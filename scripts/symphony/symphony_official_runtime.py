@@ -22,6 +22,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -490,6 +491,58 @@ def validate_source(
         errors.append(f"workflow_invalid:{exc}")
 
     if workflow is not None:
+        workflow_text = _read_text(workflow_path)
+        workflow_config = _front_matter(workflow_text)
+        command_match = re.search(
+            r"^\s+command:\s*['\"]?(.+?)['\"]?\s*$", workflow_config, re.M
+        )
+        expected_command = "./scripts/symphony/symphony-codex-router app-server"
+        if command_match is None or command_match.group(1) != expected_command:
+            errors.append("workflow_agent_command_not_canonical")
+        if "scripts/hermes/" in workflow_config or "../" in workflow_config:
+            errors.append("workflow_executable_reference_unsafe")
+        for shell_target in re.findall(
+            r"^\s+(?:[A-Z_][A-Z0-9_]*=[^\s]+\s+)*(?:bash|sh)\s+([^\s;&|]+)",
+            workflow_config,
+            re.M,
+        ):
+            if shell_target != "./scripts/symphony/symphony-nvme-package-cache.sh":
+                errors.append(f"workflow_shell_target_not_allowlisted:{shell_target}")
+        for direct_target in re.findall(
+            r"^\s+(?:(/[^\s;&|]+|\.\.?/[^\s;&|]+))", workflow_config, re.M
+        ):
+            if direct_target not in {
+                "./scripts/symphony/symphony-codex-router",
+                "./scripts/symphony/symphony-nvme-package-cache.sh",
+            }:
+                errors.append(f"workflow_direct_target_not_allowlisted:{direct_target}")
+        if re.search(r"\$\(\s*(?:/|\.\.?/)", workflow_config) or re.search(
+            r"`\s*(?:/|\.\.?/)", workflow_config
+        ):
+            errors.append("workflow_command_substitution_target_unsafe")
+        referenced = set(
+            re.findall(r"\./scripts/symphony/[A-Za-z0-9._-]+", workflow_config)
+        )
+        allowed = {
+            "./scripts/symphony/symphony-codex-router",
+            "./scripts/symphony/symphony-nvme-package-cache.sh",
+        }
+        if not referenced.issubset(allowed) or not allowed.issubset(referenced):
+            errors.append("workflow_executable_reference_not_allowlisted")
+        for relative in allowed:
+            executable = repo_root / relative.removeprefix("./")
+            try:
+                resolved = executable.resolve(strict=True)
+                expected = (repo_root.resolve() / relative.removeprefix("./"))
+                if (
+                    executable.is_symlink()
+                    or resolved != expected
+                    or not executable.is_file()
+                    or not os.access(executable, os.X_OK)
+                ):
+                    errors.append(f"workflow_executable_invalid:{relative}")
+            except OSError:
+                errors.append(f"workflow_executable_invalid:{relative}")
         if workflow.team_key != OFFICIAL_TEAM_KEY:
             errors.append(f"workflow_team_key:{workflow.team_key}")
         if workflow.project_slug is not None:
@@ -576,6 +629,10 @@ def validate_source(
             errors.append("unit_hardcodes_codex_account")
         if "SuccessExitStatus=0 1" not in unit:
             errors.append("unit_missing_clean_beam_stop_status")
+        if "KillMode=control-group" not in unit:
+            errors.append("unit_missing_control_group_kill_mode")
+        if "TimeoutStopSec=15s" not in unit:
+            errors.append("unit_missing_bounded_stop_timeout")
         for token in OBSOLETE_TOKENS:
             if token in unit:
                 errors.append(f"unit_obsolete_token:{token}")
@@ -774,7 +831,11 @@ def write_rate_limit_gate(path: pathlib.Path, classification: dict[str, Any]) ->
     return True
 
 
-def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> int:
+def _sleep_gate(
+    gate: dict[str, Any],
+    max_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
+) -> int:
     seconds = int(gate.get("retryAfterSeconds") or 0)
     if seconds <= 0:
         return 0
@@ -793,8 +854,11 @@ def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> int:
         ),
         flush=True,
     )
-    time.sleep(seconds)
-    return seconds
+    if shutdown is None:
+        time.sleep(seconds)
+        return seconds
+    interrupted = shutdown.wait(seconds)
+    return 0 if interrupted else seconds
 
 
 def _print_gate_wait_exhausted(gate: dict[str, Any], max_sleep_seconds: int) -> None:
@@ -815,6 +879,7 @@ def _pause_child_for_gate(
     process: subprocess.Popen[str],
     gate: dict[str, Any],
     max_gate_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
 ) -> int:
     if process.poll() is not None or not gate.get("active"):
         return 0
@@ -822,7 +887,7 @@ def _pause_child_for_gate(
         return 0
     os.kill(process.pid, signal.SIGSTOP)
     try:
-        return _sleep_gate(gate, max_gate_sleep_seconds)
+        return _sleep_gate(gate, max_gate_sleep_seconds, shutdown)
     finally:
         if process.poll() is None:
             try:
@@ -967,7 +1032,11 @@ def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
     return status if isinstance(status, str) else None
 
 
-def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
+def _sleep_closure_hold(
+    verdict: dict[str, Any],
+    seconds: int,
+    shutdown: threading.Event | None = None,
+) -> int:
     if seconds <= 0:
         return 0
     print(
@@ -982,8 +1051,11 @@ def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
         ),
         flush=True,
     )
-    time.sleep(seconds)
-    return seconds
+    if shutdown is None:
+        time.sleep(seconds)
+        return seconds
+    interrupted = shutdown.wait(seconds)
+    return 0 if interrupted else seconds
 
 
 def _closure_hold_wait(
@@ -992,6 +1064,7 @@ def _closure_hold_wait(
     *,
     max_sleep_seconds: int | None,
     sleep_used: int,
+    shutdown: threading.Event | None = None,
 ) -> tuple[int, dict[str, Any]]:
     """Hold new admission in bounded chunks, re-reading the fleet receipt.
 
@@ -999,7 +1072,7 @@ def _closure_hold_wait(
     receipt after every bounded chunk and releases as soon as closure health
     returns to healthy. Every hold decision rewrites the durable hold receipt.
     """
-    while verdict["hold"]:
+    while verdict["hold"] and not (shutdown is not None and shutdown.is_set()):
         write_closure_hold_receipt(
             stop_line.hold_receipt_path,
             verdict,
@@ -1015,7 +1088,9 @@ def _closure_hold_wait(
             chunk = min(chunk, remaining)
         if chunk <= 0:
             break
-        sleep_used += _sleep_closure_hold(verdict, chunk)
+        sleep_used += _sleep_closure_hold(verdict, chunk, shutdown)
+        if shutdown is not None and shutdown.is_set():
+            break
         verdict = read_closure_stop_line(
             stop_line.receipt_path, max_age_seconds=stop_line.max_receipt_age_seconds
         )
@@ -1040,6 +1115,7 @@ def _pause_child_for_closure_hold(
     stop_line: ClosureStopLine,
     verdict: dict[str, Any],
     max_gate_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
 ) -> int:
     """Pause only the scheduler while closure health holds new admission.
 
@@ -1055,7 +1131,11 @@ def _pause_child_for_closure_hold(
     os.kill(process.pid, signal.SIGSTOP)
     try:
         slept, latest = _closure_hold_wait(
-            stop_line, verdict, max_sleep_seconds=max_gate_sleep_seconds, sleep_used=0
+            stop_line,
+            verdict,
+            max_sleep_seconds=max_gate_sleep_seconds,
+            sleep_used=0,
+            shutdown=shutdown,
         )
         if latest["hold"]:
             write_closure_hold_receipt(
@@ -1236,18 +1316,92 @@ def run_official_binary_once(
         start_new_session=True,
     )
     previous_handlers: dict[signal.Signals, Any] = {}
+    shutdown = threading.Event()
+    known_descendants: set[int] = set()
+    termination_complete = False
+    shutdown_signum = 0
+
+    def descendant_pids() -> list[int]:
+        try:
+            rows = subprocess.run(
+                ["ps", "-axo", "pid=,ppid="],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=2,
+            ).stdout.splitlines()
+        except (OSError, subprocess.SubprocessError):
+            return []
+        children: dict[int, list[int]] = {}
+        for row in rows:
+            try:
+                pid, parent = (int(value) for value in row.split())
+            except (TypeError, ValueError):
+                continue
+            children.setdefault(parent, []).append(pid)
+        found: list[int] = []
+        pending = [process.pid]
+        while pending:
+            parent = pending.pop()
+            for child in children.get(parent, []):
+                if child not in found:
+                    found.append(child)
+                    pending.append(child)
+        return found
+
+    def signal_tree(signum: int) -> None:
+        known_descendants.update(descendant_pids())
+        targets = list(known_descendants)
+        for pid in [process.pid, *targets]:
+            try:
+                os.kill(pid, signal.SIGCONT)
+            except ProcessLookupError:
+                pass
+        for pid in [*reversed(targets), process.pid]:
+            try:
+                os.kill(pid, signum)
+            except ProcessLookupError:
+                pass
+
+    def terminate_tree() -> None:
+        nonlocal termination_complete
+        if termination_complete:
+            return
+        known_descendants.update(descendant_pids())
+        targets = [process.pid, *known_descendants]
+        signal_tree(signal.SIGTERM)
+        deadline = time.monotonic() + 2
+        alive = targets
+        while time.monotonic() < deadline:
+            process.poll()
+            alive = []
+            for pid in targets:
+                try:
+                    os.kill(pid, 0)
+                    alive.append(pid)
+                except ProcessLookupError:
+                    pass
+            if not alive:
+                break
+            time.sleep(0.02)
+        for pid in reversed(alive):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        termination_complete = True
 
     def forward_signal(signum: int, _frame: Any) -> None:
         """Forward service-manager termination to the complete child tree."""
-        if process.poll() is not None:
-            return
-        try:
-            # A scheduler held by a rate/closure gate must be resumed before
-            # it can observe the terminating signal.
-            os.killpg(process.pid, signal.SIGCONT)
-            os.killpg(process.pid, signum)
-        except ProcessLookupError:
-            pass
+        nonlocal shutdown_signum
+        shutdown_signum = signum
+        shutdown.set()
+        terminate_tree()
 
     for forwarded in (signal.SIGTERM, signal.SIGINT):
         previous_handlers[forwarded] = signal.getsignal(forwarded)
@@ -1259,6 +1413,8 @@ def run_official_binary_once(
     try:
         assert process.stdout is not None
         for line in process.stdout:
+            if shutdown.is_set():
+                break
             print(line, end="", flush=True)
             classification = classify_linear_log_line(line)
             if classification and write_rate_limit_gate(gate_file, classification):
@@ -1267,7 +1423,9 @@ def run_official_binary_once(
                 # terminate the process tree that may contain active Codex jobs.
                 rate_limited = True
                 gate = read_rate_limit_gate(gate_file)
-                _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
+                _pause_child_for_gate(
+                    process, gate, max_gate_sleep_seconds, shutdown
+                )
             else:
                 issue_error = classify_linear_issue_error_log_line(line)
                 if issue_error is not None:
@@ -1285,14 +1443,20 @@ def run_official_binary_once(
                 )
                 if verdict["hold"]:
                     _pause_child_for_closure_hold(
-                        process, closure, verdict, max_gate_sleep_seconds
+                        process, closure, verdict, max_gate_sleep_seconds, shutdown
                     )
+        if shutdown.is_set():
+            terminate_tree()
         returncode = process.wait()
     finally:
+        if shutdown.is_set() and process.poll() is None:
+            terminate_tree()
         if process.stdout is not None:
             process.stdout.close()
         for forwarded, previous in previous_handlers.items():
             signal.signal(forwarded, previous)
+    if shutdown_signum:
+        return 128 + shutdown_signum
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
 

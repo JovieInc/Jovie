@@ -402,6 +402,10 @@ echo "SHA256 ${SUM_NAME}"
 
 tmpdir=""
 rollback_dir=""
+candidate_dir=""
+candidate_tmp=""
+update_lock=""
+lock_owned=0
 promotion_started=0
 promotion_complete=0
 official_was_active=0
@@ -448,11 +452,52 @@ cleanup() {
     fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
+  if [ "$promotion_complete" -eq 1 ] || [ "$status" -ne 0 ]; then
+    [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
+  fi
+  [ -z "$candidate_tmp" ] || rm -rf "$candidate_tmp"
+  if [ "$lock_owned" -eq 1 ]; then
+    rm -rf "$update_lock"
+  fi
   trap - EXIT
   exit "$status"
 }
 trap cleanup EXIT
+
+mkdir -p "$STATE_DIR"
+update_lock="$STATE_DIR/update.lock"
+if [ -d "$update_lock" ]; then
+  prior_pid="$(cat "$update_lock/pid" 2>/dev/null || true)"
+  if [[ "$prior_pid" =~ ^[0-9]+$ ]] && kill -0 "$prior_pid" 2>/dev/null; then
+    echo "PROMOTION_RED updater lock is held by pid $prior_pid" >&2
+    exit 8
+  fi
+  rm -rf "$update_lock"
+fi
+if ! mkdir "$update_lock" 2>/dev/null; then
+  echo "PROMOTION_RED updater lock is held: $update_lock" >&2
+  exit 8
+fi
+lock_owned=1
+printf '%s\n' "$$" > "$update_lock/pid"
+
+rollback_dir="$STATE_DIR/promotion-transaction"
+if [ -d "$rollback_dir" ]; then
+  promotion_started=1
+  restore_target binary "$BIN_DST" 0755
+  restore_target helper "$HELPER_DST" 0755
+  restore_target unit "$UNIT_DST" 0644
+  restore_target workflow "$WORKFLOW_DST" 0644
+  prepare_systemd_context
+  systemctl --user daemon-reload
+  if [ -f "$rollback_dir/was-active" ]; then
+    systemctl --user restart "$SERVICE_NAME"
+  fi
+  rm -rf "$rollback_dir"
+  rollback_dir=""
+  promotion_started=0
+  echo "RECOVERED_INCOMPLETE_PROMOTION"
+fi
 
 if [ "$SKIP_BINARY" -eq 0 ]; then
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/symphony-elixir.XXXXXX")"
@@ -465,6 +510,47 @@ else
 fi
 
 assert_account_environment_ready
+mkdir -p "$STATE_DIR/candidates"
+candidate_inputs=("$HELPER_SRC" "$UNIT_SRC" "$WORKFLOW_SRC")
+if [ "$SKIP_BINARY" -eq 0 ]; then
+  candidate_inputs+=("${tmpdir}/${BIN_NAME}")
+fi
+candidate_id="$(CANDIDATE_VERSION="$SYMPHONY_VERSION" python3 - "${candidate_inputs[@]}" <<'PY'
+import hashlib, os, pathlib, sys
+digest = hashlib.sha256()
+digest.update(os.environ["CANDIDATE_VERSION"].encode())
+for raw in sys.argv[1:]:
+    digest.update(pathlib.Path(raw).read_bytes())
+print(digest.hexdigest())
+PY
+)"
+candidate_dir="$STATE_DIR/candidates/$candidate_id"
+if [ ! -d "$candidate_dir" ]; then
+  candidate_tmp="$(mktemp -d "$STATE_DIR/candidates/.candidate.XXXXXX")"
+  install_one "$HELPER_SRC" "$candidate_tmp/helper" 0755
+  install_one "$UNIT_SRC" "$candidate_tmp/unit" 0644
+  install_one "$WORKFLOW_SRC" "$candidate_tmp/workflow" 0644
+  if [ "$SKIP_BINARY" -eq 0 ]; then
+    install_one "${tmpdir}/${BIN_NAME}" "$candidate_tmp/binary" 0755
+  fi
+  mv "$candidate_tmp" "$candidate_dir"
+  candidate_tmp=""
+else
+  cmp -s "$HELPER_SRC" "$candidate_dir/helper"
+  cmp -s "$UNIT_SRC" "$candidate_dir/unit"
+  cmp -s "$WORKFLOW_SRC" "$candidate_dir/workflow"
+  if [ "$SKIP_BINARY" -eq 0 ]; then
+    cmp -s "${tmpdir}/${BIN_NAME}" "$candidate_dir/binary"
+  fi
+fi
+echo "STAGED $candidate_dir"
+
+if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 0 ]; then
+  promotion_complete=1
+  echo "DONE_STAGED_NO_LIVE_MUTATION"
+  exit 0
+fi
+
 if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
   prepare_systemd_context
   if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -481,7 +567,9 @@ if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 1 ] && [ "$official_was_active
 fi
 
 mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR" "$STATE_DIR"
-rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
+rollback_dir="$STATE_DIR/promotion-transaction"
+mkdir "$rollback_dir"
+[ "$official_was_active" -eq 0 ] || : > "$rollback_dir/was-active"
 backup_target binary "$BIN_DST"
 backup_target helper "$HELPER_DST"
 backup_target unit "$UNIT_DST"
@@ -489,11 +577,11 @@ backup_target workflow "$WORKFLOW_DST"
 promotion_started=1
 
 if [ "$SKIP_BINARY" -eq 0 ]; then
-  install_one "${tmpdir}/${BIN_NAME}" "$BIN_DST" 0755
+  install_one "$candidate_dir/binary" "$BIN_DST" 0755
 fi
-install_one "$HELPER_SRC" "$HELPER_DST" 0755
-install_one "$UNIT_SRC" "$UNIT_DST"
-install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
+install_one "$candidate_dir/helper" "$HELPER_DST" 0755
+install_one "$candidate_dir/unit" "$UNIT_DST"
+install_one "$candidate_dir/workflow" "$WORKFLOW_DST"
 
 if [ "$RETIRE_LEGACY" -eq 1 ]; then
   retire_legacy_units

@@ -70,21 +70,13 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
             self.assertTrue(target.is_file(), reference)
             self.assertTrue(target.stat().st_mode & 0o111, reference)
 
-    def test_activation_promotes_config_before_attempting_runtime_restart(self) -> None:
+    def test_activation_uses_one_staged_promotion(self) -> None:
         activation = (
             ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
         ).read_text()
-        config_only = (
-            "bash scripts/symphony/update-symphony-burrito.sh "
-            "--skip-binary --no-restart"
-        )
         activate = "bash scripts/symphony/update-symphony-burrito.sh --skip-binary"
-        self.assertIn(config_only, activation)
-        config_index = activation.index(config_only)
-        activation_index = activation.index(
-            activate, config_index + len(config_only)
-        )
-        self.assertLess(config_index, activation_index)
+        self.assertEqual(activation.count(activate), 1)
+        self.assertNotIn("--skip-binary --no-restart", activation)
 
     def test_homemade_issue_pickup_is_disabled(self) -> None:
         self.assertFalse(
