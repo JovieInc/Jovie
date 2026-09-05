@@ -22,18 +22,59 @@ import { logger } from '@/lib/utils/logger';
  * The primary source is `~/.hermes/state/what_shipped.json`, written by the
  * Python sidecar on the dev machine. On deployments where that file does not
  * exist (Vercel, Cloudflare), this module fetches recently merged PRs straight
- * from GitHub and humanizes their titles via `humanizePrTitle` (LLM called at
- * most once per PR, cached in Redis with no expiry).
+ * from GitHub and humanizes their titles via `humanizePrTitle`. A bounded
+ * process cache keeps the feed useful when Redis quota failures disable the
+ * shared feed and immutable-title caches.
  */
 
 const MERGED_WINDOW_MS = 24 * 60 * 60 * 1000;
 const FEED_CACHE_KEY = 'hud:what-shipped:github-feed:v1';
+const FEED_PROCESS_CACHE_TTL_MS = WHAT_SHIPPED_FEED_CACHE_TTL_SECONDS * 1_000;
+
+let processFeedCache: {
+  readonly repository: string;
+  readonly feed: WhatShippedResponse;
+  readonly expiresAt: number;
+} | null = null;
 
 interface GitHubPullSummary {
   readonly number: number;
   readonly title: string;
   readonly merged_at: string | null;
   readonly html_url: string;
+}
+
+/** Test hook for isolating the bounded per-process fallback cache. */
+export function resetWhatShippedProcessCacheForTests(): void {
+  processFeedCache = null;
+}
+
+function readProcessCachedFeed(repository: string): WhatShippedResponse | null {
+  if (!processFeedCache || processFeedCache.repository !== repository) {
+    return null;
+  }
+
+  if (Date.now() >= processFeedCache.expiresAt) {
+    processFeedCache = null;
+    return null;
+  }
+
+  return processFeedCache.feed;
+}
+
+function writeProcessCachedFeed(
+  repository: string,
+  feed: WhatShippedResponse
+): void {
+  if (!feed.available || !feed.generatedAt) return;
+
+  const generatedAt = Date.parse(feed.generatedAt);
+  if (!Number.isFinite(generatedAt)) return;
+
+  const expiresAt = generatedAt + FEED_PROCESS_CACHE_TTL_MS;
+  if (expiresAt <= Date.now()) return;
+
+  processFeedCache = { repository, feed, expiresAt };
 }
 
 function isGitHubPullSummary(value: unknown): value is GitHubPullSummary {
@@ -136,8 +177,15 @@ export async function readWhatShippedFromGitHub(): Promise<WhatShippedResponse> 
     return EMPTY_WHAT_SHIPPED_RESPONSE;
   }
 
+  const repository = `${owner}/${repo}`;
+  // generatedAt bounds freshness, so a Redis hit cannot extend this cache
+  // indefinitely and an expired success is never served after a failed refresh.
+  const processCached = readProcessCachedFeed(repository);
+  if (processCached) return processCached;
+
   const cached = await readCachedFeed();
   if (cached) {
+    writeProcessCachedFeed(repository, cached);
     return cached;
   }
 
@@ -169,6 +217,7 @@ export async function readWhatShippedFromGitHub(): Promise<WhatShippedResponse> 
     };
 
     await writeCachedFeed(feed);
+    writeProcessCachedFeed(repository, feed);
     return feed;
   } catch (error) {
     logger.error(
