@@ -128,6 +128,7 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
     codex_cli = root / "codex"
     codex_cli.write_text(
         "#!/bin/sh\n"
+        "set -eu\n"
         "test -z \"${GITHUB_TOKEN+x}\"\n"
         "test -z \"${GH_TOKEN+x}\"\n"
         "test -z \"${LINEAR_API_KEY+x}\"\n"
@@ -155,6 +156,7 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
     binary = root / "binary"
     binary.write_text(
         "#!/bin/sh\n"
+        "set -eu\n"
         "test -z \"${GITHUB_TOKEN+x}\"\n"
         "test -z \"${GH_TOKEN+x}\"\n"
         "test -z \"${AWS_SECRET_ACCESS_KEY+x}\"\n"
