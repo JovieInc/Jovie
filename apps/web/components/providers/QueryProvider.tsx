@@ -28,8 +28,17 @@ const ReactQueryDevtools = dynamic(
 );
 
 function DevToolsLoader() {
+  // Runtime chrome flags are available only in the browser. Keep the server
+  // and first hydration render identical before consulting those flags.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Only render devtools in development to avoid any production overhead
-  if (process.env.NODE_ENV !== 'development' || isDevChromeDisabledClient()) {
+  if (
+    !mounted ||
+    process.env.NODE_ENV !== 'development' ||
+    isDevChromeDisabledClient()
+  ) {
     return null;
   }
   return (

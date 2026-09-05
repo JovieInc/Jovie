@@ -797,8 +797,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-09-02T19:43:01.484Z",
-    "gitSha": "030f24e0569f555cfc60a776fedf674ed8c79652",
+    "capturedAt": "2026-09-04T19:42:22.000Z",
+    "gitSha": "e0b2be2e7bca4a6a19c3f5bbd6878303db0171c5",
     "imagePath": "public-profile-desktop.png",
     "publicExportPath": "profile-desktop.png"
   },

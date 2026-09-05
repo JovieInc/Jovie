@@ -16,7 +16,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -80,6 +80,7 @@ interface ProfileDesktopSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  readonly allowFanCapture?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -202,7 +203,7 @@ function DesktopSurfaceCard({
           <button
             type='button'
             onClick={onAction}
-            className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
+            className='inline-flex min-h-11 items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
           >
             <span>{actionLabel}</span>
             <ChevronRight className='h-4 w-4' />
@@ -233,6 +234,7 @@ export function ProfileDesktopSurface({
   latestRelease,
   profileSettings,
   alertOptInVariant = 'button',
+  allowFanCapture = true,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -261,6 +263,8 @@ export function ProfileDesktopSurface({
   onUnsubscribe = () => {},
   isUnsubscribing = false,
 }: ProfileDesktopSurfaceProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => setIsHydrated(true), []);
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
@@ -274,12 +278,18 @@ export function ProfileDesktopSurface({
   const baseActivePrimaryTab = getDesktopBaseMode(activeMode);
   const hasTourDates = tourDates.length > 0;
   const activePrimaryTab =
-    baseActivePrimaryTab === 'tour' && !hasTourDates
+    (baseActivePrimaryTab === 'tour' && !hasTourDates) ||
+    (baseActivePrimaryTab === 'subscribe' && !allowFanCapture)
       ? 'profile'
       : baseActivePrimaryTab;
   const visiblePrimaryTabs = useMemo(
-    () => PRIMARY_TABS.filter(tab => tab.mode !== 'tour' || hasTourDates),
-    [hasTourDates]
+    () =>
+      PRIMARY_TABS.filter(
+        tab =>
+          (tab.mode !== 'tour' || hasTourDates) &&
+          (tab.mode !== 'subscribe' || allowFanCapture)
+      ),
+    [allowFanCapture, hasTourDates]
   );
   const surfaceState = useMemo(
     () =>
@@ -345,7 +355,7 @@ export function ProfileDesktopSurface({
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
-    primaryActionElement = (
+    primaryActionElement = allowFanCapture ? (
       <ProfileInlineNotificationsCTA
         artist={artist}
         portalContainer={notificationsPortalContainer}
@@ -354,7 +364,7 @@ export function ProfileDesktopSurface({
         experimentVariant={alertOptInVariant}
         onManageNotifications={() => onModeSelect('subscribe')}
       />
-    );
+    ) : null;
   } else {
     const primaryActionContent = (
       <>
@@ -389,7 +399,7 @@ export function ProfileDesktopSurface({
   }
 
   const homeOverview = (
-    <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
+    <div className='grid min-h-0 min-w-0 flex-1 gap-4 [@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
       <div className='grid min-h-0 min-w-0 gap-3.5'>
         {/* Composition rule (#11899): the desktop cover is a fixed standard
             4:5 shape — height is the single driver (viewport-bounded with a
@@ -530,7 +540,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
-                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
+                        className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
                       </a>
@@ -600,7 +610,11 @@ export function ProfileDesktopSurface({
       </div>
 
       <div className='grid min-h-0 min-w-0 gap-3.5'>
-        <DesktopSurfaceCard title='Alerts' testId='profile-desktop-alerts-card'>
+        <DesktopSurfaceCard
+          title='Alerts'
+          testId='profile-desktop-alerts-card'
+          className={allowFanCapture ? undefined : 'hidden'}
+        >
           <div className='space-y-4'>
             {!isSubscribed ? (
               <button
@@ -838,10 +852,11 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div className='relative flex h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
+    <div className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
+        data-interactive-ready={isHydrated ? 'true' : undefined}
         data-testid='profile-desktop-surface'
       >
         <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>
@@ -859,7 +874,7 @@ export function ProfileDesktopSurface({
                   onClick={() => onModeSelect(tab.mode)}
                   data-testid={`profile-primary-tab-${tab.mode}`}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
+                    'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
                       ? 'text-white dark:text-white'
                       : 'text-white/50 hover:text-white/78'
@@ -881,7 +896,7 @@ export function ProfileDesktopSurface({
           <button
             type='button'
             onClick={onOpenMenu}
-            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
+            className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
             aria-label='Menu'
           >
             <MoreHorizontal className='h-5 w-5' />
@@ -895,7 +910,7 @@ export function ProfileDesktopSurface({
           </div>
         </div>
 
-        {activePrimaryTab === 'subscribe' ? (
+        {allowFanCapture && activePrimaryTab === 'subscribe' ? (
           <ProfileInlineNotificationsCTA
             artist={artist}
             presentation='modal'
