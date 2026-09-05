@@ -231,3 +231,72 @@ jobs:
             echo 'Photon route did not answer the unsigned POST contract on the production alias.' >&2
             exit 1
           fi
+      - name: Send one founder-only signed Photon canary
+        run: |
+          set -euo pipefail
+          env_file="$(mktemp)"
+          response_file="$(mktemp)"
+          cleanup() {
+            rm -f "$env_file" "$response_file"
+          }
+          trap cleanup EXIT
+          pnpm exec vercel env pull "$env_file" \
+            --environment=production \
+            --yes \
+            --scope jovie \
+            --token "$VERCEL_TOKEN" >/dev/null
+          chmod 600 "$env_file"
+          set -a
+          # Vercel writes shell-compatible dotenv values; keep them in process
+          # memory and remove the temporary file before the job exits.
+          . "$env_file"
+          set +a
+          if [ -z "${IMESSAGE_WEBHOOK_SECRET:-}" ]; then
+            echo 'IMESSAGE_WEBHOOK_SECRET is required for the signed canary.' >&2
+            exit 1
+          fi
+          sender_id="$(printf '%s' "${OVIE_IMESSAGE_ALLOWED_SENDERS:-}" |
+            cut -d, -f1 | tr -cd '0-9+')"
+          if [ -z "$sender_id" ]; then
+            echo 'OVIE_IMESSAGE_ALLOWED_SENDERS must contain one founder sender.' >&2
+            exit 1
+          fi
+          timestamp="$(date +%s)"
+          event_timestamp="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          event_id="jov5868-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          body="$(jq -cn \
+            --arg id "$event_id" \
+            --arg timestamp "$event_timestamp" \
+            --arg sender "$sender_id" \
+            '{
+              event: "messages",
+              message: {
+                content: {
+                  text: "JOV-5868 founder canary: reply with a brief confirmation.",
+                  type: "text"
+                },
+                direction: "inbound",
+                id: $id,
+                platform: "imessage",
+                sender: { id: $sender },
+                space: { id: "jov5868-founder-canary", phone: $sender },
+                timestamp: $timestamp
+              }
+            }')"
+          signature="v0=$(printf 'v0:%s:%s' "$timestamp" "$body" |
+            openssl dgst -sha256 -hmac "$IMESSAGE_WEBHOOK_SECRET" -hex |
+            awk '{print $2}')"
+          status="$(curl -sS -o "$response_file" -w '%{http_code}' \
+            -X POST https://jovie-eve-shadow.vercel.app/eve/v1/photon \
+            -H 'content-type: application/json' \
+            -H 'x-spectrum-event: messages' \
+            -H "x-spectrum-timestamp: $timestamp" \
+            -H "x-spectrum-signature: $signature" \
+            --data "$body")"
+          echo "Signed founder Photon canary status: $status"
+          if [ "$status" != "200" ]; then
+            echo 'Signed founder Photon canary did not return HTTP 200.' >&2
+            exit 1
+          fi
+          jq '{ok, code, identity, title, runId, reply}' \
+            "$response_file" 2>/dev/null || true
