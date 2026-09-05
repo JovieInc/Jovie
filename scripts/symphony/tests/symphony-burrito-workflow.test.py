@@ -136,12 +136,22 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
     gate = root / "fleet-gate.json"
     fleet = _fleet_gate_payload(status="red", intake=False)
     fleet.update(
+        workAdmission={"newIssueLeaseAllowed": False},
         remediationAdmission={
             "allowed": True,
             "localAllowed": True,
             "activities": ["isolated-pr-repair", "focused-tests"],
+            "pushAllowed": False,
+            "maxConcurrent": 0,
         },
-        concurrency={"gem": {"runtimeFloor": 1, "maxConcurrent": 0}},
+        concurrency={
+            "gem": {
+                "runtimeFloor": 1,
+                "maxConcurrent": 0,
+                "evidenceAccepted": False,
+                "newMutationAllowed": False,
+            }
+        },
     )
     gate.write_text(json.dumps(fleet), encoding="utf-8")
     now = dt.datetime.now(dt.timezone.utc)
@@ -1481,6 +1491,7 @@ while True: time.sleep(1)
             "local-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(localAllowed=False),
             "activity-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(activities=[]),
             "floor-zero": lambda manifest, fleet: fleet["concurrency"]["gem"].update(runtimeFloor=0),
+            "floor-two": lambda manifest, fleet: fleet["concurrency"]["gem"].update(runtimeFloor=2),
             "stale-gate": lambda manifest, fleet: fleet.update(observedAt="2020-01-01T00:00:00Z"),
             "future-gate": lambda manifest, fleet: fleet.update(observedAt="2099-01-01T00:00:00Z"),
             "expired": lambda manifest, fleet: manifest.update(expiresAt="2020-01-01T00:00:00+00:00"),
