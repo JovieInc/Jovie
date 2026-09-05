@@ -2126,6 +2126,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-name-search > .group\/aura > [aria-hidden="true"]::before {
+  /* Cover the pill diagonal even while the existing square rotates. */
+  width: 150%;
+  height: auto;
+  aspect-ratio: 1;
   background: conic-gradient(
     from 82deg,
     var(--color-accent-purple),
