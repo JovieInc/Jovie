@@ -21,6 +21,22 @@ const pkg = (before, after) =>
   });
 
 describe('product lane classifier', () => {
+  it('selects the consuming product and contract lane for agent transport changes', () => {
+    const receipt = classifyProductLanes([
+      'packages/agent-transport-contracts/index.ts',
+      'packages/agent-transport-contracts/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(
+      receipt.classifications.every(
+        item => item.rule === 'shared-agent-transport'
+      )
+    ).toBe(true);
+    expect(() =>
+      classifyProductLanes(['packages/unknown-agent-tool/index.ts'])
+    ).toThrow(ProductLaneClassificationError);
+  });
+
   it('keeps the allowlisted invariant addition operations-only', () => {
     const before = 'node scripts/invariants/validate.mjs';
     const receipt = pkg(
