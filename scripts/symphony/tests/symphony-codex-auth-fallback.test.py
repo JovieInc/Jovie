@@ -3814,6 +3814,10 @@ class FallbackLockGcTests(unittest.TestCase):
             ("expire", "open_pr_inflight"),
         )
         self.assertEqual(
+            expire(held=True, state_name=None, pr_verdict="skip", age_seconds=10),
+            ("keep", "live_open_pr_holder"),
+        )
+        self.assertEqual(
             expire(held=False, state_name="Todo", pr_verdict="none", age_seconds=self.module.FALLBACK_LEASE_TTL_SECONDS + 1),
             ("expire", "ttl_expired"),
         )
@@ -3866,6 +3870,30 @@ class FallbackLockGcTests(unittest.TestCase):
         self.assertFalse(path.exists())
         self.assertEqual(fetches, [])
         self.assertEqual(receipt["expired"][0]["reason"], "open_pr_inflight")
+
+    def test_gc_keeps_held_open_pr_inflight_without_linear(self):
+        path = self.touch_lock("JOV-5257", age_seconds=5)
+        handle = open(path, "a+")
+        self.addCleanup(handle.close)
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        fetches = []
+
+        receipt = self.module.gc_fallback_locks(
+            open_prs={
+                "JOV-5257": {
+                    "number": 16365,
+                    "head": "fallback/JOV-5257-fix",
+                    "mergeStateStatus": "CLEAN",
+                }
+            },
+            fetch_issue=lambda ident: fetches.append(ident)
+            or {"state": {"name": "In Progress"}},
+        )
+
+        self.assertTrue(path.exists())
+        self.assertEqual(fetches, [])
+        self.assertEqual(receipt["expired"], [])
+        self.assertEqual(receipt["kept"][0]["reason"], "live_open_pr_holder")
 
     def test_pickup_refuses_in_review_and_unknown_is_red(self):
         self.assertEqual(

@@ -1650,6 +1650,11 @@ def expire_fallback_lock_decision(
     """Pure GC verdict: expire | keep | unknown, plus a typed reason."""
     if held is None:
         return "unknown", "lock_held_unverified"
+    if held and pr_verdict == "skip":
+        # A clean/inflight PR proves another writer owns the issue; an active
+        # flock proves that writer is still alive. Never unlink its lease and
+        # make the same issue admissible to a second process.
+        return "keep", "live_open_pr_holder"
     if pr_verdict == "skip":
         return "expire", "open_pr_inflight"
     state = (state_name or "").strip().lower()
