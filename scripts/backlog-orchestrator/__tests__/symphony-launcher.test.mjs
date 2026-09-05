@@ -158,6 +158,38 @@ describe('Symphony launcher closed loop', () => {
     }
   });
 
+  it('reuses a validated materialized receipt without another tracker read', () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Repair fleet architecture');
+      runRouter(env, issue);
+      rmSync(env.rotateLog, { force: true });
+      const output = execFileSync('bash', [ROUTER, 'app-server'], {
+        cwd: env.workspace,
+        env: {
+          ...process.env,
+          SYMPHONY_ROUTING_USE_MATERIALIZED: '1',
+          SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
+          SYMPHONY_WORKSPACE: env.workspace,
+          SYMPHONY_CODEX_ROTATE: env.stub,
+          SYMPHONY_FALLBACK_LEASE_DIR: join(env.root, 'fallback-leases'),
+          SYMPHONY_OPEN_PR_INDEX: 'empty',
+          SYMPHONY_CODEX_EXHAUSTED: new URL(
+            '../../symphony/symphony-codex-exhausted.py',
+            import.meta.url
+          ).pathname,
+          CODEX_ACCOUNTS_ROOT: env.accounts,
+          CODEX_ACCOUNTS_STATE: join(env.accounts, 'state.json'),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      assert.doesNotMatch(output.toString(), /SYMPHONY_LAUNCHER_FAILURE/);
+      assert.match(readFileSync(env.rotateLog, 'utf8'), /gpt-5\.6-terra/);
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed on a tampered receipt model', () => {
     const env = fixture();
     try {

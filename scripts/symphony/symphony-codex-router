@@ -83,9 +83,36 @@ if command -v flock >/dev/null 2>&1; then
   }
 fi
 
-model="$(node "$SCRIPT_DIR/../backlog-orchestrator/symphony-routing.mjs" launch \
-  --workspace "$workspace" \
-  --issue "$issue")"
+if [ "${SYMPHONY_ROUTING_USE_MATERIALIZED:-0}" = "1" ]; then
+  model="$(node - "$workspace/.symphony-routing.json" "$SCRIPT_DIR/config/model-registry.json" "$issue" <<'JS'
+const fs = require('node:fs');
+const [receiptPath, registryPath, issue] = process.argv.slice(2);
+const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+const allowed = new Set(
+  registry.models
+    .filter(entry => entry.provider === 'codex')
+    .map(entry => entry.model)
+);
+if (
+  receipt.schema !== 'symphony-routing/v1' ||
+  receipt.issue !== issue ||
+  typeof receipt.model !== 'string' ||
+  !allowed.has(receipt.model)
+) {
+  throw new Error('materialized routing receipt is invalid');
+}
+process.stdout.write(`${receipt.model}\n`);
+JS
+)" || {
+    echo "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 class=materialized-route-invalid retryable=false maxAttempts=1 reason=\"invalid local route for $issue\"" >&2
+    exit 78
+  }
+else
+  model="$(node "$SCRIPT_DIR/../backlog-orchestrator/symphony-routing.mjs" launch \
+    --workspace "$workspace" \
+    --issue "$issue")"
+fi
 
 stop_preflight_heartbeat
 trap - EXIT TERM INT

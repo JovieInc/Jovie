@@ -112,7 +112,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
-            re.compile(r"^\s+command: \./scripts/symphony/symphony-codex-router app-server$", re.M),
+            re.compile(r"^\s+command: symphony-agent-router app-server$", re.M),
         )
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)
@@ -1247,8 +1247,28 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertIn(f'team_key: "{LIVE_TEAM_KEY}"', existing.read_text())
             unit = pathlib.Path(tmp) / "home/.config/systemd/user/symphony-elixir.service"
             helper = pathlib.Path(tmp) / "home/.local/bin/symphony-official-runtime"
+            agent_router = pathlib.Path(tmp) / "home/.local/bin/symphony-agent-router"
+            cursor_adapter = pathlib.Path(tmp) / "home/.local/bin/cursor-appserver-adapter"
+            codex_router = pathlib.Path(tmp) / "home/.local/bin/symphony-codex-router-hotfix"
+            codex_probe = pathlib.Path(tmp) / "home/.local/bin/codex-account-probe"
             self.assertTrue(unit.is_file())
             self.assertTrue(helper.is_file())
+            self.assertEqual(
+                agent_router.read_bytes(),
+                (ROOT / "scripts/symphony/symphony-agent-router").read_bytes(),
+            )
+            self.assertEqual(
+                cursor_adapter.read_bytes(),
+                (ROOT / "scripts/symphony/cursor-appserver-adapter.py").read_bytes(),
+            )
+            self.assertEqual(
+                codex_router.read_bytes(),
+                (ROOT / "scripts/symphony/symphony-codex-router").read_bytes(),
+            )
+            self.assertEqual(
+                codex_probe.read_bytes(),
+                (ROOT / "scripts/symphony/codex-account-probe.sh").read_bytes(),
+            )
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
             existing.write_text(
                 existing.read_text().replace(
