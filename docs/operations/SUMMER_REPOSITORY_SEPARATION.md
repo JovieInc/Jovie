@@ -21,11 +21,13 @@ export is imported once into `summer-config/apps/summer`; subsequent Summer
 implementation belongs there. This is a migration adapter, not a runtime build
 dependency on Jovie. The Jovie export remains a product-owned application.
 
-The only extracted utility is `@jovie/agent-transport-contracts` 1.0.0, the
+The only extracted utility is `@jovie/agent-transport-contracts`, the
 existing Ed25519 snapshot signer. Jovie consumes the workspace package. Summer
-vendors the exact release bytes and metadata for independent installation;
+vendors source-pinned implementation bytes and metadata for independent installation;
 checksums are in its extraction receipt. No package-registry credential or
-publication is needed. The protocol retains its existing `/v1` discriminators.
+publication is needed. Like the existing action-contracts package, its private
+workspace manifest omits a release version so global version stamping cannot
+overwrite an independent contract version. The protocol retains its existing `/v1` discriminators.
 Producer/verifier integration tests exercise the signature across this boundary.
 A breaking wire change needs a new discriminator and a supported transition;
 never coordinate releases by importing the other repository's implementation.
