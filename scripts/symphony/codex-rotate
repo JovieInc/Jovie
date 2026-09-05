@@ -246,6 +246,10 @@ set +e
   2> >(tee -a "$tmp_err" >&2)
 rc=$?
 set -e
+# Bash does not guarantee that process substitutions finish before the next
+# command. Wait for both tee processes so a final usage-limit event is present
+# in tmp_err before classifying the account.
+wait || true
 
 if grep -qiE 'usage limit|rate limit|429|token_invalidated|refresh token was revoked|token_expired|token is expired|session has ended|hit your usage limit' "$tmp_err"; then
   until="$(cooldown_until "$tmp_err")"
