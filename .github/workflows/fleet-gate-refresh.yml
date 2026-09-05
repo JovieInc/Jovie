@@ -45,7 +45,6 @@ jobs:
         github.event.label.name == 'hold' ||
         github.event.label.name == 'gated' ||
         github.event.label.name == 'queue-deferred' ||
-        github.event.label.name == 'needs-human' ||
         github.event.label.name == 'duplicate'
       )
     # The canonical receipt lives on the Gem host; exact-main gate code only.

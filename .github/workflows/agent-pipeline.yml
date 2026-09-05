@@ -1,4 +1,5 @@
 # Agent Pipeline
+# JOV-INV-028: bounded failures remain in autonomous remediation.
 #
 # PURPOSE: Unified automation pipeline for agent-generated PRs. Handles both
 # failure remediation (CI failures, CodeRabbit blocking reviews) and success
@@ -18,9 +19,8 @@
 # SAFETY:
 # - Runs only on the agent-branch allowlist in scripts/lib/agent-branch-pattern.mjs
 # - Max 5 fix attempts per SHA to prevent infinite loops
-# - Escalates to 'needs-human' label after exhaustion, then Slack/Linear
-#   before the 48h stale close. The label is an automation stop, not a
-#   required merge-gate status.
+# - Records bounded exhaustion to Slack/Linear while leaving the PR open for
+#   the next automated remediation lease.
 # - High-risk paths get stricter CI, not a human unattended-merge block
 # - Uses least-privilege credentials
 # - Does NOT execute untrusted PR code
@@ -135,7 +135,6 @@ jobs:
             PR_HEAD_REF=$(echo "$PR_DATA" | jq -r '.head_ref')
             PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
             IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
-            HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '(.labels // []) | any(. == "needs-human")')
 
             if [[ "$PR_HEAD_SHA" != "$HEAD_SHA" ]]; then
               echo "Workflow run head $HEAD_SHA is stale; live PR head is $PR_HEAD_SHA. Skipping."
@@ -147,7 +146,6 @@ jobs:
             write_output "pr_head_ref=$PR_HEAD_REF"
             write_output "pr_head_sha=$PR_HEAD_SHA"
             write_output "is_draft=$IS_DRAFT"
-            write_output "has_needs_human=$HAS_NEEDS_HUMAN"
             write_output "should_continue=true"
 
           elif [[ "$EVENT" == "pull_request_review" ]]; then
@@ -171,7 +169,6 @@ jobs:
             write_output "pr_head_ref=$PR_HEAD_REF_EVENT"
             write_output "pr_head_sha=$PR_HEAD_SHA_EVENT"
             write_output "is_draft=$PR_IS_DRAFT_EVENT"
-            write_output "has_needs_human=false"
             write_output "should_continue=true"
           fi
 
@@ -400,7 +397,6 @@ jobs:
           PR_NUMBER: ${{ steps.trigger.outputs.pr_number }}
           PR_HEAD_REF: ${{ steps.trigger.outputs.pr_head_ref }}
           PR_HEAD_SHA: ${{ steps.trigger.outputs.pr_head_sha }}
-          HAS_NEEDS_HUMAN: ${{ steps.trigger.outputs.has_needs_human }}
         run: |
           write_output() {
             printf '%s\n' "$1" >> "$GITHUB_OUTPUT"
@@ -412,7 +408,6 @@ jobs:
           echo "Is ready (not draft): $IS_READY"
           echo "Is systemic blocker: $IS_SYSTEMIC"
           echo "Trigger type: $TRIGGER_TYPE"
-          echo "Has needs-human: $HAS_NEEDS_HUMAN"
 
           SHOULD_FIX="false"
           SHOULD_APPROVE="false"
@@ -420,8 +415,6 @@ jobs:
 
           if [[ "$SHOULD_CONTINUE" != "true" || "$IS_AGENT" != "true" || "$IS_READY" != "true" ]]; then
             echo "Basic guards failed"
-          elif [[ "$HAS_NEEDS_HUMAN" == "true" ]]; then
-            echo "PR has needs-human label. Skipping all automation."
           elif [[ "$IS_SYSTEMIC" == "true" ]]; then
             echo "Systemic blocker detected. Skipping individual fix — merge-queue-autoenroll will rebase stale PRs."
           elif [[ "$TRIGGER_TYPE" == "ci_failure" || "$TRIGGER_TYPE" == "coderabbit_review" ]]; then
@@ -760,8 +753,8 @@ jobs:
             and (.isDraft | not)
             and .headRefOid == $expected_head
             and ([.labels[].name] | any(
-              . == "needs-human" or . == "hold" or . == "gated"
-              or . == "queue-deferred" or . == "needs-conflict-resolution"
+              . == "hold" or . == "gated" or . == "queue-deferred"
+              or . == "needs-conflict-resolution"
               or . == "fast"
             ) | not)
           ' <<<"$CURRENT_STATE" >/dev/null; then
@@ -782,9 +775,7 @@ jobs:
           - [x] CI harness risk classification recorded (advisory)
 
           This PR was auto-approved because it meets all criteria for low-risk agent changes.
-          The queue controller will independently revalidate its current head and labels before enrollment.
-
-          > If this approval is incorrect, dismiss it and add the \`needs-human\` label." \
+          The queue controller will independently revalidate its current head and machine gates before enrollment." \
             >"$APPROVAL_ERROR_LOG" 2>&1; then
             if grep -q "Resource not accessible by integration" "$APPROVAL_ERROR_LOG"; then
               echo "permission_denied=true" >> "$GITHUB_OUTPUT"
@@ -879,7 +870,7 @@ jobs:
           fi
 
   # ==========================================================================
-  # EXHAUST: Label needs-human and notify Slack/Linear. Not a merge-gate check.
+  # EXHAUST: Record the bounded attempt and keep autonomous remediation open.
   # ==========================================================================
   exhaust:
     name: Escalate Exhausted Agent PR
@@ -899,7 +890,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
-      - name: Label needs-human and notify durable channels
+      - name: Record exhaustion and notify durable channels
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -909,10 +900,9 @@ jobs:
           BRANCH: ${{ needs.guard.outputs.pr_head_ref }}
         run: |
           set -euo pipefail
-          gh pr edit "$PR_NUMBER" --add-label "needs-human" || true
           TITLE=$(gh pr view "$PR_NUMBER" --json title --jq '.title // ""')
           PR_URL="https://github.com/$GH_REPO/pull/$PR_NUMBER"
-          REASON="Agent pipeline exhausted 5 remediation attempts. needs-human is an automation stop, not a merge-gate status."
+          REASON="Agent pipeline exhausted this bounded 5-attempt lease. The failing machine gate remains authoritative and Symphony may start a fresh remediation lease."
 
           if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
             PAYLOAD=$(jq -n --arg pr "$PR_URL" --arg branch "$BRANCH" --arg title "$TITLE" --arg reason "$REASON" '{
@@ -940,7 +930,7 @@ jobs:
                 variables: { issueId: $issueId }
               }')" | jq -r '.data.issue.id // empty')
             if [ -n "$ISSUE_ID" ]; then
-              BODY="Agent pipeline exhausted retries on [$TITLE]($PR_URL) (\`$BRANCH\`). Labeled \`needs-human\` as an automation stop. This is not a merge blocker."
+              BODY="Agent pipeline exhausted one bounded retry lease on [$TITLE]($PR_URL) (\`$BRANCH\`). The failing machine gate remains authoritative; Symphony may start a fresh remediation lease."
               curl -sS https://api.linear.app/graphql \
                 -H "Authorization: $LINEAR_API_KEY" \
                 -H "Content-Type: application/json" \
@@ -955,54 +945,4 @@ jobs:
 
           $REASON
 
-          Durable routing: Slack (if configured) and Linear \`$LINEAR_ID\` (if found). The PR stays open. A 48h idle closer may later close it after another Slack/Linear ping.
-
-          To continue: push a fix, or drop \`needs-human\` once a human physical action is done." || true
-
-  # ==========================================================================
-  # STALE: Auto-close agent PRs stuck in needs-human for >48h
-  # Notify Slack/Linear first. Do not close human/hotfix branches.
-  # ==========================================================================
-  stale-cleanup:
-    name: Close Stale Agent PRs
-    needs: guard
-    if: >-
-      needs.guard.outputs.should_fix == 'false' &&
-      needs.guard.outputs.should_approve == 'false' &&
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    steps:
-      - name: Generate Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
-      - name: Checkout autoclose policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          sparse-checkout: |
-            .nvmrc
-            scripts/lib/agent-branch-pattern.mjs
-            scripts/lib/needs-human-autoclose.mjs
-          sparse-checkout-cone-mode: false
-
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Notify then close stale needs-human agent PRs
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          GH_REPO: ${{ github.repository }}
-        run: node scripts/lib/needs-human-autoclose.mjs
+          Durable routing: Slack (if configured) and Linear \`$LINEAR_ID\` (if found). The PR stays open for the next automated remediation lease." || true

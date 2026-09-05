@@ -103,7 +103,6 @@ export interface OvernightPaths {
 }
 export interface RiskAssessment {
   readonly blocked: boolean;
-  readonly requiresHuman: boolean;
   readonly autoMergeEligible: boolean;
   readonly needsTesting: boolean;
   readonly labels: readonly string[];

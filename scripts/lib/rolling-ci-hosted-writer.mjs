@@ -31,12 +31,7 @@ export const HOSTED_REPAIR_MAX_PATCH_BYTES = 512 * 1024;
 export const HOSTED_GATE_MAX_AGE_MS = 5 * 60 * 1000;
 export const HOSTED_ACCEPTANCE_TTL_MS = 45 * 60 * 1000;
 export const HOSTED_REPAIR_NODE_COMMAND = 'node';
-export const HOSTED_REPAIR_STOP_LABELS = Object.freeze([
-  'needs-human',
-  'no-auto',
-  'hold',
-  'gated',
-]);
+export const HOSTED_REPAIR_STOP_LABELS = Object.freeze(['hold', 'gated']);
 const HOSTED_VERIFICATION_ENV_KEYS = Object.freeze(
   'CI HOME LANG LC_ALL PATH PNPM_HOME TMPDIR XDG_CACHE_HOME'.split(' ')
 );
@@ -797,7 +792,7 @@ export function buildHostedTerminalReceipt({
     'tests_failed',
     'executor_failed',
     'recursive_dispatch_blocked',
-    'human_held',
+    'machine_held',
     'writer_failed',
   ]);
   if (!allowedOutcomes.has(outcome))
@@ -881,7 +876,7 @@ export async function commitHostedRepair({
     )
   );
   if (HOSTED_REPAIR_STOP_LABELS.some(label => labels.has(label))) {
-    return { committed: false, outcome: 'human_held' };
+    return { committed: false, outcome: 'machine_held' };
   }
   if (pr?.head?.sha !== plan.expectedHeadOid) {
     return { committed: false, outcome: 'stale_head' };

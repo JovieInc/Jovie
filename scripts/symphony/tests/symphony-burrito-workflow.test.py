@@ -265,7 +265,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("required_labels:", WORKFLOW)
         self.assertIn("excluded_labels:", WORKFLOW)
         self.assertIn("    - no-symphony", WORKFLOW)
-        self.assertIn("    - needs-human", WORKFLOW)
+        self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
             re.compile(r"^\s+command: \./scripts/symphony/symphony-codex-router app-server$", re.M),
@@ -623,15 +623,13 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
 
             no_exclusions = check(
-                WORKFLOW.replace(
-                    "  excluded_labels:\n    - no-symphony\n    - needs-human\n", ""
-                )
+                WORKFLOW.replace("  excluded_labels:\n    - no-symphony\n", "")
             )
             self.assertFalse(no_exclusions["ok"])
             self.assertIn(
                 "workflow_excluded_label_missing:no-symphony", no_exclusions["errors"]
             )
-            self.assertIn(
+            self.assertNotIn(
                 "workflow_excluded_label_missing:needs-human", no_exclusions["errors"]
             )
 
@@ -2192,6 +2190,33 @@ while True: time.sleep(1)
                 receipt["holdSleepSecondsUsed"], helper.CLOSURE_HOLD_RECHECK_SECONDS
             )
             self.assertEqual(receipt["reason"], "closure-health-green")
+
+    def test_closure_observe_only_runs_child_while_receipt_is_red(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload(status="red", intake=False)),
+                encoding="utf-8",
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=closure_gate,
+                hold_receipt_path=hold,
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                returncode = helper.run_official_binary(
+                    ["python3", "-c", "print('observe-only-child-ran')"],
+                    gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                    closure=closure,
+                    closure_observe_only=True,
+                    max_gate_sleep_seconds=300,
+                )
+            self.assertEqual(returncode, 0)
+            self.assertIn("observe-only-child-ran", out.getvalue())
+            self.assertFalse(hold.exists())
 
     def test_closure_hold_pauses_live_scheduler_without_terminating_child(self):
         helper = _load_helper()

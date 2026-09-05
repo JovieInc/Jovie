@@ -233,7 +233,7 @@ export async function runLiveController(params: {
         issueHistory: {
           ...state.issueHistory,
           [issue.key]: {
-            status: risk.requiresHuman ? 'parked' : 'verified',
+            status: 'verified',
             branch: branchName,
             prUrl: pr.url,
             updatedAt: new Date().toISOString(),
@@ -243,11 +243,11 @@ export async function runLiveController(params: {
       };
       await writeState(state, paths);
 
-      if (risk.blocked || risk.requiresHuman || !risk.autoMergeEligible) {
+      if (risk.blocked || !risk.autoMergeEligible) {
         state = {
           ...state,
           status: 'blocked',
-          stopReason: `Parked PR for human review: ${risk.reasons.join(' ')}`,
+          stopReason: `Automated risk policy rejected PR: ${risk.reasons.join(' ')}`,
         };
         await writeState(state, paths);
         return;

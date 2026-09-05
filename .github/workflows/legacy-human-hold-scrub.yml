@@ -1,0 +1,91 @@
+name: Legacy Human Hold Scrub
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Trusted base workflow removes retired PR control labels without checking out or executing candidate code.
+# removal-trigger: Delete this scrub hop after repository label deletion and 30 consecutive days with no attempted legacy-label application.
+
+# JOV-INV-028: retired human-hold labels are removed at the PR boundary.
+# Human taste feedback is collected before a PR opens or after landing behind
+# a feature flag. These retired labels must never pause automated remediation,
+# admission, or landing. The event path removes a newly applied label; the
+# manual sweep reconciles any label applied while this workflow was unavailable.
+on:
+  pull_request_target:
+    types: [labeled]
+  issues:
+    types: [labeled]
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: legacy-human-hold-scrub-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  scrub-event:
+    name: Delete newly applied retired label
+    if: >-
+      (github.event_name == 'pull_request_target' || github.event_name == 'issues') &&
+      (
+        github.event.label.name == 'needs-human' ||
+        github.event.label.name == 'needs-human-review' ||
+        github.event.label.name == 'needs-human-taste' ||
+        github.event.label.name == 'needs:taste' ||
+        github.event.label.name == 'human-review-required' ||
+        github.event.label.name == 'no-auto' ||
+        github.event.label.name == 'no-auto-merge' ||
+        github.event.label.name == 'no-automerge'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Delete the retired repository label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LABEL: ${{ github.event.label.name }}
+        run: gh api --method DELETE "repos/$GH_REPO/labels/$LABEL"
+
+  sweep:
+    name: Reconcile all open pull requests
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Remove every retired label from open pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh pr list --repo "$GH_REPO" --state open --limit 500 \
+            --json number,labels \
+            --jq '.[] | [.number, ([.labels[].name] | join(","))] | @tsv' |
+          while IFS=$'\t' read -r pr labels; do
+            for label in needs-human needs-human-review needs-human-taste needs:taste human-review-required no-auto no-auto-merge no-automerge; do
+              case ",$labels," in
+                *",$label,"*) gh pr edit "$pr" --repo "$GH_REPO" --remove-label "$label" ;;
+              esac
+            done
+          done
+
+      - name: Delete every retired repository label definition
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for label in needs-human needs-human-review needs-human-taste needs:taste human-review-required no-auto no-auto-merge no-automerge; do
+            gh api --method DELETE "repos/$GH_REPO/labels/$label" 2>/dev/null || true
+          done

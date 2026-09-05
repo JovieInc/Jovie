@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { HUMAN_POLICY_HOLD_LABELS } from './queue-deferral-receipt.mjs';
 
 export const WRITER_PROOF_SCHEMA = 'jovie-writer-pr-proof/v1'; // JOV-INV-022
 export const WRITER_PROMOTION_BLOCKER_SCHEMA =
@@ -24,11 +23,6 @@ const ISSUE_RE = /^[A-Z][A-Z0-9]+-\d+$/;
 const SUCCESS_EVIDENCE_STATUSES = new Set(['attached', 'complete', 'passed']);
 const INCOMPLETE_EVIDENCE_RE =
   /^$|^(?:false|fail|failed|missing|none|no|pending|skipped|todo|unchecked)(?:\b|:|$)/i;
-export const NO_AUTO_HOLD_LABELS = Object.freeze([
-  'no-auto',
-  'no-auto-merge',
-  'no-automerge',
-]);
 export const CONTROLLED_PROOF_LABELS = Object.freeze([
   'canary',
   'controlled-proof',
@@ -36,12 +30,15 @@ export const CONTROLLED_PROOF_LABELS = Object.freeze([
   'proof',
 ]);
 export const WRITER_PROMOTION_HOLD_LABELS = Object.freeze([
-  ...HUMAN_POLICY_HOLD_LABELS,
-  ...NO_AUTO_HOLD_LABELS,
+  'fast',
+  'hold',
+  'gated',
+  'incident',
+  'needs-conflict-resolution',
+  'needs-manual-rebase',
   'queue-deferred',
   'security',
   'needs:security',
-  'human-review-required',
   ...CONTROLLED_PROOF_LABELS,
 ]);
 const HOLD_LABELS = new Set(

@@ -87,6 +87,21 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
+  it('keeps the editorial search wide and clips its aura to the pill', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__copy\s*\{[\s\S]*?width: min\([\s\S]*?100%[\s\S]*?\);[\s\S]*?\}/
+    );
+    expect(css).toContain('width: min(40rem, 100%);');
+    expect(css).toMatch(
+      /@media \(max-width: 1023px\)[\s\S]*?\.homepage-editorial-hero__search\s*\{[\s\S]*?width: 100%;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?inset: 0;[\s\S]*?clip-path: inset\(0 round var\(--radius-pill\)\);[\s\S]*?\}/
+    );
+  });
+
   it('keeps the Find me pill on the 32/510 marketing button contract', () => {
     const css = readHeroCss();
 

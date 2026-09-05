@@ -11,15 +11,10 @@ export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const STALE_LEASE_RECOVERY_COMMENT =
   '<!-- stale-lease-recovery {"version":1,"action":"release-to-todo","reason":"terminal-machine-agent-evidence"} -->';
 
+// JOV-INV-028: legacy human holds cannot strand a stale machine lease.
 export const DEFAULT_PROTECTED_LABELS = new Set([
-  'needs-human',
-  'no-auto',
-  'human-review-required',
-  'founder-fast-track',
   'blocked',
   'incident',
-  'risk:high',
-  'tim-approved',
   'codex-blocked',
 ]);
 

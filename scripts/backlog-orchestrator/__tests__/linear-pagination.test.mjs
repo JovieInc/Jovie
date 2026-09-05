@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { safeFailureReceipt } from '../../ownerless-recovery-sweeper.mjs';
 import {
   collectLinearConnectionPages,
   fetchTeamActiveIssueSnapshot,
+  fetchTeamFleetClosureIssueSnapshot,
   LinearTransportError,
 } from '../linear-client.mjs';
 
@@ -216,6 +217,76 @@ describe('exhaustive Linear pagination', () => {
     assert.equal(result.coverage.pages, 21);
     assert.equal(result.coverage.complete, true);
     assert.equal(result.coverage.hasNextPage, false);
+  });
+
+  it('uses a bounded fleet-closure projection instead of the full backlog payload', async () => {
+    let query = '';
+    const result = await fetchTeamFleetClosureIssueSnapshot('team-1', {
+      graphqlImpl: async (source, input) => {
+        query = source;
+        const variables = /** @type {{
+         *   teamId: string;
+         *   pageSize: number;
+         *   stateNames: string[];
+         * }} */ (input);
+        assert.equal(variables.teamId, 'team-1');
+        assert.equal(variables.pageSize, 250);
+        assert.ok(variables.stateNames.includes('Done'));
+        return {
+          team: {
+            issues: {
+              nodes: [{ id: 'one', identifier: 'JOV-1' }],
+              pageInfo: { hasNextPage: false, endCursor: 'terminal' },
+            },
+          },
+        };
+      },
+    });
+    for (const required of [
+      'identifier',
+      'description',
+      'attachments(first: 50)',
+      'relations(first: 50)',
+      'comments(first: 50)',
+    ])
+      assert.match(query, new RegExp(required.replace(/[()]/g, '\\$&')));
+    for (const unused of [
+      'assignee',
+      'creator',
+      'labels(first:',
+      'project {',
+      'parent {',
+      'children(first:',
+    ])
+      assert.doesNotMatch(query, new RegExp(unused.replace(/[()]/g, '\\$&')));
+    assert.equal(result.coverage.complete, true);
+  });
+
+  it('renders a typed failure receipt without transport bodies or credentials', () => {
+    const cause = new LinearTransportError(
+      'Linear GraphQL request failed (auth, attempts=1)',
+      {
+        code: 'AUTH',
+        attempts: 1,
+        metadata: { status: 401, contentType: 'application/json' },
+        body: 'token=do-not-print',
+      }
+    );
+    const error = Object.assign(
+      new Error('Linear pagination page fetch failed', { cause }),
+      {
+        name: 'LinearPaginationError',
+        code: 'PAGE_FETCH_FAILED',
+        attempts: 1,
+        coverage: { complete: false, reason: 'page-fetch-failed' },
+      }
+    );
+    const receipt = safeFailureReceipt(error);
+
+    assert.equal(receipt.code, 'PAGE_FETCH_FAILED');
+    assert.equal(receipt.cause.code, 'AUTH');
+    assert.equal(receipt.cause.status, 401);
+    assert.doesNotMatch(JSON.stringify(receipt), /do-not-print|token=/);
   });
 
   describe('query-complexity page-size halving', () => {

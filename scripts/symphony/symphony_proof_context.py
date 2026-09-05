@@ -43,7 +43,7 @@ PROC_ROOT = Path("/proc")
 
 
 def service_identity() -> tuple[int, str]:
-    result = subprocess.run(["systemctl", "--user", "show", contract.V2_OFFICIAL_RUNTIME_SERVICE,
+    result = subprocess.run(["/usr/bin/systemctl", "--user", "show", contract.V2_OFFICIAL_RUNTIME_SERVICE,
         "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
     fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
     if fields.get("ActiveState") != "active" or int(fields.get("MainPID", 0)) <= 0:
@@ -126,7 +126,7 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
     runtime = contract.v2_validate_runtime_identity(value.get("runtime"))
     if runtime is None or runtime["contractSha256"] != digest(Path(contract.__file__)):
         raise ValueError("imported contract mismatch")
-    revision = subprocess.run(["git", "-C", value["sourceRoot"], "rev-parse", "HEAD"],
+    revision = subprocess.run(["/usr/bin/git", "-C", value["sourceRoot"], "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True, timeout=5).stdout.strip()
     if (revision != runtime["sourceRevision"]
         or digest(Path(value["binaryPath"])) != runtime["binarySha256"]

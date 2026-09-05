@@ -20,6 +20,7 @@ export const LINEAR_MAX_ATTEMPTS = 3;
 export const LINEAR_RETRY_BASE_MS = 100;
 export const LINEAR_MAX_ERROR_BODY_LENGTH = 256;
 export const LINEAR_PAGE_SIZE = 50;
+export const LINEAR_FLEET_CLOSURE_PAGE_SIZE = 250;
 export const LINEAR_MIN_PAGE_SIZE = 6;
 export const LINEAR_MAX_PAGES = 1000;
 // Linear rejects queries whose static complexity exceeds this ceiling with
@@ -723,13 +724,54 @@ export async function fetchTeamActiveIssueSnapshot(
 
 /**
  * @param {string} teamId
- * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
+ * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[], initialPageSize?: number }} [options]
  */
 export async function fetchTeamFleetClosureIssueSnapshot(teamId, options = {}) {
-  return fetchTeamActiveIssueSnapshot(teamId, {
-    ...options,
-    stateNames: options.stateNames ?? LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
-  });
+  const {
+    graphqlImpl = graphql,
+    maxPages = LINEAR_MAX_PAGES,
+    stateNames = LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
+    initialPageSize = LINEAR_FLEET_CLOSURE_PAGE_SIZE,
+  } = options;
+  const stateNameFilter = [...stateNames];
+  return collectLinearConnectionPages(
+    async (cursor, pageSize) => {
+      const data = await graphqlImpl(
+        `
+      query($teamId: String!, $cursor: String, $pageSize: Int!, $stateNames: [String!]!) {
+        team(id: $teamId) {
+          issues(
+            first: $pageSize,
+            after: $cursor,
+            filter: { state: { name: { in: $stateNames } } }
+          ) {
+            nodes {
+              id
+              identifier
+              title
+              description
+              state { id name type }
+              attachments(first: 50) {
+                nodes { id title subtitle url sourceType metadata }
+              }
+              relations(first: 50) {
+                nodes { type relatedIssue { id identifier title } }
+              }
+              comments(first: 50) {
+                nodes { id body createdAt }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    `,
+        { teamId, cursor, pageSize, stateNames: stateNameFilter }
+      );
+      return data?.team?.issues;
+    },
+    { maxPages, initialPageSize }
+  );
 }
 
 /** Fetch only the issues while retaining exhaustive snapshot semantics. */

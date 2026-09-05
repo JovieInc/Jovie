@@ -400,11 +400,9 @@ def test_agent_pipeline_retires_dead_qc_wires() -> None:
     assert "retries_exhausted" in workflow
     assert "SLACK_WEBHOOK_URL" in _job_block("agent-pipeline.yml", "exhaust")
     assert "LINEAR_API_KEY" in _job_block("agent-pipeline.yml", "exhaust")
-    stale = _job_block("agent-pipeline.yml", "stale-cleanup")
-    assert "SLACK_WEBHOOK_URL" in stale
-    assert "LINEAR_API_KEY" in stale
-    assert "scripts/lib/needs-human-autoclose.mjs" in stale
-    assert "scripts/lib/agent-branch-pattern.mjs" in stale
+    assert "stale-cleanup:" not in workflow
+    assert "needs-human-autoclose.mjs" not in workflow
+    assert "scripts/lib/agent-branch-pattern.mjs" in workflow
     assert "scripts/lib/agent-branch-pattern.mjs --match" in workflow
     landing = (WORKFLOWS / "agent-landing-sweep.yml").read_text(encoding="utf-8")
     assert "scope-judge" not in landing
@@ -550,15 +548,50 @@ def test_event_complete_workflows_do_not_retain_fallback_clocks() -> None:
 
 
 def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> None:
-    """Autonomous shipping: high-risk paths get stricter CI, not needs-human."""
+    """Autonomous shipping uses machine gates and never creates a human hold."""
     for workflow_name in (
         "agent-pipeline.yml",
         "agent-landing-sweep.yml",
         "agent-tick.yml",
+        "main-autofix.yml",
+        "sentry-autofix.yml",
+        "github-ai-orchestrator.yml",
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "blocksUnattendedAutoMerge == true" not in content, workflow_name
-        assert "--add-label needs-human" not in content, workflow_name
+        assert not re.search(
+            r"--add-label(?:=|\s+)[\"']?(?:needs-human|no-auto)", content
+        ), workflow_name
+        assert "Has needs-human label. Skipping" not in content, workflow_name
+        assert "requires human review; skipping" not in content, workflow_name
+
+
+def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
+    """A stale workflow or manual label action cannot create a durable hold."""
+    scrub = (WORKFLOWS / "legacy-human-hold-scrub.yml").read_text(
+        encoding="utf-8"
+    )
+    trigger = scrub.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+
+    assert "pull_request_target:" in trigger
+    assert "issues:" in trigger
+    assert "types: [labeled]" in trigger
+    assert "schedule:" in trigger
+    assert "workflow_dispatch:" in trigger
+    assert "actions/checkout" not in scrub
+    assert 'gh api --method DELETE "repos/$GH_REPO/labels/$LABEL"' in scrub
+    for label in (
+        "needs-human",
+        "needs-human-review",
+        "needs-human-taste",
+        "needs:taste",
+        "human-review-required",
+        "no-auto",
+        "no-auto-merge",
+        "no-automerge",
+    ):
+        assert f"github.event.label.name == '{label}'" in scrub
+        assert f" {label}" in scrub
 
 
 def test_claude_mention_requires_write_capable_association() -> None:
@@ -1570,7 +1603,7 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "github.event.label.name == 'hold'" in block
     assert "github.event.label.name == 'gated'" in block
     assert "github.event.label.name == 'queue-deferred'" in block
-    assert "github.event.label.name == 'needs-human'" in block
+    assert "github.event.label.name == 'needs-human'" not in block
     assert "github.event.label.name == 'duplicate'" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
     assert "Persist stack policy repair actions" in block

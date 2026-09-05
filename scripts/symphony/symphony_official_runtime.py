@@ -130,7 +130,8 @@ LOG_ATTEMPT_PATTERN = re.compile(r"\battempt[=:\s]+(\d+)\b", re.IGNORECASE)
 ISSUE_IDENTIFIER_PATTERN = re.compile(r"\b([A-Z][A-Z0-9]*-\d+)\b")
 ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
 TERMINAL_STATES = ("Done", "Canceled", "Cancelled", "Duplicate", "Closed")
-EXCLUDED_LABELS = ("no-symphony", "needs-human")
+# JOV-INV-028: only a mechanical dead-letter excludes official dispatch.
+EXCLUDED_LABELS = ("no-symphony",)
 LINEAR_API_URL = "https://api.linear.app/graphql"
 OBSOLETE_TOKENS = (
     "symphony-burrito.service",
@@ -1828,6 +1829,7 @@ def run_official_binary_once(
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
+    closure_observe_only: bool,
     max_gate_sleep_seconds: int | None,
 ) -> int:
     recovery_deadline: float | None = None
@@ -2189,7 +2191,11 @@ def run_official_binary_once(
                 )
                 shutdown.set()
                 terminate_tree()
-            if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
+            if (
+                not closure_observe_only
+                and monotonic_now - last_closure_check
+                >= CLOSURE_HOLD_RECHECK_SECONDS
+            ):
                 last_closure_check = monotonic_now
                 verdict = read_closure_stop_line(
                     closure.receipt_path,
@@ -2265,6 +2271,7 @@ def run_official_binary(
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
+    closure_observe_only: bool = False,
     max_gate_sleep_seconds: int | None = DEFAULT_MAX_GATE_SLEEP_SECONDS,
 ) -> int:
     if not command:
@@ -2277,7 +2284,7 @@ def run_official_binary(
             max_age_seconds=closure.max_receipt_age_seconds,
             recovery_manifest_path=closure.recovery_manifest_path,
         )
-        if verdict["hold"]:
+        if verdict["hold"] and not closure_observe_only:
             # The closure stop-line holds NEW admission only. Already-running
             # work belongs to a live scheduler process (or none has started
             # yet), so holding here never interrupts an active agent.
@@ -2374,6 +2381,7 @@ def run_official_binary(
             command,
             gate_file=gate_file,
             closure=closure,
+            closure_observe_only=closure_observe_only,
             max_gate_sleep_seconds=max_gate_sleep_seconds,
         )
         if returncode != RATE_LIMIT_EXIT_CODE:
@@ -2521,6 +2529,11 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_FLEET_GATE_RECEIPT,
     )
     run_parser.add_argument(
+        "--closure-observe-only",
+        action="store_true",
+        help="observe closure health without pausing the scheduler",
+    )
+    run_parser.add_argument(
         "--closure-gate-max-age-seconds",
         type=int,
         default=FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
@@ -2629,6 +2642,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_receipt_age_seconds=args.closure_gate_max_age_seconds,
                 recovery_manifest_path=args.recovery_manifest,
             ),
+            closure_observe_only=args.closure_observe_only,
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,
         )
 

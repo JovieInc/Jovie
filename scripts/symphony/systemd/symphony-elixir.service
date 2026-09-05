@@ -12,7 +12,7 @@ Environment=HOME=%h
 Environment=PATH=%h/.local/bin:%h/.hermes/bin:%h/.npm-global/bin:/usr/bin:/bin
 EnvironmentFile=%h/.config/symphony/codex-account.env
 EnvironmentFile=-%h/.config/symphony/linear.env
-ExecStart=%h/.local/bin/symphony-official-runtime run --gate-file %h/.local/state/symphony-elixir/linear-rate-limit.json --max-gate-sleep-seconds 3900 --closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json -- %h/.local/bin/symphony --i-understand-that-this-will-be-running-without-the-usual-guardrails --logs-root %h/symphony-elixir-logs --port 4041 %h/.config/symphony/WORKFLOW.md
+ExecStart=%h/.local/bin/symphony-official-runtime run --gate-file %h/.local/state/symphony-elixir/linear-rate-limit.json --max-gate-sleep-seconds 3900 --closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json --closure-observe-only -- %h/.local/bin/symphony --i-understand-that-this-will-be-running-without-the-usual-guardrails --logs-root %h/symphony-elixir-logs --port 4041 %h/.config/symphony/WORKFLOW.md
 SuccessExitStatus=0 1
 KillMode=control-group
 TimeoutStopSec=15s

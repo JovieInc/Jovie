@@ -36,8 +36,10 @@ def receipt(**overrides):
 
 
 def paint(symphony=None, mq=None, review=None, measured=None, width=200, height=None, sha="469d4bb", ship_path=None, tps=None, pr_flow=None, system_pressure=None):
+    if symphony is not None:
+        symphony = {"generated_at": NOW.isoformat(), **symphony}
     return HUD.render(
-        symphony=symphony or {"ok": True, "running": 0, "retrying": 0, "blocked": 0, "cap": 3, "rows": [], "up": True, "totals": None, "rate_limits": None, "seconds_running": None},
+        symphony=symphony or {"ok": True, "running": 0, "retrying": 0, "blocked": 0, "cap": 3, "rows": [], "up": True, "generated_at": NOW.isoformat(), "totals": None, "rate_limits": None, "seconds_running": None},
         mq=mq or {"ok": True, "count": 0, "rows": []},
         review=review,
         measured=measured or {},
@@ -73,6 +75,121 @@ def fetch_state(payload):
     fake.__exit__ = mock.Mock(return_value=False)
     with mock.patch.object(HUD.urllib.request, "urlopen", return_value=fake) as opener:
         return HUD.fetch_symphony("http://127.0.0.1:4041/api/v1/state", cap=8), opener
+
+
+class ExecutionTruthTests(unittest.TestCase):
+    def setUp(self):
+        HUD.FRAME_SOURCE_CACHE.clear()
+
+    def test_stale_cached_attempt_cannot_remain_running_or_retain_tokens(self):
+        state, _ = fetch_state(official_state())
+        HUD.retain_last_good_source("symphony", state, now=NOW)
+        retained = HUD.retain_last_good_source("symphony", {"ok": False}, now=NOW)
+        self.assertFalse(retained["ok"])
+        self.assertIsNone(retained["running"])
+        self.assertIsNone(retained["totals"])
+        self.assertEqual(HUD.execution_state(retained["rows"][0], now=NOW), "STALE")
+        self.assertEqual(state["running"], 1)
+        self.assertNotIn("stale", state["rows"][0])
+        text = strip(paint(retained, width=430, height=90))
+        self.assertIn("API STALE / UNAVAILABLE", text)
+        self.assertIn("model UNKNOWN", text)
+        self.assertNotIn("SESSION / RECENT EVENT", text)
+
+    def test_missing_old_future_and_boundary_snapshots(self):
+        for age, fresh in [(None, False), (31, False), (-11, False), (30, True), (0, True)]:
+            state, _ = fetch_state(official_state(generated_at=None if age is None else (NOW - dt.timedelta(seconds=age)).isoformat()))
+            view = HUD.current_execution_view(state, now=NOW)
+            self.assertEqual(view["ok"], fresh)
+            self.assertEqual(view["running"], 1 if fresh else None)
+
+    def test_session_activity_needs_session_tokens_and_recent_event(self):
+        row = {"kind": "running", "session_id": "session-1", "tokens_total": 12, "last_event_at": NOW.isoformat()}
+        self.assertEqual(HUD.execution_state(row, now=NOW), "SESSION / RECENT EVENT")
+        for change, expected in [({"session_id": None}, "STARTING / NO SESSION"), ({"tokens_total": 0}, "SESSION / NO TOKENS"), ({"last_event_at": None}, "SESSION / PROGRESS UNKNOWN"), ({"last_event_at": STARTED}, "SESSION / NO RECENT PROGRESS"), ({"kind": "blocked"}, "BLOCKED"), ({"kind": "retrying"}, "RETRYING"), ({"kind": "queued"}, "QUEUED"), ({"kind": "unexpected"}, "UNKNOWN")]:
+            self.assertEqual(HUD.execution_state({**row, **change}, now=NOW), expected)
+
+    def test_configured_or_selected_model_is_never_executed(self):
+        row = HUD._normalize_row({"identifier": "JOV-1", "model": "configured-sol", "provider": "selected-provider", "account": "selected-alias", "session_id": "session-1", "last_event_at": NOW.isoformat(), "tokens": {"total_tokens": 10}}, "running")
+        text = strip("\n".join(HUD.execution_lines(row, 430, now=NOW)))
+        self.assertIn("Executed: UNKNOWN", text)
+        self.assertIn("provider UNKNOWN", text)
+        self.assertIn("account UNKNOWN", text)
+        self.assertIn("requested configured-sol", text)
+        for state in ("blocked", "retrying", "queued"):
+            self.assertIn(state.upper(), strip("\n".join(HUD.execution_lines({**row, "kind": state}, 430, now=NOW))))
+
+    def test_queued_is_preserved_and_unknown_job_status_not_running(self):
+        state, _ = fetch_state({"jobs": [{"identifier": "JOV-1", "status": "queued"}, {"identifier": "JOV-2", "status": "mystery"}], "generated_at": NOW.isoformat()})
+        self.assertEqual(state["queued"], 1)
+        self.assertIsNone(state["running"])
+        self.assertEqual([row["id"] for row in state["rows"]], ["JOV-1"])
+
+    def test_wrapper_active_is_not_api_or_capacity_proof(self):
+        state = {"ok": False, "rows": [], "service_state": "active", "cap": 30, "linear_gate_until": "2026-08-31T13:00:00Z"}
+        text = strip("\n".join(HUD.execution_summary(state, 430, now=NOW)))
+        self.assertIn("service active", text)
+        self.assertIn("API STALE / UNAVAILABLE", text)
+        self.assertIn("usable capacity UNKNOWN", text)
+        self.assertIn("Linear rate limit gate until", text)
+        self.assertIn("remediation enabled UNKNOWN", text)
+
+    def test_compact_shows_model_stage_and_whole_cards(self):
+        row = {"kind": "running", "id": "JOV-1", "title": "Visible work", "session_id": "session-1", "tokens_total": 10, "last_event_at": NOW.isoformat(), "executed_model": "gpt-5.6-sol"}
+        state = {"ok": True, "generated_at": NOW.isoformat(), "rows": [row], "running": 1}
+        text = strip(paint(state, width=120, height=40))
+        self.assertIn("gpt-5.6-sol", text)
+        self.assertIn("SESSION / RECENT EVENT", text)
+        failed = {**row, "last_event": "turn_failed"}
+        self.assertEqual(HUD.execution_state(failed, now=NOW), "SESSION / ERROR")
+        self.assertIn("Executed: UNKNOWN", strip("\n".join(HUD.execution_lines(failed, 430, now=NOW))))
+        for width, height in ((80, 24), (120, 30)):
+            state["rows"] = [{**row, "id": f"JOV-{i}"} for i in range(4)]
+            compact = strip(paint(state, width=width, height=height))
+            self.assertIn("JOV-0", compact)
+            self.assertIn("gpt-5.6-sol", compact)
+            self.assertIn("SESSION / RECENT EVENT", compact)
+        for width in (120, 200):
+            state["rows"] = [{**row, "id": f"JOV-{i}", "kind": "queued"} for i in range(4)]
+            text = strip(paint(state, width=width, height=40))
+            self.assertIn("QUEUED", text)
+            self.assertNotIn("12 more", text)
+            for line in text.splitlines():
+                self.assertLessEqual(len(line), width)
+
+    def test_recovered_ultrawide_board_separates_retry_and_stale(self):
+        state = {"ok": False, "rows": [{"id": "JOV-1", "kind": "running", "stale": True, "model": "configured-sol"}, {"id": "JOV-2", "kind": "retrying", "due_at": "2026-08-31T12:05:00Z"}]}
+        lines = HUD.execution_board(state, 430, 20, now=NOW)
+        text = strip("\n".join(lines))
+        self.assertIn("STALE · 1 receipts", text)
+        self.assertIn("RETRYING · 1 receipts", text)
+        self.assertIn("model UNKNOWN", text)
+        self.assertIn("in 5m", text)
+        self.assertNotIn("configured-sol", text)
+        self.assertLessEqual(len(lines), 20)
+        self.assertTrue(all(len(strip(line)) == 430 for line in lines))
+
+    def test_ultrawide_preserves_review_queue(self):
+        for width, height in ((300, 60), (430, 90)):
+            text = strip(paint(review=7, width=width, height=height))
+            self.assertIn("!  REVIEW QUEUE 7", text)
+
+    def test_full_canvas_does_not_scroll_last_line(self):
+        frame = paint(width=430, height=90)
+        self.assertEqual(frame.count("\n"), 89)
+        self.assertFalse(frame.endswith("\n"))
+
+    def test_runtime_context_uses_only_bounded_local_readers(self):
+        gate = {"schema": "symphony-linear-rate-limit-gate/v1", "recordedAt": STARTED, "resetAt": "2026-08-31T13:00:00Z"}
+        with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")) as run, mock.patch.object(HUD, "load_json_dict", return_value=gate), mock.patch.object(HUD.Path, "read_text", return_value='command: codex -c model="configured-sol"'):
+            context = HUD.read_runtime_context(now=NOW)
+            self.assertEqual(context["service_state"], "active")
+            self.assertEqual(context["configured_model"], "configured-sol")
+            self.assertIsNotNone(context["linear_gate_until"])
+            self.assertEqual(run.call_args.kwargs["timeout"], 1)
+            self.assertNotIn("restart", run.call_args.args[0])
+        with mock.patch.object(HUD.subprocess, "run", side_effect=OSError), mock.patch.object(HUD, "load_json_dict", return_value={}), mock.patch.object(HUD.Path, "read_text", side_effect=OSError):
+            self.assertEqual(HUD.read_runtime_context(now=NOW)["service_state"], "UNKNOWN")
 
 
 class UltrawideHudTests(unittest.TestCase):
@@ -121,7 +238,8 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertGreaterEqual(max(len(line) for line in plain.splitlines()), 160)
         self.assertNotIn("─" * 56 + "\n", output)
         self.assertIn("JOVIE", header)
-        self.assertIn("main", header)
+        self.assertIn("HUD build", header)
+        self.assertNotIn("· main ·", header)
         self.assertIn("469d4bb", header)
 
     def test_omits_zero_buckets_and_never_prints_fail_zero(self):
@@ -129,7 +247,7 @@ class UltrawideHudTests(unittest.TestCase):
         for token in ("RUN ", "RETRY 0", "MQ 0", "Review 0", "FAIL 0"):
             self.assertNotIn(token, plain)
         self.assertIn("JOVIE", plain)
-        self.assertIn("main", plain)
+        self.assertIn("HUD build", plain)
 
     def test_running_issue_from_official_state_renders_id_attempt_elapsed(self):
         payload = official_state(
@@ -258,7 +376,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(len(empty.splitlines()), 40)
         self.assertEqual(len(busy.splitlines()), 40)
         self.assertIn("CURRENT WORK", busy)
-        self.assertIn("more active receipts", busy)
+        self.assertIn("more work items", busy)
 
     def test_header_has_quiet_identity_description_and_natural_freshness(self):
         state, _ = fetch_state(official_state(generated_at="2026-08-31T11:58:00Z"))
@@ -903,7 +1021,8 @@ class UltrawideHudTests(unittest.TestCase):
                 height=40,
             )
         )
-        self.assertIn("BLOCKED · Release held", compact)
+        self.assertIn("BLOCKED", compact)
+        self.assertIn("Release held", compact)
         self.assertIn("#17/p3", compact)
 
         medium = strip(paint(review=3, width=200, height=40))

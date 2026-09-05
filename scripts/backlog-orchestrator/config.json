@@ -10,7 +10,6 @@
   },
   "labels": {
     "founderFastTrack": "founder-fast-track",
-    "humanReview": "human-review-required",
     "backlogOrchestratorManaged": "backlog-orchestrator"
   },
   "remediation": {

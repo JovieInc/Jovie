@@ -11,6 +11,44 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 workspace="${SYMPHONY_WORKSPACE:-$PWD}"
 issue="${SYMPHONY_ISSUE_IDENTIFIER:-$(basename "$workspace")}"
 
+# Symphony treats read_timeout_ms as an inactivity deadline while waiting for
+# the app-server initialize response. Pickup and routing both consult Linear,
+# so a healthy preflight can exceed that five-second window and be killed as a
+# false response_timeout before codex-rotate starts. Keep the JSON-RPC stream
+# alive during preflight; codex-rotate takes over the same responsibility while
+# it waits for an account lease.
+preflight_heartbeat_pid=""
+stop_preflight_heartbeat() {
+  if [ -n "$preflight_heartbeat_pid" ]; then
+    kill "$preflight_heartbeat_pid" 2>/dev/null || true
+    wait "$preflight_heartbeat_pid" 2>/dev/null || true
+    preflight_heartbeat_pid=""
+  fi
+}
+for arg in "$@"; do
+  if [ "$arg" = "app-server" ]; then
+    heartbeat_seconds="${SYMPHONY_ROUTER_HEARTBEAT_SECONDS:-2}"
+    if [ "$heartbeat_seconds" -gt 0 ] 2>/dev/null; then
+      parent_pid="$$"
+      (
+        trap 'exit 0' TERM INT
+        trap 'kill -TERM "$parent_pid" 2>/dev/null || true; exit 0' PIPE
+        started_at="$(date +%s)"
+        while sleep "$heartbeat_seconds"; do
+          printf '{"jsonrpc":"2.0","method":"symphony-router/preflight","params":{"elapsedSeconds":%d}}\n' \
+            "$(( $(date +%s) - started_at ))" || {
+              kill -TERM "$parent_pid" 2>/dev/null || true
+              exit 0
+            }
+        done
+      ) &
+      preflight_heartbeat_pid="$!"
+      trap stop_preflight_heartbeat EXIT TERM INT
+    fi
+    break
+  fi
+done
+
 # One implementation owner per issue: the fallback sidecar takes the same
 # lease before it starts grok/cursor/kimi. If that lock is held, refuse Codex.
 # Pickup-check GCs stale leftover locks and refuses In Review / Done / open PR
@@ -49,6 +87,11 @@ model="$(node "$SCRIPT_DIR/../backlog-orchestrator/symphony-routing.mjs" launch 
   --workspace "$workspace" \
   --issue "$issue")"
 
+stop_preflight_heartbeat
+trap - EXIT TERM INT
+# The tracker credential is needed only for receipt verification. Never pass it
+# into the coding-agent process, even when the host injects it for preflight.
+unset LINEAR_API_KEY
 exec "${SYMPHONY_CODEX_ROTATE:-$HOME/.local/bin/codex-rotate}" \
   --config shell_environment_policy.inherit=all \
   --config "model=\"${model}\"" \

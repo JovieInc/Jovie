@@ -39,19 +39,16 @@ Jovie is a **100% autonomous shipping** company during development.
 ## Machine gates (required before merge)
 
 - `CI / PR Ready`, `CI / Migration Guard`, security jobs (Trivy, Gitleaks, Sonar, etc.) — **strict**: every check that ran must succeed
-- `lib/pr_gates.taste_surface` — taste-touching diffs → label `needs-human-taste`, not generic `needs-human`
-- `scripts/taste-label-guard.mjs` (workflow: `Taste Label Guard`) — backstop that auto-clears mis-applied taste labels per the rule below
+- `scripts/taste-classifier.mjs` — taste-touching diffs route to stronger LLM review and post-landing certification without a human hold
 - GitHub native merge queue (authoritative queue state only; no `merge-queue`
   label), squash, and the repository ruleset
 - Hermes `pr-autofix`, `drain-pr-queue`, `pr-merge-queue` (when `HERMES_AUTOMERGE=1`)
 
 ## What counts as a taste call (canonical, 2026-06-26)
 
-Apply `needs:taste` / `needs-human-taste` **only** when a change makes a material,
-subjective UX/visual judgment only a human can make: a new or changed user-facing
-experience, a brand/visual-identity call, or a materially different
-interaction/information design. Over-labeling forces a human to review work that
-should auto-flow — taste gates should **shrink** over time, not grow.
+Mark a change `ux:material` only when it makes a material subjective UX or
+visual judgment. The marker routes stronger automated review and a post-landing
+certification task; it never pauses the PR.
 
 **NOT taste calls (auto-flow, agents ship):**
 
@@ -61,25 +58,22 @@ should auto-flow — taste gates should **shrink** over time, not grow.
 - default-yes guardrail work: more-performant, more-secure, fewer-bugs, more-accessible, on-grid, not-slop, token-correct
 - admin/internal tooling with no user-facing taste surface
 
-**Backstop:** the `Taste Label Guard` workflow removes a taste label from any PR
-whose conventional-commit type is `chore` / `deps` / `build` / `ci` / `fix` /
-`refactor` / `test` / `docs` / `perf` / `style` / `revert` **unless** the PR
-carries an explicit `ux:material` marker. `feat` and untyped titles keep the
-label (a feature can be a material UX change). `needs:human` is separate and
-unchanged: a physical action only a human can do (sign agreement, rotate key,
-flip a dashboard toggle).
+Physical or external actions such as signing an agreement, rotating a key, or
+flipping a provider setting ship disabled and are tracked as separate
+post-landing authority actions.
 
 ## Labels (canonical)
 
 | Label | Meaning |
 |-------|---------|
-| `needs-human-taste` | Human required for **taste** only |
-| `approved:taste` / `tim-approved` | Taste override — does not bypass CI |
+| `ux:material` | Stronger automated taste review plus post-landing certification |
 | `hold` / `gated` | Explicit pause (incident, experiment) |
 | `needs-agent-fix` | Machine second-opinion/spec failed — **agent** fixes, not human review queue |
 | ~~`merge-queue`~~ | Retired. Does not enroll. Native GitHub queue membership is the only signal. |
 
-**Deprecated for dev-loop gating:** `needs-human` as a generic blocker; `blocked:migration`, `blocked:auth`, `blocked:payments` as human-merge gates (use CI instead).
+**Retired and automatically removed:** `needs-human`, `human-review-required`,
+`no-auto`, `no-auto-merge`, and `no-automerge`. Use machine gates for code and a
+separate post-landing authority action for external side effects.
 
 ## References
 

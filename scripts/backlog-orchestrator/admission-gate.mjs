@@ -55,7 +55,7 @@ export function validateAdmissionCandidate(
   if (!ALLOWED_STATES.has(issue.state?.name || issue.state))
     return 'ambiguous-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';
-  if (hasProtectedAdmissionLabel(issue)) return 'protected-or-human-review';
+  if (hasProtectedAdmissionLabel(issue)) return 'protected-policy';
   if (!contextGateReceipt(issue, { now }))
     return 'context-receipt-missing-or-invalid';
   if (!researchGateReceipt(issue, { now }))

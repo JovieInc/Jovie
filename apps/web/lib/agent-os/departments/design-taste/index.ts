@@ -414,23 +414,15 @@ function buildArtifact(params: {
     source: params.trigger === 'ui-pr' ? 'github' : 'ci',
     sourceRunId: params.runId,
     kind: 'design_review',
-    status: params.findings.length > 0 ? 'review' : 'done',
+    status:
+      errors > 0 ? 'blocked' : params.findings.length > 0 ? 'review' : 'done',
     title: 'Design/Taste department review',
     summary: `Design/Taste ${params.trigger}: reviewed ${params.kpis.filesReviewed} file(s), ${params.kpis.violationsCaught} violation(s), coverage ${(params.kpis.designSystemCoverage * 100).toFixed(1)}%, elevation ${(params.kpis.surfaceElevationConsistencyScore * 100).toFixed(1)}%.`,
     modelRoute: 'deterministic',
     allowedActions: [...ALLOWED_ACTIONS],
     forbiddenActions: [...FORBIDDEN_ACTIONS],
-    humanApprovalRequired: errors > 0,
-    humanGate:
-      errors > 0
-        ? {
-            required: true,
-            status: 'pending',
-            reason: 'Design/Taste errors require remediation before ready_pr.',
-            reviewer: null,
-            reviewedAt: null,
-          }
-        : noneGate,
+    humanApprovalRequired: false,
+    humanGate: noneGate,
     linearIssueId: params.linearIssueId,
     linearIssueUrl: params.linearIssueId
       ? `https://linear.app/jovie/issue/${params.linearIssueId}`
@@ -440,12 +432,12 @@ function buildArtifact(params: {
     verificationGates: [
       {
         name: 'gstack.review',
-        required: false,
+        required: true,
         status: errors > 0 ? 'failed' : 'passed',
         evidenceUrl: null,
         summary:
           errors > 0
-            ? `${errors} design/taste error(s) require fixes.`
+            ? `${errors} design/taste error(s) block ready_pr until automated remediation passes.`
             : 'No error-severity design/taste violations.',
         checkedAt: params.computedAt,
       },
@@ -457,7 +449,10 @@ function buildArtifact(params: {
       outputTokens: 0,
       notes: 'Deterministic regex taste scanners; no model call.',
     },
-    blockedReason: null,
+    blockedReason:
+      errors > 0
+        ? `${errors} deterministic design/taste invariant(s) failed.`
+        : null,
     createdAt: params.computedAt,
     updatedAt: params.computedAt,
     metadata: {

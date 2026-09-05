@@ -1,3 +1,7 @@
+---
+paths: ["**/*.test.*", "**/*.spec.*", "**/tests/**", "**/vitest.config.*", "**/playwright.config.*"]
+---
+
 # Testing
 
 E2E patterns, test performance, coverage philosophy, verify-before-done.

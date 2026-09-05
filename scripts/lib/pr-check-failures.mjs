@@ -139,7 +139,18 @@ export function isAdvisoryCheckName(name) {
 }
 
 export function isAdvisoryCheck(check) {
+  if (
+    REQUIRED_CHECK_NAMES.some(required =>
+      required.names.includes(normalizeCheckName(check))
+    )
+  ) {
+    return false;
+  }
+  // Only this recovery-dispatch job is operational evidence. Neither a generic
+  // sweep nor a future safety job in that workflow inherits the exception.
   return (
+    (check?.workflow === 'Ownerless Recovery Sweep' &&
+      check?.name === 'sweep') ||
     isAdvisoryCheckName(normalizeCheckName(check)) ||
     ADVISORY_CHECK_WORKFLOWS.includes(check?.workflow ?? '')
   );
@@ -208,14 +219,19 @@ export function collapseNewestCheckAttempts(checks) {
   const groups = new Map();
   for (const check of checks ?? []) {
     const name = normalizeCheckName(check);
-    const group = groups.get(name) ?? [];
+    // A rerun can supersede only the same workflow/job identity. Keep the
+    // public check name intact for required status/check-context matching.
+    const identity = JSON.stringify([check?.workflow || null, name]);
+    const group = groups.get(identity) ?? [];
     group.push(check);
-    groups.set(name, group);
+    groups.set(identity, group);
   }
 
   const collapsed = [];
   const ambiguousNames = [];
-  for (const [name, group] of groups) {
+  const ambiguousChecks = [];
+  for (const group of groups.values()) {
+    const name = normalizeCheckName(group[0]);
     if (group.length === 1) {
       collapsed.push(group[0]);
       continue;
@@ -268,6 +284,7 @@ export function collapseNewestCheckAttempts(checks) {
         continue;
       }
       ambiguousNames.push(name);
+      ambiguousChecks.push({ name, workflow: group[0]?.workflow });
       continue;
     }
     for (const attempt of ranked) {
@@ -296,6 +313,7 @@ export function collapseNewestCheckAttempts(checks) {
       const topFailure = top.filter(isTerminalFailure);
       if (topFailure.length > 0 && topSuccess.length > 0) {
         ambiguousNames.push(name);
+        ambiguousChecks.push({ name, workflow: group[0]?.workflow });
         continue;
       }
       if (topFailure.length > 0) {
@@ -312,7 +330,11 @@ export function collapseNewestCheckAttempts(checks) {
     collapsed.push(ranked[0].check);
   }
 
-  return { checks: collapsed, ambiguousNames: ambiguousNames.sort() };
+  return {
+    checks: collapsed,
+    ambiguousNames: ambiguousNames.sort(),
+    ambiguousChecks,
+  };
 }
 
 /** Positive readiness proof shared by auto-ready and queue enrollment. */
@@ -324,9 +346,9 @@ export function classifyQueueCheckBlockers(checks) {
   // newly added safety jobs (for example Brand Scrub) would otherwise be
   // silently ignored until this controller was updated.
   const blockers = new Set(extractTerminalFailures(allChecks));
-  for (const name of latest.ambiguousNames) {
-    if (!isAdvisoryCheckName(name)) {
-      blockers.add(`${name} (ambiguous latest attempt)`);
+  for (const check of latest.ambiguousChecks) {
+    if (!isAdvisoryCheck(check)) {
+      blockers.add(`${normalizeCheckName(check)} (ambiguous latest attempt)`);
     }
   }
 
@@ -424,7 +446,7 @@ export async function fetchOpenPrSummaries(repo, limit = 200) {
   );
 }
 
-const HARD_GATE_LABELS = new Set(['needs-human', 'hold', 'gated']);
+const HARD_GATE_LABELS = new Set(['hold', 'gated']);
 
 export function isHardGated(labels) {
   return (labels ?? []).some(label =>

@@ -33,7 +33,8 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
   'success',
   'timed_out',
 ]);
-const MAX_WAIT_MS = 60_000;
+export const MERGE_GROUP_ADMISSION_WAIT_MS = 90_000;
+const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
 const POLL_INTERVAL_MS = 3_000;
 const MAX_API_REQUEST_MS = 10_000;
 const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(

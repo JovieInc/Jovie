@@ -920,6 +920,53 @@ export function runScreenCertification(options = {}) {
   };
 }
 
+/**
+ * Reserved external-certification entrypoint. It accepts no verifier callback
+ * and remains unavailable until the dependent authoritative source-continuity
+ * adapter binds a GitHub push event to the immutable artifact.
+ * @param {{ artifactId?: number; screenId?: string; repoRoot?: string }} options
+ */
+export function runScreenCertificationFromArtifact({
+  artifactId,
+  screenId,
+  repoRoot = REPO_ROOT,
+} = {}) {
+  const headSha = resolveHeadSha(undefined, repoRoot);
+  const screen = SCREEN_REGISTRY.find(
+    entry => !entry.excluded && entry.id === screenId
+  );
+  // An immutable artifact alone cannot establish which push event introduced
+  // the registered source change. The post-run GitHub compare binding belongs
+  // to the dependent continuity slice; do not substitute local git history.
+  void artifactId;
+  const issue =
+    'artifact certification is unavailable until authoritative GitHub event source continuity is verified';
+  return {
+    ok: false,
+    schema: SCREEN_CERT_SCHEMA,
+    receipt: {
+      gate: SCREEN_CERT_GATE,
+      invariant: SCREEN_CERT_INVARIANT_ID,
+      headSha,
+      baseSha: null,
+      ok: false,
+      certified: false,
+      registrationOnly: false,
+      status: 'external-certification-unavailable',
+      issues: [issue],
+      changedScreens: screen
+        ? [{ id: screenId, verdict: 'block', findings: [issue] }]
+        : [],
+      excludedChanges: [],
+      fixtures: [],
+      sweeps: RETAINED_SWEEP_WORKFLOWS.map(item => ({
+        path: item.path,
+        retained: true,
+      })),
+    },
+  };
+}
+
 const isMain =
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url);

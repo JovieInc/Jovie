@@ -299,6 +299,8 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+  'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
@@ -342,7 +344,10 @@ const PRODUCT_LANE_FOUNDATION_LANE = new Set([
 ]);
 const MERGE_GROUP_ADMISSION_PRIMARY_INPUTS = new Set([
   'scripts/lib/merge-group-admission.mjs',
+  'scripts/lib/merge-group-size-bootstrap-contract.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+  'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
 ]);
 const MERGE_GROUP_ADMISSION_LANE = new Set([
   ...MERGE_GROUP_ADMISSION_PRIMARY_INPUTS,
@@ -358,6 +363,8 @@ const MERGE_GROUP_ADMISSION_WEB_TESTS = [
 const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+  'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
@@ -504,6 +511,19 @@ const FLEET_PROMOTION_GATE_PYTEST_TESTS = [
   'scripts/symphony/tests/test_evaluate_fleet_gate.py',
   'scripts/symphony/tests/test_fleet_admission_receipt.py',
 ];
+const HYPERAGENT_LIFECYCLE_LANE = new Set([
+  '.github/workflows/ci.yml',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/run-affected-tests.mjs',
+  'scripts/symphony/hyperagent/lifecycle.py',
+  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+]);
+const HYPERAGENT_LIFECYCLE_PRIMARY_INPUTS = new Set([
+  'scripts/symphony/hyperagent/lifecycle.py',
+  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+]);
 const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/requirements/pytest.in',
   '.github/requirements/pytest.txt',
@@ -1058,6 +1078,27 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: [],
       scriptVitestTests: SAFE_PR_REMEDIATION_SCRIPT_TESTS,
       nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
+    };
+  }
+  const isBoundedHyperagentLifecycleChange =
+    files.some(file => HYPERAGENT_LIFECYCLE_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => HYPERAGENT_LIFECYCLE_LANE.has(file));
+  if (isBoundedHyperagentLifecycleChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [
+        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [],
     };
   }
   const isBoundedGemCheckinHudChange =

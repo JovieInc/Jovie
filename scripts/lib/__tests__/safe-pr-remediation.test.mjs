@@ -130,7 +130,7 @@ describe('safe Eve lockfile remediation admission', () => {
           labels: [
             { name: 'dependencies' },
             { name: 'automated' },
-            { name: 'needs-human' },
+            { name: 'hold' },
           ],
         },
       },
@@ -166,15 +166,9 @@ describe('safe Eve lockfile remediation admission', () => {
     'fast',
     'gated',
     'hold',
-    'human-review-required',
     'needs-conflict-resolution',
-    'needs-human',
-    'needs-human-review',
-    'needs-human-taste',
     'needs-manual-rebase',
-    'no-auto',
     'queue-deferred',
-    'taste',
   ])('rejects the %s hold', label => {
     const pr = {
       ...candidate().pr,
@@ -183,6 +177,26 @@ describe('safe Eve lockfile remediation admission', () => {
     expect(classifyEveLockDrift(candidate({ pr }))).toMatchObject({
       eligible: false,
       reason: 'hard-hold',
+    });
+  });
+
+  it.each([
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('ignores the legacy %s label', label => {
+    const pr = {
+      ...candidate().pr,
+      labels: [...candidate().pr.labels, { name: label }],
+    };
+    expect(classifyEveLockDrift(candidate({ pr }))).toMatchObject({
+      eligible: true,
     });
   });
 });

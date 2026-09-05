@@ -11,10 +11,19 @@ case "$ID" in
 esac
 
 export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH:/usr/bin:/bin"
-SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PROMOTION_SCRIPT="$SOURCE_ROOT/scripts/writer-owned-pr-promote.sh"
-PROMOTION_LIB="$SOURCE_ROOT/scripts/lib/writer-owned-pr-promotion.mjs"
-UPSERT_PR_COMMENT="$SOURCE_ROOT/scripts/lib/upsert-pr-comment.sh"
+RUNTIME_DIR="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SOURCE_ROOT="$(cd "$RUNTIME_DIR/../.." && pwd)"
+if [ -f "$RUNTIME_DIR/writer-owned-pr-promotion.mjs" ]; then
+  PROMOTION_SCRIPT="$RUNTIME_DIR/writer-owned-pr-promote.sh"
+  PROMOTION_LIB="$RUNTIME_DIR/writer-owned-pr-promotion.mjs"
+  UPSERT_PR_COMMENT="$RUNTIME_DIR/upsert-pr-comment.sh"
+else
+  # Direct source-tree execution remains available for development. Atomic
+  # installed releases always take the immutable sibling artifacts above.
+  PROMOTION_SCRIPT="$SOURCE_ROOT/scripts/writer-owned-pr-promote.sh"
+  PROMOTION_LIB="$SOURCE_ROOT/scripts/lib/writer-owned-pr-promotion.mjs"
+  UPSERT_PR_COMMENT="$SOURCE_ROOT/scripts/lib/upsert-pr-comment.sh"
+fi
 # Husky pre-push defaults to 1 vitest worker (laptop). Gem remounts then take
 # 20–40 min (live JOV-5220). Override without skipping the gate.
 export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"

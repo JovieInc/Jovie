@@ -47,24 +47,22 @@ const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
   );
-// Durable tombstones. Unlike queue-deferred, these are never stripped by the
-// drain controller, including hold-intake missed-admission recovery (JOV-5276).
-export const NO_AUTO_HOLD_LABELS = Object.freeze([
-  'no-auto',
-  'no-auto-merge',
-  'no-automerge',
-]);
-// JOV-INV-023: human labels are not enrollment holds.
+// JOV-INV-023 / JOV-INV-028: legacy human/no-auto labels are inert. Only
+// current machine state may stop native queue admission.
 export const HARD_HOLD_LABELS = new Set([
+  'hold',
+  'gated',
+  'incident',
   'queue-deferred',
   'needs-conflict-resolution',
   'fast',
-  ...NO_AUTO_HOLD_LABELS,
 ]);
 export const SELECTOR_BLOCKING_LABELS = new Set([
+  'hold',
+  'gated',
+  'incident',
   'needs-conflict-resolution',
   'fast',
-  ...NO_AUTO_HOLD_LABELS,
 ]);
 const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
   'normal',
@@ -840,7 +838,8 @@ export function explainExactHeadAdmissionSelector({
   const mode = typeof promotionMode === 'string' ? promotionMode : '';
   const modeAllows =
     CLEAN_ADMITTING_PROMOTION_MODES.has(mode) ||
-    (mode === 'isolated-only' && row.iso === true);
+    (mode === 'isolated-only' && row.iso === true) ||
+    (mode === 'controller-repair-only' && row.controllerRepair === true);
   if (!modeAllows) {
     reasons.push(`promotion-mode=${mode || 'missing'}`);
   }

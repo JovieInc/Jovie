@@ -122,6 +122,15 @@ const FLEET_PROMOTION_GATE_LANE = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
+const HYPERAGENT_LIFECYCLE_LANE = [
+  '.github/workflows/ci.yml',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/run-affected-tests.mjs',
+  'scripts/symphony/hyperagent/lifecycle.py',
+  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+];
 const GEM_PR_REHABILITATION_LANE = [
   '.github/requirements/pytest.in',
   '.github/requirements/pytest.txt',
@@ -201,8 +210,11 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
 const MERGE_GROUP_ADMISSION_INPUTS = [
+  'scripts/lib/merge-group-size-bootstrap-contract.mjs',
   'scripts/lib/merge-group-admission.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+  'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
 ];
 const MERGE_GROUP_ADMISSION_COMPANIONS = [
   '.github/workflows/ci.yml',
@@ -216,6 +228,8 @@ const MERGE_GROUP_ADMISSION_WEB_TESTS = [
 const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+  'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
 ];
 
@@ -701,6 +715,8 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
         'scripts/lib/__tests__/merge-group-admission.test.mjs',
+        'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+        'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
         'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
         'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
@@ -930,6 +946,26 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...GEM_PR_REHABILITATION_LANE,
+        'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded Hyperagent lifecycle contract', () => {
+    expect(buildAffectedTestPlan(HYPERAGENT_LIFECYCLE_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...HYPERAGENT_LIFECYCLE_LANE,
         'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');

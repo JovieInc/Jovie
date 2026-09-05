@@ -21,7 +21,6 @@ import {
   HARD_HOLD_LABELS,
   hasAuthoritativeExactHeadQueueReceipt,
   listPullRequestQueueStates,
-  NO_AUTO_HOLD_LABELS,
   preflightMergeQueue,
   proveExactHeadQueueReceipt,
   resolveMergeQueueBackend,
@@ -658,12 +657,8 @@ describe('queue workflow mutation safety', () => {
       'node scripts/merge-queue-backend.mjs prove-receipt'
     );
     expect(drain).toContain('.state.isInMergeQueue == true');
-    expect(drain).toContain(
-      'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
-    );
-    expect(drain).toContain(
-      '(.state.labels.nodes // []) | map(.name) | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
-    );
+    expect(drain).not.toContain('NO_AUTO_HOLD_JQ');
+    expect(drain).not.toContain('. == "no-auto"');
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
@@ -891,7 +886,6 @@ describe('queue workflow mutation safety', () => {
     expect(approval).toContain('--json state,isDraft,headRefOid,labels');
     expect(approval).toContain('.headRefOid == $expected_head');
     for (const label of [
-      'needs-human',
       'hold',
       'gated',
       'queue-deferred',
@@ -1785,20 +1779,12 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
-  it('refuses a held exact head before invoking the enrollment mutation', async () => {
-    const runner = createNativeRunner({
-      states: [prState({ labels: { nodes: [{ name: 'queue-deferred' }] } })],
-    });
-    await expect(enroll(runner)).rejects.toMatchObject({
-      code: 'held_pull_request',
-      details: { labels: ['queue-deferred'] },
-    });
-    expect(invokedEnrollment(runner)).toBe(false);
-  });
-
   it.each([
-    ...NO_AUTO_HOLD_LABELS,
-  ])('refuses a %s tombstone before invoking the enrollment mutation', async label => {
+    'queue-deferred',
+    'hold',
+    'gated',
+    'incident',
+  ])('refuses the machine hold %s before invoking enrollment', async label => {
     const runner = createNativeRunner({
       states: [prState({ labels: { nodes: [{ name: label }] } })],
     });
@@ -1810,22 +1796,27 @@ describe('native enrollment', () => {
   });
 
   it.each([
-    ...NO_AUTO_HOLD_LABELS,
-  ])('refuses a delayed queue entry when a %s tombstone appears after SNAP', async label => {
-    const queuedAndHeld = prState({
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('ignores the legacy %s label during native enrollment', async label => {
+    const queued = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
-      autoMergeRequest: AUTO_MERGE,
       labels: { nodes: [{ name: label }] },
     });
     const runner = createNativeRunner({
-      states: [prState(), queuedAndHeld],
+      states: [prState({ labels: { nodes: [{ name: label }] } }), queued],
     });
-    await expect(
-      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
-    ).rejects.toMatchObject({
-      code: 'held_pull_request',
-      details: { labels: [label] },
+    await expect(enroll(runner)).resolves.toMatchObject({
+      changed: true,
+      state: { queued: true },
     });
     expect(invokedEnrollment(runner)).toBe(true);
   });
@@ -2226,6 +2217,35 @@ describe('exact-head queue receipt proof', () => {
     });
   });
 
+  it('admits only an attested controller repair in controller-repair-only mode', () => {
+    const input = {
+      admissionPr: 16068,
+      admissionHead: HEAD,
+      promotionMode: 'controller-repair-only',
+      enrollSlots: 1,
+    };
+    expect(
+      explainExactHeadAdmissionSelector({
+        ...input,
+        snapshot: [{ ...selectorRow, controllerRepair: true }],
+      })
+    ).toEqual({
+      observed: true,
+      queued: false,
+      eligible: true,
+      reason: 'eligible',
+    });
+    expect(
+      explainExactHeadAdmissionSelector({
+        ...input,
+        snapshot: [{ ...selectorRow, controllerRepair: false }],
+      })
+    ).toMatchObject({
+      eligible: false,
+      reason: 'promotion-mode=controller-repair-only',
+    });
+  });
+
   it('does not treat snapshot auto-merge intent as queued membership', () => {
     expect(
       explainExactHeadAdmissionSelector({
@@ -2243,51 +2263,67 @@ describe('exact-head queue receipt proof', () => {
     });
   });
 
-  it('treats the no-auto tombstone family as a durable selector hard hold', () => {
-    const preRepairSelectorBlockingLabels = new Set([
-      'needs-human',
-      'hold',
-      'gated',
-      'needs-conflict-resolution',
-      'fast',
-    ]);
-    expect([...NO_AUTO_HOLD_LABELS]).toEqual([
-      'no-auto',
-      'no-auto-merge',
-      'no-automerge',
-    ]);
-    for (const label of NO_AUTO_HOLD_LABELS) {
-      expect(preRepairSelectorBlockingLabels.has(label)).toBe(false);
-      expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(true);
-      expect(HARD_HOLD_LABELS.has(label)).toBe(true);
-
-      const snapshot = [{ ...selectorRow, L: [label] }];
+  it.each([
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('ignores the legacy %s label in exact-head selection', label => {
+    expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(false);
+    expect(HARD_HOLD_LABELS.has(label)).toBe(false);
+    const snapshot = [{ ...selectorRow, L: [label] }];
+    for (const promotionMode of ['normal', 'hold-intake', 'draft-only']) {
       expect(
-        snapshot[0].L.some(name => preRepairSelectorBlockingLabels.has(name))
-      ).toBe(false);
-
-      for (const promotionMode of ['normal', 'hold-intake', 'draft-only']) {
-        expect(
-          explainExactHeadAdmissionSelector({
-            snapshot,
-            admissionPr: 16068,
-            admissionHead: HEAD,
-            promotionMode,
-            enrollSlots: 15,
-          })
-        ).toEqual({
-          observed: true,
-          queued: false,
-          eligible: false,
-          reason: `held-by=${label}`,
-        });
-      }
+        explainExactHeadAdmissionSelector({
+          snapshot,
+          admissionPr: 16068,
+          admissionHead: HEAD,
+          promotionMode,
+          enrollSlots: 15,
+        })
+      ).toEqual({
+        observed: true,
+        queued: false,
+        eligible: true,
+        reason: 'eligible',
+      });
     }
   });
 
   it.each([
-    ...NO_AUTO_HOLD_LABELS,
-  ])('does not treat a delayed native entry as a receipt when %s is live', async label => {
+    'hold',
+    'gated',
+    'incident',
+  ])('blocks exact-head selection on the machine hold %s', label => {
+    expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(true);
+    expect(HARD_HOLD_LABELS.has(label)).toBe(true);
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, L: [label] }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'normal',
+        enrollSlots: 15,
+      })
+    ).toMatchObject({ eligible: false, reason: `held-by=${label}` });
+  });
+
+  it.each([
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('accepts an exact-head native receipt carrying legacy %s', async label => {
     const queuedAndHeld = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
@@ -2296,10 +2332,10 @@ describe('exact-head queue receipt proof', () => {
     expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
       true
     );
-    expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
+    expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(true);
     expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
-      ok: false,
-      reason: `held-by=${label}`,
+      ok: true,
+      reason: 'queued',
     });
 
     const runner = createNativeRunner({ states: [queuedAndHeld] });
@@ -2308,9 +2344,9 @@ describe('exact-head queue receipt proof', () => {
         nativeOptions(runner, { expectedHeadOid: HEAD })
       )
     ).resolves.toMatchObject({
-      ok: false,
+      ok: true,
       attempts: 1,
-      explanation: { ok: false, reason: `held-by=${label}` },
+      explanation: { ok: true, reason: 'queued' },
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });

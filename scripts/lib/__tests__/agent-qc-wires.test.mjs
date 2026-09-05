@@ -61,8 +61,9 @@ describe('agent QC wire honesty (JOV-5235)', () => {
     expect(pipeline).not.toContain('id: gstack-gates');
   });
 
-  it('notifies Slack/Linear before needs-human autoclose and does not treat the label as a merge blocker', () => {
-    expect(pipeline).toContain('scripts/lib/needs-human-autoclose.mjs');
+  it('routes retry exhaustion to automation without creating a human hold', () => {
+    expect(pipeline).not.toContain('scripts/lib/needs-human-autoclose.mjs');
+    expect(pipeline).not.toMatch(/--add-label(?:=|\s+)["']?needs-human/);
     expect(pipeline).toContain('SLACK_WEBHOOK_URL');
     expect(pipeline).toContain('LINEAR_API_KEY');
     expect(REQUIRED_CHECK_NAMES.map(check => check.context)).not.toContain(

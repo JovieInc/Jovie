@@ -1,4 +1,5 @@
 name: GitHub AI Orchestrator (retired)
+# JOV-INV-028: legacy human-hold labels never remove work from intake.
 
 on:
   workflow_dispatch:
@@ -129,17 +130,10 @@ jobs:
 
           BLOCKED_LABEL=$(echo "$ISSUE_JSON" | jq -r '
             [.labels[].name | ascii_downcase]
-            | if any(. == "human-review-required" or . == "no-auto" or . == "type:epic" or . == "codex-blocked" or . == "codex-in-progress") then "true" else "false" end
+            | if any(. == "type:epic" or . == "codex-blocked" or . == "codex-in-progress") then "true" else "false" end
           ')
           if [[ "$BLOCKED_LABEL" == "true" ]]; then
             echo "Issue #${ISSUE_NUMBER} has a blocked label; skipping"
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          ISSUE_TEXT=$(echo "$ISSUE_JSON" | jq -r '(.title // "") + (.body // "")')
-          if echo "$ISSUE_TEXT" | grep -q "This issue requires human review"; then
-            echo "Issue #${ISSUE_NUMBER} requires human review; skipping"
             echo "should_run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

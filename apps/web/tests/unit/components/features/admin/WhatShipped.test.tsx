@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import type { PropsWithChildren } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WhatShipped } from '@/components/features/admin/WhatShipped';
+import { WhatShipped } from '../../../../../components/features/admin/WhatShipped';
 
-function renderWithQuery(ui: ReactElement) {
+function renderWhatShipped() {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
@@ -13,9 +13,13 @@ function renderWithQuery(ui: ReactElement) {
     },
   });
 
-  return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
-  );
+  function Wrapper({ children }: Readonly<PropsWithChildren>) {
+    return (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  }
+
+  return render(<WhatShipped />, { wrapper: Wrapper });
 }
 
 describe('WhatShipped', () => {
@@ -42,7 +46,7 @@ describe('WhatShipped', () => {
       )
     );
 
-    renderWithQuery(<WhatShipped />);
+    renderWhatShipped();
 
     await waitFor(() => {
       expect(
@@ -67,7 +71,7 @@ describe('WhatShipped', () => {
       )
     );
 
-    renderWithQuery(<WhatShipped />);
+    renderWhatShipped();
 
     await waitFor(() => {
       expect(
@@ -94,7 +98,7 @@ describe('WhatShipped', () => {
       )
     );
 
-    renderWithQuery(<WhatShipped />);
+    renderWhatShipped();
 
     await waitFor(() => {
       expect(screen.getByTestId('what-shipped-observation')).toHaveAttribute(
@@ -112,7 +116,7 @@ describe('WhatShipped', () => {
       new Response('upstream failed', { status: 503 })
     );
 
-    renderWithQuery(<WhatShipped />);
+    renderWhatShipped();
 
     await waitFor(() => {
       expect(screen.getByTestId('what-shipped-observation')).toHaveAttribute(
