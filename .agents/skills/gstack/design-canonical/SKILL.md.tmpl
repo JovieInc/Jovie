@@ -22,7 +22,7 @@ allowed-tools:
 
 # /design-canonical: Jovie Design Operating System
 
-Use this skill before any design-related work. It is the canonical source of truth
+Use this skill before any design-related work. It is an execution workflow subordinate to repo canon and DESIGN.md
 for web, iOS, desktop, Ovie, ops tools, marketing surfaces, and agent-generated
 design artifacts. Legacy skills such as `/design-review`, `/plan-design-review`,
 `/design-consultation`, `/design-shotgun`, and `/design-html` remain available for
@@ -82,8 +82,12 @@ Read the smallest set that establishes the surface:
 
 ```bash
 ls DESIGN.md docs/DESIGN_REVIEW_CHECKLIST.md docs/design-system 2>/dev/null || true
-rg -n "Veronica|Ovie|design-canonical|design-review|plan-design-review|design-shotgun|design-html|design-consultation" CLAUDE.md AGENTS.md CODEX.md docs .claude .agents 2>/dev/null
+rg -n "^## " DESIGN.md docs/design-system/DETAILS.md
 ```
+
+Read DESIGN.md once, then only the linked detail section needed for the task.
+Instruction-only refactors preserve design policy; they do not need a visual
+proposal or screenshot gate unless rendered UI also changes.
 
 For UI work, also inspect the target component, existing neighboring components,
 states, fixtures/tests, and screenshots if present. For skill/doc work, inspect

@@ -2,13 +2,14 @@ name: desktop-release
 run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }}
 
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: DesktopRelease
-# necessary-trust-boundary: GitHub Actions reads exact CI and current-main state through the scoped repository token before this workflow mutates a release.
-# removal-trigger: Remove the shell GitHub API hop when a native Actions release primitive can bind publication to exact successful CI and current main.
+# accountable-writer: Gem
+# necessary-trust-boundary: Signed desktop publication must independently cross-prove the exact Production Controller evidence before release.
+# removal-trigger: Remove this observer hop when Production Controller can request the same signed desktop publication directly.
 
 # Triggers:
-# - Auto after Production Controller verifies exact current main, only when
-#   VERSION changed since the last proven publish.
+# - Auto after Production Controller verifies exact current main. A checked-in
+#   VERSION change publishes immediately; production-impacting desktop source
+#   opens one deterministic post-land stamp PR before publication.
 # - Manual dispatch publishes a signed staging prerelease from exact green
 #   current main, or rebuilds production after the same Production Verified
 #   proof.
@@ -40,6 +41,10 @@ on:
           - staging
           - production
         default: production
+      force_rebuild:
+        description: "Force an exact-current-main rebuild instead of reconciling release state"
+        type: boolean
+        default: true
 
 permissions: {}
 
@@ -67,6 +72,7 @@ jobs:
       environment: ${{ steps.authorize.outputs.environment }}
       baseline_sha: ${{ steps.authorize.outputs.baseline_sha }}
       should_release: ${{ steps.select.outputs.should_release }}
+      should_stamp: ${{ steps.select.outputs.should_stamp }}
     steps:
       - name: Cross-prove exact production evidence
         id: authorize
@@ -76,6 +82,7 @@ jobs:
           DESKTOP_RUN_ATTEMPT: ${{ github.run_attempt }}
           DESKTOP_RUN_ID: ${{ github.run_id }}
           MANUAL_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          MANUAL_FORCE_REBUILD: ${{ inputs.force_rebuild }}
           MANUAL_SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -129,7 +136,9 @@ jobs:
                 ;;
             esac
             release_sha="$MANUAL_SHA"
-            echo "manual=true" >> "$GITHUB_OUTPUT"
+            if [ "$environment" = "staging" ] || [ "$MANUAL_FORCE_REBUILD" = "true" ]; then
+              echo "manual=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "::error::Unsupported desktop release event: $EVENT_NAME"
             exit 1
@@ -283,10 +292,10 @@ jobs:
                 [[ "$controller_run_id" =~ ^[1-9][0-9]*$ ]] || continue
 
               local controller_json controller_attempt controller_jobs verified_count
-              local controller_workflow_id workflow_json
+              local controller_workflow_id marker_source workflow_json
               if ! controller_json="$(gh api \
                 "repos/$REPOSITORY/actions/runs/$controller_run_id")"; then
-                echo "::error::Could not fetch Production Controller run $controller_run_id."
+                echo "::error::Could not fetch production marker source run $controller_run_id."
                 return 2
               fi
               jq -e '
@@ -294,61 +303,109 @@ jobs:
                 (.workflow_id | type == "number") and
                 (.run_attempt | type == "number" and . >= 1)
               ' >/dev/null <<<"$controller_json" || {
-                echo "::error::GitHub returned malformed Production Controller evidence."
+                echo "::error::GitHub returned malformed production marker source evidence."
                 return 2
               }
-              if ! jq -e \
-                --arg repo "$REPOSITORY" \
-                --arg sha "$expected_sha" '
-                  type == "object" and
-                  .head_sha == $sha and
-                  .head_branch == "main" and
-                  .head_repository.full_name == $repo and
-                  .event == "workflow_run" and
-                  .path == ".github/workflows/production-controller.yml" and
-                  .status == "completed" and
-                  .conclusion == "success" and
-                  (.display_title | test("^Production Controller " + $sha + " from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
-                ' >/dev/null <<<"$controller_json"; then
-                continue
-              fi
+              marker_source="$(jq -r '.path // empty' <<<"$controller_json")"
+              case "$marker_source" in
+                .github/workflows/production-controller.yml)
+                  jq -e \
+                    --arg repo "$REPOSITORY" \
+                    --arg sha "$expected_sha" '
+                      type == "object" and
+                      .head_sha == $sha and
+                      .head_branch == "main" and
+                      .head_repository.full_name == $repo and
+                      .event == "workflow_run" and
+                      .path == ".github/workflows/production-controller.yml" and
+                      .status == "completed" and
+                      .conclusion == "success" and
+                      (.display_title | test("^Production Controller " + $sha + " from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
+                    ' >/dev/null <<<"$controller_json" || continue
+                  ;;
+                .github/workflows/production-marker-recovery.yml)
+                  jq -e \
+                    --arg repo "$REPOSITORY" \
+                    --arg sha "$expected_sha" '
+                      type == "object" and
+                      .head_sha == $sha and
+                      .head_branch == "main" and
+                      .head_repository.full_name == $repo and
+                      (.event == "workflow_run" or .event == "workflow_dispatch") and
+                      .path == ".github/workflows/production-marker-recovery.yml" and
+                      .status == "completed" and
+                      .conclusion == "success" and
+                      (.display_title | test("^Production Marker Recovery " + $sha + " from controller run [1-9][0-9]*$"))
+                    ' >/dev/null <<<"$controller_json" || continue
+                  ;;
+                *) continue ;;
+              esac
               controller_workflow_id="$(jq -r '.workflow_id' <<<"$controller_json")"
               if ! workflow_json="$(gh api \
                 "repos/$REPOSITORY/actions/workflows/$controller_workflow_id")"; then
-                echo "::error::Could not fetch Production Controller workflow identity."
+                echo "::error::Could not fetch production marker source workflow identity."
                 return 2
               fi
-              jq -e \
-                --arg workflow_id "$controller_workflow_id" '
-                  type == "object" and
-                  (.id | tostring) == $workflow_id and
-                  .name == "Production Controller" and
-                  .path == ".github/workflows/production-controller.yml"
-                ' >/dev/null <<<"$workflow_json" || continue
+              if [ "$marker_source" = ".github/workflows/production-controller.yml" ]; then
+                jq -e \
+                  --arg workflow_id "$controller_workflow_id" '
+                    type == "object" and
+                    (.id | tostring) == $workflow_id and
+                    .name == "Production Controller" and
+                    .path == ".github/workflows/production-controller.yml"
+                  ' >/dev/null <<<"$workflow_json" || continue
+              else
+                jq -e \
+                  --arg workflow_id "$controller_workflow_id" '
+                    type == "object" and
+                    (.id | tostring) == $workflow_id and
+                    .name == "Production Marker Recovery" and
+                    .path == ".github/workflows/production-marker-recovery.yml"
+                  ' >/dev/null <<<"$workflow_json" || continue
+              fi
               controller_attempt="$(jq -r '.run_attempt' <<<"$controller_json")"
               if ! controller_jobs="$(gh api --paginate --slurp \
                 "repos/$REPOSITORY/actions/runs/$controller_run_id/attempts/$controller_attempt/jobs?per_page=100")"; then
-                echo "::error::Could not fetch Production Controller jobs."
+                echo "::error::Could not fetch production marker source jobs."
                 return 2
               fi
               if ! jq -e '
                 type == "array" and length > 0 and
                 all(.[]; type == "object" and (.jobs | type == "array"))
               ' >/dev/null <<<"$controller_jobs"; then
-                echo "::error::GitHub returned malformed Production Controller jobs."
+                echo "::error::GitHub returned malformed production marker source jobs."
                 return 2
               fi
-              verified_count="$(jq --arg sha "$expected_sha" '
-                [
-                  .[].jobs[]?
-                  | select(
-                      .name == "Production Verified" and
-                      .head_sha == $sha and
-                      .status == "completed" and
-                      .conclusion == "success"
-                    )
-                ] | length
-              ' <<<"$controller_jobs")"
+              if [ "$marker_source" = ".github/workflows/production-controller.yml" ]; then
+                verified_count="$(jq --arg sha "$expected_sha" '
+                  [
+                    .[].jobs[]?
+                    | select(
+                        .name == "Production Verified" and
+                        .head_sha == $sha and
+                        .status == "completed" and
+                        .conclusion == "success"
+                      )
+                  ] | length
+                ' <<<"$controller_jobs")"
+              else
+                verified_count="$(jq --arg sha "$expected_sha" '
+                  [
+                    .[].jobs[]?
+                    | select(
+                        .name == "Recover exact verified-generation marker" and
+                        .head_sha == $sha and
+                        .status == "completed" and
+                        .conclusion == "success" and
+                        ([.steps[]? | select(
+                          .name == "Confirm uploaded recovered marker bytes" and
+                          .status == "completed" and
+                          .conclusion == "success"
+                        )] | length) == 1
+                      )
+                  ] | length
+                ' <<<"$controller_jobs")"
+              fi
               [ "$verified_count" = "1" ] || continue
 
               local marker_archive marker_json
@@ -360,16 +417,33 @@ jobs:
                 return 2
               fi
               if unzip -p "$marker_archive" production-generation-verified.json \
-                > "$marker_json" 2>/dev/null &&
-                jq -e \
-                  --arg sha "$expected_sha" \
-                  --arg run "$controller_run_id" '
-                    type == "object" and
-                    .sha == $sha and
-                    (.deploymentId | type == "string" and startswith("dpl_")) and
-                    .controllerRun == $run
-                  ' >/dev/null "$marker_json"; then
-                return 0
+                > "$marker_json" 2>/dev/null; then
+                if [ "$marker_source" = ".github/workflows/production-controller.yml" ] &&
+                  jq -e \
+                    --arg sha "$expected_sha" \
+                    --arg run "$controller_run_id" '
+                      type == "object" and
+                      .sha == $sha and
+                      (.deploymentId | type == "string" and startswith("dpl_")) and
+                      .controllerRun == $run
+                    ' >/dev/null "$marker_json"; then
+                  return 0
+                fi
+                if [ "$marker_source" = ".github/workflows/production-marker-recovery.yml" ] &&
+                  jq -e \
+                    --arg sha "$expected_sha" \
+                    --arg run "$controller_run_id" \
+                    --arg attempt "$controller_attempt" '
+                      type == "object" and
+                      .sha == $sha and
+                      (.deploymentId | type == "string" and startswith("dpl_")) and
+                      .controllerRun == $run and
+                      (.controllerAttempt | tostring) == $attempt and
+                      (.recoveredFromControllerRun | type == "string" and test("^[1-9][0-9]*$")) and
+                      (.recoveredFromControllerAttempt | type == "string" and test("^[1-9][0-9]*$"))
+                    ' >/dev/null "$marker_json"; then
+                  return 0
+                fi
               fi
             done <<<"$marker_candidates"
             echo "::error::$marker_count Production Verified marker(s) existed, but none fully proved $expected_sha."
@@ -798,6 +872,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "should_release=false" >> "$GITHUB_OUTPUT"
+          echo "should_stamp=false" >> "$GITHUB_OUTPUT"
           if [ "$AUTHORIZED" != "true" ] || [ "$ALREADY_RELEASED" = "true" ]; then
             exit 0
           fi
@@ -825,18 +900,152 @@ jobs:
             echo "::error::The last successful desktop release is not an ancestor of current main."
             exit 1
           }
-          release_paths=(
+          version_paths=(
             VERSION
           )
-          relevant_changes="$(git diff --name-status --find-renames \
-            "$BASELINE_SHA" "$RELEASE_SHA" -- "${release_paths[@]}")"
-          if [ -n "$relevant_changes" ]; then
-            printf '%s\n' "$relevant_changes"
+          production_paths=(
+            .github/workflows/desktop-release.yml
+            apps/desktop/build
+            apps/desktop/electron-builder.yml
+            apps/desktop/package.json
+            apps/desktop/scripts/apply-electron-fuses.cjs
+            apps/desktop/scripts/generate-dmg-background.mjs
+            apps/desktop/scripts/prepare-icons.mjs
+            apps/desktop/scripts/sync-version.mjs
+            apps/desktop/scripts/write-env.mjs
+            apps/desktop/src
+            pnpm-lock.yaml
+            scripts/desktop-release-assets.mjs
+          )
+          version_changes="$(git diff --name-status --find-renames \
+            "$BASELINE_SHA" "$RELEASE_SHA" -- "${version_paths[@]}")"
+          production_changes="$(git diff --name-status --find-renames \
+            "$BASELINE_SHA" "$RELEASE_SHA" -- "${production_paths[@]}")"
+          if [ -n "$version_changes" ]; then
+            printf '%s\n' "$version_changes"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "Verified production generation contains desktop release changes."
+            echo "Verified production generation contains explicit release state."
+          elif [ -n "$production_changes" ]; then
+            printf '%s\n' "$production_changes"
+            echo "should_stamp=true" >> "$GITHUB_OUTPUT"
+            echo "Verified production generation requires a post-land desktop release stamp."
           else
-            echo "No desktop release changes since the last exact successful publish."
+            echo "No production desktop changes since the last exact successful publish."
           fi
+
+  stamp-production-release:
+    name: Stamp production desktop release
+    needs: [authorize-release]
+    if: >-
+      needs.authorize-release.result == 'success' &&
+      needs.authorize-release.outputs.environment == 'production' &&
+      needs.authorize-release.outputs.should_stamp == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout exact authorized main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize-release.outputs.release_sha }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Create deterministic desktop release stamp PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Desktop release stamp SHA is malformed."
+            exit 1
+          }
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            echo "::notice::Desktop release stamp generation $RELEASE_SHA was superseded by $current_main_sha."
+            exit 0
+          fi
+
+          short_sha="${RELEASE_SHA:0:12}"
+          branch="cursor/stable-desktop-publish-$short_sha"
+          stamp_prs="$(gh api --paginate --slurp \
+            "repos/$REPOSITORY/pulls?state=open&base=main&per_page=100")"
+          stamp_pr_count="$(jq --arg repo "$REPOSITORY" '[
+            .[][]? | select(
+              .base.ref == "main" and
+              .head.repo.full_name == $repo and
+              (.head.ref | startswith("cursor/stable-desktop-publish-"))
+            )
+          ] | length' <<<"$stamp_prs")"
+          if [ "$stamp_pr_count" -gt 1 ]; then
+            echo "::error::Multiple open desktop release stamp PRs violate single-writer ownership."
+            exit 1
+          fi
+          if [ "$stamp_pr_count" = "1" ]; then
+            existing_pr="$(jq -r --arg repo "$REPOSITORY" '[
+              .[][]? | select(
+                .base.ref == "main" and
+                .head.repo.full_name == $repo and
+                (.head.ref | startswith("cursor/stable-desktop-publish-"))
+              )
+            ][0].html_url' <<<"$stamp_prs")"
+            echo "Existing desktop release stamp PR owns the publisher: $existing_pr"
+            exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "::error::Desktop release stamp branch exists without an open PR: $branch"
+            exit 1
+          fi
+
+          git checkout -b "$branch"
+          node scripts/version-stamp.mjs
+          node scripts/version-check.mjs
+          node scripts/desktop-release-guard.mjs \
+            --base "$RELEASE_SHA" \
+            --branch "$branch"
+
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            echo "::notice::Main advanced to $current_main_sha while stamping; a newer controller generation will own the release."
+            exit 0
+          fi
+
+          release_version="$(tr -d '[:space:]' < VERSION)"
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
+          git add -u
+          git commit -m "chore(release): stamp desktop $release_version"
+          git push origin "HEAD:$branch"
+
+          pr_url="$(gh pr create \
+            --repo "$REPOSITORY" \
+            --base main \
+            --head "$branch" \
+            --title "chore(release): stamp desktop $release_version" \
+            --body "$(cat <<EOF
+          ## Summary
+
+          Deterministic post-land desktop release stamp for production-impacting changes through \`$short_sha\`.
+
+          - Source generation: \`$RELEASE_SHA\`
+          - Stable version: \`$release_version\`
+          - The native merge queue and normal CI remain authoritative.
+
+          EOF
+          )")"
+          gh pr edit "$pr_url" --add-label "merge-queue"
+          echo "Opened deterministic desktop release stamp PR: $pr_url"
 
   build:
     name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Publish staging desktop prerelease' || 'Publish production desktop release' }}

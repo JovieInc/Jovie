@@ -20,6 +20,7 @@ export const LINEAR_MAX_ATTEMPTS = 3;
 export const LINEAR_RETRY_BASE_MS = 100;
 export const LINEAR_MAX_ERROR_BODY_LENGTH = 256;
 export const LINEAR_PAGE_SIZE = 50;
+export const LINEAR_FLEET_CLOSURE_PAGE_SIZE = 250;
 export const LINEAR_MIN_PAGE_SIZE = 6;
 export const LINEAR_MAX_PAGES = 1000;
 // Linear rejects queries whose static complexity exceeds this ceiling with
@@ -723,13 +724,14 @@ export async function fetchTeamActiveIssueSnapshot(
 
 /**
  * @param {string} teamId
- * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
+ * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[], initialPageSize?: number }} [options]
  */
 export async function fetchTeamFleetClosureIssueSnapshot(teamId, options = {}) {
   const {
     graphqlImpl = graphql,
     maxPages = LINEAR_MAX_PAGES,
     stateNames = LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
+    initialPageSize = LINEAR_FLEET_CLOSURE_PAGE_SIZE,
   } = options;
   const stateNameFilter = [...stateNames];
   return collectLinearConnectionPages(
@@ -768,7 +770,7 @@ export async function fetchTeamFleetClosureIssueSnapshot(teamId, options = {}) {
       );
       return data?.team?.issues;
     },
-    { maxPages }
+    { maxPages, initialPageSize }
   );
 }
 

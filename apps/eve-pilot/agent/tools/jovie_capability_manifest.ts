@@ -1,4 +1,4 @@
-import { defineTool } from 'eve/tools';
+import { defineDynamic, defineTool } from 'eve/tools';
 import { z } from 'zod';
 
 const requestedCapabilitySchema = z.enum([
@@ -51,7 +51,7 @@ export function capabilityManifest(
   };
 }
 
-export default defineTool({
+export const manifestTool = defineTool({
   description:
     'Return the pilot-safe, read-only contract for one Jovie capability. This tool never accesses user data or performs a write.',
   inputSchema: z.object({
@@ -59,5 +59,20 @@ export default defineTool({
   }),
   async execute({ capability }) {
     return capabilityManifest(capability);
+  },
+});
+
+// Conversation turns have no callable tools. Keep the commercial metadata tool
+// available through Eve's supported session/turn capability resolver.
+export default defineDynamic({
+  events: {
+    'session.started': (_event, ctx) =>
+      ctx.session.auth.current?.attributes.summerConversation === 'true'
+        ? null
+        : manifestTool,
+    'turn.started': (_event, ctx) =>
+      ctx.session.auth.current?.attributes.summerConversation === 'true'
+        ? null
+        : manifestTool,
   },
 });

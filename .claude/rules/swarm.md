@@ -1,3 +1,7 @@
+---
+paths: ["scripts/hermes/**", "scripts/backlog-orchestrator/**", ".claude/commands/qa-swarm*"]
+---
+
 # Ruflo-Coordinated Swarm Pattern
 
 Canonical reference for lead-orchestrated parallel agent swarms using ruflo MCP + pre-created Git worktrees. Read this before spawning multi-agent work without Linear issues.

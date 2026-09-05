@@ -32,13 +32,14 @@ function fixture() {
     JSON.stringify({ active: 'acct1', cooldowns: {} })
   );
   const rotateLog = join(root, 'rotate-args.txt');
+  const rotateEnv = join(root, 'rotate-env.txt');
   const stub = join(root, 'codex-rotate-stub');
   writeFileSync(
     stub,
-    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" >>"${rotateLog}"\n`
+    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" >>"${rotateLog}"\nprintf '%s' "${'${LINEAR_API_KEY-}'}" >"${rotateEnv}"\n`
   );
   chmodSync(stub, 0o755);
-  return { root, workspace, accounts, rotateLog, stub };
+  return { root, workspace, accounts, rotateLog, rotateEnv, stub };
 }
 
 function issueWithReceipt(title) {
@@ -71,6 +72,7 @@ function runRouter({ root, workspace, accounts, stub }, issue) {
       SYMPHONY_CODEX_ROTATE: stub,
       SYMPHONY_FALLBACK_LEASE_DIR: join(root, 'fallback-leases'),
       SYMPHONY_OPEN_PR_INDEX: 'empty',
+      LINEAR_API_KEY: 'tracker-secret-must-not-reach-agent',
       SYMPHONY_CODEX_EXHAUSTED: new URL(
         '../../symphony/symphony-codex-exhausted.py',
         import.meta.url
@@ -83,6 +85,60 @@ function runRouter({ root, workspace, accounts, stub }, issue) {
 }
 
 describe('Symphony launcher closed loop', () => {
+  it('keeps the app-server stream alive during a slow routing preflight', async () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Repair fleet architecture');
+      const issueFile = join(env.root, 'issue.json');
+      writeFileSync(issueFile, JSON.stringify(issue));
+      const slowPickup = join(env.root, 'slow-pickup.py');
+      writeFileSync(
+        slowPickup,
+        '#!/usr/bin/env python3\nimport time\ntime.sleep(3)\n'
+      );
+      chmodSync(slowPickup, 0o755);
+      const child = spawn('bash', [ROUTER, 'app-server'], {
+        cwd: env.workspace,
+        env: {
+          ...process.env,
+          SYMPHONY_ROUTING_ISSUE_FILE: issueFile,
+          SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
+          SYMPHONY_WORKSPACE: env.workspace,
+          SYMPHONY_CODEX_ROTATE: env.stub,
+          SYMPHONY_FALLBACK_LEASE_DIR: join(env.root, 'fallback-leases'),
+          SYMPHONY_CODEX_EXHAUSTED: slowPickup,
+          SYMPHONY_ROUTER_HEARTBEAT_SECONDS: '1',
+          CODEX_ACCOUNTS_ROOT: env.accounts,
+          CODEX_ACCOUNTS_STATE: join(env.accounts, 'state.json'),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      child.stdout.setEncoding('utf8');
+      child.stdout.on('data', chunk => {
+        stdout += chunk;
+      });
+      const exitCode = await new Promise(resolve => {
+        child.once('exit', resolve);
+      });
+      assert.equal(exitCode, 0);
+      const heartbeats = stdout
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => JSON.parse(line));
+      assert.ok(heartbeats.length >= 2);
+      assert.ok(
+        heartbeats.every(
+          heartbeat => heartbeat.method === 'symphony-router/preflight'
+        )
+      );
+      assert.match(readFileSync(env.rotateLog, 'utf8'), /app-server/);
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
   it('materializes the verified receipt and launches the selected model', () => {
     const env = fixture();
     try {
@@ -91,6 +147,7 @@ describe('Symphony launcher closed loop', () => {
       const args = readFileSync(env.rotateLog, 'utf8');
       assert.match(args, /model=\\?"gpt-5\.6-terra\\?"|model="gpt-5\.6-terra"/);
       assert.match(args, /app-server/);
+      assert.equal(readFileSync(env.rotateEnv, 'utf8'), '');
       const materialized = JSON.parse(
         readFileSync(join(env.workspace, '.symphony-routing.json'), 'utf8')
       );
@@ -279,6 +336,34 @@ describe('Symphony launcher closed loop', () => {
           return true;
         }
       );
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
+  it('backs off without a terminal block when authenticated accounts are cooling down', () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Add profile validation');
+      writeFileSync(
+        join(env.accounts, 'state.json'),
+        JSON.stringify({
+          active: null,
+          cooldowns: { acct1: Math.floor(Date.now() / 1000) + 3600 },
+        })
+      );
+      assert.throws(
+        () => runRouter(env, issue),
+        error => {
+          assert.equal(/** @type {any} */ (error).status, 75);
+          assert.match(
+            String(/** @type {any} */ (error).stderr),
+            /CAPACITY_UNAVAILABLE.*class=provider-capacity.*retryable=true/
+          );
+          return true;
+        }
+      );
+      assert.throws(() => readFileSync(env.rotateLog, 'utf8'));
     } finally {
       rmSync(env.root, { recursive: true, force: true });
     }

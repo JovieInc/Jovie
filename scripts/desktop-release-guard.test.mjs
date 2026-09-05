@@ -23,6 +23,13 @@ const desktopWorkflow = readFileSync(
   new URL('../.github/workflows/desktop-release.yml', import.meta.url),
   'utf8'
 );
+const productionMarkerRecoveryWorkflow = readFileSync(
+  new URL(
+    '../.github/workflows/production-marker-recovery.yml',
+    import.meta.url
+  ),
+  'utf8'
+);
 const desktopReleaseAssets = readFileSync(
   new URL('./desktop-release-assets.mjs', import.meta.url),
   'utf8'
@@ -400,6 +407,19 @@ test('desktop publishing follows verified production instead of raw main pushes'
   assert.doesNotMatch(desktopWorkflow, /^  push:\n/m);
 });
 
+test('marker recovery wakes a selector-bound desktop reconciliation', () => {
+  assertPatterns(desktopWorkflow, [
+    /force_rebuild:/,
+    /MANUAL_FORCE_REBUILD: \$\{\{ inputs\.force_rebuild \}\}/,
+    /"\$MANUAL_FORCE_REBUILD" = "true"/,
+  ]);
+  assertPatterns(productionMarkerRecoveryWorkflow, [
+    /gh workflow run desktop-release\.yml --ref main/,
+    /-f environment=production/,
+    /-f force_rebuild=false/,
+  ]);
+});
+
 test('desktop authorizer cross-proves exact Production Verified evidence', () => {
   const authorize = job(desktopWorkflow, 'authorize-release');
   const header = authorize.slice(0, authorize.indexOf('    steps:'));
@@ -430,6 +450,22 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
     proof.lastIndexOf('if [ "$EVENT_NAME" = "workflow_dispatch" ]') >
       proof.indexOf('if [ "$production_proven" != "true" ]')
   );
+});
+
+test('desktop authorizer accepts an exact successful recovered production marker', () => {
+  const proof = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
+
+  assertPatterns(proof, [
+    /\.path == "\.github\/workflows\/production-marker-recovery\.yml"/,
+    /\.name == "Production Marker Recovery"/,
+    /\.name == "Recover exact verified-generation marker"/,
+    /\.name == "Confirm uploaded recovered marker bytes"/,
+    /\.recoveredFromControllerRun/,
+    /\.recoveredFromControllerAttempt/,
+  ]);
 });
 
 test('desktop dedup cross-proves an actual-publish-only marker', () => {
@@ -465,8 +501,6 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
     /git diff --name-status --find-renames/,
   ]);
   assert.doesNotMatch(proof, /desktop-staging-/);
-  assert.doesNotMatch(select, /apps\/desktop/);
-  assert.doesNotMatch(select, /desktop-release\.yml/);
   assert.doesNotMatch(proof, /gh api[\s\S]{0,160}\|\| continue/);
   const failClosedIndex = proof.indexOf(
     'if [ "$publish_marker_presence_count" -gt 0 ]'
@@ -562,18 +596,48 @@ test('desktop recovery ignores legacy push titles and selects new run-name evide
   assert.equal(output.trim(), `2\t1\t${newSha}`);
 });
 
-test('automatic desktop publishing selects VERSION changes only', () => {
+test('automatic desktop publishing stamps production-impacting source before release', () => {
+  const authorize = job(desktopWorkflow, 'authorize-release');
   const select = step(
-    job(desktopWorkflow, 'authorize-release'),
+    authorize,
     'Select desktop-relevant production generation'
   );
-  const paths = select
-    .match(/release_paths=\(\n([\s\S]*?)\n\s+\)/)?.[1]
+  const productionPaths = select
+    .match(/production_paths=\(\n([\s\S]*?)\n\s+\)/)?.[1]
     ?.trim()
     .split(/\s+/);
-  assert.deepEqual(paths, ['VERSION']);
-  assert.equal(paths?.includes('.github/workflows/desktop-release.yml'), false);
-  assert.equal(paths?.includes('VERSION'), true);
+  assert.equal(productionPaths?.includes('apps/desktop/src'), true);
+  assert.equal(productionPaths?.includes('apps/desktop/package.json'), true);
+  assert.equal(
+    productionPaths?.includes('.github/workflows/desktop-release.yml'),
+    true
+  );
+  assertPatterns(select, [
+    /version_changes=/,
+    /production_changes=/,
+    /should_stamp=false/,
+    /should_stamp=true/,
+    /should_release=true/,
+  ]);
+  assert.match(
+    authorize,
+    /should_stamp: \$\{\{ steps\.select\.outputs\.should_stamp \}\}/
+  );
+
+  const stamp = job(desktopWorkflow, 'stamp-production-release');
+  assertPatterns(stamp, [
+    /needs\.authorize-release\.outputs\.should_stamp == 'true'/,
+    /actions\/create-github-app-token@/,
+    /JOVIE_BOT_APP_ID/,
+    /JOVIE_BOT_PRIVATE_KEY/,
+    /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
+    /repos\/\$REPOSITORY\/commits\/main/,
+    /node scripts\/version-stamp\.mjs/,
+    /node scripts\/version-check\.mjs/,
+    /cursor\/stable-desktop-publish-/,
+    /gh pr create/,
+    /--add-label "merge-queue"/,
+  ]);
 });
 
 test('desktop staging publishes an exact signed prerelease and production stays separately proven', () => {
@@ -725,6 +789,7 @@ test('staging release versions advance beyond installed and current-feed version
     installedVersion: '26.8.1',
     version: '26.8.2-staging.17823456790.1',
   };
+  assert.doesNotThrow(() => assertStagingVersionTransition(valid));
   assert.doesNotThrow(() =>
     assertStagingVersionTransition({
       ...valid,

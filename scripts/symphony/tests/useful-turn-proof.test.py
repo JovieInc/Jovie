@@ -158,6 +158,24 @@ class ProofBoundaryTests(unittest.TestCase):
 
 
 class LiveBindingTests(unittest.TestCase):
+    def test_context_git_measurement_ignores_hostile_path(self):
+        now = datetime.now(timezone.utc)
+        F.write_private(F.ROOT / "state.json", {"cooldowns": {}})
+        F.proof(now, "hostile-path")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker = root / "invoked"
+            for name in ("git", "systemctl"):
+                fake = root / name
+                fake.write_text("#!/bin/sh\nprintf invoked > '" + str(marker) + "'\nprintf forged\n")
+                fake.chmod(0o700)
+            with mock.patch.dict(os.environ, {"PATH": directory}):
+                self.assertEqual(T.load_context(now)["runtime"], F.RUNTIME)
+                with mock.patch.object(T.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "MainPID=123\nControlGroup=/system.slice/symphony-elixir.service\nActiveState=active", "")) as run:
+                    self.assertEqual(T.service_identity()[0], 123)
+                    self.assertEqual(run.call_args.args[0][:3], ["/usr/bin/systemctl", "--user", "show"])
+            self.assertFalse(marker.exists())
+
     def test_systemd_identity_requires_active_service(self):
         for output, valid in (("MainPID=123\nControlGroup=/system.slice/symphony-elixir.service\nActiveState=active", True), ("MainPID=0\nActiveState=active", False), ("MainPID=123\nActiveState=inactive", False)):
             with mock.patch.object(T.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, output, "")) as run:
@@ -165,7 +183,7 @@ class LiveBindingTests(unittest.TestCase):
                     self.assertEqual(T.service_identity()[0], 123)
                 else:
                     with self.assertRaises(ValueError): T.service_identity()
-                run.assert_called_once_with(["systemctl", "--user", "show", C.V2_OFFICIAL_RUNTIME_SERVICE, "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
+                run.assert_called_once_with(["/usr/bin/systemctl", "--user", "show", C.V2_OFFICIAL_RUNTIME_SERVICE, "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
 
     def test_live_runtime_requires_pid_cgroup_command_listener_and_stable_generation(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -241,7 +259,7 @@ class ProducerTests(unittest.TestCase):
         self.real_run = subprocess.run
 
     def fake(self, args, **kwargs):
-        if args[0] == "git":
+        if Path(args[0]).name == "git":
             return self.real_run(args, **kwargs)
         self.assertEqual(kwargs["env"]["CODEX_HOME"], str(self.account.resolve()))
         self.assertEqual(kwargs["env"]["JOVIE_AGENT_PROFILE"], "coder")
@@ -277,7 +295,7 @@ class ProducerTests(unittest.TestCase):
             fake.write_text("#!/bin/sh\nexit 0\n")
             fake.chmod(0o700)
             def invoke(args, **kwargs):
-                if args[0] != "git":
+                if Path(args[0]).name != "git":
                     self.assertEqual(args[0], str(F.RUNNER.resolve()))
                 return self.fake(args, **kwargs)
             previous = Path.cwd()
@@ -293,7 +311,7 @@ class ProducerTests(unittest.TestCase):
         before = set(F.ARTIFACTS.iterdir())
         for rc in (0, 78):
             def fake(args, **kwargs):
-                if args[0] == "git":
+                if Path(args[0]).name == "git":
                     return self.real_run(args, **kwargs)
                 return subprocess.CompletedProcess(args, rc, b"success", b"")
             with mock.patch.object(subprocess, "run", side_effect=fake), self.assertRaises(ValueError):
@@ -308,7 +326,7 @@ class ProducerTests(unittest.TestCase):
     def test_limiter_event_during_completion_wins(self):
         def fake(args, **kwargs):
             result = self.fake(args, **kwargs)
-            if args[0] != "git":
+            if Path(args[0]).name != "git":
                 F.write_private(self.account.parent / "state.json", {"cooldowns": {self.account.name: 9999999999}})
             return result
         before = set(F.ARTIFACTS.iterdir())

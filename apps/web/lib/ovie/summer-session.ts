@@ -15,7 +15,7 @@ import type { OvieDecision } from '@/lib/ovie/mcp/types';
 
 export const CURRENT_SUMMER_SESSION_ID = 'summer-session:current' as const;
 export const SUMMER_SESSION_SPEAKER = 'summer' as const;
-export const SUMMER_SESSION_RUNTIME = 'mac' as const;
+export const SUMMER_SESSION_RUNTIME = 'eve' as const;
 export const SUMMER_SESSION_DECISION_ID = 'dec_summer_session_current' as const;
 
 export type SummerSessionIdentity = {
@@ -34,7 +34,21 @@ export const CURRENT_SUMMER_IDENTITY: SummerSessionIdentity = {
   authority: 'current',
 };
 
+export type SummerEveReceipt = {
+  readonly eventId: string;
+  readonly sessionId: string;
+  readonly turnId: string;
+  readonly nextStartIndex: number;
+};
+export type SummerEveCheckpoint = {
+  readonly eventId: string;
+  readonly sessionId: string | null;
+  readonly nextStartIndex: number;
+};
+
 export type SummerPersistedTurn = {
+  readonly eveReceipt?: SummerEveReceipt;
+  readonly eveCheckpoint?: SummerEveCheckpoint;
   readonly turnIndex: number;
   readonly clientTurnId: string | null;
   readonly userText: string;
@@ -119,7 +133,7 @@ export function assertSummerIdentity(
   ) {
     throw new SummerSessionError(
       'identity-drift',
-      'Summer session identity drifted from the current Mac Summer'
+      'Summer session identity drifted from the current Eve Summer'
     );
   }
   return identity;
@@ -131,12 +145,38 @@ export async function loadCurrentSummerSession(
   const row = await store.getDecision(SUMMER_SESSION_DECISION_ID);
   if (!row?.decided) return null;
   try {
-    const parsed = parseSession(JSON.parse(row.decided) as unknown);
-    if (!parsed) return null;
+    const value = JSON.parse(row.decided) as {
+      identity?: Record<string, unknown>;
+      turns?: unknown;
+    };
+    // Explicit in-place Mac-to-Eve migration: preserve canonical ID and every recorded turn.
+    if (value.identity?.runtime === 'mac') {
+      const migrated = parseSession({
+        ...value,
+        identity: { ...value.identity, runtime: SUMMER_SESSION_RUNTIME },
+      });
+      if (!migrated)
+        throw new SummerSessionError(
+          'identity-drift',
+          'Cannot migrate invalid Summer history'
+        );
+      await store.putDecision(toDecision(migrated, new Date().toISOString()));
+      return migrated;
+    }
+    const parsed = parseSession(value);
+    if (!parsed)
+      throw new SummerSessionError(
+        'identity-drift',
+        'Stored Summer session is invalid'
+      );
     assertSummerIdentity(parsed.identity);
     return parsed;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof SummerSessionError) throw error;
+    throw new SummerSessionError(
+      'identity-drift',
+      'Cannot read or migrate stored Summer history'
+    );
   }
 }
 

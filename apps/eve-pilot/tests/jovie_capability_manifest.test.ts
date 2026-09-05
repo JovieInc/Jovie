@@ -25,3 +25,27 @@ describe('jovie capability manifest tool', () => {
     });
   });
 });
+
+describe('native conversation tool availability', () => {
+  it.each([
+    'session.started',
+    'turn.started',
+  ] as const)('omits every remaining tool at %s for conversation auth, preserving commercial capability', async lifecycle => {
+    const { default: definition, manifestTool } = await import(
+      '../agent/tools/jovie_capability_manifest'
+    );
+    const resolver = definition.events[lifecycle]!;
+    const context = (attributes: Record<string, string>) =>
+      ({
+        session: { id: 'ses_test', auth: { current: { attributes } } },
+        channel: {},
+        messages: [],
+      }) as Parameters<typeof resolver>[1];
+    expect(
+      await resolver({}, context({ summerConversation: 'true' }))
+    ).toBeNull();
+    expect(await resolver({}, context({ source: 'ovie-summer-shadow' }))).toBe(
+      manifestTool
+    );
+  });
+});

@@ -39,13 +39,40 @@ Symphony, and receipt-signing bindings and fails closed on missing, reused,
 stale, replayed, or uncertain evidence. Operational receipts expose only key
 IDs and public fingerprints. The offline Photon proof cannot reach a recipient.
 
+Production OV chat uses the same OIDC-protected Summer shadow channel:
+
+- `POST /ovie/v1/summer-shadow/conversation/events` admits one stable
+  `clientTurnId`-derived event, migrates bounded prior history only on the first
+  Eve turn, and rejects conflicting, concurrent, or over-budget submissions.
+- `GET /ovie/v1/summer-shadow/conversation/events/:eventId/result` returns only
+  the terminal result bound to that admitted Eve turn and persists a replay-safe
+  receipt for reconnects.
+- Jovie checks its exact founder app-user allowlist before intake. Both Eve
+  routes verify the exact Jovie production OIDC application and a fixed founder
+  principal assertion. OIDC identifies the application, not the human.
+- Jovie uses TLS to one immutable deployment origin. Admissions and results
+  bind the event, principal and deployment ID; old unbound receipts fail closed.
+  The canonical body SHA256 remains private storage and never appears in logs
+  or responses. This read-only conversation does not require signing keys.
+- Only the immutable admission creator can send. An ambiguous send remains
+  pending and is never dispatched again; result reconciliation reads the native
+  session stream for its exact event marker. A pre-send crash may require manual
+  reconciliation. This is not an exactly-once delivery guarantee.
+- Conversation turns expose no callable tools. Commercial shadow turns retain
+  the read-only capability manifest, their existing limits and governance keys.
+
+These routes document source behavior, not commissioning proof. Summer remains
+unavailable until the exact deployment and conversation receipts in
+[`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](../../docs/operations/SUMMER_RUNTIME_RETIREMENT.md)
+pass.
+
 ## Local verification
 
 Node 24 or later. Isolated from the monorepo Node 22 CI runner.
 
     pnpm --dir apps/eve-pilot install --frozen-lockfile --ignore-workspace
     pnpm --dir apps/eve-pilot --ignore-workspace run typecheck
-    pnpm --dir apps/eve-pilot --ignore-workspace run test
+    pnpm --dir apps/eve-pilot --ignore-workspace run test:coverage
     pnpm --dir apps/eve-pilot --ignore-workspace run build
 
 ## What this unit does not do

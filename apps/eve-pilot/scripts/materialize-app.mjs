@@ -15,6 +15,9 @@ const common = [
   'agent/lib/imessage-allowlist.ts',
 ];
 const summer = [
+  'agent/lib/summer-web-conversation.ts',
+  'tests/summer-web-conversation.test.ts',
+  'tests/summer-conversation-route.test.ts',
   'tests/transport-version-compatibility.test.ts',
   'agent/channels/summer-shadow.ts',
   'agent/channels/summer-bottleneck.ts',
@@ -187,7 +190,7 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
       'vitest.config.ts',
       readFileSync(resolve(source, 'vitest.config.ts'), 'utf8')
         .replace("'scripts/materialize-app.mjs',", '')
-        .replace("'scripts/jovie-release.mjs',", '')
+        .replace("'scripts/jovie-release.mjs',", '').replace("'agent/tools/jovie_capability_manifest.ts',", '')
         .replace(
           '../../packages/agent-transport-contracts/index.ts',
           'vendor/agent-transport-contracts/index.ts'

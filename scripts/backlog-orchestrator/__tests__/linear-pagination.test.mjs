@@ -230,7 +230,7 @@ describe('exhaustive Linear pagination', () => {
          *   stateNames: string[];
          * }} */ (input);
         assert.equal(variables.teamId, 'team-1');
-        assert.equal(variables.pageSize, 50);
+        assert.equal(variables.pageSize, 250);
         assert.ok(variables.stateNames.includes('Done'));
         return {
           team: {

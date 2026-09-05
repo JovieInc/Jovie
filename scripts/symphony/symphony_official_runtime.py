@@ -1225,6 +1225,7 @@ def run_official_binary_once(
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
+    closure_observe_only: bool,
     max_gate_sleep_seconds: int | None,
 ) -> int:
     process = subprocess.Popen(
@@ -1260,7 +1261,10 @@ def run_official_binary_once(
                     dead_letter_noted,
                 )
         monotonic_now = time.monotonic()
-        if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
+        if (
+            not closure_observe_only
+            and monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS
+        ):
             last_closure_check = monotonic_now
             verdict = read_closure_stop_line(
                 closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
@@ -1278,6 +1282,7 @@ def run_official_binary(
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
+    closure_observe_only: bool = False,
     max_gate_sleep_seconds: int | None = DEFAULT_MAX_GATE_SLEEP_SECONDS,
 ) -> int:
     if not command:
@@ -1288,7 +1293,7 @@ def run_official_binary(
         verdict = read_closure_stop_line(
             closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
         )
-        if verdict["hold"]:
+        if verdict["hold"] and not closure_observe_only:
             # The closure stop-line holds NEW admission only. Already-running
             # work belongs to a live scheduler process (or none has started
             # yet), so holding here never interrupts an active agent.
@@ -1360,6 +1365,7 @@ def run_official_binary(
             command,
             gate_file=gate_file,
             closure=closure,
+            closure_observe_only=closure_observe_only,
             max_gate_sleep_seconds=max_gate_sleep_seconds,
         )
         if returncode != RATE_LIMIT_EXIT_CODE:
@@ -1505,6 +1511,11 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_FLEET_GATE_RECEIPT,
     )
     run_parser.add_argument(
+        "--closure-observe-only",
+        action="store_true",
+        help="observe closure health without pausing the scheduler",
+    )
+    run_parser.add_argument(
         "--closure-gate-max-age-seconds",
         type=int,
         default=FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
@@ -1600,6 +1611,7 @@ def main(argv: list[str] | None = None) -> int:
                 dead_letter_dir=args.dead_letter_dir,
                 max_receipt_age_seconds=args.closure_gate_max_age_seconds,
             ),
+            closure_observe_only=args.closure_observe_only,
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,
         )
 
