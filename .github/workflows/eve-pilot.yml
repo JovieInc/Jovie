@@ -246,16 +246,18 @@ jobs:
             --scope jovie \
             --token "$VERCEL_TOKEN" >/dev/null
           chmod 600 "$env_file"
-          set -a
-          # Vercel writes shell-compatible dotenv values; keep them in process
-          # memory and remove the temporary file before the job exits.
-          . "$env_file"
-          set +a
-          if [ -z "${IMESSAGE_WEBHOOK_SECRET:-}" ]; then
+          dotenv_value() {
+            sed -n -E "s/^$1=(.*)$/\1/p" "$env_file" |
+              tail -n 1 |
+              sed -E "s/^['\"](.*)['\"]$/\1/"
+          }
+          webhook_secret="$(dotenv_value IMESSAGE_WEBHOOK_SECRET)"
+          allowed_senders="$(dotenv_value OVIE_IMESSAGE_ALLOWED_SENDERS)"
+          if [ -z "$webhook_secret" ]; then
             echo 'IMESSAGE_WEBHOOK_SECRET is required for the signed canary.' >&2
             exit 1
           fi
-          sender_id="$(printf '%s' "${OVIE_IMESSAGE_ALLOWED_SENDERS:-}" |
+          sender_id="$(printf '%s' "$allowed_senders" |
             cut -d, -f1 | tr -cd '0-9+')"
           if [ -z "$sender_id" ]; then
             echo 'OVIE_IMESSAGE_ALLOWED_SENDERS must contain one founder sender.' >&2
@@ -284,7 +286,7 @@ jobs:
               }
             }')"
           signature="v0=$(printf 'v0:%s:%s' "$timestamp" "$body" |
-            openssl dgst -sha256 -hmac "$IMESSAGE_WEBHOOK_SECRET" -hex |
+            openssl dgst -sha256 -hmac "$webhook_secret" -hex |
             awk '{print $2}')"
           status="$(curl -sS -o "$response_file" -w '%{http_code}' \
             -X POST https://jovie-eve-shadow.vercel.app/eve/v1/photon \
