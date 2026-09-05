@@ -233,6 +233,8 @@ export function createConversationIngress(
     }
     if (input.previousEventId && input.history.length)
       return json({ ok: false, code: 'history_already_migrated' }, 422);
+    // Keep the replay fingerprint keyed by the dedicated signature. A raw-body
+    // digest would let a leaked intent record test guesses about private founder text.
     const digest = createHash('sha256')
       .update(request.headers.get('x-jovie-summer-key-id') ?? '')
       .update('\0')
