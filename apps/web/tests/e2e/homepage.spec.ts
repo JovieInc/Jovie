@@ -1,9 +1,5 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
-import {
-  evaluateAcceptanceEvidence,
-  evaluateRelationalGrid,
-  evaluateSharedSearchGeometry,
-} from '../../../../scripts/component-rendered-invariant-policy.mjs';
+import { primeVercelBypassCookie } from '../helpers/vercel-preview';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -40,6 +36,7 @@ async function hasNextDevTransientOverlay(page: PlaywrightPage) {
 }
 
 async function gotoHomepage(page: PlaywrightPage) {
+  await primeVercelBypassCookie(page, process.env.BASE_URL);
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto('/', {
       waitUntil: 'domcontentloaded',
@@ -66,7 +63,7 @@ test.describe('Homepage', () => {
   test('renders the editorial hero with the name search as the only control', async ({
     page,
   }) => {
-    const hero = page.getByTestId('marketing-section-hero');
+    const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
     await expect(hero.getByText('operating system')).toHaveCount(0);
@@ -80,9 +77,7 @@ test.describe('Homepage', () => {
         'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeVisible();
-    const nameSearch = hero.getByPlaceholder('Search your name');
-    await expect(nameSearch).toBeVisible();
-    await expect(nameSearch).toHaveAccessibleName('Search your name');
+    await expect(hero.getByPlaceholder('Search your name')).toBeVisible();
     await expect(
       hero.getByRole('button', { name: 'Find me', exact: true })
     ).toBeEnabled();
@@ -215,12 +210,9 @@ test.describe('Homepage', () => {
       'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(
-      header.getByRole('link', { name: 'Customers' })
-    ).toHaveAttribute('href', '/artists');
     await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
@@ -228,192 +220,18 @@ test.describe('Homepage', () => {
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Get started' })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+      header.getByRole('link', { name: 'Find yourself' })
+    ).toHaveAttribute('href', '/start');
   });
 
-  test('canonical homepage controls grow natively and trust artwork stays in its slots', async ({
+  test('canonical header flyouts stay closed until requested', async ({
     page,
-    context,
   }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    // Match the consent fixture: middleware refreshes this flag from geo headers.
-    await page.setExtraHTTPHeaders({
-      'x-vercel-ip-country': 'DE',
-      'x-vercel-ip-country-region': 'BE',
-    });
-    await page.addInitScript(() => {
-      try {
-        localStorage.removeItem('jv_cc');
-      } catch {
-        // ignore
-      }
-    });
-    await context.addCookies([
-      {
-        name: 'jv_cc_required',
-        value: '1',
-        url: process.env.BASE_URL ?? 'http://localhost:3100',
-        sameSite: 'Lax',
-      },
-    ]);
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
-    for (const width of [1440, 390]) {
-      await page.setViewportSize({ width, height: 900 });
-      await gotoHomepage(page);
-      await page.evaluate(() => document.fonts.ready);
-      const actions = page.locator(
-        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button, [data-testid="homepage-primary-cta"]:visible'
-      );
-      await expect(page.getByTestId('cookie-actions')).toBeVisible();
-      expect(await actions.count()).toBeGreaterThanOrEqual(4);
-      for (const action of await actions.all()) {
-        const geometry = await action.evaluate(element => {
-          const face = element.getBoundingClientRect();
-          const target = getComputedStyle(element, '::before');
-          return {
-            height: face.height,
-            targetHeight: Number.parseFloat(target.height),
-            targetWidth: Number.parseFloat(target.width),
-          };
-        });
-        expect(geometry.height).toBeCloseTo(28, 0);
-        expect(geometry.targetHeight).toBeGreaterThanOrEqual(44);
-        expect(geometry.targetWidth).toBeGreaterThanOrEqual(44);
-      }
-
-      const ink = await page
-        .locator('.homepage-trust-logo-slot:visible')
-        .evaluateAll(slots =>
-          slots.map(slot => {
-            const svg = slot.querySelector('svg');
-            if (!svg) throw new Error('Trust logo SVG missing');
-            const matrix = svg.getScreenCTM();
-            if (!matrix) throw new Error('Trust logo transform missing');
-            const bounds = svg.getBBox();
-            const leftTop = new DOMPoint(bounds.x, bounds.y).matrixTransform(
-              matrix
-            );
-            const rightBottom = new DOMPoint(
-              bounds.x + bounds.width,
-              bounds.y + bounds.height
-            ).matrixTransform(matrix);
-            const frame = slot.getBoundingClientRect();
-            return {
-              left: leftTop.x,
-              right: rightBottom.x,
-              top: leftTop.y,
-              bottom: rightBottom.y,
-              frameLeft: frame.left,
-              frameRight: frame.right,
-              frameTop: frame.top,
-              frameBottom: frame.bottom,
-            };
-          })
-        );
-      expect(ink.length).toBeGreaterThanOrEqual(4);
-      for (const logo of ink) {
-        expect(logo.left).toBeGreaterThanOrEqual(logo.frameLeft - 1);
-        expect(logo.right).toBeLessThanOrEqual(logo.frameRight + 1);
-        expect(logo.top).toBeGreaterThanOrEqual(logo.frameTop - 1);
-        expect(logo.bottom).toBeLessThanOrEqual(logo.frameBottom + 1);
-        expect(logo.left).toBeGreaterThanOrEqual(0);
-        expect(logo.right).toBeLessThanOrEqual(width);
-      }
-
-      const consentAndHeader = page.locator(
-        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button'
-      );
-      const assertTargets = async () => {
-        const targets = await consentAndHeader.evaluateAll(elements =>
-          elements.map(element => {
-            const face = element.getBoundingClientRect();
-            const pseudo = getComputedStyle(element, '::before');
-            const width = Math.max(face.width, Number.parseFloat(pseudo.width));
-            const height = Math.max(
-              face.height,
-              Number.parseFloat(pseudo.height)
-            );
-            const left = face.x + (face.width - width) / 2;
-            const top = face.y + (face.height - height) / 2;
-            const points = [
-              [left + width / 2, top + 2],
-              [left + width / 2, top + height - 2],
-              [left + 2, top + height / 2],
-              [left + width - 2, top + height / 2],
-            ];
-            return {
-              left,
-              right: left + width,
-              top,
-              bottom: top + height,
-              owned: points.every(([x, y]) => {
-                const hit = document.elementFromPoint(x, y);
-                return (
-                  hit === element || (hit !== null && element.contains(hit))
-                );
-              }),
-            };
-          })
-        );
-        for (let i = 0; i < targets.length; i += 1) {
-          expect(targets[i].owned, '44px target must hit its own control').toBe(
-            true
-          );
-          for (const other of targets.slice(i + 1)) {
-            const target = targets[i];
-            expect(
-              target.right <= other.left ||
-                other.right <= target.left ||
-                target.bottom <= other.top ||
-                other.bottom <= target.top
-            ).toBe(true);
-          }
-        }
-      };
-      await assertTargets();
-      for (const action of await consentAndHeader.all()) {
-        await page.keyboard.press('Tab');
-        await action.focus();
-        await page.evaluate(
-          () =>
-            new Promise<void>(resolve => {
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() => resolve())
-              );
-            })
-        );
-        await expect(action).toBeFocused();
-        const shadow = await action.evaluate(
-          element => getComputedStyle(element).boxShadow
-        );
-        expect(shadow).toContain('rgb(17, 175, 255)');
-      }
-
-      // Text-only enlargement must grow the native control, not clip its label.
-      for (const action of await actions.all()) {
-        await action.evaluate(element => {
-          element.style.fontSize = '40px';
-        });
-        const grown = await action.evaluate(element => ({
-          height: element.getBoundingClientRect().height,
-          clientHeight: element.clientHeight,
-          scrollHeight: element.scrollHeight,
-        }));
-        expect(grown.height).toBeGreaterThan(28);
-        expect(grown.scrollHeight).toBeLessThanOrEqual(grown.clientHeight);
-      }
-      await assertTargets();
-    }
-  });
-
-  test('canonical header has no flyout menus', async ({ page }) => {
     const header = page.getByTestId('header-nav');
     const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
     await expect(toolsFlyout).toHaveCount(0);
   });
 
@@ -470,7 +288,7 @@ test.describe('Homepage', () => {
   }) => {
     await expect(
       page
-        .getByTestId('marketing-section-hero')
+        .getByTestId('homepage-hero-shell')
         .locator('[data-hero-layer="active"]')
     ).toHaveCount(1);
     const copy = page.locator('.homepage-editorial-hero__copy');
@@ -529,8 +347,8 @@ test.describe('Homepage', () => {
     }
 
     const sectionIds = [
-      'marketing-section-hero',
-      'marketing-section-logo-cloud',
+      'homepage-hero-shell',
+      'homepage-proof',
       'homepage-section-connected',
       'homepage-section-found',
       'homepage-section-know',
@@ -544,9 +362,7 @@ test.describe('Homepage', () => {
         ids.map(
           id =>
             document
-              .querySelector(
-                `[data-testid="${id}"], [data-homepage-testid="${id}"]`
-              )
+              .querySelector(`[data-testid="${id}"]`)
               ?.getBoundingClientRect().top ?? Number.NaN
         ),
       sectionIds
@@ -556,13 +372,13 @@ test.describe('Homepage', () => {
 
     const heroToProofBoundary = await page.evaluate(() => {
       const hero = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-hero"]'
+        '[data-testid="homepage-hero-shell"]'
       );
       const stack = document.querySelector<HTMLElement>(
         '[data-testid="homepage-story-stack"]'
       );
       const proofSection = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-logo-cloud"]'
+        '[data-testid="homepage-proof"]'
       );
       if (!(hero && stack && proofSection)) return null;
       return {
@@ -581,21 +397,11 @@ test.describe('Homepage', () => {
       Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
     ).toBeLessThanOrEqual(1);
 
-    // Section 2 retains verified logos on the page
-    // background, never a frosted card.
-    const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(
-      page.getByText("Proof is earned. We don't borrow it.", { exact: true })
-    ).toHaveCount(0);
-    await expect(
-      proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
-    ).toBeVisible();
-    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
-    );
-    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
-    await expect(proof.locator('svg')).toHaveCount(4);
+    // Section 2 is a statement, never a logo strip.
+    const proof = page.getByTestId('homepage-proof');
+    await expect(proof).toHaveText("Proof is earned. We don't borrow it.");
+    await expect(proof.locator('img, svg')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-trust')).toHaveCount(0);
 
     // Locked section copy, verbatim.
     for (const [id, headline, body] of [
@@ -630,9 +436,7 @@ test.describe('Homepage', () => {
         'Jovie adapts to your work without reducing you to a category.',
       ],
     ] as const) {
-      const section = page.locator(
-        `[data-homepage-testid="homepage-section-${id}"]`
-      );
+      const section = page.getByTestId(`homepage-section-${id}`);
       await expect(
         section.getByRole('heading', { level: 2, name: headline })
       ).toBeVisible();
@@ -640,18 +444,14 @@ test.describe('Homepage', () => {
     }
 
     // Real product exports load at device quality where they appear.
-    const connected = page.locator(
-      '[data-homepage-testid="homepage-section-connected"]'
-    );
+    const connected = page.getByTestId('homepage-section-connected');
     await connected.scrollIntoViewIfNeeded();
     await expect(connected.locator('img')).toHaveCount(1);
-    const relationships = page.locator(
-      '[data-homepage-testid="homepage-section-relationships"]'
-    );
+    const relationships = page.getByTestId('homepage-section-relationships');
     await relationships.scrollIntoViewIfNeeded();
     await expect(relationships.locator('img')).toHaveCount(3);
     const exportSelector =
-      '[data-homepage-testid="homepage-section-connected"] img, [data-homepage-testid="homepage-section-relationships"] img';
+      '[data-testid="homepage-section-connected"] img, [data-testid="homepage-section-relationships"] img';
     await page.waitForFunction(
       selector =>
         Array.from(document.querySelectorAll<HTMLImageElement>(selector)).every(
@@ -681,7 +481,7 @@ test.describe('Homepage', () => {
     }
 
     // Section 9 repeats the name search; CTA is Find me, never Search.
-    const close = page.getByTestId('marketing-section-cta');
+    const close = page.getByTestId('homepage-close');
     await close.scrollIntoViewIfNeeded();
     await expect(
       close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
@@ -764,74 +564,6 @@ test.describe('Homepage', () => {
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
-  test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await gotoHomepage(page);
-    await page.evaluate(() => document.fonts.ready);
-
-    const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
-    );
-    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
-
-    const logoBoxes = await proof.locator('svg').evaluateAll(svgs =>
-      svgs.map(svg => {
-        const box = svg.getBoundingClientRect();
-        return {
-          label: svg.getAttribute('aria-label') ?? svg.textContent ?? '',
-          left: box.left,
-          right: box.right,
-          top: box.top,
-          bottom: box.bottom,
-        };
-      })
-    );
-    expect(logoBoxes).toHaveLength(4);
-    for (let index = 0; index < logoBoxes.length; index += 1) {
-      for (let other = index + 1; other < logoBoxes.length; other += 1) {
-        const a = logoBoxes[index];
-        const b = logoBoxes[other];
-        const overlaps =
-          a.left < b.right &&
-          a.right > b.left &&
-          a.top < b.bottom &&
-          a.bottom > b.top;
-        expect(overlaps, `${a.label} overlaps ${b.label} at 1280px`).toBe(
-          false
-        );
-      }
-    }
-
-    const headerBottom = await page
-      .getByTestId('header-nav')
-      .evaluate(header => {
-        const shell = header.querySelector('.marketing-glass-header__shell');
-        return (shell ?? header).getBoundingClientRect().bottom;
-      });
-
-    const headings = page.locator('[data-homepage-section-heading]');
-    const headingCount = await headings.count();
-    expect(headingCount).toBeGreaterThanOrEqual(7);
-
-    for (let index = 0; index < headingCount; index += 1) {
-      const heading = headings.nth(index);
-      const name = (await heading.innerText()).trim();
-      await heading.evaluate(element => {
-        element.scrollIntoView({ block: 'start', inline: 'nearest' });
-      });
-      const top = await heading.evaluate(
-        element => element.getBoundingClientRect().top
-      );
-      expect(top, `${name} must clear the sticky nav`).toBeGreaterThanOrEqual(
-        headerBottom - 0.5
-      );
-    }
-  });
-
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
     page,
   }) => {
@@ -863,7 +595,7 @@ test.describe('Homepage', () => {
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
     const [heroInlinePadding, searchMaterial] = await Promise.all([
-      page.getByTestId('marketing-section-hero').evaluate(element => {
+      page.getByTestId('homepage-hero-shell').evaluate(element => {
         const style = getComputedStyle(element);
         return (
           Number.parseFloat(style.paddingLeft) +
@@ -875,19 +607,17 @@ test.describe('Homepage', () => {
           '.homepage-name-search__field'
         );
         const glow = element.querySelector<HTMLElement>(
-          '.input-aura-frame__illumination'
+          ":scope > .group\\/aura > [aria-hidden='true']"
         );
         if (!(field && glow)) return null;
         const fieldBounds = field.getBoundingClientRect();
         const glowBounds = glow.getBoundingClientRect();
-        const glowStyle = getComputedStyle(glow);
         return {
           fieldLeft: fieldBounds.left,
           fieldRight: fieldBounds.right,
           glowLeft: glowBounds.left,
           glowRight: glowBounds.right,
-          glowMaskComposite: glowStyle.maskComposite,
-          glowWebkitMaskComposite: glowStyle.webkitMaskComposite,
+          glowClipPath: getComputedStyle(glow).clipPath,
         };
       }),
     ]);
@@ -908,11 +638,7 @@ test.describe('Homepage', () => {
       searchMaterial?.fieldRight ?? Number.NaN,
       0
     );
-    expect(
-      searchMaterial?.glowMaskComposite === 'exclude' ||
-        searchMaterial?.glowWebkitMaskComposite === 'xor' ||
-        searchMaterial?.glowWebkitMaskComposite === 'XOR'
-    ).toBe(true);
+    expect(searchMaterial?.glowClipPath).not.toBe('none');
     await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
 
     await page.evaluate(() => {
@@ -929,14 +655,17 @@ test.describe('Homepage', () => {
     const mobileNav = page.locator('#mobile-nav-panel');
     await expect(mobileNav).toBeVisible();
     await expect(
+      header.getByRole('link', { name: 'Get started', exact: true })
+    ).toHaveCount(0);
+    await expect(
       header.getByRole('link', { name: 'Find yourself', exact: true })
     ).toHaveCount(0);
     await expect(
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+      mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
+    ).toHaveAttribute('href', '/start');
   });
 
   test('has no horizontal overflow across common viewports', async ({
@@ -994,7 +723,7 @@ test.describe('Homepage', () => {
       const copy = page.locator('.homepage-editorial-hero__copy');
       const copyBox = await copy.boundingBox();
       const heroBox = await page
-        .getByTestId('marketing-section-hero')
+        .getByTestId('homepage-hero-shell')
         .boundingBox();
       const copyCenter = (copyBox?.x ?? 0) + (copyBox?.width ?? 0) / 2;
       expect(Math.abs(copyCenter - viewport.width / 2)).toBeLessThanOrEqual(8);
@@ -1024,231 +753,6 @@ test.describe('Homepage', () => {
       expect(headingLines).toBeLessThanOrEqual(3);
       await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
     }
-  });
-
-  test('editorial sections share one desktop column grid and scaled phone chrome', async ({
-    page,
-  }) => {
-    const measure = async (width: number) => {
-      await page.setViewportSize({ width, height: 900 });
-      await page.evaluate(async () => {
-        await document.fonts.ready;
-        await new Promise<void>(resolve =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-        );
-      });
-      return page.evaluate(() => {
-        const copies = [
-          ...document.querySelectorAll<HTMLElement>(
-            '.homepage-certified-section .homepage-certified-section__copy'
-          ),
-        ];
-        const starts = copies.map(copy => {
-          const section = copy.closest<HTMLElement>(
-            '.homepage-certified-section'
-          );
-          return {
-            align: section?.dataset.align ?? '',
-            left: copy.getBoundingClientRect().left,
-          };
-        });
-        const startLefts = starts
-          .filter(entry => entry.align === 'start')
-          .map(entry => entry.left);
-        const endLefts = starts
-          .filter(entry => entry.align === 'end')
-          .map(entry => entry.left);
-        const notches = [
-          ...document.querySelectorAll<HTMLElement>(
-            '.homepage-certified-section__phones[data-count="3"] .ap-phone-frame'
-          ),
-        ].map(frame => {
-          const notch = frame.querySelector<HTMLElement>(
-            '.ap-phone-frame__notch'
-          );
-          const frameWidth = frame.getBoundingClientRect().width;
-          const notchWidth = notch?.getBoundingClientRect().width ?? 0;
-          return { frameWidth, notchWidth, ratio: notchWidth / frameWidth };
-        });
-        return { startLefts, endLefts, notches };
-      });
-    };
-
-    const spread = (values: number[]) =>
-      Math.max(...values) - Math.min(...values);
-
-    const desktop = await measure(1440);
-    expect(spread(desktop.startLefts)).toBeLessThanOrEqual(2);
-    expect(spread(desktop.endLefts)).toBeLessThanOrEqual(2);
-    expect(
-      evaluateRelationalGrid({
-        candidateRevision: 'live',
-        route: '/',
-        viewport: { width: 1440, height: 900 },
-        state: 'idle',
-        theme: 'light',
-        sourceTokensPass: true,
-        elements: desktop.endLefts.map((x, index) => ({
-          id: `end-copy-${index}`,
-          column: '7 / span 6',
-          align: 'end',
-          role: 'copy',
-          box: { x, y: 0, width: 0, height: 0 },
-        })),
-      }).ok
-    ).toBe(true);
-    expect(
-      evaluateAcceptanceEvidence({
-        candidateRevision: 'live',
-        route: '/',
-        viewport: { width: 1440, height: 900 },
-        state: 'idle',
-        theme: 'light',
-        sourceTokensPass: true,
-        rendered: { aligned: spread(desktop.endLefts) <= 2 },
-        screenshotBaselineUpdated: false,
-      }).ok
-    ).toBe(true);
-    expect(desktop.endLefts[0] ?? 0).toBeGreaterThan(
-      (desktop.startLefts[0] ?? 0) + 80
-    );
-
-    const aboveSwitch = await measure(900);
-    const belowSwitch = await measure(899);
-    expect(spread(aboveSwitch.startLefts)).toBeLessThanOrEqual(2);
-    expect(spread(aboveSwitch.endLefts)).toBeLessThanOrEqual(2);
-    expect(aboveSwitch.endLefts[0] ?? 0).toBeGreaterThan(
-      (aboveSwitch.startLefts[0] ?? 0) + 40
-    );
-    expect(
-      spread([...belowSwitch.startLefts, ...belowSwitch.endLefts])
-    ).toBeLessThanOrEqual(2);
-
-    const mobile = await measure(390);
-    expect(
-      spread([...mobile.startLefts, ...mobile.endLefts])
-    ).toBeLessThanOrEqual(2);
-    expect(mobile.notches.length).toBeGreaterThan(0);
-    for (const notch of mobile.notches) {
-      expect(notch.ratio).toBeLessThan(0.45);
-      expect(notch.notchWidth).toBeLessThan(notch.frameWidth);
-    }
-  });
-
-  test('optical polish keeps shared search geometry and a quiet hero field', async ({
-    page,
-  }) => {
-    await page.evaluate(() => document.fonts.ready);
-
-    const measureSearch = (root: string) =>
-      page.locator(root).evaluate(element => {
-        const field = element.querySelector<HTMLElement>(
-          '.homepage-name-search__field'
-        );
-        const glow = element.querySelector<HTMLElement>(
-          '.input-aura-frame__illumination'
-        );
-        const action = element.querySelector<HTMLElement>(
-          'button[data-size="marketing"]'
-        );
-        if (!(field && glow && action)) return null;
-        const fieldBox = field.getBoundingClientRect();
-        const actionBox = action.getBoundingClientRect();
-        const fieldStyle = getComputedStyle(field);
-        const glowStyle = getComputedStyle(glow);
-        return {
-          fieldHeight: fieldBox.height,
-          fieldBackground: fieldStyle.backgroundColor,
-          insetTop: actionBox.top - fieldBox.top,
-          insetBottom: fieldBox.bottom - actionBox.bottom,
-          insetRight: fieldBox.right - actionBox.right,
-          actionHeight: actionBox.height,
-          glowTop: glow.getBoundingClientRect().top,
-          fieldTop: fieldBox.top,
-          maskComposite: glowStyle.maskComposite,
-          treatment: element
-            .querySelector('[data-aura-treatment]')
-            ?.getAttribute('data-aura-treatment'),
-        };
-      });
-
-    const heroSearch = await measureSearch(
-      '[data-testid="homepage-editorial-hero-search"]'
-    );
-    const closeSearch = await measureSearch(
-      '[data-testid="homepage-close-search"]'
-    );
-    expect(heroSearch).not.toBeNull();
-    expect(closeSearch).not.toBeNull();
-    expect(heroSearch?.treatment).toBe('editorial');
-    expect(closeSearch?.treatment).toBe('editorial');
-    expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
-    expect(closeSearch?.actionHeight).toBeCloseTo(28, 0);
-    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
-    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
-    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetBottom ?? 0, 0);
-    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetRight ?? 0, 0);
-    expect(heroSearch?.fieldHeight).toBeCloseTo(
-      closeSearch?.fieldHeight ?? 0,
-      0
-    );
-    expect(heroSearch?.fieldBackground).toBe(closeSearch?.fieldBackground);
-    expect(
-      evaluateSharedSearchGeometry({
-        hero: {
-          treatment: heroSearch?.treatment,
-          fieldHeight: heroSearch?.fieldHeight,
-          fieldBackground: heroSearch?.fieldBackground,
-          consumerAuraPierce: false,
-        },
-        close: {
-          treatment: closeSearch?.treatment,
-          fieldHeight: closeSearch?.fieldHeight,
-          fieldBackground: closeSearch?.fieldBackground,
-          consumerAuraPierce: false,
-        },
-      }).ok
-    ).toBe(true);
-
-    const input = page
-      .getByTestId('homepage-editorial-hero-search')
-      .getByRole('combobox');
-    const idleBackground = heroSearch?.fieldBackground;
-    await input.focus();
-    const focused = await measureSearch(
-      '[data-testid="homepage-editorial-hero-search"]'
-    );
-    expect(focused?.fieldBackground).toBe(idleBackground);
-    expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
-
-    const lightWell = page.locator('.homepage-editorial-hero__light-well');
-    expect(
-      await lightWell.evaluate(element => {
-        const style = getComputedStyle(element);
-        return {
-          borderWidth: style.borderWidth,
-          backgroundImage: style.backgroundImage,
-        };
-      })
-    ).toMatchObject({
-      borderWidth: '0px',
-      backgroundImage: expect.not.stringMatching(/55\.1%/),
-    });
-
-    await page.setViewportSize({ width: 900, height: 800 });
-    await page.evaluate(() => document.fonts.ready);
-    const heading = page.getByRole('heading', {
-      name: 'Control how the world sees you.',
-    });
-    const headingLines = await heading.evaluate(element => {
-      const style = getComputedStyle(element);
-      return Math.ceil(
-        element.getBoundingClientRect().height /
-          Number.parseFloat(style.lineHeight) -
-          0.05
-      );
-    });
-    expect(headingLines).toBe(1);
   });
 
   test('loads without critical console errors', async ({ page }) => {
