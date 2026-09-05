@@ -47,13 +47,14 @@ mkdir -p "$LOG_DIR" "$WS_ROOT" "$LEASE_DIR" "$RECEIPT_DIR"
 : "${SYMPHONY_FALLBACK_BUNDLE_REVISION:?bundle revision is required}"
 : "${SYMPHONY_FALLBACK_UNIT:?fallback unit is required}"
 LEASE_FILE="$LEASE_DIR/$ID.lock"
-exec 9>"$LEASE_FILE"
+exec 9>>"$LEASE_FILE"
 if ! flock -n 9; then
   echo "$(date -u +%FT%TZ) $ID duplicate_lease" >> "$LOG"
   exit 0
 fi
 release_fallback_lease() {
-  rm -f "$LEASE_FILE"
+  # Close our descriptor; keep the inode for existing waiters and future owners.
+  exec 9>&-
 }
 trap release_fallback_lease EXIT
 

@@ -8,6 +8,29 @@ set -euo pipefail
 home="${SYMPHONY_HOME:-$HOME}"
 workspace="${SYMPHONY_WORKSPACE:-$PWD}"
 issue="${SYMPHONY_ISSUE_IDENTIFIER:-$(basename "$workspace")}"
+# Every provider shares the same issue claim, before any capacity probe. Keep
+# descriptor 9 inherited through exec; never unlink its stable pathname.
+export SYMPHONY_FALLBACK_LEASE_DIR="${SYMPHONY_FALLBACK_LEASE_DIR:-$home/.local/state/symphony-fallback/leases}"
+mkdir -p "$SYMPHONY_FALLBACK_LEASE_DIR"
+issue_lock="$SYMPHONY_FALLBACK_LEASE_DIR/$issue.lock"
+if [ "${SYMPHONY_ISSUE_LEASE_FD:-}" != "9" ]; then
+  exec 9>>"$issue_lock"
+fi
+if ! python3 - "$issue_lock" <<'PY'
+import fcntl, os, sys
+try:
+    descriptor, path = os.fstat(9), os.stat(sys.argv[1])
+    if (descriptor.st_dev, descriptor.st_ino) != (path.st_dev, path.st_ino):
+        raise OSError("inherited issue claim has a different inode")
+    fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except OSError:
+    raise SystemExit(1)
+PY
+then
+  echo 'SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 class=issue-lease-busy retryable=true reason="issue claim unavailable"' >&2
+  exit 75
+fi
+export SYMPHONY_ISSUE_LEASE_FD=9
 guard="${SYMPHONY_CAPACITY_GUARD:-$home/.local/bin/symphony-capacity-guard.py}"
 codex_probe="${SYMPHONY_CODEX_ACCOUNT_PROBE:-$home/.local/bin/codex-account-probe}"
 cursor="${SYMPHONY_CURSOR_EXECUTABLE:-$home/.local/bin/cursor-agent-std}"
@@ -104,7 +127,8 @@ PY
 
 launch_codex() {
   set -a
-  # shellcheck disable=SC1090 -- host-owned credential path, never logged
+  # Host-owned credential path, never logged.
+  # shellcheck disable=SC1090
   . "${SYMPHONY_LINEAR_ENV:-$home/.config/symphony/linear.env}"
   set +a
   export SYMPHONY_CODEX_EXHAUSTED="${SYMPHONY_CODEX_EXHAUSTED:-$home/.local/bin/symphony-codex-exhausted.py}"
