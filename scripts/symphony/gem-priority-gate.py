@@ -117,6 +117,12 @@ def already_admitted_cohort_semantics(promotion_mode: str) -> dict[str, Any]:
             "newIntakeAllowed": True,
             "semantics": "isolated-only",
         }
+    if promotion_mode == "controller-repair-only":
+        return {
+            "preserve": True,
+            "newIntakeAllowed": False,
+            "semantics": "preserve-cohort-and-admit-one-controller-repair",
+        }
     if promotion_mode == "draft-only":
         return {
             "preserve": False,
@@ -1375,6 +1381,32 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
     )
+    controller_repair_reason_codes = {reason["code"] for reason in reasons}
+    closure_reasons = set(closure_health.get("reasons") or [])
+    closure_allows_controller_repair = (
+        closure_health.get("status") == "healthy"
+        or (
+            closure_health.get("status") in {"grace", "red"}
+            and closure_reasons <= {"queue-controller-red-over-10m"}
+            and closure_health.get("newIssueIntakeAllowed") is False
+        )
+    )
+    controller_repair_allowed = (
+        state == "AMBER"
+        and review_allowed
+        and closure_allows_controller_repair
+        and controller.get("status") == "failed"
+        and main.get("status") == "green"
+        and valid_commit_sha(main.get("sha"), exact=True)
+        and production.get("status") == "green"
+        and valid_commit_sha(production.get("deployedSha"))
+        and integrity.get("status") in {"clear", "resolved"}
+        and controller_repair_reason_codes
+        in (
+            {"controller-failure"},
+            {"controller-failure", "production-deployment-unbound"},
+        )
+    )
     if isolated_promotion_allowed:
         promotion_mode = "isolated-only"
     elif state == "GREEN":
@@ -1387,6 +1419,8 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "draft-only"
     elif hold_intake_allowed:
         promotion_mode = "hold-intake"
+    elif controller_repair_allowed:
+        promotion_mode = "controller-repair-only"
     elif (
         state == "AMBER"
         and main.get("status") == "green"
@@ -1518,6 +1552,21 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
             "maxConcurrent": unbound_repair_concurrency if unbound_repair_allowed else 0,
             "deploymentsAllowed": False,
+            "authority": "canonical-merge-queue-controller",
+        },
+        "controllerRepairAdmission": {
+            "allowed": controller_repair_allowed,
+            "condition": "controller-failure" if controller_repair_allowed else None,
+            "mainSha": main.get("sha") if controller_repair_allowed else None,
+            "deployedSha": production.get("deployedSha")
+            if controller_repair_allowed
+            else None,
+            "scope": "github-approved-exact-repository-pr-head-main-path-set"
+            if controller_repair_allowed
+            else None,
+            "maxConcurrent": 1 if controller_repair_allowed else 0,
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },
         "isolatedPromotionAdmission": {

@@ -249,7 +249,7 @@ QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-re
 PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/production-unbound-repair-attestation.mjs"
 CONTROLLER_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/controller-repair-attestation.mjs"
 CONTROLLER_REPAIR_ATTESTATION_MARKER='<!-- jovie-controller-repair-attestation/v1 -->'
-CONTROLLER_REPAIR_ATTESTATION_ACTOR='jovie-bot[bot]'
+CONTROLLER_REPAIR_QUEUE_CONTEXT='jovie-controller-repair-queue/v1'
 CONTROLLER_REPAIR_MIN_VALIDITY_MS=120000
 QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
 QUEUE_DEFERRED_RELEASE_ACTOR='jovie-bot[bot]'
@@ -341,7 +341,7 @@ case "$DRAIN_PROMOTION_MODE" in
         .controllerRepairAdmission.condition == "controller-failure" and
         .controllerRepairAdmission.mainSha == .signals.main.sha and
         .controllerRepairAdmission.deployedSha == .signals.production.deployedSha and
-        .controllerRepairAdmission.scope == "trusted-comment-exact-repository-pr-head-main-path-set" and
+        .controllerRepairAdmission.scope == "github-approved-exact-repository-pr-head-main-path-set" and
         .controllerRepairAdmission.maxConcurrent == 1 and
         .controllerRepairAdmission.deploymentsAllowed == false and
         .controllerRepairAdmission.runtimeActivationAllowed == false and
@@ -483,36 +483,54 @@ production_unbound_repair_attestation_matches() {  # <body> <pr> <head> <main-sh
     --pr "$pr" --head "$head" --main-sha "$main_sha" >/dev/null 2>&1
 }
 
-controller_repair_attestation_for_pr() {  # <pr>
-  local raw body
-  raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp 2>/dev/null || true)"
-  [[ -n "$raw" ]] || return 0
-  body="$(jq -r --arg marker "$CONTROLLER_REPAIR_ATTESTATION_MARKER" --arg actor "$CONTROLLER_REPAIR_ATTESTATION_ACTOR" '
+controller_repair_review_for_pr() {  # <pr> <head>
+  local n="$1" head="$2" author author_payload reviews
+  author_payload="$(gh_retry api "repos/${REPO}/pulls/${n}" 2>/dev/null || true)"
+  author="$(jq -r '.user.login // empty' <<<"$author_payload" 2>/dev/null || true)"
+  [[ -n "$author" ]] || return 0
+  reviews="$(gh_retry api "repos/${REPO}/pulls/${n}/reviews" --paginate --slurp 2>/dev/null || true)"
+  [[ -n "$reviews" ]] || return 0
+  jq -c --arg marker "$CONTROLLER_REPAIR_ATTESTATION_MARKER" \
+    --arg author "$author" --arg head "$head" '
     [ .[][]?
-      | select(.user.login == $actor)
+      | select(.state == "APPROVED")
+      | select(((.commit_id // "") | ascii_downcase) == $head)
+      | select(.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
+      | select(.user.login != $author)
       | select((.body | type == "string") and (.body | contains($marker)))
-      | .body
+      | {
+          body,
+          reviewId: ("github-review-" + (.id | tostring)),
+          reviewer: .user.login
+        }
     ] | last // empty
-  ' <<<"$raw" 2>/dev/null || true)"
-  [[ -n "$body" ]] || return 0
-  printf '%s' "$body"
+  ' <<<"$reviews" 2>/dev/null || true
 }
 
-controller_repair_attestation_matches() {  # <body> <pr> <head> <main-sha> <paths-hash>
-  local body="$1" pr="$2" head="$3" main_sha="$4" paths_hash="$5" operation_id verdict
-  operation_id="run-${GITHUB_RUN_ID:-}-attempt-${GITHUB_RUN_ATTEMPT:-}"
-  [[ "$operation_id" =~ ^run-[1-9][0-9]*-attempt-[1-9][0-9]*$ ]] || return 1
-  # Treat the accepted bot statement as a short lease, not revocable shared
-  # state. GitHub's dequeuePullRequest mutation has no expected-head input, so
-  # a post-enrollment comment reread cannot safely compensate without risking
-  # a newer head. Require enough lease runway before mutation instead; the
-  # existing post-enrollment source/head/hold rereads remain authoritative.
+controller_repair_attestation_matches() {  # <review-json> <pr> <head> <main-sha> <paths-hash>
+  local review="$1" pr="$2" head="$3" main_sha="$4" paths_hash="$5" body review_id verdict
+  body="$(jq -r '.body // empty' <<<"$review")"
+  review_id="$(jq -r '.reviewId // empty' <<<"$review")"
+  [[ -n "$body" && "$review_id" =~ ^github-review-[1-9][0-9]*$ ]] || return 1
   verdict="$(printf '%s' "$body" | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" matches \
     --repository "$REPO" --pr "$pr" --head "$head" --main-sha "$main_sha" \
     --changed-paths-sha256 "$paths_hash" \
-    --operation-id "$operation_id" \
+    --review-id "$review_id" \
     --minimum-valid-for-ms "$CONTROLLER_REPAIR_MIN_VALIDITY_MS" 2>/dev/null)" || return 1
   jq -e 'type == "object" and .allowed == true' <<<"$verdict" >/dev/null 2>&1
+}
+
+controller_repair_live_evidence_matches() {  # <pr> <head> <main-sha>
+  local n="$1" head="$2" main_sha="$3" changed_paths paths_hash review
+  changed_paths="$(pr_changed_paths_json "$n")"
+  [[ "$changed_paths" != "null" ]] || return 1
+  paths_hash="$(printf '%s' "$changed_paths" \
+    | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
+  [[ "$paths_hash" =~ ^[0-9a-f]{64}$ ]] || return 1
+  review="$(controller_repair_review_for_pr "$n" "$head")"
+  [[ -n "$review" ]] || return 1
+  controller_repair_attestation_matches \
+    "$review" "$n" "$head" "$main_sha" "$paths_hash"
 }
 
 # Keep one scheduled tick bounded. A single in-flight GitHub call may finish
@@ -782,6 +800,53 @@ queue_reentry_receipt_is_recoverable() {  # <head>
   ' <<<"$statuses" 2>/dev/null)" || true
   [[ -n "$latest" ]] || return 1
   receipt_actor_is_trusted "$head" "$latest"
+}
+
+controller_repair_queue_receipt_is_recoverable() {  # <pr> <head>
+  local n="$1" head="$2" statuses latest description
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ "$n" =~ ^[1-9][0-9]*$ ]] || return 1
+  description="Authenticated controller repair PR #$n at exact head"
+  statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)" || return 1
+  latest="$(jq -c --arg context "$CONTROLLER_REPAIR_QUEUE_CONTEXT" --arg repo "$REPO" --arg description "$description" '
+    [ .statuses[]? | select(.context == $context) ]
+    | sort_by(.updated_at)
+    | last
+    | select(
+        . != null
+        and .state == "success"
+        and .description == $description
+        and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+      )
+  ' <<<"$statuses" 2>/dev/null)" || true
+  [[ -n "$latest" ]] || return 1
+  receipt_actor_is_trusted "$head" "$latest"
+}
+
+record_controller_repair_queue_receipt() {  # <pr> <expected-head>
+  local n="$1" expected_head="$2" current live_head target_url
+  [[ "$expected_head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $CONTROLLER_REPAIR_QUEUE_CONTEXT on #$n at $expected_head"
+    return 0
+  fi
+  if controller_repair_queue_receipt_is_recoverable "$n" "$expected_head"; then
+    echo "    =$CONTROLLER_REPAIR_QUEUE_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
+  fi
+  target_url="$(fleet_hold_target_url)" || return 1
+  current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)" || return 1
+  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+  if ! jq -e --arg head "$expected_head" '
+    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
+  ' <<<"$current" >/dev/null; then
+    return 2
+  fi
+  gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
+    -f state=success \
+    -f context="$CONTROLLER_REPAIR_QUEUE_CONTEXT" \
+    -f description="Authenticated controller repair PR #$n at exact head" \
+    -f target_url="$target_url" >/dev/null
 }
 
 record_queue_reentry_receipt() {  # <pr> <expected-head>
@@ -1288,22 +1353,13 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       return 2
     fi
   elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
-    local repair_main_sha changed_paths paths_hash attestation_body
+    local repair_main_sha
     repair_main_sha="$(jq -r '.controllerRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-    changed_paths="$(pr_changed_paths_json "$n")"
-    paths_hash=""
-    if [[ "$changed_paths" != "null" ]]; then
-      paths_hash="$(printf '%s' "$changed_paths" \
-        | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
-    fi
-    attestation_body="$(controller_repair_attestation_for_pr "$n")"
     if [[ "$n" != "$DRAIN_ADMISSION_PR" \
       || "$expected_head" != "$DRAIN_ADMISSION_HEAD" \
-      || ! "$paths_hash" =~ ^[0-9a-f]{64}$ \
-      || -z "$attestation_body" ]] \
-      || ! controller_repair_attestation_matches \
-        "$attestation_body" "$n" "$expected_head" "$repair_main_sha" "$paths_hash"; then
-      echo "    ⏸ trusted exact-scope controller repair attestation is absent or stale for #$n"
+      ]] || ! controller_repair_live_evidence_matches \
+        "$n" "$expected_head" "$repair_main_sha"; then
+      echo "    ⏸ authenticated exact-scope controller repair approval is absent or stale for #$n"
       return 2
     fi
   elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" || "$DRAIN_PROMOTION_MODE" == "draft-only" ]]; then
@@ -1447,6 +1503,35 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
           return 1
         fi
         return 2
+      fi
+    fi
+
+    if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+      local post_main_sha post_failures
+      post_main_sha="$(gh_retry api "repos/${REPO}/git/ref/heads/main" \
+        --jq '.object.sha' 2>/dev/null | tr '[:upper:]' '[:lower:]')" || post_main_sha=""
+      post_failures="$(check_failures_for_pr "$n")"
+      if [[ ! "$post_main_sha" =~ ^[0-9a-f]{40}$ \
+        || "$post_main_sha" != "$repair_main_sha" ]] \
+        || ! jq -e '.mutationActor == "jovie-bot[bot]"' \
+          <<<"$enrollment_receipt" >/dev/null \
+        || ! jq -e 'type == "array" and length == 0' \
+          <<<"$post_failures" >/dev/null \
+        || ! controller_repair_live_evidence_matches \
+          "$n" "$expected_head" "$repair_main_sha"; then
+        echo "    ⏸ controller repair evidence changed during native enrollment for #$n; compensating"
+        if ! dequeue_strict "$n" "$expected_head"; then
+          echo "    !! CRITICAL: expected-head compensation could not be proven for #$n" >&2
+          return 1
+        fi
+        return 2
+      fi
+      if ! record_controller_repair_queue_receipt "$n" "$expected_head"; then
+        echo "    !! controller repair lacks durable cross-run identity; compensating" >&2
+        if ! dequeue_strict "$n" "$expected_head"; then
+          echo "    !! CRITICAL: expected-head compensation could not be proven for #$n" >&2
+        fi
+        return 1
       fi
     fi
 
@@ -1887,23 +1972,18 @@ elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
     n="$(jq -r '.n' <<<"$pr")"
     head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
     eligible=false
-    if [[ "$n" == "$DRAIN_ADMISSION_PR" \
+    if [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] \
+      && [[ "$(jq -r '.q // false' <<<"$pr")" == "true" ]] \
+      && controller_repair_queue_receipt_is_recoverable "$n" "$head_oid"; then
+      eligible=true
+    elif [[ "$n" == "$DRAIN_ADMISSION_PR" \
       && "$head_oid" == "$DRAIN_ADMISSION_HEAD" \
       && "$head_oid" =~ ^[0-9a-f]{40}$ ]]; then
-      changed_paths="$(pr_changed_paths_json "$n")"
-      paths_hash=""
-      if [[ "$changed_paths" != "null" ]]; then
-        paths_hash="$(printf '%s' "$changed_paths" \
-          | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
-      fi
-      attestation_body="$(controller_repair_attestation_for_pr "$n")"
-      if [[ "$paths_hash" =~ ^[0-9a-f]{64}$ ]] \
-        && [[ -n "$attestation_body" ]] \
-        && controller_repair_attestation_matches \
-          "$attestation_body" "$n" "$head_oid" "$REPAIR_MAIN_SHA" "$paths_hash"; then
+      if controller_repair_live_evidence_matches \
+        "$n" "$head_oid" "$REPAIR_MAIN_SHA"; then
         eligible=true
       else
-        echo "  #$n  ⏸ trusted exact-scope controller repair attestation is absent or stale"
+        echo "  #$n  ⏸ authenticated exact-scope controller repair approval is absent or stale"
       fi
     fi
     CLASSIFIED="$(jq -c --argjson n "$n" --argjson eligible "$eligible" \
@@ -2007,7 +2087,9 @@ done < <(echo "$SNAP" | jq -c '.[]
 # labels, ready state, or auto-merge intent. Draft-only/blocked modes retain no
 # queued PRs. This is the existing queue controller applying one narrower
 # admission policy, not a parallel queue.
-if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
+if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ||
+      "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ||
+      "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   echo "=== DEQUEUE (fleet promotion constraint → queue removal) ==="
   ISOLATED_KEEP_PR=""
   CONTROLLER_REPAIR_KEEP_PR=""

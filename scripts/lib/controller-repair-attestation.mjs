@@ -4,12 +4,11 @@ export const CONTROLLER_REPAIR_ATTESTATION_SCHEMA =
   'jovie-controller-repair-attestation/v1';
 export const CONTROLLER_REPAIR_ATTESTATION_MARKER =
   '<!-- jovie-controller-repair-attestation/v1 -->';
-export const CONTROLLER_REPAIR_ATTESTATION_ACTOR = 'jovie-bot[bot]';
 
 const SHA = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const REPOSITORY = /^[^/\s]+\/[^/\s]+$/;
-const OPERATION_ID = /^[a-z0-9][a-z0-9-]{7,63}$/;
+const REVIEW_ID = /^github-review-[1-9][0-9]*$/;
 const MAX_LIFETIME_MS = 15 * 60_000;
 const CLOCK_SKEW_MS = 60_000;
 const EXACT_KEYS = [
@@ -21,7 +20,6 @@ const EXACT_KEYS = [
   'issuedAt',
   'kind',
   'mainSha',
-  'operationId',
   'pr',
   'repository',
   'reviewAuthority',
@@ -89,14 +87,14 @@ export function validateControllerRepairAttestation(
   if (typeof candidate.mainSha !== 'string' || !SHA.test(candidate.mainSha)) {
     errors.push('mainSha must be an exact lowercase SHA');
   }
-  if (candidate.reviewAuthority !== 'independent-llm-review') {
-    errors.push('reviewAuthority must be independent-llm-review');
+  if (candidate.reviewAuthority !== 'github-approved-collaborator') {
+    errors.push('reviewAuthority must be github-approved-collaborator');
   }
   if (
     typeof candidate.reviewId !== 'string' ||
-    !OPERATION_ID.test(candidate.reviewId)
+    !REVIEW_ID.test(candidate.reviewId)
   ) {
-    errors.push('reviewId must be a bounded lowercase review id');
+    errors.push('reviewId must identify the authenticated GitHub review');
   }
   if (
     typeof candidate.reviewedHead !== 'string' ||
@@ -110,12 +108,6 @@ export function validateControllerRepairAttestation(
     !SHA256.test(candidate.changedPathsSha256)
   ) {
     errors.push('changedPathsSha256 must be a lowercase SHA-256 digest');
-  }
-  if (
-    typeof candidate.operationId !== 'string' ||
-    !OPERATION_ID.test(candidate.operationId)
-  ) {
-    errors.push('operationId must be a bounded lowercase operation id');
   }
   const issued = Date.parse(String(candidate.issuedAt ?? ''));
   const expires = Date.parse(String(candidate.expiresAt ?? ''));
@@ -192,7 +184,7 @@ export function attestationMatchesControllerRepair(
     head,
     mainSha,
     changedPathsSha256,
-    operationId,
+    reviewId,
     minimumValidForMs = 0,
     now = Date.now(),
   }
@@ -208,7 +200,7 @@ export function attestationMatchesControllerRepair(
       attestation.head === head &&
       attestation.mainSha === mainSha &&
       attestation.changedPathsSha256 === changedPathsSha256 &&
-      attestation.operationId === operationId
+      attestation.reviewId === reviewId
   );
 }
 
@@ -251,7 +243,7 @@ export async function runCli(argv = process.argv.slice(2)) {
       head: args.head,
       mainSha: args['main-sha'],
       changedPathsSha256: args['changed-paths-sha256'],
-      operationId: args['operation-id'],
+      reviewId: args['review-id'],
       minimumValidForMs: Number(args['minimum-valid-for-ms'] ?? 0),
     });
     process.stdout.write(`${JSON.stringify({ allowed: matches })}\n`);
@@ -270,11 +262,10 @@ export async function runCli(argv = process.argv.slice(2)) {
         pr: Number(args.pr),
         head: args.head,
         mainSha: args['main-sha'],
-        reviewAuthority: 'independent-llm-review',
+        reviewAuthority: 'github-approved-collaborator',
         reviewId: args['review-id'],
         reviewedHead: args.head,
         changedPathsSha256: args['changed-paths-sha256'],
-        operationId: args['operation-id'],
         issuedAt: new Date(issued).toISOString(),
         expiresAt: expires,
         deploymentsAllowed: false,
