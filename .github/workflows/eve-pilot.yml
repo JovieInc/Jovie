@@ -232,15 +232,18 @@ jobs:
             exit 1
           fi
       - name: Send one founder-only signed Photon canary
+        env:
+          DOPPLER_TOKEN_PRD: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
           set -euo pipefail
           production_env_file="$(mktemp)"
           preview_env_file="$(mktemp)"
           development_env_file="$(mktemp)"
+          doppler_file="$(mktemp)"
           response_file="$(mktemp)"
           cleanup() {
             rm -f "$production_env_file" "$preview_env_file" \
-              "$development_env_file" "$response_file"
+              "$development_env_file" "$doppler_file" "$response_file"
           }
           trap cleanup EXIT
           pnpm exec vercel env pull "$production_env_file" \
@@ -273,6 +276,22 @@ jobs:
             allowed_senders="$(dotenv_value "$production_env_file" OVIE_IMESSAGE_ALLOWED_SENDERS)"
           [ -n "$allowed_senders" ] ||
             allowed_senders="$(dotenv_value "$development_env_file" OVIE_IMESSAGE_ALLOWED_SENDERS)"
+          if [ -z "$allowed_senders" ] && [ -n "${DOPPLER_TOKEN_PRD:-}" ]; then
+            for doppler_project in jovie-eve-shadow jovie-web; do
+              if curl -fsS --get \
+                --header "Authorization: Bearer $DOPPLER_TOKEN_PRD" \
+                --data-urlencode "project=$doppler_project" \
+                --data-urlencode 'config=prd' \
+                --data-urlencode 'format=json' \
+                'https://api.doppler.com/v3/configs/config/secrets/download' \
+                >"$doppler_file" 2>/dev/null; then
+                allowed_senders="$(jq -r \
+                  '.OVIE_IMESSAGE_ALLOWED_SENDERS // empty' \
+                  "$doppler_file")"
+                [ -n "$allowed_senders" ] && break
+              fi
+            done
+          fi
           if [ -z "$webhook_secret" ]; then
             echo 'IMESSAGE_WEBHOOK_SECRET is required for the signed canary.' >&2
             exit 1
