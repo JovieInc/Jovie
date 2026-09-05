@@ -236,9 +236,11 @@ jobs:
           set -euo pipefail
           production_env_file="$(mktemp)"
           preview_env_file="$(mktemp)"
+          development_env_file="$(mktemp)"
           response_file="$(mktemp)"
           cleanup() {
-            rm -f "$production_env_file" "$preview_env_file" "$response_file"
+            rm -f "$production_env_file" "$preview_env_file" \
+              "$development_env_file" "$response_file"
           }
           trap cleanup EXIT
           pnpm exec vercel env pull "$production_env_file" \
@@ -251,7 +253,13 @@ jobs:
             --yes \
             --scope jovie \
             --token "$VERCEL_TOKEN" >/dev/null
-          chmod 600 "$production_env_file" "$preview_env_file"
+          pnpm exec vercel env pull "$development_env_file" \
+            --environment=development \
+            --yes \
+            --scope jovie \
+            --token "$VERCEL_TOKEN" >/dev/null
+          chmod 600 "$production_env_file" "$preview_env_file" \
+            "$development_env_file"
           dotenv_value() {
             sed -n -E "s/^$2=(.*)$/\1/p" "$1" |
               tail -n 1 |
@@ -263,6 +271,8 @@ jobs:
           allowed_senders="$(dotenv_value "$preview_env_file" OVIE_IMESSAGE_ALLOWED_SENDERS)"
           [ -n "$allowed_senders" ] ||
             allowed_senders="$(dotenv_value "$production_env_file" OVIE_IMESSAGE_ALLOWED_SENDERS)"
+          [ -n "$allowed_senders" ] ||
+            allowed_senders="$(dotenv_value "$development_env_file" OVIE_IMESSAGE_ALLOWED_SENDERS)"
           if [ -z "$webhook_secret" ]; then
             echo 'IMESSAGE_WEBHOOK_SECRET is required for the signed canary.' >&2
             exit 1
