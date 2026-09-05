@@ -23,29 +23,3 @@
     color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
   border-radius: 1.85rem;
 }
-
-.ap-phone-frame__notch {
-  background: color-mix(
-    in oklab,
-    var(--system-b-cinematic-black) 70%,
-    transparent
-  );
-  box-shadow: 0 0 0 1px
-    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
-}
-
-.ap-phone-frame__overlay {
-  background:
-    radial-gradient(
-      circle at top,
-      color-mix(in oklab, var(--color-text-tertiary-token) 14%, transparent),
-      transparent 35%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--color-text-primary-token) 4%, transparent),
-      transparent 22%,
-      transparent 78%,
-      color-mix(in oklab, var(--system-b-cinematic-black) 22%, transparent)
-    );
-}
