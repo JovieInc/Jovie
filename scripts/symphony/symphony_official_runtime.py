@@ -19,6 +19,7 @@ import math
 import os
 import pathlib
 import re
+import select
 import signal
 import subprocess
 import sys
@@ -82,6 +83,8 @@ DEFAULT_DEAD_LETTER_DIR = (
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
+DEFAULT_SHUTDOWN_GRACE_SECONDS = 10.0
+MAX_SHUTDOWN_GRACE_SECONDS = 12.0
 ISSUE_DEAD_LETTER_SCHEMA = "symphony-issue-dead-letter/v1"
 LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS = 3
 LINEAR_API_STATUS_PATTERN = re.compile(
@@ -1362,8 +1365,16 @@ def run_official_binary_once(
     shutdown_signum = 0
     pidfds: dict[int, int] = {}
     shutdown_grace = min(
-        12.0,
-        max(0.1, float(os.environ.get("SYMPHONY_SHUTDOWN_GRACE_SECONDS", "10"))),
+        MAX_SHUTDOWN_GRACE_SECONDS,
+        max(
+            0.1,
+            float(
+                os.environ.get(
+                    "SYMPHONY_SHUTDOWN_GRACE_SECONDS",
+                    str(DEFAULT_SHUTDOWN_GRACE_SECONDS),
+                )
+            ),
+        ),
     )
 
     def remember(pid: int) -> None:
@@ -1386,21 +1397,23 @@ def run_official_binary_once(
 
     def descendant_pids() -> list[int]:
         try:
-            rows = subprocess.run(
-                ["ps", "-axo", "pid=,ppid="],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=2,
-            ).stdout.splitlines()
-        except (OSError, subprocess.SubprocessError):
+            if pathlib.Path("/proc").is_dir():
+                pairs = []
+                for entry in pathlib.Path("/proc").iterdir():
+                    if not entry.name.isdigit():
+                        continue
+                    fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+                    pairs.append((int(entry.name), int(fields[1])))
+            else:
+                rows = subprocess.run(
+                    ["ps", "-axo", "pid=,ppid="], capture_output=True,
+                    text=True, check=True, timeout=2,
+                ).stdout.splitlines()
+                pairs = [tuple(int(value) for value in row.split()) for row in rows]
+        except (OSError, IndexError, ValueError, subprocess.SubprocessError):
             return []
         children: dict[int, list[int]] = {}
-        for row in rows:
-            try:
-                pid, parent = (int(value) for value in row.split())
-            except (TypeError, ValueError):
-                continue
+        for pid, parent in pairs:
             children.setdefault(parent, []).append(pid)
         found: list[int] = []
         # Linux subreaping reparents late-forking orphans to this wrapper. Walk
@@ -1449,8 +1462,13 @@ def run_official_binary_once(
             for pid in targets:
                 try:
                     descriptor = pidfds.get(pid)
-                    if descriptor is None:
-                        os.kill(pid, 0)
+                    if descriptor is not None and select.select([descriptor], [], [], 0)[0]:
+                        try:
+                            os.waitpid(pid, os.WNOHANG)
+                        except ChildProcessError:
+                            pass
+                        continue
+                    os.kill(pid, 0)
                     alive.append(pid)
                 except ProcessLookupError:
                     pass

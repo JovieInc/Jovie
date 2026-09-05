@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import fcntl
 import hashlib
 import io
 import os
@@ -673,6 +674,7 @@ while True: time.sleep(1)
                     str(grandchild_receipt),
                 ],
                 cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -739,6 +741,7 @@ while True: time.sleep(1)
                     "--", "python3", "-c", child, str(pid_file),
                 ],
                 cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -787,6 +790,7 @@ while True: time.sleep(1)
                     "--", "python3", "-c", child, str(pids),
                 ],
                 cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -817,11 +821,11 @@ while True: time.sleep(1)
             child = r'''
 import os, pathlib, signal, subprocess, sys, time
 def terminate(*_):
-    subprocess.Popen([
+    grand = subprocess.Popen([
         sys.executable, "-c",
-        "import os,pathlib,signal,sys,time; pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
-        sys.argv[1],
+        "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
     ], start_new_session=True)
+    pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
     raise SystemExit(0)
 signal.signal(signal.SIGTERM, terminate)
 print("ready", flush=True)
@@ -861,6 +865,10 @@ while True: time.sleep(1)
 
     def test_unit_binds_closure_stop_line_gate(self):
         helper = _load_helper()
+        self.assertLess(helper.MAX_SHUTDOWN_GRACE_SECONDS, 15)
+        self.assertEqual(helper.DEFAULT_SHUTDOWN_GRACE_SECONDS, 10)
+        self.assertIn("KillMode=control-group", UNIT)
+        self.assertIn("TimeoutStopSec=15s", UNIT)
         flag = "--closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json"
         self.assertIn(flag, UNIT)
         with tempfile.TemporaryDirectory() as tmp:
@@ -1600,7 +1608,8 @@ while True: time.sleep(1)
                 "  *'show symphony-elixir.service --property=MainPID --value'*) printf '4242\\n'; exit 0;;\n"
                 "  *'is-active --quiet symphony-elixir.service'*) exit 0;;\n"
                 "  *'is-active --quiet '*) exit 1;;\n"
-                "  *'restart symphony-elixir.service'*) exit 42;;\n"
+                "  *'restart symphony-elixir.service'*) "
+                "if [ -f \"$ALLOW_RESTART_ONCE\" ]; then rm -f \"$ALLOW_RESTART_ONCE\"; exit 0; fi; exit 42;;\n"
                 "  *) exit 0;;\n"
                 "esac\n"
             )
@@ -1650,6 +1659,7 @@ while True: time.sleep(1)
                     f"http://127.0.0.1:{server.server_address[1]}/api/v1/state"
                 ),
                 "SYSTEMCTL_EVENTS": str(root / "systemctl-events"),
+                "ALLOW_RESTART_ONCE": str(root / "allow-restart-once"),
             }
             unsafe_prior = {
                 workflow: workflow.read_bytes(),
@@ -1664,6 +1674,7 @@ while True: time.sleep(1)
             transaction = target_home / ".local/state/symphony-elixir/promotion-transaction"
             transaction.mkdir(parents=True)
             (transaction / "binary.missing").touch()
+            (transaction / "was-active").touch()
             for key, path in (("workflow", workflow), ("helper", helper), ("unit", unit)):
                 (transaction / key).write_bytes(safe_prior[path])
             manifest = {
@@ -1673,8 +1684,25 @@ while True: time.sleep(1)
             }
             (transaction / "manifest.json").write_text(json.dumps(manifest))
             (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
+            known = target_home / ".local/state/symphony-elixir/candidates/known-good"
+            known.mkdir(parents=True)
+            candidate_files = {}
+            for name, source in (
+                ("workflow", WORKFLOW_PATH),
+                ("helper", HELPER_PATH),
+                ("unit", UNIT_PATH),
+            ):
+                target = known / name
+                target.write_bytes(source.read_bytes())
+                candidate_files[name] = hashlib.sha256(target.read_bytes()).hexdigest()
+            (known / "manifest.json").write_text(json.dumps({
+                "schema": "symphony-candidate/v2",
+                "version": "known-good",
+                "files": candidate_files,
+            }))
             workflow.write_bytes(WORKFLOW_PATH.read_bytes())
             helper.write_bytes(HELPER_PATH.read_bytes())
+            (root / "allow-restart-once").touch()
             config_only = subprocess.run(
                 ["bash", str(updater), "--skip-binary", "--no-restart"],
                 cwd=ROOT,
@@ -1687,6 +1715,13 @@ while True: time.sleep(1)
             self.assertIn("DONE_STAGED_NO_LIVE_MUTATION", config_only.stdout)
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
+            events_before_activation = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            self.assertEqual(
+                len([row for row in events_before_activation if "restart symphony-elixir.service" in row]),
+                1,
+            )
 
             for path, expected in unsafe_prior.items():
                 path.write_bytes(expected)
@@ -1705,13 +1740,58 @@ while True: time.sleep(1)
             restart_events = [
                 row for row in events if "restart symphony-elixir.service" in row
             ]
-            self.assertEqual(len(restart_events), 1, events)
+            self.assertEqual(len(restart_events), 2, events)
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
             self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
             hold = target_home / ".local/state/symphony-elixir/promotion-held.json"
             self.assertTrue(hold.is_file())
             self.assertEqual(json.loads(hold.read_text())["status"], "held")
+            self.assertTrue(transaction.is_dir())
+            retained_manifest = json.loads((transaction / "manifest.json").read_text())
+            self.assertIn("was-active", retained_manifest)
+            self.assertEqual(
+                set(retained_manifest),
+                {
+                    path.name
+                    for path in transaction.iterdir()
+                    if path.is_file()
+                } - {"manifest.json", "READY"},
+            )
+
+    def test_updater_lock_is_owned_by_parent_file_descriptor(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_env = config / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            state = target_home / ".local/state/symphony-elixir"
+            state.mkdir(parents=True)
+            descriptor = os.open(state / "update.lock", os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result = subprocess.run(
+                    ["bash", str(updater), "--skip-binary", "--no-restart"],
+                    cwd=ROOT,
+                    env={
+                        **os.environ,
+                        "SYMPHONY_ELIXIR_HOME": str(target_home),
+                        "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                    },
+                    capture_output=True,
+                    text=True,
+                )
+            finally:
+                os.close(descriptor)
+            self.assertEqual(result.returncode, 8, result.stderr)
+            self.assertIn("updater lock is held", result.stderr)
+            self.assertIn('exec 9>"$update_lock"', UPDATER)
+            self.assertNotIn("lock_holder_pid=\"$!\"", UPDATER)
 
     def test_incomplete_promotion_transaction_fails_before_live_mutation(self):
         updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"

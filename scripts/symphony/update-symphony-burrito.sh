@@ -109,7 +109,30 @@ validate_rollback_bundle() {
     --workflow "$rollback_dir/workflow" \
     --unit "$rollback_dir/unit" \
     --service-name "$SERVICE_NAME" \
-    --active-issues "$ACTIVE_ISSUES" >/dev/null
+    --active-issues "$ACTIVE_ISSUES" >/dev/null &&
+  cmp -s "$rollback_dir/helper" "$HELPER_SRC" &&
+  python3 - "$rollback_dir" "$STATE_DIR/candidates" <<'PY'
+import json, pathlib, sys
+rollback = pathlib.Path(sys.argv[1])
+candidates = pathlib.Path(sys.argv[2])
+saved = json.loads((rollback / "manifest.json").read_text())
+required = {name: saved.get(name) for name in ("helper", "unit", "workflow")}
+if any(value is None for value in required.values()):
+    raise SystemExit(1)
+if "binary" in saved:
+    required["binary"] = saved["binary"]
+for candidate in candidates.iterdir():
+    try:
+        manifest = json.loads((candidate / "manifest.json").read_text())
+        if manifest.get("schema") == "symphony-candidate/v2" and all(
+            manifest.get("files", {}).get(name) == digest
+            for name, digest in required.items()
+        ):
+            raise SystemExit(0)
+    except (OSError, TypeError, ValueError):
+        continue
+raise SystemExit(1)
+PY
 }
 
 install_one() {
@@ -414,8 +437,6 @@ rollback_dir=""
 candidate_dir=""
 candidate_tmp=""
 update_lock=""
-lock_holder_pid=""
-lock_status_dir=""
 promotion_started=0
 promotion_complete=0
 official_was_active=0
@@ -423,6 +444,31 @@ official_stopped_for_promotion=0
 official_pid_before=""
 files_promoted=0
 rollback_safe=1
+
+write_promotion_hold() {
+  CANDIDATE_DIR="$candidate_dir" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+target = root / "promotion-held.json"
+temporary = root / ".promotion-held.tmp"
+value = {
+    "schema": "symphony-promotion-hold/v1",
+    "status": "held",
+    "reason": "prior_config_unsafe",
+    "candidate": os.environ["CANDIDATE_DIR"],
+    "transaction": os.environ["ROLLBACK_DIR"],
+}
+temporary.write_text(json.dumps(value, sort_keys=True) + "\n")
+with temporary.open("rb") as handle:
+    os.fsync(handle.fileno())
+os.replace(temporary, target)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
 
 backup_target() {
   local key="$1" target="$2"
@@ -447,7 +493,7 @@ cleanup() {
   if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
     if [ "$promotion_started" -eq 1 ]; then
       if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
-        printf '%s\n' '{"schema":"symphony-promotion-hold/v1","status":"held","reason":"prior_config_unsafe"}' > "$STATE_DIR/promotion-held.json"
+        write_promotion_hold
       else
         restore_target binary "$BIN_DST" 0755
         restore_target helper "$HELPER_DST" 0755
@@ -470,18 +516,13 @@ cleanup() {
     fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  if [ "$promotion_complete" -eq 1 ] || [ "$status" -ne 0 ]; then
+  if [ "$promotion_complete" -eq 1 ] || { [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; }; then
     [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
   fi
   if [ -n "$candidate_tmp" ]; then
     chmod -R u+w "$candidate_tmp" >/dev/null 2>&1 || true
     rm -rf "$candidate_tmp"
   fi
-  if [ -n "$lock_holder_pid" ]; then
-    kill "$lock_holder_pid" >/dev/null 2>&1 || true
-    wait "$lock_holder_pid" 2>/dev/null || true
-  fi
-  [ -z "$lock_status_dir" ] || rm -rf "$lock_status_dir"
   trap - EXIT
   exit "$status"
 }
@@ -489,35 +530,13 @@ trap cleanup EXIT
 
 mkdir -p "$STATE_DIR"
 update_lock="$STATE_DIR/update.lock"
-lock_status_dir="$(mktemp -d "$STATE_DIR/.update-lock.XXXXXX")"
-python3 - "$update_lock" "$lock_status_dir" "$$" <<'PY' &
-import fcntl, os, pathlib, sys, time
-lock_path = pathlib.Path(sys.argv[1])
-status = pathlib.Path(sys.argv[2])
-parent = int(sys.argv[3])
-with lock_path.open("a+") as handle:
-    try:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        (status / "busy").touch()
-        raise SystemExit(8)
-    (status / "ready").touch()
-    while os.getppid() == parent:
-        time.sleep(0.05)
+exec 9>"$update_lock"
+if ! python3 - 9 <<'PY'
+import fcntl, sys
+fcntl.flock(int(sys.argv[1]), fcntl.LOCK_EX | fcntl.LOCK_NB)
 PY
-lock_holder_pid="$!"
-for _ in $(seq 1 100); do
-  if [ -f "$lock_status_dir/ready" ]; then
-    break
-  fi
-  if [ -f "$lock_status_dir/busy" ] || ! kill -0 "$lock_holder_pid" 2>/dev/null; then
-    echo "PROMOTION_RED updater lock is held: $update_lock" >&2
-    exit 8
-  fi
-  sleep 0.02
-done
-if [ ! -f "$lock_status_dir/ready" ]; then
-  echo "PROMOTION_RED updater lock acquisition timed out" >&2
+then
+  echo "PROMOTION_RED updater lock is held: $update_lock" >&2
   exit 8
 fi
 
@@ -527,6 +546,9 @@ if [ -d "$rollback_dir" ]; then
 import hashlib, json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 manifest = json.loads((root / "manifest.json").read_text())
+actual = {path.name for path in root.iterdir() if path.is_file()} - {"manifest.json", "READY"}
+if set(manifest) != actual or (root / "READY").read_text() != "symphony-promotion-transaction/v1\n":
+    raise SystemExit(1)
 for name, expected in manifest.items():
     path = root / name
     if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
@@ -652,12 +674,21 @@ if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 0 ]; then
   exit 0
 fi
 
+if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
+  prepare_systemd_context
+  if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    official_was_active=1
+    official_pid_before="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value)"
+  fi
+fi
+
 rollback_tmp="$(mktemp -d "$STATE_DIR/.promotion-transaction.XXXXXX")"
 rollback_dir="$rollback_tmp"
 backup_target binary "$BIN_DST"
 backup_target helper "$HELPER_DST"
 backup_target unit "$UNIT_DST"
 backup_target workflow "$WORKFLOW_DST"
+[ "$official_was_active" -eq 0 ] || : > "$rollback_dir/was-active"
 python3 - "$rollback_dir" <<'PY'
 import hashlib, json, os, pathlib, sys
 root = pathlib.Path(sys.argv[1])
@@ -665,6 +696,8 @@ manifest = {}
 for path in sorted(root.iterdir()):
     if path.is_file():
         manifest[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        with path.open("rb") as handle:
+            os.fsync(handle.fileno())
 manifest_path = root / "manifest.json"
 manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n")
 with manifest_path.open("rb") as handle:
@@ -679,19 +712,20 @@ finally:
     os.close(descriptor)
 PY
 mv "$rollback_tmp" "$STATE_DIR/promotion-transaction"
+python3 - "$STATE_DIR" <<'PY'
+import os, sys
+descriptor = os.open(sys.argv[1], os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
 rollback_dir="$STATE_DIR/promotion-transaction"
 promotion_started=1
 if ! validate_rollback_bundle; then
   rollback_safe=0
 fi
 
-if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
-  prepare_systemd_context
-  if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-    official_was_active=1
-    official_pid_before="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value)"
-  fi
-fi
 if [ "$RESTART" -eq 1 ]; then
   stop_idle_official_for_restart
 fi
@@ -701,7 +735,6 @@ if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 1 ] && [ "$official_was_active
 fi
 
 mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR" "$STATE_DIR"
-[ "$official_was_active" -eq 0 ] || : > "$rollback_dir/was-active"
 
 if [ "$SKIP_BINARY" -eq 0 ]; then
   files_promoted=1
