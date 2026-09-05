@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# Existing-runtime provider launcher for the official :4041 Symphony service.
+# A definite pre-start Codex capacity miss immediately falls through to the
+# next authenticated provider in the same launch. Only one app-server is ever
+# exec'd, so Symphony retains the issue lease and cannot create duplicate work.
+set -euo pipefail
+
+home="${SYMPHONY_HOME:-$HOME}"
+workspace="${SYMPHONY_WORKSPACE:-$PWD}"
+issue="${SYMPHONY_ISSUE_IDENTIFIER:-$(basename "$workspace")}"
+guard="${SYMPHONY_CAPACITY_GUARD:-$home/.local/bin/symphony-capacity-guard.py}"
+codex_probe="${SYMPHONY_CODEX_ACCOUNT_PROBE:-$home/.local/bin/codex-account-probe}"
+cursor="${SYMPHONY_CURSOR_EXECUTABLE:-$home/.local/bin/cursor-agent-std}"
+cursor_adapter="${SYMPHONY_CURSOR_ADAPTER:-$home/.local/bin/cursor-appserver-adapter}"
+auto_route="${SYMPHONY_AUTO_ROUTE:-$home/.local/bin/symphony-auto-route.mjs}"
+router_hotfix="${SYMPHONY_CODEX_ROUTER:-$home/.local/bin/symphony-codex-router-hotfix}"
+state_dir="${SYMPHONY_PROVIDER_ROUTE_STATE_DIR:-$home/.local/state/symphony-provider-router}"
+model="${SYMPHONY_CURSOR_MODEL:-gpt-5.6-luna-high}"
+probe_cooldown_seconds="${SYMPHONY_PROVIDER_PROBE_COOLDOWN_SECONDS:-60}"
+cooldown_state="$state_dir/provider-cooldowns.json"
+cooldown_lock="$state_dir/provider-cooldowns.lock"
+
+update_provider_cooldown() {
+  local provider="$1" action="$2" reason="${3:-}"
+  mkdir -p "$state_dir"
+  python3 - "$cooldown_state" "$cooldown_lock" "$provider" "$action" "$probe_cooldown_seconds" "$reason" <<'PY'
+import datetime
+import fcntl
+import json
+import os
+import pathlib
+import sys
+
+state_path = pathlib.Path(sys.argv[1])
+lock_path = pathlib.Path(sys.argv[2])
+provider, action, seconds, reason = sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6]
+lock_path.touch(mode=0o600, exist_ok=True)
+with lock_path.open("r+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    try:
+        state = json.loads(state_path.read_text()) if state_path.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        state = {}
+    providers = state.setdefault("providers", {})
+    if action == "mark":
+        now = datetime.datetime.now(datetime.timezone.utc)
+        providers[provider] = {
+            "unavailableUntil": (now + datetime.timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z"),
+            "reason": reason,
+        }
+    elif action == "clear":
+        providers.pop(provider, None)
+    temporary = state_path.with_name(f".{state_path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(state, sort_keys=True) + "\n")
+    temporary.chmod(0o600)
+    os.replace(temporary, state_path)
+PY
+}
+
+provider_is_cooling() {
+  local provider="$1"
+  mkdir -p "$state_dir"
+  python3 - "$cooldown_state" "$cooldown_lock" "$provider" <<'PY'
+import datetime
+import fcntl
+import json
+import pathlib
+import sys
+
+state_path = pathlib.Path(sys.argv[1])
+lock_path = pathlib.Path(sys.argv[2])
+provider = sys.argv[3]
+lock_path.touch(mode=0o600, exist_ok=True)
+with lock_path.open("r+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_SH)
+    try:
+        raw = json.loads(state_path.read_text()) if state_path.exists() else {}
+        value = raw.get("providers", {}).get(provider, {}).get("unavailableUntil")
+        deadline = datetime.datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        deadline = None
+raise SystemExit(0 if deadline and deadline > datetime.datetime.now(datetime.timezone.utc) else 1)
+PY
+}
+
+write_receipt() {
+  local provider="$1" selected_model="$2" reason="$3" temporary
+  mkdir -p "$state_dir"
+  temporary="$state_dir/.${issue}.tmp.$$"
+  python3 - "$issue" "$provider" "$selected_model" "$reason" >"$temporary" <<'PY'
+import datetime, json, sys
+print(json.dumps({
+  "schema": "symphony-provider-route/v1",
+  "issue": sys.argv[1],
+  "provider": sys.argv[2],
+  "model": sys.argv[3],
+  "reason": sys.argv[4],
+  "observedAt": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+}, sort_keys=True))
+PY
+  chmod 600 "$temporary"
+  mv "$temporary" "$state_dir/$issue.json"
+}
+
+launch_codex() {
+  set -a
+  # shellcheck disable=SC1090 -- host-owned credential path, never logged
+  . "${SYMPHONY_LINEAR_ENV:-$home/.config/symphony/linear.env}"
+  set +a
+  export SYMPHONY_CODEX_EXHAUSTED="${SYMPHONY_CODEX_EXHAUSTED:-$home/.local/bin/symphony-codex-exhausted.py}"
+  mkdir -p "$workspace/scripts/symphony"
+  if ! cmp -s "$router_hotfix" "$workspace/scripts/symphony/symphony-codex-router"; then
+    cp "$router_hotfix" "$workspace/scripts/symphony/symphony-codex-router"
+    chmod 755 "$workspace/scripts/symphony/symphony-codex-router"
+  fi
+  touch "${CODEX_ACCOUNTS_STATE:-$home/.codex-accounts/state.json}"
+  write_receipt codex routed-subscription "eligible-codex-account"
+  export SYMPHONY_ROUTING_USE_MATERIALIZED=1
+  exec "$workspace/scripts/symphony/symphony-codex-router" "$@"
+}
+
+prepare_codex_route() {
+  if [ -s "$workspace/.symphony-routing.json" ]; then
+    return 0
+  fi
+  node "$auto_route" >/dev/null 2>&1 && [ -s "$workspace/.symphony-routing.json" ]
+}
+
+# Codex subscription capacity is the primary delivery lane. Reuse the already
+# verified workspace receipt so launching an already-leased issue does not
+# make a redundant tracker request. A missing receipt may be prepared once;
+# failure falls through to Cursor in this same Symphony-owned launch.
+if ! "$guard" >/dev/null 2>&1 && [ -x "$codex_probe" ]; then
+  # codex-rotate's cooldown file is a cache of provider state, not the source
+  # of truth. Revalidate one cooling account under the existing account and
+  # state locks before falling through to another provider. The probe changes
+  # nothing unless an authenticated useful completion succeeds.
+  "$codex_probe" >/dev/null 2>&1 || true
+fi
+if "$guard" >/dev/null 2>&1 && prepare_codex_route; then
+  launch_codex "$@"
+fi
+
+# Cursor is the immediate authenticated fallback. Its status and model
+# inventory are authenticated, read-only pre-start evidence. Definite probe
+# failures enter one shared cooldown so concurrent issues do not stampede an
+# unavailable provider. Symphony remains the only owner of later retries.
+if ! provider_is_cooling cursor; then
+  if [ -x "$cursor" ] && [ -x "$cursor_adapter" ] &&
+     "$cursor" status 2>/dev/null | grep -q 'Logged in' &&
+     "$cursor" models 2>/dev/null | awk -v model="$model" '$1 == model { found=1 } END { exit !found }'; then
+    update_provider_cooldown cursor clear
+    write_receipt cursor "$model" "eligible-primary-provider"
+    unset LINEAR_API_KEY CODEX_HOME OPENAI_API_KEY
+    export CURSOR_BIN="$cursor" CURSOR_MODEL="$model"
+    exec "$cursor_adapter" "$@"
+  elif [ -x "$cursor" ] && [ -x "$cursor_adapter" ]; then
+    update_provider_cooldown cursor mark "authenticated-capacity-probe-failed"
+  fi
+fi
+
+echo 'CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason="no authenticated provider has eligible pre-start capacity"' >&2
+exit 75

@@ -28,9 +28,9 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         )
         self.assertRegex(
             workflow,
-            re.compile(r"^\s+command: \./scripts/symphony/symphony-codex-router app-server$", re.M),
+            re.compile(r"^\s+command: symphony-agent-router app-server$", re.M),
         )
-        self.assertIn("symphony-codex-router", workflow)
+        self.assertIn("symphony-agent-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)
         self.assertIn("max_concurrent_agents: 8", workflow)
         self.assertIn("port: 4041", workflow)

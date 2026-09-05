@@ -22,6 +22,14 @@ ACCOUNT_ENV="${TARGET_HOME}/.config/symphony/codex-account.env"
 LINEAR_ENV="${TARGET_HOME}/.config/symphony/linear.env"
 HELPER_SRC="${REPO_ROOT}/scripts/symphony/symphony_official_runtime.py"
 HELPER_DST="${TARGET_HOME}/.local/bin/symphony-official-runtime"
+AGENT_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-agent-router"
+AGENT_ROUTER_DST="${TARGET_HOME}/.local/bin/symphony-agent-router"
+CURSOR_ADAPTER_SRC="${REPO_ROOT}/scripts/symphony/cursor-appserver-adapter.py"
+CURSOR_ADAPTER_DST="${TARGET_HOME}/.local/bin/cursor-appserver-adapter"
+CODEX_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-codex-router"
+CODEX_ROUTER_DST="${TARGET_HOME}/.local/bin/symphony-codex-router-hotfix"
+CODEX_PROBE_SRC="${REPO_ROOT}/scripts/symphony/codex-account-probe.sh"
+CODEX_PROBE_DST="${TARGET_HOME}/.local/bin/codex-account-probe"
 LOG_DIR="${TARGET_HOME}/symphony-elixir-logs"
 STATE_DIR="${TARGET_HOME}/.local/state/symphony-elixir"
 STATE_URL="${SYMPHONY_STATE_URL:-http://127.0.0.1:4041/api/v1/state}"
@@ -379,6 +387,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "DRY_RUN $SUM_URL"
   echo "INSTALL $BIN_DST"
   echo "HELPER $HELPER_DST"
+  echo "AGENT_ROUTER $AGENT_ROUTER_DST"
+  echo "CURSOR_ADAPTER $CURSOR_ADAPTER_DST"
+  echo "CODEX_ROUTER $CODEX_ROUTER_DST"
   echo "UNIT $UNIT_DST"
   echo "WORKFLOW $WORKFLOW_DST"
   echo "SERVICE $SERVICE_NAME"
@@ -393,6 +404,10 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   check_workflow "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
   check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
+  check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
+  check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
+  check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
+  check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
   exit "$rc"
 fi
 
@@ -432,6 +447,10 @@ cleanup() {
     if [ "$promotion_started" -eq 1 ]; then
       restore_target binary "$BIN_DST" 0755
       restore_target helper "$HELPER_DST" 0755
+      restore_target agent-router "$AGENT_ROUTER_DST" 0755
+      restore_target cursor-adapter "$CURSOR_ADAPTER_DST" 0755
+      restore_target codex-router "$CODEX_ROUTER_DST" 0755
+      restore_target codex-probe "$CODEX_PROBE_DST" 0755
       restore_target unit "$UNIT_DST" 0644
       restore_target workflow "$WORKFLOW_DST" 0644
     fi
@@ -484,6 +503,10 @@ mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_
 rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
 backup_target binary "$BIN_DST"
 backup_target helper "$HELPER_DST"
+backup_target agent-router "$AGENT_ROUTER_DST"
+backup_target cursor-adapter "$CURSOR_ADAPTER_DST"
+backup_target codex-router "$CODEX_ROUTER_DST"
+backup_target codex-probe "$CODEX_PROBE_DST"
 backup_target unit "$UNIT_DST"
 backup_target workflow "$WORKFLOW_DST"
 promotion_started=1
@@ -492,6 +515,10 @@ if [ "$SKIP_BINARY" -eq 0 ]; then
   install_one "${tmpdir}/${BIN_NAME}" "$BIN_DST" 0755
 fi
 install_one "$HELPER_SRC" "$HELPER_DST" 0755
+install_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" 0755
+install_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" 0755
+install_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" 0755
+install_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" 0755
 install_one "$UNIT_SRC" "$UNIT_DST"
 install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
 
