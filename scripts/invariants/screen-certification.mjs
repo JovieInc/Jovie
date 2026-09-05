@@ -78,7 +78,6 @@ export const SCREEN_REGISTRY = Object.freeze(
   parseRegistry(
     `
 web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
-web.root-document|web|root-document-shell|apps/web/app/layout.tsx|desktop,mobile
 web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
@@ -94,28 +93,23 @@ web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-fou
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
-web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx|desktop,mobile
+web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
-web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
-web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
 web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
-web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
-web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
+web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
+web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
-web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
-web.root-layout|web|screen.root|apps/web/app/layout.tsx|desktop,mobile
 macos-electron.hud|macos-electron|desktop-hud|apps/desktop/src/main.ts,apps/desktop/src/navigation.ts|desktop
 ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift,apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift|compact
-ios.chat|ios|ios-chat|apps/ios/Jovie/Features/Chat/MobileChatView.swift|compact
 ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swift|compact
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
@@ -920,53 +914,6 @@ export function runScreenCertification(options = {}) {
       excludedChanges: changed.excludedChanges,
       fixtures: red.receipts,
       sweeps: (options.workflows ?? RETAINED_SWEEP_WORKFLOWS).map(item => ({
-        path: item.path,
-        retained: true,
-      })),
-    },
-  };
-}
-
-/**
- * Reserved external-certification entrypoint. It accepts no verifier callback
- * and remains unavailable until the dependent authoritative source-continuity
- * adapter binds a GitHub push event to the immutable artifact.
- * @param {{ artifactId?: number; screenId?: string; repoRoot?: string }} options
- */
-export function runScreenCertificationFromArtifact({
-  artifactId,
-  screenId,
-  repoRoot = REPO_ROOT,
-} = {}) {
-  const headSha = resolveHeadSha(undefined, repoRoot);
-  const screen = SCREEN_REGISTRY.find(
-    entry => !entry.excluded && entry.id === screenId
-  );
-  // An immutable artifact alone cannot establish which push event introduced
-  // the registered source change. The post-run GitHub compare binding belongs
-  // to the dependent continuity slice; do not substitute local git history.
-  void artifactId;
-  const issue =
-    'artifact certification is unavailable until authoritative GitHub event source continuity is verified';
-  return {
-    ok: false,
-    schema: SCREEN_CERT_SCHEMA,
-    receipt: {
-      gate: SCREEN_CERT_GATE,
-      invariant: SCREEN_CERT_INVARIANT_ID,
-      headSha,
-      baseSha: null,
-      ok: false,
-      certified: false,
-      registrationOnly: false,
-      status: 'external-certification-unavailable',
-      issues: [issue],
-      changedScreens: screen
-        ? [{ id: screenId, verdict: 'block', findings: [issue] }]
-        : [],
-      excludedChanges: [],
-      fixtures: [],
-      sweeps: RETAINED_SWEEP_WORKFLOWS.map(item => ({
         path: item.path,
         retained: true,
       })),
