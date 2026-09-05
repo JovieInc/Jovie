@@ -13,11 +13,13 @@ from __future__ import annotations
 import argparse
 import ctypes
 import datetime as dt
+import errno
 import hashlib
 import json
 import math
 import os
 import pathlib
+import queue
 import re
 import select
 import signal
@@ -83,6 +85,7 @@ DEFAULT_DEAD_LETTER_DIR = (
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
+RUNTIME_OUTPUT_QUEUE_MAX_LINES = 256
 DEFAULT_SHUTDOWN_GRACE_SECONDS = 10.0
 MAX_SHUTDOWN_GRACE_SECONDS = 12.0
 ISSUE_DEAD_LETTER_SCHEMA = "symphony-issue-dead-letter/v1"
@@ -1359,43 +1362,137 @@ def run_official_binary_once(
         try:
             libc = ctypes.CDLL(None, use_errno=True)
             if libc.prctl(36, 1, 0, 0, 0) != 0:
-                errno = ctypes.get_errno()
-                raise OSError(errno, os.strerror(errno))
+                error_number = ctypes.get_errno()
+                raise OSError(error_number, os.strerror(error_number))
         except AttributeError as exc:
             raise RuntimeError("Linux child-subreaper support is unavailable") from exc
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        errors="replace",
-        bufsize=1,
-        start_new_session=True,
-    )
+    pidfd_reserve: list[int] = []
+    if sys.platform.startswith("linux"):
+        try:
+            for _ in range(8):
+                pidfd_reserve.append(os.open("/dev/null", os.O_RDONLY))
+        except OSError:
+            for descriptor in pidfd_reserve:
+                os.close(descriptor)
+            pidfd_reserve = []
+    try:
+        launch_read, launch_write = os.pipe()
+    except BaseException:
+        for descriptor in pidfd_reserve:
+            os.close(descriptor)
+        raise
+    launcher = [
+        sys.executable,
+        "-c",
+        (
+            "import os,sys; fd=int(sys.argv[1]); ready=os.read(fd,1); "
+            "os.close(fd); "
+            "ready == b'1' or sys.exit(125); "
+            "os.execvp(sys.argv[2], sys.argv[2:])"
+        ),
+        str(launch_read),
+        *command,
+    ]
+    try:
+        process = subprocess.Popen(
+            launcher,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            bufsize=1,
+            start_new_session=True,
+            pass_fds=(launch_read,),
+        )
+    except BaseException:
+        os.close(launch_read)
+        os.close(launch_write)
+        for descriptor in pidfd_reserve:
+            os.close(descriptor)
+        raise
+    os.close(launch_read)
     previous_handlers: dict[signal.Signals, Any] = {}
     shutdown = threading.Event()
-    known_descendants: set[int] = set()
+    nonlinux_descendants: set[int] = set()
     termination_complete = False
     shutdown_signum = 0
     pidfds: dict[int, int] = {}
 
-    def remember(pid: int) -> None:
-        if pid in pidfds or not hasattr(os, "pidfd_open"):
-            return
-        try:
-            pidfds[pid] = os.pidfd_open(pid)
-        except OSError:
-            pass
+    def remember(pid: int) -> bool:
+        if pid in pidfds:
+            return True
+        if not hasattr(os, "pidfd_open"):
+            if sys.platform.startswith("linux"):
+                raise RuntimeError("Linux pidfd support is required")
+            return True
+        while True:
+            try:
+                pidfds[pid] = os.pidfd_open(pid)
+                break
+            except ProcessLookupError:
+                return False
+            except OSError as exc:
+                if exc.errno in (errno.EMFILE, errno.ENFILE) and pidfd_reserve:
+                    os.close(pidfd_reserve.pop())
+                    continue
+                raise RuntimeError(f"cannot pin process identity for pid {pid}") from exc
+        return True
 
-    def send(pid: int, signum: int) -> None:
-        descriptor = pidfds.get(pid)
+    def send_pinned(descriptor: int, signum: int) -> None:
         try:
-            if descriptor is not None and hasattr(signal, "pidfd_send_signal"):
+            if sys.platform.startswith("linux"):
+                if not hasattr(signal, "pidfd_send_signal"):
+                    raise RuntimeError("Linux process signaling requires pidfd")
                 signal.pidfd_send_signal(descriptor, signum)
             else:
-                os.kill(pid, signum)
-        except (OSError, PermissionError):
+                raise RuntimeError("send_pinned is Linux-only")
+        except ProcessLookupError:
             pass
+
+    def signal_identity(pid: int, signum: int) -> bool:
+        """Pin, signal, and release one non-root identity at a time.
+
+        Releasing each descendant pidfd immediately lets one reserved slot
+        contain an arbitrarily wide tree even when the process is already at
+        its descriptor limit. Numeric PIDs are never used for Linux signals.
+        """
+        if not sys.platform.startswith("linux"):
+            try:
+                os.kill(pid, signum)
+            except ProcessLookupError:
+                return False
+            return True
+        if pid == process.pid and pid in pidfds:
+            send_pinned(pidfds[pid], signum)
+            return True
+        if not remember(pid):
+            return False
+        descriptor = pidfds.pop(pid)
+        try:
+            send_pinned(descriptor, signum)
+        finally:
+            os.close(descriptor)
+        return True
+
+    def root_target() -> list[int]:
+        # Once Popen has observed the root exit, only a pidfd can safely refer
+        # to that numeric PID; without one it may already have been recycled.
+        if process.pid in pidfds or process.poll() is None:
+            return [process.pid]
+        return []
+
+    def close_pidfds() -> None:
+        for descriptor in pidfds.values():
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        pidfds.clear()
+        while pidfd_reserve:
+            try:
+                os.close(pidfd_reserve.pop())
+            except OSError:
+                pass
 
     def descendant_pids() -> list[int]:
         try:
@@ -1421,6 +1518,7 @@ def run_official_binary_once(
         for pid, parent in pairs:
             children.setdefault(parent, []).append(pid)
         found: list[int] = []
+        visited: set[int] = set()
         # Linux subreaping reparents late-forking orphans to this wrapper. Walk
         # both the launched root and the wrapper so those adopted descendants
         # remain inside the shutdown boundary.
@@ -1430,60 +1528,59 @@ def run_official_binary_once(
         while pending:
             parent = pending.pop()
             for child in children.get(parent, []):
-                if child not in found:
+                if child in visited:
+                    continue
+                visited.add(child)
+                pending.append(child)
+                if child != process.pid:
                     found.append(child)
-                    pending.append(child)
         return found
 
     def signal_tree(signum: int) -> None:
-        known_descendants.update(descendant_pids())
-        targets = list(known_descendants)
-        for pid in [process.pid, *targets]:
-            remember(pid)
-        for pid in [process.pid, *targets]:
-            send(pid, signal.SIGCONT)
-        for pid in [*reversed(targets), process.pid]:
-            send(pid, signum)
+        roots = root_target()
+        targets = descendant_pids()
+        if not sys.platform.startswith("linux"):
+            nonlinux_descendants.update(targets)
+            targets = list(nonlinux_descendants)
+        # Existing detached descendants must be signaled before a non-Linux
+        # root can exit and orphan them outside our observable process tree.
+        # Linux subreaping still catches anything forked by the root's handler
+        # in the grace-period rescans below.
+        for pid in [*reversed(targets), *roots]:
+            if signal_identity(pid, signal.SIGCONT):
+                signal_identity(pid, signum)
+
+    def reap_descendants(pids: list[int]) -> None:
+        if not sys.platform.startswith("linux"):
+            return
+        for pid in pids:
+            try:
+                os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                pass
 
     def terminate_tree() -> None:
         nonlocal termination_complete
         if termination_complete:
             return
-        known_descendants.update(descendant_pids())
-        targets = [process.pid, *known_descendants]
         signal_tree(signal.SIGTERM)
         deadline = time.monotonic() + shutdown_grace
-        alive = targets
         while time.monotonic() < deadline:
             process.poll()
-            newly_seen = set(descendant_pids()) - known_descendants
-            known_descendants.update(newly_seen)
-            for pid in newly_seen:
-                remember(pid)
-                send(pid, signal.SIGCONT)
-                send(pid, signal.SIGTERM)
-            targets = [process.pid, *known_descendants]
-            alive = []
-            for pid in targets:
-                try:
-                    descriptor = pidfds.get(pid)
-                    if descriptor is not None and select.select([descriptor], [], [], 0)[0]:
-                        try:
-                            os.waitpid(pid, os.WNOHANG)
-                        except ChildProcessError:
-                            pass
-                        continue
-                    os.kill(pid, 0)
-                    alive.append(pid)
-                except ProcessLookupError:
-                    pass
-            if not alive:
+            descendants = descendant_pids()
+            for pid in descendants:
+                signal_identity(pid, signal.SIGTERM)
+            reap_descendants(descendants)
+            descendants = descendant_pids()
+            root_descriptor = pidfds.get(process.pid)
+            root_alive = bool(
+                root_descriptor is not None
+                and not select.select([root_descriptor], [], [], 0)[0]
+            )
+            if not root_alive and not descendants:
                 break
             time.sleep(0.02)
-        known_descendants.update(descendant_pids())
-        for pid in [process.pid, *known_descendants]:
-            remember(pid)
-            send(pid, signal.SIGKILL)
+        signal_tree(signal.SIGKILL)
         try:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
@@ -1492,10 +1589,9 @@ def run_official_binary_once(
         if sys.platform.startswith("linux"):
             reap_deadline = time.monotonic() + 1.0
             while time.monotonic() < reap_deadline:
-                known_descendants.update(descendant_pids())
-                for pid in known_descendants:
-                    remember(pid)
-                    send(pid, signal.SIGKILL)
+                descendants = descendant_pids()
+                for pid in descendants:
+                    signal_identity(pid, signal.SIGKILL)
                 while True:
                     try:
                         reaped, _status = os.waitpid(-1, os.WNOHANG)
@@ -1504,39 +1600,89 @@ def run_official_binary_once(
                         break
                     if reaped <= 0:
                         break
-                pending = [
-                    descriptor
-                    for descriptor in pidfds.values()
-                    if not select.select([descriptor], [], [], 0)[0]
-                ]
-                if not pending:
+                if not descendant_pids():
                     break
                 time.sleep(0.01)
-        for descriptor in pidfds.values():
-            try:
-                os.close(descriptor)
-            except OSError:
-                pass
+        close_pidfds()
         termination_complete = True
 
     def forward_signal(signum: int, _frame: Any) -> None:
-        """Forward service-manager termination to the complete child tree."""
+        """Request complete child-tree termination from the main loop.
+
+        Python delivers handlers on the main thread.  Calling terminate_tree()
+        here can re-enter subprocess.Popen while an interrupted poll() still
+        owns its private waitpid lock, permanently deadlocking shutdown.
+        """
         nonlocal shutdown_signum
         shutdown_signum = signum
         shutdown.set()
-        terminate_tree()
 
-    for forwarded in (signal.SIGTERM, signal.SIGINT):
-        previous_handlers[forwarded] = signal.getsignal(forwarded)
-        signal.signal(forwarded, forward_signal)
+    # Pin the launched root before any wait/reap can make its numeric PID
+    # available for reuse.
+    try:
+        for forwarded in (signal.SIGTERM, signal.SIGINT):
+            previous_handlers[forwarded] = signal.getsignal(forwarded)
+            signal.signal(forwarded, forward_signal)
+        if not remember(process.pid) or (
+            sys.platform.startswith("linux") and
+            not hasattr(signal, "pidfd_send_signal")
+        ):
+            raise RuntimeError("Linux root pidfd support is required")
+        os.write(launch_write, b"1")
+    except BaseException:
+        try:
+            if process.pid in pidfds:
+                terminate_tree()
+            else:
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+            close_pidfds()
+            for forwarded, previous in previous_handlers.items():
+                signal.signal(forwarded, previous)
+        raise
+    finally:
+        os.close(launch_write)
+    output_lines: queue.Queue[tuple[bool, str]] = queue.Queue(
+        maxsize=RUNTIME_OUTPUT_QUEUE_MAX_LINES
+    )
+
+    def read_output() -> None:
+        try:
+            assert process.stdout is not None
+            for output_line in process.stdout:
+                output_lines.put((False, output_line))
+        finally:
+            output_lines.put((True, ""))
+
+    output_reader = threading.Thread(target=read_output, daemon=True)
+    output_reader.start()
+
     rate_limited = False
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
     try:
-        assert process.stdout is not None
-        for line in process.stdout:
-            if shutdown.is_set():
+        while True:
+            # A detached descendant can keep stdout continuously readable after
+            # the scheduler exits, so root completion cannot depend on an empty
+            # output queue. terminate_tree() kills the holder, then the bounded
+            # queue drains through its EOF sentinel.
+            if shutdown.is_set() or process.poll() is not None:
+                terminate_tree()
+            try:
+                eof, line = output_lines.get(timeout=0.1)
+            except queue.Empty:
+                if shutdown.is_set() or process.poll() is not None:
+                    terminate_tree()
+                continue
+            if eof:
                 break
             print(line, end="", flush=True)
             classification = classify_linear_log_line(line)
@@ -1568,6 +1714,9 @@ def run_official_binary_once(
                     _pause_child_for_closure_hold(
                         process, closure, verdict, max_gate_sleep_seconds, shutdown
                     )
+            if process.poll() is not None:
+                terminate_tree()
+        output_reader.join()
         returncode = process.wait()
         terminate_tree()
     finally:
@@ -1575,6 +1724,7 @@ def run_official_binary_once(
             terminate_tree()
         if process.stdout is not None:
             process.stdout.close()
+        close_pidfds()
         for forwarded, previous in previous_handlers.items():
             signal.signal(forwarded, previous)
     if shutdown_signum:

@@ -315,6 +315,84 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(payload["schema"], helper.RATE_LIMIT_GATE_SCHEMA)
             self.assertEqual(payload["kind"], "rate_limited")
 
+    def test_final_rate_limit_line_is_drained_after_root_exit(self):
+        helper = _load_helper()
+        original_queue = helper.queue.Queue
+        created = []
+
+        class DelayedPublicationQueue(original_queue):
+            def put(self, item, *args, **kwargs):
+                if not item[0]:
+                    time.sleep(0.25)
+                return super().put(item, *args, **kwargs)
+
+        def queue_factory(*, maxsize):
+            created.append(maxsize)
+            return DelayedPublicationQueue(maxsize=maxsize)
+
+        line = (
+            'status=400 retry-after: 3600 '
+            '{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            gate = root / "linear-rate-limit.json"
+            closure = helper.ClosureStopLine(
+                receipt_path=receipt,
+                hold_receipt_path=root / "closure-hold.json",
+                dead_letter_dir=root / "dead-letters",
+            )
+            with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(
+                helper.queue, "Queue", side_effect=queue_factory
+            ):
+                returncode = helper.run_official_binary_once(
+                    ["python3", "-c", f"print({line!r})"], gate_file=gate,
+                    closure=closure, max_gate_sleep_seconds=0,
+                )
+            self.assertEqual(returncode, helper.RATE_LIMIT_EXIT_CODE)
+            self.assertTrue(gate.is_file())
+            self.assertEqual(created, [helper.RUNTIME_OUTPUT_QUEUE_MAX_LINES])
+
+    def test_rate_limit_pause_keeps_noisy_output_queue_bounded(self):
+        helper = _load_helper()
+        original_queue = helper.queue.Queue
+        observed = []
+
+        class ObservedQueue(original_queue):
+            def put(self, item, *args, **kwargs):
+                result = super().put(item, *args, **kwargs)
+                observed.append(self.qsize())
+                return result
+
+        line = 'status=429 {"errors":[{"extensions":{"code":"RATELIMITED"}}]}'
+        script = f"print({line!r}); [print('noise-' + str(i)) for i in range(2000)]"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            closure = helper.ClosureStopLine(
+                receipt_path=receipt,
+                hold_receipt_path=root / "closure-hold.json",
+                dead_letter_dir=root / "dead-letters",
+            )
+            with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(
+                helper.queue, "Queue",
+                side_effect=lambda *, maxsize: ObservedQueue(maxsize=maxsize),
+            ), mock.patch.object(
+                helper, "_pause_child_for_gate",
+                side_effect=lambda *_args, **_kwargs: time.sleep(0.2),
+            ):
+                returncode = helper.run_official_binary_once(
+                    ["python3", "-c", script],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=closure,
+                    max_gate_sleep_seconds=1,
+                )
+            self.assertEqual(returncode, helper.RATE_LIMIT_EXIT_CODE)
+            self.assertLessEqual(max(observed), helper.RUNTIME_OUTPUT_QUEUE_MAX_LINES)
+
     def test_team_scope_validation_fails_closed(self):
         """Malformed or legacy project-gated scope stops dispatch validation."""
         helper = _load_helper()
@@ -799,7 +877,7 @@ while True: time.sleep(1)
                     self.assertFalse(started.exists())
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
-    def test_normal_exit_reaps_detached_resistant_descendant_before_return(self):
+    def test_normal_exit_reaps_noisy_detached_stdout_holder_before_return(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             pid_file = root / "detached.pid"
@@ -807,19 +885,16 @@ while True: time.sleep(1)
 import pathlib, signal, subprocess, sys
 grand = subprocess.Popen([
     sys.executable, "-c",
-    "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
-], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+    "exec(\"while True:\\n print('detached-noise',flush=True)\\n time.sleep(.01)\")",
+], start_new_session=True)
 pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
 print("normal exit", flush=True)
 '''
             result = subprocess.run(
-                [
-                    "python3", str(HELPER_PATH), "run",
-                    "--gate-file", str(root / "gate"),
-                    *_closure_run_args(tmp),
-                    "--max-gate-sleep-seconds", "0",
-                    "--", "python3", "-c", child, str(pid_file),
-                ],
+                ["python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                 *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0", "--",
+                 "python3", "-c", child, str(pid_file)],
                 cwd=ROOT,
                 env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "0.2"},
                 capture_output=True,
@@ -828,9 +903,154 @@ print("normal exit", flush=True)
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("normal exit", result.stdout)
-            self.assertTrue(pid_file.exists())
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(pid_file.read_text()), 0)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_normal_exit_reaps_continuously_logging_detached_child(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pid_file = root / "detached.pid"
+            child = r'''
+import pathlib, subprocess, sys
+grand = subprocess.Popen([
+    sys.executable, "-c",
+    "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN);\n"
+    "while True: print('descendant-output', flush=True); time.sleep(0.001)",
+], start_new_session=True)
+pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+print("normal exit", flush=True)
+'''
+            wrapper = subprocess.Popen(
+                ["python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                 *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0", "--",
+                 "python3", "-c", child, str(pid_file)],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "0.2"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                stdout, stderr = wrapper.communicate(timeout=3)
+                self.assertEqual(wrapper.returncode, 0, stderr)
+                self.assertIn("normal exit", stdout)
+                self.assertIn("descendant-output", stdout)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(pid_file.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.terminate()
+                    try:
+                        wrapper.communicate(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        wrapper.kill()
+                        wrapper.communicate(timeout=3)
+                if pid_file.exists():
+                    try:
+                        os.kill(int(pid_file.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                for stream in (wrapper.stdout, wrapper.stderr):
+                    if stream is not None:
+                        stream.close()
+
+    def test_root_pidfd_failure_never_launches_workload(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            started = root / "started"
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            libc = mock.Mock()
+            libc.prctl.return_value = 0
+            with mock.patch.object(helper.sys, "platform", "linux"), mock.patch.object(
+                helper.ctypes, "CDLL", return_value=libc
+            ), mock.patch.object(
+                helper.os, "pidfd_open", side_effect=OSError(24, "injected"), create=True
+            ), self.assertRaisesRegex(RuntimeError, "cannot pin process identity"):
+                helper.run_official_binary_once(
+                    ["python3", "-c", f"open({str(started)!r}, 'w').close()"],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=receipt,
+                        hold_receipt_path=root / "closure-hold.json",
+                        dead_letter_dir=root / "dead-letters",
+                    ),
+                    max_gate_sleep_seconds=0,
+                )
+            self.assertFalse(started.exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_wide_descendant_tree_reuses_pidfd_slot_without_numeric_signal(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            child_pids = root / "child.pids"
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            child = (
+                "import os,pathlib,subprocess,sys; "
+                "ps=[subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'],"
+                "start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL) "
+                "for _ in range(12)]; "
+                "pathlib.Path(sys.argv[1]).write_text(' '.join(str(p.pid) for p in ps))"
+            )
+            real_pidfd_open = os.pidfd_open
+            real_close = os.close
+            launched = []
+            tracked_pidfds = set()
+            real_popen = helper.subprocess.Popen
+
+            def recording_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                launched.append(process)
+                return process
+
+            def selective_pidfd(pid):
+                # Model a process with room for only the permanent root pidfd
+                # plus one reusable descendant slot. Accumulating descendant
+                # pidfds would fail before this tree can be contained.
+                if len(tracked_pidfds) >= 2:
+                    raise OSError(24, "injected descendant pidfd exhaustion")
+                descriptor = real_pidfd_open(pid)
+                tracked_pidfds.add(descriptor)
+                return descriptor
+
+            def tracking_close(descriptor):
+                tracked_pidfds.discard(descriptor)
+                return real_close(descriptor)
+
+            real_kill = os.kill
+            signals = []
+
+            def recording_kill(pid, signum):
+                signals.append((pid, signum))
+                return real_kill(pid, signum)
+
+            with mock.patch.object(
+                helper.subprocess, "Popen", side_effect=recording_popen
+            ), mock.patch.object(
+                helper.os, "pidfd_open", side_effect=selective_pidfd
+            ), mock.patch.object(
+                helper.os, "close", side_effect=tracking_close
+            ), mock.patch.object(helper.os, "kill", side_effect=recording_kill):
+                self.assertEqual(helper.run_official_binary_once(
+                    ["python3", "-c", child, str(child_pids)],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=receipt,
+                        hold_receipt_path=root / "closure-hold.json",
+                        dead_letter_dir=root / "dead-letters",
+                    ),
+                    max_gate_sleep_seconds=0,
+                ), 0)
+            detached = [int(value) for value in child_pids.read_text().split()]
+            self.assertEqual(len(detached), 12)
+            self.assertFalse(any(pid in detached for pid, _ in signals))
+            for pid in detached:
+                with self.assertRaises(ProcessLookupError):
+                    real_kill(pid, 0)
 
     def test_term_kills_detached_resistant_stdout_writer(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1797,6 +2017,13 @@ while True: time.sleep(1)
             }
             (transaction / "manifest.json").write_text(json.dumps(manifest))
             (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
+            hold = target_home / ".local/state/symphony-elixir/promotion-held.json"
+            hold.write_text(json.dumps({
+                "schema": "symphony-promotion-hold/v1",
+                "status": "held",
+                "reason": "rollback_restart_failed",
+                "transaction": str(transaction),
+            }))
             known = target_home / ".local/state/symphony-elixir/candidates/known-good"
             known.mkdir(parents=True)
             candidate_files = {}
@@ -1826,6 +2053,7 @@ while True: time.sleep(1)
             self.assertEqual(config_only.returncode, 0, config_only.stderr)
             self.assertIn("RECOVERED_INCOMPLETE_PROMOTION", config_only.stdout)
             self.assertIn("DONE_STAGED_NO_LIVE_MUTATION", config_only.stdout)
+            self.assertFalse(hold.exists())
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
             events_before_activation = (
@@ -1857,7 +2085,6 @@ while True: time.sleep(1)
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
             self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
-            hold = target_home / ".local/state/symphony-elixir/promotion-held.json"
             self.assertTrue(hold.is_file())
             self.assertEqual(json.loads(hold.read_text())["status"], "held")
             self.assertTrue(transaction.is_dir())
@@ -1882,6 +2109,7 @@ while True: time.sleep(1)
             account_home.mkdir(parents=True)
             config.mkdir(parents=True)
             (config / "codex-account.env").write_text(f"CODEX_HOME={account_home}\n")
+            (config / "codex-account.env").chmod(0o600)
             workflow = config / "WORKFLOW.md"
             helper = target_home / ".local/bin/symphony-official-runtime"
             unit = target_home / ".config/systemd/user/symphony-elixir.service"
@@ -1930,32 +2158,94 @@ while True: time.sleep(1)
             fake_bin.mkdir()
             events = root / "systemctl-events"
             systemctl = fake_bin / "systemctl"
+            mode = root / "systemctl-mode"
+            mode.write_text("restart-fails\n")
             systemctl.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '%s\\n' \"$*\" >> \"$SYSTEMCTL_EVENTS\"\n"
+                "mode=$(cat \"$SYSTEMCTL_MODE\")\n"
                 "case \"$*\" in\n"
-                "  *'restart symphony-elixir.service'*) exit 42;;\n"
+                "  *'daemon-reload'*) [ \"$mode\" != daemon-reload-fails ];;\n"
+                "  *'restart symphony-elixir.service'*) "
+                "if [ \"$mode\" = restart-fails ]; then exit 1; fi; "
+                "if [ \"$mode\" = restart-fails-once ] && [ ! -f \"$RESTART_ONCE\" ]; "
+                "then touch \"$RESTART_ONCE\"; exit 1; fi;;\n"
+                "  *'show symphony-elixir.service --property=MainPID --value'*) printf '4242\\n';;\n"
+                "  *'is-active --quiet symphony-elixir.service'*) [ \"$mode\" != inactive ];;\n"
                 "  *) exit 0;;\n"
                 "esac\n"
             )
             systemctl.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' '{\"counts\":{\"running\":0},"
+                "\"polling\":{\"checking\":false,\"next_poll_in_ms\":10000}}'\n"
+            )
+            curl.chmod(0o755)
+            python = fake_bin / "python3"
+            python.write_text(
+                "#!/usr/bin/env bash\n"
+                f"real={sys.executable!s}\n"
+                "if [ \"${1:-}\" != - ]; then exec \"$real\" \"$@\"; fi\n"
+                "payload=$(mktemp)\n"
+                "trap 'rm -f \"$payload\" \"$payload.injected\"' EXIT\n"
+                "cat > \"$payload\"\n"
+                "if [ \"${FAIL_FINALIZE_AFTER_HOLD:-0}\" = 1 ] && "
+                "grep -q 'shutil.rmtree(tombstone)' \"$payload\"; then\n"
+                "  sed 's/    shutil.rmtree(tombstone)/    raise OSError(\"injected post-hold failure\")/' "
+                "\"$payload\" > \"$payload.injected\"\n"
+                "  exec \"$real\" \"$payload.injected\" \"${@:2}\"\n"
+                "fi\n"
+                "exec \"$real\" \"$payload\" \"${@:2}\"\n"
+            )
+            python.chmod(0o755)
             runtime = root / "runtime"
             runtime.mkdir()
             bus = socket.socket(socket.AF_UNIX)
             bus.bind(str(runtime / "bus"))
             self.addCleanup(bus.close)
+
+            class StateHandler(BaseHTTPRequestHandler):
+                def do_GET(self):
+                    body = json.dumps({
+                        "counts": {"running": 0},
+                        "polling": {"checking": False, "next_poll_in_ms": 10000},
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, _format, *_args):
+                    return
+
+            server = HTTPServer(("127.0.0.1", 0), StateHandler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(thread.join, 5)
+            self.addCleanup(server.shutdown)
+            recovery_env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "SYMPHONY_ELIXIR_HOME": str(target_home),
+                "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                "XDG_RUNTIME_DIR": str(runtime),
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime / 'bus'}",
+                "SYSTEMCTL_EVENTS": str(events),
+                "SYSTEMCTL_MODE": str(mode),
+                "RESTART_ONCE": str(root / "restart-once"),
+                "SYMPHONY_RECOVERY_VERIFY_ATTEMPTS": "1",
+                "SYMPHONY_STATE_URL": (
+                    f"http://127.0.0.1:{server.server_address[1]}/api/v1/state"
+                ),
+            }
             result = subprocess.run(
                 ["bash", str(updater), "--skip-binary", "--no-restart"],
                 cwd=ROOT,
-                env={
-                    **os.environ,
-                    "PATH": f"{fake_bin}:{os.environ['PATH']}",
-                    "SYMPHONY_ELIXIR_HOME": str(target_home),
-                    "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
-                    "XDG_RUNTIME_DIR": str(runtime),
-                    "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime / 'bus'}",
-                    "SYSTEMCTL_EVENTS": str(events),
-                },
+                env=recovery_env,
                 capture_output=True,
                 text=True,
             )
@@ -1970,6 +2260,143 @@ while True: time.sleep(1)
                 if "restart symphony-elixir.service" in row
             ]
             self.assertEqual(len(restart_events), 2, restart_events)
+
+            mode.write_text("inactive\n")
+            inactive = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(inactive.returncode, 0)
+            self.assertNotIn("RECOVERED_INCOMPLETE_PROMOTION", inactive.stdout)
+            self.assertTrue(transaction.is_dir())
+            self.assertTrue((state / "promotion-held.json").is_file())
+
+            mode.write_text("daemon-reload-fails\n")
+            reload_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(reload_failure.returncode, 0)
+            self.assertTrue(transaction.is_dir())
+            self.assertEqual(
+                json.loads((state / "promotion-held.json").read_text())["reason"],
+                "rollback_restart_failed",
+            )
+
+            hold_path = state / "promotion-held.json"
+            mismatched = json.loads(hold_path.read_text())
+            mismatched["transaction"] = str(state / "different-transaction")
+            hold_path.write_text(json.dumps(mismatched))
+            mode.write_text("success\n")
+            clear_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(clear_failure.returncode, 0)
+            self.assertNotIn("DONE", clear_failure.stdout)
+            self.assertTrue(transaction.is_dir())
+
+            hold_path.write_text(json.dumps({
+                **mismatched,
+                "transaction": str(transaction),
+            }))
+            mode.write_text("restart-fails-once\n")
+            recovered = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(recovered.returncode, 0)
+            self.assertIn("PROMOTION_ROLLED_BACK", recovered.stderr)
+            self.assertFalse(transaction.exists())
+            self.assertFalse((state / "promotion-held.json").exists())
+
+            transaction.mkdir()
+            (transaction / "binary.missing").touch()
+            (transaction / "was-active").touch()
+            for name, source in (
+                ("workflow", WORKFLOW_PATH), ("helper", HELPER_PATH), ("unit", UNIT_PATH)
+            ):
+                (transaction / name).write_bytes(source.read_bytes())
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir() if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
+            mode.write_text("success\n")
+            hold_path.write_text(json.dumps({
+                **mismatched,
+                "transaction": str(transaction),
+            }))
+            removal_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env={**recovery_env, "FAIL_FINALIZE_AFTER_HOLD": "1"},
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(removal_failure.returncode, 0)
+            self.assertNotIn("DONE", removal_failure.stdout)
+            tombstone = state / ".promotion-transaction.removing"
+            self.assertFalse(transaction.exists())
+            self.assertFalse(hold_path.exists())
+            self.assertTrue(tombstone.is_dir())
+            retry = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertEqual(retry.returncode, 9)
+            self.assertIn("incomplete transaction cleanup", retry.stderr)
+
+    def test_transaction_removal_is_persisted_before_success(self):
+        helper = UPDATER[UPDATER.index("finalize_rollback_transaction() {"):
+                         UPDATER.index("backup_target() {")]
+        self.assertIn("os.replace(transaction, tombstone)", helper)
+        self.assertIn("symphony-promotion-cleanup-pending/v1", helper)
+        self.assertIn("shutil.rmtree(tombstone)", helper)
+        self.assertIn("os.fsync(descriptor)", helper)
+        self.assertNotIn('rm -rf "$rollback_dir"', UPDATER)
+        self.assertLess(UPDATER.rindex("finalize_rollback_transaction\n"),
+                        UPDATER.rindex('echo "DONE"'))
+
+    def test_post_delete_fsync_failure_retains_recoverable_cleanup_marker(self):
+        helper = UPDATER[UPDATER.index("finalize_rollback_transaction() {"):
+                         UPDATER.index("backup_target() {")]
+        payload = helper.split("<<'PY'\n", 1)[1].split("\nPY\n}", 1)[0]
+        injected = payload.replace(
+            "    shutil.rmtree(tombstone)\n    fsync_root()",
+            "    shutil.rmtree(tombstone)\n"
+            "    raise OSError('injected post-delete fsync failure')",
+            1,
+        )
+        self.assertNotEqual(injected, payload)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            transaction = root / "promotion-transaction"
+            transaction.mkdir()
+            hold = root / "promotion-held.json"
+            hold.write_text(json.dumps({
+                "schema": "symphony-promotion-hold/v1",
+                "status": "held",
+                "transaction": str(transaction),
+            }))
+            environment = {**os.environ, "ROLLBACK_DIR": str(transaction)}
+            failed = subprocess.run(
+                [sys.executable, "-", str(root)], input=injected, text=True,
+                env=environment, capture_output=True,
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            marker = root / ".promotion-transaction.cleanup-pending"
+            self.assertFalse(transaction.exists())
+            self.assertFalse(hold.exists())
+            self.assertFalse((root / ".promotion-transaction.removing").exists())
+            self.assertEqual(
+                marker.read_text(), "symphony-promotion-cleanup-pending/v1\n"
+            )
+            recovered = subprocess.run(
+                [sys.executable, "-", str(root)], input=payload, text=True,
+                env=environment, capture_output=True,
+            )
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            self.assertFalse(marker.exists())
 
     def test_updater_lock_is_owned_by_parent_file_descriptor(self):
         updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"

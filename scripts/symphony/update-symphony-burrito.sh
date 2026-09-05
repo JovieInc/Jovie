@@ -34,6 +34,7 @@ RUNTIME_READBACK=0
 RETIRE_LEGACY=0
 ACTIVE_ISSUES=""
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
+RECOVERY_VERIFY_ATTEMPTS="${SYMPHONY_RECOVERY_VERIFY_ATTEMPTS:-15}"
 # Genuinely retired units only. The grok/kimi sidecar
 # (symphony-grok-sidecar.{service,timer}) is the ACTIVE coding lane while
 # Codex seats are exhausted (Tim, 2026-09-03) and is installed/owned by
@@ -284,6 +285,23 @@ print(f"{running_count} {1 if checking else 0} {next_poll_ms}")
 PY
 }
 
+verify_official_restarted() {
+  local snapshot pid
+  case "$RECOVERY_VERIFY_ATTEMPTS" in
+    ''|*[!0-9]*|0) return 1 ;;
+  esac
+  for _ in $(seq 1 "$RECOVERY_VERIFY_ATTEMPTS"); do
+    pid="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null || true)"
+    if systemctl --user is-active --quiet "$SERVICE_NAME" &&
+       [[ "$pid" =~ ^[1-9][0-9]*$ ]] &&
+       snapshot="$(promotion_idle_snapshot)"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 stop_idle_official_for_restart() {
   local snapshot running checking next_poll_ms
   for _ in $(seq 1 45); do
@@ -472,6 +490,55 @@ finally:
 PY
 }
 
+finalize_rollback_transaction() {
+  ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, shutil, sys
+root = pathlib.Path(sys.argv[1])
+transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
+tombstone = root / ".promotion-transaction.removing"
+cleanup_pending = root / ".promotion-transaction.cleanup-pending"
+hold = root / "promotion-held.json"
+if transaction != root / "promotion-transaction":
+    raise SystemExit(1)
+def fsync_root():
+    descriptor = os.open(root, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+if cleanup_pending.exists():
+    if (cleanup_pending.read_text() != "symphony-promotion-cleanup-pending/v1\n" or
+            transaction.exists() or tombstone.exists() or hold.exists()):
+        raise SystemExit(1)
+    fsync_root()
+    cleanup_pending.unlink()
+    fsync_root()
+if hold.exists():
+    value = json.loads(hold.read_text())
+    if (value.get("schema") != "symphony-promotion-hold/v1" or
+            value.get("status") != "held" or
+            value.get("transaction") != str(transaction)):
+        raise SystemExit(1)
+if transaction.exists():
+    if tombstone.exists():
+        raise SystemExit(1)
+    os.replace(transaction, tombstone)
+    fsync_root()
+if hold.exists():
+    hold.unlink()
+    fsync_root()
+if tombstone.exists():
+    cleanup_pending.write_text("symphony-promotion-cleanup-pending/v1\n")
+    with cleanup_pending.open("rb") as handle:
+        os.fsync(handle.fileno())
+    fsync_root()
+    shutil.rmtree(tombstone)
+    fsync_root()
+    cleanup_pending.unlink()
+    fsync_root()
+PY
+}
+
 backup_target() {
   local key="$1" target="$2"
   if [ -e "$target" ] || [ -L "$target" ]; then
@@ -508,8 +575,11 @@ cleanup() {
         rollback_restart_verified=0
       fi
       if [ "$official_stopped_for_promotion" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; then
-        if ! systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1; then
+        if ! systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 ||
+           ! verify_official_restarted >/dev/null 2>&1; then
           rollback_restart_verified=0
+        else
+          official_stopped_for_promotion=0
         fi
       fi
       if [ "$rollback_restart_verified" -eq 0 ] && [ "$promotion_started" -eq 1 ]; then
@@ -528,7 +598,14 @@ cleanup() {
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
   if [ "$promotion_complete" -eq 1 ] || { [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; }; then
-    [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
+    if [ -n "$rollback_dir" ]; then
+      if ! finalize_rollback_transaction; then
+        rollback_restart_verified=0
+        status=10
+      else
+        rollback_dir=""
+      fi
+    fi
   fi
   if [ -n "$candidate_tmp" ]; then
     chmod -R u+w "$candidate_tmp" >/dev/null 2>&1 || true
@@ -552,6 +629,18 @@ then
 fi
 
 rollback_dir="$STATE_DIR/promotion-transaction"
+cleanup_pending="$STATE_DIR/.promotion-transaction.cleanup-pending"
+if [ -e "$cleanup_pending" ]; then
+  if ! finalize_rollback_transaction; then
+    echo "PROMOTION_RED incomplete transaction cleanup requires operator review" >&2
+    exit 9
+  fi
+  echo "RECOVERED_TRANSACTION_CLEANUP"
+fi
+if [ -e "$STATE_DIR/.promotion-transaction.removing" ]; then
+  echo "PROMOTION_RED incomplete transaction cleanup requires operator review" >&2
+  exit 9
+fi
 if [ -d "$rollback_dir" ]; then
   if [ ! -f "$rollback_dir/READY" ] || ! python3 - "$rollback_dir" <<'PY'
 import hashlib, json, pathlib, sys
@@ -578,14 +667,17 @@ PY
   restore_target helper "$HELPER_DST" 0755
   restore_target unit "$UNIT_DST" 0644
   restore_target workflow "$WORKFLOW_DST" 0644
-  prepare_systemd_context
-  systemctl --user daemon-reload
   if [ -f "$rollback_dir/was-active" ]; then
     official_stopped_for_promotion=1
+  fi
+  prepare_systemd_context
+  systemctl --user daemon-reload
+  if [ "$official_stopped_for_promotion" -eq 1 ]; then
     systemctl --user restart "$SERVICE_NAME"
+    verify_official_restarted
     official_stopped_for_promotion=0
   fi
-  rm -rf "$rollback_dir"
+  finalize_rollback_transaction
   rollback_dir=""
   promotion_started=0
   echo "RECOVERED_INCOMPLETE_PROMOTION"
@@ -786,5 +878,7 @@ elif [ "$RETIRE_LEGACY" -eq 1 ]; then
   echo "HOT_RELOAD_OK $SERVICE_NAME pid=$after_pid"
 fi
 
+finalize_rollback_transaction
+rollback_dir=""
 promotion_complete=1
 echo "DONE"
