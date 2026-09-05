@@ -137,12 +137,16 @@ test.describe('Homepage', () => {
             auraTransitionDuration: auraStyle.transitionDuration,
             fieldBackgroundColor: fieldStyle.backgroundColor,
             fieldBackgroundImage: fieldStyle.backgroundImage,
+            fieldBorderRightWidth: fieldStyle.borderRightWidth,
+            fieldHeight: fieldBounds.height,
             fieldOutlineColor: fieldStyle.outlineColor,
             fieldOutlineStyle: fieldStyle.outlineStyle,
             fieldOutlineWidth: fieldStyle.outlineWidth,
+            fieldPaddingRight: fieldStyle.paddingRight,
             insetBottom: fieldBounds.bottom - submitBounds.bottom,
             insetRight: fieldBounds.right - submitBounds.right,
             insetTop: submitBounds.top - fieldBounds.top,
+            submitHeight: submitBounds.height,
             submitTargetHeight: submitTarget.height,
           };
         });
@@ -169,8 +173,13 @@ test.describe('Homepage', () => {
         expect(material?.fieldOutlineStyle).toBe('solid');
         expect(material?.fieldOutlineWidth).not.toBe('0px');
         expect(material?.fieldOutlineColor).not.toBe('rgba(0, 0, 0, 0)');
-        expect(material?.insetTop).toBeCloseTo(material?.insetRight ?? 0, 0);
-        expect(material?.insetBottom).toBeCloseTo(material?.insetRight ?? 0, 0);
+        expect(material?.fieldHeight).toBeCloseTo(56, 0);
+        expect(material?.submitHeight).toBeCloseTo(28, 0);
+        expect(material?.fieldPaddingRight).toBe('13px');
+        expect(material?.fieldBorderRightWidth).toBe('1px');
+        expect(material?.insetTop).toBeCloseTo(14, 0);
+        expect(material?.insetRight).toBeCloseTo(14, 0);
+        expect(material?.insetBottom).toBeCloseTo(14, 0);
         expect(material?.submitTargetHeight).toBe('44px');
         if (mode.reducedMotion === 'reduce') {
           expect(material?.auraTransitionDuration).toBe('0s');
