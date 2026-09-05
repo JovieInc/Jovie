@@ -10,12 +10,14 @@ import trace
 import types
 
 ROOT = Path(__file__).resolve().parents[3]
-SUITE = ROOT / "scripts/symphony/tests/useful-turn-proof.test.py"
+SUITES = [ROOT / "scripts/symphony/tests/useful-turn-proof.test.py",
+          ROOT / "scripts/symphony/tests/symphony-concurrency-controller.test.py"]
 TARGETS = {
     "gem_gate_contract.py": {"v2_parse_time", "v2_validate_runtime_identity", "v2_validate_useful_turn_proof", "v2_accepted_useful_turn_proofs", "v2_validate_capacity_receipt"},
     "symphony_proof_context.py": None,
     "symphony_useful_turn_probe.py": None,
     "symphony_capacity_evidence.py": None,
+    "symphony-concurrency-controller.py": None,
 }
 
 
@@ -27,14 +29,15 @@ def lines(code):
     return result
 
 
-sys.path.insert(0, str(SUITE.parent))
-sys.argv = [str(SUITE)]
+sys.path.insert(0, str(SUITES[0].parent))
 tracer = trace.Trace(count=True, trace=False)
 status = 0
-try:
-    tracer.runfunc(runpy.run_path, str(SUITE), run_name="__main__")
-except SystemExit as exc:
-    status = int(exc.code or 0)
+for suite in SUITES:
+    sys.argv = [str(suite)]
+    try:
+        tracer.runfunc(runpy.run_path, str(suite), run_name="__main__")
+    except SystemExit as exc:
+        status = max(status, int(exc.code or 0))
 counts = tracer.results().counts
 report = {}
 for name, selected in TARGETS.items():
@@ -54,5 +57,5 @@ for name, selected in TARGETS.items():
     report[name] = {"percent": round(percent, 2), "executed": len(executable) - len(missing), "statements": len(executable), "missing": missing}
     if percent < 90:
         status = 1
-print(json.dumps({"selector": str(SUITE.relative_to(ROOT)), "coverage": report}, indent=2))
+print(json.dumps({"selectors": [str(suite.relative_to(ROOT)) for suite in SUITES], "coverage": report}, indent=2))
 raise SystemExit(status)
