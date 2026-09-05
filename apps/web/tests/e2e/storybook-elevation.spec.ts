@@ -173,3 +173,72 @@ test.describe('surface elevation matrix', () => {
     expect(styles.boxShadow).not.toBe('none');
   });
 });
+
+test.describe('desktop shell optical grid', () => {
+  for (const theme of THEMES) {
+    for (const width of [900, 1224]) {
+      test(`${theme} ${width}px keeps native controls on one row`, async ({
+        page,
+      }, testInfo) => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.addInitScript(() =>
+          Object.defineProperty(window, 'electronAPI', {
+            configurable: true,
+            value: {},
+          })
+        );
+        await openStory(
+          page,
+          'organisms-appshellframe--desktop-navigation',
+          theme
+        );
+        await page.evaluate(
+          () => (document.documentElement.dataset.desktopRuntime = 'electron')
+        );
+        const toggle = page.getByTestId('electron-sidebar-toggle');
+        await expect(page.getByTestId('electron-release-identity')).toHaveCount(
+          0
+        );
+
+        const control = page.getByTestId('electron-nav-forward');
+        const header = page.getByTestId('dashboard-header');
+        const main = page.locator('#main-content');
+        const controlBox = (await control.boundingBox())!;
+        const headerBox = (await header.boundingBox())!;
+        const mainBox = (await main.boundingBox())!;
+        expect(mainBox.y).toBeLessThan(8);
+        const centerY = (box: { y: number; height: number }) =>
+          box.y + box.height / 2;
+        expect(Math.abs(centerY(controlBox) - 23)).toBeLessThanOrEqual(1);
+        expect(Math.abs(centerY(headerBox) - 23)).toBeLessThanOrEqual(1);
+
+        if (width >= 1024) {
+          const link = page.getByRole('link', { name: 'New Chat' });
+          await expect(link).toBeVisible();
+          const label = link.locator('span');
+          expect(
+            await label.evaluate(
+              element =>
+                element.scrollWidth <= element.clientWidth &&
+                getComputedStyle(element).maskImage === 'none'
+            )
+          ).toBe(true);
+          const before = await link.boundingBox();
+          await link.hover();
+          await link.focus();
+          await expect(link).toBeFocused();
+          expect(await link.boundingBox()).toEqual(before);
+          await toggle.click();
+          await expect(
+            page.getByRole('button', { name: 'Expand sidebar' })
+          ).toBeVisible();
+          expect((await main.boundingBox())!.y).toBe(mainBox.y);
+        }
+
+        await testInfo.attach('desktop-shell-optical-grid', {
+          body: await page.screenshot(),
+        });
+      });
+    }
+  }
+});
