@@ -88,6 +88,7 @@ export function ShippingVelocityCanvas({
         '--color-accent-gray',
       ].map(color);
       const foreground = color('--color-text-secondary-token');
+      const fontFamily = getComputedStyle(canvas).fontFamily;
       const chartData = shippingChartData(data, colors, showClosed);
       chartData.datasets.forEach((series, index) => {
         Object.assign(series, {
@@ -102,6 +103,7 @@ export function ShippingVelocityCanvas({
         type: 'line',
         data: chartData,
         options: {
+          font: { family: fontFamily },
           responsive: true,
           maintainAspectRatio: false,
           animation: false,
