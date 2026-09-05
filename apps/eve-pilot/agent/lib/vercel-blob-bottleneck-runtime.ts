@@ -20,12 +20,17 @@ import {
 
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u;
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+export function canonicalSummerBottleneckRecord(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalSummerBottleneckRecord).join(',')}]`;
+  }
   if (value !== null && typeof value === 'object') {
     return `{${Object.entries(value)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, child]) => `${JSON.stringify(key)}:${canonical(child)}`)
+      .map(
+        ([key, child]) =>
+          `${JSON.stringify(key)}:${canonicalSummerBottleneckRecord(child)}`
+      )
       .join(',')}}`;
   }
   return JSON.stringify(value);
@@ -41,7 +46,7 @@ function signRecord(
   const unsigned = { ...body, signatureKeyId: keyId };
   const signature = nodeSign(
     null,
-    Buffer.from(`${domain}\0${canonical(unsigned)}`),
+    Buffer.from(`${domain}\0${canonicalSummerBottleneckRecord(unsigned)}`),
     privateKey
   ).toString('base64url');
   return { ...unsigned, signature: `ed25519=${signature}` };
@@ -66,7 +71,7 @@ function verifyRecord(
   const { signature: _signature, ...unsigned } = record;
   return nodeVerify(
     null,
-    Buffer.from(`${domain}\0${canonical(unsigned)}`),
+    Buffer.from(`${domain}\0${canonicalSummerBottleneckRecord(unsigned)}`),
     publicKey,
     Buffer.from(actual.slice('ed25519='.length), 'base64url')
   );
@@ -288,7 +293,11 @@ export function createVercelBlobBottleneckDependencies(
       const result = await store.create(taskPath(idempotencyKey), outbox);
       if (result === 'exists') {
         const existing = await store.read(taskPath(idempotencyKey));
-        if (!existing || canonical(existing) !== canonical(outbox)) {
+        if (
+          !existing ||
+          canonicalSummerBottleneckRecord(existing) !==
+            canonicalSummerBottleneckRecord(outbox)
+        ) {
           throw new Error('Symphony outbox conflict');
         }
       }
