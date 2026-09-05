@@ -86,7 +86,7 @@ describe('HomepageCertifiedSections', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('closes with the locked lines and the name search as the only control', () => {
+  it('closes with the locked heading and the name search as the only control', () => {
     render(<HomepageClose />);
 
     expect(
@@ -96,8 +96,8 @@ describe('HomepageCertifiedSections', () => {
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByText(HOMEPAGE_LAUNCH_COPY.certified.close.support)
-    ).toBeInTheDocument();
+      screen.queryByText(HOMEPAGE_LAUNCH_COPY.certified.close.support)
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('combobox')).toHaveAttribute(
       'placeholder',
       HOMEPAGE_LAUNCH_COPY.hero.search.placeholder
@@ -108,9 +108,6 @@ describe('HomepageCertifiedSections', () => {
     expect(cta).toHaveAttribute('data-variant', 'primary');
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryAllByRole('link')).toHaveLength(0);
-
-    // Quiet wordmark signs the page off without becoming a second control.
-    const mark = screen.getByTestId('homepage-close-mark');
-    expect(mark.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByTestId('homepage-close-mark')).not.toBeInTheDocument();
   });
 });
