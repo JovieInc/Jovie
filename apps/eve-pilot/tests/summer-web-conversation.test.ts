@@ -186,7 +186,7 @@ describe('authenticated persistent Summer conversation', () => {
     });
     expect(JSON.stringify(durableIntent)).not.toContain('Are you Summer?');
   });
-  it('never repeats a dispatch after uncertain acceptance', async () => {
+  it('never retries an ambiguous admission after an injected pre-send crash', async () => {
     const f = fixture();
     f.dispatch.mockRejectedValueOnce(new Error('network'));
     expect((await f.send(input())).status).toBe(503);
@@ -486,10 +486,15 @@ describe('Eve terminal stream receipts', () => {
     ).toBe(200);
     expect(f.dispatch).toHaveBeenCalledOnce();
   });
-  it('recovers missing acceptance from durable admission and the canonical Eve session', async () => {
+  it('reconciles a post-send crash from the exact session marker without redispatch', async () => {
     const f = fixture();
-    await f.send(input());
-    f.records.delete(conversationPath('accepted', id(1)));
+    const persist = f.deps.persist;
+    f.deps.persist = vi.fn(async (path, record) => {
+      if (path.includes('/accepted/')) throw new Error('post-send crash');
+      return persist(path, record);
+    });
+    expect((await f.send(input())).status).toBe(503);
+    expect(f.records.has(conversationPath('accepted', id(1)))).toBe(false);
     const recoverSession = vi.fn(async () => 'ses_summer');
     const response = await readConversationResult({
       store: f.store,
