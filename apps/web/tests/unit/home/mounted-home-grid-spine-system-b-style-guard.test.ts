@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
 const cssPath = 'app/(home)/home.css';
+const headerCssPath = 'components/organisms/HeaderNav.css';
 
 const forbiddenPageChromePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -91,20 +92,44 @@ describe('mounted homepage grid spine System B source contract', () => {
 
   it('locks the page-level CSS spine onto the shared content column', () => {
     const cssSource = readFileSync(path.join(webRoot, cssPath), 'utf8');
+    const headerCssSource = readFileSync(
+      path.join(webRoot, headerCssPath),
+      'utf8'
+    );
     const spine = extractGridSpineCss(cssSource);
 
     for (const pattern of forbiddenSpineCssPatterns) {
       expect(spine, `${cssPath} spine leaked ${pattern}`).not.toMatch(pattern);
     }
 
-    // The spine block itself speaks only in shared column + gutter tokens.
-    expect(spine).toContain('var(--ds-public-content-max)');
-    expect(spine).toContain('var(--homepage-page-gutter)');
+    // The glass header owns the page's visible content edges. Its shell
+    // geometry is shared with the homepage without changing the global
+    // canonical public-content width.
+    expect(headerCssSource).toContain('--marketing-glass-shell-max: 90rem;');
+    expect(headerCssSource).toContain(
+      '--marketing-glass-shell-padding-inline: clamp(1.35rem, 2.3vw, 2rem);'
+    );
+    expect(headerCssSource).toContain(
+      '--marketing-glass-shell-border-width: var(--space-px);'
+    );
+    expect(headerCssSource).toContain('--marketing-glass-content-max: calc(');
+    expect(headerCssSource).toContain(
+      '--marketing-glass-content-gutter: calc('
+    );
+    expect(headerCssSource).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*--marketing-glass-gutter: 1rem;[\s\S]*--marketing-glass-shell-padding-inline: 0\.82rem;/
+    );
+
+    // The spine consumes the header-derived content column, not a second
+    // approximation of its gutter or max-width.
     expect(spine).toContain(
-      '--homepage-grid-max: var(--ds-public-content-max);'
+      '--homepage-grid-max: var(--marketing-glass-content-max);'
     );
     expect(spine).toContain(
-      '--homepage-grid-gutter: var(--homepage-page-gutter);'
+      '--homepage-grid-gutter: var(--marketing-glass-content-gutter);'
+    );
+    expect(cssSource).toMatch(
+      /\.homepage-editorial-hero__copy \{[\s\S]*?min-width: 0;/
     );
 
     // The canonical gutter is tokenized on the space scale — one gutter for
@@ -114,13 +139,22 @@ describe('mounted homepage grid spine System B source contract', () => {
     );
 
     // No divergent chapter gutter may survive anywhere on the page: every
-    // grid-gutter declaration resolves to the shared page gutter.
+    // grid-gutter declaration resolves to the shared header content gutter.
     const gutterDeclarations =
       cssSource.match(/--homepage-grid-gutter:[^;]+;/g) ?? [];
     expect(gutterDeclarations.length).toBeGreaterThan(0);
     for (const declaration of gutterDeclarations) {
       expect(declaration).toBe(
-        '--homepage-grid-gutter: var(--homepage-page-gutter);'
+        '--homepage-grid-gutter: var(--marketing-glass-content-gutter);'
+      );
+    }
+
+    const maxDeclarations =
+      cssSource.match(/--homepage-grid-max:[^;]+;/g) ?? [];
+    expect(maxDeclarations.length).toBeGreaterThan(0);
+    for (const declaration of maxDeclarations) {
+      expect(declaration).toBe(
+        '--homepage-grid-max: var(--marketing-glass-content-max);'
       );
     }
   });
