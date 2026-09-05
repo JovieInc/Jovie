@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     coverage: {
       include: [
+        'agent/channels/summer-shadow.ts',
+        'agent/tools/jovie_capability_manifest.ts',
         'agent/instructions/summer-shadow.ts',
         'agent/lib/summer-bottleneck-loop.ts',
         'agent/lib/summer-commercial-projection.ts',
