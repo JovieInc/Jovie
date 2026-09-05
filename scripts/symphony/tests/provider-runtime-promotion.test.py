@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -57,10 +58,10 @@ class PromotionTests(unittest.TestCase):
         path.write_text(text)
         path.chmod(0o755)
 
-    def run_helper(self, rollback=0, dry=0):
+    def run_helper(self, rollback=0, dry=0, stage=0):
         output = io.StringIO()
         status = 0
-        with patch.object(sys, "argv", [str(HELPER), str(self.repo), str(self.home), str(self.state), str(rollback), str(dry)]), contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+        with patch.object(sys, "argv", [str(HELPER), str(self.repo), str(self.home), str(self.state), str(rollback), str(dry), str(stage)]), contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             try:
                 runpy.run_path(str(HELPER), run_name="__main__")
             except SystemExit as exc:
@@ -115,6 +116,72 @@ class PromotionTests(unittest.TestCase):
         self.assertFalse(self.state.exists())
         self.assertEqual(self.run_helper(rollback=1)[0], 10)
         self.assertFalse((self.store / "current").exists())
+
+    def test_stage_only_preserves_regular_and_managed_entrypoints(self):
+        aliases = [self.bin / name for name in ["symphony-agent-router", "symphony-codex-entry"]]
+        original = [path.read_bytes() for path in aliases]
+        status, output = self.run_helper(stage=1)
+        self.assertEqual(status, 0, output)
+        self.assertIn("PROVIDER_STAGED", output)
+        self.assertEqual([path.read_bytes() for path in aliases], original)
+        self.assertFalse((self.store / "current").exists())
+        self.assertFalse((self.store / "previous").exists())
+        self.assertEqual(self.run_helper()[0], 0)
+        pointers = {path: os.readlink(path) for path in [*aliases, self.store / "current", self.store / "previous"]}
+        status, output = self.run_helper(stage=1)
+        self.assertEqual(status, 0, output)
+        self.assertEqual({path: os.readlink(path) for path in pointers}, pointers)
+        generation = Path(next(line.removeprefix("PROVIDER_STAGED ") for line in output.splitlines() if line.startswith("PROVIDER_STAGED ")))
+        self.assertNotEqual(generation, (self.store / "current").resolve())
+        self.assertTrue((generation / "manifest.json").is_file())
+
+    def test_stage_dry_run_and_incompatible_rollback_make_no_mutation(self):
+        self.assertEqual(self.run_helper(stage=1, dry=1)[0], 0)
+        self.assertFalse(self.state.exists())
+        self.assertEqual(self.run_helper(stage=1, rollback=1)[0], 10)
+        self.assertFalse(self.state.exists())
+        result = subprocess.run(["bash", str(UPDATER), "--stage-provider-runtime", "--provider-runtime-rollback"],
+            env={**os.environ, "SYMPHONY_ELIXIR_HOME": str(self.home)}, capture_output=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(self.state.exists())
+
+    def test_stage_dispatch_uses_same_store_without_switching_current(self):
+        result = subprocess.run(["bash", str(UPDATER), "--stage-provider-runtime"],
+            env={**os.environ, "SYMPHONY_ELIXIR_HOME": str(self.home)}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        generation = Path(next(line.removeprefix("PROVIDER_STAGED ") for line in result.stdout.splitlines() if line.startswith("PROVIDER_STAGED ")))
+        self.assertEqual(generation.parent, self.store)
+        self.assertTrue((generation / "manifest.json").is_file())
+        self.assertFalse((self.store / "current").exists())
+
+    def test_installed_entry_copies_real_router_and_resolves_workspace_registry(self):
+        workspace = self.root / "JOV-5954"
+        config = workspace / "scripts/symphony/config"
+        config.mkdir(parents=True)
+        shutil.copyfile(ROOT / "scripts/symphony/config/model-registry.json", config / "model-registry.json")
+        (workspace / ".symphony-routing.json").write_text(json.dumps({"schema": "symphony-routing/v1", "issue": "JOV-5954", "model": "gpt-5.6-sol"}))
+        env_dir = self.home / ".config/symphony"
+        env_dir.mkdir(parents=True)
+        (env_dir / "linear.env").write_text("LINEAR_API_KEY=fixture-only\n")
+        account_state = self.home / ".codex-accounts/state.json"
+        account_state.parent.mkdir()
+        account_state.write_text("{}\n")
+        guard, exhausted, rotate = [self.root / name for name in ["guard", "exhausted.py", "rotate"]]
+        self.write(guard, "#!/bin/sh\nexit 0\n")
+        self.write(exhausted, 'import sys\nassert sys.argv[1:] == ["pickup-check", "JOV-5954"]\n')
+        self.write(rotate, '#!/bin/sh\nprintf "MODEL_FREE_CODEX_HANDOFF %s\\n" "$*"\n')
+        env = {**os.environ, "SYMPHONY_ELIXIR_HOME": str(self.home), "SYMPHONY_HOME": str(self.home),
+               "SYMPHONY_WORKSPACE": str(workspace), "SYMPHONY_ISSUE_IDENTIFIER": "JOV-5954",
+               "SYMPHONY_CAPACITY_GUARD": str(guard), "SYMPHONY_CODEX_EXHAUSTED": str(exhausted),
+               "SYMPHONY_CODEX_ROTATE": str(rotate), "SYMPHONY_FALLBACK_LEASE_DIR": str(self.root / "leases"),
+               "CODEX_ACCOUNTS_STATE": str(account_state), "SYMPHONY_ROUTER_HEARTBEAT_SECONDS": "0"}
+        install = subprocess.run(["bash", str(UPDATER), "--provider-runtime-only"], env=env, capture_output=True, text=True)
+        self.assertEqual(install.returncode, 0, install.stderr)
+        result = subprocess.run([str(self.bin / "symphony-codex-entry"), "app-server"], cwd=workspace, env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('MODEL_FREE_CODEX_HANDOFF --config shell_environment_policy.inherit=all --config model="gpt-5.6-sol" app-server', result.stdout)
+        self.assertEqual((workspace / "scripts/symphony/symphony-codex-router").read_bytes(),
+                         (ROOT / "scripts/symphony/symphony-codex-router").read_bytes())
 
     def test_inflight_launch_keeps_its_generation_across_promotion(self):
         router = self.source / "symphony-agent-router"
