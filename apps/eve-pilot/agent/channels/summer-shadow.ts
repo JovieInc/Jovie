@@ -101,6 +101,7 @@ export default defineChannel<SummerShadowChannelState>({
                 throw new Error('canonical_session_unavailable');
               await attachSession(previousSessionId).send(message, {
                 auth,
+                idempotencyKey: input.eventId,
                 turnPolicy: 'queue',
               });
               return previousSessionId;
@@ -108,6 +109,7 @@ export default defineChannel<SummerShadowChannelState>({
             if (current) throw new Error('unbound_existing_session');
             const session = await from(address).send(message, {
               auth,
+              idempotencyKey: input.eventId,
               state: {
                 dispatchAuthority: 'none',
                 eventId: input.eventId,

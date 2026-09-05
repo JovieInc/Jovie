@@ -186,12 +186,12 @@ describe('authenticated persistent Summer conversation', () => {
     });
     expect(JSON.stringify(durableIntent)).not.toContain('Are you Summer?');
   });
-  it('never retries an ambiguous admission after an injected pre-send crash', async () => {
+  it('retries an ambiguous admission under the same native delivery key', async () => {
     const f = fixture();
     f.dispatch.mockRejectedValueOnce(new Error('network'));
     expect((await f.send(input())).status).toBe(503);
-    expect((await f.send(input())).status).toBe(503);
-    expect(f.dispatch).toHaveBeenCalledOnce();
+    expect((await f.send(input())).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
   });
   it('enforces one immutable successor, even across concurrent submissions', async () => {
     const f = fixture();
@@ -283,7 +283,7 @@ describe('authenticated persistent Summer conversation', () => {
       [...f.records.keys()].filter(path => path.includes('/budgets/daily/'))
     ).toHaveLength(1);
   });
-  it('allows only the immutable admission creator to dispatch', async () => {
+  it('lets concurrent same-event recovery converge through the native key', async () => {
     const f = fixture();
     const read = f.deps.read;
     let interrupted = false;
@@ -313,9 +313,9 @@ describe('authenticated persistent Summer conversation', () => {
 
     const responses = await Promise.all([f.send(input()), f.send(input())]);
     expect(responses.map(response => response.status).sort()).toEqual([
-      202, 503,
+      202, 202,
     ]);
-    expect(f.dispatch).toHaveBeenCalledOnce();
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
     expect(
       [...f.records.keys()].filter(path => path.includes('/budgets/daily/'))
     ).toHaveLength(1);
@@ -486,7 +486,7 @@ describe('Eve terminal stream receipts', () => {
     ).toBe(200);
     expect(f.dispatch).toHaveBeenCalledOnce();
   });
-  it('reconciles a post-send crash from the exact session marker without redispatch', async () => {
+  it('reconciles a post-send crash after native same-key redispatch', async () => {
     const f = fixture();
     const persist = f.deps.persist;
     f.deps.persist = vi.fn(async (path, record) => {
@@ -495,6 +495,8 @@ describe('Eve terminal stream receipts', () => {
     });
     expect((await f.send(input())).status).toBe(503);
     expect(f.records.has(conversationPath('accepted', id(1)))).toBe(false);
+    expect((await f.send(input())).status).toBe(503);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
     const recoverSession = vi.fn(async () => 'ses_summer');
     const response = await readConversationResult({
       store: f.store,
@@ -508,7 +510,7 @@ describe('Eve terminal stream receipts', () => {
       eventId: id(1),
       sessionId: 'ses_summer',
     });
-    expect(f.dispatch).toHaveBeenCalledOnce();
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
   });
   it('does not certify recovery until the exact event marker is visible', async () => {
     const f = fixture();

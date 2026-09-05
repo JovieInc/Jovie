@@ -182,7 +182,7 @@ export function renderConversation(input: ConversationInput): string {
   ].join('\n');
 }
 
-/** Compose the existing immutable shadow budget and Eve continuation. No timer or retrying dispatcher. */
+/** Compose immutable app receipts with Eve's bounded native delivery key. No timer. */
 export function createConversationIngress(
   deps: ConversationStore & {
     authenticate(request: Request): Promise<unknown | Response>;
@@ -271,14 +271,6 @@ export function createConversationIngress(
           );
         if (rejected)
           return json({ ok: false, code: 'rejection_unavailable' }, 503);
-        const admission = await deps.read(
-          conversationPath('admissions', input.eventId)
-        );
-        if (admission)
-          return json(
-            { ok: false, code: 'dispatch_unknown', eventId: input.eventId },
-            503
-          );
       }
       const previousResult = input.previousEventId
         ? await deps.read(conversationPath('results', input.previousEventId))
@@ -457,10 +449,6 @@ export function createConversationIngress(
             { ok: false, code: 'admission_persistence_unknown' },
             503
           );
-        return json(
-          { ok: false, code: 'dispatch_unknown', eventId: input.eventId },
-          503
-        );
       }
       const sessionId = await deps.dispatch(
         input,
