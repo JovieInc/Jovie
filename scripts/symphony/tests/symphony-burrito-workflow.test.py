@@ -3288,14 +3288,23 @@ while True: time.sleep(1)
                 "transaction": str(transaction),
             }))
             mode.write_text("restart-fails-once\n")
+            events_before_cleanup = events.read_text().splitlines()
             recovered = subprocess.run(
                 ["bash", str(updater), "--skip-binary", "--no-restart"],
                 cwd=ROOT, env=recovery_env, capture_output=True, text=True,
             )
-            self.assertNotEqual(recovered.returncode, 0)
-            self.assertIn("PROMOTION_ROLLED_BACK", recovered.stderr)
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", recovered.stdout)
+            self.assertNotIn("PROMOTION_ROLLED_BACK", recovered.stderr)
+            self.assertEqual(events.read_text().splitlines(), events_before_cleanup)
             self.assertFalse(transaction.exists())
             self.assertFalse((state / "promotion-held.json").exists())
+            recovered_receipt = json.loads(
+                (state / "promotion-recovered.json").read_text()
+            )
+            self.assertEqual(recovered_receipt["status"], "restored-prior")
+            self.assertEqual(recovered_receipt["cleanupStatus"], "complete")
+            self.assertEqual(recovered_receipt["transaction"], str(transaction))
 
             transaction.mkdir()
             (transaction / "binary.missing").touch()
@@ -3326,12 +3335,21 @@ while True: time.sleep(1)
             self.assertFalse(transaction.exists())
             self.assertFalse(hold_path.exists())
             self.assertTrue(tombstone.is_dir())
+            events_before_cleanup = events.read_text().splitlines()
             retry = subprocess.run(
                 ["bash", str(updater), "--skip-binary", "--no-restart"],
                 cwd=ROOT, env=recovery_env, capture_output=True, text=True,
             )
-            self.assertEqual(retry.returncode, 9)
-            self.assertIn("incomplete transaction cleanup", retry.stderr)
+            self.assertEqual(retry.returncode, 0, retry.stderr)
+            self.assertIn("cleanup acknowledgement remains pending", retry.stderr)
+            self.assertTrue(tombstone.exists())
+            self.assertEqual(events.read_text().splitlines(), events_before_cleanup)
+            recovered_receipt = json.loads(
+                (state / "promotion-recovered.json").read_text()
+            )
+            self.assertEqual(recovered_receipt["status"], "restored-prior")
+            self.assertEqual(recovered_receipt["cleanupStatus"], "pending")
+            self.assertEqual(recovered_receipt["transaction"], str(transaction))
 
     def test_transaction_removal_is_persisted_before_success(self):
         helper = UPDATER[UPDATER.index("finalize_rollback_transaction() {"):
