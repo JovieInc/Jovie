@@ -228,6 +228,7 @@ class BoundedRepairAdmission:
     issue_identifier: str
     issue_id: str
     required_label: str
+    source_commit: str
     workspace_root: pathlib.Path
     router_path: pathlib.Path
     expires_at: dt.datetime
@@ -1243,6 +1244,7 @@ def validate_bounded_repair_admission(
         issue_identifier=issue,
         issue_id=issue_id,
         required_label=label,
+        source_commit=source_commit,
         workspace_root=workspace_root,
         router_path=router_path,
         expires_at=expires_at,
@@ -1284,6 +1286,32 @@ def claim_bounded_repair(admission: BoundedRepairAdmission) -> None:
         except OSError:
             pass
         raise
+
+
+def validate_bounded_repair_workspace_isolation(
+    admission: BoundedRepairAdmission,
+) -> None:
+    """Require a new packet-local root before the scheduler can create a workspace."""
+    expected = admission.manifest_path.parent / (
+        f"workspace-{admission.issue_identifier}-{admission.source_commit[:12]}"
+    )
+    if admission.workspace_root.resolve() != expected.resolve():
+        raise ValueError("recovery-workspace-root-not-packet-local")
+    if admission.workspace_root.is_symlink():
+        raise ValueError("recovery-workspace-root-symlink")
+    if not admission.workspace_root.exists():
+        return
+    if not admission.workspace_root.is_dir():
+        raise ValueError("recovery-workspace-root-not-directory")
+    try:
+        next(admission.workspace_root.iterdir())
+    except StopIteration:
+        return
+    except OSError as exc:
+        raise ValueError(
+            f"recovery-workspace-root-unreadable:{type(exc).__name__}"
+        ) from exc
+    raise ValueError("recovery-workspace-root-not-empty")
 
 
 def _bounded_repair_environment(*, include_linear: bool) -> dict[str, str]:
@@ -2287,13 +2315,14 @@ def run_official_binary(
                 fleet_payload = json.loads(
                     closure.receipt_path.read_text(encoding="utf-8")
                 )
-                validate_bounded_repair_admission(
+                admission = validate_bounded_repair_admission(
                     closure.recovery_manifest_path,
                     fleet_path=closure.receipt_path,
                     fleet_payload=fleet_payload,
                     expected_command=command,
                     require_unclaimed=True,
                 )
+                validate_bounded_repair_workspace_isolation(admission)
             except (OSError, json.JSONDecodeError, ValueError) as exc:
                 print(
                     json.dumps(
