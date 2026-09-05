@@ -453,11 +453,13 @@ echo "SHA256 ${SUM_NAME}"
 tmpdir=""
 rollback_dir=""
 candidate_dir=""
+candidate_id=""
 candidate_tmp=""
 update_lock=""
 promotion_started=0
 promotion_complete=0
 cleanup_pending=""
+finalized_receipt=""
 official_was_active=0
 official_stopped_for_promotion=0
 official_pid_before=""
@@ -540,6 +542,74 @@ if tombstone.exists():
 PY
 }
 
+write_finalized_receipt() {
+  local cleanup_status="$1"
+  CLEANUP_STATUS="$cleanup_status" CANDIDATE_ID="$candidate_id" \
+    CANDIDATE_DIR="$candidate_dir" ROLLBACK_DIR="$rollback_dir" \
+    python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+receipt = root / "promotion-finalized.json"
+temporary = root / ".promotion-finalized.json.tmp"
+candidate_id = os.environ["CANDIDATE_ID"]
+candidate = os.environ["CANDIDATE_DIR"]
+if not candidate_id or not candidate:
+    try:
+        previous = json.loads(receipt.read_text())
+    except (OSError, ValueError):
+        raise SystemExit(1)
+    candidate_id = previous.get("candidateId")
+    candidate = previous.get("candidate")
+payload = {
+    "schema": "symphony-promotion-finalized/v1",
+    "status": "committed",
+    "cleanupStatus": os.environ["CLEANUP_STATUS"],
+    "candidateId": candidate_id,
+    "candidate": candidate,
+    "transaction": os.environ["ROLLBACK_DIR"],
+}
+temporary.write_text(json.dumps(payload, sort_keys=True) + "\n")
+with temporary.open("rb") as handle:
+    os.fsync(handle.fileno())
+os.replace(temporary, receipt)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
+finalized_cleanup_pending() {
+  [ -n "$finalized_receipt" ] && [ -n "$rollback_dir" ] || return 1
+  FINALIZED_RECEIPT="$finalized_receipt" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, re, sys
+root = pathlib.Path(sys.argv[1])
+receipt = pathlib.Path(os.environ["FINALIZED_RECEIPT"])
+transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
+try:
+    payload = json.loads(receipt.read_text())
+except (OSError, ValueError):
+    raise SystemExit(1)
+candidate_id = payload.get("candidateId")
+candidate = payload.get("candidate")
+valid_candidate_id = (
+    isinstance(candidate_id, str) and
+    re.fullmatch(r"[0-9a-f]{64}", candidate_id) is not None
+)
+expected_candidate = root / "candidates" / candidate_id if valid_candidate_id else None
+if (receipt != root / "promotion-finalized.json" or
+        transaction != root / "promotion-transaction" or
+        payload.get("schema") != "symphony-promotion-finalized/v1" or
+        payload.get("status") != "committed" or
+        payload.get("cleanupStatus") != "pending" or
+        payload.get("transaction") != str(transaction) or
+        not valid_candidate_id or candidate != str(expected_candidate) or
+        not expected_candidate.is_dir()):
+    raise SystemExit(1)
+PY
+}
+
 backup_target() {
   local key="$1" target="$2"
   if [ -e "$target" ] || [ -L "$target" ]; then
@@ -558,33 +628,8 @@ restore_target() {
   fi
 }
 
-promotion_cleanup_is_committed() {
-  [ -n "$cleanup_pending" ] || return 1
-  CLEANUP_PENDING="$cleanup_pending" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
-import os, pathlib, sys
-root = pathlib.Path(sys.argv[1])
-marker = pathlib.Path(os.environ["CLEANUP_PENDING"])
-transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
-tombstone = root / ".promotion-transaction.removing"
-hold = root / "promotion-held.json"
-if (marker != root / ".promotion-transaction.cleanup-pending" or
-        transaction != root / "promotion-transaction" or
-        not marker.is_file() or
-        marker.read_text() != "symphony-promotion-cleanup-pending/v1\n" or
-        transaction.exists() or tombstone.exists() or hold.exists()):
-    raise SystemExit(1)
-PY
-}
-
 cleanup() {
   local status="$?"
-  if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ] &&
-     [ "$promotion_started" -eq 1 ] && [ "$files_promoted" -eq 1 ] &&
-     promotion_cleanup_is_committed; then
-    promotion_complete=1
-    rollback_dir=""
-    echo "PROMOTION_COMMITTED candidate verified; cleanup acknowledgement pending" >&2
-  fi
   if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
     if [ "$promotion_started" -eq 1 ]; then
       if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
@@ -623,7 +668,8 @@ cleanup() {
     fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  if [ "$promotion_complete" -eq 1 ] || { [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; }; then
+  if [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] &&
+     [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; then
     if [ -n "$rollback_dir" ]; then
       if ! finalize_rollback_transaction; then
         rollback_restart_verified=0
@@ -656,6 +702,15 @@ fi
 
 rollback_dir="$STATE_DIR/promotion-transaction"
 cleanup_pending="$STATE_DIR/.promotion-transaction.cleanup-pending"
+finalized_receipt="$STATE_DIR/promotion-finalized.json"
+if finalized_cleanup_pending; then
+  if ! finalize_rollback_transaction; then
+    echo "PROMOTION_COMMITTED cleanup acknowledgement remains pending" >&2
+    exit 0
+  fi
+  write_finalized_receipt complete
+  echo "RECOVERED_TRANSACTION_CLEANUP"
+fi
 if [ -e "$cleanup_pending" ]; then
   if ! finalize_rollback_transaction; then
     echo "PROMOTION_RED incomplete transaction cleanup requires operator review" >&2
@@ -904,7 +959,12 @@ elif [ "$RETIRE_LEGACY" -eq 1 ]; then
   echo "HOT_RELOAD_OK $SERVICE_NAME pid=$after_pid"
 fi
 
-finalize_rollback_transaction
-rollback_dir=""
+write_finalized_receipt pending
 promotion_complete=1
+if finalize_rollback_transaction; then
+  write_finalized_receipt complete
+else
+  echo "PROMOTION_COMMITTED candidate verified; cleanup acknowledgement pending" >&2
+fi
+rollback_dir=""
 echo "DONE"

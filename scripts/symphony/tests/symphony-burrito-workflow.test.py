@@ -2135,7 +2135,11 @@ while True: time.sleep(1)
                 capture_output=True,
                 text=True,
             )
-            self.assertNotEqual(committed_cleanup_failure.returncode, 0)
+            self.assertEqual(
+                committed_cleanup_failure.returncode,
+                0,
+                committed_cleanup_failure.stderr,
+            )
             self.assertIn("PROMOTION_COMMITTED", committed_cleanup_failure.stderr)
             self.assertNotIn("PROMOTION_ROLLED_BACK", committed_cleanup_failure.stderr)
             marker = (
@@ -2150,6 +2154,15 @@ while True: time.sleep(1)
                 (target_home / ".local/state/symphony-elixir/.promotion-transaction.removing").exists()
             )
             self.assertFalse(hold.exists())
+            finalized = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-finalized.json"
+                ).read_text()
+            )
+            self.assertEqual(finalized["status"], "committed")
+            self.assertEqual(finalized["cleanupStatus"], "pending")
+            self.assertEqual(finalized["transaction"], str(transaction))
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
 
@@ -2161,8 +2174,52 @@ while True: time.sleep(1)
                 text=True,
             )
             self.assertEqual(acknowledged.returncode, 0, acknowledged.stderr)
-            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", acknowledged.stdout)
+            self.assertIn(
+                "RECOVERED_TRANSACTION_CLEANUP",
+                acknowledged.stdout,
+                acknowledged.stderr,
+            )
             self.assertFalse(marker.exists())
+            finalized = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-finalized.json"
+                ).read_text()
+            )
+            self.assertEqual(finalized["status"], "committed")
+            self.assertEqual(finalized["cleanupStatus"], "complete")
+
+            transaction.mkdir()
+            (transaction / "binary.missing").touch()
+            for key, path in (("workflow", workflow), ("helper", helper), ("unit", unit)):
+                (transaction / key).write_bytes(unsafe_prior[path])
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir()
+                if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text(
+                "symphony-promotion-transaction/v1\n"
+            )
+            finalized["cleanupStatus"] = "pending"
+            (
+                target_home
+                / ".local/state/symphony-elixir/promotion-finalized.json"
+            ).write_text(json.dumps(finalized))
+            crash_after_commit = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(crash_after_commit.returncode, 0, crash_after_commit.stderr)
+            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", crash_after_commit.stdout)
+            self.assertNotIn("RECOVERED_INCOMPLETE_PROMOTION", crash_after_commit.stdout)
+            self.assertFalse(transaction.exists())
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
 
             for path, expected in unsafe_prior.items():
                 path.write_bytes(expected)
@@ -2454,6 +2511,15 @@ while True: time.sleep(1)
         self.assertIn("shutil.rmtree(tombstone)", helper)
         self.assertIn("os.fsync(descriptor)", helper)
         self.assertNotIn('rm -rf "$rollback_dir"', UPDATER)
+        self.assertIn("symphony-promotion-finalized/v1", UPDATER)
+        self.assertLess(
+            UPDATER.rindex("write_finalized_receipt pending\n"),
+            UPDATER.rindex("promotion_complete=1\n"),
+        )
+        self.assertLess(
+            UPDATER.rindex("promotion_complete=1\n"),
+            UPDATER.rindex("if finalize_rollback_transaction; then\n"),
+        )
         self.assertLess(UPDATER.rindex("finalize_rollback_transaction\n"),
                         UPDATER.rindex('echo "DONE"'))
 
