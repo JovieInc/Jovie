@@ -73,12 +73,14 @@ jobs:
       - name: Check out trusted queue policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Never execute policy code from the synthetic PR-controlled head.
-          ref: ${{ github.event.merge_group.base_sha }}
+          # ALLGREEN may set base_sha to a prior synthetic group commit. Run
+          # policy only from the protected default branch, never queue refs.
+          ref: main
           persist-credentials: false
           sparse-checkout: |
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-guard-policy.mjs
+            scripts/lib/repo-hygiene-limits.mjs
           sparse-checkout-cone-mode: false
 
       - name: Revalidate every merge-group member's fork policy

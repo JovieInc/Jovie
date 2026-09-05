@@ -75,6 +75,7 @@ jobs:
       - uses: ./.github/actions/setup
       - run: node scripts/check.mjs
       - run: pnpm --filter=@actual/web test
+      - run: git fetch --refetch --filter=blob:limit=1g origin "$BOOTSTRAP_HEAD"
 `
   );
 
