@@ -30,6 +30,8 @@ const PRODUCER_PUBLIC_KEY = producerKeys.publicKey
   .export({ format: 'pem', type: 'spki' })
   .toString();
 const PRODUCER_KEY_ID = 'jovie-production-2026-09';
+const EVE_EVENTS_URL =
+  'https://jovie-eve-shadow-ao5jifcht-jovie.vercel.app/ovie/v1/summer-bottleneck/events';
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -133,6 +135,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       PRODUCER_PRIVATE_KEY
     );
     vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', PRODUCER_KEY_ID);
+    vi.stubEnv('SUMMER_BOTTLENECK_EVE_EVENTS_URL', EVE_EVENTS_URL);
     mocks.verifyCronRequest.mockReturnValue(null);
     mocks.getVercelOidcToken.mockResolvedValue('test-vercel-oidc-token');
   });
@@ -162,7 +165,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('signs a strict snapshot that Eve accepts and sends it to the fixed target once', async () => {
+  it('signs a source-bound snapshot and sends it to the approved target once', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       Response.json(
         {
@@ -181,9 +184,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     const call = fetch.mock.calls[0];
     expect(call).toBeDefined();
     const [url, init] = call as Parameters<typeof globalThis.fetch>;
-    expect(String(url)).toBe(
-      'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app/ovie/v1/summer-bottleneck/events'
-    );
+    expect(String(url)).toBe(EVE_EVENTS_URL);
     expect(init).toMatchObject({
       method: 'POST',
       headers: {
@@ -208,6 +209,36 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
         Buffer.from(delivered.producerAttestation.signature, 'base64url')
       )
     ).toBe(true);
+  });
+
+  it.each([
+    ['missing', undefined],
+    [
+      'obsolete',
+      'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app/ovie/v1/summer-bottleneck/events',
+    ],
+    [
+      'wrong path',
+      'https://jovie-eve-shadow-ao5jifcht-jovie.vercel.app/ovie/v1/summer-shadow/events',
+    ],
+    [
+      'insecure',
+      'http://jovie-eve-shadow-ao5jifcht-jovie.vercel.app/ovie/v1/summer-bottleneck/events',
+    ],
+  ])('fails closed for a %s Eve target before signing', async (_name, url) => {
+    vi.stubEnv('SUMMER_BOTTLENECK_EVE_EVENTS_URL', url);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'eve_target_unavailable',
+    });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it.each([
