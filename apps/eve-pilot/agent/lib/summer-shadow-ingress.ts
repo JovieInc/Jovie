@@ -59,10 +59,10 @@ export type SummerShadowIngressDependencies = {
   readonly deployment: () => ShadowDeployment;
 };
 
-class BodyTooLargeError extends Error {
+export class ShadowBodyTooLargeError extends Error {
   constructor() {
     super('request body exceeds the shadow ingress limit');
-    this.name = 'BodyTooLargeError';
+    this.name = 'ShadowBodyTooLargeError';
   }
 }
 
@@ -78,14 +78,14 @@ function jsonResponse(
   });
 }
 
-async function readBoundedBody(request: Request): Promise<string> {
+export async function readBoundedShadowBody(request: Request): Promise<string> {
   const declaredLength = request.headers.get('content-length');
   if (
     declaredLength &&
     Number.isFinite(Number(declaredLength)) &&
     Number(declaredLength) > MAX_BODY_BYTES
   ) {
-    throw new BodyTooLargeError();
+    throw new ShadowBodyTooLargeError();
   }
 
   if (!request.body) return '';
@@ -101,7 +101,7 @@ async function readBoundedBody(request: Request): Promise<string> {
     byteLength += value.byteLength;
     if (byteLength > MAX_BODY_BYTES) {
       await reader.cancel();
-      throw new BodyTooLargeError();
+      throw new ShadowBodyTooLargeError();
     }
     body += decoder.decode(value, { stream: true });
   }
@@ -191,9 +191,9 @@ export function createSummerShadowIngressHandler(
 
     let rawBody: string;
     try {
-      rawBody = await readBoundedBody(request);
+      rawBody = await readBoundedShadowBody(request);
     } catch (error) {
-      if (error instanceof BodyTooLargeError) {
+      if (error instanceof ShadowBodyTooLargeError) {
         return jsonResponse(413, {
           ok: false,
           code: 'body_too_large',

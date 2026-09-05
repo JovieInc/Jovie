@@ -103,6 +103,8 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 | `DESIGN.md` | Operational design-system execution |
 | `docs/design-system/GOVERNANCE.md` | Design drift audit, standing initiative |
 | `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
+| `docs/OVIE.md` | Ovie surfaces and the canonical Eve/Summer operating chain |
+| `apps/eve-pilot/README.md` | Eve/Summer channels, conversation contract, and local verification |
 | `docs/macos/swift-control-invariants.md` | Mac Electron vs Swift stack; proposed Swift-control slugs |
 | `docs/marketing/AGENT_GUIDE.md` | Generating or editing any marketing/landing page |
 | `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |
