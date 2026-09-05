@@ -218,6 +218,25 @@ describe('CookieBannerSection', () => {
     );
   });
 
+  it('scopes the narrow two-row action fallback to the public-profile overlay lane', () => {
+    const source = readAppSource('styles/design-system.css');
+    const narrowActionsStart = source.indexOf('@media (max-width: 383px)');
+    const narrowActionsEnd = source.indexOf(
+      '@media (min-width: 768px)',
+      narrowActionsStart
+    );
+    const narrowActions = source.slice(narrowActionsStart, narrowActionsEnd);
+
+    expect(narrowActions).toContain(
+      '.cookie-banner-card--above-public-profile-dock .cookie-actions--compact'
+    );
+    expect(narrowActions).toContain('grid-template-columns: repeat(2');
+    expect(narrowActions).toContain('grid-column: 1 / -1');
+    expect(narrowActions).not.toMatch(
+      /(?:^|\n)\s{2}\.cookie-actions--compact\s*\{/
+    );
+  });
+
   it('gives the preferences modal sole ownership of the consent surface', async () => {
     setCookie('jv_cc_required=1');
     render(<CookieBannerSection />);

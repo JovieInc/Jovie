@@ -72,6 +72,84 @@ async function openHomepageWithBanner(
   await waitForHydration(page);
 }
 
+async function mountBannerFixtureWhenGlobalChromeIsSuppressed(
+  page: import('@playwright/test').Page
+): Promise<void> {
+  await page.evaluate(() => {
+    if (document.querySelector('[data-testid="cookie-banner"]')) return;
+
+    const banner = document.createElement('aside');
+    banner.setAttribute('aria-label', 'Cookie Consent');
+    banner.dataset.testid = 'cookie-banner';
+    banner.className =
+      'cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95';
+
+    const surface = document.createElement('div');
+    surface.className =
+      'rounded-2xl border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card';
+    const content = document.createElement('div');
+    content.className = 'min-w-0';
+    const copy = document.createElement('p');
+    copy.className = 'text-xs leading-snug text-secondary-token';
+    copy.append(
+      'Essential cookies keep Jovie working. Choose whether to allow analytics and marketing cookies. '
+    );
+    const privacy = document.createElement('a');
+    privacy.href = '/legal/privacy';
+    privacy.className =
+      'underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent';
+    privacy.textContent = 'Privacy';
+    copy.append(privacy);
+
+    const actionsMargin = document.createElement('div');
+    actionsMargin.className = 'mt-3';
+    const actions = document.createElement('div');
+    actions.className =
+      'cookie-actions--compact flex shrink-0 flex-row flex-wrap items-center';
+    actions.dataset.testid = 'cookie-actions';
+    actions.style.gap = '4px';
+
+    for (const [label, testId, kind] of [
+      ['Reject all', 'cookie-action-reject-all', 'choice'],
+      ['Accept all', 'cookie-action-accept-all', 'choice'],
+      ['Customize', 'cookie-action-customize', 'customize'],
+    ] as const) {
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.textContent = label;
+      action.dataset.testid = testId;
+      action.className = `min-w-0 flex-1 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent sm:flex-none cookie-action--${kind}`;
+      Object.assign(action.style, {
+        backgroundColor:
+          kind === 'choice'
+            ? 'var(--linear-btn-primary-bg)'
+            : 'var(--linear-bg-button)',
+        color:
+          kind === 'choice'
+            ? 'var(--linear-btn-primary-fg)'
+            : 'var(--linear-text-primary)',
+        border:
+          kind === 'choice'
+            ? '1px solid var(--linear-btn-primary-bg)'
+            : '1px solid var(--linear-border-default)',
+        borderRadius: 'var(--radius-sm)',
+        fontSize: '12px',
+        fontWeight: 'var(--linear-font-weight-medium)',
+        padding: kind === 'choice' ? '6px 8px' : '6px',
+        whiteSpace: 'nowrap',
+        height: '44px',
+      });
+      actions.append(action);
+    }
+
+    actionsMargin.append(actions);
+    content.append(copy, actionsMargin);
+    surface.append(content);
+    banner.append(surface);
+    document.body.append(banner);
+  });
+}
+
 test.describe('Cookie banner @smoke', () => {
   test('cookie banner appears for new visitors', async ({ page }) => {
     test.setTimeout(90_000);
@@ -105,6 +183,104 @@ test.describe('Cookie banner @smoke', () => {
         `${actionName} misses the 44px touch height`
       ).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  test('visible consent stays clear of the homepage primary action from 320px through desktop', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.addInitScript(() => {
+      const target = window as Window & { __cookieBannerCls?: number };
+      target.__cookieBannerCls = 0;
+      new PerformanceObserver(list => {
+        for (const entry of list.getEntries()) {
+          const shift = entry as PerformanceEntry & {
+            hadRecentInput: boolean;
+            value: number;
+          };
+          if (!shift.hadRecentInput) {
+            target.__cookieBannerCls =
+              (target.__cookieBannerCls ?? 0) + shift.value;
+          }
+        }
+      }).observe({ type: 'layout-shift', buffered: true });
+    });
+    await page.addInitScript(() => {
+      document.cookie = 'jv_cc_required=1; path=/; SameSite=Lax';
+    });
+    await openHomepageWithBanner(page);
+    // Standard managed E2E servers set NEXT_DISABLE_TOOLBAR=1, which suppresses
+    // all global chrome including CookieBannerMount. In that mode, render the
+    // exact banner DOM/classes so this remains a CSS geometry contract.
+    await mountBannerFixtureWhenGlobalChromeIsSuppressed(page);
+
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 390, height: 844 },
+      { width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(
+        () =>
+          new Promise<void>(resolve =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+
+      const banner = page.getByTestId('cookie-banner');
+      const primaryAction = page.getByTestId('homepage-editorial-hero-search');
+      await expect(banner).toBeVisible();
+      await expect(primaryAction).toBeVisible();
+
+      const [bannerBox, primaryActionBox] = await Promise.all([
+        banner.boundingBox(),
+        primaryAction.boundingBox(),
+      ]);
+      expect(bannerBox, `${viewport.width}px banner has no box`).not.toBeNull();
+      expect(
+        primaryActionBox,
+        `${viewport.width}px primary action has no box`
+      ).not.toBeNull();
+      expect(
+        bannerBox!.y >= primaryActionBox!.y + primaryActionBox!.height ||
+          primaryActionBox!.y >= bannerBox!.y + bannerBox!.height,
+        `${viewport.width}px consent banner overlaps the homepage primary action`
+      ).toBe(true);
+    }
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    const heroInput = page.getByPlaceholder('Search your name').first();
+    const heroSubmit = page.getByRole('button', { name: 'Find me' }).first();
+    await heroInput.focus();
+    await page.keyboard.press('Tab');
+    await expect(heroSubmit).toBeFocused();
+    expect(
+      await heroSubmit.evaluate(element => element.matches(':focus-visible'))
+    ).toBe(true);
+
+    const banner = page.getByTestId('cookie-banner');
+    await banner.getByRole('link', { name: 'Privacy' }).focus();
+    for (const actionName of ['Reject all', 'Accept all', 'Customize']) {
+      await page.keyboard.press('Tab');
+      const action = banner.getByRole('button', {
+        name: actionName,
+        exact: true,
+      });
+      await expect(action).toBeFocused();
+      expect(
+        await action.evaluate(element => element.matches(':focus-visible'))
+      ).toBe(true);
+    }
+
+    expect(
+      await page.evaluate(
+        () =>
+          (window as Window & { __cookieBannerCls?: number })
+            .__cookieBannerCls ?? 0
+      )
+    ).toBeLessThanOrEqual(0.01);
   });
 
   test('Accept all button is clickable and persists every optional category', async ({

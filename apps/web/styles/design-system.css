@@ -758,18 +758,24 @@
    while giving the equally prominent choices one row and Customize its own
    full-width row. */
 @media (max-width: 383px) {
-  .cookie-actions--compact {
+  .cookie-banner-card--above-public-profile-dock .cookie-actions--compact {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .cookie-actions--compact > .cookie-action--choice,
-  .cookie-actions--compact > .cookie-action--customize {
+  .cookie-banner-card--above-public-profile-dock
+    .cookie-actions--compact
+    > .cookie-action--choice,
+  .cookie-banner-card--above-public-profile-dock
+    .cookie-actions--compact
+    > .cookie-action--customize {
     width: 100%;
     min-width: 0;
   }
 
-  .cookie-actions--compact > .cookie-action--customize {
+  .cookie-banner-card--above-public-profile-dock
+    .cookie-actions--compact
+    > .cookie-action--customize {
     grid-column: 1 / -1;
   }
 }
