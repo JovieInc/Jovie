@@ -604,6 +604,24 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertFalse(labeled["ok"])
             self.assertIn("workflow_required_labels_present:symphony", labeled["errors"])
 
+            nonadjacent_duplicate = check(
+                WORKFLOW.replace(
+                    "  excluded_labels:\n    - no-symphony\n    - needs-human\n",
+                    "  required_labels:\n"
+                    "    - first\n"
+                    "  excluded_labels:\n"
+                    "    - no-symphony\n"
+                    "    - needs-human\n"
+                    "  required_labels:\n"
+                    "    - second\n",
+                )
+            )
+            self.assertFalse(nonadjacent_duplicate["ok"])
+            self.assertIn(
+                "workflow_invalid:duplicate list required_labels",
+                nonadjacent_duplicate["errors"],
+            )
+
             no_exclusions = check(
                 WORKFLOW.replace(
                     "  excluded_labels:\n    - no-symphony\n    - needs-human\n", ""
@@ -1546,6 +1564,39 @@ while True: time.sleep(1)
             self.assertEqual(second.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
             self.assertNotIn("bounded-repair-ran", second.stdout)
             self.assertIn("recovery-manifest-already-claimed", second.stdout)
+
+    def test_bounded_repair_fixture_shells_fail_secret_negative_control(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            _gate, _fleet, _manifest_path, manifest, command = (
+                _bounded_repair_fixture(tmp, helper)
+            )
+            env = os.environ.copy()
+            for name in (
+                "GITHUB_TOKEN",
+                "GH_TOKEN",
+                "LINEAR_API_KEY",
+                "AWS_SECRET_ACCESS_KEY",
+                "UNRELATED_RECOVERY_SECRET",
+            ):
+                env.pop(name, None)
+            env["GITHUB_TOKEN"] = "negative-control-must-fail"
+
+            binary = subprocess.run(
+                command, cwd=ROOT, env=env, capture_output=True, text=True
+            )
+            self.assertNotEqual(binary.returncode, 0, binary.stdout + binary.stderr)
+            self.assertNotIn("bounded-repair-ran", binary.stdout)
+
+            router = subprocess.run(
+                [manifest["artifacts"]["router"]["path"], "app-server"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(router.returncode, 0, router.stdout + router.stderr)
+            self.assertNotIn("bounded-repair-ran", router.stdout)
 
     def test_bounded_repair_claim_is_exclusive_under_concurrent_agent_start(self):
         helper = _load_helper()

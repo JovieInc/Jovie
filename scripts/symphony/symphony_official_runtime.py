@@ -302,24 +302,20 @@ def _scalar(body: list[str], key: str, *, indent: int = 2) -> str:
 
 
 def _list_items(body: list[str], key: str, *, indent: int = 2) -> tuple[str, ...]:
+    pattern = re.compile(rf"^{' ' * indent}{re.escape(key)}:\s*$")
+    starts = [index for index, line in enumerate(body) if pattern.match(line)]
+    if len(starts) > 1:
+        raise ValueError(f"duplicate list {key}")
+    if not starts:
+        return ()
     items: list[str] = []
-    inside = False
-    matches = 0
-    for line in body:
-        match = re.match(rf"^{' ' * indent}{re.escape(key)}:\s*$", line)
-        if match:
-            matches += 1
-            if matches > 1:
-                raise ValueError(f"duplicate list {key}")
-            inside = True
+    for line in body[starts[0] + 1 :]:
+        item = re.match(rf"^{' ' * (indent + 2)}-\s*(.+?)\s*$", line)
+        if item:
+            items.append(item.group(1).strip().strip('"').strip("'"))
             continue
-        if inside:
-            item = re.match(rf"^{' ' * (indent + 2)}-\s*(.+?)\s*$", line)
-            if item:
-                items.append(item.group(1).strip().strip('"').strip("'"))
-                continue
-            if line.strip() and len(line) - len(line.lstrip()) <= indent:
-                break
+        if line.strip() and len(line) - len(line.lstrip()) <= indent:
+            break
     return tuple(items)
 
 
