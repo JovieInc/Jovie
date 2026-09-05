@@ -894,6 +894,54 @@ while True: time.sleep(1)
                 if wrapper.stderr is not None:
                     wrapper.stderr.close()
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_term_catches_detached_fork_at_grace_deadline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            late_pid = root / "deadline.pid"
+            child = r'''
+import pathlib, signal, subprocess, sys, time
+def terminate(*_):
+    time.sleep(0.095)
+    grand = subprocess.Popen([
+        sys.executable, "-c",
+        "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
+    ], start_new_session=True)
+    pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, terminate)
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(late_pid),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "0.1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=5)
+                self.assertTrue(late_pid.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(late_pid.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
     def test_unit_binds_closure_stop_line_gate(self):
         helper = _load_helper()
         self.assertLess(helper.MAX_SHUTDOWN_GRACE_SECONDS, 15)

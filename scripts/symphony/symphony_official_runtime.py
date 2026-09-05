@@ -1477,7 +1477,9 @@ def run_official_binary_once(
             if not alive:
                 break
             time.sleep(0.02)
-        for pid in reversed(alive):
+        known_descendants.update(descendant_pids())
+        for pid in [process.pid, *known_descendants]:
+            remember(pid)
             send(pid, signal.SIGKILL)
         try:
             process.wait(timeout=2)
@@ -1487,6 +1489,10 @@ def run_official_binary_once(
         if sys.platform.startswith("linux"):
             reap_deadline = time.monotonic() + 1.0
             while time.monotonic() < reap_deadline:
+                known_descendants.update(descendant_pids())
+                for pid in known_descendants:
+                    remember(pid)
+                    send(pid, signal.SIGKILL)
                 while True:
                     try:
                         reaped, _status = os.waitpid(-1, os.WNOHANG)
