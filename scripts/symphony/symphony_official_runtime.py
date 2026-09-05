@@ -1216,11 +1216,14 @@ def claim_bounded_repair(admission: BoundedRepairAdmission) -> None:
         "manifestPath": str(admission.manifest_path),
         "claimedAt": _iso(_now()),
     }
-    descriptor = os.open(
-        admission.claim_path,
-        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-        0o600,
-    )
+    try:
+        descriptor = os.open(
+            admission.claim_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+    except FileExistsError as exc:
+        raise ValueError("recovery-manifest-already-claimed") from exc
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, sort_keys=True)
