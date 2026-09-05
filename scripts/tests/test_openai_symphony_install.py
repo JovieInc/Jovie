@@ -50,6 +50,13 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn('SUM_NAME="${BIN_NAME}.sha256"', updater)
         self.assertIn("symphony-elixir-safe-restart", updater)
         self.assertIn("symphony-frozen-generation-transition", updater)
+        self.assertIn(
+            'AUTO_ROUTE_SRC="${REPO_ROOT}/scripts/symphony/symphony-auto-route.mjs"',
+            updater,
+        )
+        self.assertIn(
+            'install_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" 0755', updater
+        )
         safe_restart = (ROOT / "scripts/symphony/symphony-elixir-safe-restart").read_text()
         self.assertIn("--maintenance-replace", safe_restart)
         self.assertIn("symphony-frozen-generation-transition", safe_restart)

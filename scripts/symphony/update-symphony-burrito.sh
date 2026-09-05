@@ -24,6 +24,8 @@ HELPER_SRC="${REPO_ROOT}/scripts/symphony/symphony_official_runtime.py"
 HELPER_DST="${TARGET_HOME}/.local/bin/symphony-official-runtime"
 AGENT_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-agent-router"
 AGENT_ROUTER_DST="${TARGET_HOME}/.local/bin/symphony-agent-router"
+AUTO_ROUTE_SRC="${REPO_ROOT}/scripts/symphony/symphony-auto-route.mjs"
+AUTO_ROUTE_DST="${TARGET_HOME}/.local/bin/symphony-auto-route.mjs"
 CURSOR_ADAPTER_SRC="${REPO_ROOT}/scripts/symphony/cursor-appserver-adapter.py"
 CURSOR_ADAPTER_DST="${TARGET_HOME}/.local/bin/cursor-appserver-adapter"
 CODEX_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-codex-router"
@@ -416,6 +418,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "INSTALL $BIN_DST"
   echo "HELPER $HELPER_DST"
   echo "AGENT_ROUTER $AGENT_ROUTER_DST"
+  echo "AUTO_ROUTE $AUTO_ROUTE_DST"
   echo "CURSOR_ADAPTER $CURSOR_ADAPTER_DST"
   echo "CODEX_ROUTER $CODEX_ROUTER_DST"
   echo "SAFE_RESTART $SAFE_RESTART_DST"
@@ -435,6 +438,7 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
   check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
   check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
+  check_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" || rc=1
   check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
   check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
   check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
@@ -480,6 +484,7 @@ cleanup() {
       restore_target binary "$BIN_DST" 0755
       restore_target helper "$HELPER_DST" 0755
       restore_target agent-router "$AGENT_ROUTER_DST" 0755
+      restore_target auto-route "$AUTO_ROUTE_DST" 0755
       restore_target cursor-adapter "$CURSOR_ADAPTER_DST" 0755
       restore_target codex-router "$CODEX_ROUTER_DST" 0755
       restore_target codex-probe "$CODEX_PROBE_DST" 0755
@@ -538,6 +543,7 @@ rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
 backup_target binary "$BIN_DST"
 backup_target helper "$HELPER_DST"
 backup_target agent-router "$AGENT_ROUTER_DST"
+backup_target auto-route "$AUTO_ROUTE_DST"
 backup_target cursor-adapter "$CURSOR_ADAPTER_DST"
 backup_target codex-router "$CODEX_ROUTER_DST"
 backup_target codex-probe "$CODEX_PROBE_DST"
@@ -552,6 +558,7 @@ if [ "$SKIP_BINARY" -eq 0 ]; then
 fi
 install_one "$HELPER_SRC" "$HELPER_DST" 0755
 install_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" 0755
+install_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" 0755
 install_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" 0755
 install_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" 0755
 install_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" 0755
