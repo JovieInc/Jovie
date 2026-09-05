@@ -9,6 +9,7 @@ import importlib.util
 from importlib.machinery import SourceFileLoader
 import io
 import json
+import multiprocessing
 import os
 import pathlib
 import tempfile
@@ -103,6 +104,37 @@ class LeaseDecisionTests(unittest.TestCase):
         self.assertEqual(stored["issueUpdatedAtEpoch"], 1500)
 
 
+class ConcurrentCheckTests(unittest.TestCase):
+    def test_competing_tracker_reads_preserve_both_tombstones(self):
+        context = multiprocessing.get_context("fork")
+        barrier = context.Barrier(2)
+        with tempfile.TemporaryDirectory() as directory:
+            def worker(identifier):
+                def fetch(_identifier):
+                    barrier.wait(timeout=5)
+                    return make_issue(identifier, "Done", 2000)
+                with mock.patch.dict(os.environ, {"SYMPHONY_LEASE_GUARD_STATE_DIR": directory}), mock.patch.object(MODULE, "_fetch_issue", side_effect=fetch):
+                    MODULE.check(identifier)
+            workers = [context.Process(target=worker, args=(identifier,)) for identifier in ("JOV-1", "JOV-2")]
+            for worker_process in workers:
+                worker_process.start()
+            for worker_process in workers:
+                worker_process.join(10)
+                if worker_process.is_alive():
+                    worker_process.kill()
+                    worker_process.join()
+                self.assertEqual(worker_process.exitcode, 0)
+            state = json.loads((pathlib.Path(directory) / "leases.json").read_text())
+            self.assertEqual(set(state["tombstones"]), {"JovieInc/Jovie:JOV-1", "JovieInc/Jovie:JOV-2"})
+            self.assertEqual(state["counters"]["checks"], 2)
+
+    def test_older_terminal_snapshot_cannot_lower_reopen_fence(self):
+        tombstone = {"state": "Done", "observedAt": 2000, "issueUpdatedAtEpoch": 2000}
+        _, _, stored, _ = MODULE.lease_decision("JOV-1", make_issue("JOV-1", "In Review", 1000), tombstone, ACTIVE, 3000)
+        decision, _, _, _ = MODULE.lease_decision("JOV-1", make_issue("JOV-1", "In Progress", 1500), stored, ACTIVE, 4000)
+        self.assertEqual(decision, "suppress")
+
+
 class CheckCommandTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -153,6 +185,17 @@ class CheckCommandTests(unittest.TestCase):
         state = self.load_state()
         self.assertNotIn(JOVIE_TOMBSTONE, state["tombstones"])
         self.assertEqual(state["counters"]["reopened"], 1)
+
+    def test_inflight_active_read_rechecks_newer_committed_tombstone(self):
+        def fetch(_identifier):
+            # Another check finishes while this tracker request is in flight.
+            self.run_check("JOV-5029", make_issue("JOV-5029", "Done", 3000))
+            return make_issue("JOV-5029", "In Progress", 2000)
+        with mock.patch.object(MODULE, "_fetch_issue", side_effect=fetch):
+            self.assertEqual(MODULE.check("JOV-5029"), 1)
+        state = self.load_state()
+        self.assertEqual(state["tombstones"][JOVIE_TOMBSTONE]["issueUpdatedAtEpoch"], 3000)
+        self.assertEqual(state["counters"]["checks"], 2)
 
     def test_check_scopes_tombstones_by_repository(self):
         self.run_check("JOV-5029", make_issue("JOV-5029", "In Review", 1000))

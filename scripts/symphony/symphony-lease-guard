@@ -25,6 +25,7 @@ Stdlib only; state lives in a single atomically-replaced JSON file.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import fcntl
 import json
 import os
@@ -144,16 +145,23 @@ def _load_state() -> dict:
     return {"schema": SCHEMA, "tombstones": tombstones, "counters": merged}
 
 
-def _save_state(state: dict) -> None:
+@contextmanager
+def _state_transaction():
     state_dir = _state_dir()
     state_dir.mkdir(parents=True, exist_ok=True)
-    lock_path = state_dir / "leases.json.lock"
-    with open(lock_path, "a+") as lock:
+    # Stable inode: every writer locks the whole read/decide/write transaction.
+    with open(state_dir / "leases.json.lock", "a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        temporary = state_dir / ".leases.json.tmp"
-        temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, state_dir / "leases.json")
+        yield
+
+
+def _save_state(state: dict) -> None:
+    """Publish while the caller holds _state_transaction."""
+    state_dir = _state_dir()
+    temporary = state_dir / ".leases.json.tmp"
+    temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, state_dir / "leases.json")
 
 
 def _active_states() -> frozenset[str]:
@@ -312,6 +320,8 @@ def lease_decision(
         # Active per this read, but the issue carries no transition newer than
         # the tombstoned observation: a stale tracker snapshot.
         return "suppress", "stale_snapshot", tombstone, False
+    if tombstone is not None and issue["updatedAtEpoch"] < tombstone["issueUpdatedAtEpoch"]:
+        return "suppress", "stale_snapshot", tombstone, False
     # Positive evidence of a non-active state: install the monotonic tombstone.
     observed_at = now
     if tombstone is not None:
@@ -332,36 +342,40 @@ def check(identifier: str) -> int:
     if not IDENTIFIER.fullmatch(identifier):
         print(f"LEASE_CHECK_INVALID identifier={identifier!r}", file=sys.stderr)
         return 2
-    state = _load_state()
-    counters = state["counters"]
-    counters["checks"] += 1
+    # Slow tracker I/O must not serialize independent issue checks. Re-read the
+    # ledger after it completes so stale responses see every committed fence.
     issue = _fetch_issue(identifier)
-    repository = _repository_for_identifier(identifier)
-    key = _tombstone_key(identifier, repository)
-    decision, reason, tombstone, clear = lease_decision(
-        identifier, issue, state["tombstones"].get(key), _active_states(), time.time()
-    )
-    if tombstone is not None:
-        tombstone = {
-            **tombstone,
-            "repository": repository,
-            "identifier": identifier,
-        }
-    if clear:
-        state["tombstones"].pop(key, None)
-    elif tombstone is not None:
-        state["tombstones"][key] = tombstone
-    counter_key = {
-        ("suppress", "indeterminate"): "indeterminate",
-        ("admit", "active"): "admitted",
-        ("admit", "reopened"): "reopened",
-    }.get((decision, reason))
-    if counter_key is None:
-        counter_key = (
-            "suppressedStaleSnapshot" if reason == "stale_snapshot" else "suppressedNonActive"
+    active_states = _active_states()
+    with _state_transaction():
+        state = _load_state()
+        counters = state["counters"]
+        counters["checks"] += 1
+        repository = _repository_for_identifier(identifier)
+        key = _tombstone_key(identifier, repository)
+        decision, reason, tombstone, clear = lease_decision(
+            identifier, issue, state["tombstones"].get(key), active_states, time.time()
         )
-    counters[counter_key] += 1
-    _save_state(state)
+        if tombstone is not None:
+            tombstone = {
+                **tombstone,
+                "repository": repository,
+                "identifier": identifier,
+            }
+        if clear:
+            state["tombstones"].pop(key, None)
+        elif tombstone is not None:
+            state["tombstones"][key] = tombstone
+        counter_key = {
+            ("suppress", "indeterminate"): "indeterminate",
+            ("admit", "active"): "admitted",
+            ("admit", "reopened"): "reopened",
+        }.get((decision, reason))
+        if counter_key is None:
+            counter_key = (
+                "suppressedStaleSnapshot" if reason == "stale_snapshot" else "suppressedNonActive"
+            )
+        counters[counter_key] += 1
+        _save_state(state)
     if decision == "admit":
         print(f"LEASE_ADMITTED reason={reason} identifier={identifier}")
         return 0
