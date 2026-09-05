@@ -16,6 +16,11 @@ type SpotifyArtistFixture = {
   readonly popularity: number;
 };
 
+type StartRequest = {
+  readonly url: string;
+  readonly nextRouterPrefetch: boolean;
+};
+
 const TAYLOR_SWIFT: SpotifyArtistFixture = {
   id: '06HL4z0CvFAxyc27GXpf02',
   name: 'Taylor Swift',
@@ -85,20 +90,38 @@ function visibleArtistButton(page: Page, artistName: string) {
     .first();
 }
 
-function collectStartRequests(page: Page): string[] {
-  const requests: string[] = [];
+function collectStartRequests(page: Page): StartRequest[] {
+  const requests: StartRequest[] = [];
   page.on('request', request => {
     const url = new URL(request.url());
-    if (url.pathname === START_PATH && request.headers().rsc === '1') {
-      requests.push(request.url());
+    const headers = request.headers();
+    if (url.pathname === START_PATH && headers.rsc === '1') {
+      requests.push({
+        url: request.url(),
+        nextRouterPrefetch: headers['next-router-prefetch'] === '1',
+      });
     }
   });
   return requests;
 }
 
+function collectStartNavigations(page: Page): string[] {
+  const navigations: string[] = [];
+  page.on('framenavigated', frame => {
+    if (frame === page.mainFrame()) {
+      const url = new URL(frame.url());
+      if (url.pathname === START_PATH) {
+        navigations.push(frame.url());
+      }
+    }
+  });
+  return navigations;
+}
+
 async function expectDirectStartHandoff(
   page: Page,
-  startRequests: readonly string[],
+  startRequests: readonly StartRequest[],
+  startNavigations: readonly string[],
   artist: SpotifyArtistFixture
 ): Promise<void> {
   await page.waitForURL(url => url.pathname === START_PATH, {
@@ -126,9 +149,35 @@ async function expectDirectStartHandoff(
     `hey, I'm ${artist.name}. show me my Spotify.`
   );
 
-  await expect.poll(() => startRequests.length).toBe(1);
+  await expect
+    .poll(
+      () => startRequests.filter(request => !request.nextRouterPrefetch).length
+    )
+    .toBe(1);
+  await expect.poll(() => startNavigations.length).toBe(1);
   await page.waitForTimeout(250);
-  expect(startRequests).toHaveLength(1);
+
+  const directRequests = startRequests.filter(
+    request => !request.nextRouterPrefetch
+  );
+  expect(directRequests).toHaveLength(1);
+  const directRequest = directRequests[0];
+  expect(directRequest).toBeDefined();
+  if (!directRequest) {
+    throw new Error('Expected one direct /start RSC request.');
+  }
+  // Next may prefetch /start separately; only an untagged request represents
+  // the user-triggered handoff whose single-navigation contract we enforce.
+  expect(
+    startRequests
+      .filter(request => request !== directRequest)
+      .every(request => request.nextRouterPrefetch)
+  ).toBe(true);
+
+  const directRequestUrl = new URL(directRequest.url);
+  directRequestUrl.searchParams.delete('_rsc');
+  expect(directRequestUrl.href).toBe(url.href);
+  expect(startNavigations).toEqual([url.href]);
 }
 
 test.describe('Homepage artist-search recovery (JOV-6034)', () => {
@@ -211,6 +260,7 @@ test.describe('Homepage artist-search recovery (JOV-6034)', () => {
     });
 
     const startRequests = collectStartRequests(page);
+    const startNavigations = collectStartNavigations(page);
     const input = heroSearch(page).getByPlaceholder('Search your name');
     await input.fill('Old Artist');
     await staleRequestSeen;
@@ -222,7 +272,12 @@ test.describe('Homepage artist-search recovery (JOV-6034)', () => {
 
     await expect(visibleArtistButton(page, STALE_ARTIST.name)).toHaveCount(0);
     await latestArtist.click();
-    await expectDirectStartHandoff(page, startRequests, TAYLOR_SWIFT);
+    await expectDirectStartHandoff(
+      page,
+      startRequests,
+      startNavigations,
+      TAYLOR_SWIFT
+    );
   });
 
   test('supports one direct mobile keyboard handoff without duplicate navigation', async ({
@@ -232,6 +287,7 @@ test.describe('Homepage artist-search recovery (JOV-6034)', () => {
     await page.route(SEARCH_ROUTE, route => fulfillJson(route, [TAYLOR_SWIFT]));
 
     const startRequests = collectStartRequests(page);
+    const startNavigations = collectStartNavigations(page);
     const input = heroSearch(page).getByPlaceholder('Search your name');
     await input.fill('Taylor Swift');
     await expect(visibleArtistButton(page, TAYLOR_SWIFT.name)).toBeVisible();
@@ -243,6 +299,11 @@ test.describe('Homepage artist-search recovery (JOV-6034)', () => {
     );
     await input.press('Enter');
 
-    await expectDirectStartHandoff(page, startRequests, TAYLOR_SWIFT);
+    await expectDirectStartHandoff(
+      page,
+      startRequests,
+      startNavigations,
+      TAYLOR_SWIFT
+    );
   });
 });
