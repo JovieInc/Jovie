@@ -470,6 +470,9 @@ TRANSIENT_LAUNCHER_ATTEMPTS = 3
 EX_CONFIG = 78
 EX_TEMPFAIL = 75
 SYMPHONY_ROUTING_SCHEMA = "symphony-routing/v1"
+PROVIDER_CAPACITY_CLASS = "provider-capacity"
+PROVIDER_CAPACITY_MAX_ATTEMPTS = 3
+RECONCILE_REQUIRED_SCHEMA = "symphony-reconcile-required/v1"
 
 DETERMINISTIC_LAUNCHER_PATTERN = re.compile(
     r"SYMPHONY_LAUNCHER_FAILURE.*deterministic-launcher"
@@ -586,6 +589,10 @@ def _failure(
     }
 
 
+class ReconcileRequired(RuntimeError):
+    """Persisted recovery evidence is unavailable or cannot be trusted."""
+
+
 def classify_launcher_failure(
     error: object,
     item: dict[str, object] | None = None,
@@ -631,7 +638,18 @@ def classify_launcher_failure(
             retryable=False,
             max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
         )
-    if port_exit == EX_TEMPFAIL or TRANSIENT_LAUNCHER_PATTERN.search(evidence):
+    if port_exit == EX_TEMPFAIL or re.search(
+        r"CAPACITY_UNAVAILABLE|account_busy|provider capacity",
+        evidence,
+        re.IGNORECASE,
+    ):
+        return _failure(
+            PROVIDER_CAPACITY_CLASS,
+            "capacity-unavailable",
+            retryable=True,
+            max_attempts=PROVIDER_CAPACITY_MAX_ATTEMPTS,
+        )
+    if TRANSIENT_LAUNCHER_PATTERN.search(evidence):
         return _failure(
             "transient-launcher",
             "capacity-or-provider-unavailable",
@@ -803,6 +821,23 @@ def controller_retry_decision(
         attempt = 0
     max_attempts = int(failure["maxAttempts"])
     if attempt >= max_attempts:
+        if failure["class"] == PROVIDER_CAPACITY_CLASS:
+            return {
+                "state": "capacity_incident",
+                "retryable": True,
+                "maxAttempts": max_attempts,
+                "due_at": _iso(_now() + dt.timedelta(minutes=RETRY_MINUTES)),
+                "attempt": max_attempts,
+                "lease": None,
+                "handoff": True,
+                "handoffReason": "shared-provider-capacity-incident",
+                "providerAccount": None,
+                "failure": {
+                    **failure,
+                    "exhausted": True,
+                    "escalateSharedIncident": True,
+                },
+            }
         return {
             "state": "blocked",
             "retryable": False,
@@ -814,7 +849,11 @@ def controller_retry_decision(
             "providerAccount": None,
             "failure": {**failure, "exhausted": True},
         }
-    delay_minutes = 1 if failure["class"] == "transient-launcher" else RETRY_MINUTES
+    delay_minutes = (
+        1
+        if failure["class"] == "transient-launcher"
+        else RETRY_MINUTES
+    )
     return {
         "state": "retrying",
         "retryable": True,
@@ -1260,17 +1299,28 @@ def _receipt_path(identifier: str) -> pathlib.Path:
 
 
 def _read_receipt(identifier: str) -> dict[str, object] | None:
-    try:
-        payload = json.loads(_receipt_path(identifier).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    path = _receipt_path(identifier)
+    if not path.exists():
         return None
-    return payload if isinstance(payload, dict) and payload.get("schema") == SCHEMA else None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ReconcileRequired(
+            f"{RECONCILE_REQUIRED_SCHEMA} issue={identifier} reason=receipt-unreadable"
+        ) from exc
+    if not isinstance(payload, dict) or payload.get("schema") != SCHEMA:
+        raise ReconcileRequired(
+            f"{RECONCILE_REQUIRED_SCHEMA} issue={identifier} reason=receipt-schema-mismatch"
+        )
+    return payload
 
 
 def _write_receipt(identifier: str, payload: dict[str, object]) -> None:
     path = _receipt_path(identifier)
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{identifier}.", dir=path.parent)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{identifier}.", dir=path.parent
+    )
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
@@ -1278,6 +1328,11 @@ def _write_receipt(identifier: str, payload: dict[str, object]) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary_name, path)
+        directory_descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
     finally:
         if os.path.exists(temporary_name):
             os.unlink(temporary_name)
@@ -1514,6 +1569,7 @@ def _reconcile_item(
     launcher_failure = decision["failure"] or launcher_failure
     policy_retryable = bool(decision["retryable"])
     decision_state = str(decision["state"])
+    capacity_incident = decision_state == "capacity_incident"
     fresh_routing_ready_after_consumed_repair = (
         decision_state == "ready"
         and previous_consumed_status not in {"repair_started"}
@@ -1572,7 +1628,7 @@ def _reconcile_item(
             retry_at=previous.get("nextRetryAt"),
         )
         return False
-    retry_scheduled = decision_state == "retrying"
+    retry_scheduled = decision_state in {"retrying", "capacity_incident"}
     terminal = decision_state == "blocked"
     deterministic_terminal = terminal and launcher_failure.get("retryable") is False
     retry_exhausted = terminal and launcher_failure.get("exhausted") is True
@@ -1598,12 +1654,16 @@ def _reconcile_item(
     repeated = (
         alternate_permitted
         and not returned_previous_local_repair
+        and not capacity_incident
         and (retry_scheduled or retry_exhausted)
         and _is_repeated_or_conflict(item, source, state_before)
     )
     attempted: list[dict[str, object]] = [
         {
             "kind": (
+                "provider_capacity_budget_exhausted"
+                if capacity_incident
+                else
                 "retry_policy_exhausted"
                 if launcher_failure.get("exhausted") is True
                 else "launcher_failure_classification"
@@ -1630,6 +1690,8 @@ def _reconcile_item(
     transition = (
         "admitted_generation_ready"
         if decision_state == "ready"
+        else "provider_capacity_incident"
+        if capacity_incident
         else
         "bounded_retry_exhausted"
         if launcher_failure.get("exhausted") is True
@@ -1640,6 +1702,8 @@ def _reconcile_item(
     next_action = (
         "normal_model_run_admitted_generation"
         if decision_state == "ready"
+        else "escalate_shared_provider_capacity_incident"
+        if capacity_incident
         else
         "manual_or_environment_repair"
         if terminal
@@ -1797,9 +1861,36 @@ def _reconcile_item(
                 "localRepairMaxAttempts": LOCAL_REPAIR_MAX_ATTEMPTS,
             }
         )
+    now = _iso(_now())
+    previous_failure_context = (
+        previous.get("failureContext") if isinstance(previous, dict) else None
+    )
+    first_failure_at = (
+        previous_failure_context.get("firstFailureAt")
+        if isinstance(previous_failure_context, dict)
+        and isinstance(previous_failure_context.get("firstFailureAt"), str)
+        else now
+    )
+    failure_context = {
+        "class": launcher_failure.get("class"),
+        "code": launcher_failure.get("code"),
+        "fingerprint": _sha256_bytes(
+            json.dumps(
+                {
+                    "issue": identifier,
+                    "class": launcher_failure.get("class"),
+                    "code": launcher_failure.get("code"),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        )[:24],
+        "firstFailureAt": first_failure_at,
+        "lastFailureAt": now,
+    }
     receipt: dict[str, object] = {
         "schema": SCHEMA,
-        "updatedAt": _iso(_now()),
+        "updatedAt": now,
         "generation": generation,
         "localRepairGeneration": local_repair_generation,
         "issue": {
@@ -1809,6 +1900,7 @@ def _reconcile_item(
         },
         "reason": error,
         "launcherFailure": launcher_failure,
+        "failureContext": failure_context,
         "retryPolicy": retry_policy,
         "entryCriteria": "runtime retry/blocked after bounded normal-model attempt",
         "authoritativeOwner": authoritative_owner,
@@ -1840,12 +1932,19 @@ def _reconcile_item(
         "headBaseBefore": state_before,
         "headBaseCurrent": state_after,
         "runtimeRevision": runtime.get("runtimeRevision"),
+        "runtimeGeneration": runtime.get("runtimeRevision"),
         "runtimeCapabilities": runtime.get("capabilities", []),
         "runtimeReceipt": runtime.get("receipt"),
         "attemptedRepairs": attempted,
         "transition": transition,
         "nextAutomatedAction": next_action,
         "nextRetryAt": _iso(next_retry) if next_retry else None,
+        "lease": item.get("lease") if isinstance(item.get("lease"), dict) else None,
+        "uncertainEffect": (
+            item.get("uncertainEffect")
+            if isinstance(item.get("uncertainEffect"), dict)
+            else None
+        ),
         "alternateModel": alternate,
     }
     if terminal_escalation:
@@ -1922,6 +2021,15 @@ def main() -> int:
                 if attempted:
                     local_repair_attempts += 1
                     local_slot_available = False
+            except ReconcileRequired as exc:
+                if permitted:
+                    local_slot_available = False
+                _event(
+                    str(item.get("issue_identifier") or "unknown"),
+                    "reconcile_required",
+                    reason=str(exc),
+                    next="manual_reconcile",
+                )
             except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
                 if permitted:
                     local_slot_available = False

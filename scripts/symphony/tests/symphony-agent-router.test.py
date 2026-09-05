@@ -290,6 +290,24 @@ with path.open("a+") as challenger:
             "authenticated-capacity-probe-failed",
         )
 
+    def test_corrupt_cooldown_state_requires_reconciliation(self) -> None:
+        guard = self.executable("guard", "exit 75\n")
+        cursor = self.executable("cursor", "exit 1\n")
+        adapter = self.executable("adapter", "exit 9\n")
+        cooldowns = self.home / ".local/state/symphony-provider-router/provider-cooldowns.json"
+        cooldowns.parent.mkdir(parents=True, exist_ok=True)
+        cooldowns.write_text("{not-json\n")
+        result = subprocess.run(
+            [str(ROUTER), "app-server"],
+            cwd=self.workspace,
+            env=self.environment(guard, cursor, adapter),
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 75)
+        self.assertIn("CAPACITY_RECONCILE_REQUIRED", result.stderr)
+        self.assertEqual(cooldowns.read_text(), "{not-json\n")
+
 
 if __name__ == "__main__":
     unittest.main()
