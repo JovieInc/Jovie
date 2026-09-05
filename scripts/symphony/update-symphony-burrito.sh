@@ -458,6 +458,7 @@ candidate_tmp=""
 update_lock=""
 promotion_started=0
 promotion_complete=0
+finalization_started=0
 cleanup_pending=""
 finalized_receipt=""
 official_was_active=0
@@ -630,7 +631,9 @@ restore_target() {
 
 cleanup() {
   local status="$?"
-  if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
+  if [ "$status" -ne 0 ] && [ "$finalization_started" -eq 1 ]; then
+    echo "PROMOTION_COMMITTED_CLEANUP_FAILED verified official state retained; inspect transaction cleanup before retry" >&2
+  elif [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
     if [ "$promotion_started" -eq 1 ]; then
       if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
         write_promotion_hold
@@ -668,7 +671,8 @@ cleanup() {
     fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  if [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] &&
+  if [ "$status" -ne 0 ] && [ "$finalization_started" -eq 0 ] &&
+     [ "$promotion_started" -eq 1 ] &&
      [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; then
     if [ -n "$rollback_dir" ]; then
       if ! finalize_rollback_transaction; then
@@ -758,7 +762,9 @@ PY
     verify_official_restarted
     official_stopped_for_promotion=0
   fi
+  finalization_started=1
   finalize_rollback_transaction
+  finalization_started=0
   rollback_dir=""
   promotion_started=0
   echo "RECOVERED_INCOMPLETE_PROMOTION"
@@ -960,11 +966,10 @@ elif [ "$RETIRE_LEGACY" -eq 1 ]; then
 fi
 
 write_finalized_receipt pending
-promotion_complete=1
-if finalize_rollback_transaction; then
-  write_finalized_receipt complete
-else
-  echo "PROMOTION_COMMITTED candidate verified; cleanup acknowledgement pending" >&2
-fi
+finalization_started=1
+finalize_rollback_transaction
+finalization_started=0
 rollback_dir=""
+promotion_complete=1
+write_finalized_receipt complete
 echo "DONE"

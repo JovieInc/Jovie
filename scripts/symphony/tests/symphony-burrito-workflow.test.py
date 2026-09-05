@@ -2447,13 +2447,13 @@ while True: time.sleep(1)
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(
-                committed_cleanup_failure.returncode,
-                0,
+            self.assertNotEqual(committed_cleanup_failure.returncode, 0)
+            self.assertIn(
+                "PROMOTION_COMMITTED_CLEANUP_FAILED",
                 committed_cleanup_failure.stderr,
             )
-            self.assertIn("PROMOTION_COMMITTED", committed_cleanup_failure.stderr)
             self.assertNotIn("PROMOTION_ROLLED_BACK", committed_cleanup_failure.stderr)
+            self.assertNotIn("DONE", committed_cleanup_failure.stdout)
             committed_events = (root / "systemctl-events").read_text().splitlines()
             committed_restart_events = [
                 row
@@ -2844,11 +2844,15 @@ while True: time.sleep(1)
         self.assertIn("symphony-promotion-finalized/v1", UPDATER)
         self.assertLess(
             UPDATER.rindex("write_finalized_receipt pending\n"),
-            UPDATER.rindex("promotion_complete=1\n"),
+            UPDATER.rindex("finalization_started=1\n"),
         )
         self.assertLess(
+            UPDATER.rindex("finalization_started=1\n"),
+            UPDATER.rindex("finalize_rollback_transaction\n"),
+        )
+        self.assertLess(
+            UPDATER.rindex("finalize_rollback_transaction\n"),
             UPDATER.rindex("promotion_complete=1\n"),
-            UPDATER.rindex("if finalize_rollback_transaction; then\n"),
         )
         self.assertLess(UPDATER.rindex("finalize_rollback_transaction\n"),
                         UPDATER.rindex('echo "DONE"'))
