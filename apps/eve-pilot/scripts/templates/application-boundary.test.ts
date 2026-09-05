@@ -136,9 +136,9 @@ describe('fixed application domain', () => {
     const info = JSON.parse(output.slice(output.indexOf('{')));
     expect(info.status).toBe('ready');
     expect(info.diagnostics.errors).toBe(0);
-    expect(info.tools).toEqual(
-      identity === 'summer' ? [] : ['jovie_capability_manifest']
-    );
+    // Eve info reports static tools only. The product manifest is resolved at
+    // session/turn start and its actual availability is tested in the tool suite.
+    expect(info.tools).toEqual([]);
     const routes = info.channels.map(
       (route: { urlPath: string }) => route.urlPath
     );
