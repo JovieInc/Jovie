@@ -51,7 +51,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (246 contract tokens; 464 total in CSS)
+## Design Tokens (266 contract tokens; 502 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -68,6 +68,10 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--ds-marketing-lede-leading`: var(--leading-normal)
 - `--ds-marketing-lede-size`: clamp(1.25rem, 1.6vw, 1.375rem)
 - `--ds-marketing-lede-tracking`: -0.015em
+- `--ds-marketing-route-title-leading`: 1.15
+- `--ds-marketing-route-title-size`: 1.75rem
+- `--ds-marketing-route-title-tracking`: -0.022em
+- `--ds-marketing-route-title-weight`: 620
 - `--ds-marketing-title-leading`: 1.08
 - `--ds-marketing-title-size`: clamp( var(--text-4xl), 4.6vw, calc(var(--text-5xl) + var(--space-4)) )
 - `--ds-marketing-title-tracking`: 0
@@ -93,7 +97,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-bg-secondary`: lch(95.94% 0.5 282)
 - `--color-bg-selected`: var(--noir-ion-selected)
 - `--color-bg-surface-0`: #f5f5f5
-- `--color-bg-surface-1`: var(--linear-app-content-surface)
+- `--color-bg-surface-1`: var(--app-shell-content-surface)
 - `--color-bg-surface-2`: #f2f3f5
 - `--color-bg-surface-3`: #ebecef
 - `--color-bg-tooltip`: #101012
@@ -119,10 +123,10 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-success-foreground`: oklch(100% 0 0)
 - `--color-success-subtle`: var(--color-accent-green-subtle)
 - `--color-text-disabled-token`: oklch( 70% var(--theme-base-chroma) var(--theme-base-hue) )
-- `--color-text-primary-token`: lch(9.894% 0 282)
-- `--color-text-quaternary-token`: lch(65.3% 1.25 282)
-- `--color-text-secondary-token`: lch(19.788% 1.25 282)
-- `--color-text-tertiary-token`: lch(34% 1.25 282)
+- `--color-text-primary-token`: #f7f8f8
+- `--color-text-quaternary-token`: #62666d
+- `--color-text-secondary-token`: #d0d6e0
+- `--color-text-tertiary-token`: #8a8f98
 - `--color-text-tooltip`: #ffffff
 - `--color-warning`: var(--color-accent-orange)
 - `--color-warning-foreground`: oklch(20% 0 0)
@@ -150,7 +154,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--system-b-chat-activity-meta-color`: var(--color-text-tertiary-token)
 - `--system-b-chat-activity-row-py`: var(--space-1)
 - `--system-b-chat-activity-size`: var(--text-xs)
-- `--system-b-chat-activity-timeline-color`: color-mix( in oklab, var(--linear-app-shell-border) 70%, transparent )
+- `--system-b-chat-activity-timeline-color`: color-mix( in oklab, var(--app-shell-border) 70%, transparent )
 - `--system-b-chat-activity-weight`: var(--font-weight-book)
 - `--system-b-chat-body-line-height`: 1.5
 - `--system-b-chat-body-size`: var(--text-app)
@@ -163,13 +167,13 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--system-b-chat-user-bubble-bg`: var(--color-text-primary-token)
 - `--system-b-chat-user-bubble-border`: color-mix( in oklab, var(--color-text-primary-token) 80%, transparent )
 - `--system-b-chat-user-bubble-shadow`: 0 var(--space-3) 38px -28px color-mix(in oklab, var(--system-b-cinematic-black) 85%, transparent), inset 0 var(--space-px) 0 color-mix(in oklab, var(--color-text-primary-token) 90%, transparent)
-- `--system-b-chat-user-bubble-text`: var(--system-b-cinematic-black)
+- `--system-b-chat-user-bubble-text`: var(--color-bg-base)
 - `--system-b-cinematic-black`: #06070a
 - `--system-b-duration-fast`: var(--ds-motion-subtle-duration)
 - `--system-b-ease`: var(--ds-motion-subtle-easing)
 - `--system-b-entity-chip-artist-accent`: var(--color-accent-purple)
 - `--system-b-entity-chip-event-accent`: var(--color-accent-orange)
-- `--system-b-entity-chip-on-light-text`: var(--color-text-primary-token)
+- `--system-b-entity-chip-on-light-text`: var(--system-b-chat-user-bubble-text)
 - `--system-b-entity-chip-release-accent`: var(--color-accent)
 - `--system-b-entity-chip-track-accent`: var(--color-accent-blue)
 - `--system-b-header-height`: var(--linear-header-height)
@@ -196,21 +200,44 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 
 ### App Shell
 
-- `--app-shell-audio-bar-max-height`: var(--linear-app-audio-bar-max-height)
-- `--app-shell-audio-compact-height`: var(--linear-app-audio-compact-height)
-- `--app-shell-border`: var(--linear-app-shell-border)
+- `--app-shell-audio-bar-max-height`: 120px
+- `--app-shell-audio-compact-height`: 64px
+- `--app-shell-border`: rgba(0, 0, 0, 0.05)
+- `--app-shell-card-shadow`: none
 - `--app-shell-content-max-form`: 50rem
 - `--app-shell-content-max-reading`: 56rem
 - `--app-shell-content-max-wide`: 84rem
-- `--app-shell-content-surface`: var(--linear-app-content-surface)
+- `--app-shell-content-padding-x`: 12px
+- `--app-shell-content-padding-y`: 8px
+- `--app-shell-content-surface`: var(--linear-bg-surface-0)
+- `--app-shell-control-height-sm`: 28px
+- `--app-shell-control-padding-x`: 11px
+- `--app-shell-control-radius`: 9999px
+- `--app-shell-drawer-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05)
 - `--app-shell-footer-row-height`: calc(var(--space-6) + var(--space-1-5))
-- `--app-shell-frame-seam`: var(--linear-app-frame-seam)
-- `--app-shell-gap`: var(--linear-app-shell-gap)
-- `--app-shell-header-height`: var(--linear-app-header-height)
-- `--app-shell-header-height-compact`: var(--linear-app-header-height-compact)
-- `--app-shell-radius`: var(--linear-app-shell-radius)
+- `--app-shell-frame-seam`: rgba(0, 0, 0, 0.045)
+- `--app-shell-gap`: 8px
+- `--app-shell-header-height`: 40px
+- `--app-shell-header-height-compact`: 36px
+- `--app-shell-header-padding-x`: 12px
+- `--app-shell-radius`: 12px
+- `--app-shell-radius-item`: 8px
+- `--app-shell-radius-menu`: 8px
+- `--app-shell-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045)
+- `--app-shell-sidebar-accent-active-rgb`: 236 238 241
+- `--app-shell-sidebar-accent-rgb`: 242 243 245
+- `--app-shell-sidebar-background`: rgb(247 248 248)
+- `--app-shell-sidebar-background-rgb`: 247 248 248
+- `--app-shell-sidebar-border-rgb`: 0 0 0 / 0.06
 - `--app-shell-sidebar-floating-radius`: 14px
-- `--app-shell-sidebar-width`: var(--linear-app-sidebar-width)
+- `--app-shell-sidebar-foreground-rgb`: 18 18 20
+- `--app-shell-sidebar-item-foreground-rgb`: 88 90 96
+- `--app-shell-sidebar-item-icon-rgb`: 122 125 132
+- `--app-shell-sidebar-muted-rgb`: 112 116 124
+- `--app-shell-sidebar-seam`: rgba(0, 0, 0, 0.05)
+- `--app-shell-sidebar-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035)
+- `--app-shell-sidebar-width`: 224px
+- `--app-shell-toolbar-gap`: 4px
 
 ### Public Shell
 
@@ -226,10 +253,10 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 ### Profile Shell
 
 - `--profile-action-radius`: 14px
-- `--profile-bottom-nav-height`: calc( var(--space-12) + var(--space-2-5) + max(10px, env(safe-area-inset-bottom)) + var(--space-2) + var(--space-8) )
+- `--profile-bottom-nav-height`: calc( var(--space-8) + max(10px, env(safe-area-inset-bottom)) + var(--space-2) + var(--space-6) )
 - `--profile-card-radius`: 22px
-- `--profile-drawer-bg`: rgb(248, 248, 250)
-- `--profile-drawer-highlight`: linear-gradient( 180deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.06) 40%, transparent 100% )
+- `--profile-drawer-bg`: rgb(14, 16, 20)
+- `--profile-drawer-highlight`: linear-gradient( 180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02) 36%, transparent 100% )
 - `--profile-drawer-radius-desktop`: 20px
 - `--profile-drawer-radius-mobile`: 22px
 - `--profile-inner-radius`: 18px
@@ -237,20 +264,6 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--profile-shell-card-radius`: 24px
 - `--profile-shell-header-max-width`: 38rem
 - `--profile-shell-max-width`: 430px
-
-### Border Radius
-
-- `--radius-2xl`: 20px
-- `--radius-3xl`: 24px
-- `--radius-default`: 4px
-- `--radius-full`: 9999px
-- `--radius-lg`: 12px
-- `--radius-md`: 10px
-- `--radius-none`: 0
-- `--radius-pill`: 9999px
-- `--radius-sm`: 8px
-- `--radius-xl`: 16px
-- `--radius-xs`: 2px
 
 ### Typography Scale
 
@@ -297,8 +310,11 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--space-2-5`: 0.625rem
 - `--space-20`: 5rem
 - `--space-24`: 6rem
+- `--space-28`: 7rem
 - `--space-3`: 0.75rem
+- `--space-32`: 8rem
 - `--space-4`: 1rem
+- `--space-40`: 10rem
 - `--space-5`: 1.25rem
 - `--space-6`: 1.5rem
 - `--space-8`: 2rem
@@ -306,6 +322,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 
 ### Shadows
 
+- `--shadow-button`: rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px
 - `--shadow-button-inset`: 0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%)
 - `--shadow-card`: oklch(80% 0 283) 0px 0px 0px 1px, oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px, oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px
 - `--shadow-card-elevated`: oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px, oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px

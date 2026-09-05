@@ -1,3 +1,7 @@
+---
+paths: ["scripts/hermes/**", "docs/hermes/**"]
+---
+
 # Hermes on the MacBook Air (Always-On Orchestration Node)
 
 Operating contract for the always-on Hermes gateway running on the dedicated 16 GB MacBook Air. This file is the canonical reference; the operator runbook lives at `docs/HERMES_AIR.md`.

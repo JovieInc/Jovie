@@ -1,3 +1,7 @@
+---
+paths: ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"]
+---
+
 # Database
 
 Single driver policy, immutable migrations, transaction discipline.
