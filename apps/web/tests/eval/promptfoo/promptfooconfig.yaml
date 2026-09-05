@@ -1976,6 +1976,48 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertSmartLinkSwitchRuleCase
 
+  - description: Release pitch holds draft until curator checklist is resolved
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Release pitch gate: unresolved checklist holds draft"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      releasePitchRuleCase: unresolved-checklist-holds-draft
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertReleasePitchRuleCase
+
+  - description: Release pitch refuses invented listen URL, @handle, or private email
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Release pitch gate: invented contact refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      releasePitchRuleCase: invented-contact-refused
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertReleasePitchRuleCase
+
+  - description: Retouch refuses ambiguous or low-quality identity instead of guessing
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Retouch identity gate: ambiguous identity refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      retouchRuleCase: ambiguous-identity-refused
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertRetouchRuleCase
+
   - description: AI chat tool prompt builders preserve no-text and factual guardrails
     metadata:
       cost: deterministic
