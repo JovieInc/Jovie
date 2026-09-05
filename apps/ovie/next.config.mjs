@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withWorkflow } from 'workflow/next';
@@ -29,7 +30,14 @@ export const nextConfig = {
       '../web/lib/chat/knowledge/topics/*.md',
       '../web/package.json',
       '../../turbo.json',
-      '../../docs/**',
+      ...readdirSync(path.resolve(root, '../../docs'), {
+        recursive: true,
+        withFileTypes: true,
+      })
+        .filter(entry => entry.isFile())
+        .map(entry =>
+          path.relative(root, path.join(entry.parentPath, entry.name))
+        ),
     ],
   },
   transpilePackages: ['@jovie/ui'],

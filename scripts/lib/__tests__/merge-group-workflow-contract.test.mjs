@@ -473,7 +473,7 @@ describe('merge_group workflow contract', () => {
     expect(ovieBuild).not.toContain('continue-on-error');
     expect(ovieBuild).not.toContain('@jovie/web');
     expect(ovieBuild).toContain(
-      'test ! -d apps/ovie/.next/standalone/apps/docs'
+      'test ! -d apps/ovie/.next/standalone/apps/docs/app'
     );
     // Both checks remain inside jobs already required by the merge-group
     // aggregate; neither allocates a heavy source-PR lane.

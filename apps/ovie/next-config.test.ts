@@ -17,6 +17,11 @@ describe('Ovie deployment configuration', () => {
     const { default: config } = await import('./next.config.mjs');
     expect(withWorkflow).toHaveBeenCalledOnce();
     expect(config.output).toBe('standalone');
+    const documents = config.outputFileTracingIncludes['/*'].filter(path =>
+      path.startsWith('../../docs/')
+    );
+    expect(documents).toContain('../../docs/FEATURE_REGISTRY.md');
+    expect(documents.every(path => !path.includes('*'))).toBe(true);
     expect(await config.redirects()).toContainEqual({
       source: '/app',
       destination: 'https://jov.ie/app',

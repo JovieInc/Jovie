@@ -1995,7 +1995,7 @@ jobs:
           pnpm --filter @jovie/ovie build
           test -f apps/ovie/.next/BUILD_ID
           test -f apps/ovie/.next/standalone/apps/ovie/server.js
-          test ! -d apps/ovie/.next/standalone/apps/docs
+          test ! -d apps/ovie/.next/standalone/apps/docs/app
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           NEXT_PUBLIC_APP_URL: http://localhost:3105

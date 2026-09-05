@@ -1,6 +1,8 @@
 /* Compile the shared component classes for this deployment's source root. */
 @reference "../../web/app/globals.css";
-@tailwind utilities source(none);
+@layer utilities {
+  @tailwind utilities source(none);
+}
 @source "../../web/components";
 @source "../../web/app/app";
 @source "../../web/app/hud";

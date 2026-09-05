@@ -22,4 +22,12 @@ it('compiles responsive shared-shell utilities from the Ovie workspace', async (
   expect(result.css).toContain('.md\\:hidden');
   expect(result.css).toContain('.md\\:flex');
   expect(result.css).toContain('.grid-cols-3');
+  // Preserve the shared design system's cascade over table density rules.
+  const utilities = result.root.nodes.find(
+    node =>
+      node.type === 'atrule' &&
+      node.name === 'layer' &&
+      node.params === 'utilities'
+  );
+  expect(utilities?.toString()).toContain('.flex');
 }, 30_000);
