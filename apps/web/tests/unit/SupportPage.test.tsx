@@ -38,7 +38,7 @@ describe('SupportPage', () => {
     expect(contactButton).toHaveTextContent('Contact Support');
   });
 
-  it('renders the CTA on the canonical 32px marketing Button atom', () => {
+  it('renders the CTA on the canonical 28px marketing Button atom', () => {
     render(<SupportPage />);
 
     const contactButton = screen.getByRole('link', {
@@ -46,7 +46,7 @@ describe('SupportPage', () => {
     });
     expect(contactButton).toHaveAttribute('data-variant', 'secondary');
     expect(contactButton).toHaveAttribute('data-size', 'marketing');
-    expect(contactButton).toHaveClass('h-8', 'rounded-full');
+    expect(contactButton).toHaveClass('h-7', 'rounded-full');
     expect(contactButton).not.toHaveClass('public-action-secondary');
     expect(contactButton).not.toHaveClass('public-action-primary');
   });
@@ -158,7 +158,7 @@ describe('SupportPage', () => {
         /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
       )) {
       expect(action).toHaveAttribute('data-size', 'marketing');
-      expect(action).toHaveClass('h-8', 'rounded-full');
+      expect(action).toHaveClass('h-7', 'rounded-full');
       expect(action).not.toHaveClass('public-action-inline');
     }
   });
