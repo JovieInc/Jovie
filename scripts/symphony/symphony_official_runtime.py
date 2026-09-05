@@ -89,6 +89,7 @@ BOUNDED_REPAIR_SCHEMA = "symphony-bounded-repair-admission/v1"
 BOUNDED_REPAIR_MAX_SECONDS = 900
 BOUNDED_REPAIR_MODEL = "gpt-5.3-codex-spark"
 BOUNDED_REPAIR_MODEL_LIMIT_ID = "codex_bengalfox"
+BOUNDED_REPAIR_EXPIRY_KIND = "systemd-runtime-max"
 BOUNDED_REPAIR_ADMISSION_FIELDS = frozenset(
     {"remediationAdmission", "workAdmission"}
 )
@@ -1140,6 +1141,19 @@ def validate_bounded_repair_admission(
         raise ValueError("recovery-manifest-model-limit-mismatch")
     if manifest.get("modelFallbackAllowed") is not False:
         raise ValueError("recovery-manifest-model-fallback-not-false")
+
+    external_expiry = manifest.get("externalExpiry")
+    if not isinstance(external_expiry, dict):
+        raise ValueError("recovery-manifest-external-expiry-invalid")
+    expected_expiry = {
+        "kind": BOUNDED_REPAIR_EXPIRY_KIND,
+        "unit": f"{manifest.get('requiredLabel')}.service",
+        "runtimeMaxSeconds": BOUNDED_REPAIR_MAX_SECONDS,
+        "killMode": "control-group",
+        "sendSIGKILL": True,
+    }
+    if external_expiry != expected_expiry:
+        raise ValueError("recovery-manifest-external-expiry-mismatch")
 
     issue = manifest.get("issueIdentifier")
     issue_id = manifest.get("issueId")
