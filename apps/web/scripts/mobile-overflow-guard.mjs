@@ -5,6 +5,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 import postcss from 'postcss';
+import ts from 'typescript';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -160,17 +161,65 @@ function omitAuditedOverlayUtility(filePath, content) {
   );
 }
 
+function hasAuditedOverlayDeclaration(content) {
+  const source = ts.createSourceFile(
+    'overlay-styles.ts',
+    content,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  if (source.parseDiagnostics.length) return false;
+  let uses = 0;
+  const countUses = node => {
+    if (ts.isStringLiteral(node) || ts.isTemplateLiteralToken(node))
+      uses += [...node.text.matchAll(/\bw-overlay-viewport\b/g)].length;
+    ts.forEachChild(node, countUses);
+  };
+  countUses(source);
+  if (uses !== 1) return false;
+  const declarations = source.statements
+    .filter(ts.isVariableStatement)
+    .flatMap(statement => statement.declarationList.declarations)
+    .filter(
+      declaration =>
+        ts.isIdentifier(declaration.name) &&
+        declaration.name.text === 'centeredContentStyles'
+    );
+  if (declarations.length !== 1) return false;
+  const initializer = declarations[0].initializer;
+  const object =
+    initializer && ts.isAsExpression(initializer)
+      ? initializer.expression
+      : initializer;
+  if (
+    !object ||
+    !ts.isObjectLiteralExpression(object) ||
+    object.properties.some(ts.isSpreadAssignment)
+  )
+    return false;
+  return Object.entries({
+    position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
+    layout:
+      'grid max-h-overlay-viewport w-overlay-viewport max-w-lg gap-5 overflow-y-auto overscroll-contain',
+  }).every(([name, value]) => {
+    const properties = object.properties.filter(
+      property => property.name?.getText(source) === name
+    );
+    return (
+      properties.length === 1 &&
+      ts.isPropertyAssignment(properties[0]) &&
+      ts.isStringLiteral(properties[0].initializer) &&
+      properties[0].initializer.text === value
+    );
+  });
+}
+
 function scanOverlayConsumer(filePath, content) {
   const match = /\bw-overlay-viewport\b/.exec(content);
   if (!match) return [];
   const isAuditedOwner =
     filePath === 'packages/ui/lib/overlay-styles.ts' &&
-    /position:\s*'fixed left-1\/2 top-1\/2 z-50 \[translate:-50%_-50%\]'/.test(
-      content
-    ) &&
-    /layout:\s*'grid max-h-overlay-viewport w-overlay-viewport max-w-lg gap-5 overflow-y-auto overscroll-contain'/.test(
-      content
-    );
+    hasAuditedOverlayDeclaration(content);
   if (isAuditedOwner) return [];
   return [
     {
