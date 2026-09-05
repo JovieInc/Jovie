@@ -36,10 +36,9 @@ const ICON_HIT_TARGET_44 =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
 // Every text size name is a compatibility alias for the founder-selected
-// 28px minimum face, with one typography/padding contract and a 44px minimum
-// hit target. Auto height preserves native text growth; the target grows with it.
+// 28px control, with one typography/padding contract and a 44px hit target.
 const TEXT_BUTTON_CLASSES =
-  'h-auto min-h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+  'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
 const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: TEXT_BUTTON_CLASSES,
