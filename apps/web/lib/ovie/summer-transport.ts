@@ -3,7 +3,7 @@
  *
  * OV chat must not generate as artist Jovie and must not self-identify as
  * Ovie. Eve persists/acks/routes only. Conversational authority is the
- * current Mac Summer. Missing or disabled transport fails closed with a
+ * current Eve-hosted Summer. Missing or disabled transport fails closed with a
  * typed unavailable/unknown state. Never fall back to Jovie, Eve-as-speaker,
  * Ovie-as-persona, Zoe, OpenClaw, a mock, or a fresh empty persona.
  */
@@ -30,6 +30,8 @@ import {
   findTurnByClientId,
   loadCurrentSummerSession,
   openCurrentSummerSession,
+  type SummerEveCheckpoint,
+  type SummerEveReceipt,
   type SummerSessionIdentity,
   type SummerToolReceipt,
 } from '@/lib/ovie/summer-session';
@@ -49,11 +51,14 @@ export type ForbiddenSummerFallback =
 
 export type SummerSpeaker = {
   readonly id: 'summer';
-  readonly runtime: 'mac';
+  readonly runtime: 'mac' | 'eve';
   speak(input: SummerSpeakInput): AsyncIterable<SummerSpeakEvent>;
 };
 
 export type SummerSpeakInput = {
+  readonly previousEveEventId?: string;
+  readonly previousEveSessionId?: string;
+  readonly principalHash?: string;
   readonly userText: string;
   readonly conversationId?: string;
   readonly clientTurnId?: string;
@@ -66,6 +71,9 @@ export type SummerSpeakInput = {
 };
 
 export type SummerSpeakEvent =
+  | { readonly type: 'receipt'; readonly receipt: SummerEveReceipt }
+  | { readonly type: 'checkpoint'; readonly checkpoint: SummerEveCheckpoint }
+  | { readonly type: 'notice'; readonly text: string; readonly code: string }
   | { readonly type: 'text-delta'; readonly text: string }
   | {
       readonly type: 'tool';
@@ -157,10 +165,10 @@ export function assertNotForbiddenFallback(label: string): void {
 export function bindCurrentSummerSpeaker(
   speaker: SummerSpeaker
 ): SummerSpeaker {
-  if (speaker.id !== 'summer' || speaker.runtime !== 'mac') {
+  if (speaker.id !== 'summer' || !['mac', 'eve'].includes(speaker.runtime)) {
     throw new OvieProgramError(
       'ovie-forbidden-fallback',
-      'Ovie door only binds the current Mac Summer'
+      'Ovie door only binds the current Summer runtime'
     );
   }
   assertNotForbiddenFallback(speaker.id);
@@ -254,6 +262,7 @@ export async function* runOvieSummerTurn(input: {
   readonly store: OperatingStore;
   readonly signal?: AbortSignal;
   readonly clientTurnId?: string | null;
+  readonly principalHash?: string;
 }): AsyncGenerator<SummerTurnEvent> {
   if (input.speaker.id !== 'summer') {
     denyEveAction('summer-answer');
@@ -290,6 +299,12 @@ export async function* runOvieSummerTurn(input: {
 
   yield { type: 'state', state: 'streaming' };
   let assistantText = '';
+  let eveReceipt: SummerEveReceipt | undefined;
+  let eveCheckpoint: SummerEveCheckpoint | undefined;
+  const previousEveBinding = [...session.turns]
+    .reverse()
+    .map(turn => turn.eveReceipt ?? turn.eveCheckpoint)
+    .find(Boolean);
   let toolReceipt: SummerToolReceipt | null = null;
   let terminal:
     | 'completed'
@@ -304,6 +319,9 @@ export async function* runOvieSummerTurn(input: {
       conversationId: session.identity.sessionId,
       clientTurnId: input.clientTurnId ?? binding.correlationId,
       receipts: input.receipts,
+      previousEveEventId: previousEveBinding?.eventId,
+      previousEveSessionId: previousEveBinding?.sessionId ?? undefined,
+      principalHash: input.principalHash,
       history: session.turns.flatMap(turn => [
         { role: 'user' as const, text: turn.userText },
         { role: 'assistant' as const, text: turn.assistantText },
@@ -313,6 +331,18 @@ export async function* runOvieSummerTurn(input: {
       if (input.signal?.aborted) {
         terminal = 'canceled';
         break;
+      }
+      if (event.type === 'receipt') {
+        eveReceipt = event.receipt;
+        continue;
+      }
+      if (event.type === 'checkpoint') {
+        eveCheckpoint = event.checkpoint;
+        continue;
+      }
+      if (event.type === 'notice') {
+        yield { type: 'text-delta', text: event.text };
+        continue;
       }
       if (event.type === 'text-delta') {
         assistantText += event.text;
@@ -358,10 +388,13 @@ export async function* runOvieSummerTurn(input: {
   }
   assertModelMustNotSelfIdentifyAsOvie(assistantText);
 
-  // Canceled streams are not durable session turns. The Eve/Mac queue keeps
-  // the work; reconnect with the same clientTurnId waits for completion
+  // Canceled streams are not durable session turns. Eve keeps the work;
+  // reconnect with the same clientTurnId waits for completion
   // instead of replaying an empty canceled row.
-  if (terminal !== 'canceled' && terminal !== 'unavailable') {
+  if (
+    terminal !== 'canceled' &&
+    (terminal !== 'unavailable' || Boolean(eveCheckpoint))
+  ) {
     await appendSummerTurn(input.store, {
       clientTurnId: input.clientTurnId ?? null,
       userText: input.userText,
@@ -371,6 +404,8 @@ export async function* runOvieSummerTurn(input: {
       correlationId: binding.correlationId,
       state: terminal,
       toolReceipt,
+      ...(eveReceipt ? { eveReceipt } : {}),
+      ...(eveCheckpoint ? { eveCheckpoint } : {}),
       createdAt: new Date().toISOString(),
     });
   }
