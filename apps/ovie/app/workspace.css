@@ -1,0 +1,11 @@
+/* Compile the shared component classes for this deployment's source root. */
+@reference "../../web/app/globals.css";
+@tailwind utilities source(none);
+@source "../../web/components";
+@source "../../web/app/app";
+@source "../../web/app/hud";
+@source "../../web/lib";
+@source "../../../packages/ui";
+@source not "../../web/**/*.test.*";
+@source not "../../web/**/*.spec.*";
+@source not "../../web/**/*.stories.*";
