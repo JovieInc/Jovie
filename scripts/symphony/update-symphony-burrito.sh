@@ -32,7 +32,9 @@ SKIP_BINARY=0
 CHECK_ONLY=0
 RUNTIME_READBACK=0
 RETIRE_LEGACY=0
+ACTIVE_ISSUES=""
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
+RECOVERY_VERIFY_ATTEMPTS="${SYMPHONY_RECOVERY_VERIFY_ATTEMPTS:-15}"
 # Genuinely retired units only. The grok/kimi sidecar
 # (symphony-grok-sidecar.{service,timer}) is the ACTIVE coding lane while
 # Codex seats are exhausted (Tim, 2026-09-03) and is installed/owned by
@@ -86,21 +88,52 @@ PY
 }
 
 validate_source() {
-  local active_issues
-  active_issues="$(python3 "$HELPER_SRC" linear-eligible-count --linear-env-file "$LINEAR_ENV")"
-  case "$active_issues" in
+  ACTIVE_ISSUES="$(python3 "$HELPER_SRC" linear-eligible-count --linear-env-file "$LINEAR_ENV")"
+  case "$ACTIVE_ISSUES" in
     ''|*[!0-9]*)
-      echo "SOURCE_INVALID invalid Linear active issue count: ${active_issues:-empty}" >&2
+      echo "SOURCE_INVALID invalid Linear active issue count: ${ACTIVE_ISSUES:-empty}" >&2
       return 4
       ;;
   esac
-  echo "ACTIVE_ISSUES $active_issues"
+  echo "ACTIVE_ISSUES $ACTIVE_ISSUES"
   python3 "$HELPER_SRC" validate-source \
     --repo-root "$REPO_ROOT" \
     --workflow "$WORKFLOW_SRC" \
     --unit "$UNIT_SRC" \
     --service-name "$SERVICE_NAME" \
-    --active-issues "$active_issues"
+    --active-issues "$ACTIVE_ISSUES"
+}
+
+validate_rollback_bundle() {
+  python3 "$HELPER_SRC" validate-source \
+    --repo-root "$REPO_ROOT" \
+    --workflow "$rollback_dir/workflow" \
+    --unit "$rollback_dir/unit" \
+    --service-name "$SERVICE_NAME" \
+    --active-issues "$ACTIVE_ISSUES" >/dev/null &&
+  cmp -s "$rollback_dir/helper" "$HELPER_SRC" &&
+  python3 - "$rollback_dir" "$STATE_DIR/candidates" <<'PY'
+import json, pathlib, sys
+rollback = pathlib.Path(sys.argv[1])
+candidates = pathlib.Path(sys.argv[2])
+saved = json.loads((rollback / "manifest.json").read_text())
+required = {name: saved.get(name) for name in ("helper", "unit", "workflow")}
+if any(value is None for value in required.values()):
+    raise SystemExit(1)
+if "binary" in saved:
+    required["binary"] = saved["binary"]
+for candidate in candidates.iterdir():
+    try:
+        manifest = json.loads((candidate / "manifest.json").read_text())
+        if manifest.get("schema") == "symphony-candidate/v2" and all(
+            manifest.get("files", {}).get(name) == digest
+            for name, digest in required.items()
+        ):
+            raise SystemExit(0)
+    except (OSError, TypeError, ValueError):
+        continue
+raise SystemExit(1)
+PY
 }
 
 install_one() {
@@ -250,6 +283,23 @@ if isinstance(next_poll_ms, bool) or not isinstance(next_poll_ms, int) or next_p
     raise SystemExit(4)
 print(f"{running_count} {1 if checking else 0} {next_poll_ms}")
 PY
+}
+
+verify_official_restarted() {
+  local snapshot pid
+  case "$RECOVERY_VERIFY_ATTEMPTS" in
+    ''|*[!0-9]*|0) return 1 ;;
+  esac
+  for _ in $(seq 1 "$RECOVERY_VERIFY_ATTEMPTS"); do
+    pid="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null || true)"
+    if systemctl --user is-active --quiet "$SERVICE_NAME" &&
+       [[ "$pid" =~ ^[1-9][0-9]*$ ]] &&
+       snapshot="$(promotion_idle_snapshot)"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
 }
 
 stop_idle_official_for_restart() {
@@ -402,11 +452,212 @@ echo "SHA256 ${SUM_NAME}"
 
 tmpdir=""
 rollback_dir=""
+candidate_dir=""
+candidate_id=""
+candidate_tmp=""
+update_lock=""
 promotion_started=0
 promotion_complete=0
+recovery_cleanup_started=0
+cleanup_pending=""
+finalized_receipt=""
+recovered_receipt=""
 official_was_active=0
 official_stopped_for_promotion=0
 official_pid_before=""
+files_promoted=0
+rollback_safe=1
+rollback_restart_verified=1
+
+write_promotion_hold() {
+  local reason="${1:-prior_config_unsafe}"
+  CANDIDATE_DIR="$candidate_dir" ROLLBACK_DIR="$rollback_dir" PROMOTION_HOLD_REASON="$reason" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+target = root / "promotion-held.json"
+temporary = root / ".promotion-held.tmp"
+value = {
+    "schema": "symphony-promotion-hold/v1",
+    "status": "held",
+    "reason": os.environ["PROMOTION_HOLD_REASON"],
+    "candidate": os.environ["CANDIDATE_DIR"],
+    "transaction": os.environ["ROLLBACK_DIR"],
+}
+temporary.write_text(json.dumps(value, sort_keys=True) + "\n")
+with temporary.open("rb") as handle:
+    os.fsync(handle.fileno())
+os.replace(temporary, target)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
+finalize_rollback_transaction() {
+  ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, shutil, sys
+root = pathlib.Path(sys.argv[1])
+transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
+tombstone = root / ".promotion-transaction.removing"
+cleanup_pending = root / ".promotion-transaction.cleanup-pending"
+hold = root / "promotion-held.json"
+if transaction != root / "promotion-transaction":
+    raise SystemExit(1)
+def fsync_root():
+    descriptor = os.open(root, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+if cleanup_pending.exists():
+    if (cleanup_pending.read_text() != "symphony-promotion-cleanup-pending/v1\n" or
+            transaction.exists() or tombstone.exists() or hold.exists()):
+        raise SystemExit(1)
+    fsync_root()
+    cleanup_pending.unlink()
+    fsync_root()
+if hold.exists():
+    value = json.loads(hold.read_text())
+    if (value.get("schema") != "symphony-promotion-hold/v1" or
+            value.get("status") != "held" or
+            value.get("transaction") != str(transaction)):
+        raise SystemExit(1)
+if transaction.exists():
+    if tombstone.exists():
+        raise SystemExit(1)
+    os.replace(transaction, tombstone)
+    fsync_root()
+if hold.exists():
+    hold.unlink()
+    fsync_root()
+if tombstone.exists():
+    cleanup_pending.write_text("symphony-promotion-cleanup-pending/v1\n")
+    with cleanup_pending.open("rb") as handle:
+        os.fsync(handle.fileno())
+    fsync_root()
+    shutil.rmtree(tombstone)
+    fsync_root()
+    cleanup_pending.unlink()
+    fsync_root()
+PY
+}
+
+write_finalized_receipt() {
+  local cleanup_status="$1"
+  CLEANUP_STATUS="$cleanup_status" CANDIDATE_ID="$candidate_id" \
+    CANDIDATE_DIR="$candidate_dir" ROLLBACK_DIR="$rollback_dir" \
+    python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+receipt = root / "promotion-finalized.json"
+temporary = root / ".promotion-finalized.json.tmp"
+candidate_id = os.environ["CANDIDATE_ID"]
+candidate = os.environ["CANDIDATE_DIR"]
+if not candidate_id or not candidate:
+    try:
+        previous = json.loads(receipt.read_text())
+    except (OSError, ValueError):
+        raise SystemExit(1)
+    candidate_id = previous.get("candidateId")
+    candidate = previous.get("candidate")
+payload = {
+    "schema": "symphony-promotion-finalized/v1",
+    "status": "committed",
+    "cleanupStatus": os.environ["CLEANUP_STATUS"],
+    "candidateId": candidate_id,
+    "candidate": candidate,
+    "transaction": os.environ["ROLLBACK_DIR"],
+}
+temporary.write_text(json.dumps(payload, sort_keys=True) + "\n")
+with temporary.open("rb") as handle:
+    os.fsync(handle.fileno())
+os.replace(temporary, receipt)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
+write_recovered_prior_receipt() {
+  local cleanup_status="$1"
+  CLEANUP_STATUS="$cleanup_status" ROLLBACK_DIR="$rollback_dir" \
+    python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+receipt = root / "promotion-recovered.json"
+temporary = root / ".promotion-recovered.json.tmp"
+payload = {
+    "schema": "symphony-promotion-recovered/v1",
+    "status": "restored-prior",
+    "cleanupStatus": os.environ["CLEANUP_STATUS"],
+    "transaction": os.environ["ROLLBACK_DIR"],
+}
+temporary.write_text(json.dumps(payload, sort_keys=True) + "\n")
+with temporary.open("rb") as handle:
+    os.fsync(handle.fileno())
+os.replace(temporary, receipt)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
+finalized_cleanup_pending() {
+  [ -n "$finalized_receipt" ] && [ -n "$rollback_dir" ] || return 1
+  FINALIZED_RECEIPT="$finalized_receipt" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, re, sys
+root = pathlib.Path(sys.argv[1])
+receipt = pathlib.Path(os.environ["FINALIZED_RECEIPT"])
+transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
+try:
+    payload = json.loads(receipt.read_text())
+except (OSError, ValueError):
+    raise SystemExit(1)
+candidate_id = payload.get("candidateId")
+candidate = payload.get("candidate")
+valid_candidate_id = (
+    isinstance(candidate_id, str) and
+    re.fullmatch(r"[0-9a-f]{64}", candidate_id) is not None
+)
+expected_candidate = root / "candidates" / candidate_id if valid_candidate_id else None
+if (receipt != root / "promotion-finalized.json" or
+        transaction != root / "promotion-transaction" or
+        payload.get("schema") != "symphony-promotion-finalized/v1" or
+        payload.get("status") != "committed" or
+        payload.get("cleanupStatus") != "pending" or
+        payload.get("transaction") != str(transaction) or
+        not valid_candidate_id or candidate != str(expected_candidate) or
+        not expected_candidate.is_dir()):
+    raise SystemExit(1)
+PY
+}
+
+recovered_prior_cleanup_pending() {
+  [ -n "$recovered_receipt" ] && [ -n "$rollback_dir" ] || return 1
+  RECOVERED_RECEIPT="$recovered_receipt" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+receipt = pathlib.Path(os.environ["RECOVERED_RECEIPT"])
+transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
+try:
+    payload = json.loads(receipt.read_text())
+except (OSError, ValueError):
+    raise SystemExit(1)
+if (receipt != root / "promotion-recovered.json" or
+        transaction != root / "promotion-transaction" or
+        payload.get("schema") != "symphony-promotion-recovered/v1" or
+        payload.get("status") != "restored-prior" or
+        payload.get("cleanupStatus") != "pending" or
+        payload.get("transaction") != str(transaction)):
+    raise SystemExit(1)
+PY
+}
 
 backup_target() {
   local key="$1" target="$2"
@@ -428,31 +679,160 @@ restore_target() {
 
 cleanup() {
   local status="$?"
-  if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
+  if [ "$status" -ne 0 ] && [ "$recovery_cleanup_started" -eq 1 ]; then
+    echo "RECOVERED_PRIOR_CLEANUP_FAILED restored prior state retained; inspect transaction cleanup before retry" >&2
+  elif [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
     if [ "$promotion_started" -eq 1 ]; then
-      restore_target binary "$BIN_DST" 0755
-      restore_target helper "$HELPER_DST" 0755
-      restore_target unit "$UNIT_DST" 0644
-      restore_target workflow "$WORKFLOW_DST" 0644
-    fi
-    if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
-      systemctl --user daemon-reload >/dev/null 2>&1 || true
-      if [ "$RESTART" -eq 1 ] && [ "$official_stopped_for_promotion" -eq 1 ]; then
-        systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 || true
+      if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
+        write_promotion_hold
+      else
+        restore_target binary "$BIN_DST" 0755
+        restore_target helper "$HELPER_DST" 0755
+        restore_target unit "$UNIT_DST" 0644
+        restore_target workflow "$WORKFLOW_DST" 0644
       fi
     fi
-    if [ "$promotion_started" -eq 1 ]; then
+    if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ] || [ "$official_stopped_for_promotion" -eq 1 ]; then
+      if ! systemctl --user daemon-reload >/dev/null 2>&1; then
+        rollback_restart_verified=0
+      fi
+      if [ "$official_stopped_for_promotion" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; then
+        if ! systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 ||
+           ! verify_official_restarted >/dev/null 2>&1; then
+          rollback_restart_verified=0
+        else
+          official_stopped_for_promotion=0
+        fi
+      fi
+      if [ "$rollback_restart_verified" -eq 0 ] && [ "$promotion_started" -eq 1 ]; then
+        write_promotion_hold rollback_restart_failed
+      fi
+    fi
+    if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
+      echo "PROMOTION_HELD candidate files retained offline; unsafe prior config not restored" >&2
+    elif [ "$promotion_started" -eq 1 ] && [ "$rollback_restart_verified" -eq 0 ]; then
+      echo "PROMOTION_HELD official files restored but service restart is unverified" >&2
+    elif [ "$promotion_started" -eq 1 ]; then
       echo "PROMOTION_ROLLED_BACK official files restored; legacy units remain fail-closed" >&2
     elif [ "$official_stopped_for_promotion" -eq 1 ]; then
       echo "PROMOTION_ROLLED_BACK official service restarted before file promotion" >&2
     fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
+  if [ "$status" -ne 0 ] && [ "$recovery_cleanup_started" -eq 0 ] &&
+     [ "$promotion_started" -eq 1 ] &&
+     [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; then
+    if [ -n "$rollback_dir" ]; then
+      if ! finalize_rollback_transaction; then
+        rollback_restart_verified=0
+        status=10
+      else
+        rollback_dir=""
+      fi
+    fi
+  fi
+  if [ -n "$candidate_tmp" ]; then
+    chmod -R u+w "$candidate_tmp" >/dev/null 2>&1 || true
+    rm -rf "$candidate_tmp"
+  fi
   trap - EXIT
   exit "$status"
 }
 trap cleanup EXIT
+
+mkdir -p "$STATE_DIR"
+update_lock="$STATE_DIR/update.lock"
+exec 9>"$update_lock"
+if ! python3 - 9 <<'PY'
+import fcntl, sys
+fcntl.flock(int(sys.argv[1]), fcntl.LOCK_EX | fcntl.LOCK_NB)
+PY
+then
+  echo "PROMOTION_RED updater lock is held: $update_lock" >&2
+  exit 8
+fi
+
+rollback_dir="$STATE_DIR/promotion-transaction"
+cleanup_pending="$STATE_DIR/.promotion-transaction.cleanup-pending"
+finalized_receipt="$STATE_DIR/promotion-finalized.json"
+recovered_receipt="$STATE_DIR/promotion-recovered.json"
+if finalized_cleanup_pending; then
+  if ! finalize_rollback_transaction; then
+    echo "PROMOTION_COMMITTED cleanup acknowledgement remains pending" >&2
+    exit 0
+  fi
+  write_finalized_receipt complete
+  echo "RECOVERED_TRANSACTION_CLEANUP"
+  exit 0
+fi
+if recovered_prior_cleanup_pending; then
+  recovery_cleanup_started=1
+  if ! finalize_rollback_transaction; then
+    echo "RECOVERED_PRIOR cleanup acknowledgement remains pending" >&2
+    exit 0
+  fi
+  write_recovered_prior_receipt complete
+  recovery_cleanup_started=0
+  rollback_dir=""
+  echo "RECOVERED_TRANSACTION_CLEANUP"
+  exit 0
+fi
+if [ -e "$cleanup_pending" ]; then
+  if ! finalize_rollback_transaction; then
+    echo "PROMOTION_RED incomplete transaction cleanup requires operator review" >&2
+    exit 9
+  fi
+  echo "RECOVERED_TRANSACTION_CLEANUP"
+fi
+if [ -e "$STATE_DIR/.promotion-transaction.removing" ]; then
+  echo "PROMOTION_RED incomplete transaction cleanup requires operator review" >&2
+  exit 9
+fi
+if [ -d "$rollback_dir" ]; then
+  if [ ! -f "$rollback_dir/READY" ] || ! python3 - "$rollback_dir" <<'PY'
+import hashlib, json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+manifest = json.loads((root / "manifest.json").read_text())
+actual = {path.name for path in root.iterdir() if path.is_file()} - {"manifest.json", "READY"}
+if set(manifest) != actual or (root / "READY").read_text() != "symphony-promotion-transaction/v1\n":
+    raise SystemExit(1)
+for name, expected in manifest.items():
+    path = root / name
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(1)
+PY
+  then
+    echo "PROMOTION_RED incomplete rollback transaction requires operator review" >&2
+    exit 9
+  fi
+  if ! validate_rollback_bundle; then
+    echo "PROMOTION_RED rollback transaction is not a validated known-good bundle" >&2
+    exit 9
+  fi
+  promotion_started=1
+  restore_target binary "$BIN_DST" 0755
+  restore_target helper "$HELPER_DST" 0755
+  restore_target unit "$UNIT_DST" 0644
+  restore_target workflow "$WORKFLOW_DST" 0644
+  if [ -f "$rollback_dir/was-active" ]; then
+    official_stopped_for_promotion=1
+  fi
+  prepare_systemd_context
+  systemctl --user daemon-reload
+  if [ "$official_stopped_for_promotion" -eq 1 ]; then
+    systemctl --user restart "$SERVICE_NAME"
+    verify_official_restarted
+    official_stopped_for_promotion=0
+  fi
+  write_recovered_prior_receipt pending
+  recovery_cleanup_started=1
+  finalize_rollback_transaction
+  write_recovered_prior_receipt complete
+  recovery_cleanup_started=0
+  rollback_dir=""
+  promotion_started=0
+  echo "RECOVERED_INCOMPLETE_PROMOTION"
+fi
 
 if [ "$SKIP_BINARY" -eq 0 ]; then
   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/symphony-elixir.XXXXXX")"
@@ -465,6 +845,91 @@ else
 fi
 
 assert_account_environment_ready
+mkdir -p "$STATE_DIR/candidates"
+candidate_inputs=("$HELPER_SRC" "$UNIT_SRC" "$WORKFLOW_SRC")
+if [ "$SKIP_BINARY" -eq 0 ]; then
+  candidate_inputs+=("${tmpdir}/${BIN_NAME}")
+fi
+candidate_id="$(CANDIDATE_VERSION="$SYMPHONY_VERSION" python3 - "${candidate_inputs[@]}" <<'PY'
+import hashlib, os, pathlib, sys
+digest = hashlib.sha256()
+digest.update(b"symphony-candidate/v2\0")
+digest.update(os.environ["CANDIDATE_VERSION"].encode())
+for raw in sys.argv[1:]:
+    digest.update(pathlib.Path(raw).read_bytes())
+print(digest.hexdigest())
+PY
+)"
+candidate_dir="$STATE_DIR/candidates/$candidate_id"
+if [ ! -d "$candidate_dir" ]; then
+  candidate_tmp="$(mktemp -d "$STATE_DIR/candidates/.candidate.XXXXXX")"
+  install_one "$HELPER_SRC" "$candidate_tmp/helper" 0755
+  install_one "$UNIT_SRC" "$candidate_tmp/unit" 0644
+  install_one "$WORKFLOW_SRC" "$candidate_tmp/workflow" 0644
+  if [ "$SKIP_BINARY" -eq 0 ]; then
+    install_one "${tmpdir}/${BIN_NAME}" "$candidate_tmp/binary" 0755
+  fi
+  CANDIDATE_VERSION="$SYMPHONY_VERSION" python3 - "$candidate_tmp" <<'PY'
+import hashlib, json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+files = {}
+for path in sorted(root.iterdir()):
+    if path.is_file():
+        files[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        with path.open("rb") as handle:
+            os.fsync(handle.fileno())
+manifest = {
+    "schema": "symphony-candidate/v2",
+    "version": os.environ["CANDIDATE_VERSION"],
+    "files": files,
+}
+(root / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
+with (root / "manifest.json").open("rb") as handle:
+    os.fsync(handle.fileno())
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+  chmod 0555 "$candidate_tmp/helper"
+  chmod 0444 "$candidate_tmp/unit" "$candidate_tmp/workflow" "$candidate_tmp/manifest.json"
+  if [ "$SKIP_BINARY" -eq 0 ]; then chmod 0555 "$candidate_tmp/binary"; fi
+  mv "$candidate_tmp" "$candidate_dir"
+  chmod 0555 "$candidate_dir"
+  candidate_tmp=""
+else
+  cmp -s "$HELPER_SRC" "$candidate_dir/helper"
+  cmp -s "$UNIT_SRC" "$candidate_dir/unit"
+  cmp -s "$WORKFLOW_SRC" "$candidate_dir/workflow"
+  if [ "$SKIP_BINARY" -eq 0 ]; then
+    cmp -s "${tmpdir}/${BIN_NAME}" "$candidate_dir/binary"
+  fi
+fi
+echo "STAGED $candidate_dir"
+python3 - "$candidate_dir" "$SYMPHONY_VERSION" <<'PY'
+import hashlib, json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+manifest = json.loads((root / "manifest.json").read_text())
+if manifest.get("schema") != "symphony-candidate/v2" or manifest.get("version") != sys.argv[2]:
+    raise SystemExit("candidate manifest identity mismatch")
+files = manifest.get("files")
+if not isinstance(files, dict):
+    raise SystemExit("candidate manifest files missing")
+for name, expected in files.items():
+    path = root / name
+    if not path.is_file() or path.is_symlink():
+        raise SystemExit(f"candidate file invalid: {name}")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"candidate hash mismatch: {name}")
+PY
+
+if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 0 ]; then
+  promotion_complete=1
+  echo "DONE_STAGED_NO_LIVE_MUTATION"
+  exit 0
+fi
+
 if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
   prepare_systemd_context
   if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -472,6 +937,51 @@ if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
     official_pid_before="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value)"
   fi
 fi
+
+rollback_tmp="$(mktemp -d "$STATE_DIR/.promotion-transaction.XXXXXX")"
+rollback_dir="$rollback_tmp"
+backup_target binary "$BIN_DST"
+backup_target helper "$HELPER_DST"
+backup_target unit "$UNIT_DST"
+backup_target workflow "$WORKFLOW_DST"
+[ "$official_was_active" -eq 0 ] || : > "$rollback_dir/was-active"
+python3 - "$rollback_dir" <<'PY'
+import hashlib, json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+manifest = {}
+for path in sorted(root.iterdir()):
+    if path.is_file():
+        manifest[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        with path.open("rb") as handle:
+            os.fsync(handle.fileno())
+manifest_path = root / "manifest.json"
+manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n")
+with manifest_path.open("rb") as handle:
+    os.fsync(handle.fileno())
+(root / "READY").write_text("symphony-promotion-transaction/v1\n")
+with (root / "READY").open("rb") as handle:
+    os.fsync(handle.fileno())
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+mv "$rollback_tmp" "$STATE_DIR/promotion-transaction"
+python3 - "$STATE_DIR" <<'PY'
+import os, sys
+descriptor = os.open(sys.argv[1], os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+rollback_dir="$STATE_DIR/promotion-transaction"
+promotion_started=1
+if ! validate_rollback_bundle; then
+  rollback_safe=0
+fi
+
 if [ "$RESTART" -eq 1 ]; then
   stop_idle_official_for_restart
 fi
@@ -481,19 +991,16 @@ if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 1 ] && [ "$official_was_active
 fi
 
 mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR" "$STATE_DIR"
-rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
-backup_target binary "$BIN_DST"
-backup_target helper "$HELPER_DST"
-backup_target unit "$UNIT_DST"
-backup_target workflow "$WORKFLOW_DST"
-promotion_started=1
 
 if [ "$SKIP_BINARY" -eq 0 ]; then
-  install_one "${tmpdir}/${BIN_NAME}" "$BIN_DST" 0755
+  files_promoted=1
+  install_one "$candidate_dir/binary" "$BIN_DST" 0755
+else
+  files_promoted=1
 fi
-install_one "$HELPER_SRC" "$HELPER_DST" 0755
-install_one "$UNIT_SRC" "$UNIT_DST"
-install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
+install_one "$candidate_dir/helper" "$HELPER_DST" 0755
+install_one "$candidate_dir/unit" "$UNIT_DST"
+install_one "$candidate_dir/workflow" "$WORKFLOW_DST"
 
 if [ "$RETIRE_LEGACY" -eq 1 ]; then
   retire_legacy_units
@@ -522,5 +1029,12 @@ elif [ "$RETIRE_LEGACY" -eq 1 ]; then
   echo "HOT_RELOAD_OK $SERVICE_NAME pid=$after_pid"
 fi
 
+write_finalized_receipt pending
 promotion_complete=1
+if finalize_rollback_transaction; then
+  write_finalized_receipt complete
+else
+  echo "PROMOTION_COMMITTED candidate verified; cleanup acknowledgement pending" >&2
+fi
+rollback_dir=""
 echo "DONE"

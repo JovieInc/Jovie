@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import fcntl
+import hashlib
 import io
 import os
 import pathlib
 import re
+import signal
 import socket
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 import importlib.util
 import json
@@ -86,6 +90,158 @@ def _closure_run_args(tmp):
         "--dead-letter-dir",
         str(pathlib.Path(tmp) / "dead-letters"),
     ]
+
+
+def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
+    root = pathlib.Path(tmp)
+    manifest_path = root / "repair-admission.json"
+    source = root / "source"
+    source.mkdir()
+    subprocess.run(["git", "init", "-q", str(source)], check=True)
+    subprocess.run(["git", "-C", str(source), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(source), "config", "user.name", "Test"], check=True)
+    (source / "README").write_text("bounded repair\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(source), "add", "README"], check=True)
+    subprocess.run(["git", "-C", str(source), "commit", "-qm", "fixture"], check=True)
+    commit = subprocess.run(
+        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    workspace_root = root / f"workspace-JOV-9999-{commit[:12]}"
+    workspace_root.mkdir()
+    issue_workspace = workspace_root / "JOV-9999"
+    label = "symphony-recovery-jov-9999-test"
+    workflow = root / "WORKFLOW.repair.md"
+    workflow.write_text(
+        WORKFLOW.replace(
+            "  excluded_labels:\n",
+            f"  required_labels:\n    - {label}\n  excluded_labels:\n",
+        )
+        .replace("max_concurrent_agents: 8", "max_concurrent_agents: 1")
+        .replace("max_turns: 20", "max_turns: 1")
+        .replace("root: ~/symphony-elixir-workspaces", f"root: {workspace_root}")
+        .replace("thread_sandbox: workspace-write", "thread_sandbox: read-only")
+        .replace("type: workspaceWrite", "type: readOnly")
+        .replace("networkAccess: true", "networkAccess: false"),
+        encoding="utf-8",
+    )
+    codex_cli = root / "codex"
+    codex_cli.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "test -z \"${GITHUB_TOKEN+x}\"\n"
+        "test -z \"${GH_TOKEN+x}\"\n"
+        "test -z \"${LINEAR_API_KEY+x}\"\n"
+        "test -z \"${AWS_SECRET_ACCESS_KEY+x}\"\n"
+        "test -z \"${UNRELATED_RECOVERY_SECRET+x}\"\n"
+        "test \"$SYMPHONY_RECOVERY_ISSUE_IDENTIFIER\" = JOV-9999\n"
+        "test \"$SYMPHONY_RECOVERY_ISSUE_ID\" = 12345678-1234-1234-1234-123456789abc\n"
+        "echo bounded-repair-ran\n",
+        encoding="utf-8",
+    )
+    codex_cli.chmod(0o700)
+    router = root / "router"
+    router.write_text(helper._bounded_repair_router_script(codex_cli), encoding="utf-8")
+    router.chmod(0o700)
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            "./scripts/symphony/symphony-codex-router app-server",
+            f"{HELPER_PATH} recovery-agent --manifest {manifest_path} "
+            "--issue-identifier JOV-9999 "
+            "--issue-id 12345678-1234-1234-1234-123456789abc "
+            f"--workspace {issue_workspace} -- {router} app-server",
+        ),
+        encoding="utf-8",
+    )
+    binary = root / "binary"
+    binary.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "test -z \"${GITHUB_TOKEN+x}\"\n"
+        "test -z \"${GH_TOKEN+x}\"\n"
+        "test -z \"${AWS_SECRET_ACCESS_KEY+x}\"\n"
+        "test -z \"${UNRELATED_RECOVERY_SECRET+x}\"\n"
+        f"mkdir -p {issue_workspace}\n"
+        f"cd {issue_workspace}\n"
+        f"exec {HELPER_PATH} recovery-agent --manifest {manifest_path} "
+        "--issue-identifier JOV-9999 "
+        "--issue-id 12345678-1234-1234-1234-123456789abc "
+        f"--workspace {issue_workspace} -- {router} app-server\n",
+        encoding="utf-8",
+    )
+    binary.chmod(0o700)
+    account = root / "codex-account.env"
+    account.write_text("CODEX_HOME=/tmp/codex-fourth\n", encoding="utf-8")
+    account.chmod(0o600)
+    gate = root / "fleet-gate.json"
+    fleet = _fleet_gate_payload(status="red", intake=False)
+    fleet.update(
+        workAdmission={"newIssueLeaseAllowed": False},
+        remediationAdmission={
+            "allowed": True,
+            "localAllowed": True,
+            "activities": ["isolated-pr-repair", "focused-tests"],
+            "pushAllowed": False,
+            "maxConcurrent": 0,
+        },
+        concurrency={
+            "gem": {
+                "runtimeFloor": 1,
+                "maxConcurrent": 0,
+                "evidenceAccepted": False,
+                "newMutationAllowed": False,
+            }
+        },
+    )
+    gate.write_text(json.dumps(fleet), encoding="utf-8")
+    now = dt.datetime.now(dt.timezone.utc)
+    command = [str(binary), "--repair-canary", str(workflow)]
+    artifact_paths = {
+        "runtime": HELPER_PATH,
+        "workflow": workflow,
+        "router": router,
+        "binary": binary,
+        "codexCli": codex_cli,
+        "accountEnv": account,
+    }
+    manifest = {
+        "schema": helper.BOUNDED_REPAIR_SCHEMA,
+        "status": "authorized",
+        "issuedAt": (now - dt.timedelta(seconds=1)).isoformat(),
+        "expiresAt": (now + dt.timedelta(seconds=lifetime_seconds)).isoformat(),
+        "issueIdentifier": "JOV-9999",
+        "issueId": "12345678-1234-1234-1234-123456789abc",
+        "requiredLabel": label,
+        "admissionField": "remediationAdmission",
+        "activity": "isolated-pr-repair",
+        "maxConcurrent": 1,
+        "newIssueIntakeAllowed": False,
+        "pushAllowed": False,
+        "model": helper.BOUNDED_REPAIR_MODEL,
+        "modelRateLimitId": helper.BOUNDED_REPAIR_MODEL_LIMIT_ID,
+        "modelFallbackAllowed": False,
+        "externalExpiry": {
+            "kind": helper.BOUNDED_REPAIR_EXPIRY_KIND,
+            "unit": f"{label}.service",
+            "runtimeMaxSeconds": helper.BOUNDED_REPAIR_MAX_SECONDS,
+            "killMode": "control-group",
+            "sendSIGKILL": True,
+        },
+        "fleetGatePath": str(gate),
+        "sourceRoot": str(source),
+        "sourceCommit": commit,
+        "accountHome": "/tmp/codex-fourth",
+        "workspaceRoot": str(workspace_root),
+        "schedulerCommand": command,
+        "claimPath": str(root / "repair.claim.json"),
+        "artifacts": {
+            name: {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+            for name, path in artifact_paths.items()
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    manifest_path.chmod(0o600)
+    return gate, fleet, manifest_path, manifest, command
 
 
 class OfficialSymphonyContractTests(unittest.TestCase):
@@ -311,6 +467,84 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(payload["schema"], helper.RATE_LIMIT_GATE_SCHEMA)
             self.assertEqual(payload["kind"], "rate_limited")
 
+    def test_final_rate_limit_line_is_drained_after_root_exit(self):
+        helper = _load_helper()
+        original_queue = helper.queue.Queue
+        created = []
+
+        class DelayedPublicationQueue(original_queue):
+            def put(self, item, *args, **kwargs):
+                if not item[0]:
+                    time.sleep(0.25)
+                return super().put(item, *args, **kwargs)
+
+        def queue_factory(*, maxsize):
+            created.append(maxsize)
+            return DelayedPublicationQueue(maxsize=maxsize)
+
+        line = (
+            'status=400 retry-after: 3600 '
+            '{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            gate = root / "linear-rate-limit.json"
+            closure = helper.ClosureStopLine(
+                receipt_path=receipt,
+                hold_receipt_path=root / "closure-hold.json",
+                dead_letter_dir=root / "dead-letters",
+            )
+            with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(
+                helper.queue, "Queue", side_effect=queue_factory
+            ):
+                returncode = helper.run_official_binary_once(
+                    ["python3", "-c", f"print({line!r})"], gate_file=gate,
+                    closure=closure, max_gate_sleep_seconds=0,
+                )
+            self.assertEqual(returncode, helper.RATE_LIMIT_EXIT_CODE)
+            self.assertTrue(gate.is_file())
+            self.assertEqual(created, [helper.RUNTIME_OUTPUT_QUEUE_MAX_LINES])
+
+    def test_rate_limit_pause_keeps_noisy_output_queue_bounded(self):
+        helper = _load_helper()
+        original_queue = helper.queue.Queue
+        observed = []
+
+        class ObservedQueue(original_queue):
+            def put(self, item, *args, **kwargs):
+                result = super().put(item, *args, **kwargs)
+                observed.append(self.qsize())
+                return result
+
+        line = 'status=429 {"errors":[{"extensions":{"code":"RATELIMITED"}}]}'
+        script = f"print({line!r}); [print('noise-' + str(i)) for i in range(2000)]"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            closure = helper.ClosureStopLine(
+                receipt_path=receipt,
+                hold_receipt_path=root / "closure-hold.json",
+                dead_letter_dir=root / "dead-letters",
+            )
+            with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(
+                helper.queue, "Queue",
+                side_effect=lambda *, maxsize: ObservedQueue(maxsize=maxsize),
+            ), mock.patch.object(
+                helper, "_pause_child_for_gate",
+                side_effect=lambda *_args, **_kwargs: time.sleep(0.2),
+            ):
+                returncode = helper.run_official_binary_once(
+                    ["python3", "-c", script],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=closure,
+                    max_gate_sleep_seconds=1,
+                )
+            self.assertEqual(returncode, helper.RATE_LIMIT_EXIT_CODE)
+            self.assertLessEqual(max(observed), helper.RUNTIME_OUTPUT_QUEUE_MAX_LINES)
+
     def test_team_scope_validation_fails_closed(self):
         """Malformed or legacy project-gated scope stops dispatch validation."""
         helper = _load_helper()
@@ -370,6 +604,23 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertFalse(labeled["ok"])
             self.assertIn("workflow_required_labels_present:symphony", labeled["errors"])
 
+            nonadjacent_duplicate = check(
+                WORKFLOW.replace(
+                    "  excluded_labels:\n    - no-symphony\n",
+                    "  required_labels:\n"
+                    "    - first\n"
+                    "  excluded_labels:\n"
+                    "    - no-symphony\n"
+                    "  required_labels:\n"
+                    "    - second\n",
+                )
+            )
+            self.assertFalse(nonadjacent_duplicate["ok"])
+            self.assertIn(
+                "workflow_invalid:duplicate list required_labels",
+                nonadjacent_duplicate["errors"],
+            )
+
             no_exclusions = check(
                 WORKFLOW.replace("  excluded_labels:\n    - no-symphony\n", "")
             )
@@ -389,6 +640,48 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     for error in missing_rework["errors"]
                 ),
                 missing_rework["errors"],
+            )
+
+    def test_workflow_executable_sources_reject_missing_nonexec_and_symlink(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = pathlib.Path(tmp) / "repo"
+            scripts = repo / "scripts/symphony"
+            scripts.mkdir(parents=True)
+            router = scripts / "symphony-codex-router"
+            cache = scripts / "symphony-nvme-package-cache.sh"
+            router.write_bytes((ROOT / "scripts/symphony/symphony-codex-router").read_bytes())
+            cache.write_bytes((ROOT / "scripts/symphony/symphony-nvme-package-cache.sh").read_bytes())
+            router.chmod(0o755)
+            cache.chmod(0o755)
+
+            def validate():
+                return helper.validate_source(
+                    repo_root=repo,
+                    workflow_path=WORKFLOW_PATH,
+                    unit_path=UNIT_PATH,
+                    service_name="symphony-elixir.service",
+                    active_issues=helper.MEASURED_ACTIVE_ISSUES,
+                )
+
+            self.assertTrue(validate()["ok"])
+            router.chmod(0o644)
+            self.assertIn(
+                "workflow_executable_invalid:./scripts/symphony/symphony-codex-router",
+                validate()["errors"],
+            )
+            router.unlink()
+            self.assertIn(
+                "workflow_executable_invalid:./scripts/symphony/symphony-codex-router",
+                validate()["errors"],
+            )
+            outside = pathlib.Path(tmp) / "outside-router"
+            outside.write_text("#!/bin/sh\n")
+            outside.chmod(0o755)
+            router.symlink_to(outside)
+            self.assertIn(
+                "workflow_executable_invalid:./scripts/symphony/symphony-codex-router",
+                validate()["errors"],
             )
 
     def test_linear_eligible_count_uses_team_key_pagination(self):
@@ -588,8 +881,537 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(sleeps, [20])
         self.assertEqual(kills, [(process.pid, helper.signal.SIGSTOP), (process.pid, helper.signal.SIGCONT)])
 
+    def test_official_runtime_wrapper_forwards_term_to_child_process_group(self):
+        child_program = r"""
+import os, pathlib, signal, subprocess, sys, time
+child_receipt = pathlib.Path(sys.argv[1])
+grandchild_receipt = pathlib.Path(sys.argv[2])
+grandchild_program = '''
+import os, pathlib, signal, sys, time
+receipt = pathlib.Path(sys.argv[1])
+signal.signal(signal.SIGTERM, lambda *_: (receipt.write_text("term"), sys.exit(0)))
+print(f"grandchild-ready {os.getpid()}", flush=True)
+while True: time.sleep(1)
+'''
+subprocess.Popen([sys.executable, "-c", grandchild_program, str(grandchild_receipt)])
+signal.signal(signal.SIGTERM, lambda *_: (child_receipt.write_text("term"), sys.exit(0)))
+print(f"child-ready {os.getpid()}", flush=True)
+while True: time.sleep(1)
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            child_receipt = pathlib.Path(tmp) / "child-term"
+            grandchild_receipt = pathlib.Path(tmp) / "grandchild-term"
+            process = subprocess.Popen(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    child_program,
+                    str(child_receipt),
+                    str(grandchild_receipt),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            try:
+                assert process.stdout is not None
+                ready = [
+                    process.stdout.readline().strip(),
+                    process.stdout.readline().strip(),
+                ]
+                pids = {
+                    kind: int(pid)
+                    for kind, pid in (line.split() for line in ready)
+                }
+                self.assertEqual(set(pids), {"child-ready", "grandchild-ready"})
+                os.killpg(pids["child-ready"], signal.SIGSTOP)
+                os.kill(process.pid, signal.SIGTERM)
+                process.wait(timeout=5)
+                for _ in range(50):
+                    if child_receipt.is_file() and grandchild_receipt.is_file():
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(child_receipt.read_text(), "term")
+                self.assertEqual(grandchild_receipt.read_text(), "term")
+                for _ in range(100):
+                    survivors = []
+                    for pid in pids.values():
+                        try:
+                            os.kill(pid, 0)
+                        except ProcessLookupError:
+                            continue
+                        survivors.append(pid)
+                    if not survivors:
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(survivors, [])
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=5)
+                if process.stdout is not None:
+                    process.stdout.close()
+
+    def test_term_interrupts_live_rate_gate_and_kills_resistant_child(self):
+        line = (
+            'status=400 retry-after: 3600 '
+            '{"errors":[{"message":"request budget exhausted",'
+            '"extensions":{"code":"RATELIMITED"}}]}'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pid_file = root / "child.pid"
+            gate = root / "gate.json"
+            child = (
+                "import os,pathlib,signal,sys,time; "
+                "pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); "
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                f"print({line!r}, flush=True); time.sleep(3600)"
+            )
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(gate),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "3900",
+                    "--", "python3", "-c", child, str(pid_file),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                deadline = time.time() + 5
+                while not gate.exists() and time.time() < deadline:
+                    time.sleep(0.02)
+                self.assertTrue(gate.exists())
+                child_pid = int(pid_file.read_text())
+                started = time.monotonic()
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=6)
+                self.assertLess(time.monotonic() - started, 5.5)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(child_pid, 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
+    def test_invalid_shutdown_grace_never_starts_official_child(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            started = root / "started"
+            child = (
+                "import pathlib,sys,time; "
+                "pathlib.Path(sys.argv[1]).write_text('started'); time.sleep(30)"
+            )
+            for invalid in ("invalid", "nan", "inf", "-1", "0"):
+                with self.subTest(value=invalid):
+                    started.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        [
+                            "python3", str(HELPER_PATH), "run",
+                            "--gate-file", str(root / "gate"),
+                            *_closure_run_args(tmp),
+                            "--max-gate-sleep-seconds", "0",
+                            "--", "python3", "-c", child, str(started),
+                        ],
+                        cwd=ROOT,
+                        env={
+                            **os.environ,
+                            "SYMPHONY_SHUTDOWN_GRACE_SECONDS": invalid,
+                        },
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(started.exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_normal_exit_reaps_noisy_detached_stdout_holder_before_return(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pid_file = root / "detached.pid"
+            child = r'''
+import pathlib, signal, subprocess, sys
+grand = subprocess.Popen([
+    sys.executable, "-c",
+    "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+    "exec(\"while True:\\n print('detached-noise',flush=True)\\n time.sleep(.01)\")",
+], start_new_session=True)
+pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+print("normal exit", flush=True)
+'''
+            result = subprocess.run(
+                ["python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                 *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0", "--",
+                 "python3", "-c", child, str(pid_file)],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "0.2"},
+                capture_output=True,
+                text=True,
+                timeout=6,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("normal exit", result.stdout)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pid_file.read_text()), 0)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_normal_exit_reaps_continuously_logging_detached_child(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pid_file = root / "detached.pid"
+            child = r'''
+import pathlib, subprocess, sys
+grand = subprocess.Popen([
+    sys.executable, "-c",
+    "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN);\n"
+    "while True: print('descendant-output', flush=True); time.sleep(0.001)",
+], start_new_session=True)
+pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+print("normal exit", flush=True)
+'''
+            wrapper = subprocess.Popen(
+                ["python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                 *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0", "--",
+                 "python3", "-c", child, str(pid_file)],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "0.2"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                stdout, stderr = wrapper.communicate(timeout=3)
+                self.assertEqual(wrapper.returncode, 0, stderr)
+                self.assertIn("normal exit", stdout)
+                self.assertIn("descendant-output", stdout)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(pid_file.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.terminate()
+                    try:
+                        wrapper.communicate(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        wrapper.kill()
+                        wrapper.communicate(timeout=3)
+                if pid_file.exists():
+                    try:
+                        os.kill(int(pid_file.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                for stream in (wrapper.stdout, wrapper.stderr):
+                    if stream is not None:
+                        stream.close()
+
+    def test_root_pidfd_failure_never_launches_workload(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            started = root / "started"
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            libc = mock.Mock()
+            libc.prctl.return_value = 0
+            with mock.patch.object(helper.sys, "platform", "linux"), mock.patch.object(
+                helper.ctypes, "CDLL", return_value=libc
+            ), mock.patch.object(
+                helper.os, "pidfd_open", side_effect=OSError(24, "injected"), create=True
+            ), self.assertRaisesRegex(RuntimeError, "cannot pin process identity"):
+                helper.run_official_binary_once(
+                    ["python3", "-c", f"open({str(started)!r}, 'w').close()"],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=receipt,
+                        hold_receipt_path=root / "closure-hold.json",
+                        dead_letter_dir=root / "dead-letters",
+                    ),
+                    max_gate_sleep_seconds=0,
+                )
+            self.assertFalse(started.exists())
+
+    def test_partial_pidfd_reserve_is_closed_when_launch_pipe_fails(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            libc = mock.Mock()
+            libc.prctl.return_value = 0
+            real_open = os.open
+            opened: list[int] = []
+
+            def partial_reserve_open(path, flags):
+                if len(opened) == 2:
+                    raise OSError(24, "injected partial reserve exhaustion")
+                descriptor = real_open(path, flags)
+                opened.append(descriptor)
+                return descriptor
+
+            with mock.patch.object(helper.sys, "platform", "linux"), mock.patch.object(
+                helper.ctypes, "CDLL", return_value=libc
+            ), mock.patch.object(
+                helper.os, "open", side_effect=partial_reserve_open
+            ), mock.patch.object(
+                helper.os, "pipe", side_effect=OSError(24, "injected pipe exhaustion")
+            ), mock.patch.object(helper.subprocess, "Popen") as popen, self.assertRaisesRegex(
+                OSError, "injected pipe exhaustion"
+            ):
+                helper.run_official_binary_once(
+                    ["python3", "-c", "raise SystemExit(0)"],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=receipt,
+                        hold_receipt_path=root / "closure-hold.json",
+                        dead_letter_dir=root / "dead-letters",
+                    ),
+                    max_gate_sleep_seconds=0,
+                )
+            self.assertEqual(len(opened), 2)
+            popen.assert_not_called()
+            for descriptor in opened:
+                with self.assertRaises(OSError):
+                    os.fstat(descriptor)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_wide_descendant_tree_reuses_pidfd_slot_without_numeric_signal(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            child_pids = root / "child.pids"
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            child = (
+                "import os,pathlib,subprocess,sys; "
+                "ps=[subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'],"
+                "start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL) "
+                "for _ in range(12)]; "
+                "pathlib.Path(sys.argv[1]).write_text(' '.join(str(p.pid) for p in ps))"
+            )
+            real_pidfd_open = os.pidfd_open
+            real_close = os.close
+            launched = []
+            tracked_pidfds = set()
+            real_popen = helper.subprocess.Popen
+
+            def recording_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                launched.append(process)
+                return process
+
+            def selective_pidfd(pid):
+                # Model a process with room for only the permanent root pidfd
+                # plus one reusable descendant slot. Accumulating descendant
+                # pidfds would fail before this tree can be contained.
+                if len(tracked_pidfds) >= 2:
+                    raise OSError(24, "injected descendant pidfd exhaustion")
+                descriptor = real_pidfd_open(pid)
+                tracked_pidfds.add(descriptor)
+                return descriptor
+
+            def tracking_close(descriptor):
+                tracked_pidfds.discard(descriptor)
+                return real_close(descriptor)
+
+            real_kill = os.kill
+            signals = []
+
+            def recording_kill(pid, signum):
+                signals.append((pid, signum))
+                return real_kill(pid, signum)
+
+            with mock.patch.object(
+                helper.subprocess, "Popen", side_effect=recording_popen
+            ), mock.patch.object(
+                helper.os, "pidfd_open", side_effect=selective_pidfd
+            ), mock.patch.object(
+                helper.os, "close", side_effect=tracking_close
+            ), mock.patch.object(helper.os, "kill", side_effect=recording_kill):
+                self.assertEqual(helper.run_official_binary_once(
+                    ["python3", "-c", child, str(child_pids)],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=receipt,
+                        hold_receipt_path=root / "closure-hold.json",
+                        dead_letter_dir=root / "dead-letters",
+                    ),
+                    max_gate_sleep_seconds=0,
+                ), 0)
+            detached = [int(value) for value in child_pids.read_text().split()]
+            self.assertEqual(len(detached), 12)
+            self.assertFalse(any(pid in detached for pid, _ in signals))
+            for pid in detached:
+                with self.assertRaises(ProcessLookupError):
+                    real_kill(pid, 0)
+
+    def test_term_kills_detached_resistant_stdout_writer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pids = root / "pids"
+            child = r'''
+import os, pathlib, signal, subprocess, sys, time
+grand = subprocess.Popen([
+    sys.executable, "-c",
+    "import os,signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print(os.getpid(), flush=True); time.sleep(3600)",
+], start_new_session=True, stdout=subprocess.PIPE, text=True)
+grand_pid = int(grand.stdout.readline().strip())
+pathlib.Path(sys.argv[1]).write_text(f"{os.getpid()} {grand_pid}")
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(pids),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                captured = [int(value) for value in pids.read_text().split()]
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=6)
+                for pid in captured:
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(pid, 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_term_catches_late_detached_fork_after_parent_signal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            late_pid = root / "late.pid"
+            child = r'''
+import os, pathlib, signal, subprocess, sys, time
+def terminate(*_):
+    grand = subprocess.Popen([
+        sys.executable, "-c",
+        "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
+    ], start_new_session=True)
+    pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, terminate)
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(late_pid),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=6)
+                deadline = time.time() + 2
+                while not late_pid.exists() and time.time() < deadline:
+                    time.sleep(0.02)
+                self.assertTrue(late_pid.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(late_pid.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_term_catches_detached_fork_at_grace_deadline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            late_pid = root / "deadline.pid"
+            child = r'''
+import pathlib, signal, subprocess, sys, time
+def terminate(*_):
+    time.sleep(0.095)
+    grand = subprocess.Popen([
+        sys.executable, "-c",
+        "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
+    ], start_new_session=True)
+    pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, terminate)
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(late_pid),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "0.1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=5)
+                self.assertTrue(late_pid.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(late_pid.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
     def test_unit_binds_closure_stop_line_gate(self):
         helper = _load_helper()
+        self.assertLess(helper.MAX_SHUTDOWN_GRACE_SECONDS, 15)
+        self.assertEqual(helper.DEFAULT_SHUTDOWN_GRACE_SECONDS, 10)
+        self.assertIn("KillMode=control-group", UNIT)
+        self.assertIn("TimeoutStopSec=15s", UNIT)
         flag = "--closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json"
         self.assertIn(flag, UNIT)
         with tempfile.TemporaryDirectory() as tmp:
@@ -680,6 +1502,548 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             verdict = helper.read_closure_stop_line(closure_gate)
             self.assertFalse(verdict["hold"])
             self.assertEqual(verdict["reason"], "closure-health-green")
+
+    def test_bounded_repair_admits_one_exact_job_while_canonical_closure_is_red(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {
+                "CODEX_HOME": "/tmp/codex-fourth",
+                "GITHUB_TOKEN": "must-not-reach-agent",
+                "GH_TOKEN": "must-not-reach-agent",
+                "LINEAR_API_KEY": "must-not-reach-agent",
+                "AWS_SECRET_ACCESS_KEY": "must-not-reach-agent",
+                "UNRELATED_RECOVERY_SECRET": "must-not-reach-agent",
+            },
+        ):
+            gate, _fleet, manifest_path, manifest, command = _bounded_repair_fixture(
+                tmp, helper
+            )
+            canonical_bytes = gate.read_bytes()
+            ordinary = helper.read_closure_stop_line(gate)
+            self.assertTrue(ordinary["hold"])
+            self.assertEqual(ordinary["reason"], "closure-health-not-green")
+            bounded = helper.read_closure_stop_line(
+                gate, recovery_manifest_path=manifest_path
+            )
+            self.assertFalse(bounded["hold"])
+            self.assertEqual(bounded["reason"], "bounded-local-repair")
+            self.assertEqual(bounded["issueIdentifier"], "JOV-9999")
+
+            args = [
+                "python3", str(HELPER_PATH), "run",
+                "--gate-file", str(pathlib.Path(tmp) / "rate.json"),
+                "--closure-gate-file", str(gate),
+                "--closure-hold-receipt", str(pathlib.Path(tmp) / "hold.json"),
+                "--dead-letter-dir", str(pathlib.Path(tmp) / "dead"),
+                "--recovery-manifest", str(manifest_path),
+                "--max-gate-sleep-seconds", "0", "--", *command,
+            ]
+            first = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stderr + first.stdout)
+            self.assertIn("bounded-repair-ran", first.stdout)
+            claim = json.loads((pathlib.Path(tmp) / "repair.claim.json").read_text())
+            self.assertEqual(claim["issueIdentifier"], "JOV-9999")
+            self.assertEqual(
+                claim["issueId"], "12345678-1234-1234-1234-123456789abc"
+            )
+            self.assertEqual(
+                claim["workspace"],
+                str(
+                    manifest_path.parent
+                    / f"workspace-JOV-9999-{manifest['sourceCommit'][:12]}"
+                    / "JOV-9999"
+                ),
+            )
+            self.assertEqual(gate.read_bytes(), canonical_bytes)
+
+            second = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(second.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+            self.assertNotIn("bounded-repair-ran", second.stdout)
+            self.assertIn("recovery-manifest-already-claimed", second.stdout)
+
+    def test_bounded_repair_fixture_shells_fail_secret_negative_control(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            _gate, _fleet, _manifest_path, manifest, command = (
+                _bounded_repair_fixture(tmp, helper)
+            )
+            env = os.environ.copy()
+            for name in (
+                "GITHUB_TOKEN",
+                "GH_TOKEN",
+                "LINEAR_API_KEY",
+                "AWS_SECRET_ACCESS_KEY",
+                "UNRELATED_RECOVERY_SECRET",
+            ):
+                env.pop(name, None)
+            env["GITHUB_TOKEN"] = "negative-control-must-fail"
+
+            binary = subprocess.run(
+                command, cwd=ROOT, env=env, capture_output=True, text=True
+            )
+            self.assertNotEqual(binary.returncode, 0, binary.stdout + binary.stderr)
+            self.assertNotIn("bounded-repair-ran", binary.stdout)
+
+            router = subprocess.run(
+                [manifest["artifacts"]["router"]["path"], "app-server"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(router.returncode, 0, router.stdout + router.stderr)
+            self.assertNotIn("bounded-repair-ran", router.stdout)
+
+    def test_bounded_repair_claim_is_exclusive_under_concurrent_agent_start(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            _gate, _fleet, manifest_path, manifest, _command = (
+                _bounded_repair_fixture(tmp, helper)
+            )
+            codex_cli = pathlib.Path(manifest["artifacts"]["codexCli"]["path"])
+            codex_cli.write_text(
+                "#!/bin/sh\nsleep 0.2\necho bounded-repair-ran\n",
+                encoding="utf-8",
+            )
+            codex_cli.chmod(0o700)
+            manifest["artifacts"]["codexCli"]["sha256"] = hashlib.sha256(
+                codex_cli.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_path.chmod(0o600)
+            agent_command = [
+                "python3",
+                str(HELPER_PATH),
+                "recovery-agent",
+                "--manifest",
+                str(manifest_path),
+                "--issue-identifier",
+                "JOV-9999",
+                "--issue-id",
+                "12345678-1234-1234-1234-123456789abc",
+                "--workspace",
+                str(pathlib.Path(manifest["workspaceRoot"]) / "JOV-9999"),
+                "--",
+                str(pathlib.Path(manifest["artifacts"]["router"]["path"])),
+                "app-server",
+            ]
+            workspace = pathlib.Path(manifest["workspaceRoot"]) / "JOV-9999"
+            workspace.mkdir()
+            processes = [
+                subprocess.Popen(
+                    agent_command,
+                    cwd=workspace,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for _ in range(2)
+            ]
+            results = [process.communicate(timeout=10) for process in processes]
+            self.assertEqual(
+                sorted(process.returncode for process in processes),
+                [0, helper.CLOSURE_HOLD_EXIT_CODE],
+            )
+            self.assertEqual(
+                sum("bounded-repair-ran" in stdout for stdout, _stderr in results),
+                1,
+            )
+            self.assertEqual(
+                sum("recovery-manifest-already-claimed" in stdout
+                    for stdout, _stderr in results),
+                1,
+            )
+
+    def test_bounded_repair_agent_binds_issue_uuid_identifier_and_workspace(self):
+        helper = _load_helper()
+        variants = {
+            "different-issue": ("JOV-9998", "12345678-1234-1234-1234-123456789abc", None, "recovery-agent-issue-identifier-mismatch"),
+            "different-uuid": ("JOV-9999", "aaaaaaaa-1234-1234-1234-123456789abc", None, "recovery-agent-issue-id-mismatch"),
+            "different-workspace-argument": ("JOV-9999", "12345678-1234-1234-1234-123456789abc", "JOV-9998", "recovery-agent-workspace-argument-mismatch"),
+            "different-cwd": ("JOV-9999", "12345678-1234-1234-1234-123456789abc", None, "recovery-agent-workspace-mismatch"),
+        }
+        for name, (identifier, issue_id, workspace_name, reason) in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                _gate, _fleet, manifest_path, manifest, _command = (
+                    _bounded_repair_fixture(tmp, helper)
+                )
+                root = pathlib.Path(manifest["workspaceRoot"])
+                expected_workspace = root / "JOV-9999"
+                supplied_workspace = root / (workspace_name or "JOV-9999")
+                supplied_workspace.mkdir(exist_ok=True)
+                cwd = root / "JOV-9998" if name == "different-cwd" else expected_workspace
+                cwd.mkdir(exist_ok=True)
+                router = pathlib.Path(manifest["artifacts"]["router"]["path"])
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(HELPER_PATH),
+                        "recovery-agent",
+                        "--manifest",
+                        str(manifest_path),
+                        "--issue-identifier",
+                        identifier,
+                        "--issue-id",
+                        issue_id,
+                        "--workspace",
+                        str(supplied_workspace),
+                        "--",
+                        str(router),
+                        "app-server",
+                    ],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+                self.assertIn(reason, result.stdout)
+                self.assertFalse(pathlib.Path(manifest["claimPath"]).exists())
+
+    def test_bounded_repair_refusal_matrix_fails_closed(self):
+        helper = _load_helper()
+        mutations = {
+            "wrong-issue": lambda manifest, fleet: manifest.update(issueIdentifier="JOV-9998"),
+            "wrong-label": lambda manifest, fleet: manifest.update(requiredLabel="repair"),
+            "max-two": lambda manifest, fleet: manifest.update(maxConcurrent=2),
+            "new-intake": lambda manifest, fleet: manifest.update(newIssueIntakeAllowed=True),
+            "push": lambda manifest, fleet: manifest.update(pushAllowed=True),
+            "wrong-source": lambda manifest, fleet: manifest.update(sourceCommit="0" * 40),
+            "wrong-account": lambda manifest, fleet: manifest.update(accountHome="/tmp/other"),
+            "bad-account-hash": lambda manifest, fleet: manifest["artifacts"]["accountEnv"].update(sha256="0" * 64),
+            "wrong-activity": lambda manifest, fleet: manifest.update(activity="focused-tests"),
+            "wrong-model": lambda manifest, fleet: manifest.update(model="gpt-5.6-luna"),
+            "wrong-model-limit": lambda manifest, fleet: manifest.update(modelRateLimitId="codex"),
+            "fallback-enabled": lambda manifest, fleet: manifest.update(modelFallbackAllowed=True),
+            "wrong-expiry-kind": lambda manifest, fleet: manifest["externalExpiry"].update(kind="internal-timer"),
+            "wrong-expiry-unit": lambda manifest, fleet: manifest["externalExpiry"].update(unit="shared.service"),
+            "wrong-expiry-limit": lambda manifest, fleet: manifest["externalExpiry"].update(runtimeMaxSeconds=901),
+            "wrong-expiry-kill-mode": lambda manifest, fleet: manifest["externalExpiry"].update(killMode="process"),
+            "expiry-without-sigkill": lambda manifest, fleet: manifest["externalExpiry"].update(sendSIGKILL=False),
+            "wrong-workspace": lambda manifest, fleet: manifest.update(workspaceRoot="/tmp/other"),
+            "wrong-command": lambda manifest, fleet: manifest.update(schedulerCommand=["false"]),
+            "bad-hash": lambda manifest, fleet: manifest["artifacts"]["workflow"].update(sha256="0" * 64),
+            "bad-codex-hash": lambda manifest, fleet: manifest["artifacts"]["codexCli"].update(sha256="0" * 64),
+            "local-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(localAllowed=False),
+            "activity-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(activities=[]),
+            "floor-zero": lambda manifest, fleet: fleet["concurrency"]["gem"].update(runtimeFloor=0),
+            "floor-two": lambda manifest, fleet: fleet["concurrency"]["gem"].update(runtimeFloor=2),
+            "stale-gate": lambda manifest, fleet: fleet.update(observedAt="2020-01-01T00:00:00Z"),
+            "future-gate": lambda manifest, fleet: fleet.update(observedAt="2099-01-01T00:00:00Z"),
+            "expired": lambda manifest, fleet: manifest.update(expiresAt="2020-01-01T00:00:00+00:00"),
+            "manifest-mode": lambda manifest, fleet: manifest.update(),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                gate, fleet, manifest_path, manifest, command = _bounded_repair_fixture(
+                    tmp, helper
+                )
+                mutate(manifest, fleet)
+                gate.write_text(json.dumps(fleet), encoding="utf-8")
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o644 if name == "manifest-mode" else 0o600)
+                if name == "wrong-command":
+                    with self.assertRaisesRegex(ValueError, "command-mismatch"):
+                        helper.validate_bounded_repair_admission(
+                            manifest_path,
+                            fleet_path=gate,
+                            fleet_payload=fleet,
+                            expected_command=command,
+                        )
+                    continue
+                verdict = helper.read_closure_stop_line(
+                    gate, recovery_manifest_path=manifest_path
+                )
+                self.assertTrue(verdict["hold"], name)
+                if name in {"stale-gate", "future-gate"}:
+                    self.assertEqual(
+                        verdict["reason"],
+                        "fleet-gate-receipt-stale" if name == "stale-gate" else "fleet-gate-receipt-future",
+                    )
+                else:
+                    self.assertTrue(verdict["reason"].startswith("bounded-repair-refused:"))
+
+    def test_bounded_repair_workflow_sections_cannot_be_spoofed_by_decoys(self):
+        helper = _load_helper()
+        variants = {
+            "max-turns": (
+                "max_turns: 1",
+                "max_turns: 99\nreview_metadata:\n  max_turns: 1",
+                "max-turns-not-one",
+            ),
+            "duplicate-max-turns": (
+                "max_turns: 1",
+                "max_turns: 1\n  max_turns: 1",
+                "duplicate scalar max_turns",
+            ),
+            "network": (
+                "networkAccess: false",
+                "networkAccess: true\nreview_metadata:\n  networkAccess: false",
+                "network-not-false",
+            ),
+            "sandbox": (
+                "thread_sandbox: read-only",
+                "thread_sandbox: workspace-write",
+                "thread-sandbox-not-read-only",
+            ),
+        }
+        for name, (old, new, reason) in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                gate, fleet, manifest_path, manifest, _command = _bounded_repair_fixture(
+                    tmp, helper
+                )
+                workflow = pathlib.Path(manifest["artifacts"]["workflow"]["path"])
+                workflow.write_text(
+                    workflow.read_text(encoding="utf-8").replace(old, new),
+                    encoding="utf-8",
+                )
+                manifest["artifacts"]["workflow"]["sha256"] = hashlib.sha256(
+                    workflow.read_bytes()
+                ).hexdigest()
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+                with self.assertRaisesRegex(ValueError, reason):
+                    helper.validate_bounded_repair_admission(
+                        manifest_path,
+                        fleet_path=gate,
+                        fleet_payload=fleet,
+                    )
+
+    def test_bounded_repair_workflow_root_must_match_manifest_and_launch_binding(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, fleet, manifest_path, manifest, _command = _bounded_repair_fixture(
+                tmp, helper
+            )
+            workflow = pathlib.Path(manifest["artifacts"]["workflow"]["path"])
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    f"root: {manifest['workspaceRoot']}",
+                    f"root: {pathlib.Path(tmp) / 'unrelated-workspaces'}",
+                ),
+                encoding="utf-8",
+            )
+            manifest["artifacts"]["workflow"]["sha256"] = hashlib.sha256(
+                workflow.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_path.chmod(0o600)
+            with self.assertRaisesRegex(
+                ValueError, "recovery-workflow-workspace-root-mismatch"
+            ):
+                helper.validate_bounded_repair_admission(
+                    manifest_path,
+                    fleet_path=gate,
+                    fleet_payload=fleet,
+                )
+
+    def test_bounded_repair_router_is_exact_spark_without_fallback(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, fleet, manifest_path, manifest, _command = _bounded_repair_fixture(
+                tmp, helper
+            )
+            router = pathlib.Path(manifest["artifacts"]["router"]["path"])
+            router.write_text(
+                router.read_text(encoding="utf-8").replace(
+                    helper.BOUNDED_REPAIR_MODEL, "gpt-5.6-luna"
+                ),
+                encoding="utf-8",
+            )
+            manifest["artifacts"]["router"]["sha256"] = hashlib.sha256(
+                router.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_path.chmod(0o600)
+            with self.assertRaisesRegex(
+                ValueError, "recovery-router-not-exact-spark-no-fallback"
+            ):
+                helper.validate_bounded_repair_admission(
+                    manifest_path,
+                    fleet_path=gate,
+                    fleet_payload=fleet,
+                )
+
+    def test_bounded_repair_rejects_shared_or_nonempty_root_before_scheduler(self):
+        helper = _load_helper()
+        for variant, expected_reason in {
+            "nonempty": "recovery-workspace-root-not-empty",
+            "shared": "recovery-workspace-root-not-packet-local",
+        }.items():
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                gate, _fleet, manifest_path, manifest, command = _bounded_repair_fixture(
+                    tmp, helper
+                )
+                original_root = pathlib.Path(manifest["workspaceRoot"])
+                if variant == "nonempty":
+                    (original_root / "unrelated-workspace").mkdir()
+                    expected_workspace = original_root / "JOV-9999"
+                else:
+                    shared_root = pathlib.Path(tmp) / "symphony-elixir-workspaces"
+                    shared_root.mkdir()
+                    expected_workspace = shared_root / "JOV-9999"
+                    workflow = pathlib.Path(manifest["artifacts"]["workflow"]["path"])
+                    workflow.write_text(
+                        workflow.read_text(encoding="utf-8").replace(
+                            str(original_root), str(shared_root)
+                        ),
+                        encoding="utf-8",
+                    )
+                    binary = pathlib.Path(manifest["artifacts"]["binary"]["path"])
+                    binary.write_text(
+                        binary.read_text(encoding="utf-8").replace(
+                            str(original_root), str(shared_root)
+                        ),
+                        encoding="utf-8",
+                    )
+                    binary.chmod(0o700)
+                    manifest["workspaceRoot"] = str(shared_root)
+                    for name in ("workflow", "binary"):
+                        path = pathlib.Path(manifest["artifacts"][name]["path"])
+                        manifest["artifacts"][name]["sha256"] = hashlib.sha256(
+                            path.read_bytes()
+                        ).hexdigest()
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(HELPER_PATH),
+                        "run",
+                        "--gate-file",
+                        str(pathlib.Path(tmp) / "rate.json"),
+                        "--closure-gate-file",
+                        str(gate),
+                        "--closure-hold-receipt",
+                        str(pathlib.Path(tmp) / "hold.json"),
+                        "--dead-letter-dir",
+                        str(pathlib.Path(tmp) / "dead"),
+                        "--recovery-manifest",
+                        str(manifest_path),
+                        "--max-gate-sleep-seconds",
+                        "0",
+                        "--",
+                        *command,
+                    ],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+                self.assertIn(expected_reason, result.stdout)
+                self.assertFalse(expected_workspace.exists())
+                self.assertFalse(pathlib.Path(manifest["claimPath"]).exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux subreaper proof")
+    def test_bounded_repair_expiry_terminates_root_and_detached_descendant(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, _fleet, manifest_path, _manifest, _command = _bounded_repair_fixture(
+                tmp, helper, lifetime_seconds=1
+            )
+            child_pid_path = pathlib.Path(tmp) / "child.pid"
+            script = (
+                "import os,pathlib,time; "
+                "pid=os.fork(); "
+                f"path=pathlib.Path({str(child_pid_path)!r}); "
+                "(os.setsid(),path.write_text(str(os.getpid())),time.sleep(60)) if pid==0 "
+                "else (print('root-ready',flush=True),time.sleep(60))"
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead",
+                recovery_manifest_path=manifest_path,
+            )
+            old_recheck = helper.CLOSURE_HOLD_RECHECK_SECONDS
+            helper.CLOSURE_HOLD_RECHECK_SECONDS = 0.05
+            try:
+                started = time.monotonic()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    helper.run_official_binary_once(
+                        [sys.executable, "-c", script],
+                        gate_file=pathlib.Path(tmp) / "rate.json",
+                        closure=closure,
+                        max_gate_sleep_seconds=0,
+                    )
+                self.assertLess(time.monotonic() - started, 8)
+            finally:
+                helper.CLOSURE_HOLD_RECHECK_SECONDS = old_recheck
+            child_pid = int(child_pid_path.read_text())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux subreaper proof")
+    def test_bounded_repair_gate_revocation_terminates_root_and_detached_descendant(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, fleet, manifest_path, _manifest, _command = (
+                _bounded_repair_fixture(tmp, helper)
+            )
+            child_pid_path = pathlib.Path(tmp) / "child.pid"
+            script = (
+                "import os,pathlib,time; "
+                "pid=os.fork(); "
+                f"path=pathlib.Path({str(child_pid_path)!r}); "
+                "(os.setsid(),path.write_text(str(os.getpid())),time.sleep(60)) if pid==0 "
+                "else (print('root-ready',flush=True),time.sleep(60))"
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead",
+                recovery_manifest_path=manifest_path,
+            )
+
+            def revoke_gate():
+                deadline = time.monotonic() + 5
+                while not child_pid_path.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(child_pid_path.exists())
+                fleet["remediationAdmission"]["localAllowed"] = False
+                temporary = gate.with_suffix(".next")
+                temporary.write_text(json.dumps(fleet), encoding="utf-8")
+                os.replace(temporary, gate)
+
+            mutator = threading.Thread(target=revoke_gate)
+            old_recheck = helper.CLOSURE_HOLD_RECHECK_SECONDS
+            helper.CLOSURE_HOLD_RECHECK_SECONDS = 0.05
+            output = io.StringIO()
+            try:
+                mutator.start()
+                with contextlib.redirect_stdout(output):
+                    helper.run_official_binary_once(
+                        [sys.executable, "-c", script],
+                        gate_file=pathlib.Path(tmp) / "rate.json",
+                        closure=closure,
+                        max_gate_sleep_seconds=0,
+                    )
+                mutator.join(timeout=5)
+                self.assertFalse(mutator.is_alive())
+            finally:
+                helper.CLOSURE_HOLD_RECHECK_SECONDS = old_recheck
+            self.assertIn("bounded_repair_revoked", output.getvalue())
+            child_pid = int(child_pid_path.read_text())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
 
     def test_closure_stop_line_missing_stale_future_or_tampered_fails_closed(self):
         helper = _load_helper()
@@ -1241,14 +2605,60 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(red.returncode, 4)
             self.assertIn("poll_interval_too_low:5000", red.stdout)
             self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
+            for unsafe_command in (
+                "./scripts/hermes/symphony-codex-router app-server",
+                "../../tmp/escaped-router app-server",
+                "./scripts/symphony/missing-router app-server",
+            ):
+                wrong.write_text(WORKFLOW.replace(
+                    "./scripts/symphony/symphony-codex-router app-server",
+                    unsafe_command,
+                ))
+                rejected = subprocess.run(
+                    ["bash", str(updater), "--skip-binary", "--no-restart"],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(rejected.returncode, 4, unsafe_command)
+                self.assertIn("workflow_agent_command_not_canonical", rejected.stdout)
+                self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
+            for unsafe_hook in (
+                "sh /tmp/evil",
+                "python3 /tmp/evil.py",
+                "command /tmp/evil",
+                "source /tmp/evil",
+                "$(/tmp/evil)",
+            ):
+                wrong.write_text(WORKFLOW.replace(
+                    "  after_create: |\n",
+                    f"  after_create: |\n    {unsafe_hook}\n",
+                ))
+                rejected = subprocess.run(
+                    ["bash", str(updater), "--skip-binary", "--no-restart"],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(rejected.returncode, 4, unsafe_hook)
+                self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
             env.pop("SYMPHONY_WORKFLOW_SRC")
             good = subprocess.run(["bash", str(updater), "--skip-binary", "--no-restart"], cwd=ROOT, env=env, capture_output=True, text=True)
             self.assertEqual(good.returncode, 0, good.stderr)
-            self.assertIn(f'team_key: "{LIVE_TEAM_KEY}"', existing.read_text())
+            self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
+            self.assertIn("DONE_STAGED_NO_LIVE_MUTATION", good.stdout)
+            candidates = list((target_home / ".local/state/symphony-elixir/candidates").iterdir())
+            self.assertEqual(len(candidates), 1)
+            self.assertIn(f'team_key: "{LIVE_TEAM_KEY}"', (candidates[0] / "workflow").read_text())
             unit = pathlib.Path(tmp) / "home/.config/systemd/user/symphony-elixir.service"
             helper = pathlib.Path(tmp) / "home/.local/bin/symphony-official-runtime"
-            self.assertTrue(unit.is_file())
-            self.assertTrue(helper.is_file())
+            unit.parent.mkdir(parents=True, exist_ok=True)
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            existing.write_bytes(WORKFLOW_PATH.read_bytes())
+            unit.write_bytes(UNIT_PATH.read_bytes())
+            helper.write_bytes(HELPER_PATH.read_bytes())
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
             existing.write_text(
                 existing.read_text().replace(
@@ -1277,10 +2687,827 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(drift.returncode, 1, drift.stdout + drift.stderr)
             self.assertIn(f"DRIFT {existing}", drift.stdout)
 
+    def test_staging_is_not_live_and_activation_rollback_restores_prior_config(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            target_home = root / "home"
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            (config / "codex-account.env").write_text(
+                f"CODEX_HOME={account_home}\n"
+            )
+            (config / "codex-account.env").chmod(0o600)
+            workflow = config / "WORKFLOW.md"
+            helper = target_home / ".local/bin/symphony-official-runtime"
+            unit = target_home / ".config/systemd/user/symphony-elixir.service"
+            helper.parent.mkdir(parents=True)
+            unit.parent.mkdir(parents=True)
+            workflow.write_text("retired scripts/hermes/symphony-codex-router\n")
+            helper.write_text("retired helper\n")
+            unit.write_text("retired unit\n")
+
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >> \"$SYSTEMCTL_EVENTS\"\n"
+                "case \"$*\" in\n"
+                "  *'show '*'LoadState --value'*) printf 'masked\\n'; exit 0;;\n"
+                "  *'show symphony-elixir.service --property=MainPID --value'*) printf '4242\\n'; exit 0;;\n"
+                "  *'is-active --quiet symphony-elixir.service'*) exit 0;;\n"
+                "  *'is-active --quiet '*) exit 1;;\n"
+                "  *'restart symphony-elixir.service'*) "
+                "if [ -f \"$ALLOW_RESTART_ONCE\" ]; then rm -f \"$ALLOW_RESTART_ONCE\"; exit 0; fi; exit 42;;\n"
+                "  *) exit 0;;\n"
+                "esac\n"
+            )
+            systemctl.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' '{\"counts\":{\"running\":0},"
+                "\"polling\":{\"checking\":false,\"next_poll_in_ms\":10000}}'\n"
+            )
+            curl.chmod(0o755)
+            python = fake_bin / "python3"
+            python.write_text(
+                "#!/usr/bin/env bash\n"
+                f"real={sys.executable!s}\n"
+                "if [ \"${1:-}\" != - ]; then exec \"$real\" \"$@\"; fi\n"
+                "payload=$(mktemp)\n"
+                "trap 'rm -f \"$payload\" \"$payload.injected\"' EXIT\n"
+                "cat > \"$payload\"\n"
+                "if [ \"${FAIL_FINALIZE_AFTER_REMOVE:-0}\" = 1 ] && "
+                "grep -q 'shutil.rmtree(tombstone)' \"$payload\"; then\n"
+                "  sed 's/    shutil.rmtree(tombstone)/    shutil.rmtree(tombstone)\\n"
+                "    raise OSError(\"injected post-delete fsync failure\")/' "
+                "\"$payload\" > \"$payload.injected\"\n"
+                "  exec \"$real\" \"$payload.injected\" \"${@:2}\"\n"
+                "fi\n"
+                "exec \"$real\" \"$payload\" \"${@:2}\"\n"
+            )
+            python.chmod(0o755)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            bus = socket.socket(socket.AF_UNIX)
+            bus.bind(str(runtime / "bus"))
+            self.addCleanup(bus.close)
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_GET(self):
+                    body = json.dumps({
+                        "counts": {"running": 0},
+                        "polling": {"checking": False, "next_poll_in_ms": 10000},
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, _format, *_args):
+                    return
+
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(thread.join, 5)
+            self.addCleanup(server.shutdown)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "SYMPHONY_ELIXIR_HOME": str(target_home),
+                "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                "XDG_RUNTIME_DIR": str(runtime),
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime / 'bus'}",
+                "SYMPHONY_STATE_URL": (
+                    f"http://127.0.0.1:{server.server_address[1]}/api/v1/state"
+                ),
+                "SYSTEMCTL_EVENTS": str(root / "systemctl-events"),
+                "ALLOW_RESTART_ONCE": str(root / "allow-restart-once"),
+            }
+            unsafe_prior = {
+                workflow: workflow.read_bytes(),
+                helper: helper.read_bytes(),
+                unit: unit.read_bytes(),
+            }
+            safe_prior = {
+                workflow: WORKFLOW_PATH.read_bytes(),
+                helper: HELPER_PATH.read_bytes(),
+                unit: UNIT_PATH.read_bytes(),
+            }
+            transaction = target_home / ".local/state/symphony-elixir/promotion-transaction"
+            transaction.mkdir(parents=True)
+            (transaction / "binary.missing").touch()
+            (transaction / "was-active").touch()
+            for key, path in (("workflow", workflow), ("helper", helper), ("unit", unit)):
+                (transaction / key).write_bytes(safe_prior[path])
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir()
+                if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
+            hold = target_home / ".local/state/symphony-elixir/promotion-held.json"
+            hold.write_text(json.dumps({
+                "schema": "symphony-promotion-hold/v1",
+                "status": "held",
+                "reason": "rollback_restart_failed",
+                "transaction": str(transaction),
+            }))
+            known = target_home / ".local/state/symphony-elixir/candidates/known-good"
+            known.mkdir(parents=True)
+            candidate_files = {}
+            for name, source in (
+                ("workflow", WORKFLOW_PATH),
+                ("helper", HELPER_PATH),
+                ("unit", UNIT_PATH),
+            ):
+                target = known / name
+                target.write_bytes(source.read_bytes())
+                candidate_files[name] = hashlib.sha256(target.read_bytes()).hexdigest()
+            (known / "manifest.json").write_text(json.dumps({
+                "schema": "symphony-candidate/v2",
+                "version": "known-good",
+                "files": candidate_files,
+            }))
+            workflow.write_bytes(WORKFLOW_PATH.read_bytes())
+            helper.write_bytes(HELPER_PATH.read_bytes())
+            (root / "allow-restart-once").touch()
+            recovered_cleanup_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env={**env, "FAIL_FINALIZE_AFTER_REMOVE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(recovered_cleanup_failure.returncode, 0)
+            self.assertIn(
+                "RECOVERED_PRIOR_CLEANUP_FAILED",
+                recovered_cleanup_failure.stderr,
+            )
+            self.assertNotIn(
+                "PROMOTION_COMMITTED_CLEANUP_FAILED",
+                recovered_cleanup_failure.stderr,
+            )
+            marker = (
+                target_home
+                / ".local/state/symphony-elixir/.promotion-transaction.cleanup-pending"
+            )
+            self.assertEqual(
+                marker.read_text(), "symphony-promotion-cleanup-pending/v1\n"
+            )
+            recovered_receipt = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-recovered.json"
+                ).read_text()
+            )
+            self.assertEqual(recovered_receipt["status"], "restored-prior")
+            self.assertEqual(recovered_receipt["cleanupStatus"], "pending")
+            self.assertEqual(recovered_receipt["transaction"], str(transaction))
+            events_before_recovery_acknowledgement = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            self.assertEqual(
+                len(
+                    [
+                        row
+                        for row in events_before_recovery_acknowledgement
+                        if "restart symphony-elixir.service" in row
+                    ]
+                ),
+                1,
+            )
+            config_only = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(config_only.returncode, 0, config_only.stderr)
+            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", config_only.stdout)
+            self.assertNotIn("DONE_STAGED_NO_LIVE_MUTATION", config_only.stdout)
+            self.assertFalse(marker.exists())
+            recovered_receipt = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-recovered.json"
+                ).read_text()
+            )
+            self.assertEqual(recovered_receipt["cleanupStatus"], "complete")
+            self.assertEqual(
+                (root / "systemctl-events").read_text().splitlines(),
+                events_before_recovery_acknowledgement,
+            )
+            self.assertFalse(hold.exists())
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
+            events_before_activation = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            self.assertEqual(
+                len([row for row in events_before_activation if "restart symphony-elixir.service" in row]),
+                1,
+            )
+
+            for path, expected in unsafe_prior.items():
+                path.write_bytes(expected)
+            (root / "allow-restart-once").touch()
+            committed_cleanup_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env={**env, "FAIL_FINALIZE_AFTER_REMOVE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                committed_cleanup_failure.returncode,
+                0,
+                committed_cleanup_failure.stderr,
+            )
+            self.assertIn("PROMOTION_COMMITTED", committed_cleanup_failure.stderr)
+            self.assertNotIn("PROMOTION_ROLLED_BACK", committed_cleanup_failure.stderr)
+            committed_events = (root / "systemctl-events").read_text().splitlines()
+            committed_restart_events = [
+                row
+                for row in committed_events
+                if "restart symphony-elixir.service" in row
+            ]
+            self.assertEqual(
+                len(committed_restart_events),
+                len(
+                    [
+                        row
+                        for row in events_before_activation
+                        if "restart symphony-elixir.service" in row
+                    ]
+                )
+                + 1,
+                committed_events,
+            )
+            marker = (
+                target_home
+                / ".local/state/symphony-elixir/.promotion-transaction.cleanup-pending"
+            )
+            self.assertEqual(
+                marker.read_text(), "symphony-promotion-cleanup-pending/v1\n"
+            )
+            self.assertFalse(transaction.exists())
+            self.assertFalse(
+                (target_home / ".local/state/symphony-elixir/.promotion-transaction.removing").exists()
+            )
+            self.assertFalse(hold.exists())
+            finalized = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-finalized.json"
+                ).read_text()
+            )
+            self.assertEqual(finalized["status"], "committed")
+            self.assertEqual(finalized["cleanupStatus"], "pending")
+            self.assertEqual(finalized["transaction"], str(transaction))
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
+
+            acknowledged = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(acknowledged.returncode, 0, acknowledged.stderr)
+            self.assertIn(
+                "RECOVERED_TRANSACTION_CLEANUP",
+                acknowledged.stdout,
+                acknowledged.stderr,
+            )
+            self.assertFalse(marker.exists())
+            finalized = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-finalized.json"
+                ).read_text()
+            )
+            self.assertEqual(finalized["status"], "committed")
+            self.assertEqual(finalized["cleanupStatus"], "complete")
+
+            transaction.mkdir()
+            (transaction / "binary.missing").touch()
+            for key, path in (("workflow", workflow), ("helper", helper), ("unit", unit)):
+                (transaction / key).write_bytes(unsafe_prior[path])
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir()
+                if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text(
+                "symphony-promotion-transaction/v1\n"
+            )
+            finalized["cleanupStatus"] = "pending"
+            (
+                target_home
+                / ".local/state/symphony-elixir/promotion-finalized.json"
+            ).write_text(json.dumps(finalized))
+            crash_after_commit = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(crash_after_commit.returncode, 0, crash_after_commit.stderr)
+            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", crash_after_commit.stdout)
+            self.assertNotIn("RECOVERED_INCOMPLETE_PROMOTION", crash_after_commit.stdout)
+            self.assertFalse(transaction.exists())
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
+
+            normal_events_before = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            (root / "allow-restart-once").touch()
+            normal_success = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(normal_success.returncode, 0, normal_success.stderr)
+            self.assertIn("DONE", normal_success.stdout)
+            finalized = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-finalized.json"
+                ).read_text()
+            )
+            self.assertEqual(finalized["status"], "committed")
+            self.assertEqual(finalized["cleanupStatus"], "complete")
+            self.assertEqual(finalized["transaction"], str(transaction))
+            normal_events_after = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            self.assertEqual(
+                len(
+                    [
+                        row
+                        for row in normal_events_after
+                        if "restart symphony-elixir.service" in row
+                    ]
+                ),
+                len(
+                    [
+                        row
+                        for row in normal_events_before
+                        if "restart symphony-elixir.service" in row
+                    ]
+                )
+                + 1,
+            )
+
+            for path, expected in unsafe_prior.items():
+                path.write_bytes(expected)
+
+            activation = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(activation.returncode, 0)
+            self.assertIn("PROMOTION_HELD", activation.stderr)
+            events = (root / "systemctl-events").read_text().splitlines()
+            self.assertTrue(any("stop symphony-elixir.service" in row for row in events))
+            restart_events = [
+                row for row in events if "restart symphony-elixir.service" in row
+            ]
+            self.assertEqual(len(restart_events), 4, events)
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
+            self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
+            self.assertTrue(hold.is_file())
+            self.assertEqual(json.loads(hold.read_text())["status"], "held")
+            self.assertTrue(transaction.is_dir())
+            retained_manifest = json.loads((transaction / "manifest.json").read_text())
+            self.assertIn("was-active", retained_manifest)
+            self.assertEqual(
+                set(retained_manifest),
+                {
+                    path.name
+                    for path in transaction.iterdir()
+                    if path.is_file()
+                } - {"manifest.json", "READY"},
+            )
+
+    def test_recovery_restart_double_failure_retains_transaction_and_hold(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            target_home = root / "home"
+            config = target_home / ".config/symphony"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            config.mkdir(parents=True)
+            (config / "codex-account.env").write_text(f"CODEX_HOME={account_home}\n")
+            (config / "codex-account.env").chmod(0o600)
+            workflow = config / "WORKFLOW.md"
+            helper = target_home / ".local/bin/symphony-official-runtime"
+            unit = target_home / ".config/systemd/user/symphony-elixir.service"
+            helper.parent.mkdir(parents=True)
+            unit.parent.mkdir(parents=True)
+            for target in (workflow, helper, unit):
+                target.write_text("unsafe live file\n")
+
+            state = target_home / ".local/state/symphony-elixir"
+            transaction = state / "promotion-transaction"
+            transaction.mkdir(parents=True)
+            (transaction / "binary.missing").touch()
+            (transaction / "was-active").touch()
+            for name, source in (
+                ("workflow", WORKFLOW_PATH),
+                ("helper", HELPER_PATH),
+                ("unit", UNIT_PATH),
+            ):
+                (transaction / name).write_bytes(source.read_bytes())
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir()
+                if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
+
+            known = state / "candidates/known-good"
+            known.mkdir(parents=True)
+            candidate_files = {}
+            for name, source in (
+                ("workflow", WORKFLOW_PATH),
+                ("helper", HELPER_PATH),
+                ("unit", UNIT_PATH),
+            ):
+                target = known / name
+                target.write_bytes(source.read_bytes())
+                candidate_files[name] = hashlib.sha256(target.read_bytes()).hexdigest()
+            (known / "manifest.json").write_text(json.dumps({
+                "schema": "symphony-candidate/v2",
+                "version": "known-good",
+                "files": candidate_files,
+            }))
+
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            events = root / "systemctl-events"
+            systemctl = fake_bin / "systemctl"
+            mode = root / "systemctl-mode"
+            mode.write_text("restart-fails\n")
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >> \"$SYSTEMCTL_EVENTS\"\n"
+                "mode=$(cat \"$SYSTEMCTL_MODE\")\n"
+                "case \"$*\" in\n"
+                "  *'daemon-reload'*) [ \"$mode\" != daemon-reload-fails ];;\n"
+                "  *'restart symphony-elixir.service'*) "
+                "if [ \"$mode\" = restart-fails ]; then exit 1; fi; "
+                "if [ \"$mode\" = restart-fails-once ] && [ ! -f \"$RESTART_ONCE\" ]; "
+                "then touch \"$RESTART_ONCE\"; exit 1; fi;;\n"
+                "  *'show symphony-elixir.service --property=MainPID --value'*) printf '4242\\n';;\n"
+                "  *'is-active --quiet symphony-elixir.service'*) [ \"$mode\" != inactive ];;\n"
+                "  *) exit 0;;\n"
+                "esac\n"
+            )
+            systemctl.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' '{\"counts\":{\"running\":0},"
+                "\"polling\":{\"checking\":false,\"next_poll_in_ms\":10000}}'\n"
+            )
+            curl.chmod(0o755)
+            python = fake_bin / "python3"
+            python.write_text(
+                "#!/usr/bin/env bash\n"
+                f"real={sys.executable!s}\n"
+                "if [ \"${1:-}\" != - ]; then exec \"$real\" \"$@\"; fi\n"
+                "payload=$(mktemp)\n"
+                "trap 'rm -f \"$payload\" \"$payload.injected\"' EXIT\n"
+                "cat > \"$payload\"\n"
+                "if [ \"${FAIL_FINALIZE_AFTER_HOLD:-0}\" = 1 ] && "
+                "grep -q 'shutil.rmtree(tombstone)' \"$payload\"; then\n"
+                "  sed 's/    shutil.rmtree(tombstone)/    raise OSError(\"injected post-hold failure\")/' "
+                "\"$payload\" > \"$payload.injected\"\n"
+                "  exec \"$real\" \"$payload.injected\" \"${@:2}\"\n"
+                "fi\n"
+                "exec \"$real\" \"$payload\" \"${@:2}\"\n"
+            )
+            python.chmod(0o755)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            bus = socket.socket(socket.AF_UNIX)
+            bus.bind(str(runtime / "bus"))
+            self.addCleanup(bus.close)
+
+            class StateHandler(BaseHTTPRequestHandler):
+                def do_GET(self):
+                    body = json.dumps({
+                        "counts": {"running": 0},
+                        "polling": {"checking": False, "next_poll_in_ms": 10000},
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, _format, *_args):
+                    return
+
+            server = HTTPServer(("127.0.0.1", 0), StateHandler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(thread.join, 5)
+            self.addCleanup(server.shutdown)
+            recovery_env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "SYMPHONY_ELIXIR_HOME": str(target_home),
+                "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                "XDG_RUNTIME_DIR": str(runtime),
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime / 'bus'}",
+                "SYSTEMCTL_EVENTS": str(events),
+                "SYSTEMCTL_MODE": str(mode),
+                "RESTART_ONCE": str(root / "restart-once"),
+                "SYMPHONY_RECOVERY_VERIFY_ATTEMPTS": "1",
+                "SYMPHONY_STATE_URL": (
+                    f"http://127.0.0.1:{server.server_address[1]}/api/v1/state"
+                ),
+            }
+            result = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=recovery_env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("RECOVERED_INCOMPLETE_PROMOTION", result.stdout)
+            self.assertIn("service restart is unverified", result.stderr)
+            self.assertTrue(transaction.is_dir())
+            hold = json.loads((state / "promotion-held.json").read_text())
+            self.assertEqual(hold["reason"], "rollback_restart_failed")
+            restart_events = [
+                row for row in events.read_text().splitlines()
+                if "restart symphony-elixir.service" in row
+            ]
+            self.assertEqual(len(restart_events), 2, restart_events)
+
+            mode.write_text("inactive\n")
+            inactive = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(inactive.returncode, 0)
+            self.assertNotIn("RECOVERED_INCOMPLETE_PROMOTION", inactive.stdout)
+            self.assertTrue(transaction.is_dir())
+            self.assertTrue((state / "promotion-held.json").is_file())
+
+            mode.write_text("daemon-reload-fails\n")
+            reload_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(reload_failure.returncode, 0)
+            self.assertTrue(transaction.is_dir())
+            self.assertEqual(
+                json.loads((state / "promotion-held.json").read_text())["reason"],
+                "rollback_restart_failed",
+            )
+
+            hold_path = state / "promotion-held.json"
+            mismatched = json.loads(hold_path.read_text())
+            mismatched["transaction"] = str(state / "different-transaction")
+            hold_path.write_text(json.dumps(mismatched))
+            mode.write_text("success\n")
+            clear_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(clear_failure.returncode, 0)
+            self.assertNotIn("DONE", clear_failure.stdout)
+            self.assertTrue(transaction.is_dir())
+
+            hold_path.write_text(json.dumps({
+                **mismatched,
+                "transaction": str(transaction),
+            }))
+            mode.write_text("restart-fails-once\n")
+            events_before_cleanup = events.read_text().splitlines()
+            recovered = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", recovered.stdout)
+            self.assertNotIn("PROMOTION_ROLLED_BACK", recovered.stderr)
+            self.assertEqual(events.read_text().splitlines(), events_before_cleanup)
+            self.assertFalse(transaction.exists())
+            self.assertFalse((state / "promotion-held.json").exists())
+            recovered_receipt = json.loads(
+                (state / "promotion-recovered.json").read_text()
+            )
+            self.assertEqual(recovered_receipt["status"], "restored-prior")
+            self.assertEqual(recovered_receipt["cleanupStatus"], "complete")
+            self.assertEqual(recovered_receipt["transaction"], str(transaction))
+
+            transaction.mkdir()
+            (transaction / "binary.missing").touch()
+            (transaction / "was-active").touch()
+            for name, source in (
+                ("workflow", WORKFLOW_PATH), ("helper", HELPER_PATH), ("unit", UNIT_PATH)
+            ):
+                (transaction / name).write_bytes(source.read_bytes())
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir() if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
+            mode.write_text("success\n")
+            hold_path.write_text(json.dumps({
+                **mismatched,
+                "transaction": str(transaction),
+            }))
+            removal_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env={**recovery_env, "FAIL_FINALIZE_AFTER_HOLD": "1"},
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(removal_failure.returncode, 0)
+            self.assertNotIn("DONE", removal_failure.stdout)
+            tombstone = state / ".promotion-transaction.removing"
+            self.assertFalse(transaction.exists())
+            self.assertFalse(hold_path.exists())
+            self.assertTrue(tombstone.is_dir())
+            events_before_cleanup = events.read_text().splitlines()
+            retry = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT, env=recovery_env, capture_output=True, text=True,
+            )
+            self.assertEqual(retry.returncode, 0, retry.stderr)
+            self.assertIn("cleanup acknowledgement remains pending", retry.stderr)
+            self.assertTrue(tombstone.exists())
+            self.assertEqual(events.read_text().splitlines(), events_before_cleanup)
+            recovered_receipt = json.loads(
+                (state / "promotion-recovered.json").read_text()
+            )
+            self.assertEqual(recovered_receipt["status"], "restored-prior")
+            self.assertEqual(recovered_receipt["cleanupStatus"], "pending")
+            self.assertEqual(recovered_receipt["transaction"], str(transaction))
+
+    def test_transaction_removal_is_persisted_before_success(self):
+        helper = UPDATER[UPDATER.index("finalize_rollback_transaction() {"):
+                         UPDATER.index("backup_target() {")]
+        self.assertIn("os.replace(transaction, tombstone)", helper)
+        self.assertIn("symphony-promotion-cleanup-pending/v1", helper)
+        self.assertIn("shutil.rmtree(tombstone)", helper)
+        self.assertIn("os.fsync(descriptor)", helper)
+        self.assertNotIn('rm -rf "$rollback_dir"', UPDATER)
+        self.assertIn("symphony-promotion-finalized/v1", UPDATER)
+        self.assertIn("symphony-promotion-recovered/v1", UPDATER)
+        self.assertLess(
+            UPDATER.rindex("write_finalized_receipt pending\n"),
+            UPDATER.rindex("promotion_complete=1\n"),
+        )
+        self.assertLess(
+            UPDATER.rindex("write_finalized_receipt complete\n"),
+            UPDATER.rindex('rollback_dir=""\n'),
+        )
+        self.assertLess(UPDATER.rindex("finalize_rollback_transaction\n"),
+                        UPDATER.rindex('echo "DONE"'))
+
+    def test_post_delete_fsync_failure_retains_recoverable_cleanup_marker(self):
+        helper = UPDATER[UPDATER.index("finalize_rollback_transaction() {"):
+                         UPDATER.index("backup_target() {")]
+        payload = helper.split("<<'PY'\n", 1)[1].split("\nPY\n}", 1)[0]
+        injected = payload.replace(
+            "    shutil.rmtree(tombstone)\n    fsync_root()",
+            "    shutil.rmtree(tombstone)\n"
+            "    raise OSError('injected post-delete fsync failure')",
+            1,
+        )
+        self.assertNotEqual(injected, payload)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            transaction = root / "promotion-transaction"
+            transaction.mkdir()
+            hold = root / "promotion-held.json"
+            hold.write_text(json.dumps({
+                "schema": "symphony-promotion-hold/v1",
+                "status": "held",
+                "transaction": str(transaction),
+            }))
+            environment = {**os.environ, "ROLLBACK_DIR": str(transaction)}
+            failed = subprocess.run(
+                [sys.executable, "-", str(root)], input=injected, text=True,
+                env=environment, capture_output=True,
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            marker = root / ".promotion-transaction.cleanup-pending"
+            self.assertFalse(transaction.exists())
+            self.assertFalse(hold.exists())
+            self.assertFalse((root / ".promotion-transaction.removing").exists())
+            self.assertEqual(
+                marker.read_text(), "symphony-promotion-cleanup-pending/v1\n"
+            )
+            recovered = subprocess.run(
+                [sys.executable, "-", str(root)], input=payload, text=True,
+                env=environment, capture_output=True,
+            )
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            self.assertFalse(marker.exists())
+
+    def test_updater_lock_is_owned_by_parent_file_descriptor(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_env = config / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            state = target_home / ".local/state/symphony-elixir"
+            state.mkdir(parents=True)
+            descriptor = os.open(state / "update.lock", os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result = subprocess.run(
+                    ["bash", str(updater), "--skip-binary", "--no-restart"],
+                    cwd=ROOT,
+                    env={
+                        **os.environ,
+                        "SYMPHONY_ELIXIR_HOME": str(target_home),
+                        "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                    },
+                    capture_output=True,
+                    text=True,
+                )
+            finally:
+                os.close(descriptor)
+            self.assertEqual(result.returncode, 8, result.stderr)
+            self.assertIn("updater lock is held", result.stderr)
+            self.assertIn('exec 9>"$update_lock"', UPDATER)
+            self.assertNotIn("lock_holder_pid=\"$!\"", UPDATER)
+
+    def test_incomplete_promotion_transaction_fails_before_live_mutation(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_env = config / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            workflow = config / "WORKFLOW.md"
+            workflow.write_text("live sentinel\n")
+            transaction = target_home / ".local/state/symphony-elixir/promotion-transaction"
+            transaction.mkdir(parents=True)
+            (transaction / "workflow").write_text("truncated backup\n")
+            result = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env={
+                    **os.environ,
+                    "SYMPHONY_ELIXIR_HOME": str(target_home),
+                    "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                },
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 9, result.stderr)
+            self.assertIn("incomplete rollback transaction", result.stderr)
+            self.assertEqual(workflow.read_text(), "live sentinel\n")
+
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
         account_guard = UPDATER.index("assert_account_environment_ready\n")
         stop = UPDATER.index("  stop_idle_official_for_restart\n")
-        first_install = UPDATER.index('install_one "$HELPER_SRC" "$HELPER_DST" 0755')
+        first_install = UPDATER.index(
+            'install_one "$candidate_dir/helper" "$HELPER_DST" 0755'
+        )
         retirement = UPDATER.index("  retire_legacy_units\n")
         restart = UPDATER.index(
             '  systemctl --user restart "$SERVICE_NAME"', retirement

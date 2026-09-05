@@ -11,17 +11,22 @@ account remains host-owned configuration and is never pinned by this source.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import datetime as dt
+import errno
 import hashlib
 import json
 import math
 import os
 import pathlib
+import queue
 import re
+import select
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -80,6 +85,42 @@ DEFAULT_DEAD_LETTER_DIR = (
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
+BOUNDED_REPAIR_SCHEMA = "symphony-bounded-repair-admission/v1"
+BOUNDED_REPAIR_MAX_SECONDS = 900
+BOUNDED_REPAIR_MODEL = "gpt-5.3-codex-spark"
+BOUNDED_REPAIR_MODEL_LIMIT_ID = "codex_bengalfox"
+BOUNDED_REPAIR_EXPIRY_KIND = "systemd-runtime-max"
+BOUNDED_REPAIR_ADMISSION_FIELDS = frozenset(
+    {"remediationAdmission", "workAdmission"}
+)
+BOUNDED_REPAIR_ENVIRONMENT_NAMES = frozenset(
+    {
+        "CODEX_HOME",
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "LINEAR_API_KEY",
+        "LOGNAME",
+        "PATH",
+        "SHELL",
+        "SSL_CERT_DIR",
+        "SSL_CERT_FILE",
+        "SYMPHONY_INSTALL_DIR",
+        "TERM",
+        "TMPDIR",
+        "USER",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_RUNTIME_DIR",
+        "XDG_STATE_HOME",
+    }
+)
+RUNTIME_OUTPUT_QUEUE_MAX_LINES = 256
+DEFAULT_SHUTDOWN_GRACE_SECONDS = 10.0
+MAX_SHUTDOWN_GRACE_SECONDS = 12.0
 ISSUE_DEAD_LETTER_SCHEMA = "symphony-issue-dead-letter/v1"
 LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS = 3
 LINEAR_API_STATUS_PATTERN = re.compile(
@@ -102,6 +143,30 @@ OBSOLETE_TOKENS = (
     "symphony-runtime/elixir",
     "WORKFLOW.jovie-ui-pilot.md",
 )
+EXPECTED_HOOKS = {
+    "after_create": (
+        'export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"',
+        "git clone --depth 1 https://github.com/JovieInc/Jovie.git .",
+        "git fetch --depth 1 origin main",
+        "git checkout -B main origin/main",
+        'skills_tmp="$(mktemp -d "${TMPDIR:-/tmp}/openai-symphony-skills.XXXXXX")"',
+        "trap 'rm -rf \"$skills_tmp\"' EXIT",
+        'git clone --depth 1 --filter=blob:none --sparse https://github.com/openai/symphony.git "$skills_tmp"',
+        'git -C "$skills_tmp" sparse-checkout set .codex/skills',
+        "mkdir -p .codex/skills",
+        'cp -R "$skills_tmp/.codex/skills/commit" "$skills_tmp/.codex/skills/push" "$skills_tmp/.codex/skills/pull" "$skills_tmp/.codex/skills/land" "$skills_tmp/.codex/skills/linear" .codex/skills/',
+        "SYMPHONY_TRUSTED_HOOK_PHASE=after_create bash ./scripts/symphony/symphony-nvme-package-cache.sh after-create",
+    ),
+    "before_remove": (
+        'export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"',
+        "if [ -f ./scripts/symphony/symphony-nvme-package-cache.sh ]; then",
+        "  SYMPHONY_TRUSTED_HOOK_PHASE=before_remove bash ./scripts/symphony/symphony-nvme-package-cache.sh before-remove",
+        "else",
+        "  rm -rf ./node_modules ./.symphony/package-cache/pnpm-store",
+        "  find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true",
+        "fi",
+    ),
+}
 LINEAR_ELIGIBLE_COUNT_QUERY = """
 query SymphonyLinearEligibleCount($teamKey: String!, $stateNames: [String!]!, $first: Int!, $after: String) {
   issues(filter: {team: {key: {eq: $teamKey}}, state: {name: {in: $stateNames}}}, first: $first, after: $after) {
@@ -129,6 +194,11 @@ class WorkflowContract:
     poll_interval_ms: int
     workspace_root: str
     max_concurrent_agents: int
+    max_turns: int
+    codex_command: str
+    thread_sandbox: str
+    turn_sandbox_type: str
+    network_access: bool
     server_port: int
     after_create: str
 
@@ -152,6 +222,21 @@ class ClosureStopLine:
     hold_receipt_path: pathlib.Path = DEFAULT_CLOSURE_HOLD_RECEIPT
     dead_letter_dir: pathlib.Path = DEFAULT_DEAD_LETTER_DIR
     max_receipt_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS
+    recovery_manifest_path: pathlib.Path | None = None
+
+
+@dataclass(frozen=True)
+class BoundedRepairAdmission:
+    manifest_path: pathlib.Path
+    claim_path: pathlib.Path
+    issue_identifier: str
+    issue_id: str
+    required_label: str
+    source_commit: str
+    workspace_root: pathlib.Path
+    router_path: pathlib.Path
+    expires_at: dt.datetime
+    scheduler_command: tuple[str, ...]
 
 
 def _iso(value: dt.datetime) -> str:
@@ -181,54 +266,75 @@ def _front_matter(text: str) -> str:
     return parts[0][4:]
 
 
-def _section(lines: list[str], name: str) -> list[str]:
+def _section(lines: list[str], name: str, *, indent: int = 0) -> list[str]:
+    pattern = re.compile(rf"^{' ' * indent}{re.escape(name)}:\s*$")
+    starts = [index for index, line in enumerate(lines) if pattern.match(line)]
+    if not starts:
+        raise ValueError(f"missing section {name}")
+    if len(starts) != 1:
+        raise ValueError(f"duplicate section {name}")
     out: list[str] = []
-    inside = False
-    for line in lines:
-        if re.match(rf"^{re.escape(name)}:\s*$", line):
-            inside = True
-            continue
-        if inside:
-            if line and not line.startswith(" "):
-                break
-            out.append(line)
+    for line in lines[starts[0] + 1 :]:
+        line_indent = len(line) - len(line.lstrip())
+        if line.strip() and line_indent <= indent:
+            break
+        out.append(line)
     return out
 
 
-def _scalar(body: list[str], key: str) -> str:
+def _literal_hook(front: str, name: str) -> tuple[str, ...] | None:
+    match = re.search(rf"^  {re.escape(name)}: \|\n((?:    .*\n?)*)", front, re.M)
+    if match is None:
+        return None
+    return tuple(line[4:] for line in match.group(1).splitlines())
+
+
+def _scalar(body: list[str], key: str, *, indent: int = 2) -> str:
+    values: list[str] = []
     for line in body:
-        match = re.match(rf"^\s+{re.escape(key)}:\s*(.+?)\s*$", line)
+        match = re.match(rf"^{' ' * indent}{re.escape(key)}:\s*(.+?)\s*$", line)
         if match:
-            return match.group(1).strip().strip('"').strip("'")
-    raise ValueError(f"missing scalar {key}")
+            values.append(match.group(1).strip().strip('"').strip("'"))
+    if not values:
+        raise ValueError(f"missing scalar {key}")
+    if len(values) != 1:
+        raise ValueError(f"duplicate scalar {key}")
+    return values[0]
 
 
-def _list_items(body: list[str], key: str) -> tuple[str, ...]:
+def _list_items(body: list[str], key: str, *, indent: int = 2) -> tuple[str, ...]:
+    pattern = re.compile(rf"^{' ' * indent}{re.escape(key)}:\s*$")
+    starts = [index for index, line in enumerate(body) if pattern.match(line)]
+    if len(starts) > 1:
+        raise ValueError(f"duplicate list {key}")
+    if not starts:
+        return ()
     items: list[str] = []
-    inside = False
-    key_indent: int | None = None
-    for line in body:
-        match = re.match(rf"^(\s+){re.escape(key)}:\s*$", line)
-        if match:
-            inside = True
-            key_indent = len(match.group(1))
+    for line in body[starts[0] + 1 :]:
+        item = re.match(rf"^{' ' * (indent + 2)}-\s*(.+?)\s*$", line)
+        if item:
+            items.append(item.group(1).strip().strip('"').strip("'"))
             continue
-        if inside:
-            item = re.match(r"^(\s+)-\s*(.+?)\s*$", line)
-            if item and (key_indent is None or len(item.group(1)) > key_indent):
-                items.append(item.group(2).strip().strip('"').strip("'"))
-                continue
-            if line.strip() and (key_indent is None or len(line) - len(line.lstrip()) <= key_indent):
-                break
+        if line.strip() and len(line) - len(line.lstrip()) <= indent:
+            break
     return tuple(items)
 
 
-def _int_scalar(body: list[str], key: str) -> int:
-    raw = _scalar(body, key)
+def _int_scalar(body: list[str], key: str, *, indent: int = 2) -> int:
+    raw = _scalar(body, key, indent=indent)
     try:
         return int(raw)
     except ValueError as exc:
         raise ValueError(f"{key} must be an integer") from exc
+
+
+def _bool_scalar(body: list[str], key: str, *, indent: int = 2) -> bool:
+    raw = _scalar(body, key, indent=indent)
+    if raw == "true":
+        return True
+    if raw == "false":
+        return False
+    raise ValueError(f"{key} must be a boolean")
 
 
 def _non_negative_int(value: str, *, name: str) -> int:
@@ -279,24 +385,37 @@ def parse_workflow(path: pathlib.Path) -> WorkflowContract:
     polling = _section(lines, "polling")
     workspace = _section(lines, "workspace")
     agent = _section(lines, "agent")
+    codex = _section(lines, "codex")
+    provider = _section(tracker, "provider", indent=2)
+    turn_sandbox = _section(codex, "turn_sandbox_policy", indent=2)
     server = _section(lines, "server")
-    team_match = re.search(r'^\s+team_key:\s*"?([^"\n]+?)"?\s*$', front, re.M)
-    project_match = re.search(r'^\s+project_slug:\s*"?([^"\n]+?)"?\s*$', front, re.M)
-    api_key_match = re.search(r"^\s+api_key:\s*(.+?)\s*$", front, re.M)
-    if not team_match:
-        raise ValueError("missing tracker.provider.team_key")
-    team_key = team_match.group(1).strip()
+    try:
+        team_key = _scalar(provider, "team_key", indent=4)
+    except ValueError as exc:
+        if str(exc) == "missing scalar team_key":
+            raise ValueError("missing tracker.provider.team_key") from exc
+        raise
     if not TEAM_KEY_PATTERN.fullmatch(team_key):
         raise ValueError(f"malformed tracker.provider.team_key:{team_key}")
-    if not api_key_match:
-        raise ValueError("missing tracker.provider.api_key")
+    try:
+        api_key = _scalar(provider, "api_key", indent=4)
+    except ValueError as exc:
+        if str(exc) == "missing scalar api_key":
+            raise ValueError("missing tracker.provider.api_key") from exc
+        raise
+    try:
+        project_slug = _scalar(provider, "project_slug", indent=4)
+    except ValueError as exc:
+        if str(exc) != "missing scalar project_slug":
+            raise
+        project_slug = None
     after_create = ""
     if "after_create:" in front:
         after_create = front.split("after_create:", 1)[1].split("\nagent:", 1)[0]
     return WorkflowContract(
         team_key=team_key,
-        api_key=api_key_match.group(1).strip(),
-        project_slug=project_match.group(1).strip() if project_match else None,
+        api_key=api_key,
+        project_slug=project_slug,
         required_labels=_list_items(tracker, "required_labels"),
         excluded_labels=_list_items(tracker, "excluded_labels"),
         active_states=_list_items(tracker, "active_states"),
@@ -304,6 +423,11 @@ def parse_workflow(path: pathlib.Path) -> WorkflowContract:
         poll_interval_ms=_int_scalar(polling, "interval_ms"),
         workspace_root=_scalar(workspace, "root"),
         max_concurrent_agents=_int_scalar(agent, "max_concurrent_agents"),
+        max_turns=_int_scalar(agent, "max_turns"),
+        codex_command=_scalar(codex, "command"),
+        thread_sandbox=_scalar(codex, "thread_sandbox"),
+        turn_sandbox_type=_scalar(turn_sandbox, "type", indent=4),
+        network_access=_bool_scalar(turn_sandbox, "networkAccess", indent=4),
         server_port=_int_scalar(server, "port"),
         after_create=after_create,
     )
@@ -491,6 +615,61 @@ def validate_source(
         errors.append(f"workflow_invalid:{exc}")
 
     if workflow is not None:
+        workflow_text = _read_text(workflow_path)
+        workflow_config = _front_matter(workflow_text)
+        for hook_name, expected_hook in EXPECTED_HOOKS.items():
+            if _literal_hook(workflow_config, hook_name) != expected_hook:
+                errors.append(f"workflow_hook_not_canonical:{hook_name}")
+        command_match = re.search(
+            r"^\s+command:\s*['\"]?(.+?)['\"]?\s*$", workflow_config, re.M
+        )
+        expected_command = "./scripts/symphony/symphony-codex-router app-server"
+        if command_match is None or command_match.group(1) != expected_command:
+            errors.append("workflow_agent_command_not_canonical")
+        if "scripts/hermes/" in workflow_config or "../" in workflow_config:
+            errors.append("workflow_executable_reference_unsafe")
+        for shell_target in re.findall(
+            r"^\s+(?:[A-Z_][A-Z0-9_]*=[^\s]+\s+)*(?:bash|sh)\s+([^\s;&|]+)",
+            workflow_config,
+            re.M,
+        ):
+            if shell_target != "./scripts/symphony/symphony-nvme-package-cache.sh":
+                errors.append(f"workflow_shell_target_not_allowlisted:{shell_target}")
+        for direct_target in re.findall(
+            r"^\s+(?:(/[^\s;&|]+|\.\.?/[^\s;&|]+))", workflow_config, re.M
+        ):
+            if direct_target not in {
+                "./scripts/symphony/symphony-codex-router",
+                "./scripts/symphony/symphony-nvme-package-cache.sh",
+            }:
+                errors.append(f"workflow_direct_target_not_allowlisted:{direct_target}")
+        if re.search(r"\$\(\s*(?:/|\.\.?/)", workflow_config) or re.search(
+            r"`\s*(?:/|\.\.?/)", workflow_config
+        ):
+            errors.append("workflow_command_substitution_target_unsafe")
+        referenced = set(
+            re.findall(r"\./scripts/symphony/[A-Za-z0-9._-]+", workflow_config)
+        )
+        allowed = {
+            "./scripts/symphony/symphony-codex-router",
+            "./scripts/symphony/symphony-nvme-package-cache.sh",
+        }
+        if not referenced.issubset(allowed) or not allowed.issubset(referenced):
+            errors.append("workflow_executable_reference_not_allowlisted")
+        for relative in allowed:
+            executable = repo_root / relative.removeprefix("./")
+            try:
+                resolved = executable.resolve(strict=True)
+                expected = (repo_root.resolve() / relative.removeprefix("./"))
+                if (
+                    executable.is_symlink()
+                    or resolved != expected
+                    or not executable.is_file()
+                    or not os.access(executable, os.X_OK)
+                ):
+                    errors.append(f"workflow_executable_invalid:{relative}")
+            except OSError:
+                errors.append(f"workflow_executable_invalid:{relative}")
         if workflow.team_key != OFFICIAL_TEAM_KEY:
             errors.append(f"workflow_team_key:{workflow.team_key}")
         if workflow.project_slug is not None:
@@ -577,6 +756,10 @@ def validate_source(
             errors.append("unit_hardcodes_codex_account")
         if "SuccessExitStatus=0 1" not in unit:
             errors.append("unit_missing_clean_beam_stop_status")
+        if "KillMode=control-group" not in unit:
+            errors.append("unit_missing_control_group_kill_mode")
+        if "TimeoutStopSec=15s" not in unit:
+            errors.append("unit_missing_bounded_stop_timeout")
         for token in OBSOLETE_TOKENS:
             if token in unit:
                 errors.append(f"unit_obsolete_token:{token}")
@@ -775,7 +958,11 @@ def write_rate_limit_gate(path: pathlib.Path, classification: dict[str, Any]) ->
     return True
 
 
-def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> int:
+def _sleep_gate(
+    gate: dict[str, Any],
+    max_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
+) -> int:
     seconds = int(gate.get("retryAfterSeconds") or 0)
     if seconds <= 0:
         return 0
@@ -794,8 +981,11 @@ def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> int:
         ),
         flush=True,
     )
-    time.sleep(seconds)
-    return seconds
+    if shutdown is None:
+        time.sleep(seconds)
+        return seconds
+    interrupted = shutdown.wait(seconds)
+    return 0 if interrupted else seconds
 
 
 def _print_gate_wait_exhausted(gate: dict[str, Any], max_sleep_seconds: int) -> None:
@@ -816,6 +1006,7 @@ def _pause_child_for_gate(
     process: subprocess.Popen[str],
     gate: dict[str, Any],
     max_gate_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
 ) -> int:
     if process.poll() is not None or not gate.get("active"):
         return 0
@@ -823,7 +1014,7 @@ def _pause_child_for_gate(
         return 0
     os.kill(process.pid, signal.SIGSTOP)
     try:
-        return _sleep_gate(gate, max_gate_sleep_seconds)
+        return _sleep_gate(gate, max_gate_sleep_seconds, shutdown)
     finally:
         if process.poll() is None:
             try:
@@ -848,11 +1039,390 @@ def _write_json_receipt(path: pathlib.Path, payload: dict[str, Any]) -> None:
             os.unlink(tmp_name)
 
 
+def _parse_utc_timestamp(value: Any, *, field: str) -> dt.datetime:
+    try:
+        parsed = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field}-invalid") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{field}-timezone-missing")
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def _require_private_regular_file(path: pathlib.Path, *, field: str) -> None:
+    try:
+        stat = path.lstat()
+    except OSError as exc:
+        raise ValueError(f"{field}-unreadable:{type(exc).__name__}") from exc
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{field}-not-regular")
+    if stat.st_uid != os.geteuid():
+        raise ValueError(f"{field}-wrong-owner")
+    if stat.st_mode & 0o077:
+        raise ValueError(f"{field}-permissions-not-private")
+
+
+def _bounded_repair_artifact(
+    artifacts: Any, name: str, *, private: bool = False
+) -> pathlib.Path:
+    entry = artifacts.get(name) if isinstance(artifacts, dict) else None
+    if not isinstance(entry, dict):
+        raise ValueError(f"artifact-{name}-missing")
+    raw_path = entry.get("path")
+    expected_hash = entry.get("sha256")
+    if not isinstance(raw_path, str) or not pathlib.Path(raw_path).is_absolute():
+        raise ValueError(f"artifact-{name}-path-invalid")
+    if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
+        raise ValueError(f"artifact-{name}-sha256-invalid")
+    path = pathlib.Path(raw_path)
+    if private:
+        _require_private_regular_file(path, field=f"artifact-{name}")
+    elif path.is_symlink() or not path.is_file():
+        raise ValueError(f"artifact-{name}-not-regular")
+    if sha256_file(path) != expected_hash:
+        raise ValueError(f"artifact-{name}-sha256-mismatch")
+    return path
+
+
+def _bounded_repair_router_script(codex_cli: pathlib.Path) -> str:
+    return (
+        "#!/bin/sh\n"
+        "set -eu\n"
+        f"exec {codex_cli} "
+        f"-c 'model=\"{BOUNDED_REPAIR_MODEL}\"' "
+        "-c 'model_reasoning_effort=\"high\"' "
+        "-c 'shell_environment_policy.inherit=\"none\"' "
+        "app-server --strict-config --stdio\n"
+    )
+
+
+def validate_bounded_repair_admission(
+    manifest_path: pathlib.Path,
+    *,
+    fleet_path: pathlib.Path,
+    fleet_payload: dict[str, Any],
+    now: dt.datetime | None = None,
+    expected_command: list[str] | None = None,
+    require_unclaimed: bool = False,
+) -> BoundedRepairAdmission:
+    """Validate one short-lived, single-issue repair admission without mutating fleet truth."""
+    observed_at = now or _now()
+    _require_private_regular_file(manifest_path, field="recovery-manifest")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"recovery-manifest-invalid:{type(exc).__name__}") from exc
+    if not isinstance(manifest, dict) or manifest.get("schema") != BOUNDED_REPAIR_SCHEMA:
+        raise ValueError("recovery-manifest-schema-mismatch")
+    if manifest.get("status") != "authorized":
+        raise ValueError("recovery-manifest-not-authorized")
+
+    issued_at = _parse_utc_timestamp(manifest.get("issuedAt"), field="issuedAt")
+    expires_at = _parse_utc_timestamp(manifest.get("expiresAt"), field="expiresAt")
+    duration = (expires_at - issued_at).total_seconds()
+    if duration <= 0 or duration > BOUNDED_REPAIR_MAX_SECONDS:
+        raise ValueError("recovery-manifest-duration-invalid")
+    if observed_at < issued_at - dt.timedelta(seconds=FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS):
+        raise ValueError("recovery-manifest-not-yet-valid")
+    if observed_at >= expires_at:
+        raise ValueError("recovery-manifest-expired")
+    if manifest.get("maxConcurrent") != 1:
+        raise ValueError("recovery-manifest-max-concurrent-not-one")
+    if manifest.get("newIssueIntakeAllowed") is not False:
+        raise ValueError("recovery-manifest-new-intake-not-false")
+    if manifest.get("pushAllowed") is not False:
+        raise ValueError("recovery-manifest-push-not-false")
+    if manifest.get("model") != BOUNDED_REPAIR_MODEL:
+        raise ValueError("recovery-manifest-model-mismatch")
+    if manifest.get("modelRateLimitId") != BOUNDED_REPAIR_MODEL_LIMIT_ID:
+        raise ValueError("recovery-manifest-model-limit-mismatch")
+    if manifest.get("modelFallbackAllowed") is not False:
+        raise ValueError("recovery-manifest-model-fallback-not-false")
+
+    external_expiry = manifest.get("externalExpiry")
+    if not isinstance(external_expiry, dict):
+        raise ValueError("recovery-manifest-external-expiry-invalid")
+    expected_expiry = {
+        "kind": BOUNDED_REPAIR_EXPIRY_KIND,
+        "unit": f"{manifest.get('requiredLabel')}.service",
+        "runtimeMaxSeconds": BOUNDED_REPAIR_MAX_SECONDS,
+        "killMode": "control-group",
+        "sendSIGKILL": True,
+    }
+    if external_expiry != expected_expiry:
+        raise ValueError("recovery-manifest-external-expiry-mismatch")
+
+    issue = manifest.get("issueIdentifier")
+    issue_id = manifest.get("issueId")
+    label = manifest.get("requiredLabel")
+    if not isinstance(issue, str) or not re.fullmatch(r"JOV-[1-9][0-9]*", issue):
+        raise ValueError("recovery-manifest-issue-invalid")
+    if not isinstance(issue_id, str) or not re.fullmatch(
+        r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", issue_id
+    ):
+        raise ValueError("recovery-manifest-issue-id-invalid")
+    if (
+        not isinstance(label, str)
+        or not re.fullmatch(r"symphony-recovery-[a-z0-9-]+", label)
+        or issue.lower() not in label
+    ):
+        raise ValueError("recovery-manifest-label-invalid")
+
+    admission_field = manifest.get("admissionField")
+    activity = manifest.get("activity")
+    if admission_field not in BOUNDED_REPAIR_ADMISSION_FIELDS:
+        raise ValueError("recovery-manifest-admission-field-invalid")
+    admission = fleet_payload.get(admission_field)
+    activities = admission.get("activities") if isinstance(admission, dict) else None
+    if (
+        not isinstance(admission, dict)
+        or admission.get("allowed") is not True
+        or admission.get("localAllowed") is not True
+        or activity != "isolated-pr-repair"
+        or not isinstance(activities, list)
+        or activity not in activities
+    ):
+        raise ValueError("fleet-local-repair-not-admitted")
+    concurrency = fleet_payload.get("concurrency")
+    gem = concurrency.get("gem") if isinstance(concurrency, dict) else None
+    if (
+        not isinstance(gem, dict)
+        or isinstance(gem.get("runtimeFloor"), bool)
+        or gem.get("runtimeFloor") != 1
+    ):
+        raise ValueError("fleet-runtime-floor-missing")
+    if pathlib.Path(str(manifest.get("fleetGatePath"))).resolve() != fleet_path.resolve():
+        raise ValueError("recovery-manifest-fleet-path-mismatch")
+
+    source_root_raw = manifest.get("sourceRoot")
+    source_commit = manifest.get("sourceCommit")
+    if not isinstance(source_root_raw, str) or not pathlib.Path(source_root_raw).is_absolute():
+        raise ValueError("recovery-manifest-source-root-invalid")
+    if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise ValueError("recovery-manifest-source-commit-invalid")
+    source_root = pathlib.Path(source_root_raw)
+    try:
+        actual_commit = subprocess.run(
+            ["git", "-C", str(source_root), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True, timeout=5,
+        ).stdout.strip()
+    except subprocess.SubprocessError as exc:
+        raise ValueError("recovery-manifest-source-unverifiable") from exc
+    if actual_commit != source_commit:
+        raise ValueError("recovery-manifest-source-commit-mismatch")
+
+    artifacts = manifest.get("artifacts")
+    runtime_path = _bounded_repair_artifact(artifacts, "runtime")
+    workflow_path = _bounded_repair_artifact(artifacts, "workflow")
+    router_path = _bounded_repair_artifact(artifacts, "router")
+    _bounded_repair_artifact(artifacts, "binary")
+    codex_cli_path = _bounded_repair_artifact(artifacts, "codexCli")
+    account_path = _bounded_repair_artifact(artifacts, "accountEnv", private=True)
+    if runtime_path.resolve() != pathlib.Path(__file__).resolve():
+        raise ValueError("recovery-manifest-runtime-path-mismatch")
+    account_home = manifest.get("accountHome")
+    if not isinstance(account_home, str) or _dotenv_values(account_path).get("CODEX_HOME") != account_home:
+        raise ValueError("recovery-manifest-account-home-mismatch")
+    if os.environ.get("CODEX_HOME") != account_home:
+        raise ValueError("recovery-process-account-home-mismatch")
+    if router_path.read_text(encoding="utf-8") != _bounded_repair_router_script(
+        codex_cli_path
+    ):
+        raise ValueError("recovery-router-not-exact-spark-no-fallback")
+
+    workflow = parse_workflow(workflow_path)
+    if workflow.required_labels != (label,):
+        raise ValueError("recovery-workflow-required-label-mismatch")
+    if workflow.max_concurrent_agents != 1:
+        raise ValueError("recovery-workflow-max-concurrent-not-one")
+    if workflow.max_turns != 1:
+        raise ValueError("recovery-workflow-max-turns-not-one")
+    if workflow.thread_sandbox != "read-only":
+        raise ValueError("recovery-workflow-thread-sandbox-not-read-only")
+    if workflow.turn_sandbox_type != "readOnly":
+        raise ValueError("recovery-workflow-turn-sandbox-not-read-only")
+    if workflow.network_access is not False:
+        raise ValueError("recovery-workflow-network-not-false")
+    workspace_raw = manifest.get("workspaceRoot")
+    if not isinstance(workspace_raw, str) or not pathlib.Path(workspace_raw).is_absolute():
+        raise ValueError("recovery-manifest-workspace-root-invalid")
+    workspace_root = pathlib.Path(workspace_raw)
+    if pathlib.Path(workflow.workspace_root) != workspace_root:
+        raise ValueError("recovery-workflow-workspace-root-mismatch")
+    expected_agent_command = (
+        f"{runtime_path} recovery-agent --manifest {manifest_path} "
+        f"--issue-identifier {issue} --issue-id {issue_id} "
+        f"--workspace {workspace_root / issue} -- "
+        f"{router_path} app-server"
+    )
+    if workflow.codex_command != expected_agent_command:
+        raise ValueError("recovery-workflow-router-mismatch")
+
+    command = manifest.get("schedulerCommand")
+    if not isinstance(command, list) or not command or not all(isinstance(item, str) for item in command):
+        raise ValueError("recovery-manifest-command-invalid")
+    if expected_command is not None and command != expected_command:
+        raise ValueError("recovery-manifest-command-mismatch")
+    binary_path = str(_bounded_repair_artifact(artifacts, "binary"))
+    if command[0] != binary_path or str(workflow_path) not in command:
+        raise ValueError("recovery-manifest-command-artifact-mismatch")
+    claim_raw = manifest.get("claimPath")
+    if not isinstance(claim_raw, str) or not pathlib.Path(claim_raw).is_absolute():
+        raise ValueError("recovery-manifest-claim-path-invalid")
+    claim_path = pathlib.Path(claim_raw)
+    if claim_path.parent.resolve() != manifest_path.parent.resolve():
+        raise ValueError("recovery-manifest-claim-parent-mismatch")
+    if require_unclaimed and claim_path.exists():
+        raise ValueError("recovery-manifest-already-claimed")
+    return BoundedRepairAdmission(
+        manifest_path=manifest_path,
+        claim_path=claim_path,
+        issue_identifier=issue,
+        issue_id=issue_id,
+        required_label=label,
+        source_commit=source_commit,
+        workspace_root=workspace_root,
+        router_path=router_path,
+        expires_at=expires_at,
+        scheduler_command=tuple(command),
+    )
+
+
+def claim_bounded_repair(admission: BoundedRepairAdmission) -> None:
+    payload = {
+        "schema": "symphony-bounded-repair-claim/v1",
+        "issueIdentifier": admission.issue_identifier,
+        "issueId": admission.issue_id,
+        "workspace": str(admission.workspace_root / admission.issue_identifier),
+        "manifestPath": str(admission.manifest_path),
+        "claimedAt": _iso(_now()),
+    }
+    try:
+        descriptor = os.open(
+            admission.claim_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+    except FileExistsError as exc:
+        raise ValueError("recovery-manifest-already-claimed") from exc
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        directory = os.open(admission.claim_path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    except BaseException:
+        try:
+            admission.claim_path.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def validate_bounded_repair_workspace_isolation(
+    admission: BoundedRepairAdmission,
+) -> None:
+    """Require a new packet-local root before the scheduler can create a workspace."""
+    expected = admission.manifest_path.parent / (
+        f"workspace-{admission.issue_identifier}-{admission.source_commit[:12]}"
+    )
+    if admission.workspace_root.resolve() != expected.resolve():
+        raise ValueError("recovery-workspace-root-not-packet-local")
+    if admission.workspace_root.is_symlink():
+        raise ValueError("recovery-workspace-root-symlink")
+    if not admission.workspace_root.exists():
+        return
+    if not admission.workspace_root.is_dir():
+        raise ValueError("recovery-workspace-root-not-directory")
+    try:
+        next(admission.workspace_root.iterdir())
+    except StopIteration:
+        return
+    except OSError as exc:
+        raise ValueError(
+            f"recovery-workspace-root-unreadable:{type(exc).__name__}"
+        ) from exc
+    raise ValueError("recovery-workspace-root-not-empty")
+
+
+def _bounded_repair_environment(*, include_linear: bool) -> dict[str, str]:
+    allowed = {
+        name: value
+        for name, value in os.environ.items()
+        if name in BOUNDED_REPAIR_ENVIRONMENT_NAMES or name.startswith("LC_")
+    }
+    if not include_linear:
+        allowed.pop("LINEAR_API_KEY", None)
+    return allowed
+
+
+def run_bounded_repair_agent(
+    manifest_path: pathlib.Path,
+    command: list[str],
+    *,
+    issue_identifier: str,
+    issue_id: str,
+    workspace: pathlib.Path,
+) -> int:
+    """Claim and exec the sole issue agent from its exact Symphony workspace."""
+    try:
+        _require_private_regular_file(manifest_path, field="recovery-manifest")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        fleet_path = pathlib.Path(str(manifest.get("fleetGatePath")))
+        verdict = read_closure_stop_line(
+            fleet_path, recovery_manifest_path=manifest_path
+        )
+        if verdict["hold"]:
+            raise ValueError(str(verdict["reason"]))
+        fleet_payload = json.loads(fleet_path.read_text(encoding="utf-8"))
+        admission = validate_bounded_repair_admission(
+            manifest_path,
+            fleet_path=fleet_path,
+            fleet_payload=fleet_payload,
+            require_unclaimed=True,
+        )
+        expected_workspace = (
+            admission.workspace_root / admission.issue_identifier
+        ).resolve()
+        if issue_identifier != admission.issue_identifier:
+            raise ValueError("recovery-agent-issue-identifier-mismatch")
+        if issue_id != admission.issue_id:
+            raise ValueError("recovery-agent-issue-id-mismatch")
+        if workspace.resolve() != expected_workspace:
+            raise ValueError("recovery-agent-workspace-argument-mismatch")
+        if pathlib.Path.cwd().resolve() != expected_workspace:
+            raise ValueError("recovery-agent-workspace-mismatch")
+        expected_command = [str(admission.router_path), "app-server"]
+        if command != expected_command:
+            raise ValueError("recovery-agent-command-mismatch")
+        claim_bounded_repair(admission)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(
+            json.dumps(
+                {"kind": "bounded_repair_agent_refused", "reason": str(exc)},
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+        return CLOSURE_HOLD_EXIT_CODE
+    sanitized = _bounded_repair_environment(include_linear=False)
+    sanitized["SYMPHONY_RECOVERY_ISSUE_IDENTIFIER"] = admission.issue_identifier
+    sanitized["SYMPHONY_RECOVERY_ISSUE_ID"] = admission.issue_id
+    os.execve(command[0], command, sanitized)
+    raise AssertionError("execve returned")
+
+
 def read_closure_stop_line(
     path: pathlib.Path,
     now: dt.datetime | None = None,
     *,
     max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+    recovery_manifest_path: pathlib.Path | None = None,
 ) -> dict[str, Any]:
     """Fail-closed admission verdict from the freshest Gem fleet gate receipt.
 
@@ -894,6 +1464,25 @@ def read_closure_stop_line(
         return hold("fleet-gate-receipt-future", **details)
     if age_seconds > max_age_seconds:
         return hold("fleet-gate-receipt-stale", **details)
+    if recovery_manifest_path is not None:
+        try:
+            admission = validate_bounded_repair_admission(
+                recovery_manifest_path,
+                fleet_path=path,
+                fleet_payload=payload,
+                now=observed_at,
+            )
+        except ValueError as exc:
+            return hold(f"bounded-repair-refused:{exc}", **details)
+        return {
+            "hold": False,
+            "reason": "bounded-local-repair",
+            "path": str(path),
+            "issueIdentifier": admission.issue_identifier,
+            "requiredLabel": admission.required_label,
+            "expiresAt": _iso(admission.expires_at),
+            **details,
+        }
     signals = payload.get("signals")
     closure = signals.get("closureHealth") if isinstance(signals, dict) else None
     if not isinstance(closure, dict):
@@ -968,7 +1557,11 @@ def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
     return status if isinstance(status, str) else None
 
 
-def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
+def _sleep_closure_hold(
+    verdict: dict[str, Any],
+    seconds: int,
+    shutdown: threading.Event | None = None,
+) -> int:
     if seconds <= 0:
         return 0
     print(
@@ -983,8 +1576,11 @@ def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
         ),
         flush=True,
     )
-    time.sleep(seconds)
-    return seconds
+    if shutdown is None:
+        time.sleep(seconds)
+        return seconds
+    interrupted = shutdown.wait(seconds)
+    return 0 if interrupted else seconds
 
 
 def _closure_hold_wait(
@@ -993,6 +1589,7 @@ def _closure_hold_wait(
     *,
     max_sleep_seconds: int | None,
     sleep_used: int,
+    shutdown: threading.Event | None = None,
 ) -> tuple[int, dict[str, Any]]:
     """Hold new admission in bounded chunks, re-reading the fleet receipt.
 
@@ -1000,7 +1597,7 @@ def _closure_hold_wait(
     receipt after every bounded chunk and releases as soon as closure health
     returns to healthy. Every hold decision rewrites the durable hold receipt.
     """
-    while verdict["hold"]:
+    while verdict["hold"] and not (shutdown is not None and shutdown.is_set()):
         write_closure_hold_receipt(
             stop_line.hold_receipt_path,
             verdict,
@@ -1016,7 +1613,9 @@ def _closure_hold_wait(
             chunk = min(chunk, remaining)
         if chunk <= 0:
             break
-        sleep_used += _sleep_closure_hold(verdict, chunk)
+        sleep_used += _sleep_closure_hold(verdict, chunk, shutdown)
+        if shutdown is not None and shutdown.is_set():
+            break
         verdict = read_closure_stop_line(
             stop_line.receipt_path, max_age_seconds=stop_line.max_receipt_age_seconds
         )
@@ -1041,6 +1640,7 @@ def _pause_child_for_closure_hold(
     stop_line: ClosureStopLine,
     verdict: dict[str, Any],
     max_gate_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
 ) -> int:
     """Pause only the scheduler while closure health holds new admission.
 
@@ -1056,7 +1656,11 @@ def _pause_child_for_closure_hold(
     os.kill(process.pid, signal.SIGSTOP)
     try:
         slept, latest = _closure_hold_wait(
-            stop_line, verdict, max_sleep_seconds=max_gate_sleep_seconds, sleep_used=0
+            stop_line,
+            verdict,
+            max_sleep_seconds=max_gate_sleep_seconds,
+            sleep_used=0,
+            shutdown=shutdown,
         )
         if latest["hold"]:
             write_closure_hold_receipt(
@@ -1225,55 +1829,440 @@ def run_official_binary_once(
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
-    closure_observe_only: bool,
+    closure_observe_only: bool = False,
     max_gate_sleep_seconds: int | None,
 ) -> int:
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        errors="replace",
-        bufsize=1,
+    recovery_deadline: float | None = None
+    if closure.recovery_manifest_path is not None:
+        verdict = read_closure_stop_line(
+            closure.receipt_path,
+            max_age_seconds=closure.max_receipt_age_seconds,
+            recovery_manifest_path=closure.recovery_manifest_path,
+        )
+        if verdict["hold"]:
+            raise ValueError(str(verdict["reason"]))
+        expires_at = _parse_utc_timestamp(verdict.get("expiresAt"), field="expiresAt")
+        recovery_deadline = time.monotonic() + max(
+            0.0, (expires_at - _now()).total_seconds()
+        )
+    raw_shutdown_grace = os.environ.get(
+        "SYMPHONY_SHUTDOWN_GRACE_SECONDS",
+        str(DEFAULT_SHUTDOWN_GRACE_SECONDS),
     )
+    try:
+        shutdown_grace = float(raw_shutdown_grace)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("SYMPHONY_SHUTDOWN_GRACE_SECONDS must be finite and positive") from exc
+    if not math.isfinite(shutdown_grace) or shutdown_grace <= 0:
+        raise ValueError("SYMPHONY_SHUTDOWN_GRACE_SECONDS must be finite and positive")
+    shutdown_grace = min(MAX_SHUTDOWN_GRACE_SECONDS, shutdown_grace)
+    if sys.platform.startswith("linux"):
+        try:
+            libc = ctypes.CDLL(None, use_errno=True)
+            if libc.prctl(36, 1, 0, 0, 0) != 0:
+                error_number = ctypes.get_errno()
+                raise OSError(error_number, os.strerror(error_number))
+        except AttributeError as exc:
+            raise RuntimeError("Linux child-subreaper support is unavailable") from exc
+    pidfd_reserve: list[int] = []
+    if sys.platform.startswith("linux"):
+        try:
+            for _ in range(8):
+                pidfd_reserve.append(os.open("/dev/null", os.O_RDONLY))
+        except OSError:
+            for descriptor in pidfd_reserve:
+                os.close(descriptor)
+            pidfd_reserve = []
+    try:
+        launch_read, launch_write = os.pipe()
+    except BaseException:
+        for descriptor in pidfd_reserve:
+            os.close(descriptor)
+        raise
+    launcher = [
+        sys.executable,
+        "-c",
+        (
+            "import os,sys; fd=int(sys.argv[1]); ready=os.read(fd,1); "
+            "os.close(fd); "
+            "ready == b'1' or sys.exit(125); "
+            "os.execvp(sys.argv[2], sys.argv[2:])"
+        ),
+        str(launch_read),
+        *command,
+    ]
+    try:
+        child_environment = (
+            _bounded_repair_environment(include_linear=True)
+            if closure.recovery_manifest_path is not None
+            else None
+        )
+        process = subprocess.Popen(
+            launcher,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            bufsize=1,
+            start_new_session=True,
+            pass_fds=(launch_read,),
+            env=child_environment,
+        )
+    except BaseException:
+        os.close(launch_read)
+        os.close(launch_write)
+        for descriptor in pidfd_reserve:
+            os.close(descriptor)
+        raise
+    os.close(launch_read)
+    previous_handlers: dict[signal.Signals, Any] = {}
+    shutdown = threading.Event()
+    nonlinux_descendants: set[int] = set()
+    termination_complete = False
+    shutdown_signum = 0
+    pidfds: dict[int, int] = {}
+
+    def remember(pid: int) -> bool:
+        if pid in pidfds:
+            return True
+        if not hasattr(os, "pidfd_open"):
+            if sys.platform.startswith("linux"):
+                raise RuntimeError("Linux pidfd support is required")
+            return True
+        while True:
+            try:
+                pidfds[pid] = os.pidfd_open(pid)
+                break
+            except ProcessLookupError:
+                return False
+            except OSError as exc:
+                if exc.errno in (errno.EMFILE, errno.ENFILE) and pidfd_reserve:
+                    os.close(pidfd_reserve.pop())
+                    continue
+                raise RuntimeError(f"cannot pin process identity for pid {pid}") from exc
+        return True
+
+    def send_pinned(descriptor: int, signum: int) -> None:
+        try:
+            if sys.platform.startswith("linux"):
+                if not hasattr(signal, "pidfd_send_signal"):
+                    raise RuntimeError("Linux process signaling requires pidfd")
+                signal.pidfd_send_signal(descriptor, signum)
+            else:
+                raise RuntimeError("send_pinned is Linux-only")
+        except ProcessLookupError:
+            pass
+
+    def signal_identity(pid: int, signum: int) -> bool:
+        """Pin, signal, and release one non-root identity at a time.
+
+        Releasing each descendant pidfd immediately lets one reserved slot
+        contain an arbitrarily wide tree even when the process is already at
+        its descriptor limit. Numeric PIDs are never used for Linux signals.
+        """
+        if not sys.platform.startswith("linux"):
+            try:
+                os.kill(pid, signum)
+            except ProcessLookupError:
+                return False
+            return True
+        if pid == process.pid and pid in pidfds:
+            send_pinned(pidfds[pid], signum)
+            return True
+        if not remember(pid):
+            return False
+        descriptor = pidfds.pop(pid)
+        try:
+            send_pinned(descriptor, signum)
+        finally:
+            os.close(descriptor)
+        return True
+
+    def root_target() -> list[int]:
+        # Once Popen has observed the root exit, only a pidfd can safely refer
+        # to that numeric PID; without one it may already have been recycled.
+        if process.pid in pidfds or process.poll() is None:
+            return [process.pid]
+        return []
+
+    def close_pidfds() -> None:
+        for descriptor in pidfds.values():
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        pidfds.clear()
+        while pidfd_reserve:
+            try:
+                os.close(pidfd_reserve.pop())
+            except OSError:
+                pass
+
+    def descendant_pids() -> list[int]:
+        try:
+            if pathlib.Path("/proc").is_dir():
+                pairs = []
+                for entry in pathlib.Path("/proc").iterdir():
+                    if not entry.name.isdigit():
+                        continue
+                    try:
+                        fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+                        pairs.append((int(entry.name), int(fields[1])))
+                    except (OSError, IndexError, ValueError):
+                        continue
+            else:
+                rows = subprocess.run(
+                    ["ps", "-axo", "pid=,ppid="], capture_output=True,
+                    text=True, check=True, timeout=2,
+                ).stdout.splitlines()
+                pairs = [tuple(int(value) for value in row.split()) for row in rows]
+        except (OSError, IndexError, ValueError, subprocess.SubprocessError):
+            return []
+        children: dict[int, list[int]] = {}
+        for pid, parent in pairs:
+            children.setdefault(parent, []).append(pid)
+        found: list[int] = []
+        visited: set[int] = set()
+        # Linux subreaping reparents late-forking orphans to this wrapper. Walk
+        # both the launched root and the wrapper so those adopted descendants
+        # remain inside the shutdown boundary.
+        pending = [process.pid]
+        if sys.platform.startswith("linux"):
+            pending.append(os.getpid())
+        while pending:
+            parent = pending.pop()
+            for child in children.get(parent, []):
+                if child in visited:
+                    continue
+                visited.add(child)
+                pending.append(child)
+                if child != process.pid:
+                    found.append(child)
+        return found
+
+    def signal_tree(signum: int) -> None:
+        roots = root_target()
+        targets = descendant_pids()
+        if not sys.platform.startswith("linux"):
+            nonlinux_descendants.update(targets)
+            targets = list(nonlinux_descendants)
+        # Existing detached descendants must be signaled before a non-Linux
+        # root can exit and orphan them outside our observable process tree.
+        # Linux subreaping still catches anything forked by the root's handler
+        # in the grace-period rescans below.
+        for pid in [*reversed(targets), *roots]:
+            if signal_identity(pid, signal.SIGCONT):
+                signal_identity(pid, signum)
+
+    def reap_descendants(pids: list[int]) -> None:
+        if not sys.platform.startswith("linux"):
+            return
+        for pid in pids:
+            try:
+                os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                pass
+
+    def terminate_tree() -> None:
+        nonlocal termination_complete
+        if termination_complete:
+            return
+        signal_tree(signal.SIGTERM)
+        deadline = time.monotonic() + shutdown_grace
+        while time.monotonic() < deadline:
+            process.poll()
+            descendants = descendant_pids()
+            for pid in descendants:
+                signal_identity(pid, signal.SIGTERM)
+            reap_descendants(descendants)
+            descendants = descendant_pids()
+            root_descriptor = pidfds.get(process.pid)
+            root_alive = bool(
+                root_descriptor is not None
+                and not select.select([root_descriptor], [], [], 0)[0]
+            )
+            if not root_alive and not descendants:
+                break
+            time.sleep(0.02)
+        signal_tree(signal.SIGKILL)
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        if sys.platform.startswith("linux"):
+            reap_deadline = time.monotonic() + 1.0
+            while time.monotonic() < reap_deadline:
+                descendants = descendant_pids()
+                for pid in descendants:
+                    signal_identity(pid, signal.SIGKILL)
+                while True:
+                    try:
+                        reaped, _status = os.waitpid(-1, os.WNOHANG)
+                    except ChildProcessError:
+                        reaped = 0
+                        break
+                    if reaped <= 0:
+                        break
+                if not descendant_pids():
+                    break
+                time.sleep(0.01)
+        close_pidfds()
+        termination_complete = True
+
+    def forward_signal(signum: int, _frame: Any) -> None:
+        """Request complete child-tree termination from the main loop.
+
+        Python delivers handlers on the main thread.  Calling terminate_tree()
+        here can re-enter subprocess.Popen while an interrupted poll() still
+        owns its private waitpid lock, permanently deadlocking shutdown.
+        """
+        nonlocal shutdown_signum
+        shutdown_signum = signum
+        shutdown.set()
+
+    # Pin the launched root before any wait/reap can make its numeric PID
+    # available for reuse.
+    try:
+        for forwarded in (signal.SIGTERM, signal.SIGINT):
+            previous_handlers[forwarded] = signal.getsignal(forwarded)
+            signal.signal(forwarded, forward_signal)
+        if not remember(process.pid) or (
+            sys.platform.startswith("linux") and
+            not hasattr(signal, "pidfd_send_signal")
+        ):
+            raise RuntimeError("Linux root pidfd support is required")
+        os.write(launch_write, b"1")
+    except BaseException:
+        try:
+            if process.pid in pidfds:
+                terminate_tree()
+            else:
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+            close_pidfds()
+            for forwarded, previous in previous_handlers.items():
+                signal.signal(forwarded, previous)
+        raise
+    finally:
+        os.close(launch_write)
+    output_lines: queue.Queue[tuple[bool, str]] = queue.Queue(
+        maxsize=RUNTIME_OUTPUT_QUEUE_MAX_LINES
+    )
+
+    def read_output() -> None:
+        try:
+            assert process.stdout is not None
+            for output_line in process.stdout:
+                output_lines.put((False, output_line))
+        finally:
+            output_lines.put((True, ""))
+
+    output_reader = threading.Thread(target=read_output, daemon=True)
+    output_reader.start()
+
     rate_limited = False
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
-    assert process.stdout is not None
-    for line in process.stdout:
-        print(line, end="", flush=True)
-        classification = classify_linear_log_line(line)
-        if classification and write_rate_limit_gate(gate_file, classification):
-            # The official scheduler may be supervising active agents. Record the
-            # reset gate and suspend only the scheduler process; do not
-            # terminate the process tree that may contain active Codex jobs.
-            rate_limited = True
-            gate = read_rate_limit_gate(gate_file)
-            _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
-        else:
-            issue_error = classify_linear_issue_error_log_line(line)
-            if issue_error is not None:
-                record_linear_issue_error(
-                    closure.dead_letter_dir,
-                    issue_error,
-                    issue_errors,
-                    dead_letter_noted,
+    try:
+        while True:
+            # A detached descendant can keep stdout continuously readable after
+            # the scheduler exits, so root completion cannot depend on an empty
+            # output queue. terminate_tree() kills the holder, then the bounded
+            # queue drains through its EOF sentinel.
+            if shutdown.is_set() or process.poll() is not None:
+                terminate_tree()
+            monotonic_now = time.monotonic()
+            if recovery_deadline is not None and monotonic_now >= recovery_deadline:
+                print(
+                    json.dumps(
+                        {"kind": "bounded_repair_expired", "action": "terminate-tree"},
+                        sort_keys=True,
+                    ),
+                    flush=True,
                 )
-        monotonic_now = time.monotonic()
-        if (
-            not closure_observe_only
-            and monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS
-        ):
-            last_closure_check = monotonic_now
-            verdict = read_closure_stop_line(
-                closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-            )
-            if verdict["hold"]:
-                _pause_child_for_closure_hold(
-                    process, closure, verdict, max_gate_sleep_seconds
+                shutdown.set()
+                terminate_tree()
+            if (
+                not closure_observe_only
+                and monotonic_now - last_closure_check
+                >= CLOSURE_HOLD_RECHECK_SECONDS
+            ):
+                last_closure_check = monotonic_now
+                verdict = read_closure_stop_line(
+                    closure.receipt_path,
+                    max_age_seconds=closure.max_receipt_age_seconds,
+                    recovery_manifest_path=closure.recovery_manifest_path,
                 )
-    returncode = process.wait()
+                if verdict["hold"]:
+                    if closure.recovery_manifest_path is not None:
+                        print(
+                            json.dumps(
+                                {
+                                    "kind": "bounded_repair_revoked",
+                                    "reason": verdict.get("reason"),
+                                },
+                                sort_keys=True,
+                            ),
+                            flush=True,
+                        )
+                        shutdown.set()
+                        terminate_tree()
+                    else:
+                        _pause_child_for_closure_hold(
+                            process, closure, verdict, max_gate_sleep_seconds, shutdown
+                        )
+            try:
+                eof, line = output_lines.get(timeout=0.1)
+            except queue.Empty:
+                if shutdown.is_set() or process.poll() is not None:
+                    terminate_tree()
+                continue
+            if eof:
+                break
+            print(line, end="", flush=True)
+            classification = classify_linear_log_line(line)
+            if classification and write_rate_limit_gate(gate_file, classification):
+                # The official scheduler may be supervising active agents. Record the
+                # reset gate and suspend only the scheduler process; do not
+                # terminate the process tree that may contain active Codex jobs.
+                rate_limited = True
+                gate = read_rate_limit_gate(gate_file)
+                _pause_child_for_gate(
+                    process, gate, max_gate_sleep_seconds, shutdown
+                )
+            else:
+                issue_error = classify_linear_issue_error_log_line(line)
+                if issue_error is not None:
+                    record_linear_issue_error(
+                        closure.dead_letter_dir,
+                        issue_error,
+                        issue_errors,
+                        dead_letter_noted,
+                    )
+            if process.poll() is not None:
+                terminate_tree()
+        output_reader.join()
+        returncode = process.wait()
+        terminate_tree()
+    finally:
+        if shutdown.is_set() and process.poll() is None:
+            terminate_tree()
+        if process.stdout is not None:
+            process.stdout.close()
+        close_pidfds()
+        for forwarded, previous in previous_handlers.items():
+            signal.signal(forwarded, previous)
+    if shutdown_signum:
+        return 0
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
 
@@ -1291,7 +2280,9 @@ def run_official_binary(
     closure_sleep_used = 0
     while True:
         verdict = read_closure_stop_line(
-            closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
+            closure.receipt_path,
+            max_age_seconds=closure.max_receipt_age_seconds,
+            recovery_manifest_path=closure.recovery_manifest_path,
         )
         if verdict["hold"] and not closure_observe_only:
             # The closure stop-line holds NEW admission only. Already-running
@@ -1361,6 +2352,31 @@ def run_official_binary(
                 _print_gate_wait_exhausted(gate, max_gate_sleep_seconds)
                 return RATE_LIMIT_EXIT_CODE
             continue
+        if closure.recovery_manifest_path is not None:
+            try:
+                fleet_payload = json.loads(
+                    closure.receipt_path.read_text(encoding="utf-8")
+                )
+                admission = validate_bounded_repair_admission(
+                    closure.recovery_manifest_path,
+                    fleet_path=closure.receipt_path,
+                    fleet_payload=fleet_payload,
+                    expected_command=command,
+                    require_unclaimed=True,
+                )
+                validate_bounded_repair_workspace_isolation(admission)
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                print(
+                    json.dumps(
+                        {
+                            "kind": "bounded_repair_refused",
+                            "reason": str(exc),
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+                return CLOSURE_HOLD_EXIT_CODE
         returncode = run_official_binary_once(
             command,
             gate_file=gate_file,
@@ -1369,6 +2385,8 @@ def run_official_binary(
             max_gate_sleep_seconds=max_gate_sleep_seconds,
         )
         if returncode != RATE_LIMIT_EXIT_CODE:
+            return returncode
+        if closure.recovery_manifest_path is not None:
             return returncode
         gate = read_rate_limit_gate(gate_file)
         if not gate["active"]:
@@ -1530,7 +2548,19 @@ def main(argv: list[str] | None = None) -> int:
         type=pathlib.Path,
         default=DEFAULT_DEAD_LETTER_DIR,
     )
+    run_parser.add_argument(
+        "--recovery-manifest",
+        type=pathlib.Path,
+        help="host-owned single-use bounded local-repair admission",
+    )
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
+
+    recovery_agent_parser = sub.add_parser("recovery-agent")
+    recovery_agent_parser.add_argument("--manifest", type=pathlib.Path, required=True)
+    recovery_agent_parser.add_argument("--issue-identifier", required=True)
+    recovery_agent_parser.add_argument("--issue-id", required=True)
+    recovery_agent_parser.add_argument("--workspace", type=pathlib.Path, required=True)
+    recovery_agent_parser.add_argument("agent_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
 
@@ -1610,9 +2640,22 @@ def main(argv: list[str] | None = None) -> int:
                 hold_receipt_path=args.closure_hold_receipt,
                 dead_letter_dir=args.dead_letter_dir,
                 max_receipt_age_seconds=args.closure_gate_max_age_seconds,
+                recovery_manifest_path=args.recovery_manifest,
             ),
             closure_observe_only=args.closure_observe_only,
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,
+        )
+
+    if args.command == "recovery-agent":
+        command = args.agent_command
+        if command and command[0] == "--":
+            command = command[1:]
+        return run_bounded_repair_agent(
+            args.manifest,
+            command,
+            issue_identifier=args.issue_identifier,
+            issue_id=args.issue_id,
+            workspace=args.workspace,
         )
 
     raise AssertionError(f"unhandled command {args.command}")
