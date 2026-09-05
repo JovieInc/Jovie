@@ -345,7 +345,7 @@ temporary = destination.with_suffix(".json.tmp")
 # update this value while the official workflow hot-reloads, so attest that
 # semantic overlay without restarting or replacing the running Elixir process.
 concurrency_pattern = re.compile(
-    r"^(\s*max_concurrent_agents:\s*)([1-8])(\s*)$",
+    r"^(\s*max_concurrent_agents:\s*)([1-9][0-9]*)(\s*)$",
     re.MULTILINE,
 )
 workflow_source_bytes = pathlib.Path(os.environ["WORKFLOW_SOURCE"]).read_bytes()
@@ -368,8 +368,7 @@ if len(source_matches) == 1 and len(installed_matches) == 1:
         )
 
     workflow_matches = (
-        installed_concurrency <= source_concurrency
-        and normalized(workflow_source) == normalized(workflow_installed)
+        normalized(workflow_source) == normalized(workflow_installed)
     )
     if workflow_matches:
         workflow_match_mode = (

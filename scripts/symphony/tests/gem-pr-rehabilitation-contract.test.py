@@ -635,11 +635,23 @@ exit 0
             attestation["workflow"]["installedSha256"],
         )
 
-    def test_install_rejects_out_of_bounds_concurrency_overlay(self):
+    def test_install_attests_concurrency_above_source_default(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
-            process = self._install(fixture, env, workflow_overlay="9")
+            process = self._install(fixture, env, workflow_overlay="128")
+            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertTrue(attestation["workflow"]["matches"])
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 128)
+
+    def test_install_rejects_nonpositive_concurrency_overlay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, workflow_overlay="0")
             restored_workflow = paths["workflow"].read_text(encoding="utf-8")
             attestation_exists = paths["attestation"].exists()
 
