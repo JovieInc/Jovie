@@ -1066,12 +1066,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
-    def test_queue_empty_closure_red_feeds_hold_intake_not_blocked(self):
-        """native-queue-empty-with-eligible is a feed signal: blocking
-        admission deadlocks (queue stays empty BECAUSE admission is blocked).
-        With main/production green and integrity clear, promotion resumes in
-        hold-intake even while the controller signal is failed (today's
-        controller failure was itself caused by the blocked-mode queue-noop)."""
+    def test_queue_empty_controller_failure_admits_only_exact_repair(self):
         signals = dict(GREEN_SIGNALS)
         signals["controller"] = {
             "status": "failed",
@@ -1088,12 +1083,11 @@ class DeploymentBindingTests(unittest.TestCase):
         }
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "hold-intake")
-        # New-issue intake stays closed; only promotion resumes.
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
         self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
-        # Unrelated closure debt still holds intake, not qualified source promotion.
-        signals["closureHealth"]["reasons"] = [
+        # Unrelated closure debt still holds intake, not qualified source promotion.        signals["closureHealth"]["reasons"] = [
             "native-queue-empty-with-eligible-over-15m",
             "duplicate-issue-lanes-unresolved",
         ]
@@ -1121,7 +1115,6 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertNotEqual(receipt["promotionMode"], "hold-intake")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertFalse(receipt["reviewAdmission"]["allowed"])
-
     def test_stale_or_missing_capacity_closes_mutation_admission(self):
         stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
         for evidence in (
@@ -1452,7 +1445,8 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
                 self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
-    def test_unknown_closure_observation_blocks_controller_repair(self):        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+    def test_unknown_closure_observation_blocks_controller_repair(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["independentReview"] = {
             **GREEN_SIGNALS["independentReview"],
@@ -1468,7 +1462,6 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
         self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
-
     def test_unrelated_closure_debt_still_blocks_controller_repair(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
