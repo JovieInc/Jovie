@@ -86,6 +86,7 @@ export const APP_ROUTES = {
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
   ADMIN_OPS: '/hud',
+  ADMIN_SHIPPING: '/app/ov/shipping',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',
   ADMIN_WAITLIST: '/app/ov/waitlist',
