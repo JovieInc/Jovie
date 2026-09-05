@@ -3008,6 +3008,49 @@ while True: time.sleep(1)
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
 
+            normal_events_before = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            (root / "allow-restart-once").touch()
+            normal_success = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(normal_success.returncode, 0, normal_success.stderr)
+            self.assertIn("DONE", normal_success.stdout)
+            finalized = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-finalized.json"
+                ).read_text()
+            )
+            self.assertEqual(finalized["status"], "committed")
+            self.assertEqual(finalized["cleanupStatus"], "complete")
+            self.assertEqual(finalized["transaction"], str(transaction))
+            normal_events_after = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            self.assertEqual(
+                len(
+                    [
+                        row
+                        for row in normal_events_after
+                        if "restart symphony-elixir.service" in row
+                    ]
+                ),
+                len(
+                    [
+                        row
+                        for row in normal_events_before
+                        if "restart symphony-elixir.service" in row
+                    ]
+                )
+                + 1,
+            )
+
             for path, expected in unsafe_prior.items():
                 path.write_bytes(expected)
 
@@ -3025,7 +3068,7 @@ while True: time.sleep(1)
             restart_events = [
                 row for row in events if "restart symphony-elixir.service" in row
             ]
-            self.assertEqual(len(restart_events), 3, events)
+            self.assertEqual(len(restart_events), 4, events)
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
             self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
