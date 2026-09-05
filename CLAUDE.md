@@ -67,7 +67,7 @@ weaken CI gates, or use `--no-verify`.
 Select a skill by the task's actual intent and callable capabilities, not a keyword
 alone. Load its entry point and only needed references. Edit generated skills in
 `.tmpl` sources and regenerate. Keep provider tuning out of shared policy.
-Use Playwright for repo web QA; don't invoke the removed gstack browse daemon.
+CLAUDE.md stays a router. Use Playwright only for repo web QA; don't invoke the removed gstack browse daemon.
 Batch independent reads; serialize dependent edits and state-changing operations.
 Delegate only when authorized and useful; give each worker a bounded scope and
 require evidence before integrating its result.
