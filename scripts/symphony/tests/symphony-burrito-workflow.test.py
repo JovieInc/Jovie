@@ -94,6 +94,10 @@ def _closure_run_args(tmp):
 
 def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
     root = pathlib.Path(tmp)
+    manifest_path = root / "repair-admission.json"
+    workspace_root = root / "workspaces"
+    issue_workspace = workspace_root / "JOV-9999"
+    issue_workspace.mkdir(parents=True)
     source = root / "source"
     source.mkdir()
     subprocess.run(["git", "init", "-q", str(source)], check=True)
@@ -115,20 +119,38 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         )
         .replace("max_concurrent_agents: 8", "max_concurrent_agents: 1")
         .replace("max_turns: 20", "max_turns: 1")
+        .replace("root: ~/symphony-elixir-workspaces", f"root: {workspace_root}")
+        .replace("thread_sandbox: workspace-write", "thread_sandbox: read-only")
+        .replace("type: workspaceWrite", "type: readOnly")
         .replace("networkAccess: true", "networkAccess: false"),
         encoding="utf-8",
     )
     router = root / "router"
-    router.write_text("router\n", encoding="utf-8")
+    router.write_text(
+        "#!/bin/sh\n"
+        "test -z \"${GITHUB_TOKEN+x}\"\n"
+        "test -z \"${GH_TOKEN+x}\"\n"
+        "test -z \"${LINEAR_API_KEY+x}\"\n"
+        "test \"$SYMPHONY_RECOVERY_ISSUE_IDENTIFIER\" = JOV-9999\n"
+        "test \"$SYMPHONY_RECOVERY_ISSUE_ID\" = 12345678-1234-1234-1234-123456789abc\n"
+        "echo bounded-repair-ran\n",
+        encoding="utf-8",
+    )
+    router.chmod(0o700)
     workflow.write_text(
         workflow.read_text(encoding="utf-8").replace(
             "./scripts/symphony/symphony-codex-router app-server",
-            f"{router} app-server",
+            f"{HELPER_PATH} recovery-agent --manifest {manifest_path} -- {router} app-server",
         ),
         encoding="utf-8",
     )
     binary = root / "binary"
-    binary.write_text("#!/bin/sh\necho bounded-repair-ran\n", encoding="utf-8")
+    binary.write_text(
+        "#!/bin/sh\n"
+        f"cd {issue_workspace}\n"
+        f"exec {HELPER_PATH} recovery-agent --manifest {manifest_path} -- {router} app-server\n",
+        encoding="utf-8",
+    )
     binary.chmod(0o700)
     account = root / "codex-account.env"
     account.write_text("CODEX_HOME=/tmp/codex-fourth\n", encoding="utf-8")
@@ -180,6 +202,7 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         "sourceRoot": str(source),
         "sourceCommit": commit,
         "accountHome": "/tmp/codex-fourth",
+        "workspaceRoot": str(workspace_root),
         "schedulerCommand": command,
         "claimPath": str(root / "repair.claim.json"),
         "artifacts": {
@@ -187,7 +210,6 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
             for name, path in artifact_paths.items()
         },
     }
-    manifest_path = root / "repair-admission.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     manifest_path.chmod(0o600)
     return gate, fleet, manifest_path, manifest, command
@@ -1440,7 +1462,13 @@ while True: time.sleep(1)
     def test_bounded_repair_admits_one_exact_job_while_canonical_closure_is_red(self):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
-            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            os.environ,
+            {
+                "CODEX_HOME": "/tmp/codex-fourth",
+                "GITHUB_TOKEN": "must-not-reach-agent",
+                "GH_TOKEN": "must-not-reach-agent",
+                "LINEAR_API_KEY": "must-not-reach-agent",
+            },
         ):
             gate, _fleet, manifest_path, _manifest, command = _bounded_repair_fixture(
                 tmp, helper
@@ -1470,6 +1498,12 @@ while True: time.sleep(1)
             self.assertIn("bounded-repair-ran", first.stdout)
             claim = json.loads((pathlib.Path(tmp) / "repair.claim.json").read_text())
             self.assertEqual(claim["issueIdentifier"], "JOV-9999")
+            self.assertEqual(
+                claim["issueId"], "12345678-1234-1234-1234-123456789abc"
+            )
+            self.assertEqual(
+                claim["workspace"], str(pathlib.Path(tmp) / "workspaces/JOV-9999")
+            )
             self.assertEqual(gate.read_bytes(), canonical_bytes)
 
             second = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
@@ -1486,6 +1520,7 @@ while True: time.sleep(1)
             "push": lambda manifest, fleet: manifest.update(pushAllowed=True),
             "wrong-source": lambda manifest, fleet: manifest.update(sourceCommit="0" * 40),
             "wrong-account": lambda manifest, fleet: manifest.update(accountHome="/tmp/other"),
+            "wrong-workspace": lambda manifest, fleet: manifest.update(workspaceRoot="/tmp/other"),
             "wrong-command": lambda manifest, fleet: manifest.update(schedulerCommand=["false"]),
             "bad-hash": lambda manifest, fleet: manifest["artifacts"]["workflow"].update(sha256="0" * 64),
             "local-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(localAllowed=False),
@@ -1528,6 +1563,49 @@ while True: time.sleep(1)
                     )
                 else:
                     self.assertTrue(verdict["reason"].startswith("bounded-repair-refused:"))
+
+    def test_bounded_repair_workflow_sections_cannot_be_spoofed_by_decoys(self):
+        helper = _load_helper()
+        variants = {
+            "max-turns": (
+                "max_turns: 1",
+                "max_turns: 99\nreview_metadata:\n  max_turns: 1",
+                "max-turns-not-one",
+            ),
+            "network": (
+                "networkAccess: false",
+                "networkAccess: true\nreview_metadata:\n  networkAccess: false",
+                "network-not-false",
+            ),
+            "sandbox": (
+                "thread_sandbox: read-only",
+                "thread_sandbox: workspace-write",
+                "thread-sandbox-not-read-only",
+            ),
+        }
+        for name, (old, new, reason) in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                gate, fleet, manifest_path, manifest, _command = _bounded_repair_fixture(
+                    tmp, helper
+                )
+                workflow = pathlib.Path(manifest["artifacts"]["workflow"]["path"])
+                workflow.write_text(
+                    workflow.read_text(encoding="utf-8").replace(old, new),
+                    encoding="utf-8",
+                )
+                manifest["artifacts"]["workflow"]["sha256"] = hashlib.sha256(
+                    workflow.read_bytes()
+                ).hexdigest()
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+                with self.assertRaisesRegex(ValueError, reason):
+                    helper.validate_bounded_repair_admission(
+                        manifest_path,
+                        fleet_path=gate,
+                        fleet_payload=fleet,
+                    )
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux subreaper proof")
     def test_bounded_repair_expiry_terminates_root_and_detached_descendant(self):
