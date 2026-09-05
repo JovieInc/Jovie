@@ -12,7 +12,10 @@ export const h = vi.hoisted(() => ({
   persistTerminalAssistantMessageWithReceipt: vi.fn(),
   prepareOvieChatTurn: vi.fn(),
   isSummerTransportEnabled: vi.fn(),
-  bindCurrentSummerQueueSpeaker: vi.fn(),
+  bindEveSummerSpeaker: vi.fn(),
+  getBoundSummerSpeaker: vi.fn(),
+  authorizeFounderSummerUser: vi.fn(),
+  founderPrincipalHash: vi.fn(),
   runOvieSummerTurn: vi.fn(),
 }));
 
@@ -42,10 +45,15 @@ vi.mock('@/lib/ovie/chat-entry', () => ({
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
   getOvieOperatingStore: () => ({}),
 }));
-vi.mock('@/lib/ovie/summer-queue-speaker', () => ({
-  bindCurrentSummerQueueSpeaker: h.bindCurrentSummerQueueSpeaker,
+vi.mock('@/lib/ovie/summer-eve-speaker', () => ({
+  bindEveSummerSpeaker: h.bindEveSummerSpeaker,
+}));
+vi.mock('@/lib/ovie/summer-founder-auth', () => ({
+  authorizeFounderSummerUser: h.authorizeFounderSummerUser,
+  founderPrincipalHash: h.founderPrincipalHash,
 }));
 vi.mock('@/lib/ovie/summer-transport', () => ({
+  getBoundSummerSpeaker: h.getBoundSummerSpeaker,
   isSummerTransportEnabled: h.isSummerTransportEnabled,
   runOvieSummerTurn: h.runOvieSummerTurn,
 }));
@@ -97,6 +105,8 @@ export function resetSummerMocks() {
   h.resolveChatAccountContext.mockResolvedValue({ plan: 'pro' });
   h.checkAiChatRateLimitForPlan.mockResolvedValue({ success: true });
   h.isSummerTransportEnabled.mockReturnValue(true);
+  h.authorizeFounderSummerUser.mockReturnValue('authorized');
+  h.founderPrincipalHash.mockReturnValue('founder_hash');
   h.markChatTurnStreaming.mockResolvedValue(undefined);
   h.markChatTurnTerminal.mockResolvedValue(true);
   h.resumeStaleChatTurn.mockResolvedValue('resumed');
@@ -105,9 +115,13 @@ export function resetSummerMocks() {
     message: { id: 'assistant_1' },
     persisted: true,
   });
-  h.bindCurrentSummerQueueSpeaker.mockReturnValue({
+  h.bindEveSummerSpeaker.mockReturnValue({
     id: 'summer',
-    runtime: 'mac',
+    runtime: 'eve',
+  });
+  h.getBoundSummerSpeaker.mockReturnValue({
+    id: 'summer',
+    runtime: 'eve',
   });
   h.reserveChatTurn.mockResolvedValue({
     outcome: 'reserved',
