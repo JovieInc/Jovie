@@ -280,16 +280,30 @@ describe('Auto-Ready provenance selector', () => {
   });
 
   it.each([
-    'needs:taste',
     'security',
-    'needs-human',
     'hold',
-    'no-auto',
+    'gated',
+    'queue-deferred',
   ])('never mutates a hard-held PR labeled %s', label => {
     expect(
       promotion({ authorLogin: 'jovie-bot[bot]', labels: [label] })
     ).toEqual({ eligible: false, reason: 'held' });
     expect(AUTO_READY_HOLD_LABELS).toEqual(expect.arrayContaining([label]));
+  });
+
+  it.each([
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('ignores the legacy %s label during writer promotion', label => {
+    expect(promotion({ labels: [label] })).toMatchObject({ eligible: true });
+    expect(AUTO_READY_HOLD_LABELS).not.toContain(label);
   });
 
   it('fails closed when the live head moved away from the classified commit', () => {

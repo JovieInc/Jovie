@@ -446,7 +446,7 @@ export async function fetchOpenPrSummaries(repo, limit = 200) {
   );
 }
 
-const HARD_GATE_LABELS = new Set(['needs-human', 'hold', 'gated']);
+const HARD_GATE_LABELS = new Set(['hold', 'gated']);
 
 export function isHardGated(labels) {
   return (labels ?? []).some(label =>

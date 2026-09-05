@@ -125,7 +125,7 @@ while IFS= read -r pr; do
     .draft
     and .headOwner == $repo_owner
     and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+    and (([.L[]] | any(. == "hold" or . == "gated" or . == "incident" or . == "fast")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -139,7 +139,7 @@ LINT_PR="$(echo "$SNAP" | jq -c --arg repo_owner "$REPO_OWNER" '[.[] |
     .draft
     and .headOwner == $repo_owner
     and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+    and (([.L[]] | any(. == "hold" or . == "gated" or . == "incident" or . == "fast")) | not)
     and ([.fail[]] | any(test("(?i)lint|biome")))
   )
 ]')"
