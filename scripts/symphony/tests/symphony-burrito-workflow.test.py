@@ -1511,15 +1511,73 @@ while True: time.sleep(1)
             self.assertNotIn("bounded-repair-ran", second.stdout)
             self.assertIn("recovery-manifest-already-claimed", second.stdout)
 
+    def test_bounded_repair_claim_is_exclusive_under_concurrent_agent_start(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            _gate, _fleet, manifest_path, manifest, _command = (
+                _bounded_repair_fixture(tmp, helper)
+            )
+            router = pathlib.Path(manifest["artifacts"]["router"]["path"])
+            router.write_text(
+                "#!/bin/sh\nsleep 0.2\necho bounded-repair-ran\n",
+                encoding="utf-8",
+            )
+            router.chmod(0o700)
+            manifest["artifacts"]["router"]["sha256"] = hashlib.sha256(
+                router.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_path.chmod(0o600)
+            agent_command = [
+                "python3",
+                str(HELPER_PATH),
+                "recovery-agent",
+                "--manifest",
+                str(manifest_path),
+                "--",
+                str(router),
+                "app-server",
+            ]
+            workspace = pathlib.Path(manifest["workspaceRoot"]) / "JOV-9999"
+            processes = [
+                subprocess.Popen(
+                    agent_command,
+                    cwd=workspace,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for _ in range(2)
+            ]
+            results = [process.communicate(timeout=10) for process in processes]
+            self.assertEqual(
+                sorted(process.returncode for process in processes),
+                [0, helper.CLOSURE_HOLD_EXIT_CODE],
+            )
+            self.assertEqual(
+                sum("bounded-repair-ran" in stdout for stdout, _stderr in results),
+                1,
+            )
+            self.assertEqual(
+                sum("recovery-manifest-already-claimed" in stdout
+                    for stdout, _stderr in results),
+                1,
+            )
+
     def test_bounded_repair_refusal_matrix_fails_closed(self):
         helper = _load_helper()
         mutations = {
+            "wrong-issue": lambda manifest, fleet: manifest.update(issueIdentifier="JOV-9998"),
             "wrong-label": lambda manifest, fleet: manifest.update(requiredLabel="repair"),
             "max-two": lambda manifest, fleet: manifest.update(maxConcurrent=2),
             "new-intake": lambda manifest, fleet: manifest.update(newIssueIntakeAllowed=True),
             "push": lambda manifest, fleet: manifest.update(pushAllowed=True),
             "wrong-source": lambda manifest, fleet: manifest.update(sourceCommit="0" * 40),
             "wrong-account": lambda manifest, fleet: manifest.update(accountHome="/tmp/other"),
+            "bad-account-hash": lambda manifest, fleet: manifest["artifacts"]["accountEnv"].update(sha256="0" * 64),
+            "wrong-activity": lambda manifest, fleet: manifest.update(activity="focused-tests"),
             "wrong-workspace": lambda manifest, fleet: manifest.update(workspaceRoot="/tmp/other"),
             "wrong-command": lambda manifest, fleet: manifest.update(schedulerCommand=["false"]),
             "bad-hash": lambda manifest, fleet: manifest["artifacts"]["workflow"].update(sha256="0" * 64),
@@ -1644,6 +1702,62 @@ while True: time.sleep(1)
                 self.assertLess(time.monotonic() - started, 8)
             finally:
                 helper.CLOSURE_HOLD_RECHECK_SECONDS = old_recheck
+            child_pid = int(child_pid_path.read_text())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux subreaper proof")
+    def test_bounded_repair_gate_revocation_terminates_root_and_detached_descendant(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, fleet, manifest_path, _manifest, _command = (
+                _bounded_repair_fixture(tmp, helper)
+            )
+            child_pid_path = pathlib.Path(tmp) / "child.pid"
+            script = (
+                "import os,pathlib,time; "
+                "pid=os.fork(); "
+                f"path=pathlib.Path({str(child_pid_path)!r}); "
+                "(os.setsid(),path.write_text(str(os.getpid())),time.sleep(60)) if pid==0 "
+                "else (print('root-ready',flush=True),time.sleep(60))"
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead",
+                recovery_manifest_path=manifest_path,
+            )
+
+            def revoke_gate():
+                deadline = time.monotonic() + 5
+                while not child_pid_path.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(child_pid_path.exists())
+                fleet["remediationAdmission"]["localAllowed"] = False
+                temporary = gate.with_suffix(".next")
+                temporary.write_text(json.dumps(fleet), encoding="utf-8")
+                os.replace(temporary, gate)
+
+            mutator = threading.Thread(target=revoke_gate)
+            old_recheck = helper.CLOSURE_HOLD_RECHECK_SECONDS
+            helper.CLOSURE_HOLD_RECHECK_SECONDS = 0.05
+            output = io.StringIO()
+            try:
+                mutator.start()
+                with contextlib.redirect_stdout(output):
+                    helper.run_official_binary_once(
+                        [sys.executable, "-c", script],
+                        gate_file=pathlib.Path(tmp) / "rate.json",
+                        closure=closure,
+                        max_gate_sleep_seconds=0,
+                    )
+                mutator.join(timeout=5)
+                self.assertFalse(mutator.is_alive())
+            finally:
+                helper.CLOSURE_HOLD_RECHECK_SECONDS = old_recheck
+            self.assertIn("bounded_repair_revoked", output.getvalue())
             child_pid = int(child_pid_path.read_text())
             with self.assertRaises(ProcessLookupError):
                 os.kill(child_pid, 0)
