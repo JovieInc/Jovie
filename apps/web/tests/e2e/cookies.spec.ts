@@ -17,6 +17,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { primeVercelBypassCookie } from '../helpers/vercel-preview';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /** The cookie name the middleware uses to flag consent-required regions */
@@ -29,6 +30,7 @@ async function openHomepageWithBanner(
   page: import('@playwright/test').Page
 ): Promise<void> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  await primeVercelBypassCookie(page, baseUrl);
 
   // Remove stored consent so the banner renders even on repeat runs
   await page.addInitScript(() => {
