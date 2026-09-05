@@ -102,18 +102,12 @@ export async function isProductionRed() {
  * protected, stale, terminal, malformed, and ambiguous evidence all fail
  * closed and contribute zero capacity.
  */
+// JOV-INV-028: human-review labels do not erase active machine capacity.
 const PROTECTED_LEASE_LABELS = new Set([
   'blocked',
   'codex-blocked',
-  'founder-fast-track',
-  'human-review-required',
   'incident',
-  'needs-human',
-  'no-auto',
   'protected',
-  'risk:high',
-  'tim-approved',
-  'tim-owned',
 ]);
 const MACHINE_AGENT_PATTERN =
   /jovie agent|codex issue shipper|machine-agent|machine agent/i;

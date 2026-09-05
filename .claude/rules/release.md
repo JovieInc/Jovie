@@ -63,7 +63,7 @@ required before ready/landing.
   `main` (see [`.claude/rules/ci-branching.md`](ci-branching.md)). An explicitly
   authorized dependent stack is the exception: use the native root-to-`main`,
   child-to-parent-draft, then retarget/rebase sequence in `pr-stacking.md`.
-- **Human / hotfix:** `hotfix/*` or `needs-human` labeled PRs may target `main` with full CI.
+- **Hotfix:** `hotfix/*` PRs may target `main` with full CI.
 - If a PR has been open >24h without progress, close it and re-create from fresh integration base or `main`.
 
 ### Incremental Shipping (Ship Fast, Fail Fast)
@@ -128,23 +128,22 @@ Labels are part of the CI control plane, not just project organization. Apply in
   action unsubmitted and track that authority gate separately.
 - **Do NOT use `needs-human` for taste/design issues** — taste is advisory and routes to LLM review, not a human queue.
 
-- Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
-- Do **NOT** add `automerge` to high-risk paths or to PRs that also need `needs-human`.
+- Use `automerge` only when the required machine gates below are present.
 
 - For a bounded preview, dispatch `CI` on the exact ref with `run_preview_deploy=true` (optionally setting `preview_work_id` / `preview_reason`). External Vercel preview status remains informational.
 - Hosted previews and ephemeral databases are explicit, expiring exceptions (JOV-5941). A PR never auto-creates them: the Vercel Git integration skips every non-`main`/`production` ref (`ignoreCommand` in each `vercel.json`), and Neon branches are created only by manual dispatch or scheduled evidence lanes. Every admitted environment carries the `jovie-preview-env-admission/v1` contract (work ID, exact SHA, policy, reason, required evidence, owner, surface, created/expires, cleanup trigger + expected proof, cost budget) emitted by `scripts/ci/preview-env-admission.mjs`, and teardown emits a `jovie-preview-env-cleanup/v1` receipt. The canonical registry of admitted creation sites is `.github/preview-env-registry.json`; the machine guard `scripts/lib/__tests__/preview-env-contract.test.mjs` fails when any workflow creates previews/databases outside it. Terminal events (`pull_request: closed`) trigger `neon-ephemeral-branch-cleanup.yml` + `vercel-preview-cleanup.yml`; the daily `neon-scheduled-cleanup.yml` heartbeat reconciles missed events. The Ovie HUD (`/hud`, "Env exceptions" section) shows active exceptions with owner, age, cost budget, evidence purpose, and cleanup state.
 - Do **NOT** add a label expecting it to start preview or deep CI.
 
 - Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
-- If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
+- If a migration-related PR seems to require `skip-migration-guard`, keep the bypass absent and repair the migration until the machine gate passes.
 
 - Taste gate labels (`needs-human-taste`, `needs:taste`) are **advisory and do not block merge** per the 2026-07-06 autonomous shipping policy. Taste-flagged PRs route to strong LLM review and ship. Do not hand-edit these labels; the classifier owns them.
 
 ## Auto-Merge Path Guardrails
 
-Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual review.
+All PRs land autonomously. High-risk paths require stronger machine evidence.
 
-**Auto-merge BLOCKED (require manual review):**
+**Auto-merge requires targeted deep evidence:**
 
 | Path / Area | Why |
 |-------------|-----|
@@ -164,7 +163,7 @@ Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual
 | Dependency bumps (non-breaking) | Lockfile-only, patch/minor version bumps |
 | Linting / formatting fixes | Biome auto-fixes, whitespace, import sorting |
 
-When in doubt, skip auto-merge and request review.
+When evidence is incomplete, keep remediation running until the relevant machine gate passes.
 
 ## Pre-PR Checklist (required before opening any PR)
 

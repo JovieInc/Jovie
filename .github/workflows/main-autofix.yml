@@ -10,7 +10,8 @@ name: Main Autofix
 #  - The failed CI run must already be on run_attempt >= 2.
 #  - An exact-SHA repair workflow, PR, or durable ownership marker must not exist.
 #  - Ownership is recorded before fixed-runner work so cancellation cannot loop.
-#  - ≥2 distinct SHAs recorded durable autofix ownership within 60 min → escalate to needs-human.
+#  - ≥2 distinct SHAs recorded durable autofix ownership within 60 min → emit a
+#    durable exhaustion receipt while automated remediation stays available.
 #
 # Per-SHA limits (enforced by durable status history plus PR history):
 #  - Dedup: no new PR if an open autofix PR for the SHA already exists.
@@ -247,12 +248,6 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          # Label the most recent autofix PR for this SHA as needs-human so it's visible in review queue.
-          LATEST_PR=$(gh pr list --repo "$GH_REPO" --label autofix --state all --limit 200 --json number,title --jq "[.[] | select(.title | contains(\"$SHORT_SHA\"))][0].number" || echo "")
-          if [ -n "$LATEST_PR" ]; then
-            gh pr edit --repo "$GH_REPO" "$LATEST_PR" --add-label "needs-human" || true
-          fi
-
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
             PAYLOAD=$(jq -n --arg sha "$SHORT_SHA" '{
               text: "🚨 Main autofix attempt cap reached",
@@ -260,7 +255,7 @@ jobs:
                 color: "danger",
                 fields: [
                   { title: "Failing SHA", value: $sha, short: true },
-                  { title: "Reason", value: "3 autofix attempts exhausted for this SHA. Human review required.", short: false }
+                  { title: "Reason", value: "3 autofix attempts exhausted for this lease. The failing machine gate stays authoritative and another automated remediation route may continue.", short: false }
                 ]
               }]
             }')
@@ -685,7 +680,7 @@ jobs:
           }')
           curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
 
-      - name: Fallback — mark PR as needs-human if validation failed
+      - name: Fallback — keep failed validation available for remediation
         if: failure() && steps.create-pr.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -696,13 +691,9 @@ jobs:
             echo "No PR to update."
             exit 0
           fi
-          gh pr ready --repo "$GH_REPO" "$PR_NUMBER" --undo 2>/dev/null || true
-          gh pr edit --repo "$GH_REPO" "$PR_NUMBER" --add-label "needs-human" 2>/dev/null || true
           gh pr comment --repo "$GH_REPO" "$PR_NUMBER" --body "## ⚠️ Autofix validation failed
 
-          The automated fix did not pass verify. A human developer needs to review and complete the fix.
-
-          The \`needs-human\` label has been added and auto-merge is disabled (PR converted to draft)." 2>/dev/null || true
+          The automated fix did not pass verification. The failing machine gate remains authoritative and the PR stays available for the next automated remediation lease." 2>/dev/null || true
 
       - name: Finalize exact-SHA repair ownership
         if: ${{ always() }}

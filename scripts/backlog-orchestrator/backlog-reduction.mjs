@@ -1,13 +1,9 @@
 export const BACKLOG_REDUCTION_SCHEMA = 'backlog-reduction/v1';
 
+// JOV-INV-028: backlog cleanup protects machine incidents, not human labels.
 const PROTECTED_LABELS = new Set([
   'incident',
   'security',
-  'needs-human',
-  'human-review-required',
-  'risk:high',
-  'tim-owned',
-  'no-auto',
   'blocked',
 ]);
 const ACTIVE_STATES = new Set(['In Progress', 'In Review']);

@@ -109,7 +109,8 @@ export function buildLaneCapacityReceipt(
       pr?.isDraft === false &&
       pr?.mergeStateStatus === 'CLEAN' &&
       !(pr?.labels || []).some(label =>
-        ['hold', 'gated', 'queue-deferred', 'needs-human'].includes(label?.name)
+        // JOV-INV-028: legacy human labels never consume protected capacity.
+        ['hold', 'gated', 'queue-deferred'].includes(label?.name)
       )
   );
   for (const pr of ready) {

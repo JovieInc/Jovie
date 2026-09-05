@@ -443,17 +443,13 @@ export function queryTodoIssues(input = {}, exec = defaultExec) {
 
 /** @param {{ title?: string, body?: string | null, labels?: ReadonlyArray<{ name: string }> }} issue */
 export function shouldDispatchIssue(issue) {
+  // JOV-INV-028: legacy human/no-auto labels never suppress machine intake.
   if (GITHUB_ISSUE_INTAKE_RETIRED)
     return false; /* v8 ignore start -- retired */
   const labels = (issue.labels ?? []).map(label => label.name.toLowerCase());
   const text = `${issue.title ?? ''}${issue.body ?? ''}`.toLowerCase();
 
-  if (labels.includes('human-review-required')) return false;
-  if ((issue.body ?? '').includes('This issue requires human review')) {
-    return false;
-  }
   if (labels.includes('type:epic')) return false;
-  if (labels.includes('no-auto')) return false;
   if (labels.includes('codex-blocked')) return false;
   if (labels.includes('codex-in-progress')) return false;
   if (

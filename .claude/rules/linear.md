@@ -4,22 +4,13 @@ How agents claim, transition, and finish Linear-tracked work without colliding w
 
 ## Issue Gating
 
-Before working on any Linear issue, check for the `human-review-required` label. If present, **SKIP** the issue entirely. Do not attempt to work on it, close it, or add comments. These issues require human decision-making.
-
-Also skip any issue whose description contains:
-
-> "This issue requires human review"
-
-When scanning Linear for issues to work on, always filter with:
-- Exclude label: `human-review-required`
-- Exclude description containing: "This issue requires human review"
-
-### When to apply the `human-review-required` label
-
-- Automation/infrastructure setup tasks
-- Architectural decisions requiring human judgment
-- Process or workflow changes
-- Issues filed by automated scanners that haven't been triaged
+<!-- JOV-INV-028 -->
+Legacy `human-review-required`, `needs-human`, and `no-auto` labels are invalid
+automation holds. Remove them when encountered and continue through the normal
+machine gates. Product taste is steered before PR creation or certified after
+landing behind a feature flag. A physical or external action ships disabled and
+is tracked as a separate post-landing authority action; it never parks the code
+or issue.
 
 ## Durable Follow-Up Capture
 

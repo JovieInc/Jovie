@@ -63,13 +63,15 @@ describe('intake readiness classifier', () => {
     );
   });
 
-  it('routes explicit human holds as decision-required', () => {
-    for (const label of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ]) {
+  it('ignores legacy human labels and preserves machine incident holds', () => {
+    for (const label of ['needs-human', 'decision-required', 'no-auto']) {
+      const result = classifyIntakeReadiness(
+        issue({ labels: { nodes: [{ name: label }] } })
+      );
+      assert.equal(result.disposition, 'mechanical-ready');
+      assert.equal(result.requiresHumanDecision, false);
+    }
+    for (const label of ['held', 'manual-incident']) {
       const result = classifyIntakeReadiness(
         issue({ labels: { nodes: [{ name: label }] } })
       );
