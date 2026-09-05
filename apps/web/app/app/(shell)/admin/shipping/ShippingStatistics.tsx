@@ -85,7 +85,7 @@ export function ShippingStatistics() {
         <div className='flex items-center justify-between gap-3'>
           <h2
             id='shipping-pipeline-title'
-            className='text-sm font-semibold text-primary-token'
+            className='text-sm font-semibold text-primary-token line-clamp-2'
           >
             Current Pipeline
           </h2>
@@ -161,7 +161,7 @@ export function ShippingStatistics() {
       >
         <h2
           id='shipping-runtime-title'
-          className='text-sm font-semibold text-primary-token'
+          className='text-sm font-semibold text-primary-token line-clamp-2'
         >
           Deployment And Runtime
         </h2>
