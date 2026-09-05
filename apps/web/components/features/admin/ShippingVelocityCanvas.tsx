@@ -178,7 +178,7 @@ export function ShippingVelocityCanvas({
                   'Closed Without Merge',
                   'Median hours to merge',
                 ].map(label => (
-                  <th key={label} scope='col' className='p-2'>
+                  <th key={label} scope='col' className='p-2 whitespace-nowrap'>
                     {label}
                   </th>
                 ))}
@@ -187,7 +187,7 @@ export function ShippingVelocityCanvas({
             <tbody>
               {data.map(row => (
                 <tr key={row.date}>
-                  <th scope='row' className='p-2'>
+                  <th scope='row' className='p-2 whitespace-nowrap'>
                     {row.date}
                   </th>
                   <td className='p-2'>{row.merged}</td>
