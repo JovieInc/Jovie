@@ -56,6 +56,8 @@ REQUIRED_POLICY_RULES = (
     "never_pay_api_for_a_family_with_remaining_included_pool",
     "never_spend_api_that_would_have_been_cheaper_as_a_renewed_sub",
     "gateway_only_after_included_pools_are_exhausted",
+    "gateway_models_allowlist_only",
+    "gateway_daily_budget_enforced",
     "no_claude",
     "no_composer",
     "no_on_demand_overage",
@@ -71,9 +73,32 @@ def validate_registry(data):
     rules = policy.get("rules")
     if not isinstance(rules, list) or any(rule not in rules for rule in REQUIRED_POLICY_RULES):
         raise ValueError("routing_policy.rules missing required cost rules")
+    gateway_allowlist = policy.get("gateway_model_allowlist")
+    forbidden_families = policy.get("gateway_forbidden_families")
+    if not isinstance(gateway_allowlist, list) or not gateway_allowlist:
+        raise ValueError("routing_policy.gateway_model_allowlist missing")
+    if not isinstance(forbidden_families, list) or not forbidden_families:
+        raise ValueError("routing_policy.gateway_forbidden_families missing")
+    if not isinstance(policy.get("gateway_daily_budget_usd"), (int, float)) or policy["gateway_daily_budget_usd"] <= 0:
+        raise ValueError("routing_policy.gateway_daily_budget_usd invalid")
+    owner_budgets = policy.get("owner_daily_budget_usd")
+    if not isinstance(owner_budgets, dict) or any(
+        not isinstance(owner, str)
+        or not isinstance(amount, (int, float))
+        or amount <= 0
+        for owner, amount in owner_budgets.items()
+    ):
+        raise ValueError("routing_policy.owner_daily_budget_usd invalid")
     models = data.get("models")
     if not isinstance(models, list) or not models:
         raise ValueError("models missing")
+    subscription_families = {
+        model.get("family")
+        for model in models
+        if isinstance(model, dict)
+        and model.get("channel") in {"subscription", "local"}
+        and isinstance(model.get("family"), str)
+    }
     ids = []
     for model in models:
         if not isinstance(model, dict):
@@ -94,6 +119,11 @@ def validate_registry(data):
         for price in ("list_price_in", "list_price_out"):
             if not isinstance(model[price], (int, float)) or model[price] < 0:
                 raise ValueError(f"{mid}: {price} must be >= 0")
+        if model["channel"] == "api":
+            if model["provider"] != "vercel-ai-gateway" or model["model"] not in gateway_allowlist:
+                raise ValueError(f"{mid}: gateway model is not allowlisted")
+            if model["family"] in forbidden_families or model["family"] in subscription_families:
+                raise ValueError(f"{mid}: gateway family is subscription-covered or forbidden")
         ids.append(mid)
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate model ids")
@@ -290,6 +320,14 @@ def _job_list_cost(model, tokens_in, tokens_out):
     ) * float(model.get("list_price_out") or 0)
 
 
+def _job_budget_cost(model, tokens_in, tokens_out):
+    return (tokens_in / 1_000_000.0) * float(
+        model.get("budget_price_in", model.get("list_price_in")) or 0
+    ) + (tokens_out / 1_000_000.0) * float(
+        model.get("budget_price_out", model.get("list_price_out")) or 0
+    )
+
+
 def _family_has_included(models, st, family, now, exclude_pools=()):
     if not family:
         return False
@@ -313,11 +351,45 @@ def _family_sub(models, family):
     return None
 
 
-def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
+def _gateway_daily_state(st, now):
+    day = time.strftime("%Y-%m-%d", time.gmtime(now))
+    current = st.get("gateway_daily")
+    if not isinstance(current, dict) or current.get("day") != day:
+        current = {"day": day, "total_usd": 0.0, "owners": {}}
+        st["gateway_daily"] = current
+    if not isinstance(current.get("owners"), dict):
+        current["owners"] = {}
+    return current
+
+
+def _gateway_budget(cfg, st, owner, job_cost, now):
+    policy = cfg["routing_policy"]
+    daily = _gateway_daily_state(st, now)
+    global_cap = float(policy["gateway_daily_budget_usd"])
+    owner_cap = float((policy.get("owner_daily_budget_usd") or {}).get(owner, global_cap))
+    global_spend = float(daily.get("total_usd") or 0)
+    owner_spend = float(daily["owners"].get(owner) or 0)
+    evidence = {
+        "day": daily["day"],
+        "global_cap_usd": global_cap,
+        "global_spend_usd": round(global_spend, 4),
+        "owner": owner,
+        "owner_cap_usd": owner_cap,
+        "owner_spend_usd": round(owner_spend, 4),
+    }
+    if global_spend + job_cost > global_cap:
+        return False, "gateway_daily_budget_exhausted", evidence
+    if owner_spend + job_cost > owner_cap:
+        return False, "owner_daily_budget_exhausted", evidence
+    return True, "gateway_budget_ready", evidence
+
+
+def score_candidate(cfg, model, st, capability, now, exclude_pools=(), owner="gem"):
     """Return (ok, reason, rank, extra). Lower rank wins."""
     policy = cfg.get("routing_policy") or {}
     tokens_in, tokens_out = _job_tokens(cfg, capability)
     list_cost = _job_list_cost(model, tokens_in, tokens_out)
+    budget_cost = _job_budget_cost(model, tokens_in, tokens_out)
     channel = model.get("channel") or (
         "api" if str(model.get("cost_tier") or "").startswith("gateway") else "subscription"
     )
@@ -350,8 +422,14 @@ def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
             }
             return False, "renew_sub_not_api", None, extra
 
-    extra["marginal_usd"] = round(list_cost, 4)
-    return True, "api", (1, list_cost, -quality, model["id"]), extra
+    budget_ok, budget_reason, budget = _gateway_budget(cfg, st, owner, budget_cost, now)
+    extra["gateway_budget"] = budget
+    extra["budget_reservation_usd"] = round(budget_cost, 4)
+    if not budget_ok:
+        return False, budget_reason, None, extra
+
+    extra["marginal_usd"] = round(budget_cost, 4)
+    return True, "api", (1, int(model.get("gateway_priority") or 0), list_cost, -quality, model["id"]), extra
 
 
 def record_api_spend(st, family, amount):
@@ -360,6 +438,62 @@ def record_api_spend(st, family, amount):
     spend = st.setdefault("api_spend", {})
     spend[family] = float(spend.get(family) or 0) + float(amount)
     save_state(st)
+
+
+def record_gateway_daily_spend(st, owner, amount, now):
+    if amount <= 0:
+        return
+    daily = _gateway_daily_state(st, now)
+    daily["total_usd"] = float(daily.get("total_usd") or 0) + float(amount)
+    owners = daily["owners"]
+    owners[owner] = float(owners.get(owner) or 0) + float(amount)
+    save_state(st)
+
+
+def update_gateway_exhaustion_episode(st, owner, exhausted, reason, evidence, now):
+    """Persist one notification intent for each Summer budget exhaustion episode."""
+    if owner != "summer":
+        return None
+    day = time.strftime("%Y-%m-%d", time.gmtime(now))
+    episodes = st.setdefault("gateway_exhaustion_episodes", {})
+    current = episodes.get(owner)
+    if not isinstance(current, dict) or current.get("day") != day:
+        current = {"day": day, "active": False, "sequence": 0}
+    if not exhausted:
+        if current.get("active"):
+            current["active"] = False
+            current["cleared_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+            episodes[owner] = current
+            save_state(st)
+        return None
+    if current.get("active"):
+        return None
+    sequence = int(current.get("sequence") or 0) + 1
+    detected_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+    current = {
+        "day": day,
+        "active": True,
+        "sequence": sequence,
+        "reason": reason,
+        "detected_at": detected_at,
+    }
+    episodes[owner] = current
+    intent = {
+        "schema": "jovie.summer.gateway-exhaustion-notification-intent/v1",
+        "intent_id": f"{day}:summer:{sequence}",
+        "owner": owner,
+        "reason": reason,
+        "detected_at": detected_at,
+        "budget": evidence,
+        "status": "pending",
+    }
+    intents = st.get("notification_intents")
+    if not isinstance(intents, list):
+        intents = []
+        st["notification_intents"] = intents
+    intents.append(intent)
+    save_state(st)
+    return intent
 
 
 def parse_oauth_seats(payload):
@@ -384,13 +518,15 @@ def parse_oauth_seats(payload):
     return None
 
 
-def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pools=None, include_ids=None):
+def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pools=None, include_ids=None, owner="gem"):
     cfg, config_path = load(path); mm = model_map(cfg); st = state(); now = time.time()
     exclude_pools = tuple(exclude_pools or ())
     include_ids = tuple(include_ids or ())
     chain = cfg["route_chains"][workflow]
     candidates = []
     ready = []
+    gateway_budget_ready = False
+    gateway_budget_block = None
     for mid in chain:
         if include_ids and mid not in include_ids:
             continue
@@ -415,25 +551,46 @@ def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pool
         if not ok:
             candidates.append({"id": mid, "status": "unavailable", "reason": reason, "pool": m.get("pool")})
             continue
-        scored, score_reason, rank, extra = score_candidate(cfg, m, st, capability, now, exclude_pools)
+        scored, score_reason, rank, extra = score_candidate(cfg, m, st, capability, now, exclude_pools, owner)
         row = {"id": mid, "status": "ready" if scored else "unavailable", "reason": score_reason, "pool": m.get("pool"), "family": m.get("family")}
         if extra.get("renew_subscription"):
             row["renew_subscription"] = extra["renew_subscription"]
+        if extra.get("gateway_budget"):
+            row["gateway_budget"] = extra["gateway_budget"]
         candidates.append(row)
+        if extra.get("channel") == "api":
+            if scored:
+                gateway_budget_ready = True
+            elif score_reason in {"gateway_daily_budget_exhausted", "owner_daily_budget_exhausted"}:
+                gateway_budget_block = (score_reason, extra["gateway_budget"])
         if scored:
             ready.append((rank, mid, m, selected_executor, extra))
+    notification_intent = None
+    if gateway_budget_ready:
+        update_gateway_exhaustion_episode(st, owner, False, None, None, now)
+    elif gateway_budget_block:
+        notification_intent = update_gateway_exhaustion_episode(
+            st, owner, True, gateway_budget_block[0], gateway_budget_block[1], now
+        )
     if ready:
         ready.sort(key=lambda item: item[0])
         _rank, mid, model, selected_executor, extra = ready[0]
         record_pool_use(st, model.get("pool"))
         if extra.get("channel") == "api":
             record_api_spend(st, model.get("family"), extra.get("marginal_usd") or 0)
-        return _selection_document(workflow, capability, config_path, mid, model, selected_executor, candidates, extra)
-    return {"schema_version": 1, "workflow": workflow, "capability": capability, "deterministic_first": True, "config": str(config_path), "selected": None, "candidates": candidates}
+            record_gateway_daily_spend(st, owner, extra.get("marginal_usd") or 0, now)
+        document = _selection_document(workflow, capability, config_path, mid, model, selected_executor, candidates, extra)
+        if notification_intent:
+            document["notification_intent"] = notification_intent
+        return document
+    document = {"schema_version": 1, "workflow": workflow, "capability": capability, "deterministic_first": True, "config": str(config_path), "selected": None, "candidates": candidates}
+    if notification_intent:
+        document["notification_intent"] = notification_intent
+    return document
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
-    c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--include-id", action="append", default=[]); c.add_argument("--config")
+    c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--include-id", action="append", default=[]); c.add_argument("--owner", default="gem", choices=["gem", "summer", "symphony"]); c.add_argument("--config")
     p = sub.add_parser("probe"); p.add_argument("--config")
     v = sub.add_parser("validate"); v.add_argument("--config")
     args = ap.parse_args(); cfg, config_path = load(getattr(args, "config", None))
@@ -445,5 +602,5 @@ def main():
         print(json.dumps(results, indent=2)); return 0
     if args.cmd == "validate":
         print(json.dumps({"ok": True, "config": str(config_path), "models": len(cfg["models"])}, indent=2)); return 0
-    print(json.dumps(choose(args.workflow, args.capability, args.allow_codex_exception, args.config, args.exclude_pool, args.include_id), indent=2)); return 0
+    print(json.dumps(choose(args.workflow, args.capability, args.allow_codex_exception, args.config, args.exclude_pool, args.include_id, args.owner), indent=2)); return 0
 if __name__ == "__main__": sys.exit(main())

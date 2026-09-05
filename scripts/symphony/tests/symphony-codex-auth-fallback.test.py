@@ -466,6 +466,50 @@ class FallbackTests(unittest.TestCase):
         path.chmod(0o755)
         return path
 
+    def test_grok_ship_gateway_boundary_rejects_forbidden_families(self):
+        executor = self.command("gateway-executor", "touch \"$GEM_EXECUTED\"\n")
+        executed = self.root / "gateway-executed"
+        for family, model in (
+            ("gpt-5.6", "openai/gpt-5.6-sol"),
+            ("claude", "anthropic/claude-opus-4.8"),
+            ("kimi", "moonshotai/kimi-k3"),
+            ("gpt-5.6", "zai/glm-5.3-flash"),
+        ):
+            with self.subTest(family=family):
+                selection = {
+                    "schema_version": 1,
+                    "deterministic_first": True,
+                    "selected": {
+                        "id": f"gateway-{family}",
+                        "provider": "vercel-ai-gateway",
+                        "model": model,
+                        "family": family,
+                        "channel": "api",
+                        "executor": {
+                            "executable": str(executor),
+                            "argv": ["{prompt}"],
+                        },
+                    },
+                }
+                result = subprocess.run(
+                    [GROK_SHIP, "JOV-7"],
+                    capture_output=True,
+                    text=True,
+                    env=self.env(
+                        GEM_EXECUTED=executed,
+                        LINEAR_API_KEY="unused",
+                        GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                        GROK_SHIP_LOG_DIR=self.root / "logs",
+                        SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
+                            json.dumps(selection).encode()
+                        ).decode(),
+                    ),
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("invalid router selection", result.stderr)
+                self.assertFalse(executed.exists())
+
     def set_all_accounts_cooldown(self):
         future = int(time.time()) + 3600
         self.state.write_text(json.dumps({

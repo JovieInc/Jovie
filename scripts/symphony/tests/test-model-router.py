@@ -18,6 +18,7 @@ class RegistryTests(unittest.TestCase):
             "GEM_GROK_EXECUTABLE": "/missing",
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
+            "GEM_GLM_EXECUTABLE": "/missing",
             "GEM_PR_DRAIN_CODEX": "/missing",
             "GEM_MODEL_ROUTER_STATE": str(
                 pathlib.Path(self.state_directory.name) / "router-state.json"
@@ -33,7 +34,7 @@ class RegistryTests(unittest.TestCase):
         ids = {m["id"] for m in cfg["models"]}
         self.assertTrue({
             "cursor-grok-4.6", "grok-4.6", "kimi-k3",
-            "kimi-coding", "cursor-luna", "qwen-coder-local", "deepseek-v4-flash",
+            "kimi-coding", "cursor-luna", "qwen-coder-local", "glm-5.3-flash", "deepseek-v4-flash",
             "codex-luna", "codex-terra", "codex-sol",
         } <= ids)
         self.assertNotIn("claude", ids)
@@ -52,6 +53,11 @@ class RegistryTests(unittest.TestCase):
             cfg["route_chains"]["new_pr"].index("qwen-coder-local"),
             cfg["route_chains"]["new_pr"].index("cursor-luna"),
         )
+        for chain in cfg["route_chains"].values():
+            self.assertLess(
+                chain.index("glm-5.3-flash"),
+                chain.index("deepseek-v4-flash"),
+            )
         for model in cfg["models"]:
             if model["provider"] != "kimi":
                 continue
@@ -475,13 +481,37 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(selected["marginal_usd"], 0.0)
             self.assertEqual(selected["channel"], "subscription")
 
-    def test_sol_api_is_refused_when_codex_sub_is_the_cheaper_buy(self):
+    def test_subscription_covered_families_are_forbidden_from_gateway_registry(self):
+        for index, family in enumerate(("gpt-5.6", "claude", "kimi", "grok-4.6")):
+            with self.subTest(family=family), tempfile.TemporaryDirectory() as td:
+                root = pathlib.Path(td)
+                registry = json.loads(CONFIG.read_text())
+                registry["models"].append({
+                    "id": f"forbidden-family-{index}",
+                    "provider": "vercel-ai-gateway",
+                    "model": "zai/glm-5.3-flash",
+                    "family": family,
+                    "channel": "api",
+                    "pool": "vercel-gateway",
+                    "quality": 88,
+                    "list_price_in": 0.1,
+                    "list_price_out": 0.2,
+                    "capabilities": ["code"],
+                    "cost_tier": "gateway-budgeted-paid",
+                })
+                registry_path = root / "model-registry.json"
+                registry_path.write_text(json.dumps(registry))
+                result = subprocess.run(
+                    ["python3", str(ROUTER), "validate", "--config", str(registry_path)],
+                    text=True, capture_output=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("gateway family is subscription-covered or forbidden", result.stderr)
+
+    def test_non_allowlisted_gateway_model_is_forbidden(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
             registry = json.loads(CONFIG.read_text())
-            for model in registry["models"]:
-                if model["id"] == "deepseek-v4-flash" and "architecture" not in model["capabilities"]:
-                    model["capabilities"].append("architecture")
             registry["models"].append({
                 "id": "sol-api",
                 "provider": "vercel-ai-gateway",
@@ -492,7 +522,7 @@ class RegistryTests(unittest.TestCase):
                 "quality": 88,
                 "list_price_in": 5.0,
                 "list_price_out": 30.0,
-                "capabilities": ["code", "architecture"],
+                "capabilities": ["code"],
                 "cost_tier": "gateway-budgeted-paid",
                 "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
                 "executable_default": "/missing",
@@ -503,33 +533,117 @@ class RegistryTests(unittest.TestCase):
                 "probe_argv": ["{executable}", "--help"],
                 "probe_mode": "exit-zero",
             })
-            registry["route_chains"]["new_pr"] = ["sol-api", "deepseek-v4-flash", "qwen-coder-local"]
             registry_path = root / "model-registry.json"
             registry_path.write_text(json.dumps(registry))
+            result = subprocess.run(
+                ["python3", str(ROUTER), "validate", "--config", str(registry_path)],
+                text=True, capture_output=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("gateway model is not allowlisted", result.stderr)
+
+    def test_glm_is_exact_preferred_gateway_and_global_daily_cap_binds_summer(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
             gateway = self._ready(root, "hermes", "echo ok\n")
             state_path = root / "state.json"
-            state_path.write_text(json.dumps({
-                "pools": {
-                    "codex": {"exhausted_until": time.time() + 3600, "uses": 40},
-                    "cursor-other-models": {"exhausted_until": time.time() + 3600, "uses": 9},
-                },
-                "api_spend": {"gpt-5.6": 28.0},
-            }))
             result = self.run_router(
-                "choose", "--workflow", "new_pr", "--capability", "architecture",
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                "--include-id", "glm-5.3-flash", "--include-id", "deepseek-v4-flash",
+                "--owner", "summer",
                 env={
-                    "GEM_MODEL_REGISTRY": str(registry_path),
                     "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_GLM_EXECUTABLE": str(gateway),
                     "GEM_DEEPSEEK_EXECUTABLE": str(gateway),
-                    "GEM_PR_DRAIN_QWEN": "/missing",
-                    "GEM_PR_DRAIN_CODEX": "/missing",
                 },
             )
-            document = json.loads(result.stdout)
-            self.assertEqual(document["selected"]["id"], "deepseek-v4-flash")
-            sol = next(item for item in document["candidates"] if item["id"] == "sol-api")
-            self.assertEqual(sol["reason"], "renew_sub_not_api")
-            self.assertEqual(sol["renew_subscription"]["sub_monthly_usd"], 200)
-            self.assertEqual(sol["renew_subscription"]["effective_included_usd"], 800.0)
+            selected = json.loads(result.stdout)["selected"]
+            self.assertEqual(selected["id"], "glm-5.3-flash")
+            self.assertEqual(selected["model"], "zai/glm-5.3-flash")
+            self.assertEqual(selected["gateway_budget"]["global_cap_usd"], 5.0)
+            self.assertEqual(selected["gateway_budget"]["owner_cap_usd"], 5.0)
+            state = json.loads(state_path.read_text())
+            self.assertEqual(state["gateway_daily"]["total_usd"], 0.096)
+            state["gateway_daily"]["total_usd"] = 4.95
+            state["gateway_daily"]["owners"]["summer"] = 4.95
+            state_path.write_text(json.dumps(state))
+            blocked = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                "--include-id", "glm-5.3-flash", "--owner", "summer",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_GLM_EXECUTABLE": str(gateway),
+                },
+            )
+            document = json.loads(blocked.stdout)
+            self.assertIsNone(document["selected"])
+            self.assertEqual(document["candidates"][0]["reason"], "gateway_daily_budget_exhausted")
+            self.assertEqual(
+                document["notification_intent"]["schema"],
+                "jovie.summer.gateway-exhaustion-notification-intent/v1",
+            )
+            repeated = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                "--include-id", "glm-5.3-flash", "--owner", "summer",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_GLM_EXECUTABLE": str(gateway),
+                },
+            )
+            self.assertNotIn("notification_intent", json.loads(repeated.stdout))
+            state = json.loads(state_path.read_text())
+            self.assertEqual(len(state["notification_intents"]), 1)
+
+            state["gateway_daily"]["total_usd"] = 0
+            state["gateway_daily"]["owners"]["summer"] = 0
+            state_path.write_text(json.dumps(state))
+            cleared = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                "--include-id", "glm-5.3-flash", "--owner", "summer",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_GLM_EXECUTABLE": str(gateway),
+                },
+            )
+            self.assertEqual(json.loads(cleared.stdout)["selected"]["id"], "glm-5.3-flash")
+            state = json.loads(state_path.read_text())
+            self.assertFalse(state["gateway_exhaustion_episodes"]["summer"]["active"])
+            state["gateway_daily"]["total_usd"] = 4.95
+            state["gateway_daily"]["owners"]["summer"] = 4.95
+            state_path.write_text(json.dumps(state))
+            recurrence = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                "--include-id", "glm-5.3-flash", "--owner", "summer",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_GLM_EXECUTABLE": str(gateway),
+                },
+            )
+            self.assertEqual(json.loads(recurrence.stdout)["notification_intent"]["intent_id"].rsplit(":", 1)[1], "2")
+            state = json.loads(state_path.read_text())
+            self.assertEqual(len(state["notification_intents"]), 2)
+
+    def test_gateway_exhaustion_episode_resets_on_the_next_utc_day(self):
+        from importlib.machinery import SourceFileLoader
+        router = SourceFileLoader("model_router_episode", str(ROUTER)).load_module()
+        with tempfile.TemporaryDirectory() as td:
+            state_path = pathlib.Path(td) / "state.json"
+            old = os.environ.get("GEM_MODEL_ROUTER_STATE")
+            os.environ["GEM_MODEL_ROUTER_STATE"] = str(state_path)
+            try:
+                st = {}
+                first = router.update_gateway_exhaustion_episode(
+                    st, "summer", True, "gateway_daily_budget_exhausted", {"day": "2026-09-04"}, 1788480000
+                )
+                next_day = router.update_gateway_exhaustion_episode(
+                    st, "summer", True, "gateway_daily_budget_exhausted", {"day": "2026-09-05"}, 1788566400
+                )
+            finally:
+                if old is None:
+                    os.environ.pop("GEM_MODEL_ROUTER_STATE", None)
+                else:
+                    os.environ["GEM_MODEL_ROUTER_STATE"] = old
+            self.assertNotEqual(first["intent_id"], next_day["intent_id"])
+            self.assertEqual(len(st["notification_intents"]), 2)
 
 if __name__ == "__main__": unittest.main()

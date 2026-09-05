@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-17",
+  "updated_at": "2026-09-04",
   "deterministic_first": true,
   "state_file_env": "GEM_MODEL_ROUTER_STATE",
   "routing_policy": {
@@ -14,11 +14,22 @@
       "never_pay_api_for_a_family_with_remaining_included_pool",
       "never_spend_api_that_would_have_been_cheaper_as_a_renewed_sub",
       "gateway_only_after_included_pools_are_exhausted",
+      "gateway_models_allowlist_only",
+      "gateway_daily_budget_enforced",
       "no_claude",
       "no_composer",
       "no_on_demand_overage"
     ],
     "api_burn_fraction_of_sub": 0.15,
+    "gateway_model_allowlist": [
+      "zai/glm-5.3-flash",
+      "deepseek/deepseek-v4-flash"
+    ],
+    "gateway_forbidden_families": ["gpt-5.6", "kimi", "claude"],
+    "gateway_daily_budget_usd": 5.0,
+    "owner_daily_budget_usd": {
+      "summer": 5.0
+    },
     "job_token_estimates": {
       "mechanical": {
         "input": 20000,
@@ -215,6 +226,51 @@
       "weaknesses": ["often-missing-on-gem", "not-architecture"]
     },
     {
+      "id": "glm-5.3-flash",
+      "provider": "vercel-ai-gateway",
+      "model": "zai/glm-5.3-flash",
+      "family": "glm",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 70,
+      "list_price_in": 0.07,
+      "list_price_out": 0.24,
+      "budget_price_in": 0.45,
+      "budget_price_out": 1.5,
+      "gateway_priority": 0,
+      "capabilities": ["mechanical", "code", "review", "semantic"],
+      "cost_tier": "gateway-budgeted-paid",
+      "executable_env": "GEM_GLM_EXECUTABLE",
+      "executable_default": "/home/timwhite/.local/bin/hermes",
+      "agent_executable_env": "GEM_GLM_EXECUTABLE",
+      "agent_executable_default": "/home/timwhite/.local/bin/hermes",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "--profile",
+        "gem-shipper",
+        "--provider",
+        "custom:vercel-ai-gateway",
+        "--model",
+        "{model}",
+        "--oneshot",
+        "{prompt}"
+      ],
+      "probe_argv": [
+        "{executable}",
+        "--profile",
+        "gem-shipper",
+        "--provider",
+        "custom:vercel-ai-gateway",
+        "--model",
+        "{model}",
+        "--help"
+      ],
+      "probe_mode": "exit-zero",
+      "cooldown_seconds": 1800,
+      "strengths": ["preferred-cheap-gateway", "large-context"],
+      "weaknesses": ["paid-gateway", "provider-price-varies"]
+    },
+    {
       "id": "deepseek-v4-flash",
       "provider": "vercel-ai-gateway",
       "model": "deepseek/deepseek-v4-flash",
@@ -224,6 +280,7 @@
       "quality": 65,
       "list_price_in": 0.15,
       "list_price_out": 0.6,
+      "gateway_priority": 1,
       "capabilities": ["mechanical", "code", "review", "semantic"],
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
@@ -416,6 +473,7 @@
       "codex-luna",
       "cursor-luna",
       "kimi-coding",
+      "glm-5.3-flash",
       "deepseek-v4-flash",
       "qwen-coder-local"
     ],
@@ -428,6 +486,7 @@
       "codex-luna",
       "cursor-luna",
       "kimi-coding",
+      "glm-5.3-flash",
       "deepseek-v4-flash",
       "qwen-coder-local"
     ]

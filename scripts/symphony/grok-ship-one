@@ -54,6 +54,12 @@ try:
     payload = json.loads(base64.b64decode(os.environ["SELECTION_B64"], validate=True))
     selected = payload["selected"]
     executor = selected["executor"]
+    gateway = selected.get("provider") == "vercel-ai-gateway"
+    gateway_models = {
+        "zai/glm-5.3-flash": "glm",
+        "deepseek/deepseek-v4-flash": "deepseek",
+    }
+    gateway_model_allowed = gateway_models.get(selected.get("model")) == selected.get("family")
     valid = (
         payload.get("schema_version") == 1
         and payload.get("deterministic_first") is True
@@ -63,6 +69,8 @@ try:
         and isinstance(executor.get("executable"), str)
         and isinstance(executor.get("argv"), list)
         and all(isinstance(value, str) for value in executor["argv"])
+        and (not gateway or gateway_model_allowed)
+        and (selected.get("channel") != "api" or gateway and gateway_model_allowed)
     )
 except (KeyError, TypeError, ValueError):
     valid = False
@@ -386,7 +394,8 @@ executable = executor["executable"]
 env = os.environ.copy()
 grok = os.environ.get("GEM_GROK_EXECUTABLE") or os.environ.get("GEM_GROK_BIN") or ""
 hermes = pathlib.Path(executable).name == "hermes"
-if hermes and grok and os.access(grok, os.X_OK):
+gateway = selected.get("provider") == "vercel-ai-gateway"
+if hermes and not gateway and grok and os.access(grok, os.X_OK):
     # Hermes on Gem uses OpenRouter (max_tokens 65536) and 402s. Prefer included grok.
     print("rewrite_hermes_openrouter_to_grok", grok, flush=True)
     executable = grok
@@ -401,7 +410,7 @@ if hermes and grok and os.access(grok, os.X_OK):
 elif hermes:
     cap = os.environ.get("SYMPHONY_HERMES_MAX_TOKENS", "512")
     env["HERMES_MAX_TOKENS"] = cap
-    if "--max-tokens" not in argv:
+    if not gateway and "--max-tokens" not in argv:
         argv = ["--max-tokens", cap, *argv]
         print(f"hermes_max_tokens={cap}", flush=True)
 def run_executor(run_argv):
