@@ -1156,6 +1156,7 @@ async function runGraphqlMutation(runner, query, variables, description) {
  *   backend?: string,
  *   repository?: string,
  *   number?: string | number,
+ *   expectedHeadOid?: string,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  * }} [input]
@@ -1164,11 +1165,14 @@ export async function dequeuePullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
   number,
+  expectedHeadOid,
   runner = createGhRunner(),
   mutationRunner = runner,
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
+  const expectedHead =
+    expectedHeadOid == null ? null : parseExpectedHeadOid(expectedHeadOid);
   const mutationActor =
     await assertCanonicalNativeMutationActor(mutationRunner);
   const stateOptions = {
@@ -1178,6 +1182,19 @@ export async function dequeuePullRequest({
     runner,
   };
   const before = await readPullRequestQueueState(stateOptions);
+  if (
+    expectedHead !== null &&
+    String(before.headRefOid ?? '').toLowerCase() !== expectedHead
+  ) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+      mutationActor,
+      state: before,
+    };
+  }
   if (dequeuePostcondition(before)) {
     return {
       backend: resolvedBackend,
@@ -1218,6 +1235,16 @@ export async function dequeuePullRequest({
   }
 
   if (dequeuePostcondition(current)) {
+    if (
+      expectedHead !== null &&
+      String(current.headRefOid ?? '').toLowerCase() !== expectedHead
+    ) {
+      throw backendError(
+        'dequeue_head_raced',
+        `PR #${parsedNumber} head changed during expected-head compensation`,
+        { expectedHeadOid: expectedHead, state: current }
+      );
+    }
     return {
       backend: resolvedBackend,
       changed: true,
@@ -1313,6 +1340,13 @@ export async function runCli(
         number: args[0],
         mutationRunner: resolvedMutationRunner,
       }),
+    'dequeue-ineligible': () =>
+      dequeuePullRequest({
+        ...options,
+        number: args[0],
+        expectedHeadOid: args[1],
+        mutationRunner: resolvedMutationRunner,
+      }),
   };
   const usage = {
     preflight: [0, 'preflight takes no arguments'],
@@ -1324,11 +1358,15 @@ export async function runCli(
     'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
     enroll: [2, 'enroll requires <number> <headSha>'],
     dequeue: [1, 'dequeue requires <number>'],
+    'dequeue-ineligible': [
+      2,
+      'dequeue-ineligible requires <number> <expectedHeadSha>',
+    ],
   };
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue|dequeue-ineligible>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];
@@ -1340,7 +1378,9 @@ export async function runCli(
     throw backendError('usage', usageMessage);
   }
   if (
-    (command === 'enroll' || command === 'dequeue') &&
+    (command === 'enroll' ||
+      command === 'dequeue' ||
+      command === 'dequeue-ineligible') &&
     backend === 'native' &&
     !NATIVE_MUTATION_AUTHORIZATIONS.has(env.MERGE_QUEUE_NATIVE_AUTHORIZATION)
   ) {

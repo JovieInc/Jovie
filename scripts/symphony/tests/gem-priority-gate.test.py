@@ -451,7 +451,7 @@ AUTOENROLL_RECEIPT_JQ = """
 (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
 (.promotionAdmission.allowed | type == "boolean") and
 (.isolatedPromotionAdmission.allowed | type == "boolean") and
-(.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
+(.promotionMode | IN("normal", "isolated-only", "controller-repair-only", "draft-only", "hold-intake", "blocked"))
 """.strip()
 
 
@@ -500,7 +500,7 @@ def receipt_satisfies_autoenroll(receipt: dict[str, object]) -> bool:
         and isinstance(isolated, dict)
         and isinstance(isolated.get("allowed"), bool)
         and receipt.get("promotionMode")
-        in {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
+        in {"normal", "isolated-only", "controller-repair-only", "draft-only", "hold-intake", "blocked"}
     )
 
 
@@ -1036,12 +1036,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
-    def test_queue_empty_closure_red_feeds_hold_intake_not_blocked(self):
-        """native-queue-empty-with-eligible is a feed signal: blocking
-        admission deadlocks (queue stays empty BECAUSE admission is blocked).
-        With main/production green and integrity clear, promotion resumes in
-        hold-intake even while the controller signal is failed (today's
-        controller failure was itself caused by the blocked-mode queue-noop)."""
+    def test_queue_empty_controller_failure_admits_only_exact_repair(self):
         signals = dict(GREEN_SIGNALS)
         signals["controller"] = {
             "status": "failed",
@@ -1058,17 +1053,19 @@ class DeploymentBindingTests(unittest.TestCase):
         }
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "hold-intake")
-        # New-issue intake stays closed; only promotion resumes.
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
         self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
-        # Any additional closure reason keeps the gate blocked.
+        # Closure aggregation is not repair authority. Direct exact-head
+        # checks, holds, integrity, review, and native queue state remain gates.
         signals["closureHealth"]["reasons"] = [
             "native-queue-empty-with-eligible-over-15m",
             "duplicate-issue-lanes-unresolved",
         ]
         receipt = self.evaluate(signals)
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
 
     def test_stale_or_missing_capacity_closes_mutation_admission(self):
         stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
@@ -1349,7 +1346,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
 
-    def test_failed_controller_observation_blocks_hold_intake(self):
+    def test_failed_controller_observation_admits_only_controller_repair(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
@@ -1362,7 +1359,56 @@ class DeploymentBindingTests(unittest.TestCase):
             "error": "controller-observation-failed: Connection refused",
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertFalse(receipt["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertTrue(receipt_satisfies_autoenroll(receipt))
+        self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
+
+    def test_controller_outage_closure_debt_does_not_deadlock_exact_repair(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        for status, reasons in (
+            ("grace", []),
+            ("red", ["queue-controller-red-over-10m"]),
+        ):
+            with self.subTest(status=status):
+                signals = dict(GREEN_SIGNALS)
+                signals["independentReview"] = {
+                    **GREEN_SIGNALS["independentReview"],
+                    "observedAt": MODULE.isoformat(now),
+                }
+                signals["controller"] = {"status": "failed"}
+                signals["closureHealth"] = {
+                    **GREEN_SIGNALS["closureHealth"],
+                    "status": status,
+                    "newIssueIntakeAllowed": False,
+                    "reasons": reasons,
+                }
+                receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+                self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+                self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
+                self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+
+    def test_actual_unknown_closure_observation_does_not_block_exact_repair(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {"status": "failed"}
+        signals["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["closure-observation-unknown"],
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
         timeout = subprocess.CalledProcessError(
@@ -1660,6 +1706,17 @@ class DeploymentBindingTests(unittest.TestCase):
         signals["controller"] = {"status": "failed"}
         receipt = self.evaluate(signals)
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["controllerRepairAdmission"]["scope"],
+            "github-approved-exact-repository-pr-head-main-path-set",
+        )
+        self.assertEqual(receipt["controllerRepairAdmission"]["maxConcurrent"], 1)
+        self.assertFalse(receipt["controllerRepairAdmission"]["deploymentsAllowed"])
+        self.assertFalse(
+            receipt["controllerRepairAdmission"]["runtimeActivationAllowed"]
+        )
 
     def test_red_production_keeps_the_isolated_exception(self):
         signals = dict(GREEN_SIGNALS)

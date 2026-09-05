@@ -2028,6 +2028,93 @@ describe('native dequeue', () => {
       code: 'dequeue_postcondition_failed',
     });
   });
+
+  it('compensates only while the exact expected head is still current', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({ states: [queued, prState()] });
+
+    await expect(
+      dequeuePullRequest(nativeOptions(runner, { expectedHeadOid: HEAD }))
+    ).resolves.toMatchObject({
+      backend: 'native',
+      changed: true,
+      state: { headRefOid: HEAD, isInMergeQueue: false },
+    });
+    expect(
+      runner.mock.calls.some(([args]) =>
+        queryText(args).includes('dequeuePullRequest')
+      )
+    ).toBe(true);
+  });
+
+  it('skips compensation when the head changed before mutation', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          headRefOid: OTHER_HEAD,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+
+    await expect(
+      dequeuePullRequest(nativeOptions(runner, { expectedHeadOid: HEAD }))
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+      state: { headRefOid: OTHER_HEAD },
+    });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('fails closed when the head changes during compensation', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+        prState({ headRefOid: OTHER_HEAD }),
+      ],
+    });
+
+    await expect(
+      dequeuePullRequest(nativeOptions(runner, { expectedHeadOid: HEAD }))
+    ).rejects.toMatchObject({
+      code: 'dequeue_head_raced',
+      details: { expectedHeadOid: HEAD },
+    });
+  });
+
+  it('exposes expected-head compensation through the authorized CLI', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({ states: [queued, prState()] });
+    const write = vi.fn();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner,
+        write,
+      })
+    ).resolves.toMatchObject({ changed: true });
+    expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({
+      changed: true,
+      state: { headRefOid: HEAD, isInMergeQueue: false },
+    });
+  });
 });
 
 describe('exact-head queue receipt proof', () => {
