@@ -1,7 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanner';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import {
@@ -12,7 +11,6 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/features/home/homepage-profile-preview-fixture';
-import { ClaimBanner } from '@/features/profile/ClaimBanner';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { MarketingStateRenderClient } from '../[state]/MarketingStateRenderClient';
 
@@ -55,7 +53,8 @@ function DeliberateRedDesktopHybrid() {
 function PublicProfileFixture({
   longName,
   preview = false,
-}: Readonly<{ longName: boolean; preview?: boolean }>) {
+  state = 'unclaimed',
+}: Readonly<{ longName: boolean; preview?: boolean; state?: string }>) {
   const artist = {
     ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -79,11 +78,19 @@ function PublicProfileFixture({
       tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
       releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
       profileBanner={
-        <ClaimBanner
+        <PublicClaimBanner
           profileHandle={artist.handle}
           displayName={artist.name}
-          ctaHref={`/${artist.handle}/claim?next=auth`}
-          variant='verified_claim'
+          directClaimSupported
+          claimRequiresVerification
+          isClaimed={state === 'claimed' || state === 'owner'}
+          visitorState={
+            state === 'owner'
+              ? 'owner'
+              : state === 'claimed'
+                ? 'claimed_public'
+                : 'organic_unclaimed'
+          }
         />
       }
       embeddedPreview={preview}
@@ -91,12 +98,32 @@ function PublicProfileFixture({
   );
 }
 
-export function ProfileAdmissionFixtureClient() {
-  const searchParams = useSearchParams();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+export function ProfileAdmissionFixtureClient({
+  params,
+}: Readonly<{ params: Record<string, string | string[] | undefined> }>) {
+  const searchParams = {
+    get: (key: string) => {
+      const value = params[key];
+      return Array.isArray(value) ? value[0] : value;
+    },
+  };
 
-  if (!mounted) return null;
+  if (searchParams.get('violation') === 'phantom-banner') {
+    return (
+      <div data-testid='public-profile-layout-shell' data-layout='desktop'>
+        <div
+          data-testid='profile-desktop-shell'
+          style={{ height: 600, width: '100%' }}
+        >
+          <div
+            data-testid='profile-desktop-banner'
+            style={{ display: 'block', height: 68 }}
+          />
+          <div data-testid='profile-desktop-surface' style={{ height: 532 }} />
+        </div>
+      </div>
+    );
+  }
 
   if (searchParams.get('violation') === 'desktop-compact-shell') {
     return <DeliberateRedDesktopHybrid />;
@@ -109,6 +136,7 @@ export function ProfileAdmissionFixtureClient() {
           <PublicProfileFixture
             longName={searchParams.get('name') === 'long'}
             preview={searchParams.get('layout') === 'preview'}
+            state={searchParams.get('state')}
           />
         </div>
       ) : (

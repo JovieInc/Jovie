@@ -16,7 +16,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -103,7 +103,6 @@ interface ProfileDesktopSurfaceProps {
   readonly onTogglePref?: (key: NotificationContentType) => void;
   readonly onUnsubscribe?: () => void;
   readonly isUnsubscribing?: boolean;
-  readonly hasProfileBanner?: boolean;
 }
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -263,8 +262,9 @@ export function ProfileDesktopSurface({
   onTogglePref = () => {},
   onUnsubscribe = () => {},
   isUnsubscribing = false,
-  hasProfileBanner = false,
 }: ProfileDesktopSurfaceProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => setIsHydrated(true), []);
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
@@ -852,18 +852,11 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div
-      className={cn(
-        'profile-desktop-surface relative flex w-full overflow-hidden bg-(--color-bg-surface-0)',
-        hasProfileBanner
-          ? 'profile-desktop-surface--banner rounded-b-3xl'
-          : 'rounded-3xl'
-      )}
-    >
+    <div className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
-        data-interactive-ready='true'
+        data-interactive-ready={isHydrated ? 'true' : undefined}
         data-testid='profile-desktop-surface'
       >
         <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>

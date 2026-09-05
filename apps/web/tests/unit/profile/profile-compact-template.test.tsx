@@ -8,6 +8,7 @@ import {
   within,
 } from '@testing-library/react';
 import React from 'react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
@@ -1469,6 +1470,17 @@ describe('ProfileCompactTemplate', () => {
   });
 
   it('publishes and removes the hydrated interaction-ready contract', () => {
+    const html = renderToString(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    expect(html).not.toContain('data-interactive-ready="true"');
+    expect(html).toContain('data-testid="profile-desktop-loading"');
+    expect(html).toContain('aria-busy="true"');
     const view = render(
       <ProfileCompactTemplate
         mode='profile'

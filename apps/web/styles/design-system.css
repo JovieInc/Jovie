@@ -376,6 +376,7 @@
 
 .public-profile-layout-desktop-shell {
   display: none;
+  height: min(940px, calc(100dvh - 48px));
   max-height: calc(100dvh - 48px);
   min-width: 0;
   width: 100%;
@@ -384,13 +385,29 @@
 
 .profile-desktop-surface {
   height: min(940px, calc(100dvh - 48px));
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
-.profile-desktop-surface--banner {
-  height: min(872px, calc(100dvh - 116px));
+/* A React element can render null. Only rendered banner content participates
+   in flex sizing; the surface uses the remaining space, never a guessed 68px. */
+[data-testid="profile-desktop-banner"]:empty,
+[data-testid="profile-shell-banner"]:empty {
+  display: none;
+}
+
+.public-profile-layout-desktop-shell:has(
+    > [data-testid="profile-desktop-banner"]:not(:empty)
+  )
+  .profile-desktop-surface {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .public-profile-layout-desktop-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: min(940px, calc(100dvh - 48px));
   width: 100%;
   overflow: hidden;

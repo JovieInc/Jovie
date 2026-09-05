@@ -105,6 +105,95 @@ test.describe('public profile browser admission', () => {
     });
   }
 
+  for (const state of ['unclaimed', 'claimed', 'owner'] as const) {
+    for (const width of [1179, 1180, 1512]) {
+      test(`${state} ${width}px renders only actual banner space`, async ({
+        page,
+      }) => {
+        const hydrationErrors: string[] = [];
+        page.on('pageerror', error => hydrationErrors.push(error.message));
+        page.on('console', message => {
+          if (
+            message.type() === 'error' &&
+            /hydrat|did not match|server rendered/i.test(message.text())
+          )
+            hydrationErrors.push(message.text());
+        });
+        await installPublicRouteMocks(page);
+        await page.setViewportSize({ width, height: 932 });
+        await page.goto(
+          `/renders/profile-admission?layout=public&state=${state}`
+        );
+        await waitForSettledProfileLayout(
+          page,
+          width < 1180 ? 'compact' : 'desktop'
+        );
+        const wrappers = page.locator(
+          '[data-testid="profile-desktop-banner"]:visible, [data-testid="profile-shell-banner"]:visible'
+        );
+        await expect(wrappers).toHaveCount(state === 'unclaimed' ? 1 : 0);
+        expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+        expect(hydrationErrors).toEqual([]);
+      });
+    }
+  }
+
+  for (const width of [1179, 1180, 1512]) {
+    test(`${width}px server paint exposes no premature readiness`, async ({
+      browser,
+    }, testInfo) => {
+      const context = await browser.newContext({
+        baseURL: testInfo.project.use.baseURL,
+        javaScriptEnabled: false,
+        viewport: { width, height: 932 },
+      });
+      try {
+        const page = await context.newPage();
+        const response = await page.goto(
+          '/renders/profile-admission?layout=public&state=claimed'
+        );
+        expect(response?.status()).toBe(200);
+        await expect(
+          page.getByTestId('public-profile-layout-shell')
+        ).toHaveCount(1);
+        await expect(
+          page.locator('[data-interactive-ready="true"]')
+        ).toHaveCount(0);
+        if (width >= 1180) {
+          await expect(
+            page.getByTestId('profile-desktop-loading')
+          ).toBeVisible();
+          await expect(
+            page.getByTestId('profile-desktop-loading')
+          ).toHaveAttribute('aria-busy', 'true');
+          await expect(page.getByTestId('profile-compact-shell')).toBeHidden();
+        } else {
+          await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+          await expect(
+            page.getByTestId('profile-desktop-loading')
+          ).toBeHidden();
+        }
+        await testInfo.attach(`server-paint-${width}`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  test('deliberate red detects phantom banner reservation', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1512, height: 932 });
+    await page.goto('/renders/profile-admission?violation=phantom-banner');
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.violations.map(violation => violation.code)).toContain(
+      'phantom_banner'
+    );
+  });
+
   test('live resize transfers ownership exactly at 1180', async ({ page }) => {
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1179, height: 932 });

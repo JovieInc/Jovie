@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 
 type PublicProfileLayoutViolationCode =
+  | 'phantom_banner'
+  | 'banner_reserved_geometry'
   | 'claim_cta_overflow'
   | 'claim_cta_wrap'
   | 'desktop_bottom_nav'
@@ -98,6 +100,39 @@ export async function auditPublicProfileLayout(page: Page) {
         code: 'horizontal_overflow',
         detail: `document exceeds viewport by ${overflow}px`,
       });
+    }
+
+    const banners = visible(
+      '[data-testid="profile-desktop-banner"], [data-testid="profile-shell-banner"]'
+    );
+    for (const banner of banners) {
+      if (!Array.from(banner.children).some(isVisible)) {
+        violations.push({
+          code: 'phantom_banner',
+          detail: 'visible banner wrapper has no visible child',
+        });
+      }
+    }
+    const desktopShell = visible('[data-testid="profile-desktop-shell"]')[0];
+    const desktopSurface = desktopSurfaces[0];
+    if (ownsDesktop && desktopShell && desktopSurface) {
+      const shellBox = desktopShell.getBoundingClientRect();
+      const surfaceBox = desktopSurface.getBoundingClientRect();
+      const bannerHeight = banners
+        .filter(banner => desktopShell.contains(banner))
+        .reduce(
+          (sum, banner) => sum + banner.getBoundingClientRect().height,
+          0
+        );
+      if (
+        Math.abs(surfaceBox.top - shellBox.top - bannerHeight) > 2 ||
+        Math.abs(surfaceBox.bottom - shellBox.bottom) > 2
+      ) {
+        violations.push({
+          code: 'banner_reserved_geometry',
+          detail: `banner=${bannerHeight} top reservation=${surfaceBox.top - shellBox.top} bottom gap=${shellBox.bottom - surfaceBox.bottom}`,
+        });
+      }
     }
 
     const cta = visible('[data-testid="claim-banner-cta"]')[0] ?? null;

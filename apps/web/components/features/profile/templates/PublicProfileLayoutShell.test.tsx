@@ -13,6 +13,34 @@ const baseProps = {
 };
 
 describe('PublicProfileLayoutShell', () => {
+  it('does not infer a banner height from a child that renders null', () => {
+    function NoBanner() {
+      return null;
+    }
+    render(
+      <PublicProfileLayoutShell
+        {...baseProps}
+        isDesktopLayout
+        desktopBanner={<NoBanner />}
+      />
+    );
+    // :empty controls layout before paint; no mount effect guesses visibility.
+    expect(screen.getByTestId('profile-desktop-banner')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('profile-desktop-shell')).not.toHaveClass(
+      'profile-desktop-surface--banner'
+    );
+  });
+
+  it('offers a noninteractive desktop loading state before hydration', () => {
+    render(<PublicProfileLayoutShell {...baseProps} isDesktopLayout={false} />);
+    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(screen.getByTestId('profile-desktop-loading')).not.toHaveAttribute(
+      'data-interactive-ready'
+    );
+  });
   it('mounts only the selected responsive surface', () => {
     const { rerender } = render(
       <PublicProfileLayoutShell {...baseProps} isDesktopLayout={false} />

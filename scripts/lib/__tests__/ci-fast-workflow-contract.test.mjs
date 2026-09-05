@@ -434,7 +434,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
-        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts components/features/profile/templates/PublicProfileLayoutShell.test.tsx components/features/profile/templates/ProfileDesktopSurface.test.tsx tests/unit/profile/profile-compact-template.test.tsx --coverage --coverage.include="components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx" --coverage.reportsDirectory=coverage/profile-admission --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
@@ -775,6 +775,17 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(LANE_COMMANDS['profile-admission']).toContain(
       'tests/unit/profile/ProfileHomeRail.test.tsx'
     );
+    for (const testFile of [
+      'components/features/profile/templates/PublicProfileLayoutShell.test.tsx',
+      'components/features/profile/templates/ProfileDesktopSurface.test.tsx',
+      'tests/unit/profile/profile-compact-template.test.tsx',
+    ]) {
+      expect(LANE_COMMANDS['profile-admission']).toContain(testFile);
+    }
+    expect(LANE_COMMANDS['profile-admission']).toContain('--coverage');
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'components/features/profile/templates/{PublicProfileLayoutShell,ProfileDesktopSurface,ProfileCompactTemplate}.tsx'
+    );
     expect(CI_FAST_SOURCE).toContain(
       ':(glob)apps/web/app/\\\\[username\\\\]/**'
     );
@@ -784,6 +795,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(browser).toContain('tests/e2e/profile-admission.spec.ts');
     expect(browser).toContain('--config=playwright.config.noauth.ts');
     expect(browser).toContain('--project=chromium');
+    expect(browser).toContain('--list');
+    expect(browser).toContain(
+      'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts'
+    );
     expect(browser).toMatch(/github\.event_name.*merge_group/);
     expect(browser).toMatch(/github\.event_name.*pull_request/);
     expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');

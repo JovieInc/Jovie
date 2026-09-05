@@ -68,8 +68,12 @@ const ProfileDesktopSurface = dynamic(
     loading: () => (
       <div
         className='public-profile-layout-desktop-placeholder'
-        aria-hidden='true'
-      />
+        data-testid='profile-desktop-loading'
+        role='status'
+        aria-busy='true'
+      >
+        <span className='text-secondary-token'>Loading profile…</span>
+      </div>
     ),
   }
 );
@@ -295,6 +299,7 @@ export function ProfileCompactTemplate({
   const [isDesktopLayout, setIsDesktopLayout] = useState(
     getInitialIsDesktopLayout
   );
+  const [isHydrated, setIsHydrated] = useState(false);
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
@@ -354,6 +359,7 @@ export function ProfileCompactTemplate({
     };
 
     syncPresentation();
+    setIsHydrated(true);
 
     if (
       typeof embeddedQuery.addEventListener === 'function' &&
@@ -823,7 +829,7 @@ export function ProfileCompactTemplate({
           <div
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
-            data-interactive-ready='true'
+            data-interactive-ready={isHydrated ? 'true' : undefined}
             data-public-profile-nav={publicProfileNavIds}
           >
             {profileBanner && !isDesktopLayout ? (
@@ -936,7 +942,6 @@ export function ProfileCompactTemplate({
             onTogglePref={handleTogglePref}
             onUnsubscribe={handleUnsubscribe}
             isUnsubscribing={unsubMutation.isPending}
-            hasProfileBanner={Boolean(profileBanner)}
           />
         }
       />

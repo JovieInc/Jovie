@@ -129,8 +129,12 @@ export function PublicProfileLayoutShell({
             ) : (
               <div
                 className='public-profile-layout-desktop-placeholder'
-                aria-hidden='true'
-              />
+                data-testid='profile-desktop-loading'
+                role='status'
+                aria-busy='true'
+              >
+                <span className='text-secondary-token'>Loading profile…</span>
+              </div>
             )}
           </div>
           {showClaimFooter && claimFooterHref ? (
