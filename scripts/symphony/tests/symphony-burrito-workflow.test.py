@@ -2496,8 +2496,11 @@ while True: time.sleep(1)
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
 
+            events_before_acknowledgement = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
             acknowledged = subprocess.run(
-                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                ["bash", str(updater), "--skip-binary"],
                 cwd=ROOT,
                 env=env,
                 capture_output=True,
@@ -2510,6 +2513,10 @@ while True: time.sleep(1)
                 acknowledged.stderr,
             )
             self.assertFalse(marker.exists())
+            self.assertEqual(
+                (root / "systemctl-events").read_text().splitlines(),
+                events_before_acknowledgement,
+            )
             finalized = json.loads(
                 (
                     target_home
@@ -2537,8 +2544,11 @@ while True: time.sleep(1)
                 target_home
                 / ".local/state/symphony-elixir/promotion-finalized.json"
             ).write_text(json.dumps(finalized))
+            events_before_crash_recovery = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
             crash_after_commit = subprocess.run(
-                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                ["bash", str(updater), "--skip-binary"],
                 cwd=ROOT,
                 env=env,
                 capture_output=True,
@@ -2548,6 +2558,10 @@ while True: time.sleep(1)
             self.assertIn("RECOVERED_TRANSACTION_CLEANUP", crash_after_commit.stdout)
             self.assertNotIn("RECOVERED_INCOMPLETE_PROMOTION", crash_after_commit.stdout)
             self.assertFalse(transaction.exists())
+            self.assertEqual(
+                (root / "systemctl-events").read_text().splitlines(),
+                events_before_crash_recovery,
+            )
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
 

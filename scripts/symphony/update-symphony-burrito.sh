@@ -714,6 +714,7 @@ if finalized_cleanup_pending; then
   fi
   write_finalized_receipt complete
   echo "RECOVERED_TRANSACTION_CLEANUP"
+  exit 0
 fi
 if [ -e "$cleanup_pending" ]; then
   if ! finalize_rollback_transaction; then
