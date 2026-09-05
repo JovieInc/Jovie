@@ -594,19 +594,19 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_official_runtime_wrapper_forwards_term_to_child_process_group(self):
         child_program = r"""
-import pathlib, signal, subprocess, sys, time
+import os, pathlib, signal, subprocess, sys, time
 child_receipt = pathlib.Path(sys.argv[1])
 grandchild_receipt = pathlib.Path(sys.argv[2])
 grandchild_program = '''
-import pathlib, signal, sys, time
+import os, pathlib, signal, sys, time
 receipt = pathlib.Path(sys.argv[1])
 signal.signal(signal.SIGTERM, lambda *_: (receipt.write_text("term"), sys.exit(0)))
-print("grandchild-ready", flush=True)
+print(f"grandchild-ready {os.getpid()}", flush=True)
 while True: time.sleep(1)
 '''
 subprocess.Popen([sys.executable, "-c", grandchild_program, str(grandchild_receipt)])
 signal.signal(signal.SIGTERM, lambda *_: (child_receipt.write_text("term"), sys.exit(0)))
-print("child-ready", flush=True)
+print(f"child-ready {os.getpid()}", flush=True)
 while True: time.sleep(1)
 """
         with tempfile.TemporaryDirectory() as tmp:
@@ -636,11 +636,16 @@ while True: time.sleep(1)
             )
             try:
                 assert process.stdout is not None
-                ready = {
+                ready = [
                     process.stdout.readline().strip(),
                     process.stdout.readline().strip(),
+                ]
+                pids = {
+                    kind: int(pid)
+                    for kind, pid in (line.split() for line in ready)
                 }
-                self.assertEqual(ready, {"child-ready", "grandchild-ready"})
+                self.assertEqual(set(pids), {"child-ready", "grandchild-ready"})
+                os.killpg(pids["child-ready"], signal.SIGSTOP)
                 os.kill(process.pid, signal.SIGTERM)
                 process.wait(timeout=5)
                 for _ in range(50):
@@ -649,6 +654,18 @@ while True: time.sleep(1)
                     time.sleep(0.02)
                 self.assertEqual(child_receipt.read_text(), "term")
                 self.assertEqual(grandchild_receipt.read_text(), "term")
+                for _ in range(100):
+                    survivors = []
+                    for pid in pids.values():
+                        try:
+                            os.kill(pid, 0)
+                        except ProcessLookupError:
+                            continue
+                        survivors.append(pid)
+                    if not survivors:
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(survivors, [])
             finally:
                 if process.poll() is None:
                     process.kill()
@@ -1317,6 +1334,114 @@ while True: time.sleep(1)
             )
             self.assertEqual(drift.returncode, 1, drift.stdout + drift.stderr)
             self.assertIn(f"DRIFT {existing}", drift.stdout)
+
+    def test_two_phase_promotion_keeps_canonical_config_after_activation_rollback(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            target_home = root / "home"
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            (config / "codex-account.env").write_text(
+                f"CODEX_HOME={account_home}\n"
+            )
+            (config / "codex-account.env").chmod(0o600)
+            workflow = config / "WORKFLOW.md"
+            helper = target_home / ".local/bin/symphony-official-runtime"
+            unit = target_home / ".config/systemd/user/symphony-elixir.service"
+            helper.parent.mkdir(parents=True)
+            unit.parent.mkdir(parents=True)
+            workflow.write_text("retired scripts/hermes/symphony-codex-router\n")
+            helper.write_text("retired helper\n")
+            unit.write_text("retired unit\n")
+
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "case \"$*\" in\n"
+                "  *'is-active --quiet symphony-elixir.service'*) exit 1;;\n"
+                "  *'restart symphony-elixir.service'*) exit 42;;\n"
+                "  *) exit 0;;\n"
+                "esac\n"
+            )
+            systemctl.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' '{\"counts\":{\"running\":0},"
+                "\"polling\":{\"checking\":false,\"next_poll_in_ms\":10000}}'\n"
+            )
+            curl.chmod(0o755)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            bus = socket.socket(socket.AF_UNIX)
+            bus.bind(str(runtime / "bus"))
+            self.addCleanup(bus.close)
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_GET(self):
+                    body = json.dumps({
+                        "counts": {"running": 0},
+                        "polling": {"checking": False, "next_poll_in_ms": 10000},
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, _format, *_args):
+                    return
+
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(thread.join, 5)
+            self.addCleanup(server.shutdown)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "SYMPHONY_ELIXIR_HOME": str(target_home),
+                "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                "XDG_RUNTIME_DIR": str(runtime),
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime / 'bus'}",
+                "SYMPHONY_STATE_URL": (
+                    f"http://127.0.0.1:{server.server_address[1]}/api/v1/state"
+                ),
+            }
+            config_only = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(config_only.returncode, 0, config_only.stderr)
+            canonical = {
+                workflow: WORKFLOW_PATH.read_bytes(),
+                helper: HELPER_PATH.read_bytes(),
+                unit: UNIT_PATH.read_bytes(),
+            }
+            for path, expected in canonical.items():
+                self.assertEqual(path.read_bytes(), expected)
+
+            activation = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(activation.returncode, 0)
+            self.assertIn("PROMOTION_ROLLED_BACK", activation.stderr)
+            for path, expected in canonical.items():
+                self.assertEqual(path.read_bytes(), expected)
+            self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
 
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
         account_guard = UPDATER.index("assert_account_environment_ready\n")
