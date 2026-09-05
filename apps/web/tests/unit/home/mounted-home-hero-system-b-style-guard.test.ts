@@ -49,6 +49,30 @@ function extractMountedHeroPageSource(source: string): string {
 }
 
 describe('mounted homepage hero System B source contract', () => {
+  it('keeps atmospheric light free of a hard contour or sub-percent horizon seam', () => {
+    const css = extractMountedHeroCss(
+      readFileSync(path.join(webRoot, cssPath), 'utf8')
+    );
+    const well = css.match(
+      /\.homepage-editorial-hero__light-well\s*\{([^}]+)\}/
+    )?.[1];
+    const backdrop = css.match(
+      /\.homepage-editorial-hero__backdrop\s*\{([^}]+)\}/
+    )?.[1];
+    expect(well).toBeDefined();
+    expect(backdrop).toBeDefined();
+    // Preserve the border's layout footprint without drawing a wireframe.
+    expect(well).toMatch(/border:\s*1px solid transparent;/);
+    // A sub-percent transition creates a sharp stripe at compact heights.
+    // This source guard complements rendered falloff and contrast evidence.
+    const stops = [...(backdrop ?? '').matchAll(/([\d.]+)%/g)].map(match =>
+      Number(match[1])
+    );
+    for (let index = 1; index < stops.length; index += 1) {
+      expect(stops[index] - stops[index - 1]).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('keeps mounted hero markup on named System B primitives', () => {
     const pageSource = extractMountedHeroPageSource(
       readFileSync(path.join(webRoot, pagePath), 'utf8')
