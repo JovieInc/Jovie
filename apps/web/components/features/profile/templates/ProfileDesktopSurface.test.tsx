@@ -293,6 +293,16 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('mock-desktop-alerts-cta')
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-desktop-home-overview')).toHaveAttribute(
+      'data-side-rail-enabled',
+      'false'
+    );
+    expect(screen.getByTestId('profile-desktop-side-rail')).toHaveClass(
+      'hidden'
+    );
+    expect(screen.getByTestId('profile-desktop-main-content')).toHaveClass(
+      '[@media(min-width:1180px)]:contents'
+    );
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
   });
 

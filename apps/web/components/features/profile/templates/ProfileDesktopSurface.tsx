@@ -399,14 +399,23 @@ export function ProfileDesktopSurface({
   }
 
   const homeOverview = (
-    <div className='grid min-h-0 min-w-0 flex-1 gap-4 [@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
-      <div className='grid min-h-0 min-w-0 gap-3.5'>
+    <div
+      className={cn(
+        'grid min-h-0 min-w-0 flex-1 gap-4 [@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]'
+      )}
+      data-testid='profile-desktop-home-overview'
+      data-side-rail-enabled={allowFanCapture ? 'true' : 'false'}
+    >
+      <div
+        className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
+        data-testid='profile-desktop-main-content'
+      >
         {/* Composition rule (#11899): the desktop cover is a fixed standard
             4:5 shape — height is the single driver (viewport-bounded with a
             min floor), width follows the aspect ratio, and the fill image
             crops (object-cover), never squashes. */}
         <section
-          className='relative aspect-card-standard h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)]'
+          className='relative aspect-card-standard h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)] [@media(min-width:1180px)]:col-start-1 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-cover'
         >
           <div className='absolute inset-0'>
@@ -504,7 +513,7 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'
+          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)] [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1 [@media(min-width:1180px)]:self-start'
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
@@ -609,7 +618,15 @@ export function ProfileDesktopSurface({
         </div>
       </div>
 
-      <div className='grid min-h-0 min-w-0 gap-3.5'>
+      <div
+        className={cn(
+          'min-h-0 min-w-0 gap-3.5',
+          allowFanCapture
+            ? 'grid [@media(min-width:1180px)]:col-span-2 [@media(min-width:1180px)]:row-start-2'
+            : 'hidden'
+        )}
+        data-testid='profile-desktop-side-rail'
+      >
         <DesktopSurfaceCard
           title='Alerts'
           testId='profile-desktop-alerts-card'

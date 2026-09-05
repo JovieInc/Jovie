@@ -7,6 +7,7 @@ type PublicProfileLayoutViolationCode =
   | 'claim_cta_wrap'
   | 'desktop_bottom_nav'
   | 'desktop_compact_shell'
+  | 'desktop_empty_side_rail'
   | 'desktop_stage_too_narrow'
   | 'horizontal_overflow'
   | 'layout_surface_count'
@@ -91,6 +92,21 @@ export async function auditPublicProfileLayout(page: Page) {
           });
         }
       }
+    }
+
+    const homeOverview = visible(
+      '[data-testid="profile-desktop-home-overview"]'
+    )[0];
+    const sideRail = visible('[data-testid="profile-desktop-side-rail"]')[0];
+    if (
+      ownsDesktop &&
+      homeOverview?.dataset.sideRailEnabled === 'false' &&
+      sideRail
+    ) {
+      violations.push({
+        code: 'desktop_empty_side_rail',
+        detail: 'desktop overview reserved a visible side rail without content',
+      });
     }
 
     const expectedCompact = layout === 'compact' ? 1 : 0;
