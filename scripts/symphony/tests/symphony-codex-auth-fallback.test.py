@@ -3830,6 +3830,106 @@ class FallbackLockGcTests(unittest.TestCase):
             ("unknown", "lock_held_unverified"),
         )
 
+    def test_gc_never_splits_a_live_lock_inode_for_any_issue_state(self):
+        for state in ["In Progress", "In Review", "Done", "Canceled"]:
+            with self.subTest(state=state):
+                path = self.touch_lock("JOV-59999")
+                with path.open("a+") as holder:
+                    fcntl.flock(holder, fcntl.LOCK_EX)
+                    inode = os.fstat(holder.fileno()).st_ino
+                    self.module.gc_fallback_locks(
+                        open_prs={"JOV-59999": {"number": 1, "mergeStateStatus": "CLEAN"}},
+                        fetch_issue=lambda _: {"state": {"name": state}},
+                    )
+                    with path.open("a+") as challenger:
+                        self.assertEqual(os.fstat(challenger.fileno()).st_ino, inode)
+                        with self.assertRaises(BlockingIOError):
+                            fcntl.flock(challenger, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_unheld_slot_with_preopened_waiter_keeps_one_inode(self):
+        path = self.touch_lock("JOV-59998", self.module.FALLBACK_LEASE_TTL_SECONDS + 5)
+        with path.open("a+") as waiter:
+            inode = os.fstat(waiter.fileno()).st_ino
+            self.module.gc_fallback_locks(open_prs={}, fetch_issue=lambda _: None)
+            self.assertTrue(path.exists())
+            fcntl.flock(waiter, fcntl.LOCK_EX)
+            with path.open("a+") as newcomer:
+                self.assertEqual(os.fstat(newcomer.fileno()).st_ino, inode)
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(newcomer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_retained_unheld_slots_do_not_count_as_occupied_or_query_tracker(self):
+        for number in range(10):
+            self.touch_lock(f"JOV-{59000 + number}")
+        with mock.patch.object(self.module, "_autonomous_open_pr_index", side_effect=AssertionError("no GitHub scan")):
+            self.module.gc_fallback_locks(fetch_issue=lambda _: self.fail("no tracker read"))
+        self.assertEqual(self.module._fallback_lock_count(), 0)
+
+    @contextlib.contextmanager
+    def inherited_claim(self, path):
+        try:
+            saved = os.dup(9)
+        except OSError:
+            saved = None
+        descriptor = os.open(path, os.O_RDWR)
+        if descriptor != 9:
+            os.dup2(descriptor, 9)
+            os.close(descriptor)
+        try:
+            fcntl.flock(9, fcntl.LOCK_EX)
+            with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}):
+                yield
+        finally:
+            os.close(9)
+            if saved is not None:
+                os.dup2(saved, 9)
+                os.close(saved)
+
+    def test_inherited_claim_matches_kernel_inode_and_allows_own_pickup(self):
+        path = self.touch_lock("JOV-59997")
+        other = self.touch_lock("JOV-59996")
+        self.assertFalse(self.module._inherited_issue_lease_held(path))
+        with self.inherited_claim(path):
+            self.assertTrue(self.module._inherited_issue_lease_held(path))
+            self.assertFalse(self.module._inherited_issue_lease_held(other))
+            self.assertFalse(self.module._inherited_issue_lease_held(self.leases / "missing.lock"))
+            issue = {"identifier": "JOV-59997", "state": {"name": "In Progress"}}
+            with mock.patch.object(self.module, "_fetch_single_issue", return_value=issue), mock.patch.object(self.module, "_autonomous_open_pr_index", return_value={}):
+                self.assertEqual(self.module.pickup_check_command("JOV-59997"), 0)
+        self.assertEqual(self.module._fallback_lock_count(), 0)
+
+    def test_grok_release_closes_descriptor_without_unlinking_slot(self):
+        path = self.touch_lock("JOV-59995")
+        inode = path.stat().st_ino
+        function = re.search(r"release_fallback_lease\(\) \{.*?\n\}", GROK_SHIP.read_text(), re.S).group()
+        result = subprocess.run(["bash", "-c", function + '\nexec 9>>"$LEASE_FILE"\nrelease_fallback_lease\n'],
+            env={**os.environ, "LEASE_FILE": str(path)}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(path.stat().st_ino, inode)
+
+    def test_gc_unreadable_directory_is_unknown_not_zero_capacity(self):
+        with mock.patch.object(self.module, "_iter_fallback_locks", side_effect=PermissionError("denied")):
+            self.assertIsNone(self.module._fallback_lock_count())
+            receipt = self.module.gc_fallback_locks()
+        self.assertTrue(receipt["red"])
+        self.assertIsNone(receipt["lockCountAfter"])
+
+    def test_gc_unknown_holder_or_age_preserves_inode_and_reports_red(self):
+        path = self.touch_lock("JOV-59994")
+        for held in [None, False]:
+            with mock.patch.object(self.module, "_lock_held", return_value=held), mock.patch.object(self.module, "_lock_age_seconds", return_value=None):
+                receipt = self.module.gc_fallback_locks()
+            self.assertTrue(receipt["red"])
+            self.assertTrue(path.exists())
+
+    def test_gc_malformed_observation_and_unwritable_receipt_keep_slots(self):
+        path = self.leases / "malformed.lock"
+        path.touch()
+        with mock.patch.object(self.module, "_iter_fallback_locks", return_value=[path]), mock.patch.object(self.module, "_write_json_atomic", side_effect=PermissionError("denied")):
+            receipt = self.module.gc_fallback_locks()
+        self.assertTrue(receipt["red"])
+        self.assertTrue(path.exists())
+
     def test_gc_expires_in_review_and_ttl_leftovers_keeps_live_holder(self):
         stale = self.touch_lock("JOV-5257", age_seconds=30)
         leftover = self.touch_lock("JOV-5001", age_seconds=self.module.FALLBACK_LEASE_TTL_SECONDS + 5)
@@ -3847,13 +3947,13 @@ class FallbackLockGcTests(unittest.TestCase):
             now=time.time(),
             fetch_issue=lambda ident: issues.get(ident),
         )
-        self.assertFalse(stale.exists())
-        self.assertFalse(leftover.exists())
+        self.assertTrue(stale.exists())
+        self.assertTrue(leftover.exists())
         self.assertTrue(live.exists())
-        self.assertEqual(receipt["lockCountBefore"], 3)
+        self.assertEqual(receipt["lockCountBefore"], 1)
         self.assertEqual(receipt["lockCountAfter"], 1)
-        self.assertEqual({row["identifier"] for row in receipt["expired"]}, {"JOV-5257", "JOV-5001"})
-        self.assertEqual(receipt["kept"][0]["identifier"], "JOV-5002")
+        self.assertEqual({row["identifier"] for row in receipt["expired"]}, {"JOV-5001"})
+        self.assertEqual({row["identifier"] for row in receipt["kept"]}, {"JOV-5257", "JOV-5002"})
         self.assertFalse(receipt["red"])
 
     def test_gc_expires_open_pr_inflight_without_linear(self):
@@ -3863,9 +3963,9 @@ class FallbackLockGcTests(unittest.TestCase):
             open_prs={"JOV-5257": {"number": 16365, "head": "fallback/JOV-5257-fix", "mergeStateStatus": "CLEAN"}},
             fetch_issue=lambda ident: fetches.append(ident) or {"state": {"name": "In Progress"}},
         )
-        self.assertFalse(path.exists())
+        self.assertTrue(path.exists())
         self.assertEqual(fetches, [])
-        self.assertEqual(receipt["expired"][0]["reason"], "open_pr_inflight")
+        self.assertEqual(receipt["lockCountAfter"], 0)
 
     def test_pickup_refuses_in_review_and_unknown_is_red(self):
         self.assertEqual(
@@ -3950,7 +4050,7 @@ class FallbackLockGcTests(unittest.TestCase):
         )
         self.assertEqual(
             expire(held=True, state_name="Canceled", pr_verdict="remount", age_seconds=10),
-            ("expire", "issue_canceled"),
+            ("keep", "live_remount"),
         )
 
     def test_issue_meta_admits_done_state_for_remount_only(self):

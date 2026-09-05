@@ -1602,7 +1602,8 @@ def _iter_fallback_locks() -> list[pathlib.Path]:
 
 def _fallback_lock_count() -> int | None:
     try:
-        return len(_iter_fallback_locks())
+        held = [_lock_held(path) for path in _iter_fallback_locks()]
+        return None if any(value is None for value in held) else sum(held)
     except OSError:
         return None
 
@@ -1631,6 +1632,20 @@ def _lock_held(path: pathlib.Path) -> bool | None:
         os.close(descriptor)
 
 
+def _inherited_issue_lease_held(path: pathlib.Path) -> bool:
+    """Only a matching inherited kernel claim can exempt its own pickup."""
+    if os.environ.get("SYMPHONY_ISSUE_LEASE_FD") != "9":
+        return False
+    try:
+        descriptor, current = os.fstat(9), path.stat()
+        if (descriptor.st_dev, descriptor.st_ino) != (current.st_dev, current.st_ino):
+            return False
+        fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
 def _lock_age_seconds(path: pathlib.Path, now: float) -> float | None:
     try:
         age = now - path.stat().st_mtime
@@ -1650,16 +1665,12 @@ def expire_fallback_lock_decision(
     """Pure GC verdict: expire | keep | unknown, plus a typed reason."""
     if held is None:
         return "unknown", "lock_held_unverified"
+    if held:
+        return "keep", "live_remount" if pr_verdict == "remount" else "live_holder"
     if pr_verdict == "skip":
         return "expire", "open_pr_inflight"
     state = (state_name or "").strip().lower()
     if state in DONE_LOCK_STATES:
-        # A live remount of a done/closed issue keeps its lease: the open
-        # DIRTY/CI-red PR proves the work never landed, and expiring the lock
-        # mid-remount would admit a second writer. Canceled/duplicate locks
-        # still expire — those are deliberate kills.
-        if held and pr_verdict == "remount" and state in {"done", "closed"}:
-            return "keep", "live_remount"
         return "expire", {
             "done": "issue_done",
             "closed": "issue_done",
@@ -1669,21 +1680,11 @@ def expire_fallback_lock_decision(
         }[state]
     if state == "in review" and pr_verdict != "remount":
         return "expire", "issue_in_review"
-    if held and pr_verdict == "remount":
-        return "keep", "live_remount"
-    if held and state in {"todo", "in progress"}:
-        return "keep", "live_holder"
-    if not held:
-        if age_seconds is not None and age_seconds > ttl_seconds:
-            return "expire", "ttl_expired"
-        if age_seconds is None and state_name is None and pr_verdict is None:
-            return "unknown", "lock_age_unverified"
-        return "keep", "ttl_unexpired"
-    if state_name is None and pr_verdict is None:
-        return "unknown", "lock_owner_unverified"
-    if state == "in review":
-        return "expire", "issue_in_review"
-    return "keep", "live_holder"
+    if age_seconds is not None and age_seconds > ttl_seconds:
+        return "expire", "ttl_expired"
+    if age_seconds is None and state_name is None and pr_verdict is None:
+        return "unknown", "lock_age_unverified"
+    return "keep", "ttl_unexpired"
 
 
 def _issue_state_name(issue: dict | None) -> str | None:
@@ -1754,13 +1755,13 @@ def gc_fallback_locks(
     now: float | None = None,
     fetch_issue=None,
 ) -> dict:
-    """Expire leftover fallback locks that can permanently own pickup.
+    """Observe lease slots without unlinking the shared lock inode.
 
-    Unlink is the only mutation. Live implement/remount holders are kept.
-    Missing observations fail closed (keep the file).
+    A free flock is immediately reusable. Neither tracker state nor an idle
+    observation permits unlink: a waiter may already have opened that inode.
+    Legacy observer arguments remain accepted, but GC makes no remote reads.
     """
     observed = time.time() if now is None else now
-    fetch = fetch_issue or _fetch_single_issue
     expired: list[dict] = []
     kept: list[dict] = []
     unknown: list[dict] = []
@@ -1785,40 +1786,21 @@ def gc_fallback_locks(
             flush=True,
         )
         return receipt
-    if locks and open_prs is None:
-        open_prs = _autonomous_open_pr_index(None)
-    if open_prs is None:
-        open_prs = {}
-    for path in locks:
+    held_before = [_lock_held(path) for path in locks]
+    for path, held in zip(locks, held_before):
         identifier = _lock_identifier(path)
         if identifier is None:
             unknown.append({"path": path.name, "reason": "malformed_lock"})
             continue
-        held = _lock_held(path)
         age = _lock_age_seconds(path, observed)
-        verdict, _pr = _open_pr_verdict(identifier, open_prs)
-        # Skip Linear when TTL or an inflight PR already proves the lock is stale.
-        state_name = None
-        needs_issue = not (
-            verdict == "skip" or (held is False and age is not None and age > FALLBACK_LEASE_TTL_SECONDS)
-        )
-        if needs_issue:
-            state_name = _issue_state_name(fetch(identifier))
         action, reason = expire_fallback_lock_decision(
             held=held,
-            state_name=state_name,
-            pr_verdict=verdict,
+            state_name=None,
+            pr_verdict=None,
             age_seconds=age,
         )
-        record = {"identifier": identifier, "reason": reason, "held": held, "ageSeconds": None if age is None else int(age)}
+        record = {"identifier": identifier, "reason": reason, "held": held, "ageSeconds": None if age is None else int(age), "inodeRetained": True}
         if action == "expire":
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
-            except OSError:
-                unknown.append({**record, "reason": "lock_unlink_failed"})
-                continue
             expired.append(record)
             continue
         if action == "unknown":
@@ -1830,7 +1812,8 @@ def gc_fallback_locks(
         "schema": FALLBACK_GC_SCHEMA,
         "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(observed)),
         "ttlSeconds": FALLBACK_LEASE_TTL_SECONDS,
-        "lockCountBefore": len(locks),
+        "lockCountBefore": None if any(value is None for value in held_before) else sum(held_before),
+        "retainedLockFiles": len(locks),
         "lockCountAfter": after,
         "expired": expired,
         "kept": kept,
@@ -1901,11 +1884,13 @@ def pickup_check_command(identifier: str) -> int:
         )
         return 78
     open_prs = _autonomous_open_pr_index([identifier])
-    gc_fallback_locks(open_prs=_autonomous_open_pr_index(None))
+    gc_fallback_locks()
     issue = _fetch_single_issue(identifier)
     verdict, _pr = _open_pr_verdict(identifier, open_prs)
     lock_path = _fallback_lease_dir() / f"{identifier}.lock"
     held = _lock_held(lock_path) if lock_path.is_file() else False
+    if _inherited_issue_lease_held(lock_path):
+        held = False
     reason = pickup_refuse_reason(
         identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True
     )

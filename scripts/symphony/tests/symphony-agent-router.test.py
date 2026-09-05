@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import fcntl
 import os
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -65,6 +67,70 @@ class SymphonyAgentRouterTests(unittest.TestCase):
         (self.workspace / ".symphony-routing.json").write_text(
             json.dumps({"schema": "symphony-routing/v1", "issue": "JOV-5954", "model": model})
         )
+
+    def assert_direct_owner_blocks_provider(self, guard_status):
+        probes = self.root / "probe-called"
+        guard = self.executable("guard", f'touch "{probes}"\nexit {guard_status}\n')
+        cursor = self.executable("cursor", f'touch "{probes}"\necho "Logged in"\n')
+        adapter = self.executable("adapter", "echo forbidden-start\n")
+        env = self.environment(guard, cursor, adapter)
+        lease = self.home / ".local/state/symphony-fallback/leases/JOV-5954.lock"
+        lease.parent.mkdir(parents=True)
+        with lease.open("a+") as owner:
+            fcntl.flock(owner, fcntl.LOCK_EX)
+            inode = os.fstat(owner.fileno()).st_ino
+            result = subprocess.run([str(ROUTER), "app-server"], cwd=self.workspace, env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 75, result.stderr)
+            self.assertFalse(probes.exists(), result.stdout)
+            self.assertEqual(lease.stat().st_ino, inode)
+
+    def test_direct_owner_blocks_codex_before_account_probe(self):
+        self.assert_direct_owner_blocks_provider(0)
+
+    def test_direct_owner_blocks_cursor_before_provider_probe(self):
+        self.assert_direct_owner_blocks_provider(75)
+
+    def test_forged_inherited_claim_cannot_start_provider(self):
+        guard = self.executable("guard", "exit 0\n")
+        cursor = self.executable("cursor", "exit 0\n")
+        adapter = self.executable("adapter", "echo forbidden-start\n")
+        env = {**self.environment(guard, cursor, adapter), "SYMPHONY_ISSUE_LEASE_FD": "9"}
+        result = subprocess.run([str(ROUTER), "app-server"], cwd=self.workspace, env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertIn("class=issue-lease-busy", result.stderr)
+
+    def test_actual_codex_handoff_inherits_claim_and_uses_workspace_registry(self):
+        guard = self.executable("guard", "exit 0\n")
+        cursor = self.executable("cursor", "exit 1\n")
+        adapter = self.executable("adapter", "exit 1\n")
+        env = self.environment(guard, cursor, adapter)
+        config = self.workspace / "scripts/symphony/config"
+        config.mkdir(parents=True)
+        shutil.copyfile(ROOT / "scripts/symphony/config/model-registry.json", config / "model-registry.json")
+        self.write_route()
+        exhausted = self.root / "exhausted.py"
+        exhausted.write_text('import sys\nassert sys.argv[1:] == ["pickup-check", "JOV-5954"]\n')
+        rotate = self.root / "rotate"
+        rotate.write_text('''#!/usr/bin/env python3
+import fcntl, os, pathlib, sys
+path = pathlib.Path(os.environ["SYMPHONY_FALLBACK_LEASE_DIR"]) / "JOV-5954.lock"
+with path.open("a+") as challenger:
+    try:
+        fcntl.flock(challenger, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("CLAIM_HELD " + " ".join(sys.argv[1:]))
+    else:
+        raise SystemExit("issue claim lost across exec")
+''')
+        rotate.chmod(0o755)
+        env.update({"SYMPHONY_CODEX_ROUTER": str(ROOT / "scripts/symphony/symphony-codex-router"),
+                    "SYMPHONY_CODEX_EXHAUSTED": str(exhausted), "SYMPHONY_CODEX_ROTATE": str(rotate),
+                    "SYMPHONY_ROUTER_HEARTBEAT_SECONDS": "0"})
+        result = subprocess.run([str(ROUTER), "app-server"], cwd=self.workspace, env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('CLAIM_HELD --config shell_environment_policy.inherit=all --config model="gpt-5.6-sol" app-server', result.stdout)
+        self.assertEqual((self.workspace / "scripts/symphony/symphony-codex-router").read_bytes(),
+                         (ROOT / "scripts/symphony/symphony-codex-router").read_bytes())
 
     def test_exhausted_codex_uses_eligible_cursor_in_same_launch(self) -> None:
         guard = self.executable("guard", "exit 75\n")
