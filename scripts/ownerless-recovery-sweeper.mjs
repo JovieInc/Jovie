@@ -98,6 +98,15 @@ async function linearClient() {
   return import('./backlog-orchestrator/linear-client.mjs');
 }
 
+/**
+ * @typedef {{name: string, payload?: {action?: string, label?: {name?: string}, pull_request?: {draft: boolean, state: string, base: {ref: string}, number?: number, created_at?: string, labels?: Array<{name: string}>, assignees?: Array<unknown>}}}} RecoveryEvent
+ */
+
+/**
+ * @param {NodeJS.ProcessEnv} environment
+ * @param {(path: string, encoding: 'utf8') => string} readEventFile
+ * @returns {RecoveryEvent}
+ */
 export function readRecoveryEvent(
   environment = process.env,
   readEventFile = readFileSync
@@ -109,13 +118,14 @@ export function readRecoveryEvent(
   return { name, payload: JSON.parse(readEventFile(path, 'utf8')) };
 }
 
+function readRecoveryTimeline(number) {
+  return pages(`repos/${repo}/issues/${number}/timeline?per_page=100`);
+}
+
+/** @param {RecoveryEvent} event */
 export async function recoveryEventDecision(
   { name, payload = {} },
-  {
-    now = Date.now(),
-    readTimeline = number =>
-      pages(`repos/${repo}/issues/${number}/timeline?per_page=100`),
-  } = {}
+  { now = Date.now(), readTimeline = readRecoveryTimeline } = {}
 ) {
   if (name === 'manual' || name === 'workflow_dispatch') {
     return { required: true, reason: 'explicit-audit' };
@@ -692,7 +702,7 @@ export async function processFleetClosureRemediationIntents(
 
 export async function run({
   eventContext = readRecoveryEvent(),
-  readEventTimeline,
+  readEventTimeline = readRecoveryTimeline,
   now = Date.now(),
   resolvePolicyHead = resolveExactMainPolicyHead,
   readOpenPulls = openPulls,
