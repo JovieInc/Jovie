@@ -1483,13 +1483,24 @@ def run_official_binary_once(
             process.kill()
             process.wait()
         if sys.platform.startswith("linux"):
-            while True:
-                try:
-                    reaped, _status = os.waitpid(-1, os.WNOHANG)
-                except ChildProcessError:
+            reap_deadline = time.monotonic() + 1.0
+            while time.monotonic() < reap_deadline:
+                while True:
+                    try:
+                        reaped, _status = os.waitpid(-1, os.WNOHANG)
+                    except ChildProcessError:
+                        reaped = 0
+                        break
+                    if reaped <= 0:
+                        break
+                pending = [
+                    descriptor
+                    for descriptor in pidfds.values()
+                    if not select.select([descriptor], [], [], 0)[0]
+                ]
+                if not pending:
                     break
-                if reaped <= 0:
-                    break
+                time.sleep(0.01)
         for descriptor in pidfds.values():
             try:
                 os.close(descriptor)
