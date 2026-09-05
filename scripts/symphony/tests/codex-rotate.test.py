@@ -16,6 +16,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 LAUNCHER = ROOT / "scripts/symphony/codex-rotate"
+PROBE = ROOT / "scripts/symphony/codex-account-probe.sh"
 
 
 @unittest.skipUnless(shutil.which("flock"), "requires util-linux flock")
@@ -28,7 +29,7 @@ class CodexRotateTests(unittest.TestCase):
         for name in ("account-a", "account-b"):
             account = self.accounts / name
             account.mkdir()
-            (account / "auth.json").write_text("{}\n")
+            (account / "auth.json").write_text('{"auth_mode":"chatgpt"}\n')
             (account / "config.toml").write_text('model = "test"\n')
         (self.accounts / "state.json").write_text(
             json.dumps({"active": "account-a", "cooldowns": {}, "last_error": {}})
@@ -147,6 +148,101 @@ class CodexRotateTests(unittest.TestCase):
         state = json.loads((self.accounts / "state.json").read_text())
         self.assertEqual(state["cooldowns"]["account-a"], 1893553445)
         self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
+
+    def test_recovered_typed_account_launches_before_untyped_active_account(self):
+        openrouter = self.accounts / "openrouter"
+        openrouter.mkdir()
+        (openrouter / "auth.json").write_text('{"auth_mode":"api"}\n')
+        (openrouter / "config.toml").write_text('model = "openrouter"\n')
+        future = int(time.time()) + 3600
+        state_path = self.accounts / "state.json"
+        state_path.write_text(json.dumps({
+            "active": "openrouter",
+            "cooldowns": {"account-a": future, "account-b": future + 1},
+            "last_error": {},
+        }))
+        probe_codex = self.root / "probe-codex"
+        probe_codex.write_text(
+            "#!/usr/bin/env bash\nprintf 'SYMPHONY_ACCOUNT_READY\\n'\n"
+        )
+        probe_codex.chmod(0o755)
+        probe = subprocess.run(
+            [str(PROBE)],
+            env=self.env(
+                CODEX_REAL_BIN=probe_codex,
+                CODEX_ACCOUNT_PROBE_MAX_RECOVERIES=1,
+            ),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(probe.stdout.strip(), "RECOVERED account-a")
+        self.assertEqual(json.loads(state_path.read_text())["active"], "account-a")
+        launched = self.start(FAKE_CODEX_SLEEP=0)
+        self.assertEqual(launched.wait(timeout=5), 0)
+        self.assertTrue((self.events / "account-a.started").is_file())
+        self.assertFalse((self.events / "openrouter.started").exists())
+
+    def test_recovered_identity_mutation_before_lock_fails_closed(self):
+        now = int(time.time())
+        state_path = self.accounts / "state.json"
+        state_path.write_text(json.dumps({
+            "active": "account-a",
+            "cooldowns": {"account-a": now, "account-b": now},
+            "last_error": {},
+            "readiness": {"account-a": {
+                "checkedAt": now,
+                "expiresAt": now + 60,
+                "source": "authenticated_completion_probe/v1",
+                "requiredForNextLaunch": True,
+            }},
+        }))
+        descriptor = self.hold_account_lock("account-a")
+        launched = self.start(CODEX_ACCOUNT_WAIT_SECONDS=1, FAKE_CODEX_SLEEP=0)
+        time.sleep(0.2)
+        changed = json.loads(state_path.read_text())
+        changed["active"] = "account-b"
+        state_path.write_text(json.dumps(changed))
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        self.assertEqual(launched.wait(timeout=5), 75)
+        self.assertFalse((self.events / "account-a.started").exists())
+        self.assertFalse((self.events / "account-b.started").exists())
+
+    def test_normal_candidate_new_cooldown_before_lease_prevents_launch(self):
+        shutil.rmtree(self.accounts / "account-b")
+        state_path = self.accounts / "state.json"
+        descriptor = self.hold_account_lock("account-a")
+        launched = self.start(CODEX_ACCOUNT_WAIT_SECONDS=1, FAKE_CODEX_SLEEP=0)
+        time.sleep(0.2)
+        state = json.loads(state_path.read_text())
+        state.setdefault("cooldowns", {})["account-a"] = int(time.time()) + 3600
+        state_path.write_text(json.dumps(state))
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        self.assertEqual(launched.wait(timeout=5), 75)
+        self.assertFalse((self.events / "account-a.started").exists())
+
+    def test_state_alias_override_is_rejected_without_alternate_lock(self):
+        canonical = self.accounts / "state.json"
+        alias = self.accounts / "state-alias.json"
+        alias.symlink_to(canonical)
+        launched = self.start(
+            CODEX_ACCOUNTS_STATE=str(alias),
+            CODEX_ACCOUNT_WAIT_SECONDS=1,
+            FAKE_CODEX_SLEEP=0,
+        )
+        self.assertEqual(launched.wait(timeout=5), 2)
+        self.assertFalse(pathlib.Path(f"{alias}.lock").exists())
+        self.assertFalse(any(self.events.iterdir()))
+
+    def test_symlinked_account_identity_fails_closed(self):
+        outside = self.root / "outside-seat"
+        outside.mkdir()
+        (outside / "auth.json").write_text('{"auth_mode":"chatgpt"}\n')
+        (outside / "config.toml").write_text('model = "test"\n')
+        (self.accounts / "alias").symlink_to(outside, target_is_directory=True)
+        launched = self.start(CODEX_ACCOUNT_WAIT_SECONDS=1, FAKE_CODEX_SLEEP=0)
+        self.assertEqual(launched.wait(timeout=5), 75)
+        self.assertFalse(any(self.events.iterdir()))
 
     # JOV-5031: fail-closed startup. A bounded account wait must end in a
     # typed capacity exit, never in an orphan launcher behind a dead reader.
