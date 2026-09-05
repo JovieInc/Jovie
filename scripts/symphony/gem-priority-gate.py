@@ -38,7 +38,12 @@ from closure_health import (  # noqa: E402 - sibling executable module
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
-from gem_gate_contract import validate_capacity_receipt  # noqa: E402
+from gem_gate_contract import (  # noqa: E402
+    V2_PROOF_SCHEMA,
+    validate_capacity_receipt as validate_legacy_capacity_receipt,
+    v2_validate_capacity_receipt,
+)
+from symphony_proof_context import load_context, validation_args  # noqa: E402
 
 
 SCHEMA = "jovie-fleet-gate/v1"
@@ -581,6 +586,29 @@ def observe_integrity(path: Path) -> dict[str, Any]:
         "detail": receipt.get("detail"),
         "source": str(path),
     }
+
+
+def validate_capacity_receipt(value: object, now: datetime):
+    """Revalidate v2 against operator-owned files, never receipt assertions.
+
+    The envelope schema was retained by the additive v2 producer. Runtime
+    binding or any v2 row selects the v2 boundary even when malformed; legacy
+    receipts retain their existing validator during the composed rollout.
+    """
+    rows = value.get("acceptedEvidence") if isinstance(value, dict) else None
+    v2 = isinstance(value, dict) and (
+        "runtime" in value or "contractSha256" in value
+        or (isinstance(rows, list) and any(
+            isinstance(row, dict) and row.get("schema") == V2_PROOF_SCHEMA for row in rows
+        ))
+    )
+    if not v2:
+        return validate_legacy_capacity_receipt(value, now)
+    try:
+        context = load_context(now)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        return False, "capacity-evidence-trust-context-unavailable", []
+    return v2_validate_capacity_receipt(value, now, **validation_args(context))
 
 
 def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:

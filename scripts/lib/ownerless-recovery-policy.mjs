@@ -22,6 +22,11 @@ const HOLD_LABELS = new Set(
     '|'
   )
 );
+export const MINIMUM_OWNERLESS_MS = 60 * 60_000;
+
+export function isRecoveryHoldLabel(label) {
+  return HOLD_LABELS.has(String(label ?? '').toLowerCase());
+}
 
 const MATERIAL_RISK_PATH =
   /(^|\/)(auth|billing|stripe|security|secrets?|credentials?|migrations?|drizzle)(\/|$)|^apps\/web\/app\/api\/|^apps\/web\/lib\/env|^\.github\/workflows\/production-|^scripts\/security\//i;
@@ -796,7 +801,7 @@ export function evaluateRecoveryCandidate({
   containsOpenPrHead = false,
   checksPassing,
   now = Date.now(),
-  minimumOwnerlessMs = 60 * 60_000,
+  minimumOwnerlessMs = MINIMUM_OWNERLESS_MS,
 }) {
   if (!pr || pr.state !== 'open')
     return { eligible: false, reason: 'not-open' };
