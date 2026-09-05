@@ -688,9 +688,34 @@ export async function run() {
   if (failed > 0) process.exitCode = 1;
 }
 
+export function safeFailureReceipt(error) {
+  const err = /** @type {any} */ (error);
+  const cause = /** @type {any} */ (err?.cause);
+  return {
+    schema: 'jovie-ownerless-recovery-failure/v1',
+    name: err?.name ?? 'Error',
+    message: err?.message ?? String(error),
+    code: err?.code ?? null,
+    attempts: err?.attempts ?? null,
+    resetAt: err?.resetAt ?? null,
+    coverage: err?.coverage ?? null,
+    cause: cause
+      ? {
+          name: cause.name ?? 'Error',
+          message: cause.message ?? String(cause),
+          code: cause.code ?? null,
+          attempts: cause.attempts ?? null,
+          status: cause.metadata?.status ?? null,
+          contentType: cause.metadata?.contentType ?? null,
+        }
+      : null,
+  };
+}
+
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {
   run().catch(error => {
-    console.error(error instanceof Error ? error.stack : String(error));
+    console.error(JSON.stringify(safeFailureReceipt(error)));
+    if (error instanceof Error && error.stack) console.error(error.stack);
     process.exitCode = 1;
   });
 }

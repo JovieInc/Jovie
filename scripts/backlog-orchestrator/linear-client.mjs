@@ -726,10 +726,50 @@ export async function fetchTeamActiveIssueSnapshot(
  * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
  */
 export async function fetchTeamFleetClosureIssueSnapshot(teamId, options = {}) {
-  return fetchTeamActiveIssueSnapshot(teamId, {
-    ...options,
-    stateNames: options.stateNames ?? LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
-  });
+  const {
+    graphqlImpl = graphql,
+    maxPages = LINEAR_MAX_PAGES,
+    stateNames = LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
+  } = options;
+  const stateNameFilter = [...stateNames];
+  return collectLinearConnectionPages(
+    async (cursor, pageSize) => {
+      const data = await graphqlImpl(
+        `
+      query($teamId: String!, $cursor: String, $pageSize: Int!, $stateNames: [String!]!) {
+        team(id: $teamId) {
+          issues(
+            first: $pageSize,
+            after: $cursor,
+            filter: { state: { name: { in: $stateNames } } }
+          ) {
+            nodes {
+              id
+              identifier
+              title
+              description
+              state { id name type }
+              attachments(first: 50) {
+                nodes { id title subtitle url sourceType metadata }
+              }
+              relations(first: 50) {
+                nodes { type relatedIssue { id identifier title } }
+              }
+              comments(first: 50) {
+                nodes { id body createdAt }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    `,
+        { teamId, cursor, pageSize, stateNames: stateNameFilter }
+      );
+      return data?.team?.issues;
+    },
+    { maxPages }
+  );
 }
 
 /** Fetch only the issues while retaining exhaustive snapshot semantics. */
