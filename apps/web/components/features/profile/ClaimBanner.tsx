@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/components/profile/ClaimBanner.test.tsx
 'use client';
 
 import { ArrowRight, Sparkles } from 'lucide-react';
@@ -76,7 +77,7 @@ export function ClaimBanner({
       <div className='relative max-w-4xl mx-auto px-4 py-2 sm:py-3'>
         <div className='flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3'>
           {/* Banner text */}
-          <div className='flex items-center gap-2 text-center sm:text-left max-w-xs sm:max-w-sm'>
+          <div className='flex min-w-0 items-center gap-2 text-center sm:max-w-sm sm:text-left'>
             <Sparkles
               className='h-4 w-4 shrink-0 max-sm:hidden'
               aria-hidden='true'
@@ -89,7 +90,7 @@ export function ClaimBanner({
           {ctaHref && resolvedCtaLabel ? (
             <Link
               href={ctaHref}
-              className='inline-flex min-h-11 items-center gap-2 rounded-full bg-btn-primary px-3.5 py-1.5 text-xs font-semibold text-btn-primary-foreground shadow-sm ring-1 ring-subtle transition-opacity hover:opacity-95 focus-ring-transparent-offset sm:text-sm'
+              className='inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-btn-primary px-3.5 py-1.5 text-xs font-semibold text-btn-primary-foreground shadow-sm ring-1 ring-subtle transition-opacity hover:opacity-95 focus-ring-transparent-offset sm:text-sm'
               data-testid='claim-banner-cta'
               aria-label={`${resolvedCtaLabel} for ${name}`}
               onClick={() => {
@@ -100,9 +101,14 @@ export function ClaimBanner({
                 });
               }}
             >
-              {resolvedCtaLabel}
+              <span
+                className='whitespace-nowrap'
+                data-testid='claim-banner-cta-label'
+              >
+                {resolvedCtaLabel}
+              </span>
               <ArrowRight
-                className='h-3.5 w-3.5 sm:h-4 sm:w-4'
+                className='h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4'
                 aria-hidden='true'
               />
             </Link>
