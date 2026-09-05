@@ -87,7 +87,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
-  it('keeps the editorial search wide and clips its aura to the pill', () => {
+  it('keeps the editorial search wide and bounds its aura to the pill', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
@@ -98,7 +98,21 @@ describe('homepage hero contract (JOV-5864)', () => {
       /@media \(max-width: 1023px\)[\s\S]*?\.homepage-editorial-hero__search\s*\{[\s\S]*?width: 100%;[\s\S]*?\}/
     );
     expect(css).toMatch(
-      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?inset: 0;[\s\S]*?clip-path: inset\(0 round var\(--radius-pill\)\);[\s\S]*?\}/
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?inset: 0;[\s\S]*?overflow: hidden;[\s\S]*?border-radius: var\(--radius-pill\);[\s\S]*?clip-path: inset\(0 round var\(--radius-pill\)\);[\s\S]*?\}/
+    );
+  });
+
+  it('keeps the animated aura on the border and the field interior calm', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?padding: var\(--space-px\);[\s\S]*?mask-composite: exclude;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /\.homepage-name-search__field\s*\{[\s\S]*?min-height: calc\(var\(--space-12\) \+ var\(--space-2\)\);[\s\S]*?padding: var\(--space-1\) calc\(var\(--space-3\) - var\(--space-px\)\) var\(--space-1\)[\s\S]*?var\(--space-5\);[\s\S]*?background: var\(--system-b-bg-page\);[\s\S]*?background-clip: padding-box;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /\.homepage-name-search:focus-within \.homepage-name-search__field\s*\{[\s\S]*?outline-color: var\(--color-accent-blue\);[\s\S]*?\}/
     );
   });
 

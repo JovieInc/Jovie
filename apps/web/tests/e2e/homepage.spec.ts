@@ -102,6 +102,83 @@ test.describe('Homepage', () => {
     expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
   });
 
+  test('keeps both name searches calm inside with a border-only aura', async ({
+    page,
+  }) => {
+    const readMaterial = async (testId: string) =>
+      page
+        .getByTestId(testId)
+        .locator('.homepage-name-search')
+        .evaluate(async root => {
+          const field = root.querySelector<HTMLElement>(
+            '.homepage-name-search__field'
+          );
+          const input = root.querySelector<HTMLInputElement>('input');
+          const submit = root.querySelector<HTMLButtonElement>(
+            '.homepage-name-search__submit'
+          );
+          const aura = root.querySelector<HTMLElement>(
+            ":scope > .group\\/aura > [aria-hidden='true']"
+          );
+          if (!(field && input && submit && aura)) return null;
+
+          input.focus();
+          await new Promise(resolve => setTimeout(resolve, 250));
+          const fieldBounds = field.getBoundingClientRect();
+          const submitBounds = submit.getBoundingClientRect();
+          const fieldStyle = getComputedStyle(field);
+          const auraStyle = getComputedStyle(aura);
+          const auraPaint = getComputedStyle(aura, '::before');
+          const submitTarget = getComputedStyle(submit, '::before');
+
+          return {
+            auraBackgroundImage: auraPaint.backgroundImage,
+            auraMaskComposite: auraStyle.maskComposite,
+            auraTransitionDuration: auraStyle.transitionDuration,
+            fieldBackgroundColor: fieldStyle.backgroundColor,
+            fieldBackgroundImage: fieldStyle.backgroundImage,
+            fieldOutlineColor: fieldStyle.outlineColor,
+            fieldOutlineStyle: fieldStyle.outlineStyle,
+            fieldOutlineWidth: fieldStyle.outlineWidth,
+            insetBottom: fieldBounds.bottom - submitBounds.bottom,
+            insetRight: fieldBounds.right - submitBounds.right,
+            insetTop: submitBounds.top - fieldBounds.top,
+            submitTargetHeight: submitTarget.height,
+          };
+        });
+
+    for (const mode of [
+      { width: 1280, height: 800, reducedMotion: 'no-preference' as const },
+      { width: 390, height: 844, reducedMotion: 'no-preference' as const },
+      { width: 1280, height: 800, reducedMotion: 'reduce' as const },
+    ]) {
+      await page.setViewportSize({ width: mode.width, height: mode.height });
+      await page.emulateMedia({ reducedMotion: mode.reducedMotion });
+      await gotoHomepage(page);
+
+      for (const testId of [
+        'homepage-editorial-hero-search',
+        'homepage-close-search',
+      ]) {
+        const material = await readMaterial(testId);
+        expect(material).not.toBeNull();
+        expect(material?.fieldBackgroundImage).toBe('none');
+        expect(material?.fieldBackgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+        expect(material?.auraBackgroundImage).not.toBe('none');
+        expect(material?.auraMaskComposite).toMatch(/exclude|xor/);
+        expect(material?.fieldOutlineStyle).toBe('solid');
+        expect(material?.fieldOutlineWidth).not.toBe('0px');
+        expect(material?.fieldOutlineColor).not.toBe('rgba(0, 0, 0, 0)');
+        expect(material?.insetTop).toBeCloseTo(material?.insetRight ?? 0, 0);
+        expect(material?.insetBottom).toBeCloseTo(material?.insetRight ?? 0, 0);
+        expect(material?.submitTargetHeight).toBe('44px');
+        if (mode.reducedMotion === 'reduce') {
+          expect(material?.auraTransitionDuration).toBe('0s');
+        }
+      }
+    }
+  });
+
   test('header uses the canonical marketing shell with full navigation', async ({
     page,
   }) => {

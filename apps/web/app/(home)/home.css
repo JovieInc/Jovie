@@ -1987,17 +1987,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     var(--system-b-text-primary) 2%,
     transparent
   );
-  --homepage-editorial-hairline: color-mix(
-    in oklab,
-    var(--system-b-text-primary) 12%,
-    transparent
-  );
-  --homepage-editorial-field: color-mix(
-    in oklab,
-    var(--system-b-bg-page) 58%,
-    transparent
-  );
-
   position: relative;
   display: grid;
   width: 100%;
@@ -2022,9 +2011,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   background:
     linear-gradient(
       180deg,
-      transparent 0 55%,
-      color-mix(in oklab, var(--system-b-text-primary) 3%, transparent) 55.1%,
-      transparent 55.3%
+      transparent 0 42%,
+      var(--homepage-editorial-light-soft) 55%,
+      transparent 70%
     ),
     var(--system-b-bg-page);
 }
@@ -2035,8 +2024,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   left: 50%;
   width: min(80rem, 120vw);
   height: min(34rem, 50vw);
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-text-primary) 4%, transparent);
+  /* Keep the light-well geometry, without drawing a visible ellipse. */
+  border: 1px solid transparent;
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background:
@@ -2053,9 +2042,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
     ),
     linear-gradient(
       180deg,
-      transparent 48%,
-      color-mix(in oklab, var(--system-b-text-primary) 5%, transparent) 50%,
-      transparent 52%
+      transparent 35%,
+      var(--homepage-editorial-light-soft) 50%,
+      transparent 65%
     );
   opacity: 0.68;
 }
@@ -2117,47 +2106,57 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin-top: var(--space-8);
 }
 
-/* Editorial aura is light caught inside the glass, not a neon outer glow. */
+/* Keep the animated color on the perimeter. The input interior stays calm. */
 .homepage-name-search > .group\/aura > [aria-hidden="true"] {
   inset: 0;
+  padding: var(--space-px);
+  overflow: hidden;
   border-radius: var(--radius-pill);
-  opacity: 0.28;
-  filter: blur(3px);
+  opacity: 0.72;
+  filter: none;
   clip-path: inset(0 round var(--radius-pill));
+  mask:
+    linear-gradient(var(--system-b-cinematic-black) 0 0) content-box,
+    linear-gradient(var(--system-b-cinematic-black) 0 0);
+  mask-composite: exclude;
+  -webkit-mask:
+    linear-gradient(var(--system-b-cinematic-black) 0 0) content-box,
+    linear-gradient(var(--system-b-cinematic-black) 0 0);
+  -webkit-mask-composite: xor;
+}
+
+.homepage-name-search > .group\/aura > [aria-hidden="true"]::before {
+  background: conic-gradient(
+    from 82deg,
+    var(--color-accent-purple),
+    var(--color-accent-pink),
+    var(--color-accent-blue),
+    var(--color-accent-purple)
+  );
 }
 
 .homepage-name-search:focus-within > .group\/aura > [aria-hidden="true"] {
-  opacity: 0.72;
+  opacity: 1;
 }
 
 .homepage-name-search__field {
   min-height: calc(var(--space-12) + var(--space-2));
   overflow: hidden;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5);
-  border: 1px solid var(--homepage-editorial-hairline);
+  padding: var(--space-1) calc(var(--space-3) - var(--space-px)) var(--space-1)
+    var(--space-5);
+  border: var(--space-px) solid transparent;
   border-radius: var(--radius-pill);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--system-b-text-primary) 4%, transparent),
-      transparent 58%
-    ),
-    var(--homepage-editorial-field);
-  backdrop-filter: blur(var(--space-3));
-  -webkit-backdrop-filter: blur(var(--space-3));
-  transition: border-color var(--ds-motion-subtle-duration)
+  outline: var(--space-0-5) solid transparent;
+  outline-offset: var(--space-0-5);
+  background: var(--system-b-bg-page);
+  background-clip: padding-box;
+  transition: outline-color var(--ds-motion-subtle-duration)
     var(--ds-motion-subtle-easing);
 }
 
-.homepage-name-search__field:hover,
-.homepage-name-search__field:focus-within,
-.homepage-name-search__field--open {
-  border-color: color-mix(
-    in oklab,
-    var(--system-b-text-primary) 26%,
-    transparent
-  );
+.homepage-name-search:focus-within .homepage-name-search__field {
+  outline-color: var(--color-accent-blue);
 }
 
 .homepage-name-search__input {
