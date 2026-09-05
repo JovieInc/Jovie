@@ -116,6 +116,12 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
+  it('sizes rotating border paint to cover the wide pill at every angle', () => {
+    expect(readHeroCss()).toMatch(
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]::before\s*\{[\s\S]*?width: 150%;[\s\S]*?height: auto;[\s\S]*?aspect-ratio: 1;[\s\S]*?\}/
+    );
+  });
+
   it('keeps Find me typography on the canonical marketing button contract', () => {
     const css = readHeroCss();
 
