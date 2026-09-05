@@ -56,19 +56,30 @@ jobs:
     name: ${{ github.event_name == 'merge_group' && 'PR Size Guard' || 'PR Size Guard (merge-group inactive)' }}
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    # The trusted policy has a 45s aggregate API deadline. Keep this producer
+    # terminal before merge-group admission's 90s external-check deadline.
+    timeout-minutes: 1
     steps:
       - name: Check out trusted queue policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Never execute policy code from the synthetic PR-controlled head.
-          ref: ${{ github.event.merge_group.base_sha }}
+          # Only protected-main policy executes. The pinned bootstrap below
+          # hydrates its data before the old policy lists blob sizes.
+          ref: main
           persist-credentials: false
           sparse-checkout: |
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
           sparse-checkout-cone-mode: false
+
+      - name: Hydrate exact bootstrap tree in one bounded fetch
+        if: github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0'
+        env:
+          BOOTSTRAP_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          [[ "$BOOTSTRAP_HEAD" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          timeout --kill-after=5s 40s git fetch --refetch --filter=blob:limit=1g --no-tags --depth=1 origin "$BOOTSTRAP_HEAD"
 
       - name: Enforce combined-tree payload and member size policy
         env:

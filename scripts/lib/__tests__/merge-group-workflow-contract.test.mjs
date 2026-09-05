@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
+import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
+import { MERGE_GROUP_POLICY_DEADLINE_MS } from '../merge-group-member-policy.mjs';
 import {
   createGitRunner,
   formatMetaEnv,
@@ -308,6 +310,7 @@ describe('merge_group workflow contract', () => {
 
   it('admits expensive queue lanes only while exact external gates are green', () => {
     const admission = getJobBlock(CI_WORKFLOW, 'ci-merge-group-admission');
+    const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
@@ -346,6 +349,16 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).toContain('node "$policy"');
     expect(admission).not.toContain('secrets.');
+    expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
+    expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
+    expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
+    expect(sizeGuard).toContain('timeout-minutes: 1');
+    expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(sizeGuard).toContain('--policy=size');
+    expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
+    expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThan(60_000);
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeLessThan(120_000);
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
@@ -1560,7 +1573,10 @@ ${selectedGateScript}`,
       "github.event_name == 'merge_group' && 'Fork PR Gate'"
     );
     expect(forkGate).toContain("github.event_name == 'merge_group'");
-    expect(forkGate).toContain('ref: ${{ github.event.merge_group.base_sha }}');
+    expect(forkGate).toContain('ref: main');
+    expect(forkGate).not.toContain(
+      'ref: ${{ github.event.merge_group.base_sha }}'
+    );
     expect(forkGate).toContain('persist-credentials: false');
     expect(forkGate).toContain('contents: read');
     expect(forkGate).toContain('pull-requests: read');
@@ -1581,10 +1597,20 @@ ${selectedGateScript}`,
       "github.event_name == 'merge_group' && 'PR Size Guard'"
     );
     expect(sizeGuard).toContain("github.event_name == 'merge_group'");
-    expect(sizeGuard).toContain(
-      'ref: ${{ github.event.merge_group.base_sha }}'
-    );
+    expect(sizeGuard).toContain('ref: main');
     expect(sizeGuard).toContain('persist-credentials: false');
+    expect(sizeGuard).toContain(
+      "if: github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0'"
+    );
+    expect(sizeGuard).toContain(
+      'timeout --kill-after=5s 40s git fetch --refetch --filter=blob:limit=1g --no-tags --depth=1 origin "$BOOTSTRAP_HEAD"'
+    );
+    expect(sizeGuard).toContain(
+      'BOOTSTRAP_HEAD: ${{ github.event.merge_group.head_sha }}'
+    );
+    expect(sizeGuard).not.toContain(
+      'ref: ${{ github.event.merge_group.head_sha }}'
+    );
     expect(sizeGuard).toContain('scripts/lib/repo-hygiene-limits.mjs');
     expect(SIZE_GUARD_WORKFLOW).toContain('contents: read');
     expect(SIZE_GUARD_WORKFLOW).toContain('pull-requests: read');
@@ -1595,8 +1621,10 @@ ${selectedGateScript}`,
     expect(sizeGuard).toContain(
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
-    expect(MEMBER_POLICY).toContain('enforceCombinedTreePayload({ headSha })');
-    expect(MEMBER_POLICY).toContain("['ls-tree', '-r', '-l', '-z', headSha]");
+    expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
+    expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
+    expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
+    expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
     expect(sizeGuard).toContain("MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}");
     expect(sizeGuard).not.toContain('members were size-checked as source PRs');
     const sourceSizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');

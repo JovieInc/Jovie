@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-08-31T01:24:07.836Z",
-  "totalErrors": 151,
+  "generatedAt": "2026-09-05T01:09:22.268Z",
+  "totalErrors": 143,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -111,10 +111,6 @@
     },
     "scripts/lib/merge-group-admission.mjs": {
       "TS2339": 2
-    },
-    "scripts/lib/merge-group-member-policy.mjs": {
-      "TS2339": 3,
-      "TS2353": 5
     },
     "scripts/lib/merge-queue-guard.mjs": {
       "TS2339": 2,
