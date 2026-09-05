@@ -80,3 +80,22 @@ from a reviewed main revision. It requires a separate protected
 Its preview/candidate/promote/rollback gates are covered by the same test cases
 as the independent Summer release path. Neither workflow changes current routing
 until an authorized promotion; neither environment is commissioned by this PR.
+
+## Production cutover receipt (2026-09-05)
+
+Private `JovieInc/summer-config` owns the Git-linked `jovie-eve-shadow` project,
+root `apps/summer`, production branch `main`. Runtime commit
+`f9cad8528000000c4f196e1ccbf6a8aaf386b0f7` deployed as
+`dpl_CnnoQexMQB46zwBNURMJSsAZrRAp`; the public Photon alias served that build.
+A real founder iMessage at 20:50:42.610Z reached the signed production webhook
+with HTTP 200, created one immutable admission, and received one Summer reply
+at 20:50:56.976Z. The obsolete parallel webhook was retired with sole-replacement
+readback. No credentials or message bodies belong in this repository.
+
+The monorepo Eve workflow retains all verification jobs and no longer has
+company deployment or promotion jobs. Deploy and rollback Summer through its
+private repository and verified private deployment history. Do not restore a
+mixed monorepo build onto the company alias. Product Eve materialization remains
+here; historical Summer extraction fixtures are verification-only pending
+final source cleanup. Transport delivery does not certify governor execution,
+Ovie web/mobile continuity, or revenue lift.
