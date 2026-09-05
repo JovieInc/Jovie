@@ -7,6 +7,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+## [26.9.0] - 2026-09-05
+
+- [internal] **Ovie can continue the current Summer conversation through Eve without falling back to customer Jovie chat (JOV-6021):** production OIDC admission preserves the durable session and history, binds each streamed answer to its current turn, rejects conflicting or concurrent submissions, and records replay-safe receipts.
+
+- [internal] **Private Summer turns now fail closed at their trust and resource boundaries:** Eve’s shell, file, network, and delegation tools are disabled; request, response, history, acceptance, and terminal records are bounded and schema-checked; live OV chat requires a stable client turn ID.
+
 ## [26.8.2] - 2026-08-31
 
 - **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
