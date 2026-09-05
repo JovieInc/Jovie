@@ -10,6 +10,7 @@ Run with:
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import shutil
@@ -119,6 +120,60 @@ def _production_unbound_hold_receipt(
             "preserve": True,
             "newIntakeAllowed": intake_allowed,
             "semantics": "preserve-cohort-and-continue-isolated-implementation",
+        },
+    }
+
+
+def _controller_repair_receipt() -> dict[str, object]:
+    return {
+        "schema": "jovie-fleet-gate/v1",
+        "state": "AMBER",
+        "promotionMode": "controller-repair-only",
+        "observedAt": datetime.now(timezone.utc).isoformat(),
+        "signals": {
+            "main": {"status": "green", "sha": "a" * 40},
+            "production": {"status": "green", "deployedSha": "b" * 40},
+            "controller": {"status": "failed"},
+            "queue": {
+                "status": "known",
+                "eligiblePrs": 2,
+                "greenReadyPrs": 2,
+                "target": 15,
+            },
+            "integrity": {"status": "clear"},
+        },
+        "reasons": [
+            {
+                "code": "controller-failure",
+                "layer": "controller",
+                "severity": "warning",
+            },
+            {
+                "code": "production-deployment-unbound",
+                "layer": "promotion",
+                "severity": "warning",
+            },
+        ],
+        "promotionAdmission": {"allowed": False},
+        "isolatedPromotionAdmission": {
+            "allowed": False,
+            "deploymentsAllowed": False,
+        },
+        "productionUnboundRepairAdmission": {"allowed": False},
+        "controllerRepairAdmission": {
+            "allowed": True,
+            "condition": "controller-failure",
+            "mainSha": "a" * 40,
+            "deployedSha": "b" * 40,
+            "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+            "maxConcurrent": 1,
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
+        },
+        "alreadyAdmittedCohort": {
+            "preserve": True,
+            "newIntakeAllowed": False,
+            "semantics": "preserve-cohort-and-admit-one-controller-repair",
         },
     }
 
@@ -2367,6 +2422,212 @@ JSON
         assert "fresh typed fleet receipt" in result.stderr
         assert not called.exists(), "drain invoked gh before receipt preflight"
 
+    def test_controller_repair_attestation_rejects_scope_review_and_expired_replay(
+        self,
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        paths = ["scripts/drain-pr-queue.sh"]
+        paths_hash = hashlib.sha256(
+            json.dumps(paths, separators=(",", ":")).encode()
+        ).hexdigest()
+        attestation = {
+            "schema": "jovie-controller-repair-attestation/v1",
+            "kind": "controller-runtime-repair",
+            "condition": "controller-failure",
+            "repository": "JovieInc/Jovie",
+            "pr": 904,
+            "head": "f" * 40,
+            "mainSha": "a" * 40,
+            "reviewAuthority": "independent-llm-review",
+            "reviewId": "review-17219",
+            "reviewedHead": "f" * 40,
+            "changedPathsSha256": paths_hash,
+            "operationId": "run-77-attempt-1",
+            "issuedAt": now.isoformat(),
+            "expiresAt": (now + timedelta(minutes=10)).isoformat(),
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
+        }
+
+        def matches(candidate: dict[str, object]) -> subprocess.CompletedProcess[str]:
+            body = (
+                "<!-- jovie-controller-repair-attestation/v1 -->\n```json\n"
+                + json.dumps(candidate)
+                + "\n```\n"
+            )
+            return subprocess.run(
+                [
+                    "node",
+                    "scripts/lib/controller-repair-attestation.mjs",
+                    "matches",
+                    "--repository",
+                    "JovieInc/Jovie",
+                    "--pr",
+                    "904",
+                    "--head",
+                    "f" * 40,
+                    "--main-sha",
+                    "a" * 40,
+                    "--changed-paths-sha256",
+                    paths_hash,
+                    "--operation-id",
+                    "run-77-attempt-1",
+                    "--minimum-valid-for-ms",
+                    "120000",
+                ],
+                cwd=_REPO_ROOT,
+                input=body,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        assert matches(attestation).returncode == 0
+        for changed in (
+            {**attestation, "head": "e" * 40, "reviewedHead": "e" * 40},
+            {**attestation, "mainSha": "b" * 40},
+            {**attestation, "changedPathsSha256": "0" * 64},
+            {**attestation, "reviewedHead": "e" * 40},
+            {**attestation, "operationId": "run-77-attempt-2"},
+            {**attestation, "unexpectedScope": True},
+            {
+                **attestation,
+                "expiresAt": (now + timedelta(seconds=30)).isoformat(),
+            },
+            {
+                **attestation,
+                "issuedAt": (now - timedelta(minutes=20)).isoformat(),
+                "expiresAt": (now - timedelta(minutes=10)).isoformat(),
+            },
+        ):
+            assert matches(changed).returncode == 3
+
+    @pytest.mark.parametrize(
+        ("actor", "live_hold", "live_head_changed", "expected_enroll"),
+        [
+            ("jovie-bot[bot]", False, False, True),
+            ("untrusted-user", False, False, False),
+            ("jovie-bot[bot]", True, False, False),
+            ("jovie-bot[bot]", False, True, False),
+        ],
+    )
+    def test_controller_repair_mode_admits_only_trusted_exact_candidate(
+        self,
+        tmp_path: Path,
+        actor: str,
+        live_hold: bool,
+        live_head_changed: bool,
+        expected_enroll: bool,
+    ) -> None:
+        head = "f" * 40
+        live_head = "d" * 40 if live_head_changed else head
+        live_labels = '[{"name":"hold"}]' if live_hold else "[]"
+        paths = ["scripts/drain-pr-queue.sh"]
+        paths_hash = hashlib.sha256(
+            json.dumps(paths, separators=(",", ":")).encode()
+        ).hexdigest()
+        now = datetime.now(timezone.utc)
+        attestation = {
+            "schema": "jovie-controller-repair-attestation/v1",
+            "kind": "controller-runtime-repair",
+            "condition": "controller-failure",
+            "repository": "JovieInc/Jovie",
+            "pr": 904,
+            "head": head,
+            "mainSha": "a" * 40,
+            "reviewAuthority": "independent-llm-review",
+            "reviewId": "review-17219",
+            "reviewedHead": head,
+            "changedPathsSha256": paths_hash,
+            "operationId": "run-77-attempt-1",
+            "issuedAt": now.isoformat(),
+            "expiresAt": (now + timedelta(minutes=10)).isoformat(),
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
+        }
+        body = (
+            "<!-- jovie-controller-repair-attestation/v1 -->\n```json\n"
+            + json.dumps(attestation)
+            + "\n```"
+        )
+        encoded_body = base64.b64encode(body.encode()).decode()
+        encoded_receipt = base64.b64encode(
+            json.dumps(_controller_repair_receipt()).encode()
+        ).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":904,"t":"Controller repair","draft":false,"m":"MERGEABLE","head":"codex/controller-repair","headOid":"{head}","base":"main","body":"","L":[],"fail":[],"q":false}},{{"n":905,"t":"Ordinary queued PR","draft":false,"m":"MERGEABLE","head":"codex/product","headOid":"{'e' * 40}","base":"main","body":"","L":["merge-queue"],"fail":[],"q":true}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" && " $* " == *" --json files "* ]]; then
+                  echo '["scripts/drain-pr-queue.sh"]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/issues/904/comments" ]]; then
+                  body=$(printf '%s' '{encoded_body}' | base64 --decode)
+                  jq -nc --arg actor '{actor}' --arg body "$body" '[[{{user:{{login:$actor}},body:$body}}]]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":{live_labels},"headRefOid":"{live_head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=controller-repair-only "
+                    "DRAIN_RECONCILE_QUEUE_REENTRY=1 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=9 "
+                    "GITHUB_RUN_ID=77 GITHUB_RUN_ATTEMPT=1 "
+                    "DRAIN_ADMISSION_PR=904 "
+                    f"DRAIN_ADMISSION_HEAD={head} "
+                    f"DRAIN_FLEET_GATE_B64={encoded_receipt}"
+                ),
+            )
+        )
+
+        # Dry-run reports the selector decision without turning a rejected
+        # candidate into a mutation failure. The enrollment line is the
+        # authoritative observable for this fixture.
+        assert result.returncode == 0, (
+            f"stdout={result.stdout}\nstderr={result.stderr}"
+        )
+        assert ("[dry-run] would +merge-queue on #904" in result.stdout) is expected_enroll
+        assert "would +merge-queue on #905" not in result.stdout
+        assert "would -merge-queue on #905" not in result.stdout
+        assert "=== RECOVER (bounded exact-head native admission) ===" not in result.stdout
+        if actor != "jovie-bot[bot]":
+            assert (
+                "trusted exact-scope controller repair attestation is absent or stale"
+                in result.stdout
+            )
+        if live_hold:
+            assert "eligibility changed; refusing enrollment for #904" in result.stdout
+        if live_head_changed:
+            assert "event admission scope no longer matches #904" in result.stdout
+
     def test_blocked_receipt_dry_run_preserves_clean_queued_pr(
         self, tmp_path: Path
     ) -> None:
@@ -2729,7 +2990,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"enroll","bucket":"fail","state":"FAILURE","workflow":"Merge Queue Auto-Enroll"}}]'
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"enroll","bucket":"fail","state":"FAILURE","workflow":"Merge Queue Auto-Enroll","workflowDatabaseId":299216194,"appSlug":"github-actions"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then

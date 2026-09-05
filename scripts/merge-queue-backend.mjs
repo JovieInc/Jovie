@@ -840,7 +840,8 @@ export function explainExactHeadAdmissionSelector({
   const mode = typeof promotionMode === 'string' ? promotionMode : '';
   const modeAllows =
     CLEAN_ADMITTING_PROMOTION_MODES.has(mode) ||
-    (mode === 'isolated-only' && row.iso === true);
+    (mode === 'isolated-only' && row.iso === true) ||
+    (mode === 'controller-repair-only' && row.controllerRepair === true);
   if (!modeAllows) {
     reasons.push(`promotion-mode=${mode || 'missing'}`);
   }

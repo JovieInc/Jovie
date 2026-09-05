@@ -36,7 +36,9 @@
 #     pass for admission events replaced while pending in the workflow mutex
 #   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap;
 #     0 = uncapped (bounded only by native queue depth), positive N re-caps
-#   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
+#   DRAIN_PROMOTION_MODE  normal, isolated-only, controller-repair-only,
+#                         draft-only, hold-intake, deferred-release-only,
+#                         or blocked
 #   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
@@ -248,12 +250,16 @@ LAST_ENROLL_SKIP_REASON=""
 NO_AUTO_HOLD_JQ='. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"'
 QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
 PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/production-unbound-repair-attestation.mjs"
+CONTROLLER_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/controller-repair-attestation.mjs"
+CONTROLLER_REPAIR_ATTESTATION_MARKER='<!-- jovie-controller-repair-attestation/v1 -->'
+CONTROLLER_REPAIR_ATTESTATION_ACTOR='jovie-bot[bot]'
+CONTROLLER_REPAIR_MIN_VALIDITY_MS=120000
 QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
 QUEUE_DEFERRED_RELEASE_ACTOR='jovie-bot[bot]'
 FLEET_GATE_JSON=""
 case "$DRAIN_PROMOTION_MODE" in
   normal) ;;
-  isolated-only | draft-only | blocked | hold-intake | deferred-release-only)
+  isolated-only | controller-repair-only | draft-only | blocked | hold-intake | deferred-release-only)
     if [[ -z "$DRAIN_FLEET_GATE_B64" ]]; then
       echo "::error::Refusing $DRAIN_PROMOTION_MODE without a fresh typed fleet receipt" >&2
       exit 2
@@ -323,6 +329,31 @@ case "$DRAIN_PROMOTION_MODE" in
         .closureAdmission.promotionContinues == true and
         .closureAdmission.remediationContinues == true and
         .alreadyAdmittedCohort.newIntakeAllowed == .closureAdmission.newIssueIntakeAllowed
+      elif $mode == "controller-repair-only" then
+        .state == "AMBER" and
+        .signals.main.status == "green" and
+        (.signals.main.sha | test("^[0-9a-f]{40}$")) and
+        .signals.production.status == "green" and
+        (.signals.production.deployedSha | test("^[0-9a-f]{7,40}$")) and
+        .signals.controller.status == "failed" and
+        (.signals.integrity.status | IN("clear", "resolved")) and
+        .promotionAdmission.allowed == false and
+        .isolatedPromotionAdmission.allowed == false and
+        .productionUnboundRepairAdmission.allowed == false and
+        .controllerRepairAdmission.allowed == true and
+        .controllerRepairAdmission.condition == "controller-failure" and
+        .controllerRepairAdmission.mainSha == .signals.main.sha and
+        .controllerRepairAdmission.deployedSha == .signals.production.deployedSha and
+        .controllerRepairAdmission.scope == "trusted-comment-exact-repository-pr-head-main-path-set" and
+        .controllerRepairAdmission.maxConcurrent == 1 and
+        .controllerRepairAdmission.deploymentsAllowed == false and
+        .controllerRepairAdmission.runtimeActivationAllowed == false and
+        .alreadyAdmittedCohort.preserve == true and
+        .alreadyAdmittedCohort.newIntakeAllowed == false and
+        ([.reasons[].code] | sort | IN(
+          ["controller-failure"],
+          ["controller-failure", "production-deployment-unbound"]
+        ))
       else
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
@@ -337,6 +368,13 @@ case "$DRAIN_PROMOTION_MODE" in
     exit 2
     ;;
 esac
+if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+  # Consume exactly one event-scoped lease. This lane never inherits ordinary
+  # queue re-entry or missed-admission recovery loops.
+  DRAIN_RECONCILE_QUEUE_REENTRY=0
+  DRAIN_RECONCILE_MISSED_ADMISSION=0
+  DRAIN_QUEUE_REENTRY_MAX_PER_RUN=1
+fi
 if [[ ! "$FLEET_HOLD_TTL_SECONDS" =~ ^[1-9][0-9]*$ ]] \
   || (( FLEET_HOLD_TTL_SECONDS > 3600 )); then
   echo "::error::FLEET_HOLD_TTL_SECONDS must be an integer from 1 through 3600" >&2
@@ -448,6 +486,38 @@ production_unbound_repair_attestation_matches() {  # <body> <pr> <head> <main-sh
   local body="$1" pr="$2" head="$3" main_sha="$4"
   printf '%s' "$body" | node "$PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB" matches \
     --pr "$pr" --head "$head" --main-sha "$main_sha" >/dev/null 2>&1
+}
+
+controller_repair_attestation_for_pr() {  # <pr>
+  local raw body
+  raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp 2>/dev/null || true)"
+  [[ -n "$raw" ]] || return 0
+  body="$(jq -r --arg marker "$CONTROLLER_REPAIR_ATTESTATION_MARKER" --arg actor "$CONTROLLER_REPAIR_ATTESTATION_ACTOR" '
+    [ .[][]?
+      | select(.user.login == $actor)
+      | select((.body | type == "string") and (.body | contains($marker)))
+      | .body
+    ] | last // empty
+  ' <<<"$raw" 2>/dev/null || true)"
+  [[ -n "$body" ]] || return 0
+  printf '%s' "$body"
+}
+
+controller_repair_attestation_matches() {  # <body> <pr> <head> <main-sha> <paths-hash>
+  local body="$1" pr="$2" head="$3" main_sha="$4" paths_hash="$5" operation_id verdict
+  operation_id="run-${GITHUB_RUN_ID:-}-attempt-${GITHUB_RUN_ATTEMPT:-}"
+  [[ "$operation_id" =~ ^run-[1-9][0-9]*-attempt-[1-9][0-9]*$ ]] || return 1
+  # Treat the accepted bot statement as a short lease, not revocable shared
+  # state. GitHub's dequeuePullRequest mutation has no expected-head input, so
+  # a post-enrollment comment reread cannot safely compensate without risking
+  # a newer head. Require enough lease runway before mutation instead; the
+  # existing post-enrollment source/head/hold rereads remain authoritative.
+  verdict="$(printf '%s' "$body" | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" matches \
+    --repository "$REPO" --pr "$pr" --head "$head" --main-sha "$main_sha" \
+    --changed-paths-sha256 "$paths_hash" \
+    --operation-id "$operation_id" \
+    --minimum-valid-for-ms "$CONTROLLER_REPAIR_MIN_VALIDITY_MS" 2>/dev/null)" || return 1
+  jq -e 'type == "object" and .allowed == true' <<<"$verdict" >/dev/null 2>&1
 }
 
 # Keep one scheduled tick bounded. A single in-flight GitHub call may finish
@@ -1222,6 +1292,25 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       echo "    ⏸ exact-head isolated UI/docs receipt is absent or invalid for #$n"
       return 2
     fi
+  elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+    local repair_main_sha changed_paths paths_hash attestation_body
+    repair_main_sha="$(jq -r '.controllerRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
+    changed_paths="$(pr_changed_paths_json "$n")"
+    paths_hash=""
+    if [[ "$changed_paths" != "null" ]]; then
+      paths_hash="$(printf '%s' "$changed_paths" \
+        | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
+    fi
+    attestation_body="$(controller_repair_attestation_for_pr "$n")"
+    if [[ "$n" != "$DRAIN_ADMISSION_PR" \
+      || "$expected_head" != "$DRAIN_ADMISSION_HEAD" \
+      || ! "$paths_hash" =~ ^[0-9a-f]{64}$ \
+      || -z "$attestation_body" ]] \
+      || ! controller_repair_attestation_matches \
+        "$attestation_body" "$n" "$expected_head" "$repair_main_sha" "$paths_hash"; then
+      echo "    ⏸ trusted exact-scope controller repair attestation is absent or stale for #$n"
+      return 2
+    fi
   elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" || "$DRAIN_PROMOTION_MODE" == "draft-only" ]]; then
     : # Waiting lanes must not strip enroll from CLEAN unrelated PRs.
   elif [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
@@ -1278,6 +1367,14 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     # mutation was in flight.
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
       --json state,isDraft,mergeable,labels,headRefOid,baseRefName,body 2>/dev/null)"; then
+      if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+        echo "    !! could not refresh #$n after controller-repair enrollment; attempting expected-head ineligibility compensation" >&2
+        if ! dequeue_strict "$n" "$expected_head"; then
+          echo "    !! CRITICAL: expected-head compensation could not be proven for #$n" >&2
+          return 1
+        fi
+        return 2
+      fi
       echo "    !! could not refresh #$n after native enrollment; compensating" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate uncertain native enrollment for #$n" >&2
@@ -1297,6 +1394,14 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         or '"$NO_AUTO_HOLD_JQ"'
       ) | not)
     ' <<<"$current" >/dev/null; then
+      if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+        echo "    ⏸ eligibility changed during controller-repair enrollment for #$n; attempting expected-head ineligibility compensation"
+        if ! dequeue_strict "$n" "$expected_head"; then
+          echo "    !! CRITICAL: expected-head compensation could not be proven for #$n" >&2
+          return 1
+        fi
+        return 2
+      fi
       echo "    ⏸ eligibility changed during native enrollment for #$n; compensating"
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate held native enrollment for #$n" >&2
@@ -1315,7 +1420,6 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         return 2
       fi
     fi
-
     # PR descriptions and check state can change without changing the source
     # head. Re-evaluate the semantic/evidence receipt after enrollment and
     # compensate if any exact-head prerequisite changed during mutation.
@@ -1401,8 +1505,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   return 1
 }
 
-dequeue_strict() {  # dequeue_strict <num>
-  local n="$1" current
+dequeue_strict() {  # dequeue_strict <num> [expected-head]
+  local n="$1" expected_head="${2:-}" current dequeue_receipt
   if [[ "$DRY_RUN" == "1" ]]; then
     if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
       echo "    [dry-run] would -merge-queue on #$n"
@@ -1413,7 +1517,20 @@ dequeue_strict() {  # dequeue_strict <num>
   fi
   # native-queue-transport:dequeue:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-    if ! node scripts/merge-queue-backend.mjs dequeue "$n" >/dev/null; then
+    if [[ -n "$expected_head" ]]; then
+      # GitHub exposes no atomic expected-head field on dequeuePullRequest.
+      # This is bounded best-effort compensation: the backend re-reads the
+      # head and ineligibility before mutation, suppresses a known replacement,
+      # and reports any post-write head race instead of claiming a guarantee.
+      if ! dequeue_receipt="$(node scripts/merge-queue-backend.mjs dequeue-ineligible "$n" "$expected_head")"; then
+        echo "    !! failed to revalidate and dequeue ineligible PR #$n" >&2
+        return 1
+      fi
+      if [[ "$(jq -r '.skipped // false' <<<"$dequeue_receipt")" == "true" ]]; then
+        echo "    =native-queue on #$n ($(jq -r '.reason' <<<"$dequeue_receipt")); stale dequeue suppressed"
+        return 0
+      fi
+    elif ! dequeue_receipt="$(node scripts/merge-queue-backend.mjs dequeue "$n")"; then
       echo "    !! failed to prove native dequeue for held PR #$n" >&2
       return 1
     fi
@@ -1748,7 +1865,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   SNAP="$CLASSIFIED"
 elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
   REPAIR_MAIN_SHA="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-  CLASSIFIED="$(jq -c 'map(. + {iso: false, unboundRepair: false})' <<<"$SNAP")"
+  CLASSIFIED="$(jq -c 'map(. + {iso: false, unboundRepair: false, controllerRepair: false})' <<<"$SNAP")"
   while IFS= read -r pr; do
     n="$(jq -r '.n' <<<"$pr")"
     head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
@@ -1762,8 +1879,38 @@ elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
       'map(if .n == $n then . + {unboundRepair: $eligible} else . end)' <<<"$CLASSIFIED")"
   done < <(jq -c '.[]' <<<"$SNAP")
   SNAP="$CLASSIFIED"
+elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+  REPAIR_MAIN_SHA="$(jq -r '.controllerRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
+  CLASSIFIED="$(jq -c 'map(. + {iso: false, unboundRepair: false, controllerRepair: false})' <<<"$SNAP")"
+  while IFS= read -r pr; do
+    n="$(jq -r '.n' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
+    eligible=false
+    if [[ "$n" == "$DRAIN_ADMISSION_PR" \
+      && "$head_oid" == "$DRAIN_ADMISSION_HEAD" \
+      && "$head_oid" =~ ^[0-9a-f]{40}$ ]]; then
+      changed_paths="$(pr_changed_paths_json "$n")"
+      paths_hash=""
+      if [[ "$changed_paths" != "null" ]]; then
+        paths_hash="$(printf '%s' "$changed_paths" \
+          | node "$CONTROLLER_REPAIR_ATTESTATION_LIB" paths-hash 2>/dev/null || true)"
+      fi
+      attestation_body="$(controller_repair_attestation_for_pr "$n")"
+      if [[ "$paths_hash" =~ ^[0-9a-f]{64}$ ]] \
+        && [[ -n "$attestation_body" ]] \
+        && controller_repair_attestation_matches \
+          "$attestation_body" "$n" "$head_oid" "$REPAIR_MAIN_SHA" "$paths_hash"; then
+        eligible=true
+      else
+        echo "  #$n  ⏸ trusted exact-scope controller repair attestation is absent or stale"
+      fi
+    fi
+    CLASSIFIED="$(jq -c --argjson n "$n" --argjson eligible "$eligible" \
+      'map(if .n == $n then . + {controllerRepair: $eligible} else . end)' <<<"$CLASSIFIED")"
+  done < <(jq -c '.[]' <<<"$SNAP")
+  SNAP="$CLASSIFIED"
 else
-  SNAP="$(jq -c 'map(. + {iso: false, unboundRepair: false})' <<<"$SNAP")"
+  SNAP="$(jq -c 'map(. + {iso: false, unboundRepair: false, controllerRepair: false})' <<<"$SNAP")"
 fi
 
 ENRICHED="$(jq -c 'map(. + {fail: ["required check status unavailable"]})' <<<"$SNAP")"
@@ -1853,8 +2000,8 @@ done < <(echo "$SNAP" | jq -c '.[]
   | select(.q == true)
   | select(.draft or ([.L[]] | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')))')
 
-# A production-red exception is intentionally WIP 1. Keep at most one queued
-# PR whose exact base/head/full diff still satisfies the semantic classifier;
+# Production-red and controller-repair exceptions are intentionally WIP 1.
+# Keep at most one queued PR whose exact evidence still satisfies its classifier;
 # remove every ordinary PR from the native queue without changing its source,
 # labels, ready state, or auto-merge intent. Draft-only/blocked modes retain no
 # queued PRs. This is the existing queue controller applying one narrower
@@ -1862,6 +2009,7 @@ done < <(echo "$SNAP" | jq -c '.[]
 if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   echo "=== DEQUEUE (fleet promotion constraint → queue removal) ==="
   ISOLATED_KEEP_PR=""
+  CONTROLLER_REPAIR_KEEP_PR=""
   if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
     ISOLATED_KEEP_PR="$(echo "$SNAP" | jq -r '
       [ .[]
@@ -1872,10 +2020,24 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEU
         | select(([.L[]] | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
         | .n ] | sort | first // empty')"
     [[ -n "$ISOLATED_KEEP_PR" ]] && echo "  preserving exact isolated PR #$ISOLATED_KEEP_PR (WIP 1)"
+  elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+    CONTROLLER_REPAIR_KEEP_PR="$(echo "$SNAP" | jq -r '
+      [ .[]
+        | select(.q == true and .controllerRepair == true)
+        | select(.draft | not)
+        | select(.m == "MERGEABLE")
+        | select(.fail | length == 0)
+        | select(([.L[]] | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
+        | .n ] | sort | first // empty')"
+    [[ -n "$CONTROLLER_REPAIR_KEEP_PR" ]] \
+      && echo "  preserving exact controller repair PR #$CONTROLLER_REPAIR_KEEP_PR (WIP 1)"
   fi
   while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     if [[ -n "$ISOLATED_KEEP_PR" && "$n" == "$ISOLATED_KEEP_PR" ]]; then
+      continue
+    fi
+    if [[ -n "$CONTROLLER_REPAIR_KEEP_PR" && "$n" == "$CONTROLLER_REPAIR_KEEP_PR" ]]; then
       continue
     fi
     echo "  #$n  $t  ⏸ $DRAIN_PROMOTION_MODE"
@@ -2146,6 +2308,15 @@ elif [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   MAX_QUEUE_DEPTH=1
   QUEUED_NOW=$([[ -n "${ISOLATED_KEEP_PR:-}" ]] && echo 1 || echo 0)
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
+elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+  QUEUED_CONTROLLER_REPAIRS=$(echo "$SNAP" | jq \
+    '[.[] | select(.q == true and .controllerRepair == true)] | length')
+  if [[ "$QUEUED_CONTROLLER_REPAIRS" -eq 0 && "$QUEUED_NOW" -lt "$MAX_QUEUE_DEPTH" ]]; then
+    ENROLL_SLOTS=1
+  else
+    ENROLL_SLOTS=0
+  fi
 elif [[ "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   MAX_QUEUE_DEPTH=0
   QUEUED_NOW=0
@@ -2246,6 +2417,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
       or $promotion_mode == "hold-intake"
       or $promotion_mode == "draft-only"
       or ($promotion_mode == "isolated-only" and .iso == true)
+      or ($promotion_mode == "controller-repair-only" and .controllerRepair == true)
     )
   | select((.n | tostring) == $admission_pr)
   | select(.draft|not)
