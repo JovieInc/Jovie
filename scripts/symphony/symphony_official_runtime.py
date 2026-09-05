@@ -18,6 +18,7 @@ import json
 import math
 import os
 import pathlib
+import queue
 import re
 import select
 import signal
@@ -1526,6 +1527,19 @@ def run_official_binary_once(
         shutdown.set()
         terminate_tree()
 
+    # Pin the launched root before any wait/reap can make its numeric PID
+    # available for reuse.
+    remember(process.pid)
+    output_lines: queue.Queue[str] = queue.Queue()
+
+    def read_output() -> None:
+        assert process.stdout is not None
+        for output_line in process.stdout:
+            output_lines.put(output_line)
+
+    output_reader = threading.Thread(target=read_output, daemon=True)
+    output_reader.start()
+
     for forwarded in (signal.SIGTERM, signal.SIGINT):
         previous_handlers[forwarded] = signal.getsignal(forwarded)
         signal.signal(forwarded, forward_signal)
@@ -1534,10 +1548,15 @@ def run_official_binary_once(
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
     try:
-        assert process.stdout is not None
-        for line in process.stdout:
+        while True:
             if shutdown.is_set():
                 break
+            try:
+                line = output_lines.get(timeout=0.1)
+            except queue.Empty:
+                if process.poll() is not None:
+                    break
+                continue
             print(line, end="", flush=True)
             classification = classify_linear_log_line(line)
             if classification and write_rate_limit_gate(gate_file, classification):

@@ -34,6 +34,7 @@ RUNTIME_READBACK=0
 RETIRE_LEGACY=0
 ACTIVE_ISSUES=""
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
+RECOVERY_VERIFY_ATTEMPTS="${SYMPHONY_RECOVERY_VERIFY_ATTEMPTS:-15}"
 # Genuinely retired units only. The grok/kimi sidecar
 # (symphony-grok-sidecar.{service,timer}) is the ACTIVE coding lane while
 # Codex seats are exhausted (Tim, 2026-09-03) and is installed/owned by
@@ -284,6 +285,23 @@ print(f"{running_count} {1 if checking else 0} {next_poll_ms}")
 PY
 }
 
+verify_official_restarted() {
+  local snapshot pid
+  case "$RECOVERY_VERIFY_ATTEMPTS" in
+    ''|*[!0-9]*|0) return 1 ;;
+  esac
+  for _ in $(seq 1 "$RECOVERY_VERIFY_ATTEMPTS"); do
+    pid="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null || true)"
+    if systemctl --user is-active --quiet "$SERVICE_NAME" &&
+       [[ "$pid" =~ ^[1-9][0-9]*$ ]] &&
+       snapshot="$(promotion_idle_snapshot)"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 stop_idle_official_for_restart() {
   local snapshot running checking next_poll_ms
   for _ in $(seq 1 45); do
@@ -472,6 +490,27 @@ finally:
 PY
 }
 
+clear_promotion_hold() {
+  ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+target = root / "promotion-held.json"
+if not target.exists():
+    raise SystemExit(0)
+value = json.loads(target.read_text())
+if (value.get("schema") != "symphony-promotion-hold/v1" or
+        value.get("status") != "held" or
+        value.get("transaction") != os.environ["ROLLBACK_DIR"]):
+    raise SystemExit(1)
+target.unlink()
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
 backup_target() {
   local key="$1" target="$2"
   if [ -e "$target" ] || [ -L "$target" ]; then
@@ -508,8 +547,11 @@ cleanup() {
         rollback_restart_verified=0
       fi
       if [ "$official_stopped_for_promotion" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; then
-        if ! systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1; then
+        if ! systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 ||
+           ! verify_official_restarted >/dev/null 2>&1; then
           rollback_restart_verified=0
+        else
+          official_stopped_for_promotion=0
         fi
       fi
       if [ "$rollback_restart_verified" -eq 0 ] && [ "$promotion_started" -eq 1 ]; then
@@ -578,13 +620,17 @@ PY
   restore_target helper "$HELPER_DST" 0755
   restore_target unit "$UNIT_DST" 0644
   restore_target workflow "$WORKFLOW_DST" 0644
-  prepare_systemd_context
-  systemctl --user daemon-reload
   if [ -f "$rollback_dir/was-active" ]; then
     official_stopped_for_promotion=1
+  fi
+  prepare_systemd_context
+  systemctl --user daemon-reload
+  if [ "$official_stopped_for_promotion" -eq 1 ]; then
     systemctl --user restart "$SERVICE_NAME"
+    verify_official_restarted
     official_stopped_for_promotion=0
   fi
+  clear_promotion_hold
   rm -rf "$rollback_dir"
   rollback_dir=""
   promotion_started=0
