@@ -1,5 +1,4 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
-import { Logo } from '@/components/atoms/Logo';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import {
@@ -10,8 +9,7 @@ import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 /**
  * Section 9: the close. Repeats the hero's only conversion control — the
- * existing name search — under the locked closing lines, then signs off with
- * a quiet, non-interactive wordmark.
+ * existing name search — under the locked closing heading.
  */
 export function HomepageClose() {
   const { close } = HOMEPAGE_LAUNCH_COPY.certified;
@@ -35,7 +33,6 @@ export function HomepageClose() {
         >
           {close.headline}
         </h2>
-        <p className='homepage-close__support'>{close.support}</p>
         <div
           className='homepage-close__search'
           data-testid='homepage-close-search'
@@ -54,9 +51,6 @@ export function HomepageClose() {
               },
             }}
           />
-        </div>
-        <div className='homepage-close__mark' data-testid='homepage-close-mark'>
-          <Logo variant='word' size='xs' aria-hidden />
         </div>
       </div>
     </MarketingCtaSection>
