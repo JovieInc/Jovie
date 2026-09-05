@@ -1597,14 +1597,24 @@ ${selectedGateScript}`,
       "github.event_name == 'merge_group' && 'PR Size Guard'"
     );
     expect(sizeGuard).toContain("github.event_name == 'merge_group'");
-    expect(sizeGuard).toContain('ref: main');
+    expect(sizeGuard).toContain(
+      "ref: ${{ github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0' && '7641ffa76d03326542541c62080735c28190a1f0' || 'main' }}"
+    );
     expect(sizeGuard).toContain('persist-credentials: false');
     expect(sizeGuard).toContain(
       "if: github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0'"
     );
     expect(sizeGuard).toContain(
-      'timeout --kill-after=5s 40s git fetch --refetch --filter=blob:limit=1g --no-tags --depth=1 origin "$BOOTSTRAP_HEAD"'
+      "timeout --kill-after=5s 40s bash --noprofile --norc <<'BOOTSTRAP_POLICY'"
     );
+    expect(sizeGuard).toContain('GIT_CONFIG_COUNT=2');
+    expect(sizeGuard).toContain(
+      'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader'
+    );
+    expect(sizeGuard).toContain('GIT_CONFIG_VALUE_0="$AUTH_HEADER"');
+    expect(sizeGuard).toContain('GIT_CONFIG_KEY_1=core.hooksPath');
+    expect(sizeGuard).toContain('GIT_CONFIG_VALUE_1=/dev/null');
+    expect(sizeGuard).not.toContain('git config ');
     expect(sizeGuard).toContain(
       'BOOTSTRAP_HEAD: ${{ github.event.merge_group.head_sha }}'
     );
