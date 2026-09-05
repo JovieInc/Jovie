@@ -85,6 +85,11 @@ DEFAULT_DEAD_LETTER_DIR = (
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
+BOUNDED_REPAIR_SCHEMA = "symphony-bounded-repair-admission/v1"
+BOUNDED_REPAIR_MAX_SECONDS = 900
+BOUNDED_REPAIR_ADMISSION_FIELDS = frozenset(
+    {"remediationAdmission", "workAdmission"}
+)
 RUNTIME_OUTPUT_QUEUE_MAX_LINES = 256
 DEFAULT_SHUTDOWN_GRACE_SECONDS = 10.0
 MAX_SHUTDOWN_GRACE_SECONDS = 12.0
@@ -183,6 +188,17 @@ class ClosureStopLine:
     hold_receipt_path: pathlib.Path = DEFAULT_CLOSURE_HOLD_RECEIPT
     dead_letter_dir: pathlib.Path = DEFAULT_DEAD_LETTER_DIR
     max_receipt_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS
+    recovery_manifest_path: pathlib.Path | None = None
+
+
+@dataclass(frozen=True)
+class BoundedRepairAdmission:
+    manifest_path: pathlib.Path
+    claim_path: pathlib.Path
+    issue_identifier: str
+    required_label: str
+    expires_at: dt.datetime
+    scheduler_command: tuple[str, ...]
 
 
 def _iso(value: dt.datetime) -> str:
@@ -953,11 +969,235 @@ def _write_json_receipt(path: pathlib.Path, payload: dict[str, Any]) -> None:
             os.unlink(tmp_name)
 
 
+def _parse_utc_timestamp(value: Any, *, field: str) -> dt.datetime:
+    try:
+        parsed = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field}-invalid") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{field}-timezone-missing")
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def _require_private_regular_file(path: pathlib.Path, *, field: str) -> None:
+    try:
+        stat = path.lstat()
+    except OSError as exc:
+        raise ValueError(f"{field}-unreadable:{type(exc).__name__}") from exc
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{field}-not-regular")
+    if stat.st_uid != os.geteuid():
+        raise ValueError(f"{field}-wrong-owner")
+    if stat.st_mode & 0o077:
+        raise ValueError(f"{field}-permissions-not-private")
+
+
+def _bounded_repair_artifact(
+    artifacts: Any, name: str, *, private: bool = False
+) -> pathlib.Path:
+    entry = artifacts.get(name) if isinstance(artifacts, dict) else None
+    if not isinstance(entry, dict):
+        raise ValueError(f"artifact-{name}-missing")
+    raw_path = entry.get("path")
+    expected_hash = entry.get("sha256")
+    if not isinstance(raw_path, str) or not pathlib.Path(raw_path).is_absolute():
+        raise ValueError(f"artifact-{name}-path-invalid")
+    if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
+        raise ValueError(f"artifact-{name}-sha256-invalid")
+    path = pathlib.Path(raw_path)
+    if private:
+        _require_private_regular_file(path, field=f"artifact-{name}")
+    elif path.is_symlink() or not path.is_file():
+        raise ValueError(f"artifact-{name}-not-regular")
+    if sha256_file(path) != expected_hash:
+        raise ValueError(f"artifact-{name}-sha256-mismatch")
+    return path
+
+
+def validate_bounded_repair_admission(
+    manifest_path: pathlib.Path,
+    *,
+    fleet_path: pathlib.Path,
+    fleet_payload: dict[str, Any],
+    now: dt.datetime | None = None,
+    expected_command: list[str] | None = None,
+    require_unclaimed: bool = False,
+) -> BoundedRepairAdmission:
+    """Validate one short-lived, single-issue repair admission without mutating fleet truth."""
+    observed_at = now or _now()
+    _require_private_regular_file(manifest_path, field="recovery-manifest")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"recovery-manifest-invalid:{type(exc).__name__}") from exc
+    if not isinstance(manifest, dict) or manifest.get("schema") != BOUNDED_REPAIR_SCHEMA:
+        raise ValueError("recovery-manifest-schema-mismatch")
+    if manifest.get("status") != "authorized":
+        raise ValueError("recovery-manifest-not-authorized")
+
+    issued_at = _parse_utc_timestamp(manifest.get("issuedAt"), field="issuedAt")
+    expires_at = _parse_utc_timestamp(manifest.get("expiresAt"), field="expiresAt")
+    duration = (expires_at - issued_at).total_seconds()
+    if duration <= 0 or duration > BOUNDED_REPAIR_MAX_SECONDS:
+        raise ValueError("recovery-manifest-duration-invalid")
+    if observed_at < issued_at - dt.timedelta(seconds=FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS):
+        raise ValueError("recovery-manifest-not-yet-valid")
+    if observed_at >= expires_at:
+        raise ValueError("recovery-manifest-expired")
+    if manifest.get("maxConcurrent") != 1:
+        raise ValueError("recovery-manifest-max-concurrent-not-one")
+    if manifest.get("newIssueIntakeAllowed") is not False:
+        raise ValueError("recovery-manifest-new-intake-not-false")
+    if manifest.get("pushAllowed") is not False:
+        raise ValueError("recovery-manifest-push-not-false")
+
+    issue = manifest.get("issueIdentifier")
+    issue_id = manifest.get("issueId")
+    label = manifest.get("requiredLabel")
+    if not isinstance(issue, str) or not re.fullmatch(r"JOV-[1-9][0-9]*", issue):
+        raise ValueError("recovery-manifest-issue-invalid")
+    if not isinstance(issue_id, str) or not re.fullmatch(r"[0-9a-fA-F-]{32,36}", issue_id):
+        raise ValueError("recovery-manifest-issue-id-invalid")
+    if (
+        not isinstance(label, str)
+        or not re.fullmatch(r"symphony-recovery-[a-z0-9-]+", label)
+        or issue.lower() not in label
+    ):
+        raise ValueError("recovery-manifest-label-invalid")
+
+    admission_field = manifest.get("admissionField")
+    activity = manifest.get("activity")
+    if admission_field not in BOUNDED_REPAIR_ADMISSION_FIELDS:
+        raise ValueError("recovery-manifest-admission-field-invalid")
+    admission = fleet_payload.get(admission_field)
+    activities = admission.get("activities") if isinstance(admission, dict) else None
+    if (
+        not isinstance(admission, dict)
+        or admission.get("allowed") is not True
+        or admission.get("localAllowed") is not True
+        or activity != "isolated-pr-repair"
+        or not isinstance(activities, list)
+        or activity not in activities
+    ):
+        raise ValueError("fleet-local-repair-not-admitted")
+    concurrency = fleet_payload.get("concurrency")
+    gem = concurrency.get("gem") if isinstance(concurrency, dict) else None
+    if not isinstance(gem, dict) or not isinstance(gem.get("runtimeFloor"), int) or gem["runtimeFloor"] < 1:
+        raise ValueError("fleet-runtime-floor-missing")
+    if pathlib.Path(str(manifest.get("fleetGatePath"))).resolve() != fleet_path.resolve():
+        raise ValueError("recovery-manifest-fleet-path-mismatch")
+
+    source_root_raw = manifest.get("sourceRoot")
+    source_commit = manifest.get("sourceCommit")
+    if not isinstance(source_root_raw, str) or not pathlib.Path(source_root_raw).is_absolute():
+        raise ValueError("recovery-manifest-source-root-invalid")
+    if not isinstance(source_commit, str) or not re.fullmatch(r"[0-9a-f]{40}", source_commit):
+        raise ValueError("recovery-manifest-source-commit-invalid")
+    source_root = pathlib.Path(source_root_raw)
+    try:
+        actual_commit = subprocess.run(
+            ["git", "-C", str(source_root), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True, timeout=5,
+        ).stdout.strip()
+    except subprocess.SubprocessError as exc:
+        raise ValueError("recovery-manifest-source-unverifiable") from exc
+    if actual_commit != source_commit:
+        raise ValueError("recovery-manifest-source-commit-mismatch")
+
+    artifacts = manifest.get("artifacts")
+    runtime_path = _bounded_repair_artifact(artifacts, "runtime")
+    workflow_path = _bounded_repair_artifact(artifacts, "workflow")
+    _bounded_repair_artifact(artifacts, "router")
+    _bounded_repair_artifact(artifacts, "binary")
+    account_path = _bounded_repair_artifact(artifacts, "accountEnv", private=True)
+    if runtime_path.resolve() != pathlib.Path(__file__).resolve():
+        raise ValueError("recovery-manifest-runtime-path-mismatch")
+    account_home = manifest.get("accountHome")
+    if not isinstance(account_home, str) or _dotenv_values(account_path).get("CODEX_HOME") != account_home:
+        raise ValueError("recovery-manifest-account-home-mismatch")
+    if os.environ.get("CODEX_HOME") != account_home:
+        raise ValueError("recovery-process-account-home-mismatch")
+
+    workflow = parse_workflow(workflow_path)
+    if workflow.required_labels != (label,):
+        raise ValueError("recovery-workflow-required-label-mismatch")
+    if workflow.max_concurrent_agents != 1:
+        raise ValueError("recovery-workflow-max-concurrent-not-one")
+    front = _front_matter(workflow_path.read_text(encoding="utf-8"))
+    if not re.search(r"^\s+max_turns:\s*1\s*$", front, re.M):
+        raise ValueError("recovery-workflow-max-turns-not-one")
+    if not re.search(r"^\s+networkAccess:\s*false\s*$", front, re.M):
+        raise ValueError("recovery-workflow-network-not-false")
+    if not re.search(
+        rf"^\s+command:\s*{re.escape(str(_bounded_repair_artifact(artifacts, 'router')))} app-server\s*$",
+        front,
+        re.M,
+    ):
+        raise ValueError("recovery-workflow-router-mismatch")
+
+    command = manifest.get("schedulerCommand")
+    if not isinstance(command, list) or not command or not all(isinstance(item, str) for item in command):
+        raise ValueError("recovery-manifest-command-invalid")
+    if expected_command is not None and command != expected_command:
+        raise ValueError("recovery-manifest-command-mismatch")
+    binary_path = str(_bounded_repair_artifact(artifacts, "binary"))
+    if command[0] != binary_path or str(workflow_path) not in command:
+        raise ValueError("recovery-manifest-command-artifact-mismatch")
+    claim_raw = manifest.get("claimPath")
+    if not isinstance(claim_raw, str) or not pathlib.Path(claim_raw).is_absolute():
+        raise ValueError("recovery-manifest-claim-path-invalid")
+    claim_path = pathlib.Path(claim_raw)
+    if claim_path.parent.resolve() != manifest_path.parent.resolve():
+        raise ValueError("recovery-manifest-claim-parent-mismatch")
+    if require_unclaimed and claim_path.exists():
+        raise ValueError("recovery-manifest-already-claimed")
+    return BoundedRepairAdmission(
+        manifest_path=manifest_path,
+        claim_path=claim_path,
+        issue_identifier=issue,
+        required_label=label,
+        expires_at=expires_at,
+        scheduler_command=tuple(command),
+    )
+
+
+def claim_bounded_repair(admission: BoundedRepairAdmission) -> None:
+    payload = {
+        "schema": "symphony-bounded-repair-claim/v1",
+        "issueIdentifier": admission.issue_identifier,
+        "manifestPath": str(admission.manifest_path),
+        "claimedAt": _iso(_now()),
+    }
+    descriptor = os.open(
+        admission.claim_path,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o600,
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        directory = os.open(admission.claim_path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    except BaseException:
+        try:
+            admission.claim_path.unlink()
+        except OSError:
+            pass
+        raise
+
+
 def read_closure_stop_line(
     path: pathlib.Path,
     now: dt.datetime | None = None,
     *,
     max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+    recovery_manifest_path: pathlib.Path | None = None,
 ) -> dict[str, Any]:
     """Fail-closed admission verdict from the freshest Gem fleet gate receipt.
 
@@ -999,6 +1239,25 @@ def read_closure_stop_line(
         return hold("fleet-gate-receipt-future", **details)
     if age_seconds > max_age_seconds:
         return hold("fleet-gate-receipt-stale", **details)
+    if recovery_manifest_path is not None:
+        try:
+            admission = validate_bounded_repair_admission(
+                recovery_manifest_path,
+                fleet_path=path,
+                fleet_payload=payload,
+                now=observed_at,
+            )
+        except ValueError as exc:
+            return hold(f"bounded-repair-refused:{exc}", **details)
+        return {
+            "hold": False,
+            "reason": "bounded-local-repair",
+            "path": str(path),
+            "issueIdentifier": admission.issue_identifier,
+            "requiredLabel": admission.required_label,
+            "expiresAt": _iso(admission.expires_at),
+            **details,
+        }
     signals = payload.get("signals")
     closure = signals.get("closureHealth") if isinstance(signals, dict) else None
     if not isinstance(closure, dict):
@@ -1347,6 +1606,19 @@ def run_official_binary_once(
     closure: ClosureStopLine,
     max_gate_sleep_seconds: int | None,
 ) -> int:
+    recovery_deadline: float | None = None
+    if closure.recovery_manifest_path is not None:
+        verdict = read_closure_stop_line(
+            closure.receipt_path,
+            max_age_seconds=closure.max_receipt_age_seconds,
+            recovery_manifest_path=closure.recovery_manifest_path,
+        )
+        if verdict["hold"]:
+            raise ValueError(str(verdict["reason"]))
+        expires_at = _parse_utc_timestamp(verdict.get("expiresAt"), field="expiresAt")
+        recovery_deadline = time.monotonic() + max(
+            0.0, (expires_at - _now()).total_seconds()
+        )
     raw_shutdown_grace = os.environ.get(
         "SYMPHONY_SHUTDOWN_GRACE_SECONDS",
         str(DEFAULT_SHUTDOWN_GRACE_SECONDS),
@@ -1676,6 +1948,42 @@ def run_official_binary_once(
             # queue drains through its EOF sentinel.
             if shutdown.is_set() or process.poll() is not None:
                 terminate_tree()
+            monotonic_now = time.monotonic()
+            if recovery_deadline is not None and monotonic_now >= recovery_deadline:
+                print(
+                    json.dumps(
+                        {"kind": "bounded_repair_expired", "action": "terminate-tree"},
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+                shutdown.set()
+                terminate_tree()
+            if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
+                last_closure_check = monotonic_now
+                verdict = read_closure_stop_line(
+                    closure.receipt_path,
+                    max_age_seconds=closure.max_receipt_age_seconds,
+                    recovery_manifest_path=closure.recovery_manifest_path,
+                )
+                if verdict["hold"]:
+                    if closure.recovery_manifest_path is not None:
+                        print(
+                            json.dumps(
+                                {
+                                    "kind": "bounded_repair_revoked",
+                                    "reason": verdict.get("reason"),
+                                },
+                                sort_keys=True,
+                            ),
+                            flush=True,
+                        )
+                        shutdown.set()
+                        terminate_tree()
+                    else:
+                        _pause_child_for_closure_hold(
+                            process, closure, verdict, max_gate_sleep_seconds, shutdown
+                        )
             try:
                 eof, line = output_lines.get(timeout=0.1)
             except queue.Empty:
@@ -1703,16 +2011,6 @@ def run_official_binary_once(
                         issue_error,
                         issue_errors,
                         dead_letter_noted,
-                    )
-            monotonic_now = time.monotonic()
-            if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
-                last_closure_check = monotonic_now
-                verdict = read_closure_stop_line(
-                    closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-                )
-                if verdict["hold"]:
-                    _pause_child_for_closure_hold(
-                        process, closure, verdict, max_gate_sleep_seconds, shutdown
                     )
             if process.poll() is not None:
                 terminate_tree()
@@ -1743,9 +2041,12 @@ def run_official_binary(
         raise ValueError("missing official Symphony command after --")
     gate_sleep_used = 0
     closure_sleep_used = 0
+    recovery_claimed = False
     while True:
         verdict = read_closure_stop_line(
-            closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
+            closure.receipt_path,
+            max_age_seconds=closure.max_receipt_age_seconds,
+            recovery_manifest_path=closure.recovery_manifest_path,
         )
         if verdict["hold"]:
             # The closure stop-line holds NEW admission only. Already-running
@@ -1815,6 +2116,32 @@ def run_official_binary(
                 _print_gate_wait_exhausted(gate, max_gate_sleep_seconds)
                 return RATE_LIMIT_EXIT_CODE
             continue
+        if closure.recovery_manifest_path is not None and not recovery_claimed:
+            try:
+                fleet_payload = json.loads(
+                    closure.receipt_path.read_text(encoding="utf-8")
+                )
+                admission = validate_bounded_repair_admission(
+                    closure.recovery_manifest_path,
+                    fleet_path=closure.receipt_path,
+                    fleet_payload=fleet_payload,
+                    expected_command=command,
+                    require_unclaimed=True,
+                )
+                claim_bounded_repair(admission)
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                print(
+                    json.dumps(
+                        {
+                            "kind": "bounded_repair_refused",
+                            "reason": str(exc),
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+                return CLOSURE_HOLD_EXIT_CODE
+            recovery_claimed = True
         returncode = run_official_binary_once(
             command,
             gate_file=gate_file,
@@ -1822,6 +2149,8 @@ def run_official_binary(
             max_gate_sleep_seconds=max_gate_sleep_seconds,
         )
         if returncode != RATE_LIMIT_EXIT_CODE:
+            return returncode
+        if recovery_claimed:
             return returncode
         gate = read_rate_limit_gate(gate_file)
         if not gate["active"]:
@@ -1978,6 +2307,11 @@ def main(argv: list[str] | None = None) -> int:
         type=pathlib.Path,
         default=DEFAULT_DEAD_LETTER_DIR,
     )
+    run_parser.add_argument(
+        "--recovery-manifest",
+        type=pathlib.Path,
+        help="host-owned single-use bounded local-repair admission",
+    )
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
@@ -2058,6 +2392,7 @@ def main(argv: list[str] | None = None) -> int:
                 hold_receipt_path=args.closure_hold_receipt,
                 dead_letter_dir=args.dead_letter_dir,
                 max_receipt_age_seconds=args.closure_gate_max_age_seconds,
+                recovery_manifest_path=args.recovery_manifest,
             ),
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,
         )
