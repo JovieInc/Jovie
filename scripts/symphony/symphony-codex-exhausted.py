@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import calendar
+import ctypes
 import fcntl
 import hashlib
 import json
@@ -13,6 +14,8 @@ import math
 import os
 import pathlib
 import re
+import select
+import signal
 import shutil
 import subprocess
 import sys
@@ -25,6 +28,8 @@ import urllib.request
 READY_MARKER = "GEM_MODEL_READY"
 GROK_READY_MARKER = "GROK_MODEL_READY"
 DEFAULT_ROTATE_BIN = "/home/timwhite/.local/bin/codex-rotate"
+DEFAULT_CODEX_BIN = "/home/timwhite/.local/bin/codex"
+DEFAULT_ACCOUNT_PROBE_BIN = "/home/timwhite/.local/bin/codex-account-probe.sh"
 DEFAULT_STATE = "~/.codex-accounts/state.json"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 30.0
@@ -90,12 +95,18 @@ LEGACY_RUNTIME_NAMES = (
 )
 RUNTIME_NAMES = (
     *LEGACY_RUNTIME_NAMES,
+    "codex-account-probe.sh",
     "grok-ship-one",
     "cursor-agent-std",
     "model-router.py",
     "model-registry.json",
 )
-LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
+LAUNCHER_NAMES = (
+    *LEGACY_RUNTIME_NAMES,
+    "codex-account-probe.sh",
+    "grok-ship-one",
+    "cursor-agent-std",
+)
 # Labels are derived audit evidence, never independent admission blockers.
 # The machine-written admission-gate/v1 receipt is the source of truth.
 REQUIRED_ADMISSION_LABELS = frozenset()
@@ -212,14 +223,15 @@ LYB_REPO = "JovieInc/LogYourBody"
 
 
 def _state_path() -> pathlib.Path:
-    return pathlib.Path(os.path.expanduser(os.environ.get("GEM_CODEX_ACCOUNTS_STATE", DEFAULT_STATE)))
+    requested = pathlib.Path(
+        os.path.expanduser(os.environ.get("GEM_CODEX_ACCOUNTS_STATE", DEFAULT_STATE))
+    )
+    if requested.is_symlink() or requested.name != "state.json":
+        raise ValueError("Codex account state must use the canonical state.json identity")
+    return requested.parent.resolve() / "state.json"
 
 
-def _known_account_state() -> bool:
-    try:
-        state = json.loads(_state_path().read_text(encoding="utf-8"))
-    except (OSError, TypeError, ValueError):
-        return False
+def _valid_account_state(state: object) -> bool:
     return (
         isinstance(state, dict)
         and isinstance(state.get("cooldowns"), dict)
@@ -233,7 +245,7 @@ def _timeout_seconds() -> float:
         value = float(os.environ.get("GEM_CODEX_CANARY_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS))
     except (TypeError, ValueError):
         return DEFAULT_TIMEOUT_SECONDS
-    return DEFAULT_TIMEOUT_SECONDS if value <= 0 else min(value, MAX_TIMEOUT_SECONDS)
+    return DEFAULT_TIMEOUT_SECONDS if not math.isfinite(value) or value <= 0 else min(value, MAX_TIMEOUT_SECONDS)
 
 
 def _rotate_executable() -> str | None:
@@ -249,6 +261,231 @@ def _captured(command: list[str], timeout: float) -> subprocess.CompletedProcess
         return subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired, ValueError):
         return None
+
+
+def _systemd_user_manager_available() -> bool:
+    if not (sys.platform.startswith("linux") and shutil.which("systemd-run") and shutil.which("systemctl")):
+        return False
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", "show-environment"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=1,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def _service_command(
+    command: list[str], env: dict[str, str]
+) -> tuple[list[str], str | None]:
+    if not _systemd_user_manager_available():
+        return command, None
+    unit = f"symphony-codex-controller-{os.getpid()}-{os.urandom(6).hex()}.service"
+    imported_environment = [
+        f"--setenv={name}" for name in sorted(env)
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
+    ]
+    return ([
+        "systemd-run", "--user", "--wait", "--pipe", "--quiet", "--collect",
+        "--service-type=exec", "--same-dir", "--expand-environment=no",
+        f"--unit={unit}",
+        "--property=ExitType=main",
+        "--property=KillMode=control-group",
+        "--property=TimeoutStopSec=1s",
+        *imported_environment,
+        "--", *command,
+    ], unit)
+
+
+def _stop_unit(unit: str | None) -> bool:
+    if unit is None:
+        return True
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", "stop", unit],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if result.returncode == 0:
+        return True
+    lowered = result.stderr.lower()
+    return any(marker in lowered for marker in (b"not loaded", b"not found", b"could not be found"))
+
+
+def _captured_process_group(
+    command: list[str], timeout: float, env: dict[str, str]
+) -> subprocess.CompletedProcess[bytes] | None:
+    """Bound a probe and reap its complete descendant process group."""
+    process = None
+    tree_token = os.urandom(16).hex()
+    child_env = dict(env)
+    child_env["SYMPHONY_PROCESS_TREE_TOKEN"] = tree_token
+    service_command, systemd_unit = _service_command(command, child_env)
+    try:
+        if sys.platform.startswith("linux"):
+            try:
+                ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)
+            except (AttributeError, OSError):
+                pass
+        process = subprocess.Popen(
+            service_command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=child_env,
+            start_new_session=True,
+        )
+        # A transient ExitType=main service becomes inactive when its intended
+        # root exits; KillMode=control-group then removes detached descendants.
+        stdout, stderr = process.communicate(timeout=timeout + 4.0)
+        returncode = process.returncode
+        unit_clean = _stop_unit(systemd_unit)
+        tree_clean = _terminate_process_domain(process)
+        if not unit_clean or (systemd_unit is None and not tree_clean):
+            return None
+        return subprocess.CompletedProcess(command, returncode, stdout, stderr)
+    except (OSError, ValueError):
+        return None
+    except subprocess.TimeoutExpired:
+        if process is not None:
+            _stop_unit(systemd_unit)
+            _terminate_process_domain(process)
+        return None
+
+
+def _process_children() -> dict[int, list[int]]:
+    children: dict[int, list[int]] = {}
+    try:
+        if pathlib.Path("/proc").is_dir():
+            rows = []
+            for entry in pathlib.Path("/proc").iterdir():
+                if not entry.name.isdigit():
+                    continue
+                try:
+                    fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+                    rows.append((int(entry.name), int(fields[1])))
+                except (OSError, IndexError, ValueError):
+                    continue
+        else:
+            output = subprocess.run(
+                ["ps", "-axo", "pid=,ppid="], capture_output=True, text=True,
+                check=True, timeout=2,
+            ).stdout.splitlines()
+            rows = [tuple(int(value) for value in row.split()) for row in output]
+        for pid, parent in rows:
+            children.setdefault(parent, []).append(pid)
+    except (OSError, IndexError, ValueError, subprocess.SubprocessError):
+        return {}
+    return children
+
+
+def _terminate_process_domain(process: subprocess.Popen[bytes]) -> bool:
+    descendants: set[int] = set()
+    pidfds: dict[int, int] = {}
+
+    def discover() -> None:
+        children = _process_children()
+        pending = [process.pid, os.getpid()]
+        while pending:
+            parent = pending.pop()
+            for child in children.get(parent, []):
+                if child != os.getpid() and child not in descendants:
+                    descendants.add(child)
+                    pending.append(child)
+
+    def remember(pid: int) -> None:
+        if pid in pidfds or not hasattr(os, "pidfd_open"):
+            return
+        try:
+            pidfds[pid] = os.pidfd_open(pid)
+        except OSError:
+            pass
+
+    def send(pid: int, signum: int) -> None:
+        try:
+            descriptor = pidfds.get(pid)
+            if descriptor is not None and hasattr(signal, "pidfd_send_signal"):
+                signal.pidfd_send_signal(descriptor, signum)
+            else:
+                os.kill(pid, signum)
+        except (OSError, PermissionError):
+            pass
+
+    deadline = time.monotonic() + 1.0
+    alive: list[int] = []
+    while time.monotonic() < deadline:
+        discover()
+        targets = [process.pid, *descendants]
+        for pid in targets:
+            remember(pid)
+            send(pid, signal.SIGCONT)
+            send(pid, signal.SIGTERM)
+        alive = []
+        for pid in targets:
+            try:
+                os.kill(pid, 0)
+                alive.append(pid)
+            except ProcessLookupError:
+                pass
+        if not alive:
+            break
+        time.sleep(0.02)
+    discover()
+    for pid in [process.pid, *descendants]:
+        remember(pid)
+        send(pid, signal.SIGKILL)
+    try:
+        process.communicate(timeout=0.5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.wait(timeout=0.5)
+        except subprocess.TimeoutExpired:
+            pass
+    reap_deadline = time.monotonic() + 1.0
+    quiet_since: float | None = None
+    while time.monotonic() < reap_deadline:
+        discover()
+        for pid in descendants:
+            remember(pid)
+            send(pid, signal.SIGKILL)
+        while True:
+            try:
+                reaped, _ = os.waitpid(-1, os.WNOHANG)
+            except ChildProcessError:
+                reaped = 0
+                break
+            if reaped <= 0:
+                break
+        pending = [
+            descriptor for descriptor in pidfds.values()
+            if not select.select([descriptor], [], [], 0)[0]
+        ]
+        if pending:
+            quiet_since = None
+        elif quiet_since is None:
+            quiet_since = time.monotonic()
+        elif time.monotonic() - quiet_since >= 0.1:
+            break
+        time.sleep(0.01)
+    for descriptor in pidfds.values():
+        os.close(descriptor)
+    return not any(_pid_alive(pid) for pid in descendants)
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
 
 
 def _exact_marker(output: bytes) -> bool:
@@ -503,23 +740,56 @@ def _grok_units_after_survival_window() -> list[str] | None:
 
 
 def _read_state() -> dict | None:
-    if not _known_account_state():
-        return None
     try:
-        return json.loads(_state_path().read_text(encoding="utf-8"))
+        state = json.loads(_state_path().read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError):
         return None
+    return state if _valid_account_state(state) else None
 
 
 def _configured_accounts() -> set[str] | None:
-    """Return the exact account set codex-rotate considers runnable."""
+    """Return runnable ChatGPT accounts using the canonical launcher shape."""
     try:
-        return {
-            path.name
-            for path in _state_path().parent.iterdir()
-            if path.is_dir() and (path / "auth.json").is_file()
-        }
-    except OSError:
+        root = _state_path().parent.resolve()
+        accounts = set()
+        identities: set[pathlib.Path] = set()
+        auth_identities: set[tuple[int, int]] = set()
+        config_identities: set[tuple[int, int]] = set()
+        for path in root.iterdir():
+            if path.is_symlink():
+                return None
+            auth_path = path / "auth.json"
+            config_path = path / "config.toml"
+            if (
+                not path.is_dir()
+                or path.is_symlink()
+                or path.resolve(strict=True).parent != root
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", path.name)
+                or not auth_path.is_file()
+                or auth_path.is_symlink()
+                or not config_path.is_file()
+                or config_path.is_symlink()
+                or auth_path.resolve(strict=True).parent != path
+                or config_path.resolve(strict=True).parent != path
+            ):
+                continue
+            identity = path.resolve(strict=True)
+            if identity in identities:
+                return None
+            identities.add(identity)
+            auth_identity = (auth_path.stat().st_dev, auth_path.stat().st_ino)
+            config_identity = (config_path.stat().st_dev, config_path.stat().st_ino)
+            if auth_identity in auth_identities or config_identity in config_identities:
+                return None
+            auth_identities.add(auth_identity)
+            config_identities.add(config_identity)
+            auth = json.loads(auth_path.read_text(encoding="utf-8"))
+            if not isinstance(auth, dict):
+                return None
+            if auth.get("auth_mode") == "chatgpt":
+                accounts.add(path.name)
+        return accounts
+    except (OSError, TypeError, ValueError):
         return None
 
 
@@ -539,6 +809,64 @@ def _all_accounts_on_cooldown(state: dict, accounts: set[str], now: int) -> bool
     return True
 
 
+def _refresh_stale_cooldown(
+    accounts: set[str],
+) -> tuple[str, str | None]:
+    """Delegate reset verification and mutation to the canonical account probe."""
+    probe = os.environ.get("GEM_CODEX_ACCOUNT_PROBE_BIN", DEFAULT_ACCOUNT_PROBE_BIN)
+    if not os.access(probe, os.X_OK):
+        return "indeterminate", None
+    root = _state_path().parent
+    timeout = _timeout_seconds()
+    deadline_epoch = time.time() + timeout
+    env = os.environ.copy()
+    env.update(
+        {
+            "CODEX_ACCOUNTS_ROOT": str(root),
+            "CODEX_ACCOUNTS_STATE": str(_state_path()),
+            "CODEX_REAL_BIN": os.environ.get("GEM_CODEX_BIN", DEFAULT_CODEX_BIN),
+            "CODEX_ACCOUNT_PROBE_TIMEOUT": str(timeout),
+            "CODEX_ACCOUNT_PROBE_TOTAL_TIMEOUT": str(timeout),
+            "CODEX_ACCOUNT_PROBE_MAX_RECOVERIES": "1",
+            "CODEX_ACCOUNT_PROBE_DEADLINE_EPOCH": str(deadline_epoch),
+        }
+    )
+    result = _captured_process_group([probe], timeout, env)
+    if result is None:
+        return "indeterminate", None
+    if result.returncode == 75 and not result.stdout.strip():
+        return "not_ready", None
+    if result.returncode != 0:
+        return "indeterminate", None
+    lines = result.stdout.decode("utf-8", "replace").splitlines()
+    if len(lines) != 1 or not lines[0].startswith("RECOVERED "):
+        return "indeterminate", None
+    account = lines[0].removeprefix("RECOVERED ")
+    if account not in accounts:
+        return "indeterminate", None
+    current = _read_state()
+    if current is None:
+        return "indeterminate", None
+    readiness = current.get("readiness")
+    receipt = readiness.get(account) if isinstance(readiness, dict) else None
+    cooldown = current.get("cooldowns", {}).get(account)
+    now = int(time.time())
+    if (
+        not isinstance(receipt, dict)
+        or receipt.get("source") != "authenticated_completion_probe/v1"
+        or receipt.get("requiredForNextLaunch") is not True
+        or not isinstance(receipt.get("checkedAt"), int)
+        or not isinstance(receipt.get("expiresAt"), int)
+        or receipt["checkedAt"] > now
+        or receipt["expiresAt"] <= now
+        or not isinstance(cooldown, int)
+        or cooldown > now
+        or current.get("active") != account
+    ):
+        return "indeterminate", None
+    return "recovered", account
+
+
 def codex_canary_ready() -> tuple[bool, str]:
     # Primary signal: codex-rotate's cooldown state, which matches the live
     # provider 429s. The live probe through codex-rotate is NOT trusted for the
@@ -551,7 +879,25 @@ def codex_canary_ready() -> tuple[bool, str]:
     accounts = _configured_accounts()
     if accounts is None:
         return False, "unknown_accounts"
+    if not accounts:
+        return False, "no_chatgpt_accounts"
     if _all_accounts_on_cooldown(state, accounts, int(time.time())):
+        refresh, _account = _refresh_stale_cooldown(accounts)
+        if refresh == "recovered":
+            return True, "reset_cooldown_refreshed"
+        if refresh == "indeterminate":
+            return False, "cooldown_refresh_indeterminate"
+        latest = _read_state()
+        latest_accounts = _configured_accounts()
+        if (
+            latest is None
+            or latest_accounts is None
+            or latest_accounts != accounts
+            or not _all_accounts_on_cooldown(
+                latest, latest_accounts, int(time.time())
+            )
+        ):
+            return False, "cooldown_state_changed"
         return False, "all_accounts_cooldown"
     executable = _rotate_executable()
     if executable is None:
@@ -2580,7 +2926,16 @@ def _artifacts() -> dict[str, pathlib.Path]:
     if not registry.is_file():
         registry = root / "config" / "model-registry.json"
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py")},
+        **{
+            name: root / name
+            for name in (
+                *LEGACY_RUNTIME_NAMES,
+                "codex-account-probe.sh",
+                "grok-ship-one",
+                "cursor-agent-std",
+                "model-router.py",
+            )
+        },
         "model-registry.json": registry,
     }
 

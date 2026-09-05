@@ -4,9 +4,26 @@ set -euo pipefail
 
 REAL_CODEX="${CODEX_REAL_BIN:-$HOME/.local/bin/codex}"
 ACCOUNTS_ROOT="${CODEX_ACCOUNTS_ROOT:-$HOME/.codex-accounts}"
-STATE_FILE="${CODEX_ACCOUNTS_STATE:-$ACCOUNTS_ROOT/state.json}"
+STATE_FILE_REQUESTED="${CODEX_ACCOUNTS_STATE:-$ACCOUNTS_ROOT/state.json}"
+if ! STATE_FILE="$(ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE_REQUESTED="$STATE_FILE_REQUESTED" python3 - <<'PY'
+import os
+from pathlib import Path
+root = Path(os.environ["ACCOUNTS_ROOT"]).resolve()
+requested = Path(os.environ["STATE_FILE_REQUESTED"])
+try:
+    identity = requested.parent.resolve(strict=True) / requested.name
+except OSError:
+    raise SystemExit(2)
+if requested.is_symlink() or identity != root / "state.json":
+    raise SystemExit(2)
+print(root / "state.json")
+PY
+)"; then
+  echo "codex-rotate: account state must use the canonical state.json identity" >&2
+  exit 2
+fi
 LOG_FILE="${CODEX_ROTATE_LOG:-$ACCOUNTS_ROOT/rotate.log}"
-LOCKS_DIR="${CODEX_ACCOUNT_LOCKS_DIR:-$ACCOUNTS_ROOT/locks}"
+LOCKS_DIR="$ACCOUNTS_ROOT/locks"
 WAIT_SECONDS="${CODEX_ACCOUNT_WAIT_SECONDS:-900}"
 # JOV-5031: Symphony's app-server reader enforces read_timeout_ms (5s) as an
 # inactivity deadline, not a boot budget. While this launcher waits for an
@@ -29,6 +46,10 @@ for arg in "$@"; do
   fi
 done
 
+if [[ -L "$LOCKS_DIR" ]]; then
+  echo "codex-rotate: canonical locks directory must not be a symlink" >&2
+  exit 2
+fi
 mkdir -p "$LOCKS_DIR"
 touch "$LOG_FILE"
 chmod 600 "$LOG_FILE" 2>/dev/null || true
@@ -52,11 +73,12 @@ account_order() {
   ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" python3 - <<'PY'
 import json
 import os
+import re
 import time
 import fcntl
 from pathlib import Path
 
-root = Path(os.environ["ACCOUNTS_ROOT"])
+root = Path(os.environ["ACCOUNTS_ROOT"]).resolve()
 state_path = Path(os.environ["STATE_FILE"])
 with open(str(state_path) + ".lock", "a+") as lock:
     fcntl.flock(lock, fcntl.LOCK_SH)
@@ -64,43 +86,128 @@ with open(str(state_path) + ".lock", "a+") as lock:
         state = json.loads(state_path.read_text())
     except Exception:
         state = {"active": None, "cooldowns": {}}
-accounts = sorted(
-    path.name
-    for path in root.iterdir()
-    if path.is_dir() and (path / "auth.json").is_file()
-)
+accounts = []
+identities = set()
+auth_identities = set()
+config_identities = set()
+try:
+    for path in root.iterdir():
+        if path.is_symlink():
+            accounts = []
+            break
+        auth_path = path / "auth.json"
+        config_path = path / "config.toml"
+        if (
+            not path.is_dir()
+            or path.is_symlink()
+            or path.resolve(strict=True).parent != root
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", path.name)
+            or not auth_path.is_file()
+            or auth_path.is_symlink()
+            or not config_path.is_file()
+            or config_path.is_symlink()
+            or auth_path.resolve(strict=True).parent != path
+            or config_path.resolve(strict=True).parent != path
+        ):
+            continue
+        identity = path.resolve(strict=True)
+        if identity in identities:
+            accounts = []
+            break
+        identities.add(identity)
+        auth_identity = (auth_path.stat().st_dev, auth_path.stat().st_ino)
+        config_identity = (config_path.stat().st_dev, config_path.stat().st_ino)
+        if auth_identity in auth_identities or config_identity in config_identities:
+            accounts = []
+            break
+        auth_identities.add(auth_identity)
+        config_identities.add(config_identity)
+        auth = json.loads(auth_path.read_text())
+        if not isinstance(auth, dict):
+            accounts = []
+            break
+        if auth.get("auth_mode") == "chatgpt":
+            accounts.append(path.name)
+except (OSError, TypeError, ValueError):
+    accounts = []
+accounts.sort()
 now = int(time.time())
 cooldowns = state.get("cooldowns") or {}
 ready = [name for name in accounts if int(cooldowns.get(name) or 0) <= now]
 if not ready and accounts:
     ready = [min(accounts, key=lambda name: int(cooldowns.get(name) or 0))]
 active = state.get("active")
+readiness = state.get("readiness")
+required = []
+if isinstance(readiness, dict):
+    required = [
+        name for name, receipt in readiness.items()
+        if name in accounts
+        and isinstance(receipt, dict)
+        and receipt.get("source") == "authenticated_completion_probe/v1"
+        and receipt.get("requiredForNextLaunch") is True
+        and isinstance(receipt.get("expiresAt"), int)
+        and receipt["expiresAt"] > now
+    ]
+if required:
+    if len(required) == 1 and active == required[0] and required[0] in ready:
+        print(f"{required[0]}\trecovered")
+    raise SystemExit
 if active in ready:
     ready.remove(active)
     ready.insert(0, active)
-print("\n".join(ready))
+print("\n".join(f"{name}\tnormal" for name in ready))
 PY
 }
 
-set_active() {
-  ACCOUNT="$1" STATE_FILE="$STATE_FILE" python3 - <<'PY'
-import json
-import os
-import fcntl
+claim_account() {
+  ACCOUNT="$1" MODE="$2" ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import fcntl, json, os, time
 from pathlib import Path
 
-path = Path(os.environ["STATE_FILE"])
-with open(str(path) + ".lock", "a+") as lock:
+root = Path(os.environ["ACCOUNTS_ROOT"]).resolve()
+account = os.environ["ACCOUNT"]
+path = root / account
+if path.is_symlink() or path.resolve(strict=True).parent != root:
+    raise SystemExit(1)
+state_path = Path(os.environ["STATE_FILE"])
+with open(str(state_path) + ".lock", "a+") as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
-    try:
-        state = json.loads(path.read_text())
-    except Exception:
-        state = {"active": None, "cooldowns": {}, "last_error": {}}
-    state["active"] = os.environ["ACCOUNT"]
-    temporary = path.with_suffix(path.suffix + ".tmp")
+    state = json.loads(state_path.read_text())
+    now = int(time.time())
+    cooldown = (state.get("cooldowns") or {}).get(account, 0)
+    if not isinstance(cooldown, int) or cooldown > now:
+        raise SystemExit(1)
+    readiness = state.get("readiness")
+    required = [] if not isinstance(readiness, dict) else [
+        name for name, value in readiness.items()
+        if isinstance(value, dict)
+        and value.get("source") == "authenticated_completion_probe/v1"
+        and value.get("requiredForNextLaunch") is True
+        and isinstance(value.get("expiresAt"), int)
+        and value["expiresAt"] > now
+    ]
+    if os.environ["MODE"] == "recovered":
+        receipt = readiness.get(account) if isinstance(readiness, dict) else None
+        valid = (
+            required == [account]
+            and state.get("active") == account
+            and isinstance(receipt, dict)
+            and receipt.get("source") == "authenticated_completion_probe/v1"
+            and receipt.get("requiredForNextLaunch") is True
+            and isinstance(receipt.get("expiresAt"), int)
+            and receipt["expiresAt"] > now
+        )
+        if not valid:
+            raise SystemExit(1)
+        readiness.pop(account, None)
+    elif required:
+        raise SystemExit(1)
+    state["active"] = account
+    temporary = state_path.with_suffix(state_path.suffix + ".tmp")
     temporary.write_text(json.dumps(state, indent=2) + "\n")
     os.chmod(temporary, 0o600)
-    os.replace(temporary, path)
+    os.replace(temporary, state_path)
 PY
 }
 
@@ -129,6 +236,9 @@ with open(str(path) + ".lock", "a+") as lock:
     }
     if state.get("active") == account:
         state["active"] = None
+    readiness = state.get("readiness")
+    if isinstance(readiness, dict):
+        readiness.pop(account, None)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(state, indent=2) + "\n")
     os.chmod(temporary, 0o600)
@@ -188,13 +298,15 @@ last_heartbeat=$started_at
 account=""
 account_lock_fd=""
 while [[ -z "$account" ]]; do
-  while IFS= read -r candidate; do
+  while IFS=$'\t' read -r candidate candidate_mode; do
     [[ -n "$candidate" ]] || continue
     exec {candidate_fd}>"$LOCKS_DIR/$candidate.lock"
     if flock -n "$candidate_fd"; then
-      account="$candidate"
-      account_lock_fd="$candidate_fd"
-      break
+      if claim_account "$candidate" "${candidate_mode:-normal}"; then
+        account="$candidate"
+        account_lock_fd="$candidate_fd"
+        break
+      fi
     fi
     exec {candidate_fd}>&-
   done < <(account_order)
@@ -224,13 +336,12 @@ while [[ -z "$account" ]]; do
 done
 
 home="$ACCOUNTS_ROOT/$account"
-if [[ ! -f "$home/auth.json" || ! -f "$home/config.toml" ]]; then
+if [[ ! -f "$home/auth.json" || -L "$home/auth.json" || ! -f "$home/config.toml" || -L "$home/config.toml" ]]; then
   log "ERROR incomplete account=$account"
   echo "codex-rotate: account $account is missing auth.json or config.toml" >&2
   exit 2
 fi
 
-set_active "$account"
 export CODEX_HOME="$home"
 log "START account=$account lease_fd=$account_lock_fd args=$*"
 

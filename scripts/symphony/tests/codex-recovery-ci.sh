@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+python3 scripts/symphony/tests/codex-account-probe.test.py
+python3 scripts/symphony/tests/codex-rotate.test.py
+python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py \
+  FallbackTests.test_manual_reset_refreshes_stale_chatgpt_cooldown \
+  FallbackTests.test_controller_consumes_canonical_probe_readiness_receipt \
+  FallbackTests.test_cooldown_refresh_ignores_untyped_accounts_and_uses_expiry_order \
+  FallbackTests.test_exact_marker_is_required_before_cooldown_is_cleared \
+  FallbackTests.test_multiline_marker_is_ambiguous_and_preserves_cooldowns \
+  FallbackTests.test_newer_cooldown_wins_race_with_successful_probe \
+  FallbackTests.test_same_cooldown_with_newer_active_and_error_wins_race \
+  FallbackTests.test_held_account_leases_skip_probe_and_preserve_state \
+  FallbackTests.test_reset_probe_uses_one_overall_timeout_budget \
+  FallbackTests.test_probe_claim_without_readiness_receipt_fails_closed \
+  FallbackTests.test_probe_claim_requires_recovered_account_to_remain_active \
+  FallbackTests.test_probe_process_group_timeout_has_no_late_mutation_or_survivors \
+  FallbackTests.test_outer_probe_domain_reaps_completed_double_fork \
+  FallbackTests.test_timeout_parser_rejects_nonfinite_and_nonpositive_values \
+  FallbackTests.test_clean_nonready_with_changed_state_is_indeterminate \
+  FallbackTests.test_concurrent_state_corruption_or_deletion_fails_closed \
+  FallbackTests.test_failed_reset_probe_preserves_all_cooldowns \
+  FallbackTests.test_missing_reset_probe_executable_preserves_all_cooldowns \
+  FallbackTests.test_reset_probe_timeout_preserves_all_cooldowns \
+  FallbackTests.test_malformed_account_auth_fails_closed_before_reset_probe \
+  FallbackTests.test_non_object_account_auth_fails_closed_before_reset_probe \
+  FallbackTests.test_zero_chatgpt_inventory_never_falls_through_to_rotate \
+  FallbackTests.test_incomplete_chatgpt_inventory_never_falls_through_to_rotate
