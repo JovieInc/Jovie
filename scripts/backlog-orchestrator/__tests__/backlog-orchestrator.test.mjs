@@ -2467,7 +2467,10 @@ describe('triage ownership fence', () => {
     f.client.fetchIssue = async id => {
       if (id === 'JOV-42') {
         f.change({ labels: { nodes: [{ name: 'codex-in-progress' }] } });
-        return { id: 'parent-id', identifier: 'JOV-42', title: 'Parent' };
+        return {
+          ...makeIssue({ identifier: 'JOV-42', title: 'Parent' }),
+          id: 'parent-id',
+        };
       }
       return read();
     };
@@ -2485,7 +2488,10 @@ describe('triage ownership fence', () => {
     const read = f.client.fetchIssue;
     f.client.fetchIssue = async id =>
       id === 'JOV-42'
-        ? { id: 'parent-id', identifier: 'JOV-42', title: 'Parent' }
+        ? {
+            ...makeIssue({ identifier: 'JOV-42', title: 'Parent' }),
+            id: 'parent-id',
+          }
         : read();
     const receipt = await run(f);
     assert.equal(receipt.failed, 0);
@@ -2495,15 +2501,18 @@ describe('triage ownership fence', () => {
     assert.equal(f.read().description, before);
   });
 
-  for (const [name, reader] of [
-    [
-      'unavailable',
-      async () => {
+  for (const { name, reader } of [
+    {
+      name: 'unavailable',
+      reader: async () => {
         throw new Error('read unavailable');
       },
-    ],
-    ['missing', async () => null],
-    ['wrong issue', async () => makeIssue({ identifier: 'JOV-999' })],
+    },
+    { name: 'missing', reader: async () => null },
+    {
+      name: 'wrong issue',
+      reader: async () => makeIssue({ identifier: 'JOV-999' }),
+    },
   ]) {
     it(`fails closed on ${name} ownership read`, async () => {
       const f = fixture();
@@ -2556,7 +2565,10 @@ describe('triage ownership fence', () => {
 
   it('reports failed mutations and never continues into the next side effect', async () => {
     const f = fixture();
-    f.client.addComment = async () => ({ commentCreate: { success: false } });
+    f.client.addComment = async () => ({
+      success: false,
+      commentCreate: { success: false },
+    });
     const receipt = await run(f);
     assert.equal(receipt.failed, 1);
     assert.equal(receipt.mutations, 0);
