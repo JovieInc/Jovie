@@ -167,7 +167,7 @@ describe('public CTA guard', () => {
 
     const primaryCta = contents.slice(start, end);
 
-    // Waitlist-first Get started / Request Access uses the locked 28px minimum pill.
+    // Waitlist-first Get started / Request Access uses the canonical marketing pill.
     // HeaderPrimaryAuthLink owns the single primary-variant CTA and defaults
     // to the marketing size; the minimal pill sign-in passes md explicitly.
     expect(primaryCta).toContain("size = 'marketing'");
@@ -199,9 +199,6 @@ describe('public CTA guard', () => {
       "<MarketingSignInLink variant='ghost' label={minimalLabel} />"
     );
     expect(headerNav).toContain('focus-ring-themed shrink-0 whitespace-nowrap');
-    expect(headerNav).toContain('max-w-public-content lg:px-0');
-    expect(headerNav).not.toContain('max-w-linear-content');
-    expect(headerNav).not.toContain('linear-content-max');
     expect(headerNav).toContain('function HeaderPrimaryAuthLink');
     expect(headerNav).toContain(
       "cn('focus-ring-themed shrink-0 whitespace-nowrap', className)"
@@ -217,7 +214,7 @@ describe('public CTA guard', () => {
     expect(marketingNavigation).toContain("label: 'Log in'");
     expect(marketingNavigation).toContain("label: 'Find yourself'");
     expect(marketingHeader).toContain(
-      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
+      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
   });
 
@@ -244,5 +241,41 @@ describe('public CTA guard', () => {
     // Duplicate hrefs (e.g. two labels routing to the same page) must not
     // collide on the React key.
     expect(headerNav).toContain('key={`${link.href}:${link.label}`}');
+  });
+
+  it('keeps glass navigation beside the logo and the public CTA beyond its spacer', () => {
+    const headerNav = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+    const headerCss = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.css'),
+      'utf8'
+    );
+    const leadingNav = headerNav.indexOf(
+      '{isHomepagePresentation || isMarketingGlass ? navLinksMarkup : null}'
+    );
+    const spacer = headerNav.indexOf(
+      "<div className='flex-1' aria-hidden='true' />"
+    );
+    const trailingNav = headerNav.indexOf(
+      '{isHomepagePresentation || isMarketingGlass ? null : navLinksMarkup}'
+    );
+    const publicActions = headerNav.indexOf('<GlassAuthActions', spacer);
+
+    // Mutually exclusive placements preserve the other header variants while
+    // keeping the glass header's CTA at the actual right content anchor.
+    expect(leadingNav).toBeGreaterThanOrEqual(0);
+    expect(spacer).toBeGreaterThan(leadingNav);
+    expect(trailingNav).toBeGreaterThan(spacer);
+    expect(publicActions).toBeGreaterThan(trailingNav);
+    expect(headerNav.match(/\? navLinksMarkup : null/g)).toHaveLength(1);
+    expect(headerNav.match(/\? null : navLinksMarkup/g)).toHaveLength(1);
+    const glassNavRule = headerCss.match(
+      /\.marketing-glass-header__nav\s*\{([^}]+)\}/
+    )?.[1];
+    expect(glassNavRule).toBeDefined();
+    expect(glassNavRule).toContain('position: static;');
+    expect(glassNavRule).not.toMatch(/position:\s*absolute|translate\(/);
   });
 });
