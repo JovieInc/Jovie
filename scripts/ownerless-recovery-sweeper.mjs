@@ -82,6 +82,14 @@ async function linearActiveIssueSnapshot() {
   return linear.fetchTeamFleetClosureIssueSnapshot(JOVIE_LINEAR_TEAM_ID);
 }
 
+export async function recoveryIssueSnapshot(
+  open,
+  fetchSnapshot = linearActiveIssueSnapshot
+) {
+  if (!open.some(pr => pr?.draft !== true && pr?.isDraft !== true)) return null;
+  return fetchSnapshot();
+}
+
 async function linearClient() {
   return import('./backlog-orchestrator/linear-client.mjs');
 }
@@ -605,12 +613,20 @@ export async function processFleetClosureRemediationIntents(
   return { ok: results.every(result => result.status !== 'failed'), results };
 }
 
-export async function run() {
-  const mainSha = await resolveExactMainPolicyHead();
+export async function run({
+  resolvePolicyHead = resolveExactMainPolicyHead,
+  readOpenPulls = openPulls,
+  readIssueSnapshot = linearActiveIssueSnapshot,
+} = {}) {
+  const mainSha = await resolvePolicyHead();
   const snapshotStartedAt = new Date().toISOString();
-  const open = await openPulls('main');
+  const open = await readOpenPulls('main');
   const snapshotCompletedAt = new Date().toISOString();
-  const linearSnapshot = await linearActiveIssueSnapshot();
+  const linearSnapshot = await recoveryIssueSnapshot(open, readIssueSnapshot);
+  if (linearSnapshot === null) {
+    console.log('Ownerless recovery skipped: no non-draft open PRs');
+    return;
+  }
   const linearIssues = linearSnapshot.issues;
   const audit = buildPrFleetClosureAudit({
     repository: repo,

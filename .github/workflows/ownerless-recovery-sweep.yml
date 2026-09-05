@@ -1,7 +1,7 @@
 name: Ownerless Recovery Sweep
 on:
   pull_request:
-    types: [opened, reopened, unlabeled]
+    types: [opened, reopened, unlabeled, ready_for_review]
   workflow_dispatch:
 permissions:
   contents: read
@@ -9,6 +9,8 @@ concurrency:
   group: ownerless-recovery-sweep
 jobs:
   sweep:
+    # Draft publication is not recovery demand and must not scan shared Linear quota.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 10
     steps:
