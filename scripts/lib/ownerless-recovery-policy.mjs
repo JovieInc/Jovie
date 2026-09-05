@@ -18,7 +18,7 @@ export const FLEET_CLOSURE_COUNT_KEYS = Object.freeze(
 );
 
 const HOLD_LABELS = new Set(
-  'blocked|fast|gated|hold|human-review-required|needs-conflict-resolution|needs-human|needs-human-review|needs-manual-rebase|no-auto|queue-deferred|risk:high'.split(
+  'blocked|fast|gated|hold|needs-conflict-resolution|needs-manual-rebase|queue-deferred|risk:high'.split(
     '|'
   )
 );

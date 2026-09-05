@@ -3106,12 +3106,10 @@ JSON
         assert "[dry-run] would +merge-queue on #16187" in result.stdout
         assert "would +merge-queue on #16186" not in result.stdout
 
-    def test_hold_intake_missed_admission_never_recovers_no_auto_tombstone(
+    def test_hold_intake_missed_admission_ignores_legacy_no_auto_label(
         self, tmp_path: Path
     ) -> None:
-        """Run 32542714770 re-admitted PR #16263 after a live no-auto tombstone
-        because the missed-admission selector omitted the no-auto family.
-        """
+        """Legacy no-auto labels cannot suppress exact-head machine admission."""
         tombstone_head = "528ab46cd724ca78cb72ee5168dd3b2851045b6d"
         clean_head = "564bcf770f353f0c8a9e6c1d2b3a4e5f67890123"
         receipt = {
@@ -3196,15 +3194,14 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "exact missed admission at " + tombstone_head not in result.stdout
-        assert "would +merge-queue on #16263" not in result.stdout
+        assert "exact missed admission at " + tombstone_head in result.stdout
+        assert "[dry-run] would +merge-queue on #16263" in result.stdout
         assert "would -queue-deferred on #16263" not in result.stdout
         assert "exact missed admission at " + clean_head in result.stdout
         assert "would -queue-deferred on #16187" in result.stdout
         assert "[dry-run] would +merge-queue on #16187" in result.stdout
-        assert "{no-auto}" in result.stdout
 
-    def test_label_event_does_not_enroll_a_no_auto_tombstone(
+    def test_label_event_enrolls_despite_legacy_no_auto_label(
         self, tmp_path: Path
     ) -> None:
         head = "528ab46cd724ca78cb72ee5168dd3b2851045b6d"
@@ -3246,10 +3243,9 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "would +merge-queue on #16263" not in result.stdout
-        assert "{no-auto}" in result.stdout
+        assert "[dry-run] would +merge-queue on #16263" in result.stdout
 
-    def test_queued_no_auto_tombstone_is_dequeued_once(self, tmp_path: Path) -> None:
+    def test_queued_legacy_no_auto_label_is_left_in_queue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -3257,12 +3253,12 @@ JSON
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{"n":16263,"t":"Queued no-auto","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/jov-16263","headOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","base":"main","L":["no-auto","merge-queue"],"fail":[]}]'
+                  echo '[{"n":16263,"t":"Queued no-auto","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/jov-16263","headOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","base":"main","L":["no-auto","merge-queue"],"fail":[],"q":true}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo "pr checks should not run for a no-auto tombstone" >&2
-                  exit 2
+                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
+                  exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
@@ -3277,10 +3273,8 @@ JSON
         result = _run_bash(_drain_command(tmp_path, extra_env="DRY_RUN=1"))
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "=== DEQUEUE (hard gates" in result.stdout
-        assert "[dry-run] would -merge-queue on #16263" in result.stdout
+        assert "[dry-run] would -merge-queue on #16263" not in result.stdout
         assert "would +merge-queue on #16263" not in result.stdout
-        assert "{no-auto,merge-queue}" in result.stdout
 
     def test_positive_mergeable_reread_clears_stale_conflict_label_without_dequeue(
         self, tmp_path: Path
@@ -4041,15 +4035,13 @@ JSON
         assert "DRAIN_MUTATION_AUTHORIZATION" in content
         assert "tim-approved" not in content
         assert "approved:taste" not in content
-        assert (
-            'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
-            in content
-        )
-        assert content.count("$NO_AUTO_HOLD_JQ") >= 20
+        assert "NO_AUTO_HOLD_JQ" not in content
+        assert '. == "no-auto"' not in content
+        assert 'MACHINE_HOLD_JQ=\'. == "hold" or . == "gated" or . == "incident"\'' in content
         missed = content.split("bounded exact-head native admission", 1)[1].split(
             "A completed Production Controller", 1
         )[0]
-        assert "$NO_AUTO_HOLD_JQ" in missed
+        assert "$MACHINE_HOLD_JQ" in missed
         assert 'index("queue-deferred")' in missed
         assert 'index("no-auto")' not in missed
 
@@ -4487,7 +4479,7 @@ class TestMissingCiRecovery:
         assert "close 203" not in lines
         assert "comment 203" not in lines
 
-    def test_drafts_and_hold_labels_are_never_remediated(
+    def test_drafts_and_machine_hold_labels_are_never_remediated(
         self, tmp_path: Path
     ) -> None:
         prs = [
@@ -4506,7 +4498,11 @@ class TestMissingCiRecovery:
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
-        assert mutations.read_text(encoding="utf-8") == ""
+        lines = mutations.read_text(encoding="utf-8").splitlines()
+        assert "close 203" in lines
+        assert "reopen 203" in lines
+        assert "close 201" not in lines
+        assert "close 202" not in lines
 
     def test_recovery_is_disabled_by_default(self, tmp_path: Path) -> None:
         mutations = _write_missing_ci_fixture(
@@ -4934,7 +4930,7 @@ JSON
         assert "live state no longer matches the releasable snapshot" in result.stdout
         assert "would remove" not in result.stdout
 
-    def test_untyped_hold_with_taste_stays_held(self, tmp_path: Path) -> None:
+    def test_untyped_hold_with_retired_taste_label_is_released(self, tmp_path: Path) -> None:
         head = "c" * 40
         result = _run_single_candidate_release(
             tmp_path,
@@ -4943,10 +4939,10 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "human-policy-hold:needs:taste" in result.stdout
-        assert "would remove" not in result.stdout
+        assert "human-policy-hold" not in result.stdout
+        assert "would remove `queue-deferred` from #900" in result.stdout
 
-    def test_untyped_hold_with_net_new_stays_held(self, tmp_path: Path) -> None:
+    def test_untyped_hold_with_net_new_label_is_released(self, tmp_path: Path) -> None:
         head = "c" * 40
         result = _run_single_candidate_release(
             tmp_path,
@@ -4955,10 +4951,10 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "human-policy-hold:net-new" in result.stdout
-        assert "would remove" not in result.stdout
+        assert "human-policy-hold" not in result.stdout
+        assert "would remove `queue-deferred` from #900" in result.stdout
 
-    def test_untyped_hold_with_outbound_stays_held(self, tmp_path: Path) -> None:
+    def test_untyped_hold_with_outbound_label_is_released(self, tmp_path: Path) -> None:
         head = "c" * 40
         result = _run_single_candidate_release(
             tmp_path,
@@ -4967,8 +4963,8 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "human-policy-hold:outbound" in result.stdout
-        assert "would remove" not in result.stdout
+        assert "human-policy-hold" not in result.stdout
+        assert "would remove `queue-deferred` from #900" in result.stdout
 
     def test_untyped_hold_stays_held_when_fleet_is_red(self, tmp_path: Path) -> None:
         head = "c" * 40

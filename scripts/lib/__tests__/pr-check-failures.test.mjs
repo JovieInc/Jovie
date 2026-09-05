@@ -18,6 +18,7 @@ import {
   fetchRequiredCheckFailures,
   isAdvisoryCheck,
   isAgentBranch,
+  isHardGated,
   isTerminalFailure,
   MERGE_GATE_CHECK_NAMES,
   normalizeCheckName,
@@ -26,6 +27,12 @@ import {
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 
 describe('pr-check-failures', () => {
+  it('treats legacy human labels as inert while preserving machine holds', () => {
+    expect(isHardGated(['needs-human', 'no-auto', 'needs:taste'])).toBe(false);
+    expect(isHardGated(['hold'])).toBe(true);
+    expect(isHardGated([{ name: 'gated' }])).toBe(true);
+  });
+
   it('treats bucket=fail as terminal like drain-pr-queue.sh', () => {
     expect(
       isTerminalFailure({ bucket: 'fail', state: 'SUCCESS', name: 'PR Ready' })
