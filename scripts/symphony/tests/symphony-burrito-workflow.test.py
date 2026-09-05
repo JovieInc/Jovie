@@ -606,12 +606,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
             nonadjacent_duplicate = check(
                 WORKFLOW.replace(
-                    "  excluded_labels:\n    - no-symphony\n    - needs-human\n",
+                    "  excluded_labels:\n    - no-symphony\n",
                     "  required_labels:\n"
                     "    - first\n"
                     "  excluded_labels:\n"
                     "    - no-symphony\n"
-                    "    - needs-human\n"
                     "  required_labels:\n"
                     "    - second\n",
                 )

@@ -1829,7 +1829,7 @@ def run_official_binary_once(
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
-    closure_observe_only: bool,
+    closure_observe_only: bool = False,
     max_gate_sleep_seconds: int | None,
 ) -> int:
     recovery_deadline: float | None = None
