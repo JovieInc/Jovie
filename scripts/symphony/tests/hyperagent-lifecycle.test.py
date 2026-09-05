@@ -436,6 +436,14 @@ class HyperagentLifecycleTests(unittest.TestCase):
             self.assertEqual(failed["state"], "terminal_unverified")
             self.assertEqual(lifecycle.plan_resolution(failed)["action"], "reconcile_terminal_receipts_once")
         for field, value in (
+            ("provider_error", "429"), ("transport_lost", "true"),
+            ("interaction", [self.approval()]),
+        ):
+            failed = lifecycle.classify_observation(
+                {**success, field: value}, self.now, expected_job
+            )
+            self.assertEqual(failed["state"], "unknown")
+        for field, value in (
             ("thread_id", "other"), ("idempotency_key", "other"),
             ("account_alias", "other"), ("destination", "other"),
             ("model_id", "other"), ("cost_usd", 1.01),
@@ -443,7 +451,10 @@ class HyperagentLifecycleTests(unittest.TestCase):
             failed = lifecycle.classify_observation(
                 {**success, field: value}, self.now, expected_job
             )
-            self.assertEqual(failed["state"], "terminal_unverified")
+            self.assertEqual(
+                failed["state"],
+                "unknown" if field in {"thread_id", "idempotency_key"} else "terminal_unverified",
+            )
         self.assertEqual(
             lifecycle.classify_observation(success, self.now)["state"],
             "terminal_unverified",
@@ -470,19 +481,34 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 self.now,
                 self.expected_job(),
             )
-            self.assertEqual(mismatched["state"], "terminal_unverified")
+            self.assertEqual(mismatched["state"], "unknown")
+        for updates in (
+            {"thread_id": "other"},
+            {"thread_id": "other", "transport_lost": True},
+            {"thread_id": "other", "provider_error": 503},
+            {"thread_id": "other", "interaction": {"kind": "memory_decision", "id": "memory-1"}},
+        ):
+            result = lifecycle.classify_observation(
+                self.observation(**updates), self.now, self.expected_job()
+            )
+            self.assertEqual(result, {"state": "unknown", "reason": "observation_job_mismatch"})
+        self.assertEqual(
+            lifecycle.classify_observation(self.observation(), self.now, {})["state"],
+            "unknown",
+        )
         self.assertEqual(lifecycle.classify_observation(self.observation(is_running="UNKNOWN"), self.now)["state"], "unknown")
         self.assertEqual(lifecycle.classify_observation({"schema": "wrong"}, self.now)["state"], "unknown")
         self.assertEqual(lifecycle.classify_observation({"schema": lifecycle.SCHEMA}, self.now)["reason"], "missing_job_identity")
         unknown_interaction = self.observation(interaction={"kind": "something_else"})
         self.assertEqual(lifecycle.classify_observation(unknown_interaction, self.now)["state"], "unknown")
         self.assertEqual(lifecycle.plan_resolution({"state": "unknown"})["action"], "hold_unknown")
-        self.assertEqual(
-            lifecycle.classify_observation(
-                self.observation(is_running=False, terminal_state={}), self.now
-            )["state"],
-            "unknown",
-        )
+        for terminal_state in ({}, "succeeded"):
+            self.assertEqual(
+                lifecycle.classify_observation(
+                    self.observation(is_running=False, terminal_state=terminal_state), self.now
+                )["state"],
+                "unknown",
+            )
         malformed_surface = self.observation(
             interaction=self.approval(resolution_surface=[])
         )

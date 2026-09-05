@@ -245,14 +245,29 @@ def classify_observation(observation, now=None, expected_job=None):
         "thread_id": observation["thread_id"],
         "idempotency_key": observation["idempotency_key"],
     }
+    if expected_job is not None and (
+        not _valid_job_identity(expected_job)
+        or job != {
+            "thread_id": expected_job["thread_id"],
+            "idempotency_key": expected_job["idempotency_key"],
+        }
+    ):
+        return {"state": "unknown", "reason": "observation_job_mismatch"}
     observed_at = _parse_time(observation.get("observed_at"))
     if observed_at is None or observed_at > now:
         return {"state": "unknown", "reason": "invalid_observed_at"}
     if (now - observed_at).total_seconds() > MAX_OBSERVATION_AGE_SECONDS:
         return {"state": "stale_status", "reason": "observation_expired", "job": job}
-    if observation.get("transport_lost") is True:
+    transport_lost = observation.get("transport_lost")
+    if "transport_lost" in observation and not isinstance(transport_lost, bool):
+        return {"state": "unknown", "reason": "transport_state_unknown"}
+    if transport_lost is True:
         return {"state": "transport_unknown", "reason": "reconcile_original_thread", "job": job}
     provider_error = observation.get("provider_error")
+    if "provider_error" in observation and (
+        not isinstance(provider_error, int) or isinstance(provider_error, bool)
+    ):
+        return {"state": "unknown", "reason": "provider_error_unknown"}
     if isinstance(provider_error, int) and not isinstance(provider_error, bool):
         if provider_error == 429:
             retry_after = observation.get("retry_after_seconds")
@@ -273,6 +288,8 @@ def classify_observation(observation, now=None, expected_job=None):
         return result
 
     interaction = observation.get("interaction")
+    if "interaction" in observation and not isinstance(interaction, dict):
+        return {"state": "unknown", "reason": "interaction_unknown"}
     if isinstance(interaction, dict):
         kind = interaction.get("kind")
         if kind == "approval":
@@ -318,7 +335,7 @@ def classify_observation(observation, now=None, expected_job=None):
     if running is not False:
         return {"state": "unknown", "reason": "running_state_unknown"}
     terminal = observation.get("terminal_state")
-    if terminal is not None and not isinstance(terminal, str):
+    if terminal not in (None, "declined", "cancelled", "failed", "completed"):
         return {"state": "unknown", "reason": "terminal_state_unknown"}
     terminal_job_matches = _valid_job_identity(expected_job) and job == {
         "thread_id": expected_job["thread_id"],
