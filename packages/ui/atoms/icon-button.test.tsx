@@ -161,7 +161,8 @@ describe('IconButton', () => {
       const button = screen.getByRole('button', {
         name: `${variant} action`,
       });
-      expect(button.className).toContain('focus-visible:ring-focus/55');
+      expect(button).toHaveClass('focus-visible:ring-focus');
+      expect(button).not.toHaveClass('focus-visible:ring-focus/55');
       expect(button.className).toContain('motion-reduce:transition-none');
       expect(button.className).not.toContain('focus-visible:ring-ring');
       expect(button.className).not.toContain('focus-visible:ring-focus/16');
