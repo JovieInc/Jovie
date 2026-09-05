@@ -2143,7 +2143,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   min-height: calc(var(--space-12) + var(--space-2));
   overflow: hidden;
   gap: var(--space-2);
-  padding: var(--space-1) calc(var(--space-3) - var(--space-px)) var(--space-1)
+  padding: var(--space-1) calc(var(--space-3) + var(--space-px)) var(--space-1)
     var(--space-5);
   border: var(--space-px) solid transparent;
   border-radius: var(--radius-pill);
