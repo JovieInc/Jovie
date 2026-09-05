@@ -77,6 +77,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: python3 scripts/symphony/tests/run-proof-gate.py
+      - name: Verify Codex account recovery and lease boundaries
+        run: bash scripts/symphony/tests/codex-recovery-ci.sh
 
   runner-image-offline-proof:
     name: Build and verify runner image offline
