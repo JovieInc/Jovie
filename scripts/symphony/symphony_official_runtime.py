@@ -1401,8 +1401,11 @@ def run_official_binary_once(
                 for entry in pathlib.Path("/proc").iterdir():
                     if not entry.name.isdigit():
                         continue
-                    fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
-                    pairs.append((int(entry.name), int(fields[1])))
+                    try:
+                        fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+                        pairs.append((int(entry.name), int(fields[1])))
+                    except (OSError, IndexError, ValueError):
+                        continue
             else:
                 rows = subprocess.run(
                     ["ps", "-axo", "pid=,ppid="], capture_output=True,

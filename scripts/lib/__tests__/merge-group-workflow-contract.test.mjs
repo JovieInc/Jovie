@@ -452,6 +452,12 @@ describe('merge_group workflow contract', () => {
     );
     expect(aggregate).not.toContain('!cancelled()');
     expect(aggregate).toContain('ci-fast');
+    expect(aggregate).toContain('proof-v2-substrate');
+    expect(sourceAggregate).toContain('proof-v2-substrate');
+    expect(aggregate).toContain('Exact-head proof v2:$PROOF_V2_RESULT');
+    expect(sourceAggregate).toContain(
+      'Exact-head proof v2 did not pass (result: $PROOF_V2_RESULT)'
+    );
     expect(aggregate).toContain('ci-unit-tests');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-ios');
