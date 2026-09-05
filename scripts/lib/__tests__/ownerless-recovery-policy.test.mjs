@@ -155,7 +155,7 @@ describe('tracker scan admission', () => {
       })
     ).rejects.toThrow('quota exhausted');
   });
-  it('skips draft events before the workflow scans and wakes when a draft becomes ready', () => {
+  it('skips draft scans while preserving existing workflow triggers', () => {
     const workflow = readFileSync(
       new URL(
         '../../../.github/workflows/ownerless-recovery-sweep.yml',
@@ -163,9 +163,8 @@ describe('tracker scan admission', () => {
       ),
       'utf8'
     );
-    expect(workflow).toMatch(
-      /types: \[opened, reopened, unlabeled, ready_for_review\]/
-    );
+    expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
+    expect(workflow).not.toContain('ready_for_review');
     expect(workflow).toMatch(
       /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
     );
