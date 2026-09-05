@@ -10,6 +10,7 @@ export default defineConfig({
         'agent/lib/summer-commercial-readback.ts',
         'agent/lib/summer-photon-offline-proof.ts',
         'agent/lib/summer-shadow-ingress.ts',
+        'agent/lib/symphony-consumer-api.ts',
         'agent/lib/vercel-blob-bottleneck-runtime.ts',
         'agent/lib/vercel-blob-shadow-store.ts',
       ],

@@ -1,4 +1,4 @@
-import { defineChannel, POST } from 'eve/channels';
+import { defineChannel, GET, POST } from 'eve/channels';
 import type { AuthFn } from 'eve/channels/auth';
 import {
   extractBearerToken,
@@ -12,6 +12,13 @@ import {
   type SummerBottleneckDependencies,
   summerBottleneckSnapshotSchema,
 } from '../lib/summer-bottleneck-loop';
+import {
+  claimNextSymphonyTask,
+  createSymphonyConsumerApiRuntime,
+  persistSymphonyTerminal,
+  type SymphonyConsumerApiRuntime,
+  verifySymphonyConsumerRequest,
+} from '../lib/symphony-consumer-api';
 import { createVercelBlobBottleneckDependencies } from '../lib/vercel-blob-bottleneck-runtime';
 import { bindEvePilotIdentity } from '../select-identity';
 
@@ -54,9 +61,9 @@ export const ovieSummerBottleneckOidcAuth: AuthFn<Request> = withAuthChallenges(
   [{ scheme: 'Bearer' }]
 );
 
-export async function readBoundedSummerBottleneckJson(
+async function readBoundedSummerBottleneckText(
   request: Request
-): Promise<unknown> {
+): Promise<string> {
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
     throw new Error('body-too-large');
@@ -76,7 +83,13 @@ export async function readBoundedSummerBottleneckJson(
     }
     body += decoder.decode(value, { stream: true });
   }
-  return JSON.parse(body + decoder.decode());
+  return body + decoder.decode();
+}
+
+export async function readBoundedSummerBottleneckJson(
+  request: Request
+): Promise<unknown> {
+  return JSON.parse(await readBoundedSummerBottleneckText(request));
 }
 
 type SummerBottleneckHandlerDependencies = {
@@ -139,6 +152,102 @@ export async function handleSummerBottleneckRequest(
   }
 }
 
+type SymphonyConsumerHandlerDependencies = {
+  readonly createRuntime: () => SymphonyConsumerApiRuntime;
+};
+
+function symphonyRuntimeResponse(): Response {
+  return Response.json(
+    { ok: false, code: 'symphony_consumer_runtime_unavailable' },
+    { status: 503 }
+  );
+}
+
+export async function handleSymphonyClaimRequest(
+  request: Request,
+  dependencies: SymphonyConsumerHandlerDependencies = {
+    createRuntime: createSymphonyConsumerApiRuntime,
+  }
+): Promise<Response> {
+  let runtime: SymphonyConsumerApiRuntime;
+  try {
+    runtime = dependencies.createRuntime();
+  } catch {
+    return symphonyRuntimeResponse();
+  }
+  const claimantKeyId = verifySymphonyConsumerRequest(request, '', runtime);
+  if (!claimantKeyId) {
+    return Response.json(
+      { ok: false, code: 'unauthenticated_symphony_consumer' },
+      { status: 401 }
+    );
+  }
+  try {
+    const outbox = await claimNextSymphonyTask(runtime, claimantKeyId);
+    return outbox
+      ? Response.json({ ok: true, outbox }, { status: 200 })
+      : new Response(null, { status: 204 });
+  } catch {
+    return Response.json(
+      { ok: false, code: 'symphony_claim_failed' },
+      { status: 503 }
+    );
+  }
+}
+
+export async function handleSymphonyTerminalRequest(
+  request: Request,
+  dependencies: SymphonyConsumerHandlerDependencies = {
+    createRuntime: createSymphonyConsumerApiRuntime,
+  }
+): Promise<Response> {
+  let body: string;
+  try {
+    body = await readBoundedSummerBottleneckText(request);
+  } catch (error) {
+    const oversized =
+      error instanceof Error && error.message === 'body-too-large';
+    return Response.json(
+      { ok: false, code: oversized ? 'body_too_large' : 'body_missing' },
+      { status: oversized ? 413 : 400 }
+    );
+  }
+  let runtime: SymphonyConsumerApiRuntime;
+  try {
+    runtime = dependencies.createRuntime();
+  } catch {
+    return symphonyRuntimeResponse();
+  }
+  const claimantKeyId = verifySymphonyConsumerRequest(request, body, runtime);
+  if (!claimantKeyId) {
+    return Response.json(
+      { ok: false, code: 'unauthenticated_symphony_consumer' },
+      { status: 401 }
+    );
+  }
+  let input: unknown;
+  try {
+    input = JSON.parse(body);
+  } catch {
+    return Response.json({ ok: false, code: 'invalid_json' }, { status: 400 });
+  }
+  try {
+    const result = await persistSymphonyTerminal(runtime, claimantKeyId, input);
+    return Response.json({ ok: true, result }, { status: 200 });
+  } catch (error) {
+    const conflict =
+      error instanceof Error &&
+      error.message === 'conflicting Symphony terminal';
+    return Response.json(
+      {
+        ok: false,
+        code: conflict ? 'symphony_terminal_conflict' : 'invalid_terminal',
+      },
+      { status: conflict ? 409 : 422 }
+    );
+  }
+}
+
 export default defineChannel<SummerBottleneckChannelState>({
   state: {
     dispatchAuthority: 'bounded-repair',
@@ -147,6 +256,12 @@ export default defineChannel<SummerBottleneckChannelState>({
   },
   metadata: state => state,
   routes: [
+    GET('/ovie/v1/summer-bottleneck/symphony/claim', request =>
+      handleSymphonyClaimRequest(request)
+    ),
+    POST('/ovie/v1/summer-bottleneck/symphony/terminal', request =>
+      handleSymphonyTerminalRequest(request)
+    ),
     POST('/ovie/v1/summer-bottleneck/events', async request => {
       return handleSummerBottleneckRequest(request);
     }),
