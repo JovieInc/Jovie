@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
@@ -20,11 +20,13 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 const mockSearch = vi.fn();
+const mockSearchImmediate = vi.fn();
 const mockClear = vi.fn();
 const mockHookReturn = {
   results: [] as SpotifyArtistResult[],
   state: 'idle' as ArtistSearchState,
   search: mockSearch,
+  searchImmediate: mockSearchImmediate,
   clear: mockClear,
 };
 
@@ -97,6 +99,7 @@ describe('HeroSpotifySearch', () => {
     mockHookReturn.results = [];
     mockHookReturn.state = 'idle';
     mockHookReturn.search = mockSearch;
+    mockHookReturn.searchImmediate = mockSearchImmediate;
     mockHookReturn.clear = mockClear;
   });
 
@@ -252,12 +255,38 @@ describe('HeroSpotifySearch', () => {
       expect(screen.getByText('No artists found')).toBeInTheDocument();
     });
 
-    it('shows error state message', async () => {
+    it('preserves the query and offers one immediate retry after an error', async () => {
       mockHookReturn.state = 'error';
       renderComponent();
       const user = userEvent.setup();
-      await user.type(getInput(), 'fail');
-      expect(screen.getByText('Search failed. Try again.')).toBeInTheDocument();
+      const input = getInput();
+      await user.type(input, 'tim white');
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Search failed.');
+      await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(mockSearchImmediate).toHaveBeenCalledTimes(1);
+      expect(mockSearchImmediate).toHaveBeenCalledWith('tim white');
+      expect(input).toHaveValue('tim white');
+      expect(input).toHaveFocus();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('does not select placeholder results while a new search is loading', async () => {
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'loading';
+      renderComponent();
+      const user = userEvent.setup();
+      const input = getInput();
+      await user.type(input, 'Phoebe');
+
+      const staleResult = screen.getByText('Taylor Swift').closest('button');
+      expect(staleResult).toBeDisabled();
+
+      await user.keyboard('{ArrowDown}{Enter}');
+      if (staleResult) fireEvent.click(staleResult);
+
+      expect(mockPush).not.toHaveBeenCalled();
     });
 
     it('shows artist results after typing', async () => {
@@ -370,6 +399,34 @@ describe('HeroSpotifySearch', () => {
       expect(url).toContain('spotify_url=');
       expect(url).toContain('artist_name=Taylor+Swift');
       expect(url).toContain('starter_prompt=');
+    });
+
+    it('cancels search and emits one handoff for same-frame Enter and click', async () => {
+      render(
+        <HeroSpotifySearch
+          submitAnalytics={{
+            eventName: 'homepage_certified_search_submitted',
+            properties: { placement: 'hero' },
+          }}
+        />
+      );
+      const user = userEvent.setup();
+      const input = getInput();
+      await user.type(input, 'Taylor');
+      await user.keyboard('{ArrowDown}');
+      const artistButton = screen.getByText('Taylor Swift').closest('button');
+      expect(artistButton).not.toBeNull();
+
+      act(() => {
+        fireEvent.keyDown(input, { key: 'Enter' });
+        if (artistButton) fireEvent.click(artistButton);
+      });
+
+      expect(mockClear).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockTrack).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(mockTrack.mock.calls)).not.toContain('Taylor');
     });
 
     it('verified badge shown for verified artists', async () => {
