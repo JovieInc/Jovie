@@ -49,4 +49,3 @@ Avoid filler, throat-clearing, generic optimism, founder cosplay, and unsupporte
 - End with what to do. Give the action.
 
 **Final test:** does this sound like a real cross-functional builder who wants to help someone make something people want, ship it, and make it actually work?
-
