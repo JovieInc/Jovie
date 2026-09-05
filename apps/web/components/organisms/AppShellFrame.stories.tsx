@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { CSSProperties } from 'react';
 import { chatNavItem } from '@/components/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/components/features/dashboard/dashboard-nav/NavMenuItem';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
@@ -33,10 +32,7 @@ export const WithInspector: Story = {
 export const DesktopNavigation: Story = {
   decorators: [
     Story => (
-      <SidebarProvider
-        defaultOpen
-        style={{ height: '100vh', '--sidebar-width': '190px' } as CSSProperties}
-      >
+      <SidebarProvider defaultOpen>
         <Story />
       </SidebarProvider>
     ),
@@ -46,14 +42,6 @@ export const DesktopNavigation: Story = {
       <Sidebar collapsible='offcanvas'>
         <SidebarMenu>
           <NavMenuItem item={chatNavItem} isActive />
-          <NavMenuItem
-            item={{
-              ...chatNavItem,
-              id: 'long',
-              name: 'A deliberately long navigation title that exceeds the sidebar',
-            }}
-            isActive={false}
-          />
         </SidebarMenu>
       </Sidebar>
     ),

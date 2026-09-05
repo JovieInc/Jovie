@@ -179,7 +179,7 @@ test.describe('desktop shell optical grid', () => {
     for (const width of [900, 1224]) {
       test(`${theme} ${width}px keeps native controls on one row`, async ({
         page,
-      }, testInfo) => {
+      }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.addInitScript(() =>
           Object.defineProperty(window, 'electronAPI', {
@@ -234,10 +234,6 @@ test.describe('desktop shell optical grid', () => {
           ).toBeVisible();
           expect((await main.boundingBox())!.y).toBe(mainBox.y);
         }
-
-        await testInfo.attach('desktop-shell-optical-grid', {
-          body: await page.screenshot(),
-        });
       });
     }
   }

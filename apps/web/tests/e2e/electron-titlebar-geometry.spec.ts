@@ -204,16 +204,8 @@ test('titlebar sidebar-cell width matches the compact controls token', async ({
 
   const tokens = await page.evaluate(() => {
     const rootStyle = getComputedStyle(document.documentElement);
-    const frameStyle = getComputedStyle(
-      document.querySelector<HTMLElement>('[data-app-shell-frame="true"]')!
-    );
     const readPx = (name: string) => {
       const raw = rootStyle.getPropertyValue(name).trim();
-      const match = /^([\d.]+)px$/.exec(raw);
-      return match ? Number.parseFloat(match[1]) : null;
-    };
-    const readFramePx = (name: string) => {
-      const raw = frameStyle.getPropertyValue(name).trim();
       const match = /^([\d.]+)px$/.exec(raw);
       return match ? Number.parseFloat(match[1]) : null;
     };
@@ -224,7 +216,7 @@ test('titlebar sidebar-cell width matches the compact controls token', async ({
       trafficLightY: readPx('--electron-traffic-light-y'),
       sidebarWidth: readPx('--electron-sidebar-width'),
       collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
-      controlsWidth: readFramePx('--electron-controls-width'),
+      controlsWidth: readPx('--electron-controls-width'),
     };
   });
 

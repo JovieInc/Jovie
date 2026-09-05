@@ -68,6 +68,7 @@ html[data-desktop-runtime="electron"] {
   --electron-traffic-light-y: 17px;
   --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
+  --electron-controls-width: 188px;
 }
 
 html[data-desktop-runtime="electron"] body {
@@ -132,10 +133,6 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
-}
-
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
-  --electron-controls-width: 188px;
 }
 
 html[data-desktop-runtime="electron"]
