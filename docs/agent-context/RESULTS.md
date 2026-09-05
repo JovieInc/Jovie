@@ -159,3 +159,13 @@ H1 visual lines, Scene Palette v1, and interaction activation counts. Refreshed
 preservation hashes from that main source and regenerated the design manifest.
 The 288-decision live receipt above remains evidence for its frozen input hashes,
 not a claim that provider trials were repeated on this updated landing tree.
+
+The landing tree initially exceeded the unchanged 180 MiB repository budget.
+Moved repeated full gstack voice guidance into one shared reference; generated
+entry points retain the short directive and an on-demand link. A hash check
+proves full guidance preservation. The actual voice renderer is covered by the
+same mandatory Node suite: now 16 tests, 100% line/branch/function coverage,
+including every tier and host-root form. Repository hygiene is green at 179.94 MiB.
+The generation dry-run passes. The legacy Bun generator test file cannot initialize
+because it imports the already-removed browse daemon; it provides no passing
+evidence. Current behavior is tested by the dependency-free Node runner.

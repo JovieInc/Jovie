@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, matchesGlob, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { generateVoiceDirective } from '../../.agents/skills/gstack/scripts/resolvers/voice.mjs';
 import { evaluate, references } from './check.mjs';
 import { grade } from './grade.mjs';
 import renderPrompt from './prompt.cjs';
@@ -264,4 +265,39 @@ test('relocated registry rule keeps authoritative status and before/after audit 
   );
   assert.ok(rule.includes('before and after registry mutations'));
   assert.ok(rule.includes('fails closed'));
+});
+
+test('shared voice routing is compact, host-aware, and keeps tier-one semantics', () => {
+  for (const skillRoot of ['~/.claude/skills/gstack', '$GSTACK_ROOT']) {
+    for (const tier of [undefined, 1, 2, 3, 4]) {
+      const result = generateVoiceDirective({
+        paths: { skillRoot },
+        preambleTier: tier,
+      });
+      assert.ok(Buffer.byteLength(result) < 1000);
+      assert.ok(result.includes('Cross-model agreement is a recommendation'));
+      if (tier === 1) assert.ok(!result.includes('references/VOICE.md'));
+      else assert.ok(result.includes(`${skillRoot}/references/VOICE.md`));
+    }
+  }
+});
+
+test('shared voice preserves the full original guidance without repeated generated copies', () => {
+  const shared = readFileSync(
+    resolve(root, '.agents/skills/gstack/references/VOICE.md'),
+    'utf8'
+  );
+  const body = shared.split('## Voice\n')[1].trim();
+  assert.equal(
+    createHash('sha256').update(body).digest('hex'),
+    '8246eaf65959b311650a9e90cd04e0ea009eb682ef4870b39d949f356c52e4a5'
+  );
+  const landing = readFileSync(
+    resolve(root, '.agents/skills/gstack/land-and-deploy/SKILL.md'),
+    'utf8'
+  );
+  assert.ok(landing.includes('/references/VOICE.md'));
+  assert.ok(
+    !landing.includes('**Core belief:** there is no one at the wheel.')
+  );
 });
