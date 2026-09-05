@@ -25,7 +25,7 @@ describe('independent application source export', () => {
           createHash('sha256')
             .update(readFileSync(join(destination, path)))
             .digest('hex')
-        ).toBe(hash);
+        ).toBe(hash.sha256);
         if (path.startsWith('agent/'))
           expect(readFileSync(join(destination, path), 'utf8')).not.toMatch(
             /(?:apps\/web|@\/lib\/db)/u

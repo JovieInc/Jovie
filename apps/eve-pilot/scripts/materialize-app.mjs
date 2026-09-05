@@ -264,7 +264,7 @@ The source export is preparatory; deployment and commissioning require separate 
     cwd: source,
     encoding: 'utf8',
   }).trim();
-  const hash = text => createHash('sha256').update(text).digest('hex');
+  const hash = text => ({ sha256: createHash('sha256').update(text).digest('hex') });
   const inputs = [
     'vitest.config.ts',
     'scripts/materialize-app.mjs',
