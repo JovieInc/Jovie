@@ -2142,6 +2142,24 @@ while True: time.sleep(1)
             )
             self.assertIn("PROMOTION_COMMITTED", committed_cleanup_failure.stderr)
             self.assertNotIn("PROMOTION_ROLLED_BACK", committed_cleanup_failure.stderr)
+            committed_events = (root / "systemctl-events").read_text().splitlines()
+            committed_restart_events = [
+                row
+                for row in committed_events
+                if "restart symphony-elixir.service" in row
+            ]
+            self.assertEqual(
+                len(committed_restart_events),
+                len(
+                    [
+                        row
+                        for row in events_before_activation
+                        if "restart symphony-elixir.service" in row
+                    ]
+                )
+                + 1,
+                committed_events,
+            )
             marker = (
                 target_home
                 / ".local/state/symphony-elixir/.promotion-transaction.cleanup-pending"
