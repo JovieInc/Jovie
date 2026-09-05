@@ -11,6 +11,7 @@ account remains host-owned configuration and is never pinned by this source.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import datetime as dt
 import hashlib
 import json
@@ -18,10 +19,12 @@ import math
 import os
 import pathlib
 import re
+import select
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -80,6 +83,8 @@ DEFAULT_DEAD_LETTER_DIR = (
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
+DEFAULT_SHUTDOWN_GRACE_SECONDS = 10.0
+MAX_SHUTDOWN_GRACE_SECONDS = 12.0
 ISSUE_DEAD_LETTER_SCHEMA = "symphony-issue-dead-letter/v1"
 LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS = 3
 LINEAR_API_STATUS_PATTERN = re.compile(
@@ -101,6 +106,30 @@ OBSOLETE_TOKENS = (
     "symphony-runtime/elixir",
     "WORKFLOW.jovie-ui-pilot.md",
 )
+EXPECTED_HOOKS = {
+    "after_create": (
+        'export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"',
+        "git clone --depth 1 https://github.com/JovieInc/Jovie.git .",
+        "git fetch --depth 1 origin main",
+        "git checkout -B main origin/main",
+        'skills_tmp="$(mktemp -d "${TMPDIR:-/tmp}/openai-symphony-skills.XXXXXX")"',
+        "trap 'rm -rf \"$skills_tmp\"' EXIT",
+        'git clone --depth 1 --filter=blob:none --sparse https://github.com/openai/symphony.git "$skills_tmp"',
+        'git -C "$skills_tmp" sparse-checkout set .codex/skills',
+        "mkdir -p .codex/skills",
+        'cp -R "$skills_tmp/.codex/skills/commit" "$skills_tmp/.codex/skills/push" "$skills_tmp/.codex/skills/pull" "$skills_tmp/.codex/skills/land" "$skills_tmp/.codex/skills/linear" .codex/skills/',
+        "SYMPHONY_TRUSTED_HOOK_PHASE=after_create bash ./scripts/symphony/symphony-nvme-package-cache.sh after-create",
+    ),
+    "before_remove": (
+        'export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"',
+        "if [ -f ./scripts/symphony/symphony-nvme-package-cache.sh ]; then",
+        "  SYMPHONY_TRUSTED_HOOK_PHASE=before_remove bash ./scripts/symphony/symphony-nvme-package-cache.sh before-remove",
+        "else",
+        "  rm -rf ./node_modules ./.symphony/package-cache/pnpm-store",
+        "  find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true",
+        "fi",
+    ),
+}
 LINEAR_ELIGIBLE_COUNT_QUERY = """
 query SymphonyLinearEligibleCount($teamKey: String!, $stateNames: [String!]!, $first: Int!, $after: String) {
   issues(filter: {team: {key: {eq: $teamKey}}, state: {name: {in: $stateNames}}}, first: $first, after: $after) {
@@ -192,6 +221,13 @@ def _section(lines: list[str], name: str) -> list[str]:
                 break
             out.append(line)
     return out
+
+
+def _literal_hook(front: str, name: str) -> tuple[str, ...] | None:
+    match = re.search(rf"^  {re.escape(name)}: \|\n((?:    .*\n?)*)", front, re.M)
+    if match is None:
+        return None
+    return tuple(line[4:] for line in match.group(1).splitlines())
 
 
 def _scalar(body: list[str], key: str) -> str:
@@ -490,6 +526,61 @@ def validate_source(
         errors.append(f"workflow_invalid:{exc}")
 
     if workflow is not None:
+        workflow_text = _read_text(workflow_path)
+        workflow_config = _front_matter(workflow_text)
+        for hook_name, expected_hook in EXPECTED_HOOKS.items():
+            if _literal_hook(workflow_config, hook_name) != expected_hook:
+                errors.append(f"workflow_hook_not_canonical:{hook_name}")
+        command_match = re.search(
+            r"^\s+command:\s*['\"]?(.+?)['\"]?\s*$", workflow_config, re.M
+        )
+        expected_command = "./scripts/symphony/symphony-codex-router app-server"
+        if command_match is None or command_match.group(1) != expected_command:
+            errors.append("workflow_agent_command_not_canonical")
+        if "scripts/hermes/" in workflow_config or "../" in workflow_config:
+            errors.append("workflow_executable_reference_unsafe")
+        for shell_target in re.findall(
+            r"^\s+(?:[A-Z_][A-Z0-9_]*=[^\s]+\s+)*(?:bash|sh)\s+([^\s;&|]+)",
+            workflow_config,
+            re.M,
+        ):
+            if shell_target != "./scripts/symphony/symphony-nvme-package-cache.sh":
+                errors.append(f"workflow_shell_target_not_allowlisted:{shell_target}")
+        for direct_target in re.findall(
+            r"^\s+(?:(/[^\s;&|]+|\.\.?/[^\s;&|]+))", workflow_config, re.M
+        ):
+            if direct_target not in {
+                "./scripts/symphony/symphony-codex-router",
+                "./scripts/symphony/symphony-nvme-package-cache.sh",
+            }:
+                errors.append(f"workflow_direct_target_not_allowlisted:{direct_target}")
+        if re.search(r"\$\(\s*(?:/|\.\.?/)", workflow_config) or re.search(
+            r"`\s*(?:/|\.\.?/)", workflow_config
+        ):
+            errors.append("workflow_command_substitution_target_unsafe")
+        referenced = set(
+            re.findall(r"\./scripts/symphony/[A-Za-z0-9._-]+", workflow_config)
+        )
+        allowed = {
+            "./scripts/symphony/symphony-codex-router",
+            "./scripts/symphony/symphony-nvme-package-cache.sh",
+        }
+        if not referenced.issubset(allowed) or not allowed.issubset(referenced):
+            errors.append("workflow_executable_reference_not_allowlisted")
+        for relative in allowed:
+            executable = repo_root / relative.removeprefix("./")
+            try:
+                resolved = executable.resolve(strict=True)
+                expected = (repo_root.resolve() / relative.removeprefix("./"))
+                if (
+                    executable.is_symlink()
+                    or resolved != expected
+                    or not executable.is_file()
+                    or not os.access(executable, os.X_OK)
+                ):
+                    errors.append(f"workflow_executable_invalid:{relative}")
+            except OSError:
+                errors.append(f"workflow_executable_invalid:{relative}")
         if workflow.team_key != OFFICIAL_TEAM_KEY:
             errors.append(f"workflow_team_key:{workflow.team_key}")
         if workflow.project_slug is not None:
@@ -576,6 +667,10 @@ def validate_source(
             errors.append("unit_hardcodes_codex_account")
         if "SuccessExitStatus=0 1" not in unit:
             errors.append("unit_missing_clean_beam_stop_status")
+        if "KillMode=control-group" not in unit:
+            errors.append("unit_missing_control_group_kill_mode")
+        if "TimeoutStopSec=15s" not in unit:
+            errors.append("unit_missing_bounded_stop_timeout")
         for token in OBSOLETE_TOKENS:
             if token in unit:
                 errors.append(f"unit_obsolete_token:{token}")
@@ -774,7 +869,11 @@ def write_rate_limit_gate(path: pathlib.Path, classification: dict[str, Any]) ->
     return True
 
 
-def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> int:
+def _sleep_gate(
+    gate: dict[str, Any],
+    max_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
+) -> int:
     seconds = int(gate.get("retryAfterSeconds") or 0)
     if seconds <= 0:
         return 0
@@ -793,8 +892,11 @@ def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> int:
         ),
         flush=True,
     )
-    time.sleep(seconds)
-    return seconds
+    if shutdown is None:
+        time.sleep(seconds)
+        return seconds
+    interrupted = shutdown.wait(seconds)
+    return 0 if interrupted else seconds
 
 
 def _print_gate_wait_exhausted(gate: dict[str, Any], max_sleep_seconds: int) -> None:
@@ -815,6 +917,7 @@ def _pause_child_for_gate(
     process: subprocess.Popen[str],
     gate: dict[str, Any],
     max_gate_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
 ) -> int:
     if process.poll() is not None or not gate.get("active"):
         return 0
@@ -822,7 +925,7 @@ def _pause_child_for_gate(
         return 0
     os.kill(process.pid, signal.SIGSTOP)
     try:
-        return _sleep_gate(gate, max_gate_sleep_seconds)
+        return _sleep_gate(gate, max_gate_sleep_seconds, shutdown)
     finally:
         if process.poll() is None:
             try:
@@ -967,7 +1070,11 @@ def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
     return status if isinstance(status, str) else None
 
 
-def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
+def _sleep_closure_hold(
+    verdict: dict[str, Any],
+    seconds: int,
+    shutdown: threading.Event | None = None,
+) -> int:
     if seconds <= 0:
         return 0
     print(
@@ -982,8 +1089,11 @@ def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
         ),
         flush=True,
     )
-    time.sleep(seconds)
-    return seconds
+    if shutdown is None:
+        time.sleep(seconds)
+        return seconds
+    interrupted = shutdown.wait(seconds)
+    return 0 if interrupted else seconds
 
 
 def _closure_hold_wait(
@@ -992,6 +1102,7 @@ def _closure_hold_wait(
     *,
     max_sleep_seconds: int | None,
     sleep_used: int,
+    shutdown: threading.Event | None = None,
 ) -> tuple[int, dict[str, Any]]:
     """Hold new admission in bounded chunks, re-reading the fleet receipt.
 
@@ -999,7 +1110,7 @@ def _closure_hold_wait(
     receipt after every bounded chunk and releases as soon as closure health
     returns to healthy. Every hold decision rewrites the durable hold receipt.
     """
-    while verdict["hold"]:
+    while verdict["hold"] and not (shutdown is not None and shutdown.is_set()):
         write_closure_hold_receipt(
             stop_line.hold_receipt_path,
             verdict,
@@ -1015,7 +1126,9 @@ def _closure_hold_wait(
             chunk = min(chunk, remaining)
         if chunk <= 0:
             break
-        sleep_used += _sleep_closure_hold(verdict, chunk)
+        sleep_used += _sleep_closure_hold(verdict, chunk, shutdown)
+        if shutdown is not None and shutdown.is_set():
+            break
         verdict = read_closure_stop_line(
             stop_line.receipt_path, max_age_seconds=stop_line.max_receipt_age_seconds
         )
@@ -1040,6 +1153,7 @@ def _pause_child_for_closure_hold(
     stop_line: ClosureStopLine,
     verdict: dict[str, Any],
     max_gate_sleep_seconds: int | None,
+    shutdown: threading.Event | None = None,
 ) -> int:
     """Pause only the scheduler while closure health holds new admission.
 
@@ -1055,7 +1169,11 @@ def _pause_child_for_closure_hold(
     os.kill(process.pid, signal.SIGSTOP)
     try:
         slept, latest = _closure_hold_wait(
-            stop_line, verdict, max_sleep_seconds=max_gate_sleep_seconds, sleep_used=0
+            stop_line,
+            verdict,
+            max_sleep_seconds=max_gate_sleep_seconds,
+            sleep_used=0,
+            shutdown=shutdown,
         )
         if latest["hold"]:
             write_closure_hold_receipt(
@@ -1226,6 +1344,22 @@ def run_official_binary_once(
     closure: ClosureStopLine,
     max_gate_sleep_seconds: int | None,
 ) -> int:
+    raw_shutdown_grace = os.environ.get(
+        "SYMPHONY_SHUTDOWN_GRACE_SECONDS",
+        str(DEFAULT_SHUTDOWN_GRACE_SECONDS),
+    )
+    try:
+        shutdown_grace = float(raw_shutdown_grace)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("SYMPHONY_SHUTDOWN_GRACE_SECONDS must be finite and positive") from exc
+    if not math.isfinite(shutdown_grace) or shutdown_grace <= 0:
+        raise ValueError("SYMPHONY_SHUTDOWN_GRACE_SECONDS must be finite and positive")
+    shutdown_grace = min(MAX_SHUTDOWN_GRACE_SECONDS, shutdown_grace)
+    if sys.platform.startswith("linux"):
+        try:
+            ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)
+        except (AttributeError, OSError):
+            pass
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -1233,42 +1367,216 @@ def run_official_binary_once(
         text=True,
         errors="replace",
         bufsize=1,
+        start_new_session=True,
     )
+    previous_handlers: dict[signal.Signals, Any] = {}
+    shutdown = threading.Event()
+    known_descendants: set[int] = set()
+    termination_complete = False
+    shutdown_signum = 0
+    pidfds: dict[int, int] = {}
+
+    def remember(pid: int) -> None:
+        if pid in pidfds or not hasattr(os, "pidfd_open"):
+            return
+        try:
+            pidfds[pid] = os.pidfd_open(pid)
+        except OSError:
+            pass
+
+    def send(pid: int, signum: int) -> None:
+        descriptor = pidfds.get(pid)
+        try:
+            if descriptor is not None and hasattr(signal, "pidfd_send_signal"):
+                signal.pidfd_send_signal(descriptor, signum)
+            else:
+                os.kill(pid, signum)
+        except (OSError, PermissionError):
+            pass
+
+    def descendant_pids() -> list[int]:
+        try:
+            if pathlib.Path("/proc").is_dir():
+                pairs = []
+                for entry in pathlib.Path("/proc").iterdir():
+                    if not entry.name.isdigit():
+                        continue
+                    try:
+                        fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+                        pairs.append((int(entry.name), int(fields[1])))
+                    except (OSError, IndexError, ValueError):
+                        continue
+            else:
+                rows = subprocess.run(
+                    ["ps", "-axo", "pid=,ppid="], capture_output=True,
+                    text=True, check=True, timeout=2,
+                ).stdout.splitlines()
+                pairs = [tuple(int(value) for value in row.split()) for row in rows]
+        except (OSError, IndexError, ValueError, subprocess.SubprocessError):
+            return []
+        children: dict[int, list[int]] = {}
+        for pid, parent in pairs:
+            children.setdefault(parent, []).append(pid)
+        found: list[int] = []
+        # Linux subreaping reparents late-forking orphans to this wrapper. Walk
+        # both the launched root and the wrapper so those adopted descendants
+        # remain inside the shutdown boundary.
+        pending = [process.pid]
+        if sys.platform.startswith("linux"):
+            pending.append(os.getpid())
+        while pending:
+            parent = pending.pop()
+            for child in children.get(parent, []):
+                if child not in found:
+                    found.append(child)
+                    pending.append(child)
+        return found
+
+    def signal_tree(signum: int) -> None:
+        known_descendants.update(descendant_pids())
+        targets = list(known_descendants)
+        for pid in [process.pid, *targets]:
+            remember(pid)
+        for pid in [process.pid, *targets]:
+            send(pid, signal.SIGCONT)
+        for pid in [*reversed(targets), process.pid]:
+            send(pid, signum)
+
+    def terminate_tree() -> None:
+        nonlocal termination_complete
+        if termination_complete:
+            return
+        known_descendants.update(descendant_pids())
+        targets = [process.pid, *known_descendants]
+        signal_tree(signal.SIGTERM)
+        deadline = time.monotonic() + shutdown_grace
+        alive = targets
+        while time.monotonic() < deadline:
+            process.poll()
+            newly_seen = set(descendant_pids()) - known_descendants
+            known_descendants.update(newly_seen)
+            for pid in newly_seen:
+                remember(pid)
+                send(pid, signal.SIGCONT)
+                send(pid, signal.SIGTERM)
+            targets = [process.pid, *known_descendants]
+            alive = []
+            for pid in targets:
+                try:
+                    descriptor = pidfds.get(pid)
+                    if descriptor is not None and select.select([descriptor], [], [], 0)[0]:
+                        try:
+                            os.waitpid(pid, os.WNOHANG)
+                        except ChildProcessError:
+                            pass
+                        continue
+                    os.kill(pid, 0)
+                    alive.append(pid)
+                except ProcessLookupError:
+                    pass
+            if not alive:
+                break
+            time.sleep(0.02)
+        known_descendants.update(descendant_pids())
+        for pid in [process.pid, *known_descendants]:
+            remember(pid)
+            send(pid, signal.SIGKILL)
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        if sys.platform.startswith("linux"):
+            reap_deadline = time.monotonic() + 1.0
+            while time.monotonic() < reap_deadline:
+                known_descendants.update(descendant_pids())
+                for pid in known_descendants:
+                    remember(pid)
+                    send(pid, signal.SIGKILL)
+                while True:
+                    try:
+                        reaped, _status = os.waitpid(-1, os.WNOHANG)
+                    except ChildProcessError:
+                        reaped = 0
+                        break
+                    if reaped <= 0:
+                        break
+                pending = [
+                    descriptor
+                    for descriptor in pidfds.values()
+                    if not select.select([descriptor], [], [], 0)[0]
+                ]
+                if not pending:
+                    break
+                time.sleep(0.01)
+        for descriptor in pidfds.values():
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        termination_complete = True
+
+    def forward_signal(signum: int, _frame: Any) -> None:
+        """Forward service-manager termination to the complete child tree."""
+        nonlocal shutdown_signum
+        shutdown_signum = signum
+        shutdown.set()
+        terminate_tree()
+
+    for forwarded in (signal.SIGTERM, signal.SIGINT):
+        previous_handlers[forwarded] = signal.getsignal(forwarded)
+        signal.signal(forwarded, forward_signal)
     rate_limited = False
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
-    assert process.stdout is not None
-    for line in process.stdout:
-        print(line, end="", flush=True)
-        classification = classify_linear_log_line(line)
-        if classification and write_rate_limit_gate(gate_file, classification):
-            # The official scheduler may be supervising active agents. Record the
-            # reset gate and suspend only the scheduler process; do not
-            # terminate the process tree that may contain active Codex jobs.
-            rate_limited = True
-            gate = read_rate_limit_gate(gate_file)
-            _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
-        else:
-            issue_error = classify_linear_issue_error_log_line(line)
-            if issue_error is not None:
-                record_linear_issue_error(
-                    closure.dead_letter_dir,
-                    issue_error,
-                    issue_errors,
-                    dead_letter_noted,
+    try:
+        assert process.stdout is not None
+        for line in process.stdout:
+            if shutdown.is_set():
+                break
+            print(line, end="", flush=True)
+            classification = classify_linear_log_line(line)
+            if classification and write_rate_limit_gate(gate_file, classification):
+                # The official scheduler may be supervising active agents. Record the
+                # reset gate and suspend only the scheduler process; do not
+                # terminate the process tree that may contain active Codex jobs.
+                rate_limited = True
+                gate = read_rate_limit_gate(gate_file)
+                _pause_child_for_gate(
+                    process, gate, max_gate_sleep_seconds, shutdown
                 )
-        monotonic_now = time.monotonic()
-        if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
-            last_closure_check = monotonic_now
-            verdict = read_closure_stop_line(
-                closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-            )
-            if verdict["hold"]:
-                _pause_child_for_closure_hold(
-                    process, closure, verdict, max_gate_sleep_seconds
+            else:
+                issue_error = classify_linear_issue_error_log_line(line)
+                if issue_error is not None:
+                    record_linear_issue_error(
+                        closure.dead_letter_dir,
+                        issue_error,
+                        issue_errors,
+                        dead_letter_noted,
+                    )
+            monotonic_now = time.monotonic()
+            if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
+                last_closure_check = monotonic_now
+                verdict = read_closure_stop_line(
+                    closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
                 )
-    returncode = process.wait()
+                if verdict["hold"]:
+                    _pause_child_for_closure_hold(
+                        process, closure, verdict, max_gate_sleep_seconds, shutdown
+                    )
+        if shutdown.is_set():
+            terminate_tree()
+        returncode = process.wait()
+    finally:
+        if shutdown.is_set() and process.poll() is None:
+            terminate_tree()
+        if process.stdout is not None:
+            process.stdout.close()
+        for forwarded, previous in previous_handlers.items():
+            signal.signal(forwarded, previous)
+    if shutdown_signum:
+        return 0
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
 

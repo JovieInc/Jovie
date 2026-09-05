@@ -77,6 +77,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: python3 scripts/symphony/tests/run-proof-gate.py
+      - name: Validate Symphony lifecycle and updater recovery
+        run: python3 scripts/symphony/tests/symphony-burrito-workflow.test.py
+      - name: Validate Symphony activation contract
+        run: python3 scripts/tests/test_openai_symphony_install.py
 
   runner-image-offline-proof:
     name: Build and verify runner image offline
@@ -5188,6 +5192,7 @@ jobs:
     needs:
       [
         ci-path-changes,
+        proof-v2-substrate,
         ci-merge-group-admission,
         ci-risk-classifier,
         ci-fast,
@@ -5213,6 +5218,7 @@ jobs:
         run: |
           set -euo pipefail
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
+          PROOF_V2_RESULT="${{ needs.proof-v2-substrate.result }}"
           ADMISSION_RESULT="${{ needs.ci-merge-group-admission.result }}"
           ADMISSION_ADMITTED="${{ needs.ci-merge-group-admission.outputs.admitted }}"
           ADMISSION_OBSOLETE="${{ needs.ci-merge-group-admission.outputs.obsolete }}"
@@ -5253,6 +5259,7 @@ jobs:
             echo "| Gate | Result |"
             echo "| --- | --- |"
             echo "| Path Changes | $PATH_RESULT |"
+            echo "| Exact-head proof v2 | $PROOF_V2_RESULT |"
             echo "| Typed no-op merge group | $NOOP_GROUP |"
             echo "| Jovie product suites | $RUN_JOVIE_PRODUCT |"
             echo "| Selected product lanes | $SELECTED_LANES |"
@@ -5291,6 +5298,7 @@ jobs:
 
           for gate in \
             "Path Changes:$PATH_RESULT" \
+            "Exact-head proof v2:$PROOF_V2_RESULT" \
             "Merge Group Admission:$ADMISSION_RESULT" \
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
@@ -5360,7 +5368,7 @@ jobs:
     # GitHub's merge_group producer reuses the same required context name for
     # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
     # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
+    needs: [proof-v2-substrate, ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -5370,6 +5378,7 @@ jobs:
         run: |
           set -euo pipefail
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
+          PROOF_V2_RESULT="${{ needs.proof-v2-substrate.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
@@ -5385,6 +5394,7 @@ jobs:
             echo "| Gate | Result | Next local command |"
             echo "| --- | --- | --- |"
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
+            echo "| Exact-head proof v2 | $PROOF_V2_RESULT | proof-v2 substrate job |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
@@ -5396,6 +5406,10 @@ jobs:
 
           if [[ "$PATH_RESULT" != "success" ]]; then
             echo "❌ Path Changes did not succeed (result: $PATH_RESULT)"
+            exit 1
+          fi
+          if [[ "$PROOF_V2_RESULT" != "success" ]]; then
+            echo "❌ Exact-head proof v2 did not pass (result: $PROOF_V2_RESULT)"
             exit 1
           fi
           if [[ "$SECRET_SCAN_RESULT" != "success" ]]; then

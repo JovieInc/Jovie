@@ -64,6 +64,8 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          # The updater stages the complete candidate away from live paths,
+          # then promotes it only inside the proved-idle activation window.
           bash scripts/symphony/update-symphony-burrito.sh --skip-binary
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh

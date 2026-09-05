@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import fcntl
+import hashlib
 import io
 import os
 import pathlib
 import re
+import signal
 import socket
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 import importlib.util
 import json
@@ -393,6 +397,48 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 missing_rework["errors"],
             )
 
+    def test_workflow_executable_sources_reject_missing_nonexec_and_symlink(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = pathlib.Path(tmp) / "repo"
+            scripts = repo / "scripts/symphony"
+            scripts.mkdir(parents=True)
+            router = scripts / "symphony-codex-router"
+            cache = scripts / "symphony-nvme-package-cache.sh"
+            router.write_bytes((ROOT / "scripts/symphony/symphony-codex-router").read_bytes())
+            cache.write_bytes((ROOT / "scripts/symphony/symphony-nvme-package-cache.sh").read_bytes())
+            router.chmod(0o755)
+            cache.chmod(0o755)
+
+            def validate():
+                return helper.validate_source(
+                    repo_root=repo,
+                    workflow_path=WORKFLOW_PATH,
+                    unit_path=UNIT_PATH,
+                    service_name="symphony-elixir.service",
+                    active_issues=helper.MEASURED_ACTIVE_ISSUES,
+                )
+
+            self.assertTrue(validate()["ok"])
+            router.chmod(0o644)
+            self.assertIn(
+                "workflow_executable_invalid:./scripts/symphony/symphony-codex-router",
+                validate()["errors"],
+            )
+            router.unlink()
+            self.assertIn(
+                "workflow_executable_invalid:./scripts/symphony/symphony-codex-router",
+                validate()["errors"],
+            )
+            outside = pathlib.Path(tmp) / "outside-router"
+            outside.write_text("#!/bin/sh\n")
+            outside.chmod(0o755)
+            router.symlink_to(outside)
+            self.assertIn(
+                "workflow_executable_invalid:./scripts/symphony/symphony-codex-router",
+                validate()["errors"],
+            )
+
     def test_linear_eligible_count_uses_team_key_pagination(self):
         helper = _load_helper()
         calls = []
@@ -590,8 +636,318 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(sleeps, [20])
         self.assertEqual(kills, [(process.pid, helper.signal.SIGSTOP), (process.pid, helper.signal.SIGCONT)])
 
+    def test_official_runtime_wrapper_forwards_term_to_child_process_group(self):
+        child_program = r"""
+import os, pathlib, signal, subprocess, sys, time
+child_receipt = pathlib.Path(sys.argv[1])
+grandchild_receipt = pathlib.Path(sys.argv[2])
+grandchild_program = '''
+import os, pathlib, signal, sys, time
+receipt = pathlib.Path(sys.argv[1])
+signal.signal(signal.SIGTERM, lambda *_: (receipt.write_text("term"), sys.exit(0)))
+print(f"grandchild-ready {os.getpid()}", flush=True)
+while True: time.sleep(1)
+'''
+subprocess.Popen([sys.executable, "-c", grandchild_program, str(grandchild_receipt)])
+signal.signal(signal.SIGTERM, lambda *_: (child_receipt.write_text("term"), sys.exit(0)))
+print(f"child-ready {os.getpid()}", flush=True)
+while True: time.sleep(1)
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            child_receipt = pathlib.Path(tmp) / "child-term"
+            grandchild_receipt = pathlib.Path(tmp) / "grandchild-term"
+            process = subprocess.Popen(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    child_program,
+                    str(child_receipt),
+                    str(grandchild_receipt),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            try:
+                assert process.stdout is not None
+                ready = [
+                    process.stdout.readline().strip(),
+                    process.stdout.readline().strip(),
+                ]
+                pids = {
+                    kind: int(pid)
+                    for kind, pid in (line.split() for line in ready)
+                }
+                self.assertEqual(set(pids), {"child-ready", "grandchild-ready"})
+                os.killpg(pids["child-ready"], signal.SIGSTOP)
+                os.kill(process.pid, signal.SIGTERM)
+                process.wait(timeout=5)
+                for _ in range(50):
+                    if child_receipt.is_file() and grandchild_receipt.is_file():
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(child_receipt.read_text(), "term")
+                self.assertEqual(grandchild_receipt.read_text(), "term")
+                for _ in range(100):
+                    survivors = []
+                    for pid in pids.values():
+                        try:
+                            os.kill(pid, 0)
+                        except ProcessLookupError:
+                            continue
+                        survivors.append(pid)
+                    if not survivors:
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(survivors, [])
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=5)
+                if process.stdout is not None:
+                    process.stdout.close()
+
+    def test_term_interrupts_live_rate_gate_and_kills_resistant_child(self):
+        line = (
+            'status=400 retry-after: 3600 '
+            '{"errors":[{"message":"request budget exhausted",'
+            '"extensions":{"code":"RATELIMITED"}}]}'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pid_file = root / "child.pid"
+            gate = root / "gate.json"
+            child = (
+                "import os,pathlib,signal,sys,time; "
+                "pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); "
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                f"print({line!r}, flush=True); time.sleep(3600)"
+            )
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(gate),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "3900",
+                    "--", "python3", "-c", child, str(pid_file),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                deadline = time.time() + 5
+                while not gate.exists() and time.time() < deadline:
+                    time.sleep(0.02)
+                self.assertTrue(gate.exists())
+                child_pid = int(pid_file.read_text())
+                started = time.monotonic()
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=6)
+                self.assertLess(time.monotonic() - started, 5.5)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(child_pid, 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
+    def test_invalid_shutdown_grace_never_starts_official_child(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            started = root / "started"
+            child = (
+                "import pathlib,sys,time; "
+                "pathlib.Path(sys.argv[1]).write_text('started'); time.sleep(30)"
+            )
+            for invalid in ("invalid", "nan", "inf", "-1", "0"):
+                with self.subTest(value=invalid):
+                    started.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        [
+                            "python3", str(HELPER_PATH), "run",
+                            "--gate-file", str(root / "gate"),
+                            *_closure_run_args(tmp),
+                            "--max-gate-sleep-seconds", "0",
+                            "--", "python3", "-c", child, str(started),
+                        ],
+                        cwd=ROOT,
+                        env={
+                            **os.environ,
+                            "SYMPHONY_SHUTDOWN_GRACE_SECONDS": invalid,
+                        },
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(started.exists())
+
+    def test_term_kills_detached_resistant_stdout_writer(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            pids = root / "pids"
+            child = r'''
+import os, pathlib, signal, subprocess, sys, time
+grand = subprocess.Popen([
+    sys.executable, "-c",
+    "import os,signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print(os.getpid(), flush=True); time.sleep(3600)",
+], start_new_session=True, stdout=subprocess.PIPE, text=True)
+grand_pid = int(grand.stdout.readline().strip())
+pathlib.Path(sys.argv[1]).write_text(f"{os.getpid()} {grand_pid}")
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(pids),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                captured = [int(value) for value in pids.read_text().split()]
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=6)
+                for pid in captured:
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(pid, 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_term_catches_late_detached_fork_after_parent_signal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            late_pid = root / "late.pid"
+            child = r'''
+import os, pathlib, signal, subprocess, sys, time
+def terminate(*_):
+    grand = subprocess.Popen([
+        sys.executable, "-c",
+        "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
+    ], start_new_session=True)
+    pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, terminate)
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(late_pid),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=6)
+                deadline = time.time() + 2
+                while not late_pid.exists() and time.time() < deadline:
+                    time.sleep(0.02)
+                self.assertTrue(late_pid.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(late_pid.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_term_catches_detached_fork_at_grace_deadline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            late_pid = root / "deadline.pid"
+            child = r'''
+import pathlib, signal, subprocess, sys, time
+def terminate(*_):
+    time.sleep(0.095)
+    grand = subprocess.Popen([
+        sys.executable, "-c",
+        "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
+    ], start_new_session=True)
+    pathlib.Path(sys.argv[1]).write_text(str(grand.pid))
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, terminate)
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(late_pid),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "0.1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=5)
+                self.assertTrue(late_pid.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(late_pid.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
     def test_unit_binds_closure_stop_line_gate(self):
         helper = _load_helper()
+        self.assertLess(helper.MAX_SHUTDOWN_GRACE_SECONDS, 15)
+        self.assertEqual(helper.DEFAULT_SHUTDOWN_GRACE_SECONDS, 10)
+        self.assertIn("KillMode=control-group", UNIT)
+        self.assertIn("TimeoutStopSec=15s", UNIT)
         flag = "--closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json"
         self.assertIn(flag, UNIT)
         with tempfile.TemporaryDirectory() as tmp:
@@ -1216,14 +1572,60 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(red.returncode, 4)
             self.assertIn("poll_interval_too_low:5000", red.stdout)
             self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
+            for unsafe_command in (
+                "./scripts/hermes/symphony-codex-router app-server",
+                "../../tmp/escaped-router app-server",
+                "./scripts/symphony/missing-router app-server",
+            ):
+                wrong.write_text(WORKFLOW.replace(
+                    "./scripts/symphony/symphony-codex-router app-server",
+                    unsafe_command,
+                ))
+                rejected = subprocess.run(
+                    ["bash", str(updater), "--skip-binary", "--no-restart"],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(rejected.returncode, 4, unsafe_command)
+                self.assertIn("workflow_agent_command_not_canonical", rejected.stdout)
+                self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
+            for unsafe_hook in (
+                "sh /tmp/evil",
+                "python3 /tmp/evil.py",
+                "command /tmp/evil",
+                "source /tmp/evil",
+                "$(/tmp/evil)",
+            ):
+                wrong.write_text(WORKFLOW.replace(
+                    "  after_create: |\n",
+                    f"  after_create: |\n    {unsafe_hook}\n",
+                ))
+                rejected = subprocess.run(
+                    ["bash", str(updater), "--skip-binary", "--no-restart"],
+                    cwd=ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(rejected.returncode, 4, unsafe_hook)
+                self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
             env.pop("SYMPHONY_WORKFLOW_SRC")
             good = subprocess.run(["bash", str(updater), "--skip-binary", "--no-restart"], cwd=ROOT, env=env, capture_output=True, text=True)
             self.assertEqual(good.returncode, 0, good.stderr)
-            self.assertIn(f'team_key: "{LIVE_TEAM_KEY}"', existing.read_text())
+            self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
+            self.assertIn("DONE_STAGED_NO_LIVE_MUTATION", good.stdout)
+            candidates = list((target_home / ".local/state/symphony-elixir/candidates").iterdir())
+            self.assertEqual(len(candidates), 1)
+            self.assertIn(f'team_key: "{LIVE_TEAM_KEY}"', (candidates[0] / "workflow").read_text())
             unit = pathlib.Path(tmp) / "home/.config/systemd/user/symphony-elixir.service"
             helper = pathlib.Path(tmp) / "home/.local/bin/symphony-official-runtime"
-            self.assertTrue(unit.is_file())
-            self.assertTrue(helper.is_file())
+            unit.parent.mkdir(parents=True, exist_ok=True)
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            existing.write_bytes(WORKFLOW_PATH.read_bytes())
+            unit.write_bytes(UNIT_PATH.read_bytes())
+            helper.write_bytes(HELPER_PATH.read_bytes())
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
             existing.write_text(
                 existing.read_text().replace(
@@ -1252,10 +1654,261 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(drift.returncode, 1, drift.stdout + drift.stderr)
             self.assertIn(f"DRIFT {existing}", drift.stdout)
 
+    def test_staging_is_not_live_and_activation_rollback_restores_prior_config(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            target_home = root / "home"
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            (config / "codex-account.env").write_text(
+                f"CODEX_HOME={account_home}\n"
+            )
+            (config / "codex-account.env").chmod(0o600)
+            workflow = config / "WORKFLOW.md"
+            helper = target_home / ".local/bin/symphony-official-runtime"
+            unit = target_home / ".config/systemd/user/symphony-elixir.service"
+            helper.parent.mkdir(parents=True)
+            unit.parent.mkdir(parents=True)
+            workflow.write_text("retired scripts/hermes/symphony-codex-router\n")
+            helper.write_text("retired helper\n")
+            unit.write_text("retired unit\n")
+
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >> \"$SYSTEMCTL_EVENTS\"\n"
+                "case \"$*\" in\n"
+                "  *'show '*'LoadState --value'*) printf 'masked\\n'; exit 0;;\n"
+                "  *'show symphony-elixir.service --property=MainPID --value'*) printf '4242\\n'; exit 0;;\n"
+                "  *'is-active --quiet symphony-elixir.service'*) exit 0;;\n"
+                "  *'is-active --quiet '*) exit 1;;\n"
+                "  *'restart symphony-elixir.service'*) "
+                "if [ -f \"$ALLOW_RESTART_ONCE\" ]; then rm -f \"$ALLOW_RESTART_ONCE\"; exit 0; fi; exit 42;;\n"
+                "  *) exit 0;;\n"
+                "esac\n"
+            )
+            systemctl.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' '{\"counts\":{\"running\":0},"
+                "\"polling\":{\"checking\":false,\"next_poll_in_ms\":10000}}'\n"
+            )
+            curl.chmod(0o755)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            bus = socket.socket(socket.AF_UNIX)
+            bus.bind(str(runtime / "bus"))
+            self.addCleanup(bus.close)
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_GET(self):
+                    body = json.dumps({
+                        "counts": {"running": 0},
+                        "polling": {"checking": False, "next_poll_in_ms": 10000},
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, _format, *_args):
+                    return
+
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(thread.join, 5)
+            self.addCleanup(server.shutdown)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "SYMPHONY_ELIXIR_HOME": str(target_home),
+                "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                "XDG_RUNTIME_DIR": str(runtime),
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime / 'bus'}",
+                "SYMPHONY_STATE_URL": (
+                    f"http://127.0.0.1:{server.server_address[1]}/api/v1/state"
+                ),
+                "SYSTEMCTL_EVENTS": str(root / "systemctl-events"),
+                "ALLOW_RESTART_ONCE": str(root / "allow-restart-once"),
+            }
+            unsafe_prior = {
+                workflow: workflow.read_bytes(),
+                helper: helper.read_bytes(),
+                unit: unit.read_bytes(),
+            }
+            safe_prior = {
+                workflow: WORKFLOW_PATH.read_bytes(),
+                helper: HELPER_PATH.read_bytes(),
+                unit: UNIT_PATH.read_bytes(),
+            }
+            transaction = target_home / ".local/state/symphony-elixir/promotion-transaction"
+            transaction.mkdir(parents=True)
+            (transaction / "binary.missing").touch()
+            (transaction / "was-active").touch()
+            for key, path in (("workflow", workflow), ("helper", helper), ("unit", unit)):
+                (transaction / key).write_bytes(safe_prior[path])
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir()
+                if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
+            known = target_home / ".local/state/symphony-elixir/candidates/known-good"
+            known.mkdir(parents=True)
+            candidate_files = {}
+            for name, source in (
+                ("workflow", WORKFLOW_PATH),
+                ("helper", HELPER_PATH),
+                ("unit", UNIT_PATH),
+            ):
+                target = known / name
+                target.write_bytes(source.read_bytes())
+                candidate_files[name] = hashlib.sha256(target.read_bytes()).hexdigest()
+            (known / "manifest.json").write_text(json.dumps({
+                "schema": "symphony-candidate/v2",
+                "version": "known-good",
+                "files": candidate_files,
+            }))
+            workflow.write_bytes(WORKFLOW_PATH.read_bytes())
+            helper.write_bytes(HELPER_PATH.read_bytes())
+            (root / "allow-restart-once").touch()
+            config_only = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(config_only.returncode, 0, config_only.stderr)
+            self.assertIn("RECOVERED_INCOMPLETE_PROMOTION", config_only.stdout)
+            self.assertIn("DONE_STAGED_NO_LIVE_MUTATION", config_only.stdout)
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
+            events_before_activation = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            self.assertEqual(
+                len([row for row in events_before_activation if "restart symphony-elixir.service" in row]),
+                1,
+            )
+
+            for path, expected in unsafe_prior.items():
+                path.write_bytes(expected)
+
+            activation = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(activation.returncode, 0)
+            self.assertIn("PROMOTION_HELD", activation.stderr)
+            events = (root / "systemctl-events").read_text().splitlines()
+            self.assertTrue(any("stop symphony-elixir.service" in row for row in events))
+            restart_events = [
+                row for row in events if "restart symphony-elixir.service" in row
+            ]
+            self.assertEqual(len(restart_events), 2, events)
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
+            self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
+            hold = target_home / ".local/state/symphony-elixir/promotion-held.json"
+            self.assertTrue(hold.is_file())
+            self.assertEqual(json.loads(hold.read_text())["status"], "held")
+            self.assertTrue(transaction.is_dir())
+            retained_manifest = json.loads((transaction / "manifest.json").read_text())
+            self.assertIn("was-active", retained_manifest)
+            self.assertEqual(
+                set(retained_manifest),
+                {
+                    path.name
+                    for path in transaction.iterdir()
+                    if path.is_file()
+                } - {"manifest.json", "READY"},
+            )
+
+    def test_updater_lock_is_owned_by_parent_file_descriptor(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_env = config / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            state = target_home / ".local/state/symphony-elixir"
+            state.mkdir(parents=True)
+            descriptor = os.open(state / "update.lock", os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result = subprocess.run(
+                    ["bash", str(updater), "--skip-binary", "--no-restart"],
+                    cwd=ROOT,
+                    env={
+                        **os.environ,
+                        "SYMPHONY_ELIXIR_HOME": str(target_home),
+                        "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                    },
+                    capture_output=True,
+                    text=True,
+                )
+            finally:
+                os.close(descriptor)
+            self.assertEqual(result.returncode, 8, result.stderr)
+            self.assertIn("updater lock is held", result.stderr)
+            self.assertIn('exec 9>"$update_lock"', UPDATER)
+            self.assertNotIn("lock_holder_pid=\"$!\"", UPDATER)
+
+    def test_incomplete_promotion_transaction_fails_before_live_mutation(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_env = config / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            workflow = config / "WORKFLOW.md"
+            workflow.write_text("live sentinel\n")
+            transaction = target_home / ".local/state/symphony-elixir/promotion-transaction"
+            transaction.mkdir(parents=True)
+            (transaction / "workflow").write_text("truncated backup\n")
+            result = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env={
+                    **os.environ,
+                    "SYMPHONY_ELIXIR_HOME": str(target_home),
+                    "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                },
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 9, result.stderr)
+            self.assertIn("incomplete rollback transaction", result.stderr)
+            self.assertEqual(workflow.read_text(), "live sentinel\n")
+
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
         account_guard = UPDATER.index("assert_account_environment_ready\n")
         stop = UPDATER.index("  stop_idle_official_for_restart\n")
-        first_install = UPDATER.index('install_one "$HELPER_SRC" "$HELPER_DST" 0755')
+        first_install = UPDATER.index(
+            'install_one "$candidate_dir/helper" "$HELPER_DST" 0755'
+        )
         retirement = UPDATER.index("  retire_legacy_units\n")
         restart = UPDATER.index(
             '  systemctl --user restart "$SERVICE_NAME"', retirement
