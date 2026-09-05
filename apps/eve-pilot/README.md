@@ -39,6 +39,20 @@ Symphony, and receipt-signing bindings and fails closed on missing, reused,
 stale, replayed, or uncertain evidence. Operational receipts expose only key
 IDs and public fingerprints. The offline Photon proof cannot reach a recipient.
 
+Production OV chat uses the same OIDC-protected Summer shadow channel:
+
+- `POST /ovie/v1/summer-shadow/conversation/events` admits one stable
+  `clientTurnId`-derived event, migrates bounded prior history only on the first
+  Eve turn, and rejects conflicting, concurrent, or over-budget submissions.
+- `GET /ovie/v1/summer-shadow/conversation/events/:eventId/result` returns only
+  the terminal result bound to that admitted Eve turn and persists a replay-safe
+  receipt for reconnects.
+
+These routes document source behavior, not commissioning proof. Summer remains
+unavailable until the exact deployment and conversation receipts in
+[`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](../../docs/operations/SUMMER_RUNTIME_RETIREMENT.md)
+pass.
+
 ## Local verification
 
 Node 24 or later. Isolated from the monorepo Node 22 CI runner.
