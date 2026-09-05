@@ -765,6 +765,7 @@ export function classifyAppServerObservation({
 }
 
 const EXIT_CONFIG = 78;
+const EXIT_TEMPFAIL = 75;
 
 async function runLauncher(argv) {
   const flag = name => {
@@ -787,6 +788,16 @@ async function runLauncher(argv) {
     );
     process.exit(EXIT_CONFIG);
   };
+  const deferForCapacity = message => {
+    const reason = String(message || 'provider capacity unavailable').replace(
+      /\s+/g,
+      ' '
+    );
+    console.error(
+      `CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason=${JSON.stringify(reason)}`
+    );
+    process.exit(EXIT_TEMPFAIL);
+  };
   let issue;
   if (process.env.SYMPHONY_ROUTING_ISSUE_FILE) {
     issue = JSON.parse(
@@ -798,8 +809,12 @@ async function runLauncher(argv) {
   }
   if (!issue) fail(`issue not found: ${issueArg}`);
   const capacity = readCodexRotateCapacity();
-  if (!capacity || capacity.accounts === 0 || capacity.ready === 0)
+  if (!capacity || capacity.accounts === 0)
     fail('codex-rotate capacity is unavailable; refusing to route');
+  if (capacity.ready === 0)
+    deferForCapacity(
+      'all authenticated codex-rotate accounts are cooling down; retry after capacity recovers'
+    );
   const materialized = materializeRoutingReceipt(issue, workspace, {
     requireCapacityEvidence: true,
   });
