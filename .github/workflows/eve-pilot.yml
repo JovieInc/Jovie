@@ -282,12 +282,10 @@ jobs:
                 --header "Authorization: Bearer $DOPPLER_TOKEN_PRD" \
                 --data-urlencode "project=$doppler_project" \
                 --data-urlencode 'config=prd' \
-                --data-urlencode 'format=json' \
-                'https://api.doppler.com/v3/configs/config/secrets/download' \
+                --data-urlencode 'name=OVIE_IMESSAGE_ALLOWED_SENDERS' \
+                'https://api.doppler.com/v3/configs/config/secret' \
                 >"$doppler_file" 2>/dev/null; then
-                allowed_senders="$(jq -r \
-                  '.OVIE_IMESSAGE_ALLOWED_SENDERS // empty' \
-                  "$doppler_file")"
+                allowed_senders="$(jq -r '.value // empty' "$doppler_file")"
                 [ -n "$allowed_senders" ] && break
               fi
             done
