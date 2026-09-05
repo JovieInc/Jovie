@@ -70,10 +70,18 @@ export function renderEnvironmentVariableNameDiagnostics(contents) {
   return `${names.map(name => `environment_variable_name=${name}`).join('\n')}\n`;
 }
 
+/**
+ * @param {string[]} args
+ * @param {{
+ *   read?: (path: string) => Promise<string>,
+ *   writeOut?: (value: string) => void,
+ *   writeError?: (value: string) => void,
+ * }} dependencies
+ */
 export async function runEnvironmentVariableNameDiagnostics(
   args,
   {
-    read = readFile,
+    read = path => readFile(path, 'utf8'),
     writeOut = value => process.stdout.write(value),
     writeError = value => process.stderr.write(value),
   } = {}
@@ -84,7 +92,7 @@ export async function runEnvironmentVariableNameDiagnostics(
   }
 
   try {
-    const contents = await read(args[0], 'utf8');
+    const contents = await read(args[0]);
     writeOut(renderEnvironmentVariableNameDiagnostics(contents));
     return 0;
   } catch {
