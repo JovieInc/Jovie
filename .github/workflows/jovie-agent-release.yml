@@ -1,0 +1,82 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# necessary-trust-boundary: Artist-agent releases require a product-only protected environment and project credential separate from company Summer releases.
+# removal-trigger: Remove when the product release system provides the same isolated artist-agent revision and rollback gates.
+name: Jovie artist agent Eve release and rollback
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [preview, candidate, promote, rollback]
+        required: true
+      expected_sha:
+        description: Exact reviewed Jovie revision
+        type: string
+        required: true
+      deployment_id:
+        description: Exact READY deployment ID for promotion or rollback
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: jovie-agent-release
+  cancel-in-progress: false
+jobs:
+  authority:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require existing protected release environment before accessing credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          test "$REPO" = 'JovieInc/Jovie'
+          test '${{ github.ref }}' = 'refs/heads/main'
+          gh api "repos/$REPO/environments/jovie-agent-release" --jq '.protection_rules' > /tmp/rules.json
+          jq -e 'any(.[]; .type == "required_reviewers" and .prevent_self_review == true and (.reviewers | length) > 0)' /tmp/rules.json
+          gh api "repos/$REPO/environments/jovie-agent-release" --jq '.deployment_branch_policy' | jq -e '.protected_branches == true'
+  release:
+    needs: authority
+    environment: jovie-agent-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: .context/jovie-agent-release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Require reviewed revision on main
+        working-directory: .
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git merge-base --is-ancestor "$EXPECTED_SHA" origin/main
+          git checkout --detach "$EXPECTED_SHA"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Export the product application from reviewed source
+        working-directory: .
+        run: node apps/eve-pilot/scripts/materialize-app.mjs jovie .context/jovie-agent-release
+      - run: pnpm install --ignore-workspace --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run test:coverage
+      - run: pnpm run build
+      - run: pnpm run test:built
+      - name: Release exact Jovie artist agent project revision
+        env:
+          OPERATION: ${{ inputs.operation }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          JOVIE_AGENT_VERCEL_TOKEN: ${{ secrets.JOVIE_AGENT_VERCEL_TOKEN }}
+          JOVIE_AGENT_VERCEL_PROJECT_ID: ${{ vars.JOVIE_AGENT_VERCEL_PROJECT_ID }}
+          JOVIE_AGENT_VERCEL_TEAM_ID: ${{ vars.JOVIE_AGENT_VERCEL_TEAM_ID }}
+        run: node scripts/jovie-release.mjs

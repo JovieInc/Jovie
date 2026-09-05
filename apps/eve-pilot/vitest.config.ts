@@ -3,7 +3,11 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     coverage: {
+      allowExternal: true,
       include: [
+        'scripts/jovie-release.mjs',
+        'scripts/materialize-app.mjs',
+        '../../packages/agent-transport-contracts/index.ts',
         'agent/instructions/summer-shadow.ts',
         'agent/lib/summer-bottleneck-loop.ts',
         'agent/lib/summer-commercial-projection.ts',
