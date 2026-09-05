@@ -1344,6 +1344,17 @@ def run_official_binary_once(
     closure: ClosureStopLine,
     max_gate_sleep_seconds: int | None,
 ) -> int:
+    raw_shutdown_grace = os.environ.get(
+        "SYMPHONY_SHUTDOWN_GRACE_SECONDS",
+        str(DEFAULT_SHUTDOWN_GRACE_SECONDS),
+    )
+    try:
+        shutdown_grace = float(raw_shutdown_grace)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("SYMPHONY_SHUTDOWN_GRACE_SECONDS must be finite and positive") from exc
+    if not math.isfinite(shutdown_grace) or shutdown_grace <= 0:
+        raise ValueError("SYMPHONY_SHUTDOWN_GRACE_SECONDS must be finite and positive")
+    shutdown_grace = min(MAX_SHUTDOWN_GRACE_SECONDS, shutdown_grace)
     if sys.platform.startswith("linux"):
         try:
             ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)
@@ -1364,18 +1375,6 @@ def run_official_binary_once(
     termination_complete = False
     shutdown_signum = 0
     pidfds: dict[int, int] = {}
-    shutdown_grace = min(
-        MAX_SHUTDOWN_GRACE_SECONDS,
-        max(
-            0.1,
-            float(
-                os.environ.get(
-                    "SYMPHONY_SHUTDOWN_GRACE_SECONDS",
-                    str(DEFAULT_SHUTDOWN_GRACE_SECONDS),
-                )
-            ),
-        ),
-    )
 
     def remember(pid: int) -> None:
         if pid in pidfds or not hasattr(os, "pidfd_open"):

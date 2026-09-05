@@ -767,6 +767,37 @@ while True: time.sleep(1)
                 if wrapper.stderr is not None:
                     wrapper.stderr.close()
 
+    def test_invalid_shutdown_grace_never_starts_official_child(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            started = root / "started"
+            child = (
+                "import pathlib,sys,time; "
+                "pathlib.Path(sys.argv[1]).write_text('started'); time.sleep(30)"
+            )
+            for invalid in ("invalid", "nan", "inf", "-1", "0"):
+                with self.subTest(value=invalid):
+                    started.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        [
+                            "python3", str(HELPER_PATH), "run",
+                            "--gate-file", str(root / "gate"),
+                            *_closure_run_args(tmp),
+                            "--max-gate-sleep-seconds", "0",
+                            "--", "python3", "-c", child, str(started),
+                        ],
+                        cwd=ROOT,
+                        env={
+                            **os.environ,
+                            "SYMPHONY_SHUTDOWN_GRACE_SECONDS": invalid,
+                        },
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(started.exists())
+
     def test_term_kills_detached_resistant_stdout_writer(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
