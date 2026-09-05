@@ -125,6 +125,51 @@ describe('audited overlay width exception', () => {
   });
 
   it.each([
+    'additional export',
+    'comment-only constraints',
+  ])('rejects an unaudited same-file consumer: %s', mutation => {
+    const original = readFileSync(join(repoRoot, owner), 'utf8');
+    const changed =
+      mutation === 'additional export'
+        ? `${original}\nexport const unconstrained = 'w-overlay-viewport';`
+        : `${original.replace('fixed left-1/2', 'absolute left-0')}\n// position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]'`;
+    expect(
+      scanSourceFile(owner, changed).some(item =>
+        item.rule.includes('unaudited')
+      )
+    ).toBe(true);
+  });
+
+  it('fails closed on ambiguous or invalid owner declarations', () => {
+    const original = readFileSync(join(repoRoot, owner), 'utf8');
+    for (const changed of [
+      `${original}\nexport const invalid = ;`,
+      original.replace(
+        'export const centeredContentStyles =',
+        'export const renamedStyles ='
+      ),
+      original.replace('position:', '...unconstrained, position:'),
+      original.replace('position:', "position: 'absolute', position:"),
+      original
+        .replace(
+          'export const centeredContentStyles = {',
+          'export const centeredContentStyles = wrap({'
+        )
+        .replace(
+          '} as const;\n\n/**\n * Combined centered',
+          '});\n\n/**\n * Combined centered'
+        ),
+      `${original}\nexport const another = \`w-overlay-viewport\`;`,
+    ]) {
+      expect(
+        scanSourceFile(owner, changed).some(item =>
+          item.rule.includes('unaudited')
+        )
+      ).toBe(true);
+    }
+  });
+
+  it.each([
     'w-screen',
     'min-w-screen',
     'w-[100vw]',
