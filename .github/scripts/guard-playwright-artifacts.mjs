@@ -25,7 +25,7 @@ import {
   resolve,
   sep,
 } from 'node:path';
-import { validPlaywrightPng } from '../../scripts/lib/playwright-png.mjs';
+import { inspectPlaywrightPng } from '../../scripts/lib/playwright-png.mjs';
 
 const SENSITIVE =
   /(?:^|_)(?:SECRET|PASSWORD|PASSPHRASE|PRIVATE_KEY(?!_ID(?:_|$))|API_KEY(?!_(?:ID|SID)(?:_|$))|ACCESS_KEY(?!_ID(?:_|$))|HASH_KEY(?!_ID(?:_|$))|DATABASE_URL|DSN|AUTHORIZATION|COOKIE|COOKIES|PROTECTION_BYPASS|ENCRYPT_KEY|ENCRYPTION_KEY|SIGNING_KEY(?!_ID(?:_|$))|SIGNER_KEY(?!_ID(?:_|$))|WEBHOOK_URL|DEPLOY_HOOK(?!_ID(?:_|$))|CAPABILITY_URL|(?:CERTIFICATE|PRIVATE_KEY|SIGNING_KEY|SIGNER_KEY)_(?:BASE64|B64)|CSC_LINK|GITLEAKS_LICENSE)(?:_|$)/;
@@ -71,6 +71,15 @@ const REDACTED = new Set([
   'unknown',
 ]);
 const DEFAULT_PATHS = ['apps/web/{playwright-report,test-results}'];
+
+const imageDiagnostic = png => ({
+  format: 'png',
+  reason: png.reason,
+  dimensions:
+    Number.isSafeInteger(png.width) && Number.isSafeInteger(png.height)
+      ? `${png.width}x${png.height}`
+      : 'unknown',
+});
 
 const isInside = (root, path) => {
   const child = relative(root, path);
@@ -377,15 +386,18 @@ function inspect(paths, environment, options = {}) {
   const omitted = new Set();
   for (const record of records) {
     const extension = extname(record.path).toLowerCase();
+    const png =
+      extension === '.png' ? inspectPlaywrightPng(record.bytes) : null;
     if (FORBIDDEN.has(extension)) {
       findings.push({ path: record.path, category: 'forbidden-container' });
       continue;
     }
-    if (
-      IMAGES.has(extension) &&
-      (extension !== '.png' || !validPlaywrightPng(record.bytes))
-    ) {
-      findings.push({ path: record.path, category: 'image-policy' });
+    if (IMAGES.has(extension) && (extension !== '.png' || !png.valid)) {
+      findings.push({
+        path: record.path,
+        category: 'image-policy',
+        ...(png ? { diagnostic: imageDiagnostic(png) } : {}),
+      });
       continue;
     }
     if (
@@ -654,8 +666,15 @@ function report(findings) {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([category, count]) => category + ':' + count)
     .join(',');
+  const diagnostics = findings
+    .flatMap(({ diagnostic }) => (diagnostic ? [diagnostic] : []))
+    .map(
+      ({ format, reason, dimensions }, index) =>
+        `${format}:${reason}:${dimensions}:path-index-${index + 1}`
+    )
+    .join(',');
   console.error(
-    `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${categories}`
+    `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${categories}${diagnostics ? `; image-diagnostics=${diagnostics}` : ''}`
   );
 }
 
