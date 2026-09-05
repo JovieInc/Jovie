@@ -11,9 +11,14 @@ import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
 
+type ChatConversationsQueryOptions = {
+  readonly limit?: number;
+  readonly enabled?: boolean;
+};
+
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
 export const mockUseChatConversationsQuery = vi.fn(
-  (_options?: { readonly limit?: number; readonly enabled?: boolean }) => ({
+  (_options?: ChatConversationsQueryOptions) => ({
     data: undefined,
   })
 );
@@ -43,8 +48,8 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
-  useChatConversationsQuery: (...args: unknown[]) =>
-    mockUseChatConversationsQuery(...args),
+  useChatConversationsQuery: (options?: ChatConversationsQueryOptions) =>
+    mockUseChatConversationsQuery(options),
 }));
 
 vi.mock('@/lib/queries/useChatMutations', () => ({
