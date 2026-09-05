@@ -1,23 +1,23 @@
 [
   {
     "heading": "## Authority and precedence",
-    "sha256": "a336c34246bac56de9f23fb708dc11e3a2ea6d584320a849cdeca91486659dba"
+    "sha256": "bacc403143e3587606b957307b5b66f5ef0d062ed38853a5c5da66e5709ead75"
   },
   {
     "heading": "## Surface Classification",
-    "sha256": "17e022f6c74f087615089efeb71b721bf1bb836e4b2d1a84f89dd87c2055c756"
+    "sha256": "a92a85dd33bf210ae0dd2a9db42a6b277bad904767da704adb9948e5673a99ac"
   },
   {
     "heading": "## Typography",
-    "sha256": "3017a47fff5776cfebbd100636858ff9fac8d6d3149d57533a857f8d41c72b24"
+    "sha256": "55be6a1bb1990b6aaa71d7eb3878655f0c84ddd29f43dab4b0b18a9ad4605927"
   },
   {
     "heading": "## Copywriting",
-    "sha256": "bc4b6db62fda887197352a68bede3f53ba89a8ff5787c87435600920778a9928"
+    "sha256": "75941813976e2b29f836e653d58a310bc5ef7a33ac3ec059f7efecbcd09f1923"
   },
   {
     "heading": "## Subtraction Principle",
-    "sha256": "b5f1771a61f7690af972d9832a98fd0fc35bb972bb2ead7d99fea653e48b6390"
+    "sha256": "b978a89bb985390799420c8145599ea07ec04d00921696041a84d8c850448d37"
   },
   {
     "heading": "## Use Tokens, Not Raw Colors",
@@ -29,27 +29,27 @@
   },
   {
     "heading": "## Spacing",
-    "sha256": "d02fc2dad28b89cc8cdb67885c341ccc68ce28ef0073ee8c1c1a59fd6ec9d690"
+    "sha256": "b5c5d01230514b6ee31a9b7302be1b00d6619a174b6bbcb3f474adaca3b7eb3d"
   },
   {
     "heading": "## DS_FOUNDATION_V1 canonical decisions",
-    "sha256": "17a3cb65a827467d23aafc81b154022788c1e762eb98591af83e7004c57ce84a"
+    "sha256": "909c14cce1e17cc4669cf7e2c51d4d567eb54b5ca3a0585c4be9034759f73398"
   },
   {
     "heading": "## Borders & Radius",
-    "sha256": "4f814092c949a23ca9e5c4d7a99042bdd4dbe537a5bab729330cab91825fe5fc"
+    "sha256": "4e6b7dcfac163d18867190fd5577f389ec46a174518ec52997688b61b1d157ff"
   },
   {
     "heading": "## Shadows",
-    "sha256": "a35ee3f2824f3e74abada8ceca63cc026e158a7342656847a19c04b058770eab"
+    "sha256": "d27ea2b39408c7ccc877df042b4dd22e89dd342531a60c50e965c3e2dfdbbe6a"
   },
   {
     "heading": "## Motion",
-    "sha256": "1a00660de1e58d0c5331245c46fa3c894e60406b226296bd6b6ca94bc29aef5f"
+    "sha256": "7ba61ab993b4f9e5ea010148090f85f8e90e51a395e3fb248e57751508df8fdf"
   },
   {
     "heading": "## App IA & Page Scaffold",
-    "sha256": "19d50dbe5f3e51fe1c2cf3db9b1afc48b656b9bdacedad5d18f518cf691611d9"
+    "sha256": "2b381186120b6c09c7c0edf6f0699d81c3caca72371a784b5402ce0fbf5a9dbd"
   },
   {
     "heading": "## Component Patterns",
@@ -57,7 +57,7 @@
   },
   {
     "heading": "## Full-Screen Status Screens",
-    "sha256": "9f7d836b1d0463d53ae5a8c7036aeb2b7f1a4dec5f3ed6e38cf6417648c5d452"
+    "sha256": "5a7ffc0b78175154767f01868e2976c43aac47469977d5030afa5094df10aa8c"
   },
   {
     "heading": "## Layout Shift Prevention (Visual Stability)",
@@ -65,18 +65,18 @@
   },
   {
     "heading": "## Text Casing",
-    "sha256": "10db10e0e41b2b585ba45b3ed8daa43e5976274706aecc1718d3a3a4cb309aa8"
+    "sha256": "72ca9843efd3700de2cf8f05d9ea0e6218eed63f2656e60bb3c92eac57df9886"
   },
   {
     "heading": "## Canonical Surface Split",
-    "sha256": "ec58c1877747673868cbe63598a745c8df9785cced288bef4bfc8c1c87089b6c"
+    "sha256": "46649ef01644d150514adda1de6b78e79276ef0aa91f8fcb3b49682c6d0742a7"
   },
   {
     "heading": "## Source-of-Truth File Map",
-    "sha256": "f9ffaf9d908bdb8a980303f3d0f643296eea4431635614ffae2a7f47488e21d2"
+    "sha256": "0e6dd1dde0044b616949e5a8610863d59269e3e0c5540c4d14aa3758ea255b71"
   },
   {
     "heading": "## Decisions Log",
-    "sha256": "a4e225adaf13ffe4a690bc8f19ebe7ef0e3ce2f3e56daae43a633c052c6fbff3"
+    "sha256": "d2543abcbfc7530528dde23e9382d2401dac2b8a5462ebc731483c0eef0760d1"
   }
 ]
