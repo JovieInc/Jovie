@@ -981,6 +981,49 @@ print("normal exit", flush=True)
                 )
             self.assertFalse(started.exists())
 
+    def test_partial_pidfd_reserve_is_closed_when_launch_pipe_fails(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receipt = root / "fleet-gate.json"
+            receipt.write_text(json.dumps(_fleet_gate_payload()))
+            libc = mock.Mock()
+            libc.prctl.return_value = 0
+            real_open = os.open
+            opened: list[int] = []
+
+            def partial_reserve_open(path, flags):
+                if len(opened) == 2:
+                    raise OSError(24, "injected partial reserve exhaustion")
+                descriptor = real_open(path, flags)
+                opened.append(descriptor)
+                return descriptor
+
+            with mock.patch.object(helper.sys, "platform", "linux"), mock.patch.object(
+                helper.ctypes, "CDLL", return_value=libc
+            ), mock.patch.object(
+                helper.os, "open", side_effect=partial_reserve_open
+            ), mock.patch.object(
+                helper.os, "pipe", side_effect=OSError(24, "injected pipe exhaustion")
+            ), mock.patch.object(helper.subprocess, "Popen") as popen, self.assertRaisesRegex(
+                OSError, "injected pipe exhaustion"
+            ):
+                helper.run_official_binary_once(
+                    ["python3", "-c", "raise SystemExit(0)"],
+                    gate_file=root / "linear-rate-limit.json",
+                    closure=helper.ClosureStopLine(
+                        receipt_path=receipt,
+                        hold_receipt_path=root / "closure-hold.json",
+                        dead_letter_dir=root / "dead-letters",
+                    ),
+                    max_gate_sleep_seconds=0,
+                )
+            self.assertEqual(len(opened), 2)
+            popen.assert_not_called()
+            for descriptor in opened:
+                with self.assertRaises(OSError):
+                    os.fstat(descriptor)
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
     def test_wide_descendant_tree_reuses_pidfd_slot_without_numeric_signal(self):
         helper = _load_helper()
