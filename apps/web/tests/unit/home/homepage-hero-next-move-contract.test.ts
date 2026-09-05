@@ -109,14 +109,14 @@ describe('homepage hero contract (JOV-5864)', () => {
       /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?padding: var\(--space-px\);[\s\S]*?mask-composite: exclude;[\s\S]*?\}/
     );
     expect(css).toMatch(
-      /\.homepage-name-search__field\s*\{[\s\S]*?min-height: calc\(var\(--space-12\) \+ var\(--space-2\)\);[\s\S]*?padding: var\(--space-1\) calc\(var\(--space-3\) - var\(--space-px\)\) var\(--space-1\)[\s\S]*?var\(--space-5\);[\s\S]*?background: var\(--system-b-bg-page\);[\s\S]*?background-clip: padding-box;[\s\S]*?\}/
+      /\.homepage-name-search__field\s*\{[\s\S]*?min-height: calc\(var\(--space-12\) \+ var\(--space-2\)\);[\s\S]*?padding: var\(--space-1\) calc\(var\(--space-3\) \+ var\(--space-px\)\) var\(--space-1\)[\s\S]*?var\(--space-5\);[\s\S]*?background: var\(--system-b-bg-page\);[\s\S]*?background-clip: padding-box;[\s\S]*?\}/
     );
     expect(css).toMatch(
       /\.homepage-name-search:focus-within \.homepage-name-search__field\s*\{[\s\S]*?outline-color: var\(--color-accent-blue\);[\s\S]*?\}/
     );
   });
 
-  it('keeps the Find me pill on the 32/510 marketing button contract', () => {
+  it('keeps Find me typography on the canonical marketing button contract', () => {
     const css = readHeroCss();
 
     expect(css).toMatch(
