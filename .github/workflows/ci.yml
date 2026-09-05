@@ -5394,7 +5394,7 @@ jobs:
             echo "| Gate | Result | Next local command |"
             echo "| --- | --- | --- |"
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
-            echo "| Exact-head proof v2 | $PROOF_V2_RESULT | \`python3 scripts/symphony/tests/run-proof-gate.py\` |"
+            echo "| Exact-head proof v2 | $PROOF_V2_RESULT | proof-v2 substrate job |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
