@@ -92,7 +92,8 @@ export function materializeApp(identity, destination, source = pilot) {
   manifest.name =
     identity === 'summer' ? '@jovieinc/summer-runtime' : '@jovie/jovie-agent';
   manifest.private = true;
-  if (identity === 'jovie') manifest.scripts.release = 'node scripts/jovie-release.mjs';
+  if (identity === 'jovie')
+    manifest.scripts.release = 'node scripts/jovie-release.mjs';
   manifest.scripts['test:built'] =
     `node scripts/check-built-app.mjs ${identity}`;
   manifest.scripts['test:coverage'] =
@@ -190,7 +191,8 @@ export default defineChannel({ routes: [GET('/runtime/v1/health', async () => {
       'vitest.config.ts',
       readFileSync(resolve(source, 'vitest.config.ts'), 'utf8')
         .replace("'scripts/materialize-app.mjs',", '')
-        .replace("'scripts/jovie-release.mjs',", '').replace("'agent/tools/jovie_capability_manifest.ts',", '')
+        .replace("'scripts/jovie-release.mjs',", '')
+        .replace("'agent/tools/jovie_capability_manifest.ts',", '')
         .replace(
           '../../packages/agent-transport-contracts/index.ts',
           'vendor/agent-transport-contracts/index.ts'
@@ -268,7 +270,9 @@ The source export is preparatory; deployment and commissioning require separate 
     cwd: source,
     encoding: 'utf8',
   }).trim();
-  const hash = text => ({ sha256: createHash('sha256').update(text).digest('hex') });
+  const hash = text => ({
+    sha256: createHash('sha256').update(text).digest('hex'),
+  });
   const inputs = [
     'vitest.config.ts',
     'scripts/materialize-app.mjs',
