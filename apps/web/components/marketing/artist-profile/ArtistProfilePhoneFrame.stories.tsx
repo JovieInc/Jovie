@@ -1,18 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import Image from 'next/image';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 
-const preview = getMarketingExportImage('tim-white-profile-live-mobile');
-
-function PhoneScreen() {
-  return (
-    <img
-      alt={preview.alt}
-      className='h-full w-full object-cover object-top'
-      src={preview.publicUrl}
-    />
-  );
-}
+const PROFILE = getMarketingExportImage('tim-white-profile-listen-mobile');
 
 const meta = {
   title: 'Marketing/Artist Profile/ArtistProfilePhoneFrame',
@@ -22,29 +13,25 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='bg-base p-8 text-primary-token'>
+      <div className='min-h-screen bg-base p-8 text-primary-token'>
         <Story />
       </div>
     ),
   ],
-  args: {
-    children: <PhoneScreen />,
-  },
 } satisfies Meta<typeof ArtistProfilePhoneFrame>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Large: Story = {};
-
-export const Medium: Story = {
+export const Default: Story = {
   args: {
-    size: 'md',
-  },
-};
-
-export const Small: Story = {
-  args: {
-    size: 'sm',
+    children: (
+      <Image
+        alt={PROFILE.alt}
+        height={PROFILE.height}
+        src={PROFILE.publicUrl}
+        width={PROFILE.width}
+      />
+    ),
   },
 };
