@@ -147,7 +147,7 @@ describe('classifier', () => {
     );
   });
 
-  it('excludes Tim-owned and protected machine-looking work', () => {
+  it('excludes active Tim ownership but ignores a legacy human-hold label', () => {
     const evidence = [
       {
         body: 'machine-agent running process: 123 workspace: /tmp/jovie branch: fix/JOV-1',
@@ -171,7 +171,7 @@ describe('classifier', () => {
         ],
         { now }
       ),
-      { healthy: true, count: 0 }
+      { healthy: true, count: 1 }
     );
   });
 
@@ -605,16 +605,34 @@ describe('stale lease guard', () => {
     };
   }
 
-  it('does not recover protected-label issues', async () => {
-    const client = fakeClient(staleIssue({ labels: ['needs-human'] }));
+  it('recovers stale leases carrying a legacy human-hold label', async () => {
+    const issue = staleIssue({ labels: ['needs-human'] });
+    const recoveryComment = {
+      id: 'recovery',
+      createdAt: now,
+      body: staleLease.STALE_LEASE_RECOVERY_COMMENT,
+    };
+    const client = fakeClient(issue, {
+      rereads: [
+        staleIssue({
+          labels: ['needs-human'],
+          comments: [terminalComment, recoveryComment],
+        }),
+        staleIssue({
+          labels: ['needs-human'],
+          state: 'Todo',
+          comments: [terminalComment, recoveryComment],
+        }),
+      ],
+    });
     const result = await staleLease.sweepStaleLeases({
-      issues: [staleIssue({ labels: ['needs-human'] })],
+      issues: [issue],
       client,
       now,
     });
-    assert.equal(result.recovered.length, 0);
-    assert.equal(client.calls.transitions.length, 0);
-    assert.equal(result.skipped[0].reason, 'protected-label');
+    assert.equal(result.recovered.length, 1);
+    assert.equal(client.calls.transitions.length, 1);
+    assert.equal(result.skipped.length, 0);
   });
 
   it('does not recover issues with an active PR', async () => {
@@ -2130,7 +2148,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.equal(result.admit[0].type, 'issue');
   });
 
-  it('excludes protected and Tim-owned issues', async () => {
+  it('admits a legacy-labeled issue while preserving active Tim ownership', async () => {
     const protectedIssue = admissionIssue({
       identifier: 'JOV-4513',
       labels: ['plan-approved', 'admission-approved', 'needs-human'],
@@ -2144,10 +2162,11 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       [],
       { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
-    assert.equal(result.admit.length, 0);
+    assert.equal(result.admit.length, 1);
+    assert.equal(result.admit[0].identifier, 'JOV-4513');
   });
 
-  it('reports typed pre-admission holds before selecting an issue', async () => {
+  it('reports machine holds while legacy human labels remain eligible', async () => {
     const held = [
       'needs-human',
       'held',
@@ -2166,20 +2185,22 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
 
-    assert.equal(result.admit[0].identifier, 'JOV-4529');
-    for (const [index, label] of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ].entries()) {
+    assert.equal(result.admit[0].identifier, 'JOV-4520');
+    for (const [index, label] of ['held', 'manual-incident'].entries()) {
+      const issueIndex = index === 0 ? 1 : 3;
       const decision = result.admissionDecisions.find(
-        item => item.identifier === `JOV-${4520 + index}`
+        item => item.identifier === `JOV-${4520 + issueIndex}`
       );
       assert.equal(decision.allowed, false);
       assert.equal(decision.preAdmission.reason.code, 'protected-policy');
       assert.deepEqual(decision.preAdmission.matchedLabels, [label]);
       assert.equal(decision.preAdmission.reason.retryable, false);
+    }
+    for (const issueIndex of [0, 2]) {
+      const decision = result.admissionDecisions.find(
+        item => item.identifier === `JOV-${4520 + issueIndex}`
+      );
+      assert.equal(decision.allowed, true);
     }
   });
 

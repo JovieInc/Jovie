@@ -89,7 +89,8 @@ LOG_ATTEMPT_PATTERN = re.compile(r"\battempt[=:\s]+(\d+)\b", re.IGNORECASE)
 ISSUE_IDENTIFIER_PATTERN = re.compile(r"\b([A-Z][A-Z0-9]*-\d+)\b")
 ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
 TERMINAL_STATES = ("Done", "Canceled", "Cancelled", "Duplicate", "Closed")
-EXCLUDED_LABELS = ("no-symphony", "needs-human")
+# JOV-INV-028: only a mechanical dead-letter excludes official dispatch.
+EXCLUDED_LABELS = ("no-symphony",)
 LINEAR_API_URL = "https://api.linear.app/graphql"
 OBSOLETE_TOKENS = (
     "symphony-burrito.service",

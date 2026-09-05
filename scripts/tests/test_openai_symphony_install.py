@@ -22,7 +22,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertNotIn("required_labels:", workflow)
         self.assertIn("excluded_labels:", workflow)
         self.assertIn("    - no-symphony", workflow)
-        self.assertIn("    - needs-human", workflow)
+        self.assertNotIn("    - needs-human", workflow)
         self.assertIn(
             "git clone --depth 1 https://github.com/JovieInc/Jovie.git .", workflow
         )

@@ -109,7 +109,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("required_labels:", WORKFLOW)
         self.assertIn("excluded_labels:", WORKFLOW)
         self.assertIn("    - no-symphony", WORKFLOW)
-        self.assertIn("    - needs-human", WORKFLOW)
+        self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
             re.compile(r"^\s+command: \./scripts/symphony/symphony-codex-router app-server$", re.M),
@@ -371,15 +371,13 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertIn("workflow_required_labels_present:symphony", labeled["errors"])
 
             no_exclusions = check(
-                WORKFLOW.replace(
-                    "  excluded_labels:\n    - no-symphony\n    - needs-human\n", ""
-                )
+                WORKFLOW.replace("  excluded_labels:\n    - no-symphony\n", "")
             )
             self.assertFalse(no_exclusions["ok"])
             self.assertIn(
                 "workflow_excluded_label_missing:no-symphony", no_exclusions["errors"]
             )
-            self.assertIn(
+            self.assertNotIn(
                 "workflow_excluded_label_missing:needs-human", no_exclusions["errors"]
             )
 

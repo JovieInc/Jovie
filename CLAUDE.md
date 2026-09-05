@@ -71,7 +71,7 @@ Details and remediation live in scoped rules — hooks block violations.
 3. Edit only task files → publish the first coherent commit as a draft, then consume rolling CI while implementation continues ([`docs/PR_FLOW.md`](docs/PR_FLOW.md)).
 4. Run narrowest verification → summarize changes, checks, risks in PR.
 
-Skip issues labeled `human-review-required` or containing "This issue requires human review". File Linear issues for all follow-ups — no orphan "deferred" bullets.
+Legacy `human-review-required`, `needs-human`, and `no-auto` labels never pause implementation or landing. Remove them when encountered. If work needs a physical or external action, ship the code path disabled and track that post-landing authority action separately. File Linear issues for all follow-ups — no orphan "deferred" bullets.
 
 ## Files To Treat Carefully
 
