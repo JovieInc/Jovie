@@ -11,6 +11,7 @@ account remains host-owned configuration and is never pinned by this source.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import datetime as dt
 import hashlib
 import json
@@ -102,6 +103,30 @@ OBSOLETE_TOKENS = (
     "symphony-runtime/elixir",
     "WORKFLOW.jovie-ui-pilot.md",
 )
+EXPECTED_HOOKS = {
+    "after_create": (
+        'export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"',
+        "git clone --depth 1 https://github.com/JovieInc/Jovie.git .",
+        "git fetch --depth 1 origin main",
+        "git checkout -B main origin/main",
+        'skills_tmp="$(mktemp -d "${TMPDIR:-/tmp}/openai-symphony-skills.XXXXXX")"',
+        "trap 'rm -rf \"$skills_tmp\"' EXIT",
+        'git clone --depth 1 --filter=blob:none --sparse https://github.com/openai/symphony.git "$skills_tmp"',
+        'git -C "$skills_tmp" sparse-checkout set .codex/skills',
+        "mkdir -p .codex/skills",
+        'cp -R "$skills_tmp/.codex/skills/commit" "$skills_tmp/.codex/skills/push" "$skills_tmp/.codex/skills/pull" "$skills_tmp/.codex/skills/land" "$skills_tmp/.codex/skills/linear" .codex/skills/',
+        "SYMPHONY_TRUSTED_HOOK_PHASE=after_create bash ./scripts/symphony/symphony-nvme-package-cache.sh after-create",
+    ),
+    "before_remove": (
+        'export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"',
+        "if [ -f ./scripts/symphony/symphony-nvme-package-cache.sh ]; then",
+        "  SYMPHONY_TRUSTED_HOOK_PHASE=before_remove bash ./scripts/symphony/symphony-nvme-package-cache.sh before-remove",
+        "else",
+        "  rm -rf ./node_modules ./.symphony/package-cache/pnpm-store",
+        "  find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true",
+        "fi",
+    ),
+}
 LINEAR_ELIGIBLE_COUNT_QUERY = """
 query SymphonyLinearEligibleCount($teamKey: String!, $stateNames: [String!]!, $first: Int!, $after: String) {
   issues(filter: {team: {key: {eq: $teamKey}}, state: {name: {in: $stateNames}}}, first: $first, after: $after) {
@@ -193,6 +218,13 @@ def _section(lines: list[str], name: str) -> list[str]:
                 break
             out.append(line)
     return out
+
+
+def _literal_hook(front: str, name: str) -> tuple[str, ...] | None:
+    match = re.search(rf"^  {re.escape(name)}: \|\n((?:    .*\n?)*)", front, re.M)
+    if match is None:
+        return None
+    return tuple(line[4:] for line in match.group(1).splitlines())
 
 
 def _scalar(body: list[str], key: str) -> str:
@@ -493,6 +525,9 @@ def validate_source(
     if workflow is not None:
         workflow_text = _read_text(workflow_path)
         workflow_config = _front_matter(workflow_text)
+        for hook_name, expected_hook in EXPECTED_HOOKS.items():
+            if _literal_hook(workflow_config, hook_name) != expected_hook:
+                errors.append(f"workflow_hook_not_canonical:{hook_name}")
         command_match = re.search(
             r"^\s+command:\s*['\"]?(.+?)['\"]?\s*$", workflow_config, re.M
         )
@@ -1306,6 +1341,11 @@ def run_official_binary_once(
     closure: ClosureStopLine,
     max_gate_sleep_seconds: int | None,
 ) -> int:
+    if sys.platform.startswith("linux"):
+        try:
+            ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)
+        except (AttributeError, OSError):
+            pass
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -1320,6 +1360,29 @@ def run_official_binary_once(
     known_descendants: set[int] = set()
     termination_complete = False
     shutdown_signum = 0
+    pidfds: dict[int, int] = {}
+    shutdown_grace = min(
+        12.0,
+        max(0.1, float(os.environ.get("SYMPHONY_SHUTDOWN_GRACE_SECONDS", "10"))),
+    )
+
+    def remember(pid: int) -> None:
+        if pid in pidfds or not hasattr(os, "pidfd_open"):
+            return
+        try:
+            pidfds[pid] = os.pidfd_open(pid)
+        except OSError:
+            pass
+
+    def send(pid: int, signum: int) -> None:
+        descriptor = pidfds.get(pid)
+        try:
+            if descriptor is not None and hasattr(signal, "pidfd_send_signal"):
+                signal.pidfd_send_signal(descriptor, signum)
+            else:
+                os.kill(pid, signum)
+        except (OSError, PermissionError):
+            pass
 
     def descendant_pids() -> list[int]:
         try:
@@ -1340,7 +1403,12 @@ def run_official_binary_once(
                 continue
             children.setdefault(parent, []).append(pid)
         found: list[int] = []
+        # Linux subreaping reparents late-forking orphans to this wrapper. Walk
+        # both the launched root and the wrapper so those adopted descendants
+        # remain inside the shutdown boundary.
         pending = [process.pid]
+        if sys.platform.startswith("linux"):
+            pending.append(os.getpid())
         while pending:
             parent = pending.pop()
             for child in children.get(parent, []):
@@ -1353,15 +1421,11 @@ def run_official_binary_once(
         known_descendants.update(descendant_pids())
         targets = list(known_descendants)
         for pid in [process.pid, *targets]:
-            try:
-                os.kill(pid, signal.SIGCONT)
-            except ProcessLookupError:
-                pass
+            remember(pid)
+        for pid in [process.pid, *targets]:
+            send(pid, signal.SIGCONT)
         for pid in [*reversed(targets), process.pid]:
-            try:
-                os.kill(pid, signum)
-            except ProcessLookupError:
-                pass
+            send(pid, signum)
 
     def terminate_tree() -> None:
         nonlocal termination_complete
@@ -1370,14 +1434,23 @@ def run_official_binary_once(
         known_descendants.update(descendant_pids())
         targets = [process.pid, *known_descendants]
         signal_tree(signal.SIGTERM)
-        deadline = time.monotonic() + 2
+        deadline = time.monotonic() + shutdown_grace
         alive = targets
         while time.monotonic() < deadline:
             process.poll()
+            newly_seen = set(descendant_pids()) - known_descendants
+            known_descendants.update(newly_seen)
+            for pid in newly_seen:
+                remember(pid)
+                send(pid, signal.SIGCONT)
+                send(pid, signal.SIGTERM)
+            targets = [process.pid, *known_descendants]
             alive = []
             for pid in targets:
                 try:
-                    os.kill(pid, 0)
+                    descriptor = pidfds.get(pid)
+                    if descriptor is None:
+                        os.kill(pid, 0)
                     alive.append(pid)
                 except ProcessLookupError:
                     pass
@@ -1385,15 +1458,25 @@ def run_official_binary_once(
                 break
             time.sleep(0.02)
         for pid in reversed(alive):
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            send(pid, signal.SIGKILL)
         try:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+        if sys.platform.startswith("linux"):
+            while True:
+                try:
+                    reaped, _status = os.waitpid(-1, os.WNOHANG)
+                except ChildProcessError:
+                    break
+                if reaped <= 0:
+                    break
+        for descriptor in pidfds.values():
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
         termination_complete = True
 
     def forward_signal(signum: int, _frame: Any) -> None:
@@ -1456,7 +1539,7 @@ def run_official_binary_once(
         for forwarded, previous in previous_handlers.items():
             signal.signal(forwarded, previous)
     if shutdown_signum:
-        return 128 + shutdown_signum
+        return 0
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
 

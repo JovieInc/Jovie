@@ -77,6 +77,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: python3 scripts/symphony/tests/run-proof-gate.py
+      - name: Validate Symphony lifecycle and updater recovery
+        run: python3 scripts/symphony/tests/symphony-burrito-workflow.test.py
+      - name: Validate Symphony activation contract
+        run: python3 scripts/tests/test_openai_symphony_install.py
 
   runner-image-offline-proof:
     name: Build and verify runner image offline

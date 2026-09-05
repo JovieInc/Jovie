@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import hashlib
 import io
 import os
 import pathlib
@@ -808,6 +809,56 @@ while True: time.sleep(1)
                 if wrapper.stderr is not None:
                     wrapper.stderr.close()
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_term_catches_late_detached_fork_after_parent_signal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            late_pid = root / "late.pid"
+            child = r'''
+import os, pathlib, signal, subprocess, sys, time
+def terminate(*_):
+    subprocess.Popen([
+        sys.executable, "-c",
+        "import os,pathlib,signal,sys,time; pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(3600)",
+        sys.argv[1],
+    ], start_new_session=True)
+    raise SystemExit(0)
+signal.signal(signal.SIGTERM, terminate)
+print("ready", flush=True)
+while True: time.sleep(1)
+'''
+            wrapper = subprocess.Popen(
+                [
+                    "python3", str(HELPER_PATH), "run", "--gate-file", str(root / "gate"),
+                    *_closure_run_args(tmp), "--max-gate-sleep-seconds", "0",
+                    "--", "python3", "-c", child, str(late_pid),
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_SHUTDOWN_GRACE_SECONDS": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "ready")
+                os.kill(wrapper.pid, signal.SIGTERM)
+                wrapper.wait(timeout=6)
+                deadline = time.time() + 2
+                while not late_pid.exists() and time.time() < deadline:
+                    time.sleep(0.02)
+                self.assertTrue(late_pid.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(late_pid.read_text()), 0)
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                wrapper.wait(timeout=5)
+                if wrapper.stdout is not None:
+                    wrapper.stdout.close()
+                if wrapper.stderr is not None:
+                    wrapper.stderr.close()
+
     def test_unit_binds_closure_stop_line_gate(self):
         helper = _load_helper()
         flag = "--closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json"
@@ -1453,7 +1504,13 @@ while True: time.sleep(1)
                 self.assertEqual(rejected.returncode, 4, unsafe_command)
                 self.assertIn("workflow_agent_command_not_canonical", rejected.stdout)
                 self.assertEqual(existing.read_text(), "LIVE gem WORKFLOW — do not overwrite\n")
-            for unsafe_hook in ("sh /tmp/evil", "$(/tmp/evil)"):
+            for unsafe_hook in (
+                "sh /tmp/evil",
+                "python3 /tmp/evil.py",
+                "command /tmp/evil",
+                "source /tmp/evil",
+                "$(/tmp/evil)",
+            ):
                 wrong.write_text(WORKFLOW.replace(
                     "  after_create: |\n",
                     f"  after_create: |\n    {unsafe_hook}\n",
@@ -1594,16 +1651,28 @@ while True: time.sleep(1)
                 ),
                 "SYSTEMCTL_EVENTS": str(root / "systemctl-events"),
             }
-            prior = {
+            unsafe_prior = {
                 workflow: workflow.read_bytes(),
                 helper: helper.read_bytes(),
                 unit: unit.read_bytes(),
+            }
+            safe_prior = {
+                workflow: WORKFLOW_PATH.read_bytes(),
+                helper: HELPER_PATH.read_bytes(),
+                unit: UNIT_PATH.read_bytes(),
             }
             transaction = target_home / ".local/state/symphony-elixir/promotion-transaction"
             transaction.mkdir(parents=True)
             (transaction / "binary.missing").touch()
             for key, path in (("workflow", workflow), ("helper", helper), ("unit", unit)):
-                (transaction / key).write_bytes(prior[path])
+                (transaction / key).write_bytes(safe_prior[path])
+            manifest = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in transaction.iterdir()
+                if path.is_file()
+            }
+            (transaction / "manifest.json").write_text(json.dumps(manifest))
+            (transaction / "READY").write_text("symphony-promotion-transaction/v1\n")
             workflow.write_bytes(WORKFLOW_PATH.read_bytes())
             helper.write_bytes(HELPER_PATH.read_bytes())
             config_only = subprocess.run(
@@ -1616,8 +1685,11 @@ while True: time.sleep(1)
             self.assertEqual(config_only.returncode, 0, config_only.stderr)
             self.assertIn("RECOVERED_INCOMPLETE_PROMOTION", config_only.stdout)
             self.assertIn("DONE_STAGED_NO_LIVE_MUTATION", config_only.stdout)
-            for path, expected in prior.items():
+            for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
+
+            for path, expected in unsafe_prior.items():
+                path.write_bytes(expected)
 
             activation = subprocess.run(
                 ["bash", str(updater), "--skip-binary"],
@@ -1627,13 +1699,50 @@ while True: time.sleep(1)
                 text=True,
             )
             self.assertNotEqual(activation.returncode, 0)
-            self.assertIn("PROMOTION_ROLLED_BACK", activation.stderr)
+            self.assertIn("PROMOTION_HELD", activation.stderr)
             events = (root / "systemctl-events").read_text().splitlines()
             self.assertTrue(any("stop symphony-elixir.service" in row for row in events))
-            self.assertTrue(any("restart symphony-elixir.service" in row for row in events))
-            for path, expected in prior.items():
+            restart_events = [
+                row for row in events if "restart symphony-elixir.service" in row
+            ]
+            self.assertEqual(len(restart_events), 1, events)
+            for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
-            self.assertIn("scripts/hermes/symphony-", workflow.read_text())
+            self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
+            hold = target_home / ".local/state/symphony-elixir/promotion-held.json"
+            self.assertTrue(hold.is_file())
+            self.assertEqual(json.loads(hold.read_text())["status"], "held")
+
+    def test_incomplete_promotion_transaction_fails_before_live_mutation(self):
+        updater = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            config = target_home / ".config/symphony"
+            config.mkdir(parents=True)
+            account_env = config / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            workflow = config / "WORKFLOW.md"
+            workflow.write_text("live sentinel\n")
+            transaction = target_home / ".local/state/symphony-elixir/promotion-transaction"
+            transaction.mkdir(parents=True)
+            (transaction / "workflow").write_text("truncated backup\n")
+            result = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env={
+                    **os.environ,
+                    "SYMPHONY_ELIXIR_HOME": str(target_home),
+                    "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                },
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 9, result.stderr)
+            self.assertIn("incomplete rollback transaction", result.stderr)
+            self.assertEqual(workflow.read_text(), "live sentinel\n")
 
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
         account_guard = UPDATER.index("assert_account_environment_ready\n")

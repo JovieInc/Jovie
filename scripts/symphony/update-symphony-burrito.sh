@@ -32,6 +32,7 @@ SKIP_BINARY=0
 CHECK_ONLY=0
 RUNTIME_READBACK=0
 RETIRE_LEGACY=0
+ACTIVE_ISSUES=""
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 # Genuinely retired units only. The grok/kimi sidecar
 # (symphony-grok-sidecar.{service,timer}) is the ACTIVE coding lane while
@@ -86,21 +87,29 @@ PY
 }
 
 validate_source() {
-  local active_issues
-  active_issues="$(python3 "$HELPER_SRC" linear-eligible-count --linear-env-file "$LINEAR_ENV")"
-  case "$active_issues" in
+  ACTIVE_ISSUES="$(python3 "$HELPER_SRC" linear-eligible-count --linear-env-file "$LINEAR_ENV")"
+  case "$ACTIVE_ISSUES" in
     ''|*[!0-9]*)
-      echo "SOURCE_INVALID invalid Linear active issue count: ${active_issues:-empty}" >&2
+      echo "SOURCE_INVALID invalid Linear active issue count: ${ACTIVE_ISSUES:-empty}" >&2
       return 4
       ;;
   esac
-  echo "ACTIVE_ISSUES $active_issues"
+  echo "ACTIVE_ISSUES $ACTIVE_ISSUES"
   python3 "$HELPER_SRC" validate-source \
     --repo-root "$REPO_ROOT" \
     --workflow "$WORKFLOW_SRC" \
     --unit "$UNIT_SRC" \
     --service-name "$SERVICE_NAME" \
-    --active-issues "$active_issues"
+    --active-issues "$ACTIVE_ISSUES"
+}
+
+validate_rollback_bundle() {
+  python3 "$HELPER_SRC" validate-source \
+    --repo-root "$REPO_ROOT" \
+    --workflow "$rollback_dir/workflow" \
+    --unit "$rollback_dir/unit" \
+    --service-name "$SERVICE_NAME" \
+    --active-issues "$ACTIVE_ISSUES" >/dev/null
 }
 
 install_one() {
@@ -405,12 +414,15 @@ rollback_dir=""
 candidate_dir=""
 candidate_tmp=""
 update_lock=""
-lock_owned=0
+lock_holder_pid=""
+lock_status_dir=""
 promotion_started=0
 promotion_complete=0
 official_was_active=0
 official_stopped_for_promotion=0
 official_pid_before=""
+files_promoted=0
+rollback_safe=1
 
 backup_target() {
   local key="$1" target="$2"
@@ -434,18 +446,24 @@ cleanup() {
   local status="$?"
   if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
     if [ "$promotion_started" -eq 1 ]; then
-      restore_target binary "$BIN_DST" 0755
-      restore_target helper "$HELPER_DST" 0755
-      restore_target unit "$UNIT_DST" 0644
-      restore_target workflow "$WORKFLOW_DST" 0644
+      if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
+        printf '%s\n' '{"schema":"symphony-promotion-hold/v1","status":"held","reason":"prior_config_unsafe"}' > "$STATE_DIR/promotion-held.json"
+      else
+        restore_target binary "$BIN_DST" 0755
+        restore_target helper "$HELPER_DST" 0755
+        restore_target unit "$UNIT_DST" 0644
+        restore_target workflow "$WORKFLOW_DST" 0644
+      fi
     fi
     if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
       systemctl --user daemon-reload >/dev/null 2>&1 || true
-      if [ "$RESTART" -eq 1 ] && [ "$official_stopped_for_promotion" -eq 1 ]; then
+      if [ "$RESTART" -eq 1 ] && [ "$official_stopped_for_promotion" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; then
         systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 || true
       fi
     fi
-    if [ "$promotion_started" -eq 1 ]; then
+    if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
+      echo "PROMOTION_HELD candidate files retained offline; unsafe prior config not restored" >&2
+    elif [ "$promotion_started" -eq 1 ]; then
       echo "PROMOTION_ROLLED_BACK official files restored; legacy units remain fail-closed" >&2
     elif [ "$official_stopped_for_promotion" -eq 1 ]; then
       echo "PROMOTION_ROLLED_BACK official service restarted before file promotion" >&2
@@ -455,10 +473,15 @@ cleanup() {
   if [ "$promotion_complete" -eq 1 ] || [ "$status" -ne 0 ]; then
     [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
   fi
-  [ -z "$candidate_tmp" ] || rm -rf "$candidate_tmp"
-  if [ "$lock_owned" -eq 1 ]; then
-    rm -rf "$update_lock"
+  if [ -n "$candidate_tmp" ]; then
+    chmod -R u+w "$candidate_tmp" >/dev/null 2>&1 || true
+    rm -rf "$candidate_tmp"
   fi
+  if [ -n "$lock_holder_pid" ]; then
+    kill "$lock_holder_pid" >/dev/null 2>&1 || true
+    wait "$lock_holder_pid" 2>/dev/null || true
+  fi
+  [ -z "$lock_status_dir" ] || rm -rf "$lock_status_dir"
   trap - EXIT
   exit "$status"
 }
@@ -466,23 +489,57 @@ trap cleanup EXIT
 
 mkdir -p "$STATE_DIR"
 update_lock="$STATE_DIR/update.lock"
-if [ -d "$update_lock" ]; then
-  prior_pid="$(cat "$update_lock/pid" 2>/dev/null || true)"
-  if [[ "$prior_pid" =~ ^[0-9]+$ ]] && kill -0 "$prior_pid" 2>/dev/null; then
-    echo "PROMOTION_RED updater lock is held by pid $prior_pid" >&2
+lock_status_dir="$(mktemp -d "$STATE_DIR/.update-lock.XXXXXX")"
+python3 - "$update_lock" "$lock_status_dir" "$$" <<'PY' &
+import fcntl, os, pathlib, sys, time
+lock_path = pathlib.Path(sys.argv[1])
+status = pathlib.Path(sys.argv[2])
+parent = int(sys.argv[3])
+with lock_path.open("a+") as handle:
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        (status / "busy").touch()
+        raise SystemExit(8)
+    (status / "ready").touch()
+    while os.getppid() == parent:
+        time.sleep(0.05)
+PY
+lock_holder_pid="$!"
+for _ in $(seq 1 100); do
+  if [ -f "$lock_status_dir/ready" ]; then
+    break
+  fi
+  if [ -f "$lock_status_dir/busy" ] || ! kill -0 "$lock_holder_pid" 2>/dev/null; then
+    echo "PROMOTION_RED updater lock is held: $update_lock" >&2
     exit 8
   fi
-  rm -rf "$update_lock"
-fi
-if ! mkdir "$update_lock" 2>/dev/null; then
-  echo "PROMOTION_RED updater lock is held: $update_lock" >&2
+  sleep 0.02
+done
+if [ ! -f "$lock_status_dir/ready" ]; then
+  echo "PROMOTION_RED updater lock acquisition timed out" >&2
   exit 8
 fi
-lock_owned=1
-printf '%s\n' "$$" > "$update_lock/pid"
 
 rollback_dir="$STATE_DIR/promotion-transaction"
 if [ -d "$rollback_dir" ]; then
+  if [ ! -f "$rollback_dir/READY" ] || ! python3 - "$rollback_dir" <<'PY'
+import hashlib, json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+manifest = json.loads((root / "manifest.json").read_text())
+for name, expected in manifest.items():
+    path = root / name
+    if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(1)
+PY
+  then
+    echo "PROMOTION_RED incomplete rollback transaction requires operator review" >&2
+    exit 9
+  fi
+  if ! validate_rollback_bundle; then
+    echo "PROMOTION_RED rollback transaction is not a validated known-good bundle" >&2
+    exit 9
+  fi
   promotion_started=1
   restore_target binary "$BIN_DST" 0755
   restore_target helper "$HELPER_DST" 0755
@@ -518,6 +575,7 @@ fi
 candidate_id="$(CANDIDATE_VERSION="$SYMPHONY_VERSION" python3 - "${candidate_inputs[@]}" <<'PY'
 import hashlib, os, pathlib, sys
 digest = hashlib.sha256()
+digest.update(b"symphony-candidate/v2\0")
 digest.update(os.environ["CANDIDATE_VERSION"].encode())
 for raw in sys.argv[1:]:
     digest.update(pathlib.Path(raw).read_bytes())
@@ -533,7 +591,34 @@ if [ ! -d "$candidate_dir" ]; then
   if [ "$SKIP_BINARY" -eq 0 ]; then
     install_one "${tmpdir}/${BIN_NAME}" "$candidate_tmp/binary" 0755
   fi
+  CANDIDATE_VERSION="$SYMPHONY_VERSION" python3 - "$candidate_tmp" <<'PY'
+import hashlib, json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+files = {}
+for path in sorted(root.iterdir()):
+    if path.is_file():
+        files[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        with path.open("rb") as handle:
+            os.fsync(handle.fileno())
+manifest = {
+    "schema": "symphony-candidate/v2",
+    "version": os.environ["CANDIDATE_VERSION"],
+    "files": files,
+}
+(root / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
+with (root / "manifest.json").open("rb") as handle:
+    os.fsync(handle.fileno())
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+  chmod 0555 "$candidate_tmp/helper"
+  chmod 0444 "$candidate_tmp/unit" "$candidate_tmp/workflow" "$candidate_tmp/manifest.json"
+  if [ "$SKIP_BINARY" -eq 0 ]; then chmod 0555 "$candidate_tmp/binary"; fi
   mv "$candidate_tmp" "$candidate_dir"
+  chmod 0555 "$candidate_dir"
   candidate_tmp=""
 else
   cmp -s "$HELPER_SRC" "$candidate_dir/helper"
@@ -544,11 +629,60 @@ else
   fi
 fi
 echo "STAGED $candidate_dir"
+python3 - "$candidate_dir" "$SYMPHONY_VERSION" <<'PY'
+import hashlib, json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+manifest = json.loads((root / "manifest.json").read_text())
+if manifest.get("schema") != "symphony-candidate/v2" or manifest.get("version") != sys.argv[2]:
+    raise SystemExit("candidate manifest identity mismatch")
+files = manifest.get("files")
+if not isinstance(files, dict):
+    raise SystemExit("candidate manifest files missing")
+for name, expected in files.items():
+    path = root / name
+    if not path.is_file() or path.is_symlink():
+        raise SystemExit(f"candidate file invalid: {name}")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+        raise SystemExit(f"candidate hash mismatch: {name}")
+PY
 
 if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 0 ]; then
   promotion_complete=1
   echo "DONE_STAGED_NO_LIVE_MUTATION"
   exit 0
+fi
+
+rollback_tmp="$(mktemp -d "$STATE_DIR/.promotion-transaction.XXXXXX")"
+rollback_dir="$rollback_tmp"
+backup_target binary "$BIN_DST"
+backup_target helper "$HELPER_DST"
+backup_target unit "$UNIT_DST"
+backup_target workflow "$WORKFLOW_DST"
+python3 - "$rollback_dir" <<'PY'
+import hashlib, json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+manifest = {}
+for path in sorted(root.iterdir()):
+    if path.is_file():
+        manifest[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+manifest_path = root / "manifest.json"
+manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n")
+with manifest_path.open("rb") as handle:
+    os.fsync(handle.fileno())
+(root / "READY").write_text("symphony-promotion-transaction/v1\n")
+with (root / "READY").open("rb") as handle:
+    os.fsync(handle.fileno())
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+mv "$rollback_tmp" "$STATE_DIR/promotion-transaction"
+rollback_dir="$STATE_DIR/promotion-transaction"
+promotion_started=1
+if ! validate_rollback_bundle; then
+  rollback_safe=0
 fi
 
 if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
@@ -567,17 +701,13 @@ if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 1 ] && [ "$official_was_active
 fi
 
 mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR" "$STATE_DIR"
-rollback_dir="$STATE_DIR/promotion-transaction"
-mkdir "$rollback_dir"
 [ "$official_was_active" -eq 0 ] || : > "$rollback_dir/was-active"
-backup_target binary "$BIN_DST"
-backup_target helper "$HELPER_DST"
-backup_target unit "$UNIT_DST"
-backup_target workflow "$WORKFLOW_DST"
-promotion_started=1
 
 if [ "$SKIP_BINARY" -eq 0 ]; then
+  files_promoted=1
   install_one "$candidate_dir/binary" "$BIN_DST" 0755
+else
+  files_promoted=1
 fi
 install_one "$candidate_dir/helper" "$HELPER_DST" 0755
 install_one "$candidate_dir/unit" "$UNIT_DST"
