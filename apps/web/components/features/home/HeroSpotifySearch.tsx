@@ -88,6 +88,7 @@ export function HeroSpotifySearch({
   const [showResults, setShowResults] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isNavigating, setIsNavigating] = useState(false);
+  const isNavigatingRef = useRef(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
@@ -120,8 +121,12 @@ export function HeroSpotifySearch({
 
   const handleNavigateToStart = useCallback(
     (spotifyUrl: string, artistName?: string) => {
-      if (isNavigating) return;
+      if (isNavigatingRef.current) return;
+      isNavigatingRef.current = true;
       setIsNavigating(true);
+      clear();
+      setShowResults(false);
+      setActiveIndex(-1);
       if (submitAnalytics) {
         track(submitAnalytics.eventName, {
           ...submitAnalytics.properties,
@@ -141,7 +146,7 @@ export function HeroSpotifySearch({
       );
       router.push(`${APP_ROUTES.START}?${params.toString()}`);
     },
-    [router, isNavigating, submitAnalytics]
+    [clear, router, submitAnalytics]
   );
 
   const handleSearchInputChange = useCallback(
@@ -507,7 +512,9 @@ export function HeroSpotifySearch({
             {/* Error state */}
             {state === 'error' && (
               <div className='p-4 text-center'>
-                <p className='text-sm text-error'>Search failed.</p>
+                <p role='alert' className='text-sm text-error'>
+                  Search failed.
+                </p>
                 <Button
                   type='button'
                   size='sm'

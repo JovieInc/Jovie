@@ -159,7 +159,7 @@ export function useUnifiedArtistSearchQuery<TResult>(
 
       if (trimmed === debouncedQuery) {
         if (queryError && !isFetching) {
-          void refetch();
+          void refetch({ cancelRefetch: false });
         }
         return;
       }

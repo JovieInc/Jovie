@@ -167,7 +167,7 @@ describe('useArtistSearchQuery', () => {
     expect(result.current.error).toBe('Search failed');
   });
 
-  it('retries the same query after a timeout without clearing the query', async () => {
+  it('coalesces same-frame retries after a timeout without clearing the query', async () => {
     const timeoutError = new DOMException(
       'The operation was aborted',
       'AbortError'
@@ -194,6 +194,7 @@ describe('useArtistSearchQuery', () => {
     });
 
     act(() => {
+      result.current.searchImmediate('tim white');
       result.current.searchImmediate('tim white');
     });
 
@@ -271,6 +272,32 @@ describe('useArtistSearchQuery', () => {
     await waitFor(() => {
       expect(result.current.state).toBe('empty');
     });
+  });
+
+  it('cancels a pending debounced search when cleared', async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(
+        () => useArtistSearchQuery({ debounceMs: 300 }),
+        { wrapper: TestWrapper }
+      );
+
+      act(() => {
+        result.current.search('tim white');
+        result.current.clear();
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+
+      expect(result.current.query).toBe('');
+      expect(result.current.isPending).toBe(false);
+      expect(result.current.state).toBe('idle');
+      expect(mockFetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should handle rate limit error', async () => {

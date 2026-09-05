@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
@@ -262,7 +262,7 @@ describe('HeroSpotifySearch', () => {
       const input = getInput();
       await user.type(input, 'tim white');
 
-      expect(screen.getByText('Search failed.')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Search failed.');
       await user.click(screen.getByRole('button', { name: 'Try again' }));
 
       expect(mockSearchImmediate).toHaveBeenCalledTimes(1);
@@ -399,6 +399,34 @@ describe('HeroSpotifySearch', () => {
       expect(url).toContain('spotify_url=');
       expect(url).toContain('artist_name=Taylor+Swift');
       expect(url).toContain('starter_prompt=');
+    });
+
+    it('cancels search and emits one handoff for same-frame Enter and click', async () => {
+      render(
+        <HeroSpotifySearch
+          submitAnalytics={{
+            eventName: 'homepage_certified_search_submitted',
+            properties: { placement: 'hero' },
+          }}
+        />
+      );
+      const user = userEvent.setup();
+      const input = getInput();
+      await user.type(input, 'Taylor');
+      await user.keyboard('{ArrowDown}');
+      const artistButton = screen.getByText('Taylor Swift').closest('button');
+      expect(artistButton).not.toBeNull();
+
+      act(() => {
+        fireEvent.keyDown(input, { key: 'Enter' });
+        if (artistButton) fireEvent.click(artistButton);
+      });
+
+      expect(mockClear).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockTrack).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(mockTrack.mock.calls)).not.toContain('Taylor');
     });
 
     it('verified badge shown for verified artists', async () => {
