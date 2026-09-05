@@ -95,6 +95,7 @@ Required variables are defined in `lib/env.ts` with Zod validation.
 - Do not commit `.env`, local settings, tokens, credentials, screenshots with secrets, or generated secret dumps.
 - Do not add secrets to `CLAUDE.md`, `AGENTS.md`, `CODEX.md`, `.claude/`, `.cursor/`, `.codex/`, docs, tests, or fixtures.
 - If a secret appears in the repo, stop and report it.
+- A redaction or parser helper is not recurrence prevention until the real diagnostic producer calls it. Wire the executable or installed operator boundary, and add a deliberate-red integration test proving multiline values and malformed input cannot reach emitted diagnostics.
 
 ## CI Seeding Guardrail
 

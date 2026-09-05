@@ -16,6 +16,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Auth / Env
 
+### Secret-safe parsers must be wired to the real diagnostic boundary
+
+**Mistake:** A multiline EnvironmentFile parser and isolated unit tests were treated as recurrence prevention even though no production diagnostic producer called the helper. The vulnerable operational path therefore remained unchanged.
+
+**Rule:** A redaction/parser fix is incomplete until the executable or installed diagnostic boundary consumes it. Exercise that exact boundary with multiline secret-shaped sentinel data, prove only safe names/context are emitted, and prove malformed input fails without reflection.
+
 ### OAuth provider buttons use a code allowlist, not NEXT_PUBLIC kill-switches
 **Mistake:** Gating Apple/Google buttons on `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` (first via dynamic `process.env[key]`, then via static `process.env.NEXT_PUBLIC_*` lookups) emptied production sign-in even when Vercel env vars were set (PR #8458, #8497). The hardcode allowlist (PR #8499) fixed it.
 

@@ -610,6 +610,7 @@ function runStructural() {
   const selected = selectedProductLanes();
   const operationsParts = [
     'pnpm invariants:check',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/environment-file-names.test.mjs --coverage --coverage.include=lib/environment-file-names.mjs --coverage.thresholds.lines=95 --coverage.thresholds.functions=100 --coverage.thresholds.branches=95',
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',

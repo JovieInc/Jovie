@@ -20,8 +20,11 @@ WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/symphony/WORKFLOW.md
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
 ACCOUNT_ENV="${TARGET_HOME}/.config/symphony/codex-account.env"
 LINEAR_ENV="${TARGET_HOME}/.config/symphony/linear.env"
+SIGNING_ENV="${TARGET_HOME}/.config/symphony/summer-bottleneck-signing.env"
 HELPER_SRC="${REPO_ROOT}/scripts/symphony/symphony_official_runtime.py"
 HELPER_DST="${TARGET_HOME}/.local/bin/symphony-official-runtime"
+ENV_REPORTER_SRC="${REPO_ROOT}/scripts/lib/environment-file-names.mjs"
+ENV_REPORTER_DST="${TARGET_HOME}/.local/bin/symphony-environment-file-names"
 LOG_DIR="${TARGET_HOME}/symphony-elixir-logs"
 STATE_DIR="${TARGET_HOME}/.local/state/symphony-elixir"
 STATE_URL="${SYMPHONY_STATE_URL:-http://127.0.0.1:4041/api/v1/state}"
@@ -129,6 +132,15 @@ check_one() {
     rc=1
   fi
   return "$rc"
+}
+
+check_executable() {
+  local dst="$1"
+  if [ ! -x "$dst" ]; then
+    echo "NOT_EXECUTABLE $dst"
+    return 1
+  fi
+  echo "EXECUTABLE $dst"
 }
 
 check_workflow() {
@@ -311,6 +323,14 @@ assert_account_environment_ready() {
     echo "PROMOTION_RED Codex account selection must not be group/world writable: $ACCOUNT_ENV" >&2
     return 8
   fi
+  if ! node "$ENV_REPORTER_SRC" "$ACCOUNT_ENV"; then
+    echo "PROMOTION_RED host-owned account environment diagnostics are unavailable" >&2
+    return 8
+  fi
+  if [ -f "$SIGNING_ENV" ] && ! node "$ENV_REPORTER_SRC" "$SIGNING_ENV"; then
+    echo "PROMOTION_RED Summer signing environment diagnostics are unavailable" >&2
+    return 8
+  fi
   echo "ACCOUNT_ENV_OK host-owned selection present"
 }
 
@@ -379,6 +399,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "DRY_RUN $SUM_URL"
   echo "INSTALL $BIN_DST"
   echo "HELPER $HELPER_DST"
+  echo "ENV_REPORTER $ENV_REPORTER_DST"
   echo "UNIT $UNIT_DST"
   echo "WORKFLOW $WORKFLOW_DST"
   echo "SERVICE $SERVICE_NAME"
@@ -390,9 +411,12 @@ fi
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
   rc=0
+  assert_account_environment_ready || rc=1
   check_workflow "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
   check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
+  check_one "$ENV_REPORTER_SRC" "$ENV_REPORTER_DST" || rc=1
+  check_executable "$ENV_REPORTER_DST" || rc=1
   exit "$rc"
 fi
 
@@ -432,6 +456,7 @@ cleanup() {
     if [ "$promotion_started" -eq 1 ]; then
       restore_target binary "$BIN_DST" 0755
       restore_target helper "$HELPER_DST" 0755
+      restore_target env_reporter "$ENV_REPORTER_DST" 0755
       restore_target unit "$UNIT_DST" 0644
       restore_target workflow "$WORKFLOW_DST" 0644
     fi
@@ -484,6 +509,7 @@ mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_
 rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
 backup_target binary "$BIN_DST"
 backup_target helper "$HELPER_DST"
+backup_target env_reporter "$ENV_REPORTER_DST"
 backup_target unit "$UNIT_DST"
 backup_target workflow "$WORKFLOW_DST"
 promotion_started=1
@@ -492,6 +518,7 @@ if [ "$SKIP_BINARY" -eq 0 ]; then
   install_one "${tmpdir}/${BIN_NAME}" "$BIN_DST" 0755
 fi
 install_one "$HELPER_SRC" "$HELPER_DST" 0755
+install_one "$ENV_REPORTER_SRC" "$ENV_REPORTER_DST" 0755
 install_one "$UNIT_SRC" "$UNIT_DST"
 install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
 
