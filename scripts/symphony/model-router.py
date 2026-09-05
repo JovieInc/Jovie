@@ -8,6 +8,7 @@ Codex routes require an explicit flag; cooldowns are persisted atomically.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import pathlib
@@ -124,6 +125,19 @@ def save_state(d):
     finally:
         if os.path.exists(tmp): os.unlink(tmp)
 
+def update_state(snapshot, mutate):
+    """Merge one transition under the stable state lock, never stale snapshots."""
+    path = state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path.with_name(path.name + ".lock"), "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        latest = state()
+        mutate(latest)
+        save_state(latest)
+        snapshot.clear()
+        snapshot.update(latest)
+
+
 def model_map(cfg): return {m["id"]: m for m in cfg["models"]}
 
 def _runnable(candidate: str) -> str | None:
@@ -199,16 +213,20 @@ def mark_pool_exhausted(st, pool, seconds, now=None):
     if not pool:
         return
     now = time.time() if now is None else now
-    _pool_state(st, pool)["exhausted_until"] = now + max(60, int(seconds))
-    save_state(st)
+    until = now + max(60, int(seconds))
+    def mutate(latest):
+        entry = _pool_state(latest, pool)
+        entry["exhausted_until"] = max(float(entry["exhausted_until"] or 0), until)
+    update_state(st, mutate)
 
 
 def record_pool_use(st, pool):
     if not pool:
         return
-    entry = _pool_state(st, pool)
-    entry["uses"] = int(entry.get("uses") or 0) + 1
-    save_state(st)
+    def mutate(latest):
+        entry = _pool_state(latest, pool)
+        entry["uses"] = int(entry.get("uses") or 0) + 1
+    update_state(st, mutate)
 
 
 def _quota_signal(text):
@@ -357,9 +375,10 @@ def score_candidate(cfg, model, st, capability, now, exclude_pools=()):
 def record_api_spend(st, family, amount):
     if not family or amount <= 0:
         return
-    spend = st.setdefault("api_spend", {})
-    spend[family] = float(spend.get(family) or 0) + float(amount)
-    save_state(st)
+    def mutate(latest):
+        spend = latest.setdefault("api_spend", {})
+        spend[family] = float(spend.get(family) or 0) + float(amount)
+    update_state(st, mutate)
 
 
 def parse_oauth_seats(payload):

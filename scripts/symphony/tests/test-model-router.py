@@ -1,9 +1,65 @@
 #!/usr/bin/env python3
 import json, os, pathlib, subprocess, tempfile, time, unittest
+import importlib.util
+import multiprocessing
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 ROUTER = ROOT / "scripts/symphony/model-router.py"
 CONFIG = ROOT / "scripts/symphony/config/model-registry.json"
+
+SPEC = importlib.util.spec_from_file_location("model_router", ROUTER)
+MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(MODULE)
+
+
+class StateTransactionTests(unittest.TestCase):
+    def test_competing_writers_preserve_pool_rejections_usage_and_spend(self):
+        context = multiprocessing.get_context("fork")
+        barrier = context.Barrier(3)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "state.json"
+            def worker(index):
+                with mock.patch.dict(os.environ, {"GEM_MODEL_ROUTER_STATE": str(path)}):
+                    snapshot = MODULE.state()
+                    barrier.wait(timeout=10)
+                    MODULE.mark_pool_exhausted(snapshot, f"pool-{index}", 300, now=1000)
+                    MODULE.record_pool_use(snapshot, "shared")
+                    MODULE.record_api_spend(snapshot, "shared", 0.5)
+            workers = [context.Process(target=worker, args=(index,)) for index in range(3)]
+            for process in workers:
+                process.start()
+            for process in workers:
+                process.join(15)
+                if process.is_alive():
+                    process.kill()
+                    process.join()
+                self.assertEqual(process.exitcode, 0)
+            saved = json.loads(path.read_text())
+            self.assertEqual(saved["pools"]["shared"]["uses"], 3)
+            self.assertEqual(saved["api_spend"]["shared"], 1.5)
+            for index in range(3):
+                self.assertEqual(saved["pools"][f"pool-{index}"]["exhausted_until"], 1300)
+
+    def test_missing_pool_or_nonpositive_spend_does_not_create_state(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(os.environ, {"GEM_MODEL_ROUTER_STATE": str(pathlib.Path(directory) / "state.json")}):
+            MODULE.mark_pool_exhausted({}, None, 60)
+            MODULE.record_pool_use({}, None)
+            MODULE.record_api_spend({}, None, 1)
+            MODULE.record_api_spend({}, "shared", 0)
+            self.assertFalse(MODULE.state_path().exists())
+
+    def test_stale_success_and_rejection_do_not_erase_or_shorten_cooldown(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(os.environ, {"GEM_MODEL_ROUTER_STATE": str(pathlib.Path(directory) / "state.json")}):
+            stale = MODULE.state()
+            MODULE.mark_pool_exhausted({}, "shared", 600, now=1000)
+            MODULE.record_pool_use(stale, "shared")
+            MODULE.record_api_spend(stale, "shared", 0.5)
+            MODULE.record_api_spend({}, "shared", 0.5)
+            self.assertEqual(MODULE.state()["api_spend"]["shared"], 1.0)
+            MODULE.mark_pool_exhausted(stale, "shared", 60, now=1000)
+            self.assertEqual(MODULE.state()["pools"]["shared"]["exhausted_until"], 1600)
+
 
 class RegistryTests(unittest.TestCase):
     def setUp(self):
