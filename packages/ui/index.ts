@@ -71,6 +71,7 @@ export {
   type ButtonVariant,
   type ButtonVariantInput,
   buttonPenVariantKey,
+  CTA_BUTTON_SIZE,
   normalizeButtonSizeContract,
   normalizeButtonVariantContract,
   resolveButtonPenMaster,

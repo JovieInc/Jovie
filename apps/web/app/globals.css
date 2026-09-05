@@ -618,6 +618,8 @@ body {
   /* Map app-level button tokens to Tailwind v4 color tokens so classes like bg-btn-primary work */
   --color-btn-primary: var(--color-btn-primary-bg);
   --color-btn-primary-foreground: var(--color-btn-primary-fg);
+  --color-btn-secondary: var(--color-btn-secondary-bg);
+  --color-btn-secondary-foreground: var(--color-btn-secondary-fg);
   /* Platform brand colors - exposed as Tailwind utilities */
   --color-brand-spotify: var(--color-brand-spotify);
   --color-brand-spotify-hover: var(--color-brand-spotify-hover);
@@ -1995,11 +1997,7 @@ body {
   }
   .focus-ring-themed {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-    --tw-ring-color: color-mix(
-      in oklab,
-      var(--color-focus-ring) 52%,
-      transparent
-    );
+    --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-color: var(--color-bg-page);
   }
 }
