@@ -1,5 +1,10 @@
 # AI Agent Developer Guide
 
+Use this file as an API/cron/webhook inventory. For execution policy start at
+[CLAUDE.md](../CLAUDE.md); for instruction, skill, or harness changes read the
+[context contract](agent-context/README.md). Search the relevant section instead
+of loading this inventory for unrelated tasks.
+
 Quick-reference for AI agents working in the Jovie codebase. For hard guardrails and enforcement rules, see [`AGENTS.md`](../AGENTS.md).
 
 ---

@@ -1,3 +1,7 @@
+---
+paths: ["scripts/backlog-orchestrator/**", "scripts/hermes/**", "docs/PR_FLOW.md"]
+---
+
 # Linear: Issue Gating + Ownership Contract
 
 How agents claim, transition, and finish Linear-tracked work without colliding with each other.

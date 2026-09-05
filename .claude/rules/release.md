@@ -1,3 +1,7 @@
+---
+paths: [".github/**", "scripts/*deploy*", "scripts/*release*", "docs/PR_FLOW.md", "RELEASE_CHECKLIST.md"]
+---
+
 # Release: PRs, Ship, Deploy
 
 PR discipline, ship validation, branch strategy, deploy flow, bot-review blocking.

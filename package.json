@@ -187,6 +187,8 @@
     "pr:conflict:dry-run": "node scripts/pr-conflict-handler.mjs --dry-run",
     "pr:conflict:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/pr-conflict-handler.test.mjs",
     "ci:harness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__",
+    "agent-context:check": "node scripts/agent-context/check.mjs",
+    "agent-context:test": "node --test --experimental-test-coverage --test-coverage-include=\"scripts/agent-context/{check,grade,prompt}.{mjs,cjs}\" --test-coverage-lines=95 --test-coverage-functions=95 --test-coverage-branches=90 scripts/agent-context/check.test.mjs",
     "doc:freshness:check": "node scripts/doc-freshness-lint.mjs",
     "doc:freshness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs",
     "hermes:gbrain-health": "tsx scripts/symphony/jobs/gbrain-health-summary.ts",

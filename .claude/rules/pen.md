@@ -1,3 +1,7 @@
+---
+paths: ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"]
+---
+
 # Pen Workspace File Lock
 
 Read this before any Pen mutation. `CLAUDE.md` only points here.
@@ -55,3 +59,7 @@ discard, resume, or switch. If Pen displays Save/Don't Save, choose **Cancel**.
 If no dialog is displayed, leave Pen untouched. In either case, stop all
 mutations, preserve the active work, and report the lock failure. Never ask
 the founder to decide whether unknown agent work should be saved or discarded.
+
+## Registry authority and mutation proof
+
+Registry status is singular and machine-recomputed: `metadataStatus` on each registry root is the only authoritative status field, and visible ledger rows are generated, never hand-written. Audit any ledger export with [`scripts/agent/pen-registry-audit.mjs`](../../scripts/agent/PEN_REGISTRY_LEDGER.md) before and after registry mutations; it fails closed on visible/metadata contradiction, duplicate authoritative records, unentitled SAFE, silently retained stale proof, and denominator drift.

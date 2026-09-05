@@ -1,0 +1,157 @@
+[
+  {
+    "file": ".claude/rules/auth.md",
+    "paths": [
+      "apps/web/**/auth/**",
+      "apps/web/**/clerk*",
+      "apps/web/proxy.ts",
+      "apps/web/tests/**"
+    ],
+    "bodySha256": "f4f47b3acc01d76d980d48344117bb41e3480daf0b4dba1c6d95af701e155ea2"
+  },
+  {
+    "file": ".claude/rules/ci-branching.md",
+    "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
+    "bodySha256": "aeaf66b744e87693197d3862601e2b33c49d19100049f8ba98e7176bdc94c500"
+  },
+  {
+    "file": ".claude/rules/code-style.md",
+    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
+    "bodySha256": "f6b327bba7ba7033cb351cf065945e476291b445d09c658573b4f1bbd294419d"
+  },
+  {
+    "file": ".claude/rules/db.md",
+    "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
+    "bodySha256": "f63b9f10c6a648253edb94de57708f6ae569eef6834638b2e8f9569115e26656"
+  },
+  {
+    "file": ".claude/rules/environment.md",
+    "paths": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      ".nvmrc",
+      ".node-version",
+      "scripts/setup*",
+      ".codex/**"
+    ],
+    "bodySha256": "d4c714ad1d20c53284aabdcbaf63cd465a47ee30d502d867f1f62ba38f21a8c2"
+  },
+  {
+    "file": ".claude/rules/gstack.md",
+    "paths": [
+      ".agents/skills/**",
+      ".claude/skills/**",
+      "docs/agent-context/**"
+    ],
+    "bodySha256": "81ddf33073d91e23b2666d1330025c4d83bd743a1c2c806def16ef0122293938"
+  },
+  {
+    "file": ".claude/rules/hermes-air.md",
+    "paths": ["scripts/hermes/**", "docs/hermes/**"],
+    "bodySha256": "a8e1c32a2b612b5c3757357e063442b173513929642771fb228cab8796fbceb6"
+  },
+  {
+    "file": ".claude/rules/infra.md",
+    "paths": [
+      ".github/**",
+      "scripts/hermes/**",
+      "apps/web/app/api/cron/**",
+      "vercel.json"
+    ],
+    "bodySha256": "c4e9985133e811da0ea02b174b00b7f9dcef41a1ed834bbc6de1cca3b9c9c24f"
+  },
+  {
+    "file": ".claude/rules/ios.md",
+    "paths": ["apps/ios/**", "**/*.swift"],
+    "bodySha256": "7d5ed17b77c0285b0796444697a5e73e842480586af55437c4479603027a02f2"
+  },
+  {
+    "file": ".claude/rules/linear.md",
+    "paths": [
+      "scripts/backlog-orchestrator/**",
+      "scripts/hermes/**",
+      "docs/PR_FLOW.md"
+    ],
+    "bodySha256": "73e61f1035f4d715e08422a99a0577f72f3f9f84c87d43554a7b9a7c9bdc53ee"
+  },
+  {
+    "file": ".claude/rules/macos.md",
+    "paths": ["apps/desktop/**", "apps/macos/**", "docs/macos/**"],
+    "bodySha256": "86546e550894071822f0230039e2f3190f5665f961fba2178a3e1e0a539c6b7d"
+  },
+  {
+    "file": ".claude/rules/motion.md",
+    "paths": [
+      "apps/web/**/*.tsx",
+      "apps/web/**/*.css",
+      "packages/ui/**",
+      "DESIGN.md",
+      "docs/design-system/**"
+    ],
+    "bodySha256": "c88601f1ff765b3d671ee02523fe6d2124a50f8b39b9275061604bc2a7c75346"
+  },
+  {
+    "file": ".claude/rules/pen.md",
+    "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
+    "bodySha256": "6dcfcd4b052bd71873bfd431fdc265a7452384f4823f41575924c08598c53582"
+  },
+  {
+    "file": ".claude/rules/pr-stacking.md",
+    "paths": [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"],
+    "bodySha256": "c399abcf344dc0f107c6131a3524e63d345c2cd211b627ef57ae5f522ba3cfba"
+  },
+  {
+    "file": ".claude/rules/release.md",
+    "paths": [
+      ".github/**",
+      "scripts/*deploy*",
+      "scripts/*release*",
+      "docs/PR_FLOW.md",
+      "RELEASE_CHECKLIST.md"
+    ],
+    "bodySha256": "19b13c669a3ef0f007076bab948a3776f5289d6a922115b682c267afaaa3728e"
+  },
+  {
+    "file": ".claude/rules/security.md",
+    "paths": [
+      "apps/web/app/api/**",
+      "apps/web/lib/**",
+      "packages/**",
+      ".github/**",
+      "scripts/**"
+    ],
+    "bodySha256": "fde7b500d8f9bc41f224183ffd4ccbeb7d357bb3bf324a753384e3565580fc37"
+  },
+  {
+    "file": ".claude/rules/swarm.md",
+    "paths": [
+      "scripts/hermes/**",
+      "scripts/backlog-orchestrator/**",
+      ".claude/commands/qa-swarm*"
+    ],
+    "bodySha256": "3b601f1f02ff5afc2c65eca5d22f43dc1b93dea2da784ee488018b17e4208c2c"
+  },
+  {
+    "file": ".claude/rules/testing.md",
+    "paths": [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/tests/**",
+      "**/vitest.config.*",
+      "**/playwright.config.*"
+    ],
+    "bodySha256": "d8fc11d851d52ebf1ebf19308ea563be4041da85769d24bc0242ce7251c1ca90"
+  },
+  {
+    "file": ".claude/rules/ui.md",
+    "paths": [
+      "apps/web/**/*.tsx",
+      "apps/web/**/*.css",
+      "packages/ui/**",
+      "DESIGN.md",
+      "docs/design-system/**"
+    ],
+    "bodySha256": "4fcf8773be1909d059c1fd20b90ef0cd594fb7d65a58e2d809544b7d60bb481f"
+  }
+]
