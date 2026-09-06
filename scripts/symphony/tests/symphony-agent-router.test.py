@@ -63,6 +63,53 @@ class SymphonyAgentRouterTests(unittest.TestCase):
             "CODEX_ACCOUNTS_STATE": str(state),
         }
 
+    def assert_headless_arguments(self, provider: str, opt_in: str | None) -> None:
+        guard = self.executable("guard", "exit 0\n" if provider == "codex" else "exit 75\n")
+        cursor = self.executable(
+            "cursor",
+            'case "$1" in status) echo "Logged in";; models) echo "gpt-5.6-luna-high";; esac\n',
+        )
+        capture = self.executable("capture", 'printf "%s\\n" "$@"\n')
+        env = self.environment(guard, cursor, capture)
+        # Deliberately isolate the inherited host environment from this opt-in.
+        env.pop("SYMPHONY_CODEX_DISABLE_APPS", None)
+        if opt_in is not None:
+            env["SYMPHONY_CODEX_DISABLE_APPS"] = opt_in
+        env["SYMPHONY_CODEX_ROUTER"] = str(capture)
+        env["PS4"] = '+${LINENO}: '
+        self.write_route()
+        arguments = ["app-server", "--config", 'model="gpt-5.6-sol"']
+        result = subprocess.run(
+            ["bash", "-x", str(ROUTER), *arguments], cwd=self.workspace,
+            env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = (["--disable", "apps"] if provider == "codex" and opt_in == "1" else []) + arguments
+        self.assertEqual(result.stdout.splitlines(), expected)
+        injection_line = next(
+            n for n, line in enumerate(ROUTER.read_text().splitlines(), 1)
+            if 'set -- --disable apps "$@"' in line
+        )
+        trace = f"+{injection_line}: set -- --disable apps app-server"
+        if provider == "codex" and opt_in == "1":
+            self.assertIn(trace, result.stderr)
+        else:
+            self.assertNotIn(trace, result.stderr)
+        receipt = json.loads((self.home / ".local/state/symphony-provider-router/JOV-5954.json").read_text())
+        self.assertEqual(receipt["provider"], provider)
+
+    def test_headless_codex_disables_apps_with_real_argv_and_changed_line_execution(self):
+        self.assert_headless_arguments("codex", "1")
+
+    def test_headless_cursor_never_receives_codex_flags(self):
+        self.assert_headless_arguments("cursor", "1")
+
+    def test_default_codex_keeps_existing_arguments(self):
+        self.assert_headless_arguments("codex", None)
+
+    def test_disabled_opt_in_keeps_existing_codex_arguments(self):
+        self.assert_headless_arguments("codex", "0")
+
     def write_route(self, model: str = "gpt-5.6-sol") -> None:
         (self.workspace / ".symphony-routing.json").write_text(
             json.dumps({"schema": "symphony-routing/v1", "issue": "JOV-5954", "model": model})
@@ -151,8 +198,42 @@ with path.open("a+") as challenger:
         receipt = json.loads(
             (self.home / ".local/state/symphony-provider-router/JOV-5954.json").read_text()
         )
+        self.assertEqual(receipt["authority"], "symphony-agent-router")
+        self.assertEqual(receipt["policyGeneration"], "symphony-routing-policy-v1")
+        self.assertEqual(
+            receipt["selectedRoute"], {"provider": "cursor", "model": "gpt-5.6-luna-high"}
+        )
+        self.assertEqual(receipt["reservation"]["key"], "JOV-5954")
+        self.assertEqual(receipt["reservation"]["status"], "held")
+        self.assertEqual(receipt["lease"]["authority"], "symphony-agent-router")
         self.assertEqual(receipt["provider"], "cursor")
         self.assertEqual(receipt["reason"], "eligible-primary-provider")
+
+    def test_busy_cursor_slot_holds_admission_before_probe_or_spawn(self) -> None:
+        guard = self.executable("guard", "exit 75\n")
+        probes = self.root / "cursor-probes"
+        cursor = self.executable(
+            "cursor",
+            f'echo probe >> "{probes}"\n'
+            'case "${1:-}" in status) echo "Logged in" ;; models) echo "gpt-5.6-luna-high - ready" ;; esac\n',
+        )
+        adapter = self.executable("adapter", f'echo spawned >> "{probes}"\n')
+        env = self.environment(guard, cursor, adapter)
+        locks = self.home / ".local/state/symphony-provider-router/locks"
+        locks.mkdir(parents=True)
+        slot = locks / "cursor.lock"
+        with slot.open("a+") as holder:
+            fcntl.flock(holder, fcntl.LOCK_EX)
+            result = subprocess.run(
+                [str(ROUTER), "app-server"],
+                cwd=self.workspace,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertIn("class=provider-capacity", result.stderr)
+        self.assertFalse(probes.exists())
 
     def test_ready_codex_is_preferred_without_requerying_linear(self) -> None:
         guard = self.executable("guard", "exit 0\n")

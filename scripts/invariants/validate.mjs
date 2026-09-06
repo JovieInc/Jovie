@@ -5,7 +5,9 @@ import {
   validateHarnessContract,
 } from './harness-contract.mjs';
 import { validatePerformanceFactory } from './performance-factory.mjs';
+import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
 import { validateQualityRatchet } from './quality-ratchet.mjs';
+// JOV-INV-029 is composed here so every CI invariant run checks the lifecycle.
 import {
   readInvariantRegistry,
   validateInvariantRegistry,
@@ -23,11 +25,13 @@ const result = validateInvariantRegistry(registry);
 const harnessErrors = validateHarnessContract(registry);
 const performanceErrors = validatePerformanceFactory(undefined, { registry });
 const qualityErrors = validateQualityRatchet(registry);
+const lifecycleErrors = validatePrLifecycleContract(registry);
 const errors = [
   ...result.errors,
   ...harnessErrors.map(error => `harness-contract: ${error}`),
   ...performanceErrors.map(error => `performance-factory: ${error}`),
   ...qualityErrors.map(error => `quality-ratchet: ${error}`),
+  ...lifecycleErrors.map(error => `pr-lifecycle: ${error}`),
 ];
 const ok = errors.length === 0 && result.blockers.length === 0;
 

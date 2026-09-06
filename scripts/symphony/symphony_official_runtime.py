@@ -6,6 +6,8 @@ the deployed service unit, workflow shape, request-budget math, closure
 stop-line admission, permanent-error dead-letter receipts, and rate-limit
 classification artifacts; OpenAI owns the binary itself. The selected Codex
 account remains host-owned configuration and is never pinned by this source.
+# JOV-INV-029: runtime admission is the draft-phase owner; activation requires
+# separate production proof and is never inferred from a green wrapper.
 """
 
 from __future__ import annotations
