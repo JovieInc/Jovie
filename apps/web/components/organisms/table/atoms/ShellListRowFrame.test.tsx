@@ -35,6 +35,13 @@ describe('ShellListRowFrame', () => {
     expect(className).not.toContain('cursor-pointer');
   });
 
+  it('centralizes compact density and rejects legacy row hover styling', () => {
+    const className = getShellListRowFrameClassName({ density: 'compact' });
+
+    expect(className).toContain('min-h-7');
+    expect(className).not.toContain('hover:text-accent');
+  });
+
   it('uses button semantics for clickable shell rows', () => {
     const { getByTestId } = render(
       <ShellListRowButton data-testid='row-button' isSelected className='px-3'>

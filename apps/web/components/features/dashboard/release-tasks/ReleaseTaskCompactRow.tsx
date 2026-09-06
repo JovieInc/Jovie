@@ -3,7 +3,6 @@
 import React from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
-import { cn } from '@/lib/utils';
 import { ReleaseTaskDueBadge } from './ReleaseTaskDueBadge';
 import {
   isReleaseTaskAutomated,
@@ -34,7 +33,10 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
   const isAi = isReleaseTaskAutomated(task);
 
   return (
-    <ShellListRowFrame className='flex min-h-7 items-center gap-2 px-3 py-0.5'>
+    <ShellListRowFrame
+      density='compact'
+      className='flex items-center gap-2 px-3 py-0.5'
+    >
       <ReleaseTaskCheckbox
         task={task}
         isDone={isDone}
@@ -44,10 +46,7 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
       <button
         type='button'
         onClick={() => onNavigate(task.id)}
-        className={cn(
-          'flex-1 text-left text-2xs truncate transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base outline-none',
-          isAi ? 'opacity-70' : 'hover:text-accent'
-        )}
+        className='flex-1 truncate text-left text-2xs outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'
       >
         <ReleaseTaskTitleText className='block' isDone={isDone}>
           {task.title}
