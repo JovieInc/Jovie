@@ -1,4 +1,5 @@
 ---
+# jovie-pr-lifecycle/v1 (JOV-INV-029): draft -> review -> native queue -> merge -> activation -> closure.
 tracker:
   kind: linear
   provider:
