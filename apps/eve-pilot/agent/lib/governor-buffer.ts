@@ -73,15 +73,38 @@ const EXCLUDED_LABELS = new Set([
 ]);
 
 const PRIORITY_RULES = [
-  { labels: ['P0', 'production'], score: 1000, reason: 'P0 production urgency' },
-  { labels: ['ci-remediation', 'merge'], score: 900, reason: 'merge/CI remediation' },
-  { labels: ['founder-shipping', 'shipping-goal'], score: 800, reason: 'active founder shipping goal' },
-  { labels: ['ui-invariant', 'design-invariant'], score: 700, reason: 'isolated UI/design invariant fix' },
-  { labels: ['verified-backlog', 'backlog-remediation'], score: 600, reason: 'verified backlog remediation' },
+  {
+    labels: ['P0', 'production'],
+    score: 1000,
+    reason: 'P0 production urgency',
+  },
+  {
+    labels: ['ci-remediation', 'merge'],
+    score: 900,
+    reason: 'merge/CI remediation',
+  },
+  {
+    labels: ['founder-shipping', 'shipping-goal'],
+    score: 800,
+    reason: 'active founder shipping goal',
+  },
+  {
+    labels: ['ui-invariant', 'design-invariant'],
+    score: 700,
+    reason: 'isolated UI/design invariant fix',
+  },
+  {
+    labels: ['verified-backlog', 'backlog-remediation'],
+    score: 600,
+    reason: 'verified backlog remediation',
+  },
 ] as const;
 
 export class GovernorCapacityError extends Error {
-  constructor(readonly source: string, readonly reason: string) {
+  constructor(
+    readonly source: string,
+    readonly reason: string
+  ) {
     super(`Governor capacity error from ${source}: ${reason}`);
     this.name = 'GovernorCapacityError';
   }
@@ -90,7 +113,10 @@ export class GovernorCapacityError extends Error {
 function parseCapacity(value: string): number {
   const trimmed = value.trim();
   if (!/^\d+$/.test(trimmed)) {
-    throw new GovernorCapacityError('env', `non-integer capacity value: ${value}`);
+    throw new GovernorCapacityError(
+      'env',
+      `non-integer capacity value: ${value}`
+    );
   }
   const parsed = Number.parseInt(trimmed, 10);
   if (parsed < 1 || parsed > 1000) {
@@ -108,13 +134,17 @@ export function officialSymphonyCapacity(
     env.SYMPHONY_WORKFLOW_CAPACITY !== undefined
       ? 'env:SYMPHONY_WORKFLOW_CAPACITY'
       : 'env:SYMPHONY_UI_PILOT_CAPACITY';
-  const value = raw === undefined ? DEFAULT_SYMPHONY_WORKFLOW_CAPACITY : parseCapacity(raw);
+  const value =
+    raw === undefined ? DEFAULT_SYMPHONY_WORKFLOW_CAPACITY : parseCapacity(raw);
   return { kind: 'symphony-workflow', value, source, observedAt: now };
 }
 
 export function computeQualifiedTodoBufferTarget(capacity: number): number {
   if (!Number.isInteger(capacity) || capacity < 1) {
-    throw new GovernorCapacityError('compute', 'capacity must be a positive integer');
+    throw new GovernorCapacityError(
+      'compute',
+      'capacity must be a positive integer'
+    );
   }
   return capacity * 2;
 }
@@ -122,12 +152,17 @@ export function computeQualifiedTodoBufferTarget(capacity: number): number {
 export function qualifyIssueForTodoBuffer(
   issue: GovernorBufferIssue,
   blockedIdentifiers: ReadonlySet<string> = new Set()
-): { readonly qualified: true; readonly reason: 'qualified' } | { readonly qualified: false; readonly reason: string } {
+):
+  | { readonly qualified: true; readonly reason: 'qualified' }
+  | { readonly qualified: false; readonly reason: string } {
   if (issue.team !== 'JOV') {
     return { qualified: false, reason: 'team-not-jov' };
   }
   if (BLOCKED_STATES.has(issue.state)) {
-    return { qualified: false, reason: `state-${issue.state.toLowerCase().replace(/\s+/g, '-')}` };
+    return {
+      qualified: false,
+      reason: `state-${issue.state.toLowerCase().replace(/\s+/g, '-')}`,
+    };
   }
   if (issue.assignee !== null) {
     return { qualified: false, reason: 'assigned-to-lane' };
@@ -143,7 +178,10 @@ export function qualifyIssueForTodoBuffer(
   return { qualified: true, reason: 'qualified' };
 }
 
-export function rankTodoBufferCandidate(issue: GovernorBufferIssue): { readonly score: number; readonly reason: string } {
+export function rankTodoBufferCandidate(issue: GovernorBufferIssue): {
+  readonly score: number;
+  readonly reason: string;
+} {
   const lowerLabels = issue.labels.map(label => label.toLowerCase());
   for (const rule of PRIORITY_RULES) {
     if (rule.labels.some(label => lowerLabels.includes(label.toLowerCase()))) {
@@ -161,7 +199,9 @@ export type GovernorBufferPlanInput = {
   readonly observedAt?: string;
 };
 
-export function planQualifiedTodoBuffer(input: GovernorBufferPlanInput): GovernorBufferReceipt {
+export function planQualifiedTodoBuffer(
+  input: GovernorBufferPlanInput
+): GovernorBufferReceipt {
   const observedAt = input.observedAt ?? new Date().toISOString();
   const target = computeQualifiedTodoBufferTarget(input.capacity.value);
   const shortage = Math.max(0, target - input.qualifiedTodoCount);
@@ -217,7 +257,9 @@ export function planQualifiedTodoBuffer(input: GovernorBufferPlanInput): Governo
   }
 
   if (remainingShortage > 0) {
-    exceptions.push(`insufficient-qualified-candidates: need ${remainingShortage} more to reach target ${target}`);
+    exceptions.push(
+      `insufficient-qualified-candidates: need ${remainingShortage} more to reach target ${target}`
+    );
   }
 
   return {

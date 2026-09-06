@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type CapacitySource,
   computeQualifiedTodoBufferTarget,
   DEFAULT_SYMPHONY_WORKFLOW_CAPACITY,
   GOVERNOR_BUFFER_SCHEMA,
   GOVERNOR_BUFFER_VERSION,
+  type GovernorBufferIssue,
   GovernorCapacityError,
   officialSymphonyCapacity,
   planQualifiedTodoBuffer,
   qualifyIssueForTodoBuffer,
   rankTodoBufferCandidate,
-  type CapacitySource,
-  type GovernorBufferIssue,
 } from '../agent/lib/governor-buffer';
 
 function issue(
@@ -28,7 +28,10 @@ function issue(
   };
 }
 
-function capacity(value: number, source = 'env:SYMPHONY_WORKFLOW_CAPACITY'): CapacitySource {
+function capacity(
+  value: number,
+  source = 'env:SYMPHONY_WORKFLOW_CAPACITY'
+): CapacitySource {
   return {
     kind: 'symphony-workflow',
     value,
@@ -54,12 +57,12 @@ describe('Governor qualified Todo buffer', () => {
   });
 
   it('fails closed on a non-integer or out-of-bounds capacity value', () => {
-    expect(() => officialSymphonyCapacity({ SYMPHONY_WORKFLOW_CAPACITY: 'abc' })).toThrow(
-      GovernorCapacityError
-    );
-    expect(() => officialSymphonyCapacity({ SYMPHONY_WORKFLOW_CAPACITY: '0' })).toThrow(
-      GovernorCapacityError
-    );
+    expect(() =>
+      officialSymphonyCapacity({ SYMPHONY_WORKFLOW_CAPACITY: 'abc' })
+    ).toThrow(GovernorCapacityError);
+    expect(() =>
+      officialSymphonyCapacity({ SYMPHONY_WORKFLOW_CAPACITY: '0' })
+    ).toThrow(GovernorCapacityError);
   });
 
   it('computes a 2x target from the configured capacity', () => {
@@ -68,8 +71,12 @@ describe('Governor qualified Todo buffer', () => {
   });
 
   it('rejects non-positive capacity for the target', () => {
-    expect(() => computeQualifiedTodoBufferTarget(0)).toThrow(GovernorCapacityError);
-    expect(() => computeQualifiedTodoBufferTarget(-1)).toThrow(GovernorCapacityError);
+    expect(() => computeQualifiedTodoBufferTarget(0)).toThrow(
+      GovernorCapacityError
+    );
+    expect(() => computeQualifiedTodoBufferTarget(-1)).toThrow(
+      GovernorCapacityError
+    );
   });
 
   it('qualifies only JOV issues that are unassigned and not in excluded states', () => {
@@ -88,9 +95,9 @@ describe('Governor qualified Todo buffer', () => {
     expect(qualifyIssueForTodoBuffer(excluded).reason).toContain('excluded');
 
     const blocked = issue('JOV-1005');
-    expect(qualifyIssueForTodoBuffer(blocked, new Set(['JOV-1005'])).reason).toBe(
-      'blocked-by-open-pr-or-file-ownership'
-    );
+    expect(
+      qualifyIssueForTodoBuffer(blocked, new Set(['JOV-1005'])).reason
+    ).toBe('blocked-by-open-pr-or-file-ownership');
   });
 
   it('ranks candidates by the priority order from JOV-5597', () => {
@@ -133,7 +140,10 @@ describe('Governor qualified Todo buffer', () => {
     expect(receipt.version).toBe(GOVERNOR_BUFFER_VERSION);
     expect(receipt.target).toBe(60);
     expect(receipt.shortage).toBe(2);
-    expect(receipt.promotions.map(p => p.identifier)).toEqual(['JOV-3001', 'JOV-3002']);
+    expect(receipt.promotions.map(p => p.identifier)).toEqual([
+      'JOV-3001',
+      'JOV-3002',
+    ]);
     expect(receipt.promotions[0].reason).toBe('P0 production urgency');
     expect(receipt.exceptions).toEqual([]);
   });
@@ -195,11 +205,7 @@ describe('Governor qualified Todo buffer', () => {
   });
 
   it('uses identifier ordering as a tie-breaker at equal priority', () => {
-    const issues = [
-      issue('JOV-7002'),
-      issue('JOV-7001'),
-      issue('JOV-7003'),
-    ];
+    const issues = [issue('JOV-7002'), issue('JOV-7001'), issue('JOV-7003')];
     const receipt = planQualifiedTodoBuffer({
       issues,
       qualifiedTodoCount: 58,
