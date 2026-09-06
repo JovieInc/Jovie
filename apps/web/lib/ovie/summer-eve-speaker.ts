@@ -29,12 +29,18 @@ const budgetCheckpointSchema = z.object({
   nextStartIndex: z.number().int().nonnegative(),
   status: z.literal('rejected_budget'),
 });
+const blockingEventSchema = z.object({
+  eventId: z.string().regex(/^sum_[A-Za-z0-9_-]{24}$/u),
+  deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
+});
 const prefix = '/ovie/v1/summer-shadow/conversation/events';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_MIGRATION_HISTORY_BYTES = 20 * 1024;
 const MAX_MIGRATION_HISTORY_ENTRIES = 200;
 const PENDING_RECOVERY_TEXT =
   'Summer is still reconciling this turn. Your message will not be sent again; reopen this conversation to check for the exact Eve result.';
+const BLOCKING_RECOVERY_TEXT =
+  'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.';
 
 function assertExpectedEveDeployment(response: Response): void {
   const expected = env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim();
@@ -116,13 +122,62 @@ export function createEveSummerSpeaker(
             ? { canonicalTailRecovery: true }
             : {}),
         });
-        const response = await fetchShadow(prefix, {
+        let response = await fetchShadow(prefix, {
           method: 'POST',
           signal: input.signal,
           body: rawBody,
         });
         assertExpectedEveDeployment(response);
-        const admission = await body(response);
+        let admission = await body(response);
+        if (response.status === 409 && admission.code === 'conversation_busy') {
+          const blocking = blockingEventSchema.safeParse(
+            admission.blockingEvent
+          );
+          if (!blocking.success) {
+            yield {
+              type: 'notice',
+              text: BLOCKING_RECOVERY_TEXT,
+              code: 'summer_turn_pending',
+            };
+            yield { type: 'error', state: 'unknown' };
+            return;
+          }
+          const blockingResponse = await fetchShadow(
+            `${prefix}/${blocking.data.eventId}/result`,
+            {
+              signal: input.signal,
+              headers: {
+                'x-jovie-summer-principal-hash': input.principalHash,
+                'x-jovie-summer-deployment-id': blocking.data.deploymentId,
+              },
+            }
+          );
+          assertExpectedEveDeployment(blockingResponse);
+          const blockingTerminal = await body(blockingResponse);
+          if (!blockingResponse.ok) {
+            yield {
+              type: 'notice',
+              text: BLOCKING_RECOVERY_TEXT,
+              code: 'summer_turn_pending',
+            };
+            yield { type: 'error', state: 'unknown' };
+            return;
+          }
+          const blockingResult = resultSchema.parse(blockingTerminal.result);
+          if (
+            blockingResult.eventId !== blocking.data.eventId ||
+            blockingResult.principalHash !== input.principalHash ||
+            blockingResult.deploymentId !== blocking.data.deploymentId
+          )
+            throw new Error('summer_blocking_result_drift');
+          response = await fetchShadow(prefix, {
+            method: 'POST',
+            signal: input.signal,
+            body: rawBody,
+          });
+          assertExpectedEveDeployment(response);
+          admission = await body(response);
+        }
         const recoverableAdmission =
           admission.code === 'dispatch_unknown' ||
           admission.code === 'conversation_persistence_or_dispatch_unknown';

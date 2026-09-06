@@ -294,6 +294,107 @@ describe('Ovie speaks through durable Eve Summer', () => {
     });
     expect(fetchShadow).toHaveBeenCalledTimes(2);
   });
+  it('reconciles the canonical blocking event before dispatching the new event exactly once', async () => {
+    const blockingEventId = 'sum_000000000000000000000099';
+    const blockingResult = {
+      ...result,
+      eventId: blockingEventId,
+      turnId: 'turn_blocking',
+      responseText: 'Earlier turn completed.',
+    };
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(
+        eveResponse(
+          {
+            code: 'conversation_busy',
+            blockingEvent: {
+              eventId: blockingEventId,
+              deploymentId: 'dpl_test',
+            },
+          },
+          { status: 409 }
+        )
+      )
+      .mockResolvedValueOnce(eveResponse({ result: blockingResult }))
+      .mockResolvedValueOnce(
+        eveResponse({ ok: true, accepted: { eventId } }, { status: 202 })
+      )
+      .mockResolvedValueOnce(eveResponse({ result }));
+
+    expect(await collect()).toContainEqual({
+      type: 'text-delta',
+      text: result.responseText,
+    });
+    expect(fetchShadow).toHaveBeenCalledTimes(4);
+    expect(fetchShadow.mock.calls[0]?.[0]).toBe(
+      '/ovie/v1/summer-shadow/conversation/events'
+    );
+    expect(fetchShadow.mock.calls[1]).toEqual([
+      `/ovie/v1/summer-shadow/conversation/events/${blockingEventId}/result`,
+      expect.objectContaining({
+        headers: {
+          'x-jovie-summer-principal-hash': input.principalHash,
+          'x-jovie-summer-deployment-id': 'dpl_test',
+        },
+      }),
+    ]);
+    expect(fetchShadow.mock.calls[2]?.[0]).toBe(
+      '/ovie/v1/summer-shadow/conversation/events'
+    );
+    expect(fetchShadow.mock.calls[2]?.[1]?.body).toBe(
+      fetchShadow.mock.calls[0]?.[1]?.body
+    );
+  });
+  it('surfaces a terminal notice without redispatch while the canonical blocker is pending', async () => {
+    const blockingEventId = 'sum_000000000000000000000099';
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(
+        eveResponse(
+          {
+            code: 'conversation_busy',
+            blockingEvent: {
+              eventId: blockingEventId,
+              deploymentId: 'dpl_test',
+            },
+          },
+          { status: 409 }
+        )
+      )
+      .mockResolvedValueOnce(
+        eveResponse(
+          { code: 'turn_pending', eventId: blockingEventId },
+          { status: 503 }
+        )
+      );
+
+    expect(await collect()).toEqual([
+      {
+        type: 'notice',
+        text: 'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.',
+        code: 'summer_turn_pending',
+      },
+      { type: 'error', state: 'unknown' },
+    ]);
+    expect(fetchShadow).toHaveBeenCalledTimes(2);
+  });
+  it('surfaces a terminal notice when a busy response cannot identify its blocker', async () => {
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(
+        eveResponse({ code: 'conversation_busy' }, { status: 409 })
+      );
+    expect(await collect()).toEqual([
+      {
+        type: 'notice',
+        text: 'Summer is still finishing an earlier turn. This message has not been sent; reopen the conversation to reconcile the earlier result before trying again.',
+        code: 'summer_turn_pending',
+      },
+      { type: 'error', state: 'unknown' },
+    ]);
+    expect(fetchShadow).toHaveBeenCalledOnce();
+  });
   it('renders an explicit pending receipt when the exact Eve marker is not visible yet', async () => {
     fetchShadow
       .mockReset()
