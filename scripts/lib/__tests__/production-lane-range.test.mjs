@@ -8,12 +8,12 @@ import { classifyProductionMarkerEvidence } from '../../../.github/scripts/produ
 import {
   classifyProductionBaseEvidence,
   collectProductionGitRange,
+  PRODUCTION_BASE_EVIDENCE,
   planProductionLaneRange,
   planProductionMarkerRecovery,
   resolveHistoricalLaneEvidence,
   runProductionLaneRange,
   validateLaneEvidenceReceipt,
-  PRODUCTION_BASE_EVIDENCE,
   WEB_BIND_REASONS,
 } from '../production-lane-range.mjs';
 
@@ -68,18 +68,20 @@ describe('production lane range', () => {
     ).toThrow('production base evidence is not admissible');
   });
 
-  it.each(['pending', 'manual', 'recovery_available', ''])(
-    'rejects %s production marker state as a release base',
-    markerState => {
-      expect(() =>
-        classifyProductionBaseEvidence({
-          markerState,
-          deployedSha: sha('a'),
-          currentSha: sha('b'),
-        })
-      ).toThrow('production base evidence is not admissible');
-    }
-  );
+  it.each([
+    'pending',
+    'manual',
+    'recovery_available',
+    '',
+  ])('rejects %s production marker state as a release base', markerState => {
+    expect(() =>
+      classifyProductionBaseEvidence({
+        markerState,
+        deployedSha: sha('a'),
+        currentSha: sha('b'),
+      })
+    ).toThrow('production base evidence is not admissible');
+  });
 
   it('keeps a preceding web lane live when a rapid operations merge becomes current', () => {
     const deployedSha = sha('a');
