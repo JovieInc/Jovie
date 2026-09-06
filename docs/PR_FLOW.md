@@ -20,7 +20,7 @@ the implementation slot only after its exact-head receipt is acknowledged.
 | --- | --- | --- |
 | Draft | Symphony | Evidence-complete draft and writer-owned handoff receipt |
 | Review | Writer | Exact-head review, CI, and ticket evidence |
-| Promotion | Gem | Native merge-queue admission at the same head |
+| Promotion | Writer | Native merge-queue admission at the same head |
 | Merge | GitHub native queue | Merge event; this is not activation |
 | Activation | Production controller | Exact deployed runtime proof |
 | Closure | Summer | Closure receipt referencing activation proof |

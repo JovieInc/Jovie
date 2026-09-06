@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// JOV-INV-029: owning writer records exact native intent before mutation.
 // JOV-INV-023: source intent does not depend on fleet or production observations.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -289,6 +290,7 @@ export async function submitMergeIntent(
       receipt,
       JSON.stringify(
         result('unknown', 'request-attempted', {
+          schema: 'jovie-native-merge-intent/v1',
           at: new Date().toISOString(),
           ...(reconcileRemoval
             ? { removalEventId: reconcileRemoval, reconciliation }
