@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
 
 const linkVariants = cva(
   [
-    'inline-flex items-center gap-1 text-app font-medium tracking-normal underline-offset-4 transition-colors duration-normal ease-interactive',
+    'inline-flex items-center gap-1 text-app font-medium tracking-normal underline-offset-4 transition-colors duration-normal ease-interactive motion-reduce:transition-none',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
     'rounded-sm',
   ],
