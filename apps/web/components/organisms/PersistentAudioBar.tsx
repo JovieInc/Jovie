@@ -1,15 +1,20 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AudioLines, Pause, Play, X } from 'lucide-react';
+import { AudioLines, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
+import { AudioPlayButton } from '@/components/shell/AudioPlayButton';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
@@ -360,15 +365,10 @@ export function PersistentAudioBar() {
   const isPreview = playbackState.duration > 0 && playbackState.duration < 45;
 
   let playButtonLabel = 'Resume playback';
-  let playButtonIcon = <Play className='h-3 w-3' />;
   if (isLoading) {
     playButtonLabel = 'Loading track';
-    playButtonIcon = (
-      <div className='h-3 w-3 animate-pulse rounded-full bg-current' />
-    );
   } else if (playbackState.isPlaying) {
     playButtonLabel = 'Pause playback';
-    playButtonIcon = <Pause className='h-3 w-3' />;
   }
 
   const mobileBar = (className?: string) => (
@@ -384,15 +384,17 @@ export function PersistentAudioBar() {
       <div className='flex items-center gap-3'>
         {/* Artwork */}
         {playbackState.artworkUrl && !imgError ? (
-          <Image
-            src={playbackState.artworkUrl}
-            alt=''
-            width={36}
-            height={36}
-            className='h-9 w-9 shrink-0 rounded-lg object-cover'
-            unoptimized
-            onError={() => setImgError(true)}
-          />
+          <ArtworkFrame size={36} className='h-9 w-9 shrink-0 bg-surface-2'>
+            <Image
+              src={playbackState.artworkUrl}
+              alt=''
+              fill
+              sizes='36px'
+              className={ARTWORK_FIT_CLASSNAME}
+              unoptimized
+              onError={() => setImgError(true)}
+            />
+          </ArtworkFrame>
         ) : (
           <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-1'>
             <Play className='h-3.5 w-3.5 text-tertiary-token' />
@@ -442,15 +444,13 @@ export function PersistentAudioBar() {
         </div>
 
         {/* Play/pause button — 28px visible, 44px touch target via before pseudo-element */}
-        <button
-          type='button'
+        <AudioPlayButton
+          isPlaying={playbackState.isPlaying}
+          isLoading={isLoading}
           onClick={handleToggle}
-          disabled={isLoading}
-          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
-          aria-label={playButtonLabel}
-        >
-          {playButtonIcon}
-        </button>
+          label={playButtonLabel}
+          size='persistent'
+        />
 
         {/* Dismiss button — 24px visible, 44px touch target via before pseudo-element */}
         <button

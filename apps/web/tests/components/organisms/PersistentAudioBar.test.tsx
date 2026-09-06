@@ -187,6 +187,16 @@ describe('PersistentAudioBar', () => {
     );
   });
 
+  it('keeps compact playback artwork contained instead of cropping it', async () => {
+    setPlaying({ artworkUrl: 'https://x.invalid/art.jpg' });
+    render(<PersistentAudioBar />);
+    await flushReveal();
+
+    const artwork = screen.getAllByTestId('artwork-img')[0];
+    expect(artwork).toHaveClass('object-contain');
+    expect(artwork).not.toHaveClass('object-cover');
+  });
+
   it('opens and closes the idle playback tray with the global toggle shortcuts', () => {
     render(<PersistentAudioBar />);
 

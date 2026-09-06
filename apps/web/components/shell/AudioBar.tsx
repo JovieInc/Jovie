@@ -5,8 +5,6 @@ import {
   AudioWaveform,
   Mic2,
   Minimize2,
-  Pause,
-  Play,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -14,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
+import { AudioPlayButton } from './AudioPlayButton';
 import { IconBtn } from './IconBtn';
 import { LoopBtn, type LoopMode } from './LoopBtn';
 import {
@@ -138,26 +137,12 @@ export function AudioBar({
         shortcut={SHORTCUTS.playPause}
         side='top'
       >
-        <button
-          type='button'
+        <AudioPlayButton
+          isPlaying={isPlaying}
           onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
-          aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
-        >
-          {isPlaying ? (
-            <Pause
-              className='h-3.5 w-3.5'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          ) : (
-            <Play
-              className='h-3.5 w-3.5 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          )}
-        </button>
+          label={isPlaying ? 'Pause (space)' : 'Play (space)'}
+          size='bar'
+        />
       </Tooltip>
       {onNext && (
         <IconBtn label='Next' tooltipSide='top' tone='ghost' onClick={onNext}>
