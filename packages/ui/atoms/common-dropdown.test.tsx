@@ -1,9 +1,45 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Settings, Star } from 'lucide-react';
+import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CommonDropdown } from './common-dropdown';
 import type { CommonDropdownItem } from './common-dropdown-types';
+
+const capturedDropdownContentProps = vi.hoisted(
+  () => [] as Array<Record<string, unknown>>
+);
+const capturedContextContentProps = vi.hoisted(
+  () => [] as Array<Record<string, unknown>>
+);
+
+vi.mock('@radix-ui/react-dropdown-menu', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@radix-ui/react-dropdown-menu')>();
+  const RecordingContent = React.forwardRef<
+    React.ComponentRef<typeof actual.Content>,
+    React.ComponentPropsWithoutRef<typeof actual.Content>
+  >((props, ref) => {
+    capturedDropdownContentProps.push(props as Record<string, unknown>);
+    return <actual.Content ref={ref} {...props} />;
+  });
+  RecordingContent.displayName = 'RecordingDropdownContent';
+  return { ...actual, Content: RecordingContent };
+});
+
+vi.mock('@radix-ui/react-context-menu', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@radix-ui/react-context-menu')>();
+  const RecordingContent = React.forwardRef<
+    React.ComponentRef<typeof actual.Content>,
+    React.ComponentPropsWithoutRef<typeof actual.Content>
+  >((props, ref) => {
+    capturedContextContentProps.push(props as Record<string, unknown>);
+    return <actual.Content ref={ref} {...props} />;
+  });
+  RecordingContent.displayName = 'RecordingContextContent';
+  return { ...actual, Content: RecordingContent };
+});
 
 // Basic action items for testing
 const basicItems: CommonDropdownItem[] = [
@@ -19,6 +55,23 @@ const basicItems: CommonDropdownItem[] = [
 ];
 
 describe('CommonDropdown', () => {
+  describe('Far-edge placement (deliberate-red regression)', () => {
+    it('keeps dropdown and context surfaces inside the viewport collision gutter', () => {
+      const dropdown = render(<CommonDropdown items={basicItems} open={true} />);
+      expect(capturedDropdownContentProps.at(-1)?.collisionPadding).toBe(8);
+      dropdown.unmount();
+
+      render(
+        <CommonDropdown items={basicItems} variant='context'>
+          <div data-testid='collision-context-area'>Right click me</div>
+        </CommonDropdown>
+      );
+
+      fireEvent.contextMenu(screen.getByTestId('collision-context-area'));
+      expect(capturedContextContentProps.at(-1)?.collisionPadding).toBe(8);
+    });
+  });
+
   describe('Default Trigger', () => {
     it('renders default button trigger', () => {
       render(<CommonDropdown items={basicItems} />);
