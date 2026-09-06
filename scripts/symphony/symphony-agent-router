@@ -110,14 +110,28 @@ write_receipt() {
   local provider="$1" selected_model="$2" reason="$3" temporary
   mkdir -p "$state_dir"
   temporary="$state_dir/.${issue}.tmp.$$"
-  python3 - "$issue" "$provider" "$selected_model" "$reason" >"$temporary" <<'PY'
+  python3 - "$issue" "$provider" "$selected_model" "$reason" "${SYMPHONY_POLICY_GENERATION:-symphony-routing-policy-v1}" >"$temporary" <<'PY'
 import datetime, json, sys
 print(json.dumps({
   "schema": "symphony-provider-route/v1",
+  "authority": "symphony-agent-router",
   "issue": sys.argv[1],
   "provider": sys.argv[2],
   "model": sys.argv[3],
   "reason": sys.argv[4],
+  "policyGeneration": sys.argv[5],
+  "selectedRoute": {"provider": sys.argv[2], "model": sys.argv[3]},
+  "reservation": {
+    "authority": "symphony-agent-router",
+    "scope": "issue",
+    "key": sys.argv[1],
+    "status": "held",
+  },
+  "lease": {
+    "authority": "symphony-agent-router",
+    "fd": 9,
+    "status": "held",
+  },
   "observedAt": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
 }, sort_keys=True))
 PY

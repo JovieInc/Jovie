@@ -151,6 +151,14 @@ with path.open("a+") as challenger:
         receipt = json.loads(
             (self.home / ".local/state/symphony-provider-router/JOV-5954.json").read_text()
         )
+        self.assertEqual(receipt["authority"], "symphony-agent-router")
+        self.assertEqual(receipt["policyGeneration"], "symphony-routing-policy-v1")
+        self.assertEqual(
+            receipt["selectedRoute"], {"provider": "cursor", "model": "gpt-5.6-luna-high"}
+        )
+        self.assertEqual(receipt["reservation"]["key"], "JOV-5954")
+        self.assertEqual(receipt["reservation"]["status"], "held")
+        self.assertEqual(receipt["lease"]["authority"], "symphony-agent-router")
         self.assertEqual(receipt["provider"], "cursor")
         self.assertEqual(receipt["reason"], "eligible-primary-provider")
 
