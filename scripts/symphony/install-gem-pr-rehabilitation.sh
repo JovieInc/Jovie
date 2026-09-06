@@ -28,6 +28,7 @@ readonly -a RELATIVE_SOURCES=(
   scripts/symphony/gem_gate_contract.py
   scripts/symphony/gem-pr-drain.py
   scripts/symphony/gem-repo-drain-cycle.py
+  scripts/symphony/summer_bottleneck_producer.py
   scripts/symphony/gem_repo_registry.py
   scripts/symphony/gem_rehabilitation_policy.py
   scripts/symphony/model-router.py
@@ -43,6 +44,7 @@ readonly -a TARGETS=(
   "${GEM_ROOT}/scripts/gem_gate_contract.py"
   "${GEM_ROOT}/scripts/gem-pr-drain.py"
   "${GEM_ROOT}/scripts/gem-repo-drain-cycle.py"
+  "${GEM_ROOT}/scripts/summer_bottleneck_producer.py"
   "${GEM_ROOT}/scripts/gem_repo_registry.py"
   "${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
   "${GEM_ROOT}/scripts/model-router.py"
@@ -81,6 +83,7 @@ python3 -m py_compile \
   "${SOURCE_ROOT}/scripts/symphony/gem_gate_contract.py" \
   "${SOURCE_ROOT}/scripts/symphony/gem-pr-drain.py" \
   "${SOURCE_ROOT}/scripts/symphony/gem-repo-drain-cycle.py" \
+  "${SOURCE_ROOT}/scripts/symphony/summer_bottleneck_producer.py" \
   "${SOURCE_ROOT}/scripts/symphony/gem_repo_registry.py" \
   "${SOURCE_ROOT}/scripts/symphony/gem_rehabilitation_policy.py" \
   "${SOURCE_ROOT}/scripts/symphony/model-router.py"
@@ -180,6 +183,7 @@ python3 -m py_compile \
   "${GEM_ROOT}/scripts/gem_gate_contract.py" \
   "${GEM_ROOT}/scripts/gem-pr-drain.py" \
   "${GEM_ROOT}/scripts/gem-repo-drain-cycle.py" \
+  "${GEM_ROOT}/scripts/summer_bottleneck_producer.py" \
   "${GEM_ROOT}/scripts/gem_repo_registry.py" \
   "${GEM_ROOT}/scripts/gem_rehabilitation_policy.py" \
   "${GEM_ROOT}/scripts/model-router.py"
@@ -209,6 +213,7 @@ pairs = {
     "contract": (source_root / "scripts/symphony/gem_gate_contract.py", gem_root / "scripts/gem_gate_contract.py"),
     "drain": (source_root / "scripts/symphony/gem-pr-drain.py", gem_root / "scripts/gem-pr-drain.py"),
     "cycle": (source_root / "scripts/symphony/gem-repo-drain-cycle.py", gem_root / "scripts/gem-repo-drain-cycle.py"),
+    "summerBottleneckProducer": (source_root / "scripts/symphony/summer_bottleneck_producer.py", gem_root / "scripts/summer_bottleneck_producer.py"),
     "registryModule": (source_root / "scripts/symphony/gem_repo_registry.py", gem_root / "scripts/gem_repo_registry.py"),
     "policy": (source_root / "scripts/symphony/gem_rehabilitation_policy.py", gem_root / "scripts/gem_rehabilitation_policy.py"),
     "modelRouter": (source_root / "scripts/symphony/model-router.py", gem_root / "scripts/model-router.py"),

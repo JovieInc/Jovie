@@ -575,6 +575,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).not.toContain('elif [[');
     expect(remaining).toContain('jovie-symphony-workspace\\.test\\.py$');
     expect(remaining).toContain('_gem_workspace_migrate)\\.py$');
+    expect(remaining).toContain('summer_bottleneck_producer\\.py$');
+    expect(remaining).toContain('summer-bottleneck-producer\\.test\\.py$');
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
     );
