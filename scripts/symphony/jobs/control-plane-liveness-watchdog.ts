@@ -9,6 +9,8 @@
  * controller is dark, the receipt authorizes the independent control-plane
  * recovery lane. This job does not mutate Linear, PRs, the merge queue, or
  * deployments.
+ *
+ * Recovery runbook: scripts/symphony/runbooks/control-plane-liveness-recovery.md
  */
 
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';

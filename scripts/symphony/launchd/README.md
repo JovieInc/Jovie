@@ -10,6 +10,11 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 
 ## Units
 
+Operational recovery runbooks for the critical units live in
+[`scripts/symphony/runbooks/`](../runbooks/). The control-plane liveness
+watchdog runbook is
+[`control-plane-liveness-recovery.md`](../runbooks/control-plane-liveness-recovery.md).
+
 | File | Schedule | Purpose |
 |---|---|---|
 | `co.jovie.hermes.watchdog.plist.template` | every 60s | Start the Hermes gateway if `hermes gateway status` fails |
