@@ -35,6 +35,11 @@ STACK_MAX_DEPTH = 4  # JOV-INV-020
 STACK_DEADLINE_MAX = timedelta(days=7)
 STACK_ROOT_BASE = "main"
 STACK_REPAIR_ACTION = "split-or-retarget-draft-stack"
+LIFECYCLE_ACTION_SCHEMA = "jovie-pr-lifecycle-action/v1"
+PROTECTED_PR_EXCLUSIONS = frozenset({17156})
+LIFECYCLE_MACHINE_OWNERS = frozenset(
+    {"controller", "gem", "github-native-merge-queue", "symphony"}
+)
 UTC = timezone.utc
 
 
@@ -1417,6 +1422,154 @@ def _promotion_disposition(
     }
 
 
+def _lifecycle_action(
+    pr: dict[str, Any],
+    inventory_index: int,
+    disposition: dict[str, Any] | None,
+    unclassified: dict[str, Any] | None,
+    now: datetime,
+    repository: str,
+) -> dict[str, Any]:
+    """Give every observed row one machine-owned lifecycle disposition."""
+    number = pr.get("number")
+    valid_number = (
+        isinstance(number, int) and not isinstance(number, bool) and number > 0
+    )
+    head_oid = pr.get("headRefOid") if _valid_oid(pr.get("headRefOid")) else None
+    issue = disposition.get("issue") if isinstance(disposition, dict) else None
+
+    if valid_number and number in PROTECTED_PR_EXCLUSIONS:
+        route = {
+            "disposition": "terminal",
+            "sourceState": "protected",
+            "owner": "gem",
+            "writer": "gem",
+            "action": "preserve-protected-pr-exclusion",
+            "reason": f"protected-machine-exclusion:{number}",
+            "terminal": True,
+        }
+    elif disposition is None:
+        reason = (
+            unclassified.get("reason")
+            if isinstance(unclassified, dict)
+            else "missing-pr-number"
+        )
+        route = {
+            "disposition": "active-remediation",
+            "sourceState": "unclassified",
+            "owner": "controller",
+            "writer": "controller",
+            "action": "collect-missing-pr-evidence",
+            "reason": reason,
+            "terminal": False,
+        }
+    else:
+        state = disposition["state"]
+        reason = str(disposition.get("reason") or state)
+        if state == "close":
+            route = {
+                "disposition": "terminal",
+                "sourceState": state,
+                "owner": "gem",
+                "writer": "gem",
+                "action": "preserve-explicit-duplicate-terminal",
+                "reason": reason,
+                "terminal": True,
+            }
+        elif state == "queued":
+            route = {
+                "disposition": "active-remediation",
+                "sourceState": state,
+                "owner": "github-native-merge-queue",
+                "writer": "github-native-merge-queue",
+                "action": "preserve-native-queue-ownership",
+                "reason": reason,
+                "terminal": False,
+            }
+        elif state == "promote":
+            route = {
+                "disposition": "active-remediation",
+                "sourceState": state,
+                "owner": "gem",
+                "writer": "gem",
+                "action": "reconcile-exact-head-queue-admission",
+                "reason": reason,
+                "terminal": False,
+            }
+        elif state == "held":
+            expires_at = parse_time(disposition.get("expiresAt"))
+            expired = expires_at is not None and expires_at <= now
+            route = {
+                "disposition": "active-remediation",
+                "sourceState": state,
+                "owner": "symphony",
+                "writer": "symphony",
+                "action": (
+                    "reconcile-expired-machine-hold"
+                    if expired
+                    else "promote-or-supersede-before-expiry"
+                ),
+                "reason": reason,
+                "terminal": False,
+            }
+        else:
+            evidence_reasons = {
+                "required-check-policy-drift",
+                "required-check-evidence-missing",
+            }
+            evidence_only = reason in evidence_reasons or reason.startswith(
+                "promotion-evidence-"
+            )
+            branch_repair = reason == "stale-base" or reason.startswith(
+                "merge-state-"
+            )
+            owner = "controller" if evidence_only else (
+                "gem"
+                if reason == "non-main-base" or branch_repair
+                else "symphony"
+            )
+            action = (
+                "collect-missing-pr-evidence"
+                if evidence_only
+                else "retarget-pr-base-to-main"
+                if reason == "non-main-base"
+                else "exact-head-branch-update"
+                if branch_repair
+                else "create-bounded-ci-repair-pr"
+            )
+            route = {
+                "disposition": "active-remediation",
+                "sourceState": state,
+                "owner": owner,
+                "writer": owner,
+                "action": action,
+                "reason": reason,
+                "terminal": False,
+            }
+
+    identity = {
+        "repository": repository,
+        "inventoryIndex": inventory_index,
+        "pr": number if valid_number else None,
+        "headSha": head_oid,
+        "issue": issue,
+        **route,
+    }
+    action_identity = _lifecycle_action_identity(identity)
+    return {
+        "schema": LIFECYCLE_ACTION_SCHEMA,
+        **identity,
+        "lifecycleKey": (
+            f"{repository}:pr:{number}"
+            if valid_number
+            else f"{repository}:inventory-row:{inventory_index}"
+        ),
+        "actionKey": _lifecycle_action_digest(action_identity),
+        "observedAt": isoformat(now),
+        "externalMutations": 0,
+    }
+
+
 def classify_open_prs(
     prs: list[dict[str, Any]], now: datetime, repository: str = "JovieInc/Jovie"
 ) -> dict[str, Any]:
@@ -1567,6 +1720,25 @@ def classify_open_prs(
     counts = {state: 0 for state in ("close", "repair", "promote", "queued", "held")}
     for disposition in dispositions:
         counts[disposition["state"]] += 1
+    disposition_by_number = {item["number"]: item for item in dispositions}
+    unclassified_by_number = {
+        item.get("number"): item
+        for item in unclassified
+        if isinstance(item.get("number"), int)
+        and not isinstance(item.get("number"), bool)
+        and item.get("number") > 0
+    }
+    lifecycle_actions = [
+        _lifecycle_action(
+            pr,
+            index,
+            disposition_by_number.get(pr.get("number")),
+            unclassified_by_number.get(pr.get("number")),
+            now,
+            repository,
+        )
+        for index, pr in enumerate(prs)
+    ]
     stack_health = _draft_stack_health(repository, usable, prs_by_number, now)
     return {
         "dispositions": dispositions,
@@ -1577,6 +1749,7 @@ def classify_open_prs(
         "changedFileEvidence": changed_file_evidence,
         "stackHealth": stack_health,
         "repairActions": stack_health["repairActions"],
+        "lifecycleActions": lifecycle_actions,
         "promotionEvidence": promotion_evidence,
     }
 
@@ -1593,6 +1766,176 @@ def _episode_since(
     candidate = episode.get("since")
     parsed = parse_time(candidate)
     return parsed if parsed is not None and parsed <= now else now
+
+
+def _lifecycle_action_identity(action: dict[str, Any]) -> dict[str, Any]:
+    """Canonical content-addressed identity shared by emission and validation."""
+    fields = (
+        "repository",
+        "inventoryIndex",
+        "pr",
+        "headSha",
+        "issue",
+        "disposition",
+        "sourceState",
+        "owner",
+        "writer",
+        "action",
+        "reason",
+        "terminal",
+    )
+    identity = {field: action.get(field) for field in fields}
+    if isinstance(identity["pr"], int) and not isinstance(identity["pr"], bool):
+        identity.pop("inventoryIndex")
+    return identity
+
+
+def _lifecycle_action_digest(identity: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            identity,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode()
+    ).hexdigest()
+
+
+def _lifecycle_route_valid(action: dict[str, Any]) -> bool:
+    source_state = action.get("sourceState")
+    owner = action.get("owner")
+    next_action = action.get("action")
+    disposition = action.get("disposition")
+    route = (disposition, owner, next_action)
+    expected = {
+        "protected": ("terminal", "gem", "preserve-protected-pr-exclusion"),
+        "unclassified": (
+            "active-remediation",
+            "controller",
+            "collect-missing-pr-evidence",
+        ),
+        "close": ("terminal", "gem", "preserve-explicit-duplicate-terminal"),
+        "queued": (
+            "active-remediation",
+            "github-native-merge-queue",
+            "preserve-native-queue-ownership",
+        ),
+        "promote": (
+            "active-remediation",
+            "gem",
+            "reconcile-exact-head-queue-admission",
+        ),
+    }
+    if source_state in expected:
+        return route == expected[source_state]
+    if source_state == "held":
+        return route in {
+            ("active-remediation", "symphony", "reconcile-expired-machine-hold"),
+            (
+                "active-remediation",
+                "symphony",
+                "promote-or-supersede-before-expiry",
+            ),
+        }
+    if source_state != "repair":
+        return False
+    return route in {
+        ("active-remediation", "controller", "collect-missing-pr-evidence"),
+        ("active-remediation", "gem", "retarget-pr-base-to-main"),
+        ("active-remediation", "gem", "exact-head-branch-update"),
+        ("active-remediation", "symphony", "create-bounded-ci-repair-pr"),
+    }
+
+
+def _lifecycle_inventory_valid(
+    actions: object, open_prs: object, expected_repository: object
+) -> bool:
+    if (
+        not isinstance(actions, list)
+        or not isinstance(open_prs, int)
+        or isinstance(open_prs, bool)
+        or len(actions) != open_prs
+    ):
+        return False
+    lifecycle_keys: set[str] = set()
+    inventory_indexes: set[int] = set()
+    for action in actions:
+        if not isinstance(action, dict):
+            return False
+        lifecycle_key = action.get("lifecycleKey")
+        action_key = action.get("actionKey")
+        repository = action.get("repository")
+        inventory_index = action.get("inventoryIndex")
+        pr = action.get("pr")
+        head_sha = action.get("headSha")
+        issue = action.get("issue")
+        owner = action.get("owner")
+        disposition = action.get("disposition")
+        source_state = action.get("sourceState")
+        next_action = action.get("action")
+        reason = action.get("reason")
+        observed_at = action.get("observedAt")
+        parsed_observed_at = parse_time(observed_at)
+        route = (disposition, owner, next_action)
+        valid_pr = isinstance(pr, int) and not isinstance(pr, bool) and pr > 0
+        expected_lifecycle_key = (
+            f"{repository}:pr:{pr}"
+            if valid_pr
+            else f"{repository}:inventory-row:{inventory_index}"
+        )
+        if (
+            action.get("schema") != LIFECYCLE_ACTION_SCHEMA
+            or not isinstance(repository, str)
+            or REPOSITORY_NAME.fullmatch(repository) is None
+            or repository != expected_repository
+            or not isinstance(inventory_index, int)
+            or isinstance(inventory_index, bool)
+            or inventory_index < 0
+            or inventory_index >= open_prs
+            or inventory_index in inventory_indexes
+            or (not valid_pr and pr is not None)
+            or (not valid_pr and source_state != "unclassified")
+            or (head_sha is not None and not _valid_oid(head_sha))
+            or (head_sha is None and source_state != "unclassified")
+            or (
+                issue is not None
+                and (
+                    not isinstance(issue, str)
+                    or ISSUE_REFERENCE.fullmatch(issue) is None
+                )
+            )
+            or not isinstance(lifecycle_key, str)
+            or lifecycle_key != expected_lifecycle_key
+            or lifecycle_key in lifecycle_keys
+            or not isinstance(action_key, str)
+            or re.fullmatch(r"[0-9a-f]{64}", action_key) is None
+            or action_key != _lifecycle_action_digest(
+                _lifecycle_action_identity(action)
+            )
+            or owner not in LIFECYCLE_MACHINE_OWNERS
+            or action.get("writer") != owner
+            or disposition not in {"active-remediation", "terminal"}
+            or not isinstance(next_action, str)
+            or not next_action
+            or len(next_action) > 160
+            or not isinstance(reason, str)
+            or not reason
+            or len(reason) > 240
+            or parsed_observed_at is None
+            or isoformat(parsed_observed_at) != observed_at
+            or not _lifecycle_route_valid(action)
+            or action.get("terminal") != (disposition == "terminal")
+            or action.get("externalMutations") != 0
+            or (
+                pr == 17156
+                and route
+                != ("terminal", "gem", "preserve-protected-pr-exclusion")
+            )
+        ):
+            return False
+        lifecycle_keys.add(lifecycle_key)
+        inventory_indexes.add(inventory_index)
+    return inventory_indexes == set(range(open_prs))
 
 
 def _previous_for_repository(
@@ -1649,6 +1992,7 @@ def evaluate_closure_health(
     expired_holds = classifications.get("expiredHolds")
     stack_health = classifications.get("stackHealth")
     repair_actions = classifications.get("repairActions")
+    lifecycle_actions = classifications.get("lifecycleActions")
     observer_unknown = observer_unknown or not all(
         isinstance(value, list)
         for value in (dispositions, unclassified, duplicates, expired_holds)
@@ -1665,6 +2009,12 @@ def evaluate_closure_health(
     if repair_actions is None:
         repair_actions = []
     observer_unknown = observer_unknown or not isinstance(repair_actions, list)
+    if lifecycle_actions is None:
+        lifecycle_actions = []
+    lifecycle_inventory_valid = _lifecycle_inventory_valid(
+        lifecycle_actions, open_prs, repository
+    )
+    observer_unknown = observer_unknown or not isinstance(lifecycle_actions, list)
     dispositions = dispositions if isinstance(dispositions, list) else []
     unclassified = unclassified if isinstance(unclassified, list) else []
     duplicates = duplicates if isinstance(duplicates, list) else []
@@ -1676,6 +2026,9 @@ def evaluate_closure_health(
         else []
     )
     repair_actions = repair_actions if isinstance(repair_actions, list) else []
+    lifecycle_actions = (
+        lifecycle_actions if isinstance(lifecycle_actions, list) else []
+    )
 
     unmergeable_queue_prs = sorted(
         item.get("number")
@@ -1704,6 +2057,8 @@ def evaluate_closure_health(
     reasons: list[str] = []
     if observer_unknown:
         reasons.append("closure-observation-unknown")
+    if not lifecycle_inventory_valid:
+        reasons.append("lifecycle-action-inventory-incomplete")
     if duplicates:
         reasons.append("duplicate-issue-lanes-unresolved")
     if expired_holds:
@@ -1802,6 +2157,7 @@ def evaluate_closure_health(
         "latestMergeAt": snapshot.get("latestMergeAt"),
         "stackHealth": bounded_stack_health(stack_health),
         "repairActions": repair_actions if isinstance(repair_actions, list) else [],
+        "lifecycleActions": lifecycle_actions,
         "classifications": classifications,
     }
 
@@ -2050,6 +2406,7 @@ def observe_closure_health(
             # JOV-INV-020 ingress contract used by Fleet Gate Refresh.
             "stackHealth": empty_stack_health(),
             "repairActions": [],
+            "lifecycleActions": [],
             "classifications": {
                 "dispositions": [],
                 "counts": {},
@@ -2057,5 +2414,6 @@ def observe_closure_health(
                 "duplicateIssueLanes": [],
                 "expiredHolds": [],
                 "changedFileEvidence": [],
+                "lifecycleActions": [],
             },
         }

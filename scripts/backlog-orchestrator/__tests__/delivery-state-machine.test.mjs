@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -18,8 +27,63 @@ import {
 const HEAD = 'a'.repeat(40);
 const REPO = 'JovieInc/Jovie';
 const LYB_REPO = 'JovieInc/LogYourBody';
+const CROSS_RUNTIME_LIFECYCLE_KEY =
+  '5a34f15f28cdfed416aa498dd84fdf5d048f68f9f183f782c1a2b95800f28c52';
+
+function canonicalDigest(value) {
+  const canonicalize = candidate => {
+    if (Array.isArray(candidate)) return candidate.map(canonicalize);
+    if (!candidate || typeof candidate !== 'object') return candidate;
+    return Object.fromEntries(
+      Object.keys(candidate)
+        .sort()
+        .map(key => [key, canonicalize(candidate[key])])
+    );
+  };
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalize(value)))
+    .digest('hex');
+}
+
+function lifecycleAction(overrides = {}) {
+  const pr = overrides.pr ?? 17001;
+  const sourceState = overrides.sourceState ?? 'repair';
+  const terminal = overrides.terminal ?? false;
+  const action = {
+    schema: 'jovie-pr-lifecycle-action/v1',
+    repository: REPO,
+    inventoryIndex: overrides.inventoryIndex ?? 0,
+    pr,
+    headSha: overrides.headSha === undefined ? HEAD : overrides.headSha,
+    issue: null,
+    lifecycleKey: `${REPO}:pr:${pr}`,
+    disposition: terminal ? 'terminal' : 'active-remediation',
+    sourceState,
+    owner: overrides.owner ?? 'symphony',
+    writer: overrides.writer ?? overrides.owner ?? 'symphony',
+    action: overrides.action ?? 'create-bounded-ci-repair-pr',
+    reason: overrides.reason ?? 'required-checks-not-green',
+    terminal,
+    observedAt: overrides.observedAt ?? '2026-09-06T12:00:00.000Z',
+    externalMutations: 0,
+  };
+  const identity = { ...action };
+  delete identity.schema;
+  delete identity.lifecycleKey;
+  delete identity.observedAt;
+  delete identity.externalMutations;
+  if (pr) delete identity.inventoryIndex;
+  return {
+    ...action,
+    actionKey: overrides.actionKey ?? canonicalDigest(identity),
+  };
+}
 
 describe('delivery state machine', () => {
+  it('matches the Python canonical lifecycle action digest', () => {
+    assert.equal(lifecycleAction().actionKey, CROSS_RUNTIME_LIFECYCLE_KEY);
+  });
+
   it('turns every machine-owned failure into one bounded repair route', () => {
     for (const [failure, action] of [
       ['workflow-cancelled', 'reconcile-cancelled-workflow'],
@@ -410,6 +474,237 @@ describe('delivery state machine', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('persists lifecycle replay idempotently and supersedes an older exact head', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-pr-lifecycle-'));
+    try {
+      const firstAction = lifecycleAction();
+      const source = {
+        schema: 'jovie-closure-health/v1',
+        repository: REPO,
+        authority: 'Summer',
+        observedAt: firstAction.observedAt,
+        lifecycleActions: [firstAction],
+      };
+      const first = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      const duplicate = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      const advancedAction = lifecycleAction({
+        headSha: 'b'.repeat(40),
+        observedAt: '2026-09-06T12:15:00.000Z',
+      });
+      const advanced = await persistClosureHealthActions(
+        {
+          ...source,
+          observedAt: advancedAction.observedAt,
+          lifecycleActions: [advancedAction],
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(first.lifecycleActions[0].status, 'created');
+      assert.equal(duplicate.lifecycleActions[0].status, 'duplicate');
+      assert.equal(advanced.lifecycleActions[0].status, 'created');
+      assert.equal(advanced.lifecycleActions[0].receipt.generation, 1);
+      assert.equal(
+        advanced.lifecycleActions[0].receipt.supersedesActionKey,
+        firstAction.actionKey
+      );
+      assert.equal(
+        advanced.lifecycleActions[0].receipt.headSha,
+        'b'.repeat(40)
+      );
+
+      const forgedReplay = await persistClosureHealthActions(
+        {
+          ...source,
+          observedAt: '2026-09-06T12:30:00.000Z',
+          lifecycleActions: [
+            lifecycleAction({
+              headSha: 'c'.repeat(40),
+              actionKey: advancedAction.actionKey,
+              observedAt: '2026-09-06T12:30:00.000Z',
+            }),
+          ],
+        },
+        { stateDir: directory }
+      );
+      assert.equal(forgedReplay.status, 'partial');
+      assert.equal(forgedReplay.lifecycleRejectedCount, 1);
+      assert.match(
+        forgedReplay.lifecycleActions[0].reason,
+        /key does not match its content/
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('fails a malformed lifecycle row closed without dropping valid rows', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-pr-lifecycle-bad-'));
+    try {
+      const valid = lifecycleAction();
+      const malformed = { ...lifecycleAction({ pr: 17002 }), owner: 'human' };
+      const result = await persistClosureHealthActions(
+        {
+          schema: 'jovie-closure-health/v1',
+          repository: REPO,
+          authority: 'Summer',
+          observedAt: valid.observedAt,
+          lifecycleActions: [malformed, valid],
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(result.status, 'partial');
+      assert.equal(result.failClosed, true);
+      assert.equal(result.lifecycleActionCount, 1);
+      assert.equal(result.lifecycleRejectedCount, 1);
+      assert.equal(result.lifecycleActions[0].status, 'rejected');
+      assert.equal(result.lifecycleActions[1].status, 'created');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('returns a failing CLI status after retaining valid siblings', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-pr-lifecycle-cli-'));
+    try {
+      const valid = lifecycleAction();
+      const input = join(directory, 'closure-health.json');
+      await writeFile(
+        input,
+        JSON.stringify({
+          repository: REPO,
+          observedAt: valid.observedAt,
+          lifecycleActions: [
+            { ...lifecycleAction({ pr: 17002 }), owner: 'human' },
+            valid,
+          ],
+        })
+      );
+      const result = spawnSync(
+        process.execPath,
+        [
+          new URL('../delivery-state-machine.mjs', import.meta.url).pathname,
+          `--closure-health-file=${input}`,
+          `--state-dir=${directory}`,
+        ],
+        { encoding: 'utf8' }
+      );
+      const output = JSON.parse(result.stdout);
+
+      assert.equal(result.status, 1);
+      assert.equal(output.failClosed, true);
+      assert.equal(output.lifecycleActionCount, 1);
+      assert.equal(output.lifecycleRejectedCount, 1);
+      assert.equal(output.lifecycleActions[1].status, 'created');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('quarantines malformed persisted siblings and atomically retains valid actions', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-pr-lifecycle-poison-')
+    );
+    const receiptDirectory = join(directory, 'pr-lifecycle-actions');
+    try {
+      await mkdir(receiptDirectory, { recursive: true });
+      await writeFile(join(receiptDirectory, 'poison.json'), '{bad json\n');
+      const action = lifecycleAction();
+      const [first, replay] = await Promise.all([
+        persistClosureHealthActions(
+          {
+            repository: REPO,
+            observedAt: action.observedAt,
+            lifecycleActions: [action],
+          },
+          { stateDir: directory }
+        ),
+        persistClosureHealthActions(
+          {
+            repository: REPO,
+            observedAt: action.observedAt,
+            lifecycleActions: [action],
+          },
+          { stateDir: directory }
+        ),
+      ]);
+
+      assert.deepEqual(
+        [
+          first.lifecycleActions[0].status,
+          replay.lifecycleActions[0].status,
+        ].sort(),
+        ['created', 'duplicate']
+      );
+      const names = await readdir(receiptDirectory);
+      assert.equal(names.filter(name => name.endsWith('.json')).length, 1);
+      assert.equal(
+        names.some(name => name.endsWith('.tmp')),
+        false
+      );
+      const quarantined = await readdir(join(receiptDirectory, 'quarantine'));
+      assert.equal(quarantined.length, 1);
+      assert.match(quarantined[0], /^poison\.json\..+\.malformed$/);
+      assert.equal(
+        JSON.parse(
+          await readFile(
+            join(receiptDirectory, `${action.actionKey}.json`),
+            'utf8'
+          )
+        ).headSha,
+        HEAD
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts only the protected machine terminal disposition for PR 17156', async () => {
+    const protectedAction = lifecycleAction({
+      pr: 17156,
+      terminal: true,
+      sourceState: 'protected',
+      owner: 'gem',
+      action: 'preserve-protected-pr-exclusion',
+      reason: 'protected-machine-exclusion:17156',
+    });
+    const accepted = await persistClosureHealthActions(
+      {
+        repository: REPO,
+        observedAt: protectedAction.observedAt,
+        lifecycleActions: [protectedAction],
+      },
+      { dryRun: true }
+    );
+    const rejected = await persistClosureHealthActions(
+      {
+        repository: REPO,
+        observedAt: protectedAction.observedAt,
+        lifecycleActions: [
+          {
+            ...protectedAction,
+            terminal: false,
+            disposition: 'active-remediation',
+            owner: 'symphony',
+            writer: 'symphony',
+            action: 'create-bounded-ci-repair-pr',
+          },
+        ],
+      },
+      { dryRun: true }
+    );
+
+    assert.equal(accepted.lifecycleRejectedCount, 0);
+    assert.equal(accepted.lifecycleActions[0].receipt.outcome, 'terminal');
+    assert.equal(rejected.status, 'partial');
+    assert.equal(rejected.lifecycleRejectedCount, 1);
   });
 
   it('accepts a schema-valid fleet receipt whose stack fields were omitted', async () => {

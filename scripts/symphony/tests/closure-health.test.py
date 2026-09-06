@@ -209,22 +209,19 @@ def snapshot(**overrides: object) -> dict[str, object]:
         "greenReadyPrs": 2,
         "nativeQueueCount": 1,
         "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
-        "classifications": {
-            "dispositions": [
-                {
-                    "number": 1,
-                    "state": "queued",
-                    "queueState": "AWAITING_CHECKS",
-                },
-                {"number": 2, "state": "promote"},
+        "classifications": MODULE.classify_open_prs(
+            [
+                pr(1, title="feat: ship JOV-1", queued=True),
+                pr(2, title="feat: ship JOV-2"),
             ],
-            "unclassified": [],
-            "duplicateIssueLanes": [],
-            "expiredHolds": [],
-            "changedFileEvidence": [],
-        },
+            NOW,
+        ),
     }
     value.update(overrides)
+    if "classifications" in overrides and "openPrs" not in overrides:
+        lifecycle_actions = value["classifications"].get("lifecycleActions")
+        if isinstance(lifecycle_actions, list):
+            value["openPrs"] = len(lifecycle_actions)
     return value
 
 
@@ -412,6 +409,127 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(held["reason"], "draft")
         self.assertIsInstance(held["expiresAt"], str)
         self.assertEqual(result["unclassified"], [])
+
+    def test_mixed_84_row_inventory_has_one_machine_owned_lifecycle_action_each(self):
+        rows = []
+        for number in range(1001, 1084):
+            variant = number % 5
+            rows.append(
+                pr(
+                    number,
+                    title=f"change: JOV-{number}",
+                    queued=variant == 0,
+                    draft=variant == 1,
+                    merge_state="DIRTY" if variant == 2 else "CLEAN",
+                    labels=("duplicate",) if variant == 3 else (),
+                )
+            )
+        rows.append(pr(17156, title="protected: JOV-17156", draft=True))
+
+        actions = MODULE.classify_open_prs(rows, NOW)["lifecycleActions"]
+
+        self.assertEqual(len(actions), 84)
+        self.assertEqual(len({item["lifecycleKey"] for item in actions}), 84)
+        self.assertEqual(len({item["actionKey"] for item in actions}), 84)
+        self.assertTrue(
+            all(
+                item["owner"] == item["writer"]
+                and item["owner"]
+                in {"controller", "gem", "github-native-merge-queue", "symphony"}
+                and item["disposition"]
+                in {"active-remediation", "terminal"}
+                for item in actions
+            )
+        )
+
+    def test_lifecycle_mapping_preserves_native_queue_and_machine_routes(self):
+        actions = MODULE.classify_open_prs(
+            [
+                pr(10, title="queued JOV-10", queued=True),
+                pr(11, title="promote JOV-11"),
+                pr(12, title="repair JOV-12", merge_state="DIRTY"),
+                pr(13, title="draft JOV-13", draft=True),
+                pr(14, title="duplicate JOV-14", labels=("duplicate",)),
+            ],
+            NOW,
+        )["lifecycleActions"]
+        by_pr = {item["pr"]: item for item in actions}
+
+        self.assertEqual(
+            (by_pr[10]["owner"], by_pr[10]["action"]),
+            ("github-native-merge-queue", "preserve-native-queue-ownership"),
+        )
+        self.assertEqual(
+            (by_pr[11]["owner"], by_pr[11]["action"]),
+            ("gem", "reconcile-exact-head-queue-admission"),
+        )
+        self.assertEqual(
+            (by_pr[12]["owner"], by_pr[12]["action"]),
+            ("gem", "exact-head-branch-update"),
+        )
+        self.assertEqual(by_pr[13]["owner"], "symphony")
+        self.assertTrue(by_pr[14]["terminal"])
+
+    def test_protected_pr_is_inventoried_as_terminal_machine_exclusion(self):
+        action = MODULE.classify_open_prs(
+            [pr(17156, title="protected JOV-17156", draft=True)], NOW
+        )["lifecycleActions"][0]
+
+        self.assertEqual(action["sourceState"], "protected")
+        self.assertEqual(action["disposition"], "terminal")
+        self.assertEqual(action["owner"], "gem")
+        self.assertEqual(action["action"], "preserve-protected-pr-exclusion")
+
+    def test_legacy_human_taste_and_no_auto_labels_never_create_a_hold(self):
+        rows = [
+            pr(20 + index, title=f"ready JOV-{20 + index}", labels=(label,))
+            for index, label in enumerate(
+                (
+                    "needs-human",
+                    "human-review-required",
+                    "needs:taste",
+                    "needs-human-taste",
+                    "taste",
+                    "no-auto",
+                    "no-auto-merge",
+                    "no-automerge",
+                )
+            )
+        ]
+        result = MODULE.classify_open_prs(rows, NOW)
+
+        self.assertEqual(
+            {item["state"] for item in result["dispositions"]}, {"promote"}
+        )
+        self.assertTrue(
+            all(item["owner"] == "gem" for item in result["lifecycleActions"])
+        )
+
+    def test_malformed_row_fails_closed_without_dropping_other_lifecycle_actions(self):
+        malformed = pr(31, title="malformed JOV-31")
+        malformed["headRefOid"] = None
+        result = MODULE.classify_open_prs(
+            [pr(30, title="ready JOV-30"), malformed], NOW
+        )
+        by_pr = {item["pr"]: item for item in result["lifecycleActions"]}
+
+        self.assertEqual(len(result["lifecycleActions"]), 2)
+        self.assertEqual(by_pr[30]["sourceState"], "promote")
+        self.assertEqual(by_pr[31]["sourceState"], "unclassified")
+        self.assertEqual(by_pr[31]["owner"], "controller")
+        self.assertIsNone(by_pr[31]["headSha"])
+
+    def test_native_merge_queue_policy_remains_20_1_5(self):
+        ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(
+            encoding="utf-8"
+        )
+        guard = (ROOT / "scripts/lib/merge-queue-guard.mjs").read_text(
+            encoding="utf-8"
+        )
+        for source in (ruleset, guard):
+            self.assertRegex(source, r"check_response_timeout_minutes:\s*20")
+            self.assertRegex(source, r"max_entries_to_build:\s*1")
+            self.assertRegex(source, r"max_entries_to_merge:\s*5")
 
     def test_clean_pr_with_stale_base_is_repair_not_promote(self):
         evidence = exact_green_promotion_evidence(12)
@@ -1108,6 +1226,87 @@ class ClosureClassificationTests(unittest.TestCase):
 
 
 class ClosureHealthEvaluationTests(unittest.TestCase):
+    def test_lifecycle_action_digest_is_cross_runtime_canonical(self):
+        identity = {
+            "repository": "JovieInc/Jovie",
+            "pr": 17001,
+            "headSha": "a" * 40,
+            "issue": None,
+            "disposition": "active-remediation",
+            "sourceState": "repair",
+            "owner": "symphony",
+            "writer": "symphony",
+            "action": "create-bounded-ci-repair-pr",
+            "reason": "required-checks-not-green",
+            "terminal": False,
+        }
+
+        self.assertEqual(
+            MODULE._lifecycle_action_digest(identity),
+            "5a34f15f28cdfed416aa498dd84fdf5d048f68f9f183f782c1a2b95800f28c52",
+        )
+
+    def test_health_fails_closed_when_one_open_pr_lacks_owned_lifecycle_action(self):
+        observed = snapshot()
+        observed["classifications"]["lifecycleActions"] = observed[
+            "classifications"
+        ]["lifecycleActions"][:-1]
+
+        health = MODULE.evaluate_closure_health(observed, None, NOW)
+
+        self.assertEqual(health["status"], "red")
+        self.assertIn("lifecycle-action-inventory-incomplete", health["reasons"])
+
+    def test_health_fails_closed_for_malformed_or_unbound_lifecycle_content(self):
+        mutations = {
+            "missing-pr": (lambda action: action.update(pr=None), True),
+            "missing-head": (lambda action: action.update(headSha=None), True),
+            "missing-action": (lambda action: action.pop("action"), True),
+            "missing-reason": (lambda action: action.pop("reason"), True),
+            "missing-observed-at": (lambda action: action.pop("observedAt"), True),
+            "unbound-lifecycle-key": (
+                lambda action: action.update(lifecycleKey="JovieInc/Jovie:pr:999"),
+                True,
+            ),
+            "wrong-repository": (
+                lambda action: action.update(repository="JovieInc/LogYourBody"),
+                True,
+            ),
+            "unbound-action-key": (
+                lambda action: action.update(headSha="b" * 40),
+                False,
+            ),
+            "wrong-native-queue-writer": (
+                lambda action: action.update(owner="gem", writer="gem"),
+                True,
+            ),
+        }
+
+        for name, (mutate, rebind_action_key) in mutations.items():
+            with self.subTest(name=name):
+                observed = snapshot()
+                action = dict(observed["classifications"]["lifecycleActions"][0])
+                mutate(action)
+                if rebind_action_key:
+                    action["actionKey"] = MODULE._lifecycle_action_digest(
+                        MODULE._lifecycle_action_identity(action)
+                    )
+                observed["classifications"] = {
+                    **observed["classifications"],
+                    "lifecycleActions": [
+                        action,
+                        observed["classifications"]["lifecycleActions"][1],
+                    ],
+                }
+
+                health = MODULE.evaluate_closure_health(observed, None, NOW)
+
+                self.assertEqual(health["status"], "red")
+                self.assertFalse(health["newIssueIntakeAllowed"])
+                self.assertIn(
+                    "lifecycle-action-inventory-incomplete", health["reasons"]
+                )
+
     def test_boundary_offset_timestamp_is_treated_as_missing_history(self):
         self.assertIsNone(MODULE.parse_time("0001-01-01T00:00:00+14:00"))
 
@@ -1304,13 +1503,12 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertTrue(cleared["newIssueIntakeAllowed"])
 
     def test_unclassified_pr_crosses_fifteen_minute_deliberate_red(self):
+        missing_provenance = pr(1, title="fix: JOV-1")
+        missing_provenance["isCrossRepository"] = None
         unclassified = snapshot(
-            classifications={
-                "dispositions": [{"number": 2, "state": "promote"}],
-                "unclassified": [{"number": 1, "reason": "missing-owner"}],
-                "duplicateIssueLanes": [],
-                "expiredHolds": [],
-            }
+            classifications=MODULE.classify_open_prs(
+                [missing_provenance, pr(2, title="fix: JOV-2")], NOW
+            )
         )
         first = MODULE.evaluate_closure_health(unclassified, previous=None, now=NOW)
         self.assertEqual(first["status"], "grace")
@@ -1334,10 +1532,19 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
             now=NOW,
         )
         current_now = NOW + timedelta(minutes=20)
+        lyb_classifications = MODULE.classify_open_prs(
+            [
+                pr(1, title="feat: ship LYB-1", queued=True),
+                pr(2, title="feat: ship LYB-2"),
+            ],
+            NOW,
+            repository="JovieInc/LogYourBody",
+        )
         current = MODULE.evaluate_closure_health(
             snapshot(
                 repository="JovieInc/LogYourBody",
                 nativeQueueCount=0,
+                classifications=lyb_classifications,
             ),
             previous=previous,
             now=current_now,
