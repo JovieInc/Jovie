@@ -1,4 +1,4 @@
-import { PageShell } from '@/components/organisms/PageShell';
+import { PageShell } from '@/components/canonical';
 
 export default function SettingsLayout({
   children,
