@@ -23,7 +23,7 @@ test('desktop dev script routes through launch-electron', async () => {
   const packageJson = await readFile(join(desktopRoot, 'package.json'), 'utf8');
   assert.match(
     packageJson,
-    /"dev": "tsc && node scripts\/launch-electron\.mjs"/
+    /"dev": "pnpm run compile && node scripts\/launch-electron\.mjs"/
   );
 });
 
