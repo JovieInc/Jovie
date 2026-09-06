@@ -109,8 +109,42 @@ class ExecutionTruthTests(unittest.TestCase):
         for change, expected in [({"session_id": None}, "STARTING / NO SESSION"), ({"tokens_total": 0}, "SESSION / NO TOKENS"), ({"last_event_at": None}, "SESSION / PROGRESS UNKNOWN"), ({"last_event_at": STARTED}, "SESSION / NO RECENT PROGRESS"), ({"kind": "blocked"}, "BLOCKED"), ({"kind": "retrying"}, "RETRYING"), ({"kind": "queued"}, "QUEUED"), ({"kind": "unexpected"}, "UNKNOWN")]:
             self.assertEqual(HUD.execution_state({**row, **change}, now=NOW), expected)
 
+    def test_execution_identity_requires_current_bound_proof(self):
+        proof = {
+            "issue_identifier": "JOV-1", "attempt": 2, "session_id": "session-1", "lease_id": "lease-1",
+            "service": "symphony-elixir.service", "host": "gem", "pid": 4242,
+            "process_started_at": STARTED, "process_instance_id": "pid-start-1",
+            "artifact_sha256": "a" * 64, "source_revision": SHA,
+            "workflow_config_sha256": "b" * 64, "observed_at": NOW.isoformat(),
+            "provider": "openai", "model": "gpt-5.6-sol", "account_alias": "sol-1",
+        }
+        row = HUD._normalize_row({
+            "identifier": "JOV-1", "attempt": 2, "session_id": "session-1",
+            "last_event_at": NOW.isoformat(), "tokens": {"total_tokens": 10},
+            "execution": proof, "model": "selected-model",
+        }, "running")
+        self.assertTrue(row["execution_proof_valid"])
+        self.assertEqual(row["executed_model"], "gpt-5.6-sol")
+        self.assertEqual(row["executed_account_alias"], "sol-1")
+        for field, value in (("pid", 4243), ("session_id", "old-session"), ("attempt", 1)):
+            forged = dict(proof)
+            forged[field] = value
+            candidate = HUD._normalize_row({
+                "identifier": "JOV-1", "attempt": 2, "session_id": "session-1", "codex_app_server_pid": 4242,
+                "execution": forged,
+            }, "running")
+            self.assertFalse(candidate["execution_proof_valid"])
+            self.assertIsNone(candidate["executed_model"])
+        incomplete = dict(proof)
+        del incomplete["workflow_config_sha256"]
+        candidate = HUD._normalize_row({
+            "identifier": "JOV-1", "attempt": 2, "session_id": "session-1", "execution": incomplete,
+        }, "running")
+        self.assertFalse(candidate["execution_proof_valid"])
+        self.assertIsNone(candidate["executed_provider"])
+
     def test_configured_or_selected_model_is_never_executed(self):
-        row = HUD._normalize_row({"identifier": "JOV-1", "model": "configured-sol", "provider": "selected-provider", "account": "selected-alias", "session_id": "session-1", "last_event_at": NOW.isoformat(), "tokens": {"total_tokens": 10}}, "running")
+        row = HUD._normalize_row({"identifier": "JOV-1", "model": "configured-sol", "provider": "selected-provider", "account": "selected-alias", "attempt": 1, "session_id": "session-1", "last_event_at": NOW.isoformat(), "tokens": {"total_tokens": 10}}, "running")
         text = strip("\n".join(HUD.execution_lines(row, 430, now=NOW)))
         self.assertIn("Executed: UNKNOWN", text)
         self.assertIn("provider UNKNOWN", text)
