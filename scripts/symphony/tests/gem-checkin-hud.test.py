@@ -250,7 +250,7 @@ class UltrawideHudTests(unittest.TestCase):
         output = paint(width=200)
         plain, source = strip(output), SOURCE.read_text(encoding="utf-8")
         self.assertIn("get_terminal_size", source)
-        for token in ("ST", "TRY/TURN", "TOKENS", "ELAPSED", "WORKSPACE / PR"):
+        for token in ("ST", "TRY/TURN", "TOKENS", "ELAPSED", "EVIDENCE / PR"):
             self.assertIn(token, plain)
         header = plain.splitlines()[0]
         self.assertGreaterEqual(len(header), 80)
@@ -291,7 +291,7 @@ class UltrawideHudTests(unittest.TestCase):
             self.assertIn(token, plain)
         self.assertNotIn("OpenAI", plain)
         running_line = next(line for line in plain.splitlines() if line.startswith("●") and "JOV-5491" in line)
-        self.assertTrue(running_line.rstrip().endswith("JOV-5491") or "…/JOV-5491" in running_line or running_line.rstrip().endswith("…"))
+        self.assertIn("turn completed", running_line)
         self.assertLess(plain.index("JOV-5488"), plain.index("JOV-5491"))
         self.assertLess(plain.index("JOV-5491"), plain.index("#16796"))
         self.assertNotIn("GEM OPERATIONS", plain)
@@ -339,6 +339,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:55Z", "output_tokens": 200, "scope": "symphony:4041", "unit": "output_tokens"}], now=NOW))
         self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:55Z", "output_tokens": 50, "scope": "other", "unit": "output_tokens"}], now=NOW))
         self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:55Z", "output_tokens": 50, "scope": "symphony:4041", "unit": "total_tokens"}], now=NOW))
+        self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:59Z", "output_tokens": 50, "scope": "symphony:4041", "unit": "output_tokens"}], now=NOW))
 
     def test_null_rate_limits_render_dash_never_invented(self):
         state, _ = fetch_state(official_state(rate_limits=None))
@@ -514,14 +515,14 @@ class UltrawideHudTests(unittest.TestCase):
             height=70,
         )
         plain = strip(output)
-        header = next(line for line in plain.splitlines() if "POS" in line and "WORKSPACE / PR" in line)
+        header = next(line for line in plain.splitlines() if "POS" in line and "EVIDENCE / PR" in line)
         pr_line = next(line for line in plain.splitlines() if "#16796" in line)
         missing_line = next(line for line in plain.splitlines() if "Missing PR" in line)
         pos_col = header.index("POS")
         id_col = header.index("ID")
         stage_col = header.index("STAGE")
         title_col = header.index("TITLE")
-        workspace_col = header.index("WORKSPACE / PR")
+        workspace_col = header.index("EVIDENCE / PR")
         self.assertEqual(pr_line[pos_col:id_col].strip(), "5")
         self.assertEqual(pr_line[id_col:stage_col].strip(), "#16796")
         self.assertEqual(pr_line[workspace_col:].strip(), "-")
@@ -558,8 +559,38 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("BLOCKED · 0 receipts", plain)
         self.assertNotIn("SESSION / RECENT EVENT", plain)
 
+    def test_rendered_table_exposes_failure_message_and_execution_identity(self):
+        symphony = {
+            "ok": True,
+            "running": 1,
+            "retrying": 0,
+            "blocked": 0,
+            "cap": 4,
+            "rows": [
+                {
+                    "kind": "running",
+                    "id": "JOV-44",
+                    "title": "Repair provider",
+                    "session_id": "session-1",
+                    "last_event": "turn_failed",
+                    "last_message": "quota exhausted",
+                    "executed_model": "gpt-5.6-sol",
+                    "executed_provider": "codex",
+                    "executed_account_alias": "seat-b",
+                }
+            ],
+            "up": True,
+        }
+        plain = strip(paint(symphony=symphony, width=430, height=90))
+        row = next(line for line in plain.splitlines() if "JOV-44" in line)
+        self.assertIn("BLOCKED", row)
+        self.assertIn("gpt-5.6-sol/codex/seat-b", row)
+        self.assertIn("quota exhausted", row)
+
     def test_ci_success_is_separate_from_admission_hold(self):
         self.assertEqual(HUD.admission_status({"isDraft": False, "mergeStateStatus": "BLOCKED"}, in_merge_queue=False), "blocked")
+        self.assertEqual(HUD.admission_status({"isDraft": False, "mergeStateStatus": "CLEAN", "labels": [{"name": "hold"}]}, in_merge_queue=False), "blocked")
+        self.assertEqual(HUD.admission_status({"isDraft": False, "mergeStateStatus": "CLEAN", "labels": []}, in_merge_queue=False), "clean")
         lines = HUD._ci_matrix_lines(
             {"ok": True, "generated_at": NOW.isoformat(), "ci_matrix": [{"number": 17323, "title": "Green checks, held admission", "fast": "success", "ready": "success", "security": "success", "visual": "success", "all": "success", "admission": "blocked"}]},
             200,
@@ -596,6 +627,24 @@ class UltrawideHudTests(unittest.TestCase):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("1/2", rejected["source_error"])
+
+        without_metadata = {"data": {"project": {"issues": {"nodes": []}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=without_metadata):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("metadata incomplete", rejected["source_error"])
+
+        repeated = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "same"}}}}}
+        with mock.patch.object(HUD, "_linear_request", side_effect=[repeated, repeated]):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("cursor repeated", rejected["source_error"])
+
+        over_budget = {"data": {"project": {"issues": {"totalCount": HUD.MAX_LINEAR_ISSUES + 1, "nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=over_budget):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("bounded total", rejected["source_error"])
 
     def test_pressure_and_ci_matrix_keep_unknowns_semantic_and_bounded(self):
         pressure = {

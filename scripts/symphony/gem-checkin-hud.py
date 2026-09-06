@@ -73,6 +73,9 @@ PR_READY_NAMES = frozenset({"PR Ready"})
 CHECK_PENDING = frozenset({"queued", "in_progress", "pending", "waiting", "requested"})
 CHECK_FAILURE = frozenset({"failure", "failed", "error", "cancelled", "timed_out", "action_required"})
 CHECK_SUCCESS = frozenset({"success", "successful", "neutral", "skipped"})
+HARD_ADMISSION_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred", "needs-conflict-resolution", "needs-manual-rebase"})
+MAX_LINEAR_PAGES = 50
+MAX_LINEAR_ISSUES = 5_000
 P95_MIN_SAMPLES = 20
 P95_BASELINE_MAX_AGE_SECONDS = 300
 MIN_WIDTH = 80
@@ -567,7 +570,7 @@ def compute_throughput(totals: Any, snapshots: list[dict[str, Any]] | None, *, n
         hit = (stamp, prev_tokens, _int(item.get("seconds_running")))
         if 4.0 <= age <= 8.0:
             window_hit = hit
-        elif 0.4 < age <= 15.0 and fallback_hit is None:
+        elif 4.0 <= age <= 15.0 and fallback_hit is None:
             fallback_hit = hit
     chosen = window_hit or fallback_hit
     if chosen is not None:
@@ -998,11 +1001,18 @@ def aggregate_check_status(rollups: Any, *, names: frozenset[str] | None = None,
 def admission_status(pr: dict[str, Any], *, in_merge_queue: bool) -> str:
     if pr.get("isDraft") is True:
         return "review"
+    labels = {
+        str(item.get("name") if isinstance(item, dict) else item).strip().lower()
+        for item in (pr.get("labels") or [])
+        if isinstance(item, (dict, str))
+    }
+    if labels & HARD_ADMISSION_LABELS:
+        return "blocked"
     if in_merge_queue:
         return "queued"
     state = str(pr.get("mergeStateStatus") or "").upper()
     if state in {"CLEAN", "HAS_HOOKS"}:
-        return "ready"
+        return "clean"
     if state in {"BEHIND", "BLOCKED", "DIRTY", "DRAFT", "UNSTABLE"}:
         return "blocked"
     return "unknown"
@@ -1345,24 +1355,61 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
     cursor = None
     total_count = None
     pages = 0
+    seen_cursors: set[str] = set()
     while True:
-        payload = _linear_request(LINEAR_STAGES_QUERY, timeout=timeout, variables={"after": cursor})
-        project = (payload.get("data") or {}).get("project") if payload else None
-        issues = project.get("issues") if isinstance(project, dict) else None
-        if not isinstance(issues, dict):
+        if pages >= MAX_LINEAR_PAGES:
             return {
                 "ok": False,
                 "review": None,
                 "todo": None,
                 "pickup_durations": None,
                 "generated_at": None,
-                "source_error": "Linear project pagination incomplete",
+                "source_error": f"Linear pagination exceeded {MAX_LINEAR_PAGES} pages",
+            }
+        payload = _linear_request(LINEAR_STAGES_QUERY, timeout=timeout, variables={"after": cursor})
+        project = (payload.get("data") or {}).get("project") if payload else None
+        issues = project.get("issues") if isinstance(project, dict) else None
+        if not isinstance(issues, dict) or not isinstance(issues.get("totalCount"), int) or not isinstance(issues.get("pageInfo"), dict):
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear project pagination metadata incomplete",
             }
         pages += 1
-        if isinstance(issues.get("totalCount"), int):
-            total_count = issues["totalCount"]
+        page_total = issues["totalCount"]
+        if page_total < 0 or page_total > MAX_LINEAR_ISSUES:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": f"Linear inventory exceeds bounded total {MAX_LINEAR_ISSUES}",
+            }
+        if total_count is not None and page_total != total_count:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear totalCount changed during pagination",
+            }
+        total_count = page_total
         nodes.extend(node for node in (issues.get("nodes") or []) if isinstance(node, dict))
-        page_info = issues.get("pageInfo") if isinstance(issues.get("pageInfo"), dict) else {}
+        if len(nodes) > MAX_LINEAR_ISSUES:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": f"Linear inventory exceeded bounded total {MAX_LINEAR_ISSUES}",
+            }
+        page_info = issues["pageInfo"]
         if page_info.get("hasNextPage") is not True:
             break
         cursor = page_info.get("endCursor")
@@ -1375,6 +1422,16 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "generated_at": None,
                 "source_error": "Linear page cursor missing",
             }
+        if cursor in seen_cursors:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear page cursor repeated",
+            }
+        seen_cursors.add(cursor)
     todo = review = 0
     pickup: list[float] = []
     for node in nodes:
@@ -1482,7 +1539,7 @@ def fetch_github_ship(
             return {**cached, "cache_hit": True, "cache_age_seconds": cache_age, "stale": True, "refreshing": True}
         return {"ok": False, "refreshing": True, "generated_at": None, "query_ms": None, "ci_matrix": []}
     query_started = time.perf_counter()
-    open_prs = _pr_list("open", "number,title,createdAt,isDraft,statusCheckRollup,mergeStateStatus", "10", timeout=timeout)
+    open_prs = _pr_list("open", "number,title,createdAt,isDraft,labels,statusCheckRollup,mergeStateStatus", "10", timeout=timeout)
     merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt,statusCheckRollup", "10", timeout=timeout)
     merge_group = _gh_json(["api", "repos/JovieInc/Jovie/actions/runs?event=merge_group&per_page=20"], timeout=timeout)
     if not isinstance(open_prs, list) or not isinstance(merged_prs, list):
@@ -1804,13 +1861,13 @@ def _table_header(widths: dict[str, int]) -> str:
         ("TRY/TURN", "run", True),
         ("TOKENS", "tokens", True),
         ("ELAPSED", "elapsed", True),
-        ("WORKSPACE / PR", "ws", False),
+        ("EVIDENCE / PR", "ws", False),
     )
     return _rgb(DIM, "  ".join(_cell(name, widths[key], right=right) for name, key, right in columns))
 
 
 def _col_widths(width: int) -> dict[str, int]:
-    st, pos, ident, stage, run, tokens, elapsed, ws = 2, 4, 12, 14, 9, 10, 20, 24
+    st, pos, ident, stage, run, tokens, elapsed, ws = 2, 4, 12, 14, 9, 10, 20, 48
     remaining = width - (st + pos + ident + stage + run + tokens + elapsed + ws + 16)
     return {
         "st": st,
@@ -1858,6 +1915,8 @@ def _cells(
 def _work_stage(row: dict[str, Any]) -> str:
     if row.get("stale"):
         return UNKNOWN
+    if row.get("error") or str(row.get("last_event") or "").lower() in {"turn_failed", "turn_cancelled", "session_failed"}:
+        return "BLOCKED"
     explicit = str(row.get("stage") or "").strip().lower().replace("_", " ")
     aliases = {
         "planning": "PLANNING",
@@ -1894,6 +1953,22 @@ def _stage_color(stage: str) -> tuple[int, int, int]:
     return DIM
 
 
+def _execution_evidence(row: dict[str, Any]) -> str:
+    identities = [
+        str(value)
+        for value in (row.get("executed_model"), row.get("executed_provider"), row.get("executed_account_alias"))
+        if value not in {None, ""}
+    ]
+    message = row.get("error") or row.get("last_message")
+    parts = ["/".join(identities)] if identities else []
+    if message not in {None, ""}:
+        parts.append(str(message))
+    if parts:
+        return " · ".join(parts)
+    fallback = row.get("workspace") or row.get("url")
+    return str(fallback) if fallback not in {None, ""} else "UNKNOWN · execution evidence absent"
+
+
 def _job_row(
     row: dict[str, Any],
     widths: dict[str, int],
@@ -1915,12 +1990,12 @@ def _job_row(
     if row.get("stale"):
         return _cells(DIM, widths, "?", "-", dash(row.get("id")), UNKNOWN, dash(row.get("title") or "UNKNOWN · retained row; current :4041 truth unavailable"), dash(row.get("attempt")), dash(row.get("turn")), "-", UNKNOWN, "current source unavailable")
     if kind == "queued":
-        return _cells(PURPLE, widths, "…", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), "-", short_path(row.get("workspace")))
+        return _cells(PURPLE, widths, "…", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), "-", _execution_evidence(row))
     if kind == "retrying":
-        return _cells(ORANGE, widths, "↻", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("error") or row.get("workspace")))
+        return _cells(ORANGE, widths, "↻", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), _execution_evidence(row))
     if kind == "blocked":
-        return _cells(RED, widths, "✕", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("error") or row.get("workspace")))
-    return _cells(_stage_color(stage), widths, "●", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
+        return _cells(RED, widths, "✕", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
+    return _cells(_stage_color(stage), widths, "●", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
 
 
 def _compact_work_header(width: int) -> list[str]:
@@ -1942,7 +2017,7 @@ def _compact_job_row(
     title_width = max(12, width - ident_width - stage_width - age_width - 10)
     kind = str(row.get("kind") or "running")
     ident = dash(row.get("id"))
-    title = dash(row.get("title") or row.get("error") or row.get("last_message"))
+    title = dash(row.get("title") or "UNKNOWN · :4041 title absent")
     stage = _work_stage(row)
     if row.get("stale"):
         return _rgb(DIM, clip(f"STALE {ident} | {title} | current execution UNKNOWN", width))
@@ -1971,6 +2046,9 @@ def _compact_job_row(
     else:
         status, glyph = "healthy", "●"
         age = elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
+    evidence = _execution_evidence(row)
+    if evidence != "UNKNOWN · execution evidence absent":
+        title = f"{title} · {evidence}"
     color = _semantic_color(status)
     columns = "  ".join(
         (
@@ -2274,14 +2352,15 @@ def _matrix_status(status: Any, width: int) -> str:
 def _admission_cell(status: Any, width: int) -> str:
     normalized = str(status or "unknown")
     text = {
-        "ready": "✓ READY",
+        "clean": "◇ CLEAN",
         "queued": "… QUEUED",
         "review": "! REVIEW",
         "blocked": "× HOLD",
         "unknown": "? UNKNOWN",
     }.get(normalized, "? UNKNOWN")
-    semantic = "success" if normalized == "ready" else "pending" if normalized in {"queued", "review"} else "failure" if normalized == "blocked" else "unknown"
-    return _rgb(_semantic_color(semantic), _cell(text, width), bold=normalized == "blocked")
+    semantic = "pending" if normalized in {"queued", "review"} else "failure" if normalized == "blocked" else "unknown"
+    color = BLUE if normalized == "clean" else _semantic_color(semantic)
+    return _rgb(color, _cell(text, width), bold=normalized == "blocked")
 
 
 def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
