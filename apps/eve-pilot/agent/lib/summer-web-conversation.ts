@@ -464,10 +464,9 @@ export function createConversationIngress(
         // delivery key is not authority to send again after an ambiguous outcome.
         return json({ ok: false, code: 'dispatch_unknown' }, 503);
       }
-      const dispatchInput =
-        input.canonicalTailRecovery && resolvedPreviousEventId
-          ? { ...input, history: [] }
-          : input;
+      const dispatchInput = input.canonicalTailRecovery
+        ? { ...input, history: [] }
+        : input;
       const sessionId = await deps.dispatch(
         dispatchInput,
         renderConversation(dispatchInput),

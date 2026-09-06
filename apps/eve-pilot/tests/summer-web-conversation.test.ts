@@ -259,6 +259,25 @@ describe('authenticated persistent Summer conversation', () => {
     expect((await f.send(recoveredInput)).status).toBe(200);
     expect(f.dispatch).toHaveBeenCalledTimes(2);
   });
+  it('never dispatches unverified local history when no canonical tail exists', async () => {
+    const f = fixture();
+    const staleLocalText = 'unverified local turn must not become Eve context';
+    const recoveredInput: ConversationInput = {
+      ...input(1),
+      canonicalTailRecovery: true,
+      history: [{ role: 'user', text: staleLocalText }],
+    };
+
+    expect((await f.send(recoveredInput)).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledOnce();
+    expect(f.dispatch.mock.calls[0]?.[0]).toMatchObject({
+      eventId: id(1),
+      history: [],
+      canonicalTailRecovery: true,
+    });
+    expect(f.dispatch.mock.calls[0]?.[1]).not.toContain(staleLocalText);
+    expect(f.dispatch.mock.calls[0]?.[2]).toBeNull();
+  });
   it('fails closed when canonical-tail recovery is pending or crosses a binding', async () => {
     const pending = fixture();
     expect((await pending.send(input(1))).status).toBe(202);
