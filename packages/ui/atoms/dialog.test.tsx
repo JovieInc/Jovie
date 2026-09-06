@@ -196,6 +196,14 @@ describe('Dialog', () => {
       );
     });
 
+    it('uses cinematic motion for modal reveals', () => {
+      render(<TestDialog open={true} />);
+      const content = screen.getByTestId('dialog-content');
+
+      expect(content.className).toContain('duration-cinematic');
+      expect(content.className).toContain('ease-cinematic');
+    });
+
     it('hides close button when hideClose is true', () => {
       render(<TestDialog open={true} hideClose={true} />);
       expect(
