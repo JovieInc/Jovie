@@ -78,6 +78,7 @@ const CAPACITY_MAX_TARGET = 40;
 export const FLEET_PROMOTION_MODE = Object.freeze({
   NORMAL: 'normal',
   ISOLATED_ONLY: 'isolated-only',
+  CONTROLLER_REPAIR_ONLY: 'controller-repair-only',
   DRAFT_ONLY: 'draft-only',
   HOLD_INTAKE: 'hold-intake',
   BLOCKED: 'blocked',
@@ -103,6 +104,13 @@ function alreadyAdmittedCohortSemantics(promotionMode) {
       preserve: false,
       newIntakeAllowed: true,
       semantics: 'isolated-only',
+    };
+  }
+  if (promotionMode === FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY) {
+    return {
+      preserve: true,
+      newIntakeAllowed: false,
+      semantics: 'preserve-cohort-and-admit-one-controller-repair',
     };
   }
   if (promotionMode === FLEET_PROMOTION_MODE.DRAFT_ONLY) {
@@ -708,6 +716,35 @@ export function evaluateFleetGate(
     ['clear', 'resolved'].includes(integrityStatus) &&
     reasons.length === 1 &&
     reasons[0]?.code === FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND;
+  const controllerRepairReasonCodes = new Set(
+    reasons.map(reason => reason.code)
+  );
+  const closureRepairReasons = new Set(closureAdmission.reasons);
+  const closureAllowsControllerRepair =
+    closureAdmission.status === 'healthy' ||
+    (['grace', 'red'].includes(closureAdmission.status) &&
+      [...closureRepairReasons].every(
+        reason => reason === 'queue-controller-red-over-10m'
+      ) &&
+      closureAdmission.newIssueIntakeAllowed === false);
+  const controllerRepairAllowed =
+    state === FLEET_GATE_STATE.AMBER &&
+    reviewAdmission.allowed &&
+    closureAllowsControllerRepair &&
+    controllerFresh &&
+    controllerStatus === 'failed' &&
+    mainStatus === 'green' &&
+    validCommitSha(evidence?.main?.sha, { exact: true }) &&
+    productionStatus === 'green' &&
+    validCommitSha(evidence?.production?.deployedSha) &&
+    ['clear', 'resolved'].includes(integrityStatus) &&
+    controllerRepairReasonCodes.has(FLEET_GATE_REASON.CONTROLLER_FAILURE) &&
+    [...controllerRepairReasonCodes].every(reason =>
+      [
+        FLEET_GATE_REASON.CONTROLLER_FAILURE,
+        FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
+      ].includes(reason)
+    );
   const promotionMode = isolatedPromotionAllowed
     ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
     : state === FLEET_GATE_STATE.GREEN
@@ -718,7 +755,9 @@ export function evaluateFleetGate(
         ? FLEET_PROMOTION_MODE.DRAFT_ONLY
         : holdIntakeAllowed
           ? FLEET_PROMOTION_MODE.HOLD_INTAKE
-          : FLEET_PROMOTION_MODE.BLOCKED;
+          : controllerRepairAllowed
+            ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
+            : FLEET_PROMOTION_MODE.BLOCKED;
   const cohort = alreadyAdmittedCohortSemantics(promotionMode);
   const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
     ? cohort
@@ -756,6 +795,19 @@ export function evaluateFleetGate(
       deploymentsAllowed: false,
       scope: 'exact-head-semantically-isolated-ui-docs',
       maxConcurrent: 1,
+      authority: 'canonical-merge-queue-controller',
+    },
+    controllerRepairAdmission: {
+      allowed: controllerRepairAllowed,
+      condition: controllerRepairAllowed ? 'controller-failure' : null,
+      mainSha: controllerRepairAllowed ? evidence?.main?.sha : null,
+      deployedSha: controllerRepairAllowed
+        ? evidence?.production?.deployedSha
+        : null,
+      scope: 'trusted-comment-exact-repository-pr-head-main-path-set',
+      maxConcurrent: controllerRepairAllowed ? 1 : 0,
+      deploymentsAllowed: false,
+      runtimeActivationAllowed: false,
       authority: 'canonical-merge-queue-controller',
     },
     ownership: {
