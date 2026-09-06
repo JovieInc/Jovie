@@ -868,11 +868,12 @@ describe('profile mode route redirects', () => {
   it('keeps the canonical profile admission URL backed by the production canary', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
-    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+    const redirects = (await nextConfig.redirects()) as RedirectRule[];
 
-    expect(afterFiles).toContainEqual({
+    expect(redirects).toContainEqual({
       source: '/unfazed',
       destination: '/authqaprod',
+      permanent: false,
     });
   });
 
