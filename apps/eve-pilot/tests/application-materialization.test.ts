@@ -38,6 +38,25 @@ describe('independent application source export', () => {
           );
       }
       if (identity === 'summer') {
+        const contractDirectory = join(
+          destination,
+          'vendor/agent-transport-contracts'
+        );
+        const entrypoint = readFileSync(
+          join(contractDirectory, 'index.ts'),
+          'utf8'
+        );
+        expect(entrypoint).toContain("export * from './symphony-outage'");
+        for (const [, target] of entrypoint.matchAll(
+          /from ['"](\.\/[^'"]+)['"]/gu
+        ))
+          expect(existsSync(join(contractDirectory, `${target}.ts`))).toBe(
+            true
+          );
+        expect(
+          receipt.files['vendor/agent-transport-contracts/symphony-outage.ts']
+        ).toBeDefined();
+
         expect(
           readFileSync(join(destination, 'agent/channels/eve.ts'), 'utf8')
         ).toContain('disableRoute()');
