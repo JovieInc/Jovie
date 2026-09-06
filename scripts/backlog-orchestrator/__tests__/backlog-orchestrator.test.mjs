@@ -1330,7 +1330,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
+  it('preserves the cohort for one controller repair when production is unbound', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         production: { status: 'green', deployedSha: 'bda0d88' },
@@ -1340,8 +1340,61 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
+    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, true);
+    assert.equal(fleetGate.alreadyAdmittedCohort.newIntakeAllowed, false);
+    assert.equal(fleetGate.controllerRepairAdmission.allowed, true);
+    assert.equal(fleetGate.controllerRepairAdmission.maxConcurrent, 1);
+  });
+
+  it('admits only one controller repair through the second fleet consumer', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({ controller: { status: 'failed' } }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
+    assert.deepEqual(fleetGate.alreadyAdmittedCohort, {
+      preserve: true,
+      newIntakeAllowed: false,
+      semantics: 'preserve-cohort-and-admit-one-controller-repair',
+    });
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
+    assert.deepEqual(fleetGate.controllerRepairAdmission, {
+      allowed: true,
+      condition: 'controller-failure',
+      mainSha: fleetEvidence().main.sha,
+      deployedSha: fleetEvidence().production.deployedSha,
+      scope: 'trusted-comment-exact-repository-pr-head-main-path-set',
+      maxConcurrent: 1,
+      deploymentsAllowed: false,
+      runtimeActivationAllowed: false,
+      authority: 'canonical-merge-queue-controller',
+    });
+  });
+
+  it('denies controller repair when closure observation is unknown', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: { status: 'failed' },
+        closureHealth: {
+          schema: 'jovie-closure-health/v1',
+          status: 'red',
+          authority: 'Summer',
+          newIssueIntakeAllowed: false,
+          promotionContinues: true,
+          remediationContinues: true,
+          reasons: ['closure-observation-unknown'],
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
     assert.equal(fleetGate.promotionMode, 'blocked');
-    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, false);
+    assert.equal(fleetGate.controllerRepairAdmission.allowed, false);
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
   });
 
   it('wires persisted main and deployment identities into lease admission', async () => {
