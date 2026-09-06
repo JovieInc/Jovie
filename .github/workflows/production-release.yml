@@ -841,6 +841,7 @@ jobs:
           required_runtime_env=(
             BETTER_AUTH_URL
             NEXT_PUBLIC_BETTER_AUTH_URL
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID
             BETTER_AUTH_SECRET
             DATABASE_URL
             SESSION_SECRET
@@ -1024,7 +1025,7 @@ jobs:
           }
           export -f production_stage
           doppler run --project jovie-web --config prd \
-            --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,AUTH_GOOGLE_CLIENT_ID,AUTH_GOOGLE_CLIENT_SECRET,SENTRY_AUTH_TOKEN \
+            --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,NEXT_PUBLIC_GOOGLE_CLIENT_ID,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,AUTH_GOOGLE_CLIENT_ID,AUTH_GOOGLE_CLIENT_SECRET,SENTRY_AUTH_TOKEN \
             --no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage
 
       - name: Setup Playwright for exact-build performance gate
