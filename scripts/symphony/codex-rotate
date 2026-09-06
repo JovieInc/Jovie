@@ -217,6 +217,142 @@ print(int(parsed.timestamp()))
 PY
 }
 
+classify_provider_error() {
+  STDOUT_FILE="$1" STDERR_FILE="$2" APP_SERVER_MODE="$app_server_mode" PROCESS_RC="$3" python3 - <<'PY'
+import json
+import os
+import re
+
+
+def normalized(value):
+    return re.sub(r"[^a-z0-9]", "", str(value).lower())
+
+
+def http_status(value):
+    if not isinstance(value, dict):
+        return None
+    for key in ("httpStatusCode", "http_status_code", "status", "statusCode"):
+        status = value.get(key)
+        if isinstance(status, int) and not isinstance(status, bool):
+            return status
+    return None
+
+
+def typed_limit_or_auth(info):
+    exact = {"usagelimitexceeded", "ratelimitexceeded", "unauthorized"}
+    http_variants = {
+        "httpconnectionfailed",
+        "responsestreamconnectionfailed",
+        "responsestreamdisconnected",
+        "responsetoomanyfailedattempts",
+    }
+    if isinstance(info, str):
+        return normalized(info) in exact
+    if not isinstance(info, dict):
+        return False
+    kind = info.get("type") or info.get("kind")
+    if isinstance(kind, str):
+        name = normalized(kind)
+        if name in exact:
+            return True
+        if name in http_variants and http_status(info) == 429:
+            return True
+    for key, value in info.items():
+        name = normalized(key)
+        if name in exact:
+            return True
+        if name in http_variants and http_status(value) == 429:
+            return True
+    return False
+
+
+def trusted_error(error):
+    if not isinstance(error, dict):
+        return False
+    if typed_limit_or_auth(error.get("codexErrorInfo")):
+        return True
+    error_type = normalized(error.get("type", ""))
+    if error_type in {
+        "ratelimiterror",
+        "usagelimiterror",
+        "authenticationerror",
+        "tokeninvalidated",
+        "tokenexpired",
+        "unauthorized",
+    }:
+        return True
+    message = str(error.get("message", "")).strip().lower()
+    return any(
+        message.startswith(prefix)
+        for prefix in (
+            "you've hit your usage limit",
+            "usage limit; try again at",
+            "rate limit exceeded",
+            "token_invalidated",
+            "refresh token was revoked",
+            "token_expired",
+            "token is expired",
+            "session has ended",
+        )
+    )
+
+
+def app_server_error(payload):
+    if not isinstance(payload, dict):
+        return None
+    method = payload.get("method")
+    params = payload.get("params")
+    if method == "error" and isinstance(params, dict):
+        return params.get("error")
+    if method == "turn/completed" and isinstance(params, dict):
+        turn = params.get("turn")
+        if isinstance(turn, dict) and turn.get("status") == "failed":
+            return turn.get("error")
+    # Older app-server builds emitted a typed top-level error event.
+    if payload.get("type") == "error":
+        return payload.get("error") if isinstance(payload.get("error"), dict) else payload
+    return None
+
+
+stdout = open(os.environ["STDOUT_FILE"], encoding="utf-8", errors="replace")
+stderr = open(os.environ["STDERR_FILE"], encoding="utf-8", errors="replace")
+if os.environ["APP_SERVER_MODE"] == "1":
+    for line in stdout:
+        try:
+            payload = json.loads(line)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        error = app_server_error(payload)
+        if trusted_error(error):
+            print(str(error.get("message", "")))
+            raise SystemExit(0)
+elif int(os.environ["PROCESS_RC"]) != 0:
+    prefixes = (
+        "you've hit your usage limit",
+        "usage limit; try again at",
+        "error: usage limit",
+        "rate limit exceeded",
+        "error: rate limit exceeded",
+        "error: exceeded retry limit, last status: 429 too many requests",
+        "token_invalidated",
+        "error: token_invalidated",
+        "refresh token was revoked",
+        "error: refresh token was revoked",
+        "token_expired",
+        "error: token_expired",
+        "token is expired",
+        "error: token is expired",
+        "session has ended",
+        "error: session has ended",
+    )
+    for line in stderr:
+        if line.strip().lower().startswith(prefixes):
+            print(line.strip())
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
 started_at=$(date +%s)
 last_heartbeat=$started_at
 account=""
@@ -292,25 +428,26 @@ set_active "$account"
 export CODEX_HOME="$home"
 log "START account=$account lease_fd=$account_lock_fd args=$*"
 
+tmp_out=$(mktemp)
 tmp_err=$(mktemp)
-trap 'rm -f "$tmp_err"' EXIT
+tmp_provider_error=$(mktemp)
+trap 'rm -f "$tmp_out" "$tmp_err" "$tmp_provider_error"' EXIT
 set +e
-# Codex CLI reports limits on stderr, while app-server reports the same
-# provider error inside its stdout JSON-RPC stream. Preserve both streams for
-# the caller and inspect both after exit so an exhausted account is quarantined
-# instead of returning repeated zero-token turns.
+# Keep the streams separate: Codex CLI owns stderr errors, while app-server owns
+# structured stdout events. Mixing them lets arbitrary JSON-RPC values or tool
+# text impersonate a provider failure.
 "$REAL_CODEX" "$@" \
-  > >(tee -a "$tmp_err") \
+  > >(tee -a "$tmp_out") \
   2> >(tee -a "$tmp_err" >&2)
 rc=$?
 set -e
 # Bash does not guarantee that process substitutions finish before the next
-# command. Wait for both tee processes so a final usage-limit event is present
-# in tmp_err before classifying the account.
+# command. Wait for both tee processes so the terminal event is present before
+# classifying the account.
 wait || true
 
-if grep -qiE 'usage limit|rate limit|429|token_invalidated|refresh token was revoked|token_expired|token is expired|session has ended|hit your usage limit' "$tmp_err"; then
-  until="$(cooldown_until "$tmp_err")"
+if classify_provider_error "$tmp_out" "$tmp_err" "$rc" >"$tmp_provider_error"; then
+  until="$(cooldown_until "$tmp_provider_error")"
   mark_cooldown "$account" "$until"
   log "COOLDOWN account=$account until=$until rc=$rc"
   if [[ "$rc" -eq 0 ]]; then

@@ -298,7 +298,7 @@ class CodexRotateTests(unittest.TestCase):
         limited = self.root / "limited-app-server"
         limited.write_text(
             "#!/usr/bin/env bash\n"
-            "echo '{\"type\":\"error\",\"message\":\"usage limit; try again at 2030-01-02T03:04:05Z\"}'\n"
+            "echo '{\"method\":\"error\",\"params\":{\"error\":{\"message\":\"usage limit; try again at 2030-01-02T03:04:05Z\",\"codexErrorInfo\":\"UsageLimitExceeded\"}}}'\n"
             "exit 0\n"
         )
         limited.chmod(0o755)
@@ -311,9 +311,67 @@ class CodexRotateTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 75)
-        self.assertIn('"type":"error"', result.stdout)
+        self.assertIn('"method":"error"', result.stdout)
         state = json.loads((self.accounts / "state.json").read_text())
         self.assertEqual(state["cooldowns"]["account-a"], 1893553445)
+        self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
+
+    def test_app_server_non_error_payload_with_quota_like_content_does_not_cool(self):
+        normal = self.root / "normal-app-server"
+        normal.write_text(
+            "#!/usr/bin/env bash\n"
+            "cat <<'EOF'\n"
+            '{"method":"thread/tokenUsage/updated","params":{"threadId":"thr-429-rate-limit","tokenUsage":{"total":{"inputTokens":4290}}}}\n'
+            '{"id":429,"method":"mcpServer/elicitation/request","params":{"threadId":"thr-ok","turnId":"turn-ok","serverName":"ovie","mode":"form","message":"Describe a rate limit or usage limit","requestedSchema":{"type":"object","properties":{"note":{"type":"string"}}}}}\n'
+            '{"method":"item/completed","params":{"item":{"type":"mcpToolCall","id":"call-429-usage-limit","server":"ovie","tool":"probe","status":"completed","result":{"content":[{"type":"text","text":"429 rate limit usage limit token_invalidated"}]}}}}\n'
+            "EOF\n"
+            "echo 'debug payload mentions rate limit and 429' >&2\n"
+            "exit 0\n"
+        )
+        normal.chmod(0o755)
+
+        result = subprocess.run(
+            [str(LAUNCHER), "app-server"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=self.env(CODEX_REAL_BIN=normal),
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "debug payload mentions rate limit and 429\n")
+        state = json.loads((self.accounts / "state.json").read_text())
+        self.assertEqual(state["active"], "account-a")
+        self.assertEqual(state["cooldowns"], {})
+        self.assertEqual(state["last_error"], {})
+
+    def test_failed_app_server_auth_event_uses_bounded_default_cooldown(self):
+        unauthorized = self.root / "unauthorized-app-server"
+        unauthorized.write_text(
+            "#!/usr/bin/env bash\n"
+            "echo '{\"method\":\"turn/completed\",\"params\":{\"turn\":{\"status\":\"failed\",\"error\":{\"message\":\"authentication failed\",\"codexErrorInfo\":\"Unauthorized\"}}}}'\n"
+            "exit 0\n"
+        )
+        unauthorized.chmod(0o755)
+        before = int(time.time())
+
+        result = subprocess.run(
+            [str(LAUNCHER), "app-server"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=self.env(
+                CODEX_REAL_BIN=unauthorized,
+                CODEX_DEFAULT_COOLDOWN_SECONDS=60,
+            ),
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 75)
+        state = json.loads((self.accounts / "state.json").read_text())
+        self.assertGreaterEqual(state["cooldowns"]["account-a"], before + 60)
+        self.assertLessEqual(state["cooldowns"]["account-a"], int(time.time()) + 60)
         self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
 
     # JOV-5031: fail-closed startup. A bounded account wait must end in a
