@@ -118,6 +118,11 @@ test.describe('public profile browser admission', () => {
       );
     });
 
+    const desktopFrame = page.locator('.public-profile-layout-frame--desktop');
+    await expect
+      .poll(() => desktopFrame.boundingBox())
+      .toMatchObject({ width: 1298 });
+
     const audit = await auditPublicProfileLayout(page);
     expect(audit.claimCtaLineCount).toBe(1);
     expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);

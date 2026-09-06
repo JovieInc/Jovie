@@ -924,7 +924,7 @@ html[data-profile-initial-mode]
      state hydrates. Embedded editor/demo previews remain compact. */
   .profile-viewport:not(.profile-viewport--embedded)
   .public-profile-layout-frame {
-    max-width: 1512px;
+    max-width: min(100%, var(--ds-public-content-max));
     padding-left: max(var(--page-pad), env(safe-area-inset-left));
     padding-right: max(var(--page-pad), env(safe-area-inset-right));
     padding-block: clamp(16px, 2vw, 24px);
