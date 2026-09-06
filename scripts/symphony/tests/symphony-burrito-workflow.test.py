@@ -120,6 +120,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("`symphony-concurrency-controller.py` | observer/overlay", authority_map)
         self.assertIn("`symphony-reconciler.py` | retired by the official updater", authority_map)
         self.assertIn("symphony-provider-route/v1", authority_map)
+        self.assertIn("Cursor/Grok/Kimi CLI executors", authority_map)
+        self.assertIn("native Codex app-server transport", authority_map)
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]

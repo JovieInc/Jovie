@@ -65,7 +65,7 @@ Intake is the Jovie Linear team. States: `Todo` = queued (move to `In Progress` 
 
 Before work: `gbrain search` / `gbrain query`. After: `gbrain put` learnings. No secrets in git. Use official `.codex/skills` only (`commit`, `push`, `pull`, `land`, `linear`) — do not invent a second skill tree. after_create is HTTPS clone only; never SSH. The trusted after_create hook alone may perform the one bounded `pnpm install --offline --frozen-lockfile --ignore-scripts` restore from immutable Gem NVMe into private mutable SATA workspace state before agent start; coding agents must not run package install/fetch commands or create package stores. No mix/elixir hooks on this Jovie workspace.
 
-The app-server command is the repository routing launcher. It verifies the durable `symphony-routing/v1` receipt and launches the selected model instead of a fixed default.
+The app-server command accepts only the native Codex app-server transport. It verifies the durable `symphony-routing/v1` receipt and launches the selected Codex model; registry-backed Cursor, Grok, and Kimi CLIs run only through the isolated shared-lease fallback worker.
 
 Unattended git uses git + gh CLI only. Never GitHub MCP, never Codex Apps `create_branch`, never connector `76869538009648d5b282a4bb21c3d157` (meetjovie has `[apps.connector_76869538009648d5b282a4bb21c3d157] enabled=false`).
 
