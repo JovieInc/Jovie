@@ -1,8 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
-import { runDspInteraction } from './utils/public-surface-helpers';
+import {
+  installPublicRouteMocks,
+  runDspInteraction,
+} from './utils/public-surface-helpers';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -26,22 +29,287 @@ function intersectionArea(
   return width * height;
 }
 
+async function captureStill(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  fullPage = false
+) {
+  const path = testInfo.outputPath(name);
+  const body = await page.screenshot({ fullPage, path });
+  await testInfo.attach(name, { contentType: 'image/png', path });
+  return body;
+}
+
+async function waitForSettledProfileLayout(
+  page: import('@playwright/test').Page,
+  expectedLayout: 'compact' | 'desktop'
+) {
+  const shell = page.getByTestId('public-profile-layout-shell');
+  await expect(shell).toHaveAttribute('data-layout', expectedLayout);
+  const visibleSurface = page.getByTestId(
+    expectedLayout === 'desktop'
+      ? 'profile-desktop-surface'
+      : 'profile-compact-shell'
+  );
+  await expect(visibleSurface).toBeVisible();
+  await expect(visibleSurface).toHaveAttribute(
+    'data-interactive-ready',
+    'true'
+  );
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  });
+}
+
 test.describe('public profile browser admission', () => {
-  test('1512px public route blocks the founder-reported compact desktop hybrid', async ({
+  const responsiveCases = [
+    { id: '1179-compact', width: 1179, height: 932, layout: 'compact' },
+    { id: '1180-desktop', width: 1180, height: 932, layout: 'desktop' },
+    { id: '1512-desktop', width: 1512, height: 982, layout: 'desktop' },
+  ] as const;
+
+  for (const fixture of responsiveCases) {
+    test(`${fixture.id} enforces one responsive presentation`, async ({
+      page,
+    }, testInfo) => {
+      await installPublicRouteMocks(page);
+      await page.setViewportSize({
+        width: fixture.width,
+        height: fixture.height,
+      });
+      const response = await page.goto(
+        '/renders/profile-admission?layout=public',
+        {
+          waitUntil: 'domcontentloaded',
+        }
+      );
+      expect(response?.status()).toBe(200);
+      await waitForSettledProfileLayout(page, fixture.layout);
+
+      const audit = await auditPublicProfileLayout(page);
+      expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+      await expect(page.getByTestId('profile-compact-shell')).toHaveCount(
+        fixture.layout === 'compact' ? 1 : 0
+      );
+      await expect(page.getByTestId('profile-desktop-surface')).toHaveCount(
+        fixture.layout === 'desktop' ? 1 : 0
+      );
+      if (fixture.layout === 'desktop') {
+        await expect(
+          page.getByRole('button', { name: 'Alerts', exact: true })
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: 'Get alerts' })
+        ).toHaveCount(0);
+      }
+      await captureStill(page, testInfo, `${fixture.id}.png`);
+      if (fixture.id === '1512-desktop') {
+        const music = page.getByRole('button', { name: 'Music', exact: true });
+        await music.click();
+        await expect(music).toHaveAttribute('aria-current', 'page');
+        const menu = page.getByRole('button', { name: 'Menu', exact: true });
+        await menu.click();
+        await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.getByTestId('profile-menu-drawer')).toBeHidden();
+        await expect(menu).toBeFocused();
+      }
+    });
+  }
+
+  for (const state of ['unclaimed', 'claimed', 'owner'] as const) {
+    for (const width of [1179, 1180, 1512]) {
+      test(`${state} ${width}px renders only actual banner space`, async ({
+        page,
+      }, testInfo) => {
+        const hydrationErrors: string[] = [];
+        page.on('pageerror', error => hydrationErrors.push(error.message));
+        page.on('console', message => {
+          if (
+            message.type() === 'error' &&
+            /hydrat|did not match|server rendered/i.test(message.text())
+          )
+            hydrationErrors.push(message.text());
+        });
+        await installPublicRouteMocks(page);
+        await page.setViewportSize({
+          width,
+          height: width === 1512 ? 982 : 932,
+        });
+        await page.goto(
+          `/renders/profile-admission?layout=public&state=${state}`
+        );
+        await waitForSettledProfileLayout(
+          page,
+          width < 1180 ? 'compact' : 'desktop'
+        );
+        const wrappers = page.locator(
+          '[data-testid="profile-desktop-banner"]:visible, [data-testid="profile-shell-banner"]:visible'
+        );
+        await expect(wrappers).toHaveCount(state === 'unclaimed' ? 1 : 0);
+        expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+        expect(hydrationErrors).toEqual([]);
+        if (state === 'claimed' && width === 1512) {
+          await captureStill(page, testInfo, 'claimed-desktop-1512x982.png');
+        }
+      });
+    }
+  }
+
+  test('deliberate red detects phantom banner reservation', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1512, height: 932 });
+    await page.goto('/renders/profile-admission?violation=phantom-banner');
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.violations.map(violation => violation.code)).toContain(
+      'phantom_banner'
+    );
+  });
+
+  test('deliberate red detects reserved space without a rendered banner', async ({
+    page,
+  }) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1512, height: 932 });
+    await page.goto('/renders/profile-admission?layout=public&state=claimed');
+    await waitForSettledProfileLayout(page, 'desktop');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+    await page.getByTestId('profile-desktop-surface').evaluate(surface => {
+      surface.style.marginTop = '68px';
+    });
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.violations.map(violation => violation.code)).toContain(
+      'banner_reserved_geometry'
+    );
+  });
+
+  test('live resize transfers ownership exactly at 1180', async ({ page }) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1179, height: 932 });
+    await page.goto('/renders/profile-admission?layout=public', {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForSettledProfileLayout(page, 'compact');
+
+    await page.setViewportSize({ width: 1180, height: 932 });
+    await waitForSettledProfileLayout(page, 'desktop');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+
+    await page.setViewportSize({ width: 1179, height: 932 });
+    await waitForSettledProfileLayout(page, 'compact');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+  });
+
+  test('desktop keeps the long-name Verify & Claim CTA coherent', async ({
+    page,
+  }) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/renders/profile-admission?layout=public&name=long', {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForSettledProfileLayout(page, 'desktop');
+
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.claimCtaLineCount).toBe(1);
+    expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+    await expect(page.getByTestId('claim-banner-cta')).toHaveAccessibleName(
+      'Verify & Claim for The Extraordinary Midnight Radio Orchestra'
+    );
+  });
+
+  test('deliberate red detects a desktop artist name escaping its cover', async ({
+    page,
+  }) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/renders/profile-admission?layout=public&name=long', {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForSettledProfileLayout(page, 'desktop');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+
+    await page.getByTestId('profile-header').evaluate(header => {
+      header.style.width = '200%';
+      header.style.maxWidth = 'none';
+    });
+    expect(
+      (await auditPublicProfileLayout(page)).violations.map(
+        violation => violation.code
+      )
+    ).toContain('artist_name_clipped');
+  });
+
+  test('captures the founder 3024x1964 retina state without a compact desktop shell', async ({
+    browser,
+  }, testInfo) => {
+    const context = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL,
+      deviceScaleFactor: 2,
+      storageState: { cookies: [], origins: [] },
+      viewport: { width: 1512, height: 982 },
+    });
+    try {
+      const page = await context.newPage();
+      await installPublicRouteMocks(page);
+      const response = await page.goto(
+        '/renders/profile-admission?layout=public&state=unclaimed&name=long',
+        { waitUntil: 'domcontentloaded' }
+      );
+      expect(response?.status()).toBe(200);
+      await waitForSettledProfileLayout(page, 'desktop');
+
+      const audit = await auditPublicProfileLayout(page);
+      expect(audit.claimCtaLineCount).toBe(1);
+      expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+      const still = await captureStill(
+        page,
+        testInfo,
+        'public-profile-founder-retina-3024x1964.png'
+      );
+      expect(still.readUInt32BE(16)).toBe(3024);
+      expect(still.readUInt32BE(20)).toBe(1964);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('desktop-width compact preview is labeled and keyboard-exitable', async ({
     page,
   }, testInfo) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1280, height: 932 });
+    await page.goto('/renders/profile-admission?layout=preview', {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForSettledProfileLayout(page, 'compact');
+
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+    await expect(page.getByTestId('profile-preview-label')).toHaveText(
+      'Preview'
+    );
+    const exit = page.getByTestId('profile-preview-exit');
+    await exit.focus();
+    await expect(exit).toBeFocused();
+    await expect(exit).toHaveAttribute('href', '/unfazed');
+    await captureStill(page, testInfo, 'labeled-desktop-profile-preview.png');
+  });
+
+  test('deliberate red rejects the founder-reported desktop hybrid', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1512, height: 932 });
-    const response = await page.goto(
-      '/renders/profile-admission?layout=public&state=unclaimed',
+    await page.goto(
+      '/renders/profile-admission?violation=desktop-compact-shell',
       { waitUntil: 'domcontentloaded' }
     );
-    expect(response?.status()).toBe(200);
-
-    const shell = page.getByTestId('public-profile-layout-shell');
-    const desktop = page.getByTestId('profile-desktop-surface');
-    await expect(shell).toHaveAttribute('data-layout', 'desktop');
-    await expect(desktop).toBeVisible();
-    await expect(desktop).toHaveAttribute('data-interactive-ready', 'true');
+    await expect(
+      page.getByTestId('public-profile-layout-shell')
+    ).toHaveAttribute('data-interactive-ready', 'true');
     await page.evaluate(async () => {
       await document.fonts.ready;
       await new Promise<void>(resolve =>
@@ -53,31 +321,9 @@ test.describe('public profile browser admission', () => {
     });
 
     const audit = await auditPublicProfileLayout(page);
-    expect(audit.claimCtaLineCount).toBe(1);
-    expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
-    await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
-    await expect(page.getByTestId('profile-bottom-nav')).toHaveCount(0);
-    await testInfo.attach('public-profile-desktop-1512.png', {
-      body: await page.screenshot({ fullPage: false }),
-      contentType: 'image/png',
-    });
-  });
-
-  test('deliberate red rejects the narrow desktop card, bottom nav, and wrapped claim CTA', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1512, height: 932 });
-    const response = await page.goto(
-      '/renders/profile-admission?violation=desktop-compact-shell',
-      { waitUntil: 'domcontentloaded' }
-    );
-    expect(response?.status()).toBe(200);
-
-    const audit = await auditPublicProfileLayout(page);
     const codes = new Set(audit.violations.map(violation => violation.code));
     expect(codes.has('desktop_bottom_nav')).toBe(true);
     expect(codes.has('desktop_compact_shell')).toBe(true);
-    expect(codes.has('desktop_stage_too_narrow')).toBe(true);
     expect(codes.has('unlabeled_preview')).toBe(true);
     expect(codes.has('claim_cta_wrap') || codes.has('claim_cta_overflow')).toBe(
       true
@@ -102,6 +348,8 @@ test.describe('public profile browser admission', () => {
         runtimeErrors.push(response.status() + ' ' + url.pathname);
       }
     });
+
+    await installPublicRouteMocks(page);
 
     await page.addInitScript(() => {
       HTMLMediaElement.prototype.play = function play() {
@@ -226,10 +474,7 @@ test.describe('public profile browser admission', () => {
     await expect.poll(() => pacEvents.length).toBeGreaterThanOrEqual(3);
 
     await expectNoDocumentOverflow(page, testInfo, 'profile admission mobile');
-    await testInfo.attach('profile-admission-mobile.png', {
-      body: await page.screenshot({ fullPage: true }),
-      contentType: 'image/png',
-    });
+    await captureStill(page, testInfo, 'profile-admission-mobile.png', true);
     const accessibility = await new AxeBuilder({ page })
       .include('[data-testid="marketing-render-surface"]')
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

@@ -212,9 +212,12 @@ describe('ProfileDesktopSurface', () => {
     expect(listenCta).toHaveClass('h-8');
     expect(listenCta.className).toContain('before:h-11');
     expect(listenCta.className).toContain('before:min-w-11');
-    expect(
-      within(screen.getByTestId('profile-header')).getByText('Tim White')
-    ).toHaveClass('line-clamp-2');
+    const profileHeader = screen.getByTestId('profile-header');
+    expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
+    expect(within(profileHeader).getByText('Tim White')).toHaveClass(
+      'min-w-0',
+      'line-clamp-2'
+    );
     expect(
       screen.getByText('Producer, songwriter, and after-hours romantic.')
     ).toHaveClass('line-clamp-2');

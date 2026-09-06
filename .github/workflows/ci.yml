@@ -1443,6 +1443,10 @@ jobs:
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     if: >-
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
@@ -1491,7 +1495,10 @@ jobs:
             'apps/web/lib/tracking/pac-**' \
             'apps/web/styles/design-system.css' \
             'apps/web/tests/e2e/profile-admission.spec.ts' \
-            'apps/web/tests/e2e/utils/public-surface-helpers.ts')"
+            'apps/web/tests/e2e/profile/**' \
+            'apps/web/tests/e2e/utils/profile-route-matrix.ts' \
+            'apps/web/tests/e2e/utils/public-profile-**' \
+            'apps/web/tests/e2e/utils/public-surface-**')"
           if [[ -n "$CHANGED_FILES" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
@@ -1522,14 +1529,16 @@ jobs:
           --config=playwright.config.noauth.ts
           --project=chromium
           --reporter=line
-      - name: Upload profile admission failure evidence
-        if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+      - name: Upload profile admission evidence
+        if: ${{ !cancelled() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 3
+          allow-images: 'true'
+          public-images: 'true'
 
   ci-fast:
     name: ci-fast
