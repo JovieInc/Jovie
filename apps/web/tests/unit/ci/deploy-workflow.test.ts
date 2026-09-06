@@ -4062,9 +4062,10 @@ describe('ci-fast critical deploy contract', () => {
   it('targets the web test directly so a zero-task Turbo run cannot pass', () => {
     const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
     const command =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts';
 
     expect(ciFastLanes).toContain(command);
+    expect(command).toContain('tests/unit/ci/setup-doppler-action.test.ts');
     expect(command).not.toContain('turbo');
     expect(command).not.toContain('--affected');
     expect(command).not.toContain('--passWithNoTests');
