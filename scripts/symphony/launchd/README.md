@@ -20,6 +20,7 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | load/crash recovery only | Manual fallback for the event-driven GitHub/Symphony admission lanes; never polls for work |
 | `co.jovie.hermes.delivery-liveness-watchdog.plist.template` | every 120s | Validate durable delivery receipts; retry/reassign active leases and reclaim Linear In Progress items after five minutes without a matching accepted-owner machine receipt |
+| `co.jovie.hermes.control-plane-liveness-watchdog.plist.template` | every 60s | JOV-6004 slice 1: read the Mac ship-owner lock and Gem HUD activation attestation, classify each controller as healthy or dark, and write `~/.hermes/state/controller-liveness-latest.json`. Authorizes the independent recovery lane only when a required controller is dark. |
 
 Linear active leases are accepted only from a comment containing a
 `<!-- jovie-active-lease:v1 -->` JSON envelope with `owner`, `leaseId`,
