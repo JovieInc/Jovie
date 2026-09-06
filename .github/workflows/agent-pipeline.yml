@@ -592,7 +592,7 @@ jobs:
   # APPROVE: Auto-approve and hand passing agent PRs to the queue controller
   # ==========================================================================
   # Successful CI does not manufacture review or merge intent. The owning agent
-  # completes review/qualification and runs pnpm ship:merge with its exact SHA.
+  # completes review/qualification and runs scripts/writer-owned-pr-promote.sh with its exact SHA.
   # Native GitHub stores intent; this workflow retains bounded failure repair.
   exhaust:
     name: Escalate Exhausted Agent PR

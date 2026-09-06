@@ -133,7 +133,7 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 After completing review and qualification, the owning agent uses
 `scripts/writer-owned-pr-promote.sh` to attach author proof, mark ready and submit
 native intent in one bounded action. Already-qualified ready PRs can use
-`pnpm ship:merge --repo JovieInc/Jovie --pr NUMBER --head FULL_SHA`.
+`node scripts/native-merge-intent.mjs --repo JovieInc/Jovie --pr NUMBER --head FULL_SHA`.
 This is an exact-head native merge/auto-merge request. GitHub stores waiting
 intent and owns required checks and combined-head merge-group validation.
 The agent does not need to remain alive polling. No admin bypass is allowed.

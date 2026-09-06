@@ -53,6 +53,9 @@ function tombstone(context = 'jovie-queue-product-failure/v1') {
 }
 test('qualified source remains eligible with unavailable Symphony, unbound production and unrelated failures', () => {
   const input = fixture();
+  input.pr.labels = ['needs-human', 'human-review-required', 'no-auto'].map(
+    name => ({ name })
+  );
   input.statuses = [
     'symphony-health',
     'production-binding',
@@ -77,7 +80,10 @@ test('every mechanical hold blocks and removing it restores eligibility', () => 
   }
 });
 test('draft closed conflicting wrong-base and stale heads block', () => {
-  for (const [mutate, reason] of [
+  for (const [
+    mutate,
+    reason,
+  ] of /** @type {Array<[(pr: ReturnType<typeof fixture>["pr"]) => void, string]>} */ ([
     [
       pr => {
         pr.draft = true;
@@ -108,7 +114,7 @@ test('draft closed conflicting wrong-base and stale heads block', () => {
       },
       'stale-head',
     ],
-  ]) {
+  ])) {
     const input = fixture();
     mutate(input.pr);
     assert.ok(evaluateSourceAdmission(input).blockers.includes(reason));
@@ -196,6 +202,10 @@ test('both trusted exact-head tombstones block even with later success; spoofed 
     assert.equal(evaluateSourceAdmission(input).allowed, false);
   }
 });
+/**
+ * @param {ReturnType<typeof fixture>} input
+ * @param {(path: string, response: {data: unknown, link: string | null}, calls: {path: string, options: object}[]) => void} [change]
+ */
 function requester(input, change = () => {}) {
   const calls = [];
   const request = async (path, options) => {

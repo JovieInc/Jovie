@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// JOV-INV-023: source intent does not depend on fleet or production observations.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -53,6 +54,14 @@ export function parseArgs(args) {
   return options;
 }
 
+/**
+ * @typedef {{code: number, stdout: string}} CommandResult
+ * @typedef {{repo?: string, pr?: number | string, head?: string, receiptDir?: string, base?: string}} MergeIntentOptions
+ * @typedef {{status: string, reason: string, repo?: string, pr: number, head?: string, position?: number, receipt?: string, requestExitCode?: number, blockers?: string[]}} MergeIntentResult
+ * @param {MergeIntentOptions} options
+ * @param {{exec?: (args: string[]) => CommandResult | Promise<CommandResult>, policy?: import('./lib/source-admission-policy.mjs').AdmissionEvaluator}} [dependencies]
+ * @returns {Promise<MergeIntentResult>}
+ */
 export async function submitMergeIntent(
   options,
   { exec = execute, policy = runSourceAdmission } = {}

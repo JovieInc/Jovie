@@ -10,7 +10,7 @@ parent lands. There is no second landing transport.
 ## How a PR lands
 
 The owning agent completes review and qualification, marks its PR ready, then
-runs `pnpm ship:merge --repo JovieInc/Jovie --pr NUMBER --head FULL_SHA`.
+runs `node scripts/native-merge-intent.mjs --repo JovieInc/Jovie --pr NUMBER --head FULL_SHA`.
 The command pins the mutation with `--match-head-commit`, verifies native queue
 is required, checks current metadata policy, and requests auto-merge once.
 GitHub waits for required checks and validates the combined merge-group head.

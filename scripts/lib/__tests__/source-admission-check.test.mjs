@@ -88,7 +88,6 @@ test('malformed event refuses all API effects', async () => {
 
 test('trusted review signal reads current PR metadata without executing review artifacts', async () => {
   const f = fixture();
-  const api = f.args.api;
   const event = {
     repository: { full_name: 'JovieInc/Jovie' },
     workflow_run: {
@@ -99,10 +98,6 @@ test('trusted review signal reads current PR metadata without executing review a
   const result = await publishSourceAdmission({
     ...f.args,
     event,
-    api: (endpoint, payload) =>
-      endpoint === 'repos/JovieInc/Jovie/pulls/1'
-        ? { head: { sha: head } }
-        : api(endpoint, payload),
   });
   assert.equal(result.disposition, 'allowed');
   assert.equal(f.writes.length, 1);
