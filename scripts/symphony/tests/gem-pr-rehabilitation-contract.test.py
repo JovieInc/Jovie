@@ -502,6 +502,9 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
             "registry_config": gem / "config/gem-repo-registry.json",
             "workflow": symphony / "WORKFLOW.md",
             "attestation": gem / "state/gem-service-attestation.json",
+            "systemctl_log": root / "systemctl.log",
+            "concurrency_timer_enabled": root / "concurrency-timer.enabled",
+            "concurrency_timer_active": root / "concurrency-timer.active",
         }
         (gem / "scripts").mkdir(parents=True)
         (gem / "config").mkdir(parents=True)
@@ -527,10 +530,45 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
         systemctl = fake_bin / "systemctl"
         systemctl.write_text(
             """#!/bin/sh
+printf '%s\n' "$*" >> "$FAKE_SYSTEMCTL_LOG"
 case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
+  *"is-enabled --quiet symphony-concurrency-controller.timer"*)
+    test -f "$FAKE_CONCURRENCY_TIMER_ENABLED"
+    exit $?
+    ;;
+  *"is-active --quiet symphony-concurrency-controller.timer"*)
+    test -f "$FAKE_CONCURRENCY_TIMER_ACTIVE"
+    exit $?
+    ;;
+  *"enable --now symphony-concurrency-controller.timer"*)
+    : > "$FAKE_CONCURRENCY_TIMER_ENABLED"
+    : > "$FAKE_CONCURRENCY_TIMER_ACTIVE"
+    exit 0
+    ;;
+  *"enable symphony-concurrency-controller.timer"*)
+    : > "$FAKE_CONCURRENCY_TIMER_ENABLED"
+    exit 0
+    ;;
+  *"disable symphony-concurrency-controller.timer"*)
+    rm -f "$FAKE_CONCURRENCY_TIMER_ENABLED"
+    exit 0
+    ;;
+  *"stop symphony-concurrency-controller.timer"*)
+    rm -f "$FAKE_CONCURRENCY_TIMER_ACTIVE"
+    exit 0
+    ;;
+  *"start symphony-concurrency-controller.timer"*)
+    : > "$FAKE_CONCURRENCY_TIMER_ACTIVE"
+    exit 0
+    ;;
+  *"start symphony-concurrency-controller.service"*)
+    [ "${FAKE_CONTROLLER_START_FAILURE:-false}" != true ]
+    exit $?
+    ;;
+  *"stop symphony-concurrency-controller.service"*) exit 0 ;;
   *"daemon-reload"*)
     if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
        [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
@@ -594,6 +632,9 @@ exit 0
             "FAKE_WORKFLOW_MUTATION_MARKER": str(root / "workflow-mutated"),
             "FAKE_WORKFLOW_OVERLAY_TARGET": str(paths["workflow"]),
             "GEM_PROC_ROOT": str(proc_root),
+            "FAKE_SYSTEMCTL_LOG": str(paths["systemctl_log"]),
+            "FAKE_CONCURRENCY_TIMER_ENABLED": str(paths["concurrency_timer_enabled"]),
+            "FAKE_CONCURRENCY_TIMER_ACTIVE": str(paths["concurrency_timer_active"]),
             "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
         }
         return paths, env
@@ -604,6 +645,7 @@ exit 0
         env: dict[str, str],
         *,
         fail_restart: bool = False,
+        fail_controller_start: bool = False,
         workflow_overlay: str = "",
         unrelated_workflow_drift: bool = False,
     ) -> subprocess.CompletedProcess[str]:
@@ -612,6 +654,9 @@ exit 0
             env={
                 **env,
                 "FAKE_RUNTIME_FAILURE": "true" if fail_restart else "false",
+                "FAKE_CONTROLLER_START_FAILURE": (
+                    "true" if fail_controller_start else "false"
+                ),
                 "FAKE_WORKFLOW_OVERLAY_VALUE": workflow_overlay,
                 "FAKE_WORKFLOW_UNRELATED_DRIFT": (
                     "true" if unrelated_workflow_drift else "false"
@@ -650,6 +695,8 @@ exit 0
         self.assertIn("scripts/symphony/gem_rehabilitation_policy.py", process.stdout)
         self.assertIn("scripts/symphony/gem_repo_registry.py", process.stdout)
         self.assertIn("scripts/symphony/config/gem-repo-registry.json", process.stdout)
+        self.assertIn("scripts/symphony/symphony-concurrency-controller.py", process.stdout)
+        self.assertIn("symphony-concurrency-controller.timer", process.stdout)
 
     def test_verify_only_fails_when_policy_cannot_satisfy_the_consumer_import(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -693,6 +740,9 @@ exit 0
         self.assertTrue(attestation["policy"]["matches"])
         self.assertTrue(attestation["gate"]["matches"])
         self.assertTrue(attestation["closureHealth"]["matches"])
+        self.assertTrue(attestation["concurrencyController"]["matches"])
+        self.assertTrue(attestation["concurrencyService"]["matches"])
+        self.assertTrue(attestation["concurrencyTimer"]["matches"])
         self.assertEqual(
             attestation["policy"]["sourceSha256"],
             attestation["policy"]["installedSha256"],
@@ -702,6 +752,79 @@ exit 0
         self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 8)
         self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
         self.assertEqual(attestation["listener"]["pid"], 4242)
+
+    def test_install_activates_existing_adaptive_controller_from_disabled_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env)
+            commands = paths["systemctl_log"].read_text(encoding="utf-8").splitlines()
+            installed = all(
+                path.is_file()
+                for path in (
+                    pathlib.Path(env["HOME"]) / ".local/bin/symphony-concurrency-controller",
+                    pathlib.Path(env["HOME"]) / ".config/systemd/user/symphony-concurrency-controller.service",
+                    pathlib.Path(env["HOME"]) / ".config/systemd/user/symphony-concurrency-controller.timer",
+                )
+            )
+            enabled = paths["concurrency_timer_enabled"].exists()
+            active = paths["concurrency_timer_active"].exists()
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertTrue(installed)
+        self.assertTrue(enabled)
+        self.assertTrue(active)
+        self.assertIn(
+            "--user enable --now symphony-concurrency-controller.timer", commands
+        )
+        self.assertIn(
+            "--user start symphony-concurrency-controller.service", commands
+        )
+        self.assertIn(
+            "--user is-enabled --quiet symphony-concurrency-controller.timer", commands
+        )
+        self.assertIn(
+            "--user is-active --quiet symphony-concurrency-controller.timer", commands
+        )
+
+    def test_controller_start_failure_rolls_back_artifacts_attestation_and_timer_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            home = pathlib.Path(env["HOME"])
+            controller = home / ".local/bin/symphony-concurrency-controller"
+            service = home / ".config/systemd/user/symphony-concurrency-controller.service"
+            timer = home / ".config/systemd/user/symphony-concurrency-controller.timer"
+            controller.parent.mkdir(parents=True, exist_ok=True)
+            for path, contents in (
+                (controller, "old controller\n"),
+                (service, "old service\n"),
+                (timer, "old timer\n"),
+            ):
+                path.write_text(contents, encoding="utf-8")
+            paths["attestation"].parent.mkdir(parents=True, exist_ok=True)
+            paths["attestation"].write_text(
+                '{"schema":"prior-attestation"}\n', encoding="utf-8"
+            )
+
+            process = self._install(fixture, env, fail_controller_start=True)
+            restored = {
+                "controller": controller.read_text(encoding="utf-8"),
+                "service": service.read_text(encoding="utf-8"),
+                "timer": timer.read_text(encoding="utf-8"),
+                "attestation": paths["attestation"].read_text(encoding="utf-8"),
+            }
+            enabled = paths["concurrency_timer_enabled"].exists()
+            active = paths["concurrency_timer_active"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored["controller"], "old controller\n")
+        self.assertEqual(restored["service"], "old service\n")
+        self.assertEqual(restored["timer"], "old timer\n")
+        self.assertEqual(restored["attestation"], '{"schema":"prior-attestation"}\n')
+        self.assertFalse(enabled)
+        self.assertFalse(active)
+        self.assertIn("fleet controller install rolled back", process.stderr)
 
     def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:

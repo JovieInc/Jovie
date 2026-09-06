@@ -65,20 +65,15 @@ jobs:
         run: |
           set -euo pipefail
           # Preserve the managed provider generation boundary. The next installer
-          # owns the exact workflow/service-unit overlay, and the explicit installs
-          # below own the adaptive controller; provider-only is not the whole activation.
+          # owns the exact workflow/service-unit overlay and the existing adaptive
+          # controller as one rollback-safe unit; provider-only is not the whole activation.
           bash scripts/symphony/update-symphony-burrito.sh --provider-runtime-only
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh
-          install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"
-          install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.service "$HOME/.config/systemd/user/symphony-concurrency-controller.service"
-          install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.timer "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
           install -D -m 0755 scripts/symphony/gem-disk-reclaim.py "$HOME/.local/bin/gem-disk-reclaim"
           install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.service "$HOME/.config/systemd/user/gem-disk-reclaim.service"
           install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.timer "$HOME/.config/systemd/user/gem-disk-reclaim.timer"
           systemctl --user daemon-reload
-          systemctl --user enable --now symphony-concurrency-controller.timer
-          systemctl --user start symphony-concurrency-controller.service
           systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
         env:
