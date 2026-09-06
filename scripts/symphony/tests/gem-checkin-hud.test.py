@@ -330,7 +330,7 @@ class UltrawideHudTests(unittest.TestCase):
         )
         self.assertAlmostEqual(tps, 1000.0)
         plain = strip(paint(state, tps=tps, width=430))
-        for token in ("AGENTS", "1/8", "OUTPUT RATE", "1K output tok/s", "FAILURES", "TOKENS", "69.1K", "Runtime 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
+        for token in ("AGENTS", "1/8", "OUTPUT RATE", "1K output tok/s", "FAILURES", "CUMULATIVE TOKENS", "69.1K", "AGENT EXECUTION RUNTIME 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
             self.assertIn(token, plain)
         self.assertIsNone(HUD.compute_throughput(state["totals"], [], now=NOW))
 
@@ -576,7 +576,7 @@ class UltrawideHudTests(unittest.TestCase):
                 pr_flow={"ok": True, "open_count": 103, "opened_24h": 41, "merged_24h": 37, "generated_at": "2026-08-31T11:58:00Z"},
             )
         )
-        for token in ("PR FLOW", "rolling prior 24h", "GitHub", "Updated 2 minutes ago", "OPEN NOW", "103", "OPENED 24H", "41", "MERGED 24H", "37", "NET FLOW", "+4"):
+        for token in ("PR FLOW", "rolling prior 24h", "GitHub", "Updated 2 minutes ago", "OPEN NOW", "103", "OPENED 24H", "41", "MERGED 24H", "37", "OPENED − MERGED", "+4"):
             self.assertIn(token, known)
         unknown = strip(paint(width=430, pr_flow={"ok": False}))
         self.assertIn("source unavailable", unknown)
@@ -601,7 +601,7 @@ class UltrawideHudTests(unittest.TestCase):
         pressure = {
             "ok": True,
             "generated_at": "2026-08-31T11:58:00Z",
-            "cpu": {"status": "failure", "signal_pct": 131, "load1": 49.0, "cores": 16, "psi": 74},
+            "cpu": {"status": "failure", "signal_pct": 131, "load_pct": 131, "load1": 49.0, "cores": 16, "psi": 74},
             "memory": {"status": "healthy", "available_pct": 62, "psi": 1},
             "disk": {
                 "status": "warning",
@@ -638,11 +638,11 @@ class UltrawideHudTests(unittest.TestCase):
         }
         output = paint(width=430, height=90, pr_flow=matrix, system_pressure=pressure)
         plain = strip(output)
-        for token in ("SYSTEM PRESSURE", "CPU / LOAD", "131%", "MEMORY", "62% available", "ROOT DISK FREE", "9% free", "I/O FULL PSI", "12% full", "NETWORK", "rate window pending", "WORKER SLOTS", "6/8", "CI MATRIX", "cached GitHub rollup", "8/103 rows", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
+        for token in ("SYSTEM PRESSURE", "CPU LOAD / STALL", "load 131%", "MEMORY", "62% available", "ROOT DISK FREE", "9% free", "I/O FULL PSI", "12% full", "NETWORK", "rate window pending", "WORKER SLOTS", "6/8", "CI MATRIX", "cached GitHub rollup", "display 8 · sampled 11 · open 103", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
             self.assertIn(token, plain)
         self.assertNotIn("DISK / I/O", plain)
         self.assertNotIn("#9 Work 9", plain)
-        self.assertIn("\033[38;2;255;103;125m131%", output)
+        self.assertIn("\033[38;2;255;103;125mload 131%", output)
 
     def test_disk_capacity_and_io_pressure_are_separate_source_metrics(self):
         psi_samples = (
@@ -860,7 +860,7 @@ class UltrawideHudTests(unittest.TestCase):
         pressure = {
             "ok": True,
             "generated_at": sampled_at,
-            "cpu": {"status": "failure", "state": "fresh", "signal_pct": 125, "load1": 20, "cores": 16, "psi": 125, "source": "getloadavg + /proc/pressure/cpu", "unit": "load/PSI percent", "window": "load1 + PSI avg10", "denominator": "16 cores; red at 125%", "sampled_at": sampled_at},
+            "cpu": {"status": "failure", "state": "fresh", "signal_pct": 125, "load_pct": 125, "load1": 20, "cores": 16, "psi": 125, "source": "getloadavg + /proc/pressure/cpu", "unit": "load/PSI percent", "window": "load1 + PSI avg10", "denominator": "16 cores; red at 125%", "sampled_at": sampled_at},
             "memory": {"status": "healthy", "state": "fresh", "available_pct": 50, "psi": 2, "source": "/proc/meminfo + /proc/pressure/memory", "unit": "free/PSI percent", "window": "point + PSI avg10", "denominator": "100% memory; PSI red at 30%", "sampled_at": sampled_at},
             "disk": {"status": "warning", "state": "fresh", "available_pct": 10, "used_pct": 90, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "window": "point", "denominator": "100% root volume", "sampled_at": sampled_at},
             "io": {"status": "healthy", "state": "fresh", "some_avg10_pct": 8, "full_avg10_pct": 4, "source": "/proc/pressure/io", "unit": "stall percent", "window": "avg10", "denominator": "red at 20% full stall", "sampled_at": sampled_at},
@@ -895,7 +895,7 @@ class UltrawideHudTests(unittest.TestCase):
         )
         self.assertIn("┌─ × CRITICAL · OPERATOR HEALTH", plain)
         self.assertIn("STALLED/BLOCKED 1", plain)
-        self.assertIn("CPU / LOAD RED", plain)
+        self.assertIn("CPU LOAD / STALL RED", plain)
         order = ["OPERATOR HEALTH", "AGENTS", "PRIMARY CAPACITY / PRESSURE", "CURRENT WORK", "SHIP", "PR FLOW", "CI MATRIX", "BUSINESS SIGNALS"]
         for before, after in zip(order, order[1:]):
             self.assertLess(plain.index(before), plain.index(after))
@@ -918,7 +918,8 @@ class UltrawideHudTests(unittest.TestCase):
             self.assertIn(label, output)
         self.assertNotIn("┏━ THROUGHPUT", output)
         self.assertNotIn("┏━ TOKENS", output)
-        self.assertIn("TELEMETRY · OUTPUT RATE", output)
+        self.assertIn("TELEMETRY · REVIEW", output)
+        self.assertIn("OUTPUT RATE", output)
         self.assertLess(output.index("┏━ AGENTS"), output.index("PRIMARY CAPACITY / PRESSURE"))
         hero_top = next(line for line in output.splitlines() if "┏━ AGENTS" in line)
         self.assertEqual(hero_top.count("┓"), 4)
@@ -1097,7 +1098,7 @@ class UltrawideHudTests(unittest.TestCase):
         HUD.retain_last_good_source("pressure", good, now=NOW)
         partial = json.loads(json.dumps(good))
         partial["generated_at"] = NOW.isoformat()
-        partial["cpu"].update({"signal_pct": 60, "sampled_at": NOW.isoformat()})
+        partial["cpu"].update({"signal_pct": 60, "load_pct": 60, "sampled_at": NOW.isoformat()})
         partial["disk"] = {
             "status": "unknown",
             "state": "error",
@@ -1113,7 +1114,7 @@ class UltrawideHudTests(unittest.TestCase):
         plain = strip(paint(width=430, height=90, system_pressure=retained))
         self.assertIn("DEGRADED/ERROR", plain)
         self.assertIn("? STALE · 23% free", plain)
-        self.assertIn("60% · ✓ NORMAL", plain)
+        self.assertIn("load 60% · PSI - · ✓ NORMAL", plain)
 
     def test_compact_critical_rows_and_medium_review_are_visible(self):
         path = HUD.empty_ship_path()
@@ -1147,7 +1148,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("#17/p3", compact)
 
         medium = strip(paint(review=3, width=200, height=40))
-        self.assertIn("Review 3", medium)
+        self.assertIn("REVIEW 3", medium)
         crowded = strip(
             paint(
                 symphony={

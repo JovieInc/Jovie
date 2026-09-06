@@ -792,6 +792,7 @@ def fetch_system_pressure(
             "state": cpu_state,
             "signal_pct": cpu_signal,
             "load1": load1,
+            "load_pct": load_pct,
             "cores": cpu_count,
             "psi": cpu_psi.get("some"),
             "source": "getloadavg + /proc/pressure/cpu",
@@ -1066,11 +1067,9 @@ def ship_bottleneck(stages: list[dict[str, Any]]) -> dict[str, Any] | None:
     queued = next((s for s in stages if s.get("queued") and s.get("queue_reason")), None)
     if queued:
         return {"id": queued["id"], "label": queued["label"], "reason": queued["queue_reason"]}
-    measured = [s for s in stages if s.get("p95") is not None]
-    if not measured:
-        return None
-    worst = max(measured, key=lambda stage: float(stage["p95"]))
-    return {"id": worst["id"], "label": worst["label"], "reason": f"{worst['label']} p95 {runtime_label(worst['p95'])}"}
+    # Each stage has a different source population and observation window.
+    # A largest-p95 comparison across those cohorts is not bottleneck evidence.
+    return None
 
 
 def build_ship_path(
@@ -1669,7 +1668,7 @@ def _operator_health(
 
     payload = pressure if isinstance(pressure, dict) else {}
     metric_names = {
-        "cpu": "CPU / LOAD",
+        "cpu": "CPU LOAD / STALL",
         "memory": "MEMORY",
         "disk": "ROOT DISK",
         "io": "I/O FULL PSI",
@@ -2069,9 +2068,8 @@ def _hero_metrics(
         bottoms.append(pad_visible(_rgb(color, clip(bottom, col_width)), col_width))
     spacer = " " * gap
     throughput = UNKNOWN if tps is None else f"{compact_tokens(tps)} output tok/s"
-    context = f"TELEMETRY · OUTPUT RATE {throughput} · 4–15s wall window · Symphony :4041 output counter · TOKENS {total} ({incoming} in · {outgoing} out) · Runtime {runtime_label(seconds)} · Rate limits {limits}"
-    if isinstance(review, int) and review > 0:
-        context += f" · Review {review}"
+    review_text = f"{review} · Linear freshness UNKNOWN" if isinstance(review, int) else "UNKNOWN · Linear source unavailable"
+    context = f"TELEMETRY · REVIEW {review_text} · OUTPUT RATE {throughput} · 4–15s wall window · Symphony :4041 output counter · CUMULATIVE TOKENS {total} ({incoming} in · {outgoing} out) · AGENT EXECUTION RUNTIME {runtime_label(seconds)} · Rate limits {limits}"
     return [
         spacer.join(tops),
         spacer.join(values),
@@ -2086,12 +2084,8 @@ def _stage_bar(stage: dict[str, Any], max_p95: float | None, width: int) -> str:
     series = stage.get("series")
     if isinstance(series, list) and series:
         return sparkline(series)[: max(1, width)]
-    p95 = stage.get("p95")
-    if p95 is None or max_p95 is None or max_p95 <= 0:
-        return "-"
-    last = len(BARS) - 1
-    height = max(0, min(last, int(round((float(p95) / max_p95) * last))))
-    return BARS[height] * max(1, min(8, width))
+    # Do not visually normalize latency across incomparable source cohorts.
+    return "-"
 
 
 def _pr_flow_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
@@ -2112,7 +2106,7 @@ def _pr_flow_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) ->
         ("OPEN NOW", dash(_int(payload.get("open_count")) if known else None), FG),
         ("OPENED 24H", dash(opened), BLUE if opened else DIM),
         ("MERGED 24H", dash(merged), BLUE if merged else DIM),
-        ("NET FLOW", net_text, PINK if net is not None and net > 0 else BLUE if net is not None and net < 0 else DIM),
+        ("OPENED − MERGED", net_text, PINK if net is not None and net > 0 else BLUE if net is not None and net < 0 else DIM),
     ]
     gap = 4
     col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
@@ -2217,7 +2211,14 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
         payload.get("stale") is True and payload.get("partial_stale") is not True
     )
     raw_cells = [
-        ("CPU / LOAD", _pct0(cpu.get("signal_pct")), f"load {load_text}/{dash(cpu.get('cores'))} · PSI {_pct0(cpu.get('psi'))}", cpu, cpu.get("signal_pct"), 125),
+        (
+            "CPU LOAD / STALL",
+            f"load {_pct0(cpu.get('load_pct'))} · PSI {_pct0(cpu.get('psi'))}",
+            f"load1 {load_text}/{dash(cpu.get('cores'))} · worst signal {_pct0(cpu.get('signal_pct'))}",
+            cpu,
+            cpu.get("signal_pct"),
+            125,
+        ),
         ("MEMORY", f"{_pct0(memory.get('available_pct'))} available", f"PSI {_pct0(memory.get('psi'))}", memory, memory.get("available_pct"), 100),
         (
             "ROOT DISK FREE",
@@ -2285,8 +2286,8 @@ def _admission_cell(status: Any, width: int) -> str:
 
 def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
     payload = flow if isinstance(flow, dict) else {}
-    rows = payload.get("ci_matrix") if isinstance(payload.get("ci_matrix"), list) else []
-    rows = [row for row in rows if isinstance(row, dict)][:8]
+    sampled_rows = [row for row in (payload.get("ci_matrix") or []) if isinstance(row, dict)] if isinstance(payload.get("ci_matrix"), list) else []
+    rows = sampled_rows[:8]
     known = payload.get("ok") is True
     freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
     if payload.get("stale") is True:
@@ -2295,7 +2296,7 @@ def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) 
     total = _int(payload.get("open_count")) if known else None
     heading = (
         _rgb(FG, SHIPPING_DISPLAY_IA["ci_matrix"]["label"], bold=True)
-        + _rgb(DIM, f"  ·  cached GitHub rollup  ·  {len(rows)}/{dash(total)} rows  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
+        + _rgb(DIM, f"  ·  cached GitHub rollup  ·  display {len(rows)} · sampled {len(sampled_rows)} · open {dash(total)}  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
     )
     status_width = 10
     admission_width = 11
