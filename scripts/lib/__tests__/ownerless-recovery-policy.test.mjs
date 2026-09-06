@@ -6,6 +6,7 @@ import {
   readRecoveryEvent,
   recoveryEventDecision,
   recoveryIssueSnapshot,
+  recoveryNativeAdmissionDecision,
   run,
 } from '../../ownerless-recovery-sweeper.mjs';
 import {
@@ -198,6 +199,7 @@ describe('recovery event admission before tracker reads', () => {
   });
   const ready = {
     number: 17298,
+    head: { sha: head },
     draft: false,
     state: 'open',
     base: { ref: 'main' },
@@ -258,12 +260,87 @@ describe('recovery event admission before tracker reads', () => {
         eventContext,
         now: Date.parse(now),
         resolvePolicyHead: async () => main,
+        readEventQueueState: async () => ({
+          number: 17298,
+          headRefOid: head,
+          state: 'OPEN',
+          isDraft: false,
+          queued: false,
+          autoMergeEnabled: false,
+        }),
         readOpenPulls: async () => [ready],
         readIssueSnapshot: async () => {
           throw new Error('full closure audit reached');
         },
       })
     ).rejects.toThrow('full closure audit reached');
+  });
+
+  it.each([
+    { queued: true, autoMergeEnabled: true },
+    { queued: false, autoMergeEnabled: true },
+  ])('repeated events for admitted exact heads never inventory GitHub or Linear: %j', async admission => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await run({
+        eventContext: event('opened'),
+        now: Date.parse(now),
+        readEventQueueState: async input => {
+          expect(input).toEqual({
+            repository: 'JovieInc/Jovie',
+            number: 17298,
+          });
+          return {
+            number: 17298,
+            headRefOid: head,
+            state: 'OPEN',
+            isDraft: false,
+            ...admission,
+          };
+        },
+        resolvePolicyHead: unexpected,
+        readOpenPulls: unexpected,
+        readIssueSnapshot: unexpected,
+      });
+    }
+  });
+
+  it.each([
+    { number: 17298, headRefOid: main },
+    { number: 17299, headRefOid: head },
+    { number: 17298, headRefOid: head, state: 'OPEN', isDraft: false },
+    { number: 17298, headRefOid: head },
+    null,
+  ])('rejects stale or partial live admission evidence before tracker inventory: %j', async state => {
+    await expect(
+      run({
+        eventContext: event('opened'),
+        readEventQueueState: async () => state,
+        resolvePolicyHead: unexpected,
+        readOpenPulls: unexpected,
+        readIssueSnapshot: unexpected,
+      })
+    ).rejects.toThrow(/indeterminate|changed/);
+  });
+
+  it('skips a current closed or draft PR and propagates failed readback', async () => {
+    for (const changed of [
+      { state: 'CLOSED', isDraft: false },
+      { state: 'OPEN', isDraft: true },
+    ]) {
+      expect(
+        await recoveryNativeAdmissionDecision(event('opened'), async () => ({
+          number: 17298,
+          headRefOid: head,
+          ...changed,
+        }))
+      ).toEqual({ required: false, reason: 'current-pr-not-ready' });
+    }
+    await expect(
+      recoveryNativeAdmissionDecision(event('opened'), unexpected)
+    ).rejects.toThrow('unexpected external read');
+    await expect(
+      recoveryNativeAdmissionDecision(event('opened', { head: {} }), unexpected)
+    ).rejects.toThrow('exact PR head is indeterminate');
   });
 
   it('requires a full ownerless hour after the most recent assignment transition', async () => {
