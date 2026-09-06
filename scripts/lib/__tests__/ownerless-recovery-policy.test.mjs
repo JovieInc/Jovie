@@ -102,6 +102,30 @@ describe('ownerless recovery policy', () => {
     ).toBe(false);
   });
 
+  it('accepts the official Symphony API timestamp schema', () => {
+    const result = audit([pull(60)], [issue('JOV-60', 'In Progress')], {
+      symphonyState: {
+        generated_at: fresh,
+        running: [{ issue_identifier: 'JOV-60' }],
+        retrying: [],
+        blocked: [],
+      },
+    });
+
+    expect(
+      result.violations.some(
+        violation => violation.reason === 'symphony-state-malformed'
+      )
+    ).toBe(false);
+    expect(result.symphony).toMatchObject({
+      healthy: true,
+      observedAt: fresh,
+      running: 1,
+      retrying: 0,
+      blocked: 0,
+    });
+  });
+
   it('validates queue ownership and comment dedupe keys', () => {
     expect(
       classifyQueueOwnership({ headRefOid: head, queued: true }, head).outcome
