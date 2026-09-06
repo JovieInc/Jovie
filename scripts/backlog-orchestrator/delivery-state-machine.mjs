@@ -11,7 +11,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, open, readFile } from 'node:fs/promises';
+import { mkdir, open, readdir, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import {
   policyDigest,
@@ -35,6 +35,7 @@ import {
 export const DELIVERY_RECEIPT_SCHEMA = 'jovie-delivery-receipt/v1';
 export const REPAIR_TASK_SCHEMA = 'jovie-symphony-repair-task/v1';
 export const STACK_HEALTH_ACTION_SCHEMA = 'jovie-stack-health-action/v1';
+export const PR_LIFECYCLE_ACTION_SCHEMA = 'jovie-pr-lifecycle-action/v1';
 export const STACK_REPAIR_ACTION = 'split-or-retarget-draft-stack'; // JOV-INV-020
 export const PR_LIFECYCLE_CONTRACT_ID = 'JOV-INV-029';
 export const PR_LIFECYCLE_POLICY_DIGEST = policyDigest(
@@ -105,6 +106,14 @@ const NON_AUTHORITATIVE_CLOSURE_REASONS = new Set([
   'gate-evaluation-failed',
 ]);
 
+const LIFECYCLE_DISPOSITIONS = new Set(['active-remediation', 'terminal']);
+const LIFECYCLE_OWNERS = new Set([
+  'controller',
+  'gem',
+  'github-native-merge-queue',
+  'symphony',
+]);
+
 function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
@@ -127,6 +136,201 @@ function exactSha(value) {
 
 function exactPositiveInteger(value) {
   return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function boundedLifecycleAction(action, repository) {
+  if (!action || typeof action !== 'object' || Array.isArray(action)) {
+    throw new Error('PR lifecycle action must be an object');
+  }
+  if (action.schema !== PR_LIFECYCLE_ACTION_SCHEMA) {
+    throw new Error('PR lifecycle action schema is invalid');
+  }
+  const actionRepository = repositoryName(action.repository);
+  if (!actionRepository || actionRepository !== repository) {
+    throw new Error('PR lifecycle action repository is invalid');
+  }
+  const inventoryIndex = action.inventoryIndex;
+  if (
+    !Number.isInteger(inventoryIndex) ||
+    inventoryIndex < 0 ||
+    inventoryIndex > 10_000
+  ) {
+    throw new Error('PR lifecycle action inventory index is invalid');
+  }
+  const pr = exactPositiveInteger(action.pr);
+  const sourceState = nonEmpty(action.sourceState);
+  if (!pr && sourceState !== 'unclassified') {
+    throw new Error('PR lifecycle action requires a PR number');
+  }
+  const headSha = exactSha(action.headSha);
+  if (!headSha && sourceState !== 'unclassified') {
+    throw new Error('PR lifecycle action requires an exact head SHA');
+  }
+  const lifecycleKey = nonEmpty(action.lifecycleKey);
+  const expectedLifecycleKey = pr
+    ? `${repository}:pr:${pr}`
+    : `${repository}:inventory-row:${inventoryIndex}`;
+  if (lifecycleKey !== expectedLifecycleKey || lifecycleKey.length > 180) {
+    throw new Error('PR lifecycle action key is invalid');
+  }
+  const actionKey = nonEmpty(action.actionKey);
+  if (!actionKey || !/^[0-9a-f]{64}$/i.test(actionKey)) {
+    throw new Error('PR lifecycle action requires a SHA-256 action key');
+  }
+  const disposition = nonEmpty(action.disposition);
+  const owner = nonEmpty(action.owner);
+  const writer = nonEmpty(action.writer);
+  const nextAction = nonEmpty(action.action);
+  const reason = nonEmpty(action.reason);
+  if (!LIFECYCLE_DISPOSITIONS.has(disposition)) {
+    throw new Error('PR lifecycle disposition is invalid');
+  }
+  if (!LIFECYCLE_OWNERS.has(owner) || writer !== owner) {
+    throw new Error('PR lifecycle action requires one machine owner/writer');
+  }
+  if (
+    !nextAction ||
+    nextAction.length > 160 ||
+    !reason ||
+    reason.length > 240
+  ) {
+    throw new Error('PR lifecycle action route is invalid');
+  }
+  if (action.terminal !== (disposition === 'terminal')) {
+    throw new Error('PR lifecycle terminal state is inconsistent');
+  }
+  if (action.externalMutations !== 0) {
+    throw new Error('PR lifecycle ingress cannot mutate external state');
+  }
+  if (
+    sourceState === 'queued' &&
+    (owner !== 'github-native-merge-queue' ||
+      nextAction !== 'preserve-native-queue-ownership')
+  ) {
+    throw new Error(
+      'queued PR lifecycle action must preserve native queue ownership'
+    );
+  }
+  if (
+    sourceState === 'promote' &&
+    (owner !== 'gem' || nextAction !== 'reconcile-exact-head-queue-admission')
+  ) {
+    throw new Error('promotable PR lifecycle action must remain Gem-owned');
+  }
+  if (
+    pr === 17156 &&
+    (disposition !== 'terminal' ||
+      owner !== 'gem' ||
+      nextAction !== 'preserve-protected-pr-exclusion')
+  ) {
+    throw new Error('protected PR 17156 lifecycle exclusion is invalid');
+  }
+  const observedAt = nonEmpty(action.observedAt);
+  if (!observedAt || !Number.isFinite(Date.parse(observedAt))) {
+    throw new Error('PR lifecycle action observedAt is invalid');
+  }
+  return {
+    ...action,
+    repository,
+    inventoryIndex,
+    pr,
+    headSha,
+    issue: nonEmpty(action.issue),
+    sourceState,
+    lifecycleKey,
+    actionKey: actionKey.toLowerCase(),
+    disposition,
+    owner,
+    writer,
+    action: nextAction,
+    reason,
+    observedAt: new Date(observedAt).toISOString(),
+  };
+}
+
+async function loadLifecycleActions(stateDir) {
+  const directory = join(stateDir, 'pr-lifecycle-actions');
+  let names;
+  try {
+    names = await readdir(directory);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+  const records = [];
+  for (const name of names.filter(name => name.endsWith('.json')).sort()) {
+    const record = JSON.parse(await readFile(join(directory, name), 'utf8'));
+    if (record?.schema !== 'jovie-pr-lifecycle-action-receipt/v1') {
+      throw new Error('persisted PR lifecycle action is malformed');
+    }
+    records.push(record);
+  }
+  return records;
+}
+
+async function persistLifecycleAction(action, { stateDir, dryRun }) {
+  const records = dryRun ? [] : await loadLifecycleActions(stateDir);
+  const previous = records
+    .filter(record => record.lifecycleKey === action.lifecycleKey)
+    .sort((left, right) => {
+      const observed = `${right.observedAt}`.localeCompare(
+        `${left.observedAt}`
+      );
+      return (
+        observed || Number(right.generation || 0) - Number(left.generation || 0)
+      );
+    })[0];
+  if (
+    previous &&
+    Date.parse(previous.observedAt) > Date.parse(action.observedAt)
+  ) {
+    throw new Error('PR lifecycle action is older than persisted authority');
+  }
+  if (
+    previous &&
+    previous.observedAt === action.observedAt &&
+    previous.actionKey !== action.actionKey
+  ) {
+    throw new Error(
+      'PR lifecycle action conflicts at the same observation time'
+    );
+  }
+  const receipt = {
+    ...action,
+    schema: 'jovie-pr-lifecycle-action-receipt/v1',
+    generation:
+      previous?.actionKey === action.actionKey
+        ? Number(previous.generation || 0)
+        : Number(previous?.generation ?? -1) + 1,
+    supersedesActionKey:
+      previous && previous.actionKey !== action.actionKey
+        ? previous.actionKey
+        : null,
+    outcome: action.terminal ? 'terminal' : 'open',
+    nextProofAt: action.terminal
+      ? null
+      : new Date(Date.parse(action.observedAt) + 10 * 60 * 1000).toISOString(),
+  };
+  const destination = join(
+    stateDir,
+    'pr-lifecycle-actions',
+    `${action.actionKey}.json`
+  );
+  if (dryRun) {
+    return { status: 'dry-run', receipt, path: destination };
+  }
+  const persisted = await atomicPersist(destination, receipt);
+  if (
+    persisted.value.actionKey !== action.actionKey ||
+    persisted.value.lifecycleKey !== action.lifecycleKey
+  ) {
+    throw new Error('PR lifecycle action key collision');
+  }
+  return {
+    status: persisted.status,
+    receipt: persisted.value,
+    path: destination,
+  };
 }
 
 function boundedStackHealthAction(action) {
@@ -636,6 +840,33 @@ export async function persistClosureHealthActions(
   }
   const repository =
     repositoryName(candidate.repository) || DEFAULT_DELIVERY_REPOSITORY;
+  const rawLifecycleActions = candidate.lifecycleActions;
+  if (
+    rawLifecycleActions != null &&
+    (!Array.isArray(rawLifecycleActions) || rawLifecycleActions.length > 500)
+  ) {
+    throw new Error('PR lifecycle actions are missing or unbounded');
+  }
+  const lifecycleRows = Array.isArray(rawLifecycleActions)
+    ? rawLifecycleActions
+    : [];
+  const seenLifecycleKeys = new Set();
+  const boundedLifecycleRows = lifecycleRows.map((action, index) => {
+    try {
+      const bounded = boundedLifecycleAction(action, repository);
+      if (seenLifecycleKeys.has(bounded.lifecycleKey)) {
+        throw new Error('duplicate PR lifecycle action');
+      }
+      seenLifecycleKeys.add(bounded.lifecycleKey);
+      return { index, action: bounded, error: null };
+    } catch (error) {
+      return {
+        index,
+        action: null,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
   const rawActions = candidate.repairActions;
   if (
     rawActions != null &&
@@ -703,6 +934,41 @@ export async function persistClosureHealthActions(
         })
       );
     }
+    const lifecycle = [];
+    for (const row of boundedLifecycleRows) {
+      if (row.error) {
+        lifecycle.push({
+          status: 'rejected',
+          inventoryIndex: row.index,
+          reason: row.error,
+        });
+        continue;
+      }
+      try {
+        const persisted = await persistLifecycleAction(row.action, {
+          stateDir,
+          dryRun,
+        });
+        lifecycle.push({
+          status: persisted.status,
+          inventoryIndex: row.action.inventoryIndex,
+          pr: row.action.pr,
+          headSha: row.action.headSha,
+          owner: row.action.owner,
+          disposition: row.action.disposition,
+          action: row.action.action,
+          receipt: persisted.receipt,
+          path: persisted.path,
+        });
+      } catch (error) {
+        lifecycle.push({
+          status: 'rejected',
+          inventoryIndex: row.index,
+          pr: row.action.pr,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
     const evidence = [];
     for (const rootPr of activeViolationRoots || []) {
       if (roots.has(rootPr)) continue;
@@ -745,20 +1011,32 @@ export async function persistClosureHealthActions(
         repository,
       }
     );
-    const statuses = [...results, ...evidence].map(result => result.status);
+    const rejectedLifecycle = lifecycle.filter(
+      result => result.status === 'rejected'
+    );
+    const statuses = [
+      ...results,
+      ...evidence,
+      ...lifecycle.filter(result => result.status !== 'rejected'),
+    ].map(result => result.status);
     return {
       schema: 'jovie-stack-health-action-ingress/v1',
       observedAt,
       actionCount: results.length,
       evidenceCount: evidence.length,
+      lifecycleActionCount: lifecycle.length - rejectedLifecycle.length,
+      lifecycleRejectedCount: rejectedLifecycle.length,
+      failClosed: rejectedLifecycle.length > 0,
       status:
-        statuses.length === 0
-          ? resolution.status === 'resolved'
-            ? 'resolved'
-            : 'none'
-          : statuses.every(status => status === 'duplicate')
-            ? 'duplicate'
-            : 'created',
+        rejectedLifecycle.length > 0
+          ? 'partial'
+          : statuses.length === 0
+            ? resolution.status === 'resolved'
+              ? 'resolved'
+              : 'none'
+            : statuses.every(status => status === 'duplicate')
+              ? 'duplicate'
+              : 'created',
       resolution,
       actions: results.map(result => ({
         status: result.status,
@@ -775,6 +1053,7 @@ export async function persistClosureHealthActions(
         taskPath: result.evidencePath,
         loop: result.record,
       })),
+      lifecycleActions: lifecycle,
     };
   };
   if (activeViolationRoots == null || dryRun) return persistSnapshot(false);
@@ -805,8 +1084,12 @@ export async function persistClosureHealthActions(
         status: 'stale',
         actionCount: 0,
         evidenceCount: 0,
+        lifecycleActionCount: 0,
+        lifecycleRejectedCount: 0,
+        failClosed: false,
         actions: [],
         evidence: [],
+        lifecycleActions: [],
       };
     }
     if (

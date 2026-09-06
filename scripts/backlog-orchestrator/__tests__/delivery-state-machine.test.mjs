@@ -19,6 +19,31 @@ const HEAD = 'a'.repeat(40);
 const REPO = 'JovieInc/Jovie';
 const LYB_REPO = 'JovieInc/LogYourBody';
 
+function lifecycleAction(overrides = {}) {
+  const pr = overrides.pr ?? 17001;
+  const sourceState = overrides.sourceState ?? 'repair';
+  const terminal = overrides.terminal ?? false;
+  return {
+    schema: 'jovie-pr-lifecycle-action/v1',
+    repository: REPO,
+    inventoryIndex: overrides.inventoryIndex ?? 0,
+    pr,
+    headSha: overrides.headSha === undefined ? HEAD : overrides.headSha,
+    issue: null,
+    lifecycleKey: `${REPO}:pr:${pr}`,
+    actionKey: overrides.actionKey ?? 'e'.repeat(64),
+    disposition: terminal ? 'terminal' : 'active-remediation',
+    sourceState,
+    owner: overrides.owner ?? 'symphony',
+    writer: overrides.writer ?? overrides.owner ?? 'symphony',
+    action: overrides.action ?? 'create-bounded-ci-repair-pr',
+    reason: overrides.reason ?? 'required-checks-not-green',
+    terminal,
+    observedAt: overrides.observedAt ?? '2026-09-06T12:00:00.000Z',
+    externalMutations: 0,
+  };
+}
+
 describe('delivery state machine', () => {
   it('turns every machine-owned failure into one bounded repair route', () => {
     for (const [failure, action] of [
@@ -410,6 +435,122 @@ describe('delivery state machine', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('persists lifecycle replay idempotently and supersedes an older exact head', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-pr-lifecycle-'));
+    try {
+      const firstAction = lifecycleAction();
+      const source = {
+        schema: 'jovie-closure-health/v1',
+        repository: REPO,
+        authority: 'Summer',
+        observedAt: firstAction.observedAt,
+        lifecycleActions: [firstAction],
+      };
+      const first = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      const duplicate = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      const advancedAction = lifecycleAction({
+        headSha: 'b'.repeat(40),
+        actionKey: 'f'.repeat(64),
+        observedAt: '2026-09-06T12:15:00.000Z',
+      });
+      const advanced = await persistClosureHealthActions(
+        {
+          ...source,
+          observedAt: advancedAction.observedAt,
+          lifecycleActions: [advancedAction],
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(first.lifecycleActions[0].status, 'created');
+      assert.equal(duplicate.lifecycleActions[0].status, 'duplicate');
+      assert.equal(advanced.lifecycleActions[0].status, 'created');
+      assert.equal(advanced.lifecycleActions[0].receipt.generation, 1);
+      assert.equal(
+        advanced.lifecycleActions[0].receipt.supersedesActionKey,
+        firstAction.actionKey
+      );
+      assert.equal(
+        advanced.lifecycleActions[0].receipt.headSha,
+        'b'.repeat(40)
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('fails a malformed lifecycle row closed without dropping valid rows', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-pr-lifecycle-bad-'));
+    try {
+      const valid = lifecycleAction();
+      const malformed = { ...lifecycleAction({ pr: 17002 }), owner: 'human' };
+      const result = await persistClosureHealthActions(
+        {
+          schema: 'jovie-closure-health/v1',
+          repository: REPO,
+          authority: 'Summer',
+          observedAt: valid.observedAt,
+          lifecycleActions: [malformed, valid],
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(result.status, 'partial');
+      assert.equal(result.failClosed, true);
+      assert.equal(result.lifecycleActionCount, 1);
+      assert.equal(result.lifecycleRejectedCount, 1);
+      assert.equal(result.lifecycleActions[0].status, 'rejected');
+      assert.equal(result.lifecycleActions[1].status, 'created');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts only the protected machine terminal disposition for PR 17156', async () => {
+    const protectedAction = lifecycleAction({
+      pr: 17156,
+      terminal: true,
+      sourceState: 'protected',
+      owner: 'gem',
+      action: 'preserve-protected-pr-exclusion',
+      reason: 'protected-machine-exclusion:17156',
+    });
+    const accepted = await persistClosureHealthActions(
+      {
+        repository: REPO,
+        observedAt: protectedAction.observedAt,
+        lifecycleActions: [protectedAction],
+      },
+      { dryRun: true }
+    );
+    const rejected = await persistClosureHealthActions(
+      {
+        repository: REPO,
+        observedAt: protectedAction.observedAt,
+        lifecycleActions: [
+          {
+            ...protectedAction,
+            terminal: false,
+            disposition: 'active-remediation',
+            owner: 'symphony',
+            writer: 'symphony',
+            action: 'create-bounded-ci-repair-pr',
+          },
+        ],
+      },
+      { dryRun: true }
+    );
+
+    assert.equal(accepted.lifecycleRejectedCount, 0);
+    assert.equal(accepted.lifecycleActions[0].receipt.outcome, 'terminal');
+    assert.equal(rejected.status, 'partial');
+    assert.equal(rejected.lifecycleRejectedCount, 1);
   });
 
   it('accepts a schema-valid fleet receipt whose stack fields were omitted', async () => {
