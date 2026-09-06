@@ -300,11 +300,19 @@ test.describe('Homepage', () => {
       Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
     ).toBeLessThanOrEqual(1);
 
-    // Section 2 is a statement, never a logo strip.
+    // Section 2 is the earned-proof statement plus verified logos on the page
+    // background, never a frosted card.
     const proof = page.getByTestId('homepage-proof');
     await expect(proof).toHaveText("Proof is earned. We don't borrow it.");
-    await expect(proof.locator('img, svg')).toHaveCount(0);
-    await expect(page.getByTestId('homepage-trust')).toHaveCount(0);
+    await expect(
+      proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
+    ).toBeVisible();
+    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-presentation',
+      'inline-strip'
+    );
+    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
+    await expect(proof.locator('svg')).toHaveCount(4);
 
     // Locked section copy, verbatim.
     for (const [id, headline, body] of [
