@@ -19,6 +19,7 @@ export const conversationInputSchema = z
     principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
     deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
     message: z.string().trim().min(1).max(4000),
+    canonicalTailRecovery: z.boolean().optional(),
     history: z
       .array(
         z
@@ -167,6 +168,8 @@ export function createConversationIngress(
     }
     if (input.previousEventId && input.history.length)
       return json({ ok: false, code: 'history_already_migrated' }, 422);
+    if (input.previousEventId && input.canonicalTailRecovery)
+      return json({ ok: false, code: 'invalid_tail_recovery' }, 422);
     // Canonical schema order makes equivalent JSON replay identically. This digest
     // stays in private durable storage; never expose it in responses or logs.
     const bodySHA256 = createHash('sha256')
@@ -239,10 +242,14 @@ export function createConversationIngress(
           : null);
 
       // A product datastore can be restored or replaced while Eve's canonical
-      // conversation remains durable. Resume an empty local session from the
-      // verified terminal Eve tail instead of trying to create a second root.
-      // Never merge a non-empty local history or cross a binding/pending edge.
-      if (!existing && !resolvedPreviousEventId && input.history.length === 0) {
+      // conversation remains durable. An authenticated recovery request may
+      // carry preserved local history, but that history is never evidence for
+      // Eve's tail and is never merged over an existing canonical chain.
+      if (
+        !existing &&
+        !resolvedPreviousEventId &&
+        (input.history.length === 0 || input.canonicalTailRecovery === true)
+      ) {
         const visited = new Set<string>();
         let successor = await deps.read(conversationPath('successors', 'root'));
         for (let hop = 0; successor; hop += 1) {
@@ -457,9 +464,12 @@ export function createConversationIngress(
         // delivery key is not authority to send again after an ambiguous outcome.
         return json({ ok: false, code: 'dispatch_unknown' }, 503);
       }
+      const dispatchInput = input.canonicalTailRecovery
+        ? { ...input, history: [] }
+        : input;
       const sessionId = await deps.dispatch(
-        input,
-        renderConversation(input),
+        dispatchInput,
+        renderConversation(dispatchInput),
         typeof previous?.sessionId === 'string' ? previous.sessionId : null
       );
       const accepted = {

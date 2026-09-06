@@ -108,14 +108,16 @@ describe('Ovie speaks through durable Eve Summer', () => {
       previousEveSessionId: 'ses_summer',
       history: [{ role: 'user', text: 'older' }],
     });
-    expect(
-      JSON.parse(String(fetchShadow.mock.calls[0]?.[1]?.body))
-    ).toMatchObject({
+    const posted = JSON.parse(
+      String(fetchShadow.mock.calls[0]?.[1]?.body)
+    ) as Record<string, unknown>;
+    expect(posted).toMatchObject({
       previousEventId: 'previous',
       principalHash: input.principalHash,
       deploymentId: 'dpl_test',
       history: [],
     });
+    expect(posted).not.toHaveProperty('canonicalTailRecovery');
     expect(fetchShadow.mock.calls[0]?.[1]?.headers).toBeUndefined();
     expect(fetchShadow.mock.calls[1]?.[1]?.headers).toMatchObject({
       'x-jovie-summer-principal-hash': input.principalHash,
@@ -125,14 +127,17 @@ describe('Ovie speaks through durable Eve Summer', () => {
   it('bounds the one-time legacy history import to Eve ingress limits', async () => {
     await collect({
       ...input,
+      canonicalTailRecovery: true,
       history: Array.from({ length: 220 }, (_, index) => ({
         role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
         text: `legacy-${index}-${'x'.repeat(500)}`,
       })),
     });
     const posted = JSON.parse(String(fetchShadow.mock.calls[0]?.[1]?.body)) as {
+      canonicalTailRecovery?: boolean;
       history: { text: string }[];
     };
+    expect(posted.canonicalTailRecovery).toBe(true);
     expect(posted.history.length).toBeLessThanOrEqual(200);
     expect(
       new TextEncoder().encode(JSON.stringify(posted.history)).byteLength

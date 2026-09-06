@@ -58,6 +58,7 @@ export type SummerSpeaker = {
 export type SummerSpeakInput = {
   readonly previousEveEventId?: string;
   readonly previousEveSessionId?: string;
+  readonly canonicalTailRecovery?: boolean;
   readonly principalHash?: string;
   readonly userText: string;
   readonly conversationId?: string;
@@ -321,6 +322,8 @@ export async function* runOvieSummerTurn(input: {
       receipts: input.receipts,
       previousEveEventId: previousEveBinding?.eventId,
       previousEveSessionId: previousEveBinding?.sessionId ?? undefined,
+      canonicalTailRecovery:
+        !previousEveBinding && session.turns.length > 0 ? true : undefined,
       principalHash: input.principalHash,
       history: session.turns.flatMap(turn => [
         { role: 'user' as const, text: turn.userText },
