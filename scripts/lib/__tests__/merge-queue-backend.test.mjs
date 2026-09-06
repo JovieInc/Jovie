@@ -32,6 +32,7 @@ import {
 import {
   attestationMatchesControllerRepair,
   renderControllerRepairAttestation,
+  selectSeerControllerRepairReview,
 } from '../controller-repair-attestation.mjs';
 import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
@@ -688,7 +689,7 @@ describe('queue workflow mutation safety', () => {
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
     expect(workflow).toContain(
-      'types: [reopened, labeled, unlabeled, enqueued]'
+      'types: [reopened, labeled, unlabeled, enqueued, dequeued]'
     );
     expect(workflow).not.toContain('ready_for_review, reopened');
 
@@ -937,10 +938,12 @@ describe('queue workflow mutation safety', () => {
     );
     expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
     expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'");
-    expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
+    expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-admission/v2"');
     expect(drain).toContain('bounded exact-head native admission');
     expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$');
-    expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
+    expect(drain).toContain(
+      'queue_reentry_receipt_is_recoverable "$n" "$head_oid"'
+    );
     expect(drain).toContain('check_failures_for_pr "$n"');
     expect(drain).toContain('(( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 ))');
     expect(drain).toContain('select((.n | tostring) != $admission_pr)');
@@ -973,6 +976,9 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('production-release-checkpoint-');
     expect(scope).toContain('recover_holds=0');
     expect(scope).toContain('reconcile_queue_reentry=0');
+    expect(enroll).toContain(
+      'DRAIN_PRODUCTION_CHECKPOINT_STATE: ${{ steps.release-checkpoint.outputs.state }}'
+    );
     expect(
       enroll.match(
         /steps\.release-checkpoint\.outputs\.admission_allowed == 'true'/g
@@ -1147,6 +1153,87 @@ describe('queue workflow mutation safety', () => {
         now: now + 10 * 60_000,
       })
     ).toBe(false);
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        operationId: 'run-34050357620-attempt-2',
+        minimumValidForMs: 1,
+        now: now + 10 * 60_000,
+      })
+    ).toBe(false);
+  });
+
+  it('binds controller repair authority to one successful exact-head Seer check', () => {
+    const checkSuite = {
+      app: { id: 12637, slug: 'sentry' },
+      head_sha: HEAD,
+      id: 92271699412,
+    };
+    const checkRun = {
+      app: { id: 12637, slug: 'sentry' },
+      check_suite: { id: checkSuite.id },
+      conclusion: 'success',
+      head_sha: HEAD,
+      id: 101553168181,
+      name: 'Seer Code Review',
+      status: 'completed',
+    };
+
+    expect(
+      selectSeerControllerRepairReview(
+        { checkRuns: [checkRun], checkSuite },
+        { expectedHead: HEAD }
+      )
+    ).toEqual({
+      checkRunId: checkRun.id,
+      checkSuiteId: checkSuite.id,
+      reviewId: `seer-check-${checkRun.id}`,
+      reviewedHead: HEAD,
+    });
+
+    for (const evidence of [
+      { checkRuns: [{ ...checkRun, head_sha: OTHER_HEAD }], checkSuite },
+      { checkRuns: [{ ...checkRun, conclusion: 'failure' }], checkSuite },
+      {
+        checkRuns: [checkRun, { ...checkRun, id: checkRun.id + 1 }],
+        checkSuite,
+      },
+      {
+        checkRuns: [{ ...checkRun, app: { id: 999, slug: 'attacker-review' } }],
+        checkSuite,
+      },
+      {
+        checkRuns: [checkRun],
+        checkSuite: { ...checkSuite, head_sha: OTHER_HEAD },
+      },
+    ]) {
+      expect(() =>
+        selectSeerControllerRepairReview(evidence, { expectedHead: HEAD })
+      ).toThrow();
+    }
+  });
+
+  it('publishes controller repair leases from the same Auto-Enroll attempt only', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const producer = workflowStep(
+      workflow,
+      'Publish exact controller repair attestation'
+    );
+
+    expect(producer).toContain(
+      "needs.fleet-policy.outputs.mode == 'controller-repair-only'"
+    );
+    expect(producer).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(producer).toContain(
+      'OPERATION_ID: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}'
+    );
+    expect(producer).toContain('check_name=Seer%20Code%20Review');
+    expect(producer).toContain('--operation-id "$OPERATION_ID"');
+    expect(producer).toContain('controller-repair-attestation "$attestation"');
   });
 
   it('recovers missing-CI heads with a bounded, per-head-idempotent close+reopen', () => {

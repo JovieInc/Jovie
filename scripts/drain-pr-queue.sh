@@ -39,6 +39,9 @@
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, controller-repair-only,
 #                         draft-only, hold-intake, deferred-release-only,
 #                         or blocked
+#   DRAIN_PRODUCTION_CHECKPOINT_STATE  verified when the exact current-main
+#     production checkpoint authorized admission; controller-repair-only uses
+#     its existing exact attestation instead
 #   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
@@ -238,7 +241,7 @@ DRAIN_MISSING_CI_MIN_AGE_MINUTES="${DRAIN_MISSING_CI_MIN_AGE_MINUTES:-120}"
 DRAIN_GROUP_STARVED_MINUTES="${DRAIN_GROUP_STARVED_MINUTES:-20}"
 MISSING_CI_RECOVERY_MARKER='<!-- bot-comment:missing-ci-recovery -->'
 MISSING_CI_RECOVERY_ACTOR='jovie-bot[bot]'
-QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
+QUEUE_REENTRY_CONTEXT="jovie-queue-admission/v2"
 UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
 PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"
 PRODUCT_FAILURE_DESCRIPTION="blocked:merge-group-product-failure"
@@ -763,30 +766,42 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
 # without changing the source revision. The receipt is never sufficient on its
 # own; recovery still re-reads current PR state, current source checks, and the
 # native queue postcondition.
-queue_reentry_receipt_is_recoverable() {  # <head>
-  local head="$1" statuses latest
-  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url]
+  local n="$1" head="$2" expected_target="${3:-}" statuses latest
+  [[ "$n" =~ ^[1-9][0-9]*$ && "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 1
   fi
-  latest="$(jq -c --arg context "$QUEUE_REENTRY_CONTEXT" --arg repo "$REPO" '
+  latest="$(jq -c \
+    --arg context "$QUEUE_REENTRY_CONTEXT" \
+    --arg repo "$REPO" \
+    --argjson pr "$n" \
+    --arg expected_target "$expected_target" '
     [ .statuses[]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
+    | . as $receipt
+    | ($receipt.description | capture("^checkpoint=(?<checkpoint>verified|controller-repair);main=(?<main>[0-9a-f]{40});pr=(?<pr>[1-9][0-9]*)$")) as $binding
     | select(
-        . != null
-        and .state == "success"
-        and (.description == "Native queue admission recorded at exact head")
-        and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+        $receipt != null
+        and $receipt.state == "success"
+        and (($binding.pr | tonumber) == $pr)
+        and ($receipt.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+        and ($expected_target == "" or $receipt.target_url == $expected_target)
       )
   ' <<<"$statuses" 2>/dev/null)" || true
   [[ -n "$latest" ]] || return 1
-  receipt_actor_is_trusted "$head" "$latest"
+  if jq -e --arg actor "$FLEET_HOLD_APP_USER" '
+    .creator.type == "Bot" and .creator.login == $actor
+  ' <<<"$latest" >/dev/null; then
+    return 0
+  fi
+  null_creator_receipt_has_provenance "$head" "$latest"
 }
 
 record_queue_reentry_receipt() {  # <pr> <expected-head>
-  local n="$1" expected_head="$2" current live_head target_url
-  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+  local n="$1" expected_head="$2" current live_head target_url checkpoint description
+  if [[ ! "$n" =~ ^[1-9][0-9]*$ || ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
     echo "    !! cannot record queue re-entry receipt for #$n without an exact head" >&2
     return 1
   fi
@@ -794,15 +809,29 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
     echo "    [dry-run] would record $QUEUE_REENTRY_CONTEXT on #$n at $expected_head"
     return 0
   fi
-  # Re-enrollment of an already-receipted immutable head is intentionally
-  # idempotent. Do not create an unbounded stream of duplicate statuses.
-  if queue_reentry_receipt_is_recoverable "$expected_head"; then
-    echo "    =$QUEUE_REENTRY_CONTEXT on #$n at $expected_head (already recorded)"
-    return 0
-  fi
   if ! target_url="$(fleet_hold_target_url)"; then
     echo "    !! canonical workflow run identity is missing for queue re-entry receipt #$n" >&2
     return 1
+  fi
+  if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+    checkpoint="controller-repair"
+  elif [[ "${DRAIN_PRODUCTION_CHECKPOINT_STATE:-}" == "verified" ]]; then
+    checkpoint="verified"
+  else
+    echo "    !! refusing admission receipt for #$n without a verified production checkpoint" >&2
+    return 1
+  fi
+  if [[ ! "${FLEET_POLICY_MAIN_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! refusing admission receipt for #$n without an exact checkpoint main SHA" >&2
+    return 1
+  fi
+  description="checkpoint=$checkpoint;main=$FLEET_POLICY_MAIN_SHA;pr=$n"
+  # One run may observe the same immutable head more than once. Reuse only its
+  # own receipt; a later re-admission run must emit fresh evidence after the
+  # latest AddedToMergeQueueEvent.
+  if queue_reentry_receipt_is_recoverable "$n" "$expected_head" "$target_url"; then
+    echo "    =$QUEUE_REENTRY_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
   fi
   if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
     echo "    !! could not refresh #$n before recording queue re-entry receipt" >&2
@@ -818,7 +847,7 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
   if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
     -f state=success \
     -f context="$QUEUE_REENTRY_CONTEXT" \
-    -f description="Native queue admission recorded at exact head" \
+    -f description="$description" \
     -f target_url="$target_url" >/dev/null; then
     echo "    !! failed to record exact-head queue re-entry receipt for #$n" >&2
     return 1
@@ -2520,7 +2549,7 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
     head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
     recovery_kind=""
     if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" ]] \
-      && queue_reentry_receipt_is_recoverable "$head_oid"; then
+      && queue_reentry_receipt_is_recoverable "$n" "$head_oid"; then
       recovery_kind="native re-entry"
     elif [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
       recovery_kind="missed admission"

@@ -968,7 +968,8 @@ jobs:
           set -euo pipefail
           policy='scripts/lib/merge-group-admission.mjs'
           policy_contract="$(node "$policy" --print-contract-version)"
-          if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v1' ]]; then
+          if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v2' \
+            || "$policy_contract" == 'jovie-merge-group-live-admission/v1' ]]; then
             node "$policy"
             admitted_value="$(sed -n 's/^admitted=//p' "$GITHUB_OUTPUT")"
             if [[ "$admitted_value" != 'true' && "$admitted_value" != 'false' ]]; then

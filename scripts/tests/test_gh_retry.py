@@ -58,6 +58,8 @@ def _drain_command(
         f'DRAIN_EXPECT_GH="{expected}" '
         f'DRAIN_MUTATION_AUTHORIZATION={authorization} '
         'GH_MUTATION_TOKEN=test-fixture-writer-token '
+        f'FLEET_POLICY_MAIN_SHA={"a" * 40} '
+        'DRAIN_PRODUCTION_CHECKPOINT_STATE=verified '
         f'MERGE_QUEUE_BACKEND={backend} '
     )
     if extra_env:
@@ -749,9 +751,9 @@ class TestNullCreatorQueueReceiptProvenance:
             title="Trusted queue-reentry creator null",
             status=_null_creator_status(
                 head=head,
-                context="jovie-queue-reentry/v1",
+                context="jovie-queue-admission/v2",
                 state="success",
-                description="Native queue admission recorded at exact head",
+                description=f"checkpoint=verified;main={'a' * 40};pr=1001",
             ),
             run=_trusted_autoenroll_run(head=head),
             front_churn="allow",
@@ -775,8 +777,88 @@ class TestNullCreatorQueueReceiptProvenance:
         assert "exact native re-entry at " + head in result.stdout
         assert logs["enroll"].read_text(encoding="utf-8").splitlines() == ["1001"]
         assert logs["post"].read_text(encoding="utf-8") == ""
-        assert "+jovie-queue-reentry/v1" not in result.stdout
-        assert f"=jovie-queue-reentry/v1 on #1001 at {head} (already recorded)" in result.stdout
+        assert "+jovie-queue-admission/v2" not in result.stdout
+        assert f"=jovie-queue-admission/v2 on #1001 at {head} (already recorded)" in result.stdout
+
+    def test_reentry_writes_fresh_receipt_for_the_latest_admission_run(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        prior = _null_creator_status(
+            head=head,
+            context="jovie-queue-admission/v2",
+            state="success",
+            description=f"checkpoint=verified;main={'a' * 40};pr=1001",
+        )
+        prior["creator"] = {"login": "jovie-bot[bot]", "type": "Bot"}
+        prior["target_url"] = "https://github.com/JovieInc/Jovie/actions/runs/76"
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=1001,
+            head=head,
+            title="Fresh canonical reentry receipt",
+            status=prior,
+            run=_trusted_autoenroll_run(head=head),
+            front_churn="allow",
+            allow_enroll=True,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECONCILE_QUEUE_REENTRY=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=1 "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["enroll"].read_text(encoding="utf-8").splitlines() == ["1001"]
+        posted = logs["post"].read_text(encoding="utf-8")
+        assert "context=jovie-queue-admission/v2" in posted
+        assert f"description=checkpoint=verified;main={'a' * 40};pr=1001" in posted
+        assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/77" in posted
+
+    def test_reentry_rejects_a_receipt_written_by_another_bot(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        forged = _null_creator_status(
+            head=head,
+            context="jovie-queue-admission/v2",
+            state="success",
+            description=f"checkpoint=verified;main={'a' * 40};pr=1001",
+        )
+        forged["creator"] = {"login": "cursor[bot]", "type": "Bot"}
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=1001,
+            head=head,
+            title="Forged queue receipt",
+            status=forged,
+            run=_trusted_autoenroll_run(head=head),
+            front_churn="allow",
+            allow_enroll=True,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECONCILE_QUEUE_REENTRY=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=1 "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["enroll"].read_text(encoding="utf-8") == ""
+        assert logs["post"].read_text(encoding="utf-8") == ""
 
     def test_trusted_unmergeable_eject_creator_null_blocks_enroll_without_rewrite(
         self, tmp_path: Path
@@ -1847,12 +1929,19 @@ class TestDrainPrQueueWiring:
         assert int(view_calls.read_text(encoding="utf-8")) >= 2
 
     @pytest.mark.parametrize(
-        ("enroll_mode", "dequeue_mode", "expected_returncode", "expected_dequeues"),
+        (
+            "enroll_mode",
+            "dequeue_mode",
+            "checkpoint_state",
+            "expected_returncode",
+            "expected_dequeues",
+        ),
         [
-            ("failure", "success", 1, "1"),
-            ("malformed", "success", 1, "1"),
-            ("failure", "failure", 1, "1"),
-            ("valid", "success", 0, "0"),
+            ("failure", "success", "verified", 1, "1"),
+            ("malformed", "success", "verified", 1, "1"),
+            ("failure", "failure", "verified", 1, "1"),
+            ("valid", "success", "verified", 0, "0"),
+            ("valid", "success", "unavailable", 1, "1"),
         ],
     )
     def test_native_enrollment_requires_receipt_and_compensates_once(
@@ -1860,12 +1949,15 @@ class TestDrainPrQueueWiring:
         tmp_path: Path,
         enroll_mode: str,
         dequeue_mode: str,
+        checkpoint_state: str,
         expected_returncode: int,
         expected_dequeues: str,
     ) -> None:
         head = "a" * 40
         dequeue_calls = tmp_path / "dequeue-calls"
         dequeue_calls.write_text("0", encoding="utf-8")
+        status_posts = tmp_path / "status-posts"
+        status_posts.write_text("", encoding="utf-8")
         fake_node = tmp_path / "node"
         fake_node.write_text(
             textwrap.dedent(
@@ -1932,6 +2024,7 @@ class TestDrainPrQueueWiring:
                     exit 0
                   fi
                   if [[ " $* " == *"/statuses/{head} "* ]]; then
+                    printf '%s\n' "$*" >>'{status_posts}'
                     exit 0
                   fi
                   exit 1
@@ -1952,6 +2045,7 @@ class TestDrainPrQueueWiring:
                     f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
                     f"FAKE_ENROLL_MODE={enroll_mode} FAKE_DEQUEUE_MODE={dequeue_mode} "
                     f"FAKE_DEQUEUE_CALLS={dequeue_calls} "
+                    f"DRAIN_PRODUCTION_CHECKPOINT_STATE={checkpoint_state} "
                     "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
                 ),
             )
@@ -1961,13 +2055,19 @@ class TestDrainPrQueueWiring:
             f"stdout={result.stdout}\nstderr={result.stderr}"
         )
         assert dequeue_calls.read_text(encoding="utf-8").strip() == expected_dequeues
-        if enroll_mode == "valid":
+        if enroll_mode == "valid" and checkpoint_state == "verified":
             assert "+native-queue on #101" in result.stdout
             assert "state AWAITING_CHECKS, position 3" in result.stdout
         else:
             assert "native enrollment" in result.stderr
         if dequeue_mode == "failure":
             assert "CRITICAL: could not compensate unproven" in result.stderr
+        if enroll_mode == "valid" and checkpoint_state == "verified":
+            posted = status_posts.read_text(encoding="utf-8")
+            assert "context=jovie-queue-admission/v2" in posted
+            assert f"description=checkpoint=verified;main={'a' * 40};pr=101" in posted
+        if enroll_mode == "valid" and checkpoint_state != "verified":
+            assert "without a verified production checkpoint" in result.stderr
 
     def test_composite_ci_reentry_recovers_only_bounded_exact_bot_receipts(
         self, tmp_path: Path
@@ -2036,7 +2136,13 @@ JSON
                 if [[ "$1" == "api" ]]; then
                   if [[ "$2" == *"/commits/"*"/status"* ]]; then
                     head="${{2#*/commits/}}"; head="${{head%%/status*}}"
-                    echo "{{\\"statuses\\":[{{\\"context\\":\\"jovie-queue-reentry/v1\\",\\"state\\":\\"success\\",\\"description\\":\\"Native queue admission recorded at exact head\\",\\"creator\\":{{\\"type\\":\\"Bot\\"}},\\"target_url\\":\\"https://github.com/JovieInc/Jovie/actions/runs/77\\",\\"updated_at\\":\\"2026-08-15T12:00:00Z\\"}}]}}"
+                    case "$head" in
+                      {heads["1001"]}) pr=1001 ;;
+                      {heads["1002"]}) pr=1002 ;;
+                      {heads["1003"]}) pr=1003 ;;
+                      *) echo "unexpected receipt head: $head" >&2; exit 2 ;;
+                    esac
+                    echo "{{\\"statuses\\":[{{\\"context\\":\\"jovie-queue-admission/v2\\",\\"state\\":\\"success\\",\\"description\\":\\"checkpoint=verified;main={'a' * 40};pr=$pr\\",\\"creator\\":{{\\"type\\":\\"Bot\\",\\"login\\":\\"jovie-bot[bot]\\"}},\\"target_url\\":\\"https://github.com/JovieInc/Jovie/actions/runs/77\\",\\"updated_at\\":\\"2026-08-15T12:00:00Z\\"}}]}}"
                     exit 0
                   fi
                   # Merge-group churn is unknown in this isolated receipt test;

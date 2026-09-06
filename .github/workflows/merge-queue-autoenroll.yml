@@ -41,8 +41,9 @@ on:
     # native auto-merge intent; the first source CI flight remains authoritative.
     # A successful native enqueue emits `enqueued`, which advances the next
     # bounded recovery cohort after the event target proves idempotently
-    # already queued.
-    types: [reopened, labeled, unlabeled, enqueued]
+    # already queued. A rejected noncanonical admission emits `dequeued`; that
+    # exact head re-enters only through this controller and its checkpoint.
+    types: [reopened, labeled, unlabeled, enqueued, dequeued]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
@@ -397,6 +398,85 @@ jobs:
             echo "deferred_release=$deferred_release"
             echo "reconcile_queue_reentry=$reconcile_queue_reentry"
           } >>"$GITHUB_OUTPUT"
+      - name: Publish exact controller repair attestation
+        if: >-
+          needs.fleet-policy.outputs.mode == 'controller-repair-only' &&
+          steps.admission.outputs.disposition == 'candidate'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.admission.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.admission.outputs.head_sha }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          OPERATION_ID: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pr_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER")"
+          jq -e \
+            --arg repo "$REPO" \
+            --arg head "$PR_HEAD_SHA" '
+              .state == "open" and
+              .base.ref == "main" and
+              .base.repo.full_name == $repo and
+              ((.head.sha // "") | ascii_downcase) == $head
+            ' <<<"$pr_json" >/dev/null
+
+          current_main_sha="$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha | ascii_downcase')"
+          if [[ "$current_main_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
+            echo "::error::Main moved before controller repair attestation ($current_main_sha != $FLEET_POLICY_MAIN_SHA)" >&2
+            exit 2
+          fi
+
+          check_pages="$(gh api --paginate --slurp \
+            "repos/$REPO/commits/$PR_HEAD_SHA/check-runs?check_name=Seer%20Code%20Review&filter=all&per_page=100")"
+          check_runs="$(jq -ce '[.[] | .check_runs[]?]' <<<"$check_pages")"
+          suite_id="$(jq -er '
+            [.[] | select(.name == "Seer Code Review")]
+            | select(length == 1)
+            | .[0].check_suite.id
+            | select(type == "number" and floor == . and . > 0)
+          ' <<<"$check_runs")"
+          check_suite="$(gh api "repos/$REPO/check-suites/$suite_id")"
+          review_json="$(jq -nc \
+            --argjson checkRuns "$check_runs" \
+            --argjson checkSuite "$check_suite" \
+            '{checkRuns:$checkRuns,checkSuite:$checkSuite}' \
+            | node scripts/lib/controller-repair-attestation.mjs seer-review \
+                --head "$PR_HEAD_SHA")"
+          review_id="$(jq -er '.reviewId | select(test("^seer-check-[1-9][0-9]*$"))' <<<"$review_json")"
+
+          file_pages="$(gh api --paginate --slurp \
+            "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100")"
+          changed_paths="$(jq -ce '
+            [.[][]? | .filename]
+            | select(length > 0 and length < 3000)
+            | select(all(.[]; type == "string" and length > 0))
+          ' <<<"$file_pages")"
+          paths_hash="$(printf '%s' "$changed_paths" \
+            | node scripts/lib/controller-repair-attestation.mjs paths-hash)"
+
+          attestation="$(node scripts/lib/controller-repair-attestation.mjs render \
+            --repository "$REPO" \
+            --pr "$PR_NUMBER" \
+            --head "$PR_HEAD_SHA" \
+            --main-sha "$FLEET_POLICY_MAIN_SHA" \
+            --review-id "$review_id" \
+            --changed-paths-sha256 "$paths_hash" \
+            --operation-id "$OPERATION_ID")"
+          GITHUB_REPOSITORY="$REPO" bash scripts/lib/upsert-pr-comment.sh \
+            "$PR_NUMBER" controller-repair-attestation "$attestation"
+
+          post_pr_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER")"
+          post_main_sha="$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha | ascii_downcase')"
+          jq -e --arg head "$PR_HEAD_SHA" \
+            '.state == "open" and ((.head.sha // "") | ascii_downcase) == $head' \
+            <<<"$post_pr_json" >/dev/null
+          if [[ "$post_main_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
+            echo "::error::Main moved while publishing controller repair attestation" >&2
+            exit 2
+          fi
       - name: Enroll clean PRs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -427,6 +507,7 @@ jobs:
           # exact-head mode; deferred-release-only is only for when the fleet
           # policy itself is that fallback.
           DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && needs.fleet-policy.outputs.mode != 'hold-intake' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
+          DRAIN_PRODUCTION_CHECKPOINT_STATE: ${{ steps.release-checkpoint.outputs.state }}
           # Bounded admission projection for isolated-only, hold-intake, draft-only, blocked.
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
           DRAIN_RECOVER_FLEET_HOLDS: ${{ steps.release-checkpoint.outputs.admission_allowed == 'true' && needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
