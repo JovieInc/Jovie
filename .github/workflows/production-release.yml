@@ -1325,9 +1325,34 @@ jobs:
             echo "::error::Staging homepage is missing the HTTP noindex policy."
             exit 1
           fi
+          preview_robots_policy_valid() {
+            awk '
+              function trim(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+              BEGIN { wildcard_group = 0; group_has_rules = 0; wildcard_disallow = 0; root_allow = 0; sitemap_advertised = 0 }
+              {
+                line = $0; sub(/\r$/, "", line); sub(/[[:space:]]*#.*/, "", line); line = trim(line)
+                if (line == "") next
+                separator = index(line, ":"); if (separator == 0) next
+                directive = tolower(trim(substr(line, 1, separator - 1)))
+                value = trim(substr(line, separator + 1))
+                if (directive == "sitemap") { sitemap_advertised = 1; next }
+                if (directive == "user-agent") {
+                  if (group_has_rules) { wildcard_group = 0; group_has_rules = 0 }
+                  if (value == "*") wildcard_group = 1
+                  next
+                }
+                if (directive == "allow" || directive == "disallow") {
+                  group_has_rules = 1
+                  if (wildcard_group && directive == "allow" && value == "/") root_allow = 1
+                  if (wildcard_group && directive == "disallow" && value == "/") wildcard_disallow = 1
+                }
+              }
+              END { exit(wildcard_disallow && !root_allow && !sitemap_advertised ? 0 : 1) }
+            '
+          }
+
           robots="$(curl "${curl_args[@]}" https://staging.jov.ie/robots.txt)"
-          if [[ "$robots" != *$'User-Agent: *\nDisallow: /'* ]] ||
-            [[ "$robots" == *'Sitemap:'* ]]; then
+          if ! printf '%s\n' "$robots" | preview_robots_policy_valid; then
             echo "::error::Staging robots policy is not private/noindex."
             exit 1
           fi
