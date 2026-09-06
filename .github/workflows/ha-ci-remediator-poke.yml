@@ -1,16 +1,15 @@
 name: HA CI remediator poke
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Symphony
-# necessary-trust-boundary: GitHub-hosted CI failure events must wake Gem Symphony refresh plus the Grok/Kimi sidecar; Hyperagent is general product throughput, not the remediator queue.
-# removal-trigger: Delete when Symphony ingests GitHub CI workflow_run failures natively without a poke hop.
+# accountable-writer: Hyperagent CI remediator
+# necessary-trust-boundary: GitHub-hosted CI failure events on pull_request/merge_group
+#   wake the Hyperagent remediator via a signed outbound webhook. No self-hosted
+#   runner access, no local systemd, no Symphony port pokes.
+# removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
 # idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA.
 #   - Workflow-level concurrency serializes same-key runs (FIFO, no cancel), so
-#     a redelivery storm can never race the gate below.
-#   - The gate step fails closed: it skips the poke when the PR is merged/closed
-#     or when any earlier run of this workflow already succeeded for the same
-#     head SHA (a thread is in-flight or the key is terminal).
-#   - `force: true` on workflow_dispatch is the only bounded-retry escape hatch;
-#     the dispatch run itself is the recorded retry receipt.
+#     a redelivery storm can never race the webhook POST below.
+#   - The job-level filter fails closed: only CI failures on pull_request/merge_group
+#     for non-excluded PRs are forwarded.
 #   - Successful runs are the durable dedup record (GitHub Actions run history);
 #     no external state, so restarts cannot lose ownership of a key.
 on:
@@ -27,9 +26,7 @@ on:
         description: 'Bounded retry: poke even if a poke already succeeded for this head SHA'
         type: boolean
         default: false
-permissions:
-  actions: read
-  pull-requests: read
+permissions: {}
 concurrency:
   group: >-
     ha-ci-remediator-${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}-${{ github.event.workflow_run.head_sha || github.sha }}
@@ -43,40 +40,45 @@ jobs:
         contains(fromJSON('["pull_request","merge_group"]'), github.event.workflow_run.event) &&
         github.event.workflow_run.pull_requests[0].number != 16419
       )
-    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    runs-on: ubuntu-latest
     timeout-minutes: 2
+    permissions: {}
     steps:
-      - name: Gate duplicate, merged, and closed remediation keys
-        id: gate
+      - name: Poke Hyperagent CI remediator
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBHOOK_URL: ${{ secrets.HYPERAGENT_CI_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.HYPERAGENT_CI_WEBHOOK_SECRET }}
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || '' }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-          FORCE: ${{ inputs.force || false }}
+          RUN_URL: ${{ github.event.workflow_run.html_url || inputs.run_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event.workflow_run.event || 'workflow_dispatch' }}
         run: |
           set -euo pipefail
-          if [ -n "$PR_NUMBER" ]; then
-            pr_json=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER")
-            merged=$(jq -r '.merged' <<<"$pr_json")
-            state=$(jq -r '.state' <<<"$pr_json")
-            if [ "$merged" = "true" ] || [ "$state" != "open" ]; then
-              echo "::notice::PR #$PR_NUMBER is $state (merged=$merged); remediation key is terminal. Skipping poke."
-              exit 0
-            fi
+
+          payload=$(jq -n \
+            --arg repo "$REPO" \
+            --arg pr_number "$PR_NUMBER" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg run_url "$RUN_URL" \
+            --arg event "$EVENT" \
+            '{repository: $repo, pr_number: ($pr_number | tonumber? // null), head_sha: $head_sha, run_url: $run_url, event: $event, source: "ha-ci-remediator-poke"}')
+
+          timestamp=$(date -u +%s)
+          signature=$(printf '%s.%s' "$timestamp" "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)
+
+          http_code=$(curl -sS -o /tmp/hyperagent-response -w '%{http_code}' \
+            -X POST --max-time 5 \
+            -H 'Content-Type: application/json' \
+            -H "X-Hyperagent-Webhook-Timestamp: $timestamp" \
+            -H "X-Hyperagent-Webhook-Signature: sha256=$signature" \
+            -d "$payload" \
+            "$WEBHOOK_URL")
+
+          if [ "$http_code" != "202" ]; then
+            echo "::error::Hyperagent CI webhook returned HTTP $http_code (expected 202). Response:"
+            cat /tmp/hyperagent-response
+            exit 1
           fi
-          if [ "$FORCE" != "true" ]; then
-            prior=$(gh api "repos/${{ github.repository }}/actions/workflows/ha-ci-remediator-poke.yml/runs?head_sha=$HEAD_SHA&status=success&per_page=1" --jq '.total_count')
-            if [ "${prior:-0}" -gt 0 ]; then
-              echo "::notice::A poke already succeeded for head SHA $HEAD_SHA; one in-flight remediator per PR+SHA. Skipping duplicate."
-              exit 0
-            fi
-          fi
-          echo "proceed=true" >> "$GITHUB_OUTPUT"
-      - name: Poke Symphony remediator
-        if: steps.gate.outputs.proceed == 'true'
-        run: |
-          set -euo pipefail
-          # GitHub poke enters Symphony on :4041. Do not restart burrito.
-          # Do not touch LYB :4042. HA remediator webhook is not the queue.
-          curl -fsS -X POST --max-time 5 http://127.0.0.1:4041/api/v1/refresh >/dev/null
-          systemctl --user --no-block start symphony-grok-sidecar.service
+
+          echo "::notice::Hyperagent CI remediator poke accepted (HTTP 202)."
