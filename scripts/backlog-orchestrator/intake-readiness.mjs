@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 
-import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import {
+  hasProtectedAdmissionLabel,
+  isFounderSteeringAssignee,
+} from './admission-policy.mjs';
+// JOV-INV-028: founder assignment carries steering, not a human hold.
 import {
   admissionTargetPacket,
   resolveAdmissionTarget,
@@ -54,16 +58,6 @@ function sectionHeaders(description) {
         .toLowerCase();
     })
     .filter(Boolean);
-}
-
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  return Boolean(
-    assignee &&
-      /tim(?:\s|-|_)*white|itstimwhite|^tim$/i.test(
-        `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''}`
-      )
-  );
 }
 
 function hasActiveOwnership(issue, labels) {
@@ -147,9 +141,7 @@ export function classifyIntakeReadiness(issue, options = {}) {
     return disposition(issue, 'invalid', 'missing-identity', options);
   if (!INTAKE_STATES.has(state))
     return disposition(issue, 'owned-active', 'non-intake-state', options);
-  if (isTimOwned(issue))
-    return disposition(issue, 'decision-required', 'tim-owned', options);
-  if (issue.assignee)
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
     return disposition(issue, 'owned-active', 'already-assigned', options);
   if (hasActiveOwnership(issue, labels))
     return disposition(

@@ -156,10 +156,16 @@ describe('official Symphony backlog remediation', () => {
     for (const candidate of [
       issue('JOV-19', { title: 'Founder steering on brand voice' }),
       issue('JOV-20', { labels: ['needs-decision', 'needs:taste'] }),
+      issue('JOV-18', {
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+      }),
     ]) {
       const result = classifyRemediationCandidate(candidate, { now: NOW });
       assert.equal(result.selected, true, result.reason);
+      assert.notEqual(result.reason, 'human-taste-or-steering');
     }
+    assert.doesNotMatch(MODULE, /human-taste-or-steering/);
 
     /** @type {Array<[object, string]>} */
     const cases = [
