@@ -9,5 +9,5 @@ jobs:
     timeout-minutes: 1
     steps:
       - run: |
-          echo 'Retired. Owning agent must request exact-head native intent with pnpm ship:merge --repo OWNER/REPO --pr NUMBER --head SHA.'
+          echo 'Retired. The qualified owning agent may request native intent with node scripts/native-merge-intent.mjs --repo OWNER/REPO --pr NUMBER --head SHA.'
           exit 2
