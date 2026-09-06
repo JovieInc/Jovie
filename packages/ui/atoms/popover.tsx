@@ -53,7 +53,13 @@ const PopoverContent = React.forwardRef<
         align={align}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
-        className={cn(popoverContentClasses, className)}
+        className={cn(
+          popoverContentClasses,
+          // Keep rich content inside the collision-safe viewport on narrow
+          // screens, including long unbroken values supplied by consumers.
+          'max-w-full break-words',
+          className
+        )}
         data-testid={testId}
         {...props}
       >
