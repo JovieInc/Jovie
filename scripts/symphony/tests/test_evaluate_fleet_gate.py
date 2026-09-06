@@ -313,20 +313,13 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
             ROOT / ".github/workflows/queue-deferred-release.yml"
         ).read_text()
         wrapper = SCRIPT.read_text()
+        self.assertNotIn("DRAIN_FLEET_GATE_B64", autoenroll)
+        self.assertNotIn("fleet-policy:", autoenroll)
+        self.assertIn("exit 2", autoenroll)
+        self.assertIn("persistent owner storage", autoenroll)
         self.assertIn(
-            "DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}",
-            autoenroll,
+            "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", deferred_release
         )
-        for needle in (
-            "main_sha: ${{ steps.main-head.outputs.sha }}",
-            "expected-sha: ${{ steps.main-head.outputs.sha }}",
-            "ref: ${{ needs.fleet-policy.outputs.main_sha }}",
-        ):
-            self.assertIn(needle, autoenroll)
-        for workflow in (autoenroll, deferred_release):
-            self.assertIn(
-                "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", workflow
-            )
         self.assertIn("Base64 bounded admission projection", action)
         self.assertIn(
             "value: ${{ steps.evaluate.outputs.receipt_b64 }}",

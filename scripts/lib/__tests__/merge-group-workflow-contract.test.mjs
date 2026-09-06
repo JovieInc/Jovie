@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -229,22 +230,18 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('runs source checks once per revision and never on ready_for_review', () => {
+  it('keeps source checks revision-bound while revalidating mutable metadata', () => {
     const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
     // Draft state does not change the source SHA. The original source checks
     // remain authoritative when the owner pairs ready with native auto-merge.
     expect(CI_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
-    expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request:\n    ${sourceRevisionTrigger}`
-    );
-    expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request_target:\n    ${sourceRevisionTrigger}`
-    );
+    expect(FORK_GATE_WORKFLOW).not.toMatch(/^  pull_request:$/m);
+    expect(FORK_GATE_WORKFLOW).toContain('pull_request_target:');
     expect(CI_WORKFLOW).not.toContain('ready_for_review');
     expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
-    expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
+    expect(FORK_GATE_WORKFLOW).toContain('ready_for_review');
     expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
     expect(SIZE_GUARD_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
@@ -254,7 +251,7 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('does not launch any workflow from an unchanged ready transition', () => {
+  it('only revalidates trusted mutable metadata on a ready transition', () => {
     const workflowDir = resolve(REPO_ROOT, '.github/workflows');
     const offenders = readdirSync(workflowDir)
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
@@ -263,7 +260,7 @@ describe('merge_group workflow contract', () => {
         return workflowDeclaresReadyForReviewType(source);
       });
 
-    expect(offenders).toEqual([]);
+    expect(offenders).toEqual(['fork-pr-gate.yml']);
   });
 
   it('rejects every valid YAML spelling of a ready_for_review type', () => {
@@ -1500,27 +1497,25 @@ ${selectedGateScript}`,
     expect(POSTDEPLOY_PROBES_WORKFLOW).toContain('#alerts-production');
   });
 
-  it('revalidates submitted and dismissed reviews for main-bound forks', () => {
-    const controller = getJobBlock(FORK_GATE_WORKFLOW, 'fork-gate');
-    const jobCondition = controller.match(
-      /^    if: >-\n([\s\S]*?)^    runs-on:/m
-    )?.[1];
-    expect(jobCondition).toBeTruthy();
-    for (const requirement of [
-      "github.event_name == 'pull_request_target'",
-      "github.event_name == 'pull_request_review'",
-      "github.event.pull_request.base.ref == 'main'",
-      'github.event.pull_request.head.repo.fork == true',
-    ]) {
-      expect(jobCondition).toContain(requirement);
-    }
-    expect(jobCondition).toContain("github.actor != 'dependabot[bot]'");
-    expect(jobCondition).not.toContain('copilot-swe-agent');
+  it('revalidates review changes through trusted main metadata policy', () => {
+    const controller = getJobBlock(FORK_GATE_WORKFLOW, 'source-policy');
+    expect(controller).toContain("github.event_name == 'pull_request_target'");
+    expect(controller).toContain(
+      "github.event.pull_request.base.ref == 'main'"
+    );
+    expect(controller).toContain(
+      "github.event.workflow_run.event == 'pull_request_review'"
+    );
+    expect(controller).toContain(
+      "github.event.workflow_run.conclusion == 'success'"
+    );
+    expect(controller).toContain('ref: main');
+    expect(controller).toContain('persist-credentials: false');
+    expect(controller).toContain('node scripts/source-admission-check.mjs');
     expect(FORK_GATE_WORKFLOW).toContain('types: [submitted, dismissed]');
-    expect(controller).toContain('gh api --paginate --slurp');
-    expect(controller).toContain('.state == "DISMISSED"');
-    expect(controller).toContain('.commit_id == $head_sha');
-    expect(controller).toContain('.author_association == "COLLABORATOR"');
+    const signal = getJobBlock(FORK_GATE_WORKFLOW, 'review-signal');
+    expect(signal).not.toMatch(/secrets\.|uses:|GH_TOKEN/);
+    expect(signal).toContain("github.event_name == 'pull_request_review'");
   });
 
   it.each([
@@ -1529,11 +1524,17 @@ ${selectedGateScript}`,
   ])('loads the complete %s policy import closure from its sparse checkout', (_policy, workflow, job) => {
     const block = getJobBlock(workflow, job);
     const sparse = block.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
-    expect(sparse, 'trusted policy sparse checkout').not.toBeNull();
-    const paths = sparse[1]
-      .trim()
-      .split('\n')
-      .map(line => line.trim());
+    const directoryCheckout = /sparse-checkout: scripts\s*$/m.test(block);
+    expect(
+      Boolean(sparse) || directoryCheckout,
+      'trusted policy sparse checkout'
+    ).toBe(true);
+    const paths = directoryCheckout
+      ? ['scripts/lib']
+      : sparse[1]
+          .trim()
+          .split('\n')
+          .map(line => line.trim());
     const root = mkdtempSync(join(tmpdir(), 'jovie-policy-checkout-'));
     const load = () =>
       spawnSync(
@@ -1549,7 +1550,11 @@ ${selectedGateScript}`,
       for (const path of paths) {
         const target = resolve(root, path);
         mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, readFileSync(resolve(REPO_ROOT, path)));
+        cpSync(resolve(REPO_ROOT, path), target, {
+          recursive: true,
+          filter: source =>
+            !source.includes('__tests__') && !source.includes('node_modules'),
+        });
       }
       // Node discovers all transitive static imports in the actual policy.
       const complete = load();
@@ -1763,7 +1768,7 @@ ${selectedGateScript}`,
       'secrets.'
     );
     expect(FORK_GATE_WORKFLOW).toContain(
-      'Active native-queue required-context producer'
+      'Required metadata policy runs trusted main code only'
     );
     expect(SIZE_GUARD_WORKFLOW).toContain(
       'Active native-queue required-context producer'
@@ -1891,16 +1896,17 @@ ${selectedGateScript}`,
 
     const mergeFork = getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate');
     expect(mergeFork).toContain("'Fork PR Gate (merge-group inactive)'");
-    expect(getJobBlock(FORK_GATE_WORKFLOW, 'dependabot-gate')).toContain(
-      'name: Fork PR Gate Dependabot Controller'
-    );
-    expect(getJobBlock(FORK_GATE_WORKFLOW, 'fork-gate')).toContain(
-      'name: Fork PR Gate Controller'
-    );
+    const sourcePolicy = getJobBlock(FORK_GATE_WORKFLOW, 'source-policy');
+    expect(sourcePolicy).toContain('node scripts/source-admission-check.mjs');
     expect(FORK_GATE_WORKFLOW).not.toMatch(/^ {4}name: Fork PR Gate\s*$/m);
-    expect(FORK_GATE_WORKFLOW.match(/-f context="Fork PR Gate"/g)).toHaveLength(
-      3
+    const producer = readFileSync(
+      resolve(REPO_ROOT, 'scripts/source-admission-check.mjs'),
+      'utf8'
     );
+    expect(producer).toContain("context: 'Fork PR Gate'");
+    expect(producer).toContain('statuses/${head}');
+    expect(producer).toContain('const before = current()');
+    expect(producer).toContain('const after = current()');
   });
 });
 
