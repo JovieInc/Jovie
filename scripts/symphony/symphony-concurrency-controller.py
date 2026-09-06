@@ -245,10 +245,21 @@ def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> di
         ready, budget = queue.get("greenReadyPrs", queue.get("eligiblePrs")), queue.get("target")
         if queue.get("status") != "known" or type(ready) is not int or ready < 0 or type(budget) is not int or budget <= 0:
             return None
-        healthy = (gate.get("state") != "RED" and gate.get("workAdmission", {}).get("allowed") is True
-                   and gate.get("closureAdmission", {}).get("newIssueIntakeAllowed") is True
-                   and signals.get("main", {}).get("status") == "green"
-                   and signals.get("production", {}).get("status") == "green")
+        closure = signals.get("closureHealth")
+        remediation_continues = (
+            isinstance(closure, dict)
+            and closure.get("remediationContinues") is True
+        )
+        normal_intake = (
+            gate.get("workAdmission", {}).get("allowed") is True
+            and gate.get("closureAdmission", {}).get("newIssueIntakeAllowed") is True
+        )
+        healthy = (
+            gate.get("state") != "RED"
+            and signals.get("main", {}).get("status") == "green"
+            and signals.get("production", {}).get("status") == "green"
+            and (normal_intake or remediation_continues)
+        )
         # Do not consume gate.concurrency here: that is proof inventory, and
         # using it to authorize a probe would create a circular capacity gate.
         return {"healthy": healthy, "headroom": max(0, budget - ready), "repository": repository}

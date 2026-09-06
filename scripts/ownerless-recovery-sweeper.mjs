@@ -13,6 +13,7 @@ import {
   isRecoveryHoldLabel,
   MINIMUM_OWNERLESS_MS,
   ownerlessSince,
+  parseFleetClosureRemediationLeases,
   renderFleetClosureRemediationLease,
   renderPrFleetClosureAudit,
   renderRecoveryReceipt,
@@ -221,28 +222,38 @@ export async function recoveryNativeAdmissionDecision(
 export async function fetchOfficialSymphonyState({
   fetchImpl = globalThis.fetch,
   url = OFFICIAL_SYMPHONY_STATE_URL,
+  attempts = 3,
+  retryDelayMs = 250,
+  sleepImpl = sleep,
 } = {}) {
-  try {
-    const response = await fetchImpl(url, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response?.ok) {
-      return {
-        source: 'official-symphony-state',
-        error: `http-${response?.status || 'unknown'}`,
-      };
+  let lastError = 'not-read';
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response?.ok) {
+        lastError = `http-${response?.status || 'unknown'}`;
+      } else {
+        const body = await response.json();
+        if (
+          body &&
+          typeof body === 'object' &&
+          typeof (body.observedAt || body.generated_at) === 'string' &&
+          Array.isArray(body.running) &&
+          Array.isArray(body.retrying) &&
+          Array.isArray(body.blocked)
+        ) {
+          return { ...body, source: 'official-symphony-state' };
+        }
+        lastError = 'malformed-state';
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
     }
-    const body = await response.json();
-    return {
-      ...(body && typeof body === 'object' ? body : {}),
-      source: 'official-symphony-state',
-    };
-  } catch (error) {
-    return {
-      source: 'official-symphony-state',
-      error: error instanceof Error ? error.message : String(error),
-    };
+    if (attempt < attempts) await sleepImpl(retryDelayMs);
   }
+  return { source: 'official-symphony-state', error: lastError };
 }
 
 function prPacketMap(linearIssues) {
@@ -683,6 +694,23 @@ export async function processFleetClosureRemediationIntents(
       continue;
     }
     try {
+      const conflictingLease = (issue?.comments?.nodes ?? issue?.comments ?? [])
+        .flatMap(comment =>
+          parseFleetClosureRemediationLeases(comment?.body ?? comment)
+        )
+        .find(
+          receipt =>
+            receipt.pr === intent.pr &&
+            receipt.head === intent.head &&
+            receipt.issue === intent.issue &&
+            (receipt.reason !== intent.reason ||
+              receipt.action !== 'reattach-remediation-lane' ||
+              receipt.consumer !== 'symphony-linear-writer')
+        );
+      if (conflictingLease) {
+        fail('intent-conflict');
+        continue;
+      }
       if (!hasFleetClosureRemediationLease(issue, intent)) {
         const created = await client.addComment(
           issue.id,
@@ -730,9 +758,17 @@ export async function processFleetClosureRemediationIntents(
       continue;
     }
     const lease = await waitLease(intent.issue);
-    lease.ok
-      ? record('reattached', { readback: lease })
-      : fail(lease.reason, { readback: lease });
+    if (lease.ok) {
+      record('reattached', { readback: lease });
+    } else if (lease.reason === 'symphony-lease-readback-missing') {
+      // Linear Todo plus the exact, read-back remediation receipt is the
+      // durable queue owned by official Symphony. A healthy runtime may be at
+      // capacity, so absence from its active/retrying projection is pending
+      // work rather than a failed dispatch.
+      record('queued', { readback: lease });
+    } else {
+      fail(lease.reason, { readback: lease });
+    }
   }
   return { ok: results.every(result => result.status !== 'failed'), results };
 }

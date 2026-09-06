@@ -20,6 +20,7 @@ UNIT_DIR = ROOT / "scripts/symphony/systemd"
 SERVICE_UNIT = UNIT_DIR / "symphony-concurrency-controller.service"
 TIMER_UNIT = UNIT_DIR / "symphony-concurrency-controller.timer"
 INSTALLER = ROOT / "scripts/symphony/install-symphony-ui-pilot.sh"
+ACTIVATION = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 SPEC = importlib.util.spec_from_file_location("symphony_concurrency_controller", SOURCE)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {SOURCE}")
@@ -234,6 +235,15 @@ class EvidenceTests(unittest.TestCase):
             self.assertTrue(result["healthy"])
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/LogYourBody", now))
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now + 601))
+            gate["state"] = "AMBER"
+            gate["workAdmission"]["allowed"] = False
+            gate["closureAdmission"]["newIssueIntakeAllowed"] = False
+            gate["signals"]["closureHealth"] = {"remediationContinues": True}
+            path.write_text(json.dumps(gate))
+            self.assertTrue(MODULE.read_downstream(path, "JovieInc/Jovie", now)["healthy"])
+            gate["signals"]["closureHealth"]["remediationContinues"] = False
+            path.write_text(json.dumps(gate))
+            self.assertFalse(MODULE.read_downstream(path, "JovieInc/Jovie", now)["healthy"])
             gate["state"] = "RED"
             path.write_text(json.dumps(gate))
             self.assertFalse(MODULE.read_downstream(path, "JovieInc/Jovie", now)["healthy"])
@@ -578,6 +588,24 @@ class SystemdActivationTests(unittest.TestCase):
             "systemctl --user enable --now symphony-concurrency-controller.timer",
             text,
         )
+
+    def test_exact_production_activation_installs_runs_and_attests_controller(self):
+        text = ACTIVATION.read_text(encoding="utf-8")
+        self.assertIn(
+            'install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"',
+            text,
+        )
+        self.assertIn(
+            "systemctl --user enable --now symphony-concurrency-controller.timer",
+            text,
+        )
+        self.assertIn(
+            "systemctl --user start symphony-concurrency-controller.service",
+            text,
+        )
+        self.assertIn("--verify-workflow-overlay", text)
+        self.assertIn('.bounds.max == null', text)
+        self.assertIn('.bounds.policy == "empirical-additive-probe"', text)
 
 
 if __name__ == "__main__":

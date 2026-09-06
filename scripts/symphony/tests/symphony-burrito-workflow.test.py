@@ -1318,7 +1318,24 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(overlay.returncode, 0, overlay.stdout + overlay.stderr)
-            self.assertIn("bounded max_concurrent_agents overlay accepted", overlay.stdout)
+            self.assertIn("adaptive max_concurrent_agents overlay accepted", overlay.stdout)
+            existing.write_text(
+                existing.read_text().replace(
+                    "max_concurrent_agents: 4", "max_concurrent_agents: 128"
+                )
+            )
+            adaptive_overlay = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                adaptive_overlay.returncode,
+                0,
+                adaptive_overlay.stdout + adaptive_overlay.stderr,
+            )
             existing.write_text(
                 existing.read_text().replace("interval_ms: 30000", "interval_ms: 31000")
             )
