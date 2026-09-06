@@ -5,7 +5,11 @@ import {
   validateOptimizationContract,
 } from '../invariants/optimization-contract.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
-import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import {
+  hasProtectedAdmissionLabel,
+  isFounderSteeringAssignee,
+} from './admission-policy.mjs';
+// JOV-INV-028: founder assignment carries steering, not a human hold.
 import { resolveAdmissionTarget } from './ownership-inventory.mjs';
 
 export const TEAM_ROUTES = Object.freeze({
@@ -44,16 +48,6 @@ function commentsOf(issue) {
 
 function commentBody(comment) {
   return typeof comment === 'string' ? comment : comment?.body || '';
-}
-
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  return Boolean(
-    assignee &&
-      /tim(?:\s|-|_)*white|itstimwhite|^tim$/i.test(
-        `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''}`
-      )
-  );
 }
 
 function sectionHeader(line) {
@@ -102,8 +96,8 @@ export function validateDeterministicPlanCandidate(
     return 'not-concrete-routed-issue';
   if (!['Triage', 'Backlog', 'Todo'].includes(issue.state?.name || issue.state))
     return 'inactive-or-active-state';
-  if (isTimOwned(issue)) return 'tim-owned';
-  if (issue.assignee) return 'already-assigned';
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
+    return 'already-assigned';
   // Ordinary complete, unowned, non-sensitive work is machine-authorized by
   // this deterministic policy. Readiness, plan, and admission labels are
   // durable evidence written by the control plane, not a human prerequisite.

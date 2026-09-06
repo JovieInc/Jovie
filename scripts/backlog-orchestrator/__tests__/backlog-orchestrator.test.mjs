@@ -212,7 +212,7 @@ describe('classifier', () => {
     );
   });
 
-  it('excludes active Tim ownership but ignores a legacy human-hold label', () => {
+  it('counts machine leases even when founder steering remains assigned', () => {
     const evidence = [
       {
         body: 'machine-agent running process: 123 workspace: /tmp/jovie branch: fix/JOV-1',
@@ -236,7 +236,7 @@ describe('classifier', () => {
         ],
         { now }
       ),
-      { healthy: true, count: 1 }
+      { healthy: true, count: 2 }
     );
   });
 
@@ -677,7 +677,8 @@ describe('stale lease guard', () => {
   }
 
   it('recovers stale leases carrying a legacy human-hold label', async () => {
-    const issue = staleIssue({ labels: ['needs-human'] });
+    const assignee = { id: 'tim', name: 'Tim White' };
+    const issue = staleIssue({ labels: ['needs-human'], assignee });
     const recoveryComment = {
       id: 'recovery',
       createdAt: now,
@@ -687,10 +688,12 @@ describe('stale lease guard', () => {
       rereads: [
         staleIssue({
           labels: ['needs-human'],
+          assignee,
           comments: [terminalComment, recoveryComment],
         }),
         staleIssue({
           labels: ['needs-human'],
+          assignee,
           state: 'Todo',
           comments: [terminalComment, recoveryComment],
         }),
@@ -722,7 +725,9 @@ describe('stale lease guard', () => {
   });
 
   it('does not recover assigned or unknown leases', async () => {
-    const assigned = staleIssue({ assignee: { id: 'tim', name: 'Tim White' } });
+    const assigned = staleIssue({
+      assignee: { id: 'other', name: 'Other Owner' },
+    });
     const unknown = staleIssue({ comments: [] });
     const assignedResult = await staleLease.sweepStaleLeases({
       issues: [assigned],
@@ -2219,7 +2224,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.equal(result.admit[0].type, 'issue');
   });
 
-  it('admits a legacy-labeled issue while preserving active Tim ownership', async () => {
+  it('admits founder-assigned work without a human ownership hold', async () => {
     const protectedIssue = admissionIssue({
       identifier: 'JOV-4513',
       labels: ['plan-approved', 'admission-approved', 'needs-human'],
@@ -2234,7 +2239,13 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
     assert.equal(result.admit.length, 1);
-    assert.equal(result.admit[0].identifier, 'JOV-4513');
+    assert.equal(result.admit[0].identifier, 'JOV-4396');
+    assert.equal(
+      result.admissionDecisions.find(
+        decision => decision.identifier === 'JOV-4396'
+      ).allowed,
+      true
+    );
   });
 
   it('reports machine holds while legacy human labels remain eligible', async () => {
@@ -2439,7 +2450,10 @@ describe('triage ownership fence', () => {
 
   for (const [name, overrides] of [
     ['protected direct task', { labels: ['agent-ready', 'codex-in-progress'] }],
-    ['assigned direct owner', { assignee: { id: 'tim', name: 'Tim White' } }],
+    [
+      'assigned direct owner',
+      { assignee: { id: 'other', name: 'Other Owner' } },
+    ],
     [
       'canonical active claim',
       {
@@ -2475,6 +2489,16 @@ describe('triage ownership fence', () => {
       );
     });
   }
+
+  it('routes founder-assigned ready work as steering without a human hold', async () => {
+    const f = fixture({ assignee: { id: 'tim', name: 'Tim White' } });
+    const receipt = await run(f);
+
+    assert.deepEqual(f.writes, ['comment', 'transition']);
+    assert.equal(receipt.skipped, 0);
+    assert.equal(receipt.mutations, 1);
+    assert.equal(f.read().state.name, 'Todo');
+  });
 
   it('does not mistake expired machine evidence or handoff prose for release authority', async () => {
     const f = fixture({

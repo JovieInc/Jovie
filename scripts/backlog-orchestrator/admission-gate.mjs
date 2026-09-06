@@ -1,7 +1,10 @@
 /** Deterministic approval boundary between a verified plan and Symphony. */
 
 import { createHash } from 'node:crypto';
-import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import {
+  hasProtectedAdmissionLabel,
+  isFounderSteeringAssignee,
+} from './admission-policy.mjs';
 import { contextGateReceipt, issueContentHash } from './context-gate.mjs';
 import {
   admissionTargetPacket,
@@ -36,16 +39,6 @@ function hasLabel(issue, label) {
   return labelsOf(issue).includes(label.toLowerCase());
 }
 
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  return Boolean(
-    assignee &&
-      /tim(?:\s|-|_)*white|itstimwhite|^tim$/i.test(
-        `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''}`
-      )
-  );
-}
-
 export function validateAdmissionCandidate(
   issue,
   { now = new Date().toISOString() } = {}
@@ -54,7 +47,8 @@ export function validateAdmissionCandidate(
     return 'not-concrete-routed-issue';
   if (!ALLOWED_STATES.has(issue.state?.name || issue.state))
     return 'ambiguous-or-active-state';
-  if (isTimOwned(issue)) return 'tim-owned';
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
+    return 'already-assigned';
   if (hasProtectedAdmissionLabel(issue)) return 'protected-policy';
   if (!contextGateReceipt(issue, { now }))
     return 'context-receipt-missing-or-invalid';

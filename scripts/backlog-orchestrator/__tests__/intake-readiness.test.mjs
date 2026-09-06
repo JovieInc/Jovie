@@ -71,6 +71,21 @@ describe('intake readiness classifier', () => {
       assert.equal(result.disposition, 'mechanical-ready');
       assert.equal(result.requiresHumanDecision, false);
     }
+
+    const founderSteered = classifyIntakeReadiness(
+      issue({
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+        labels: { nodes: [{ name: 'needs:taste' }] },
+      })
+    );
+    assert.equal(founderSteered.disposition, 'mechanical-ready');
+    assert.equal(
+      founderSteered.permittedNextAction,
+      'propose-readiness-receipt'
+    );
+    assert.equal(founderSteered.requiresHumanDecision, false);
+
     for (const label of ['held', 'manual-incident']) {
       const result = classifyIntakeReadiness(
         issue({ labels: { nodes: [{ name: label }] } })

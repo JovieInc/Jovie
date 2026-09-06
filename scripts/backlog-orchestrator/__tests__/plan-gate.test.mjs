@@ -113,10 +113,26 @@ describe('plan-gate/v1', () => {
     assert.equal(fake.calls.fetchIssue, 0);
   });
 
+  it('accepts founder assignment as steering rather than implementation ownership', () => {
+    assert.equal(
+      planGate.validatePlanCandidate(
+        issue({ assignee: { id: 'tim', name: 'Tim White' } }),
+        evidence()
+      ),
+      null
+    );
+    assert.equal(
+      planGate.validatePlanCandidate(
+        issue({ assignee: { id: 'another-owner', name: 'Another Owner' } }),
+        evidence()
+      ),
+      'already-assigned'
+    );
+  });
+
   it('fails closed for invalid, protected, synthetic, ambiguous, closed, and active-PR candidates', async () => {
     const cases = [
       ['unverified', {}, { verified: false }],
-      ['Tim-owned', { assignee: { id: 'tim', name: 'Tim White' } }, {}],
       ['protected', { labels: { nodes: [{ name: 'hold' }] } }, {}],
       ['credential', { title: 'Rotate API credential' }, {}],
       ['synthetic', { labels: { nodes: [{ name: 'synthetic' }] } }, {}],
