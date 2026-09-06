@@ -670,6 +670,11 @@ function runStructural() {
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const parts = [
+    ...(selected.has('operations') || selected.has('web')
+      ? [
+          'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
+        ]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
   ];
