@@ -126,6 +126,10 @@ function assertIndexContainsCanonicalStories(index, repoRoot) {
 function ownerSelector(owner) {
   if (owner === 'atom.button') return 'button, [role="button"]';
   if (owner === 'atom.badge') return 'span[data-variant], span[data-tone]';
+  if (owner === 'atom.skeleton') return '[data-slot="skeleton"]';
+  if (owner === 'molecule.loading-skeleton') {
+    return '[data-slot="loading-skeleton"]';
+  }
   return '[data-variant="hoverable"], [data-variant="default"]';
 }
 
@@ -363,9 +367,16 @@ async function measureStory(page, story, viewport, axePath) {
             (el.hasAttribute('data-variant') || el.hasAttribute('data-tone'))
           : owner === 'atom.button'
             ? interactive
-            : classOf(el).includes('rounded-(--system-b-radius-card)') &&
-              (el.getAttribute('data-variant') === 'default' ||
-                el.getAttribute('data-variant') === 'hoverable');
+            : owner === 'atom.skeleton'
+              ? el.getAttribute('data-slot') === 'skeleton' &&
+                el.getAttribute('aria-hidden') === 'true'
+              : owner === 'molecule.loading-skeleton'
+                ? el.getAttribute('data-slot') === 'loading-skeleton' &&
+                  el.getAttribute('role') === 'status' &&
+                  el.getAttribute('aria-busy') === 'true'
+                : classOf(el).includes('rounded-(--system-b-radius-card)') &&
+                  (el.getAttribute('data-variant') === 'default' ||
+                    el.getAttribute('data-variant') === 'hoverable');
 
       return {
         copy:

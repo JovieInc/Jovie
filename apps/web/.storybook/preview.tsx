@@ -48,6 +48,8 @@ function installDeterministicFixtures(): void {
   (
     window as Window & { __jovieStorybookFixtures?: boolean }
   ).__jovieStorybookFixtures = true;
+  const allowMotion =
+    new URLSearchParams(window.location.search).get('jovieMotion') === 'allow';
 
   // Fixed clock — Date.now is the primary source of time drift in snapshots.
   const fixedMs = FIXED_NOW.getTime();
@@ -70,44 +72,46 @@ function installDeterministicFixtures(): void {
     };
   }
 
-  // Inject CSS that freezes animation/transition for Chromatic + a11y runs.
-  const style = document.createElement('style');
-  style.setAttribute('data-jovie-storybook-fixtures', 'true');
-  style.textContent = `
-    *, *::before, *::after {
-      animation-duration: 0s !important;
-      animation-delay: 0s !important;
-      transition-duration: 0s !important;
-      transition-delay: 0s !important;
-      caret-color: transparent !important;
-    }
-    .skeleton, [data-shimmer], [class*="animate-"] {
-      animation: none !important;
-    }
-  `;
-  document.head.appendChild(style);
+  if (!allowMotion) {
+    // Inject CSS that freezes animation/transition for Chromatic + a11y runs.
+    const style = document.createElement('style');
+    style.setAttribute('data-jovie-storybook-fixtures', 'true');
+    style.textContent = `
+      *, *::before, *::after {
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+        caret-color: transparent !important;
+      }
+      .skeleton, [data-shimmer], [class*="animate-"] {
+        animation: none !important;
+      }
+    `;
+    document.head.appendChild(style);
 
-  // Prefer reduced motion so components that branch on it render consistently.
-  try {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      configurable: true,
-      value: (query: string) => {
-        const reduced = query.includes('prefers-reduced-motion');
-        return {
-          matches: reduced,
-          media: query,
-          onchange: null,
-          addListener: () => undefined,
-          removeListener: () => undefined,
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-          dispatchEvent: () => false,
-        } as MediaQueryList;
-      },
-    });
-  } catch {
-    // ignore if already non-configurable
+    // Prefer reduced motion so deterministic snapshots never drift on motion.
+    try {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: (query: string) => {
+          const reduced = query.includes('prefers-reduced-motion');
+          return {
+            matches: reduced,
+            media: query,
+            onchange: null,
+            addListener: () => undefined,
+            removeListener: () => undefined,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined,
+            dispatchEvent: () => false,
+          } as MediaQueryList;
+        },
+      });
+    } catch {
+      // ignore if already non-configurable
+    }
   }
 
   // Stable id helper for stories that need an explicit id prop.

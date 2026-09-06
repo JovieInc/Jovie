@@ -16,6 +16,8 @@ export const DESIGN_SYSTEM_COMPONENT_IDS = [
   'atom.brand-logo',
   'atom.logo',
   'atom.logo-link',
+  'atom.skeleton',
+  'molecule.loading-skeleton',
 ] as const;
 
 export type DesignSystemComponentId =
@@ -253,6 +255,47 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
     variantAxes: {
       variant: ['word', 'wordAlt', 'icon', 'full', 'fullAlt'],
       logoSize: ['xs', 'sm', 'md', 'lg', 'xl'],
+    },
+  },
+  {
+    id: 'atom.skeleton',
+    layer: 'atom',
+    source: 'packages/ui/atoms/skeleton.tsx',
+    exportName: 'Skeleton',
+    storySource: 'packages/ui/atoms/skeleton.stories.tsx',
+    storybookTitle: 'UI/Atoms/Skeleton',
+    storyExport: 'CertificationMatrix',
+    testSources: ['packages/ui/atoms/skeleton.test.tsx'],
+    dependsOn: [],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'Source and runtime own loading feedback; no mapped Pen root exists.',
+    variantAxes: {
+      rounded: ['none', 'sm', 'md', 'lg', 'full'],
+      shimmer: ['false', 'true'],
+    },
+  },
+  {
+    id: 'molecule.loading-skeleton',
+    layer: 'molecule',
+    source: 'packages/ui/atoms/skeleton.tsx',
+    exportName: 'LoadingSkeleton',
+    storySource: 'packages/ui/atoms/skeleton.stories.tsx',
+    storybookTitle: 'UI/Atoms/Skeleton',
+    storyExport: 'LoadingCertificationMatrix',
+    testSources: ['packages/ui/atoms/skeleton.test.tsx'],
+    dependsOn: ['atom.skeleton'],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'Source and runtime own loading feedback; no mapped Pen root exists.',
+    variantAxes: {
+      announce: ['false', 'true'],
+      lines: ['single', 'multiple'],
+      rounded: ['none', 'sm', 'md', 'lg', 'full'],
     },
   },
 ] as const satisfies readonly DesignSystemComponentRegistryEntry[];
