@@ -35,6 +35,7 @@ GROK_SHIP = SOURCE_DIR / "grok-ship-one"
 CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
+PROVIDER_CAPACITY = SOURCE_DIR / "provider_capacity.py"
 PROMOTION_SCRIPT = ROOT / "scripts/writer-owned-pr-promote.sh"
 PROMOTION_LIB = ROOT / "scripts/lib/writer-owned-pr-promotion.mjs"
 QUEUE_DEFERRAL_LIB = ROOT / "scripts/lib/queue-deferral-receipt.mjs"
@@ -47,6 +48,7 @@ RUNTIME_ARTIFACTS = (
     CURSOR_STD,
     MODEL_ROUTER,
     MODEL_REGISTRY,
+    PROVIDER_CAPACITY,
     PROMOTION_SCRIPT,
     PROMOTION_LIB,
     QUEUE_DEFERRAL_LIB,
@@ -388,7 +390,9 @@ class FallbackTests(unittest.TestCase):
         python = self.bin / "python3"
         python.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
         python.chmod(0o755)
-        self.command("grok", "printf 'GROK_MODEL_READY\\n'")
+        # The registry probe requires the selected model name; the canary also
+        # needs its readiness marker.
+        self.command("grok", "printf 'grok-4.6 GROK_MODEL_READY\\n'")
         self.command(
             "gh",
             'case "$*" in\n'
@@ -411,11 +415,12 @@ class FallbackTests(unittest.TestCase):
         self.environment = mock.patch.dict(os.environ, {
             "SYMPHONY_OPEN_PR_INDEX": "empty",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
             "GEM_KIMI_EXECUTABLE": "/missing",
-            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": str(self.bin / "grok"),
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
         })
@@ -445,11 +450,12 @@ class FallbackTests(unittest.TestCase):
             "GEM_GROK_CANARY_TIMEOUT_SECONDS": "1.0",
             "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
             "GEM_KIMI_EXECUTABLE": "/missing",
-            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": str(self.bin / "grok"),
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
             "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(json.dumps({
@@ -927,7 +933,7 @@ PY
     def test_targeted_drain_launches_only_the_exact_eligible_issue(self):
         module = self.load_controller_module()
         captured: dict[str, object] = {}
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
             captured.update(
                 identifiers=identifiers,
@@ -979,7 +985,7 @@ PY
         selection.assert_not_called()
     def test_targeted_drain_refuses_when_another_worker_owns_capacity(self):
         module = self.load_controller_module()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
@@ -1102,7 +1108,7 @@ PY
     def test_untargeted_drain_preserves_existing_capacity_and_issue_set(self):
         module = self.load_controller_module()
         captured: dict[str, object] = {}
-        selection = {"selected": {"id": "grok-4.6", "pool": "grok-build"}}
+        selection = {"selected": {"id": "grok-4.6", "provider": "grok", "pool": "grok-build"}}
         def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
             captured.update(identifiers=identifiers, limit=limit)
             providers = kwargs.get("unit_providers")
@@ -1157,7 +1163,7 @@ PY
         module = self.load_controller_module()
         final_active = mock.Mock()
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1194,7 +1200,7 @@ PY
         module = self.load_controller_module()
         target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1220,7 +1226,7 @@ PY
         unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
         controls: list[list[str]] = []
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1260,7 +1266,7 @@ PY
         target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
         unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1848,7 +1854,7 @@ PY
         events = self.events.read_text()
         self.assertNotIn("systemd-run", events)
         self.assertNotIn("systemctl --user stop", events)
-        self.assertIn("grok_capacity_zero symphony_unchanged", result.stderr)
+        self.assertIn("provider_capacity_zero symphony_unchanged", result.stderr)
 
     def test_grok_max_does_not_steal_kimi_chairs(self):
         module = self.load_controller_module()
@@ -2092,6 +2098,21 @@ PY
         module = self.load_controller_module()
         controls: list[list[str]] = []
         unit = module._fallback_unit("JOV-1", "2026-08-14T19:00:00Z") + ".service"
+        # The production selector now fails closed for registry-incompatible
+        # providers. Keep this cleanup test deterministic with a valid
+        # registry-backed Grok selection instead of relying on the old Qwen
+        # compatibility fixture.
+        grok_selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "grok-4.6",
+                "provider": "grok",
+                "pool": "grok-build",
+                "model": "grok-4.6",
+                "executor": {"executable": "/bin/true", "argv": ["-p", "{prompt}"]},
+            },
+        }
 
         def control(command):
             controls.append(command)
@@ -2104,6 +2125,11 @@ PY
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
             mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
+            mock.patch.object(
+                module,
+                "_oauth_fallback_selections",
+                return_value=( {"grok": grok_selection}, "oauth_ready"),
+            ),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit]]),
             mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
@@ -2711,7 +2737,7 @@ PY
             mock.patch.object(
                 module,
                 "_model_router_selection",
-                return_value=({"selected": {"id": "grok", "pool": "grok"}}, "ok"),
+                return_value=({"selected": {"id": "grok", "provider": "grok", "pool": "grok"}}, "ok"),
             ),
             mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
             mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
