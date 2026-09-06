@@ -133,4 +133,23 @@ describe('ReleaseTaskCompactRow', () => {
     );
     expect(onToggle).toHaveBeenCalledWith('task_1', true);
   });
+
+  it('uses the shared compact density without legacy accent hover styling', () => {
+    render(
+      <ReleaseTaskCompactRow
+        task={createTask()}
+        onNavigate={vi.fn()}
+        onToggle={vi.fn()}
+      />
+    );
+
+    const row = screen
+      .getByRole('button', { name: /Pitch playlist/ })
+      .closest('[data-shell-list-row="true"]');
+
+    expect(row?.className).toContain('min-h-7');
+    expect(
+      screen.getByRole('button', { name: /Pitch playlist/ }).className
+    ).not.toContain('hover:text-accent');
+  });
 });
