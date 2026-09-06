@@ -1,6 +1,6 @@
 name: HA CI remediator poke
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Hyperagent CI remediator
+# accountable-writer: Hyperagent
 # necessary-trust-boundary: GitHub-hosted CI failure events on pull_request/merge_group
 #   wake the Hyperagent remediator via a signed outbound webhook. No self-hosted
 #   runner access, no local systemd, no Symphony port pokes.
