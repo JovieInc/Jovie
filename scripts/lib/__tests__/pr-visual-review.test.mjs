@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { evaluateVisualEvidence } from '../../../.github/scripts/pr-visual-evidence-gate.mjs';
@@ -351,6 +351,22 @@ describe('bounded PR visual review contract', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
       await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves a capture path that redundantly includes the artifact directory', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'visual-artifact-'));
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('duplicated-artifact-directory'),
+    ]);
+    try {
+      await writeFile(join(directory, 'home-desktop.png'), png);
+      await expect(
+        readTrustedCapture(directory, `${basename(directory)}/home-desktop.png`)
+      ).resolves.toEqual(png);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
     }
   });
   it('separates objective findings from taste and never auto-fixes taste', () => {
