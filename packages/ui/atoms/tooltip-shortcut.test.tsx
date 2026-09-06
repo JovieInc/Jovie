@@ -71,6 +71,7 @@ describe('TooltipShortcut', () => {
       expect(screen.getByTestId('tooltip-content')).not.toHaveClass(
         'whitespace-nowrap'
       );
+      expect(screen.getByTestId('tooltip-label')).toHaveClass('min-w-0');
     });
   });
 
