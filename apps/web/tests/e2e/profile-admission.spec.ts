@@ -1,8 +1,20 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
+import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import { runDspInteraction } from './utils/public-surface-helpers';
+
+const diagnostics = new WeakMap<object, () => Promise<void>>();
+
+test.beforeEach(({ page }) => {
+  diagnostics.set(page, observeProfileAdmissionFailure(page));
+});
+
+test.afterEach(async ({ page }) => {
+  await diagnostics.get(page)?.();
+  diagnostics.delete(page);
+});
 
 test.use({
   storageState: { cookies: [], origins: [] },
