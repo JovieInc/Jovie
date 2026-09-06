@@ -54,9 +54,9 @@ LINEAR_QUERY = (
     "{ totalCount } } }"
 )
 LINEAR_STAGES_QUERY = (
-    "query($id: String!) { project(id: $id) { issues(first: 100, filter: { "
+    "query($id: String!, $after: String) { project(id: $id) { issues(first: 100, after: $after, filter: { "
     "state: { name: { in: [\"Todo\", \"In Progress\", \"In Review\"] } } }) "
-    "{ nodes { createdAt startedAt completedAt state { name } } } } }"
+    "{ totalCount pageInfo { hasNextPage endCursor } nodes { createdAt startedAt completedAt state { name } } } } }"
 )
 SHIP_STAGES = (
     ("todo", "Todo/pickup"),
@@ -73,6 +73,13 @@ PR_READY_NAMES = frozenset({"PR Ready"})
 CHECK_PENDING = frozenset({"queued", "in_progress", "pending", "waiting", "requested"})
 CHECK_FAILURE = frozenset({"failure", "failed", "error", "cancelled", "timed_out", "action_required"})
 CHECK_SUCCESS = frozenset({"success", "successful", "neutral", "skipped"})
+HARD_ADMISSION_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred", "needs-conflict-resolution", "needs-manual-rebase"})
+MAX_LINEAR_PAGES = 50
+MAX_LINEAR_ISSUES = 5_000
+LINEAR_CACHE_SECONDS = 60.0
+LINEAR_PROJECT_CACHE: dict[str, Any] = {}
+LINEAR_RETRY_AFTER_SECONDS = 0.0
+LINEAR_REQUEST_ERROR: str | None = None
 P95_MIN_SAMPLES = 20
 P95_BASELINE_MAX_AGE_SECONDS = 300
 MIN_WIDTH = 80
@@ -82,7 +89,7 @@ TARGET_HEIGHT = 90
 PRODUCT_DESCRIPTION = "Autonomous work from Todo to merged."
 SHIPPING_DISPLAY_IA = {
     "capacity": {"label": "AGENTS", "representation": "active-over-limit"},
-    "throughput": {"label": "THROUGHPUT", "representation": "token-rate"},
+    "throughput": {"label": "OUTPUT RATE", "representation": "output-token-wall-rate"},
     "failures": {"label": "FAILURES", "representation": "count-and-list"},
     "tokens": {"label": "TOKENS", "representation": "total-and-per-work-item"},
     "queue": {"label": "QUEUE", "representation": "count"},
@@ -103,6 +110,13 @@ def _now() -> datetime:
 
 
 def _rgb(rgb: tuple[int, int, int], text: str, *, bold: bool = False, bg: bool = False) -> str:
+    if os.environ.get("TERM") == "linux":
+        if bg:
+            code = 40
+        else:
+            code = {BLUE: 94, PURPLE: 95, MINT: 92, ORANGE: 93, RED: 91, DIM: 90, FG: 97}.get(rgb, 37)
+        prefix = "\033[1m" if bold else ""
+        return f"{prefix}\033[{code}m{text}\033[0m"
     code = 48 if bg else 38
     prefix = "\033[1m" if bold else ""
     return f"{prefix}\033[{code};2;{rgb[0]};{rgb[1]};{rgb[2]}m{text}\033[0m"
@@ -131,6 +145,15 @@ def _int(value: Any) -> int | None:
     if number is None:
         return None
     return int(number)
+
+
+def _int_text(value: Any) -> int | None:
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return _int(value)
 
 
 def _rounded_int(value: Any) -> int | None:
@@ -516,40 +539,53 @@ def load_tps_snapshots(path: Path) -> list[dict[str, Any]]:
 def persist_tps_snapshot(path: Path, totals: Any, *, now: datetime | None = None) -> None:
     if not isinstance(totals, dict):
         return
-    tokens, seconds = _int(totals.get("total_tokens")), _int(totals.get("seconds_running"))
-    if tokens is None and seconds is None:
+    tokens, seconds = _int(totals.get("output_tokens")), _int(totals.get("seconds_running"))
+    if tokens is None:
         return
     clock = now or _now()
     cutoff = clock - timedelta(seconds=90)
     kept = [item for item in load_tps_snapshots(path) if (stamp := _iso(item.get("at"))) is not None and stamp >= cutoff]
-    kept.append({"at": clock.isoformat(), "total_tokens": tokens, "seconds_running": seconds})
+    kept.append(
+        {
+            "at": clock.isoformat(),
+            "output_tokens": tokens,
+            "seconds_running": seconds,
+            "scope": "symphony:4041",
+            "unit": "output_tokens",
+        }
+    )
     write_json(path, {"snapshots": kept[-20:]})
 
 
 def compute_throughput(totals: Any, snapshots: list[dict[str, Any]] | None, *, now: datetime | None = None) -> float | None:
     if not isinstance(totals, dict):
         return None
-    tokens, seconds, clock = _int(totals.get("total_tokens")), _int(totals.get("seconds_running")), now or _now()
+    tokens, seconds, clock = _int(totals.get("output_tokens")), _int(totals.get("seconds_running")), now or _now()
+    if tokens is None:
+        return None
     window_hit = fallback_hit = None
     for item in snapshots or []:
-        stamp, prev_tokens = _iso(item.get("at")), _int(item.get("total_tokens"))
+        if item.get("scope") != "symphony:4041" or item.get("unit") != "output_tokens":
+            continue
+        stamp, prev_tokens = _iso(item.get("at")), _int(item.get("output_tokens"))
         if stamp is None or prev_tokens is None:
             continue
         age = (clock - stamp).total_seconds()
         hit = (stamp, prev_tokens, _int(item.get("seconds_running")))
         if 4.0 <= age <= 8.0:
             window_hit = hit
-        elif 0.4 < age <= 15.0 and fallback_hit is None:
+        elif 4.0 <= age <= 15.0 and fallback_hit is None:
             fallback_hit = hit
     chosen = window_hit or fallback_hit
-    if chosen is not None and tokens is not None:
+    if chosen is not None:
         stamp, prev_tokens, prev_seconds = chosen
-        running_delta = None if seconds is None or prev_seconds is None else seconds - prev_seconds
-        denom = running_delta if running_delta is not None and running_delta > 0 else (clock - stamp).total_seconds()
+        if tokens < prev_tokens or (
+            seconds is not None and prev_seconds is not None and seconds < prev_seconds
+        ):
+            return None
+        denom = (clock - stamp).total_seconds()
         if denom > 0:
-            return max(0.0, (tokens - prev_tokens) / denom)
-    if tokens is not None and seconds is not None and seconds > 0:
-        return tokens / seconds
+            return (tokens - prev_tokens) / denom
     return None
 
 
@@ -611,7 +647,13 @@ def network_health_status(value: float | None) -> str:
 
 
 def worker_slot_health_status(value: float | None) -> str:
-    return _pressure_status(value, 75, 95)
+    if value is None:
+        return "unknown"
+    if value >= 125:
+        return "failure"
+    if value > 100:
+        return "warning"
+    return "healthy"
 
 
 def memory_health_status(available_pct: float | None, psi_pct: float | None) -> str:
@@ -637,6 +679,15 @@ def _net_sample() -> dict[str, Any] | None:
         lines = Path("/proc/net/dev").read_text(encoding="utf-8").splitlines()[2:]
     except OSError:
         return None
+    default_interface = None
+    try:
+        for route in Path("/proc/net/route").read_text(encoding="utf-8").splitlines()[1:]:
+            fields = route.split()
+            if len(fields) >= 4 and fields[1] == "00000000" and int(fields[3], 16) & 0x1:
+                default_interface = fields[0]
+                break
+    except (OSError, ValueError):
+        pass
     interfaces = []
     for line in lines:
         if ":" not in line:
@@ -646,10 +697,14 @@ def _net_sample() -> dict[str, Any] | None:
         if name == "lo":
             continue
         sysfs = Path("/sys/class/net") / name
+        if not (sysfs / "device").exists():
+            continue
         try:
             if (sysfs / "operstate").read_text(encoding="utf-8").strip() != "up":
                 continue
-            speed = _int((sysfs / "speed").read_text(encoding="utf-8").strip())
+            speed = _int_text((sysfs / "speed").read_text(encoding="utf-8"))
+            if speed is not None and speed <= 0:
+                speed = None
         except OSError:
             speed = None
         values = raw.split()
@@ -658,10 +713,14 @@ def _net_sample() -> dict[str, Any] | None:
         interfaces.append({"name": name, "rx": int(values[0]), "tx": int(values[8]), "speed_mbps": speed})
     if not interfaces:
         return None
+    selected = next((item for item in interfaces if item["name"] == default_interface), None)
+    if selected is None:
+        selected = sorted(interfaces, key=lambda item: item["name"])[0]
     return {
-        "rx": sum(item["rx"] for item in interfaces),
-        "tx": sum(item["tx"] for item in interfaces),
-        "speed_mbps": max((item["speed_mbps"] for item in interfaces if item["speed_mbps"]), default=None),
+        "interface": selected["name"],
+        "rx": selected["rx"],
+        "tx": selected["tx"],
+        "speed_mbps": selected["speed_mbps"],
     }
 
 
@@ -681,11 +740,13 @@ def fetch_system_pressure(
     memory_psi = _psi(Path("/proc/pressure/memory"))
     io_psi = _psi(Path("/proc/pressure/io"))
     disk_error = None
-    disk_used_pct = disk_available_pct = None
+    disk_used_pct = disk_available_pct = disk_free_gib = disk_total_gib = None
     try:
         disk = shutil.disk_usage("/")
         disk_used_pct = None if disk.total <= 0 else (disk.used / disk.total) * 100
         disk_available_pct = None if disk.total <= 0 else (disk.free / disk.total) * 100
+        disk_free_gib = disk.free / (1024**3)
+        disk_total_gib = disk.total / (1024**3)
     except OSError:
         disk_error = "unavailable"
     memory_error = None
@@ -706,7 +767,11 @@ def fetch_system_pressure(
     prior = load_json_dict(state_path)
     prior_at = _iso(prior.get("at"))
     network_pct = network_mbps = network_window_seconds = None
-    if current_net is not None and prior_at is not None:
+    if (
+        current_net is not None
+        and prior_at is not None
+        and prior.get("interface") == current_net.get("interface")
+    ):
         seconds = (clock - prior_at).total_seconds()
         if 0.5 <= seconds <= 120:
             network_window_seconds = seconds
@@ -734,6 +799,7 @@ def fetch_system_pressure(
             "state": cpu_state,
             "signal_pct": cpu_signal,
             "load1": load1,
+            "load_pct": load_pct,
             "cores": cpu_count,
             "psi": cpu_psi.get("some"),
             "source": "getloadavg + /proc/pressure/cpu",
@@ -760,6 +826,9 @@ def fetch_system_pressure(
             "state": disk_state,
             "used_pct": disk_used_pct,
             "available_pct": disk_available_pct,
+            "free_gib": disk_free_gib,
+            "total_gib": disk_total_gib,
+            "mount": "/",
             "source": "shutil.disk_usage('/')",
             "unit": "capacity percent",
             "window": "point",
@@ -785,10 +854,18 @@ def fetch_system_pressure(
             "util_pct": network_pct,
             "mbps": network_mbps,
             "speed_mbps": None if current_net is None else current_net.get("speed_mbps"),
-            "source": "/proc/net/dev + /sys/class/net",
-            "unit": "Mbps/link percent",
+            "interface": None if current_net is None else current_net.get("interface"),
+            "source": "/proc/net/dev + /sys/class/net/<physical-interface>",
+            "unit": "physical-interface Mbps/link percent",
             "window": None if network_window_seconds is None else f"{network_window_seconds:.1f} seconds",
             "denominator": "link speed unknown" if current_net is None or current_net.get("speed_mbps") is None else f"{current_net['speed_mbps']} Mbps link",
+            "cause": "physical interface unavailable"
+            if current_net is None
+            else "link speed unavailable"
+            if current_net.get("speed_mbps") is None
+            else "rate window pending"
+            if network_pct is None
+            else None,
             "sampled_at": sampled_at if network_state == "fresh" else None,
         },
         "slots": {
@@ -821,7 +898,7 @@ def format_rate_window(window: Any) -> str:
 
 def format_rate_limits(rate_limits: Any) -> str:
     if not isinstance(rate_limits, dict) or not rate_limits:
-        return "-"
+        return "UNKNOWN (not reported by Symphony API)"
     parts: list[str] = []
     limit_id = rate_limits.get("limit_id")
     if isinstance(limit_id, str) and limit_id.strip():
@@ -839,7 +916,7 @@ def format_rate_limits(rate_limits: Any) -> str:
             parts.append(f"credits {credits['balance']}")
         else:
             parts.append("credits yes" if credits.get("has_credits") is True else "credits -")
-    return " | ".join(parts) if parts else "-"
+    return " | ".join(parts) if parts else "UNKNOWN (provider/account window fields absent)"
 
 
 def check_duration_seconds(record: dict[str, Any]) -> float | None:
@@ -925,6 +1002,26 @@ def aggregate_check_status(rollups: Any, *, names: frozenset[str] | None = None,
     return "unknown"
 
 
+def admission_status(pr: dict[str, Any], *, in_merge_queue: bool) -> str:
+    if pr.get("isDraft") is True:
+        return "review"
+    labels = {
+        str(item.get("name") if isinstance(item, dict) else item).strip().lower()
+        for item in (pr.get("labels") or [])
+        if isinstance(item, (dict, str))
+    }
+    if labels & HARD_ADMISSION_LABELS:
+        return "blocked"
+    if in_merge_queue:
+        return "queued"
+    state = str(pr.get("mergeStateStatus") or "").upper()
+    if state in {"CLEAN", "HAS_HOOKS"}:
+        return "clean"
+    if state in {"BEHIND", "BLOCKED", "DIRTY", "DRAFT", "UNSTABLE"}:
+        return "blocked"
+    return "unknown"
+
+
 def stage_from_source(
     stage_id: str,
     label: str,
@@ -984,11 +1081,9 @@ def ship_bottleneck(stages: list[dict[str, Any]]) -> dict[str, Any] | None:
     queued = next((s for s in stages if s.get("queued") and s.get("queue_reason")), None)
     if queued:
         return {"id": queued["id"], "label": queued["label"], "reason": queued["queue_reason"]}
-    measured = [s for s in stages if s.get("p95") is not None]
-    if not measured:
-        return None
-    worst = max(measured, key=lambda stage: float(stage["p95"]))
-    return {"id": worst["id"], "label": worst["label"], "reason": f"{worst['label']} p95 {runtime_label(worst['p95'])}"}
+    # Each stage has a different source population and observation window.
+    # A largest-p95 comparison across those cohorts is not bottleneck evidence.
+    return None
 
 
 def build_ship_path(
@@ -1121,6 +1216,7 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
             error = error.split(marker, 1)[0].rstrip()
     return {
         "kind": kind, "id": ident, "title": title, "url": url,
+        "stage": _text(item, ("stage",)) or _text(running, ("stage",)),
         "attempt": _int(item.get("attempt") or running.get("attempt") or retry.get("attempt")),
         "turn": _int(item.get("turn_count") or running.get("turn_count")),
         "tokens_in": incoming, "tokens_out": outgoing, "tokens_total": total,
@@ -1232,21 +1328,41 @@ def fetch_mq(*, timeout: float = 8.0) -> dict[str, Any]:
     return {"ok": True, "count": len(rows), "rows": rows, "generated_at": _now().isoformat()}
 
 
-def _linear_request(query: str, *, timeout: float) -> dict[str, Any] | None:
+def _linear_request(query: str, *, timeout: float, variables: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    global LINEAR_REQUEST_ERROR, LINEAR_RETRY_AFTER_SECONDS
     key = os.environ.get("LINEAR_API_KEY")
     if not key:
+        LINEAR_REQUEST_ERROR = "Linear API key unavailable"
         return None
     request = urllib.request.Request(
         LINEAR_API,
-        data=json.dumps({"query": query, "variables": {"id": LIVE_PROJECT_ID}}).encode(),
+        data=json.dumps({"query": query, "variables": {"id": LIVE_PROJECT_ID, **(variables or {})}}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json", "User-Agent": "gem-checkin-hud/3"},
         method="POST",
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+    except urllib.error.HTTPError as error:
+        retry_after = 0.0
+        raw_retry = error.headers.get("Retry-After") if error.headers else None
+        raw_reset = error.headers.get("X-RateLimit-Reset") if error.headers else None
+        try:
+            retry_after = max(retry_after, float(raw_retry)) if raw_retry is not None else retry_after
+        except (TypeError, ValueError):
+            pass
+        try:
+            retry_after = max(retry_after, float(raw_reset) - _now().timestamp()) if raw_reset is not None else retry_after
+        except (TypeError, ValueError):
+            pass
+        LINEAR_RETRY_AFTER_SECONDS = max(0.0, retry_after)
+        LINEAR_REQUEST_ERROR = f"Linear HTTP {error.code}" + (" rate limited" if error.code == 429 else "")
         return None
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        LINEAR_REQUEST_ERROR = "Linear transport or response unavailable"
+        return None
+    LINEAR_RETRY_AFTER_SECONDS = 0.0
+    LINEAR_REQUEST_ERROR = None if isinstance(payload, dict) else "Linear response was not an object"
     return payload if isinstance(payload, dict) else None
 
 
@@ -1259,23 +1375,158 @@ def fetch_review(*, timeout: float = 8.0) -> int | None:
 
 
 def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
-    payload = _linear_request(LINEAR_STAGES_QUERY, timeout=timeout)
-    project = (payload.get("data") or {}).get("project") if payload else None
-    if not isinstance(project, dict):
-        review = fetch_review(timeout=timeout)
-        return {"ok": review is not None, "review": review, "todo": None, "pickup_durations": None}
+    deadline = time.monotonic() + max(0.0, timeout)
+    nodes: list[dict[str, Any]] = []
+    cursor = None
+    total_count = None
+    pages = 0
+    seen_cursors: set[str] = set()
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear pagination exceeded overall fetch budget",
+            }
+        if pages >= MAX_LINEAR_PAGES:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": f"Linear pagination exceeded {MAX_LINEAR_PAGES} pages",
+            }
+        payload = _linear_request(LINEAR_STAGES_QUERY, timeout=remaining, variables={"after": cursor})
+        project = (payload.get("data") or {}).get("project") if payload else None
+        issues = project.get("issues") if isinstance(project, dict) else None
+        page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
+        if (
+            not isinstance(issues, dict)
+            or not isinstance(issues.get("nodes"), list)
+            or isinstance(issues.get("totalCount"), bool)
+            or not isinstance(issues.get("totalCount"), int)
+            or not isinstance(page_info, dict)
+            or not isinstance(page_info.get("hasNextPage"), bool)
+        ):
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": LINEAR_REQUEST_ERROR or "Linear project pagination metadata incomplete",
+            }
+        pages += 1
+        page_total = issues["totalCount"]
+        if page_total < 0 or page_total > MAX_LINEAR_ISSUES:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": f"Linear inventory exceeds bounded total {MAX_LINEAR_ISSUES}",
+            }
+        if total_count is not None and page_total != total_count:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear totalCount changed during pagination",
+            }
+        total_count = page_total
+        nodes.extend(node for node in issues["nodes"] if isinstance(node, dict))
+        if len(nodes) > MAX_LINEAR_ISSUES:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": f"Linear inventory exceeded bounded total {MAX_LINEAR_ISSUES}",
+            }
+        if page_info.get("hasNextPage") is not True:
+            break
+        cursor = page_info.get("endCursor")
+        if not isinstance(cursor, str) or not cursor:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear page cursor missing",
+            }
+        if cursor in seen_cursors:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear page cursor repeated",
+            }
+        seen_cursors.add(cursor)
     todo = review = 0
     pickup: list[float] = []
-    for node in (project.get("issues") or {}).get("nodes") or []:
-        if not isinstance(node, dict):
-            continue
+    for node in nodes:
         state = ((node.get("state") or {}).get("name") if isinstance(node.get("state"), dict) else None) or ""
         todo += state == "Todo"
         review += state == "In Review"
         created, started = _iso(node.get("createdAt")), _iso(node.get("startedAt"))
         if created is not None and started is not None and (started - created).total_seconds() > 0:
             pickup.append((started - created).total_seconds())
-    return {"ok": True, "review": review, "todo": todo, "pickup_durations": pickup or None}
+    if total_count is not None and len(nodes) != total_count:
+        return {
+            "ok": False,
+            "review": None,
+            "todo": None,
+            "pickup_durations": None,
+            "generated_at": None,
+            "source_error": f"Linear inventory incomplete: {len(nodes)}/{total_count}",
+        }
+    return {
+        "ok": True,
+        "review": review,
+        "todo": todo,
+        "pickup_durations": pickup or None,
+        "total_count": total_count if total_count is not None else len(nodes),
+        "pages": pages,
+        "generated_at": _now().isoformat(),
+    }
+
+
+def fetch_linear_project_cached(*, timeout: float = 8.0, monotonic_now: float | None = None) -> dict[str, Any]:
+    tick = time.monotonic() if monotonic_now is None else monotonic_now
+    next_fetch_at = _num(LINEAR_PROJECT_CACHE.get("next_fetch_at"))
+    cached = LINEAR_PROJECT_CACHE.get("value")
+    if isinstance(cached, dict) and next_fetch_at is not None and tick < next_fetch_at:
+        return copy.deepcopy(cached)
+    current = fetch_linear_project(timeout=timeout)
+    if current.get("ok") is True:
+        LINEAR_PROJECT_CACHE.update({"value": copy.deepcopy(current), "next_fetch_at": tick + LINEAR_CACHE_SECONDS})
+        return current
+    retry_delay = max(LINEAR_CACHE_SECONDS, LINEAR_RETRY_AFTER_SECONDS)
+    if isinstance(cached, dict) and cached.get("ok") is True:
+        retained = copy.deepcopy(cached)
+        retained.update(
+            {
+                "stale": True,
+                "source_error": current.get("source_error") or "Linear source unavailable",
+                "source_error_at": _now().isoformat(),
+            }
+        )
+        LINEAR_PROJECT_CACHE.update({"value": retained, "next_fetch_at": tick + retry_delay})
+        return retained
+    LINEAR_PROJECT_CACHE.update({"value": copy.deepcopy(current), "next_fetch_at": tick + retry_delay})
+    return current
 
 
 def _gh_json(args: list[str], *, timeout: float) -> Any | None:
@@ -1356,7 +1607,7 @@ def fetch_github_ship(
             return {**cached, "cache_hit": True, "cache_age_seconds": cache_age, "stale": True, "refreshing": True}
         return {"ok": False, "refreshing": True, "generated_at": None, "query_ms": None, "ci_matrix": []}
     query_started = time.perf_counter()
-    open_prs = _pr_list("open", "number,title,createdAt,isDraft,statusCheckRollup,mergeStateStatus", "10", timeout=timeout)
+    open_prs = _pr_list("open", "number,title,createdAt,isDraft,labels,statusCheckRollup,mergeStateStatus", "10", timeout=timeout)
     merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt,statusCheckRollup", "10", timeout=timeout)
     merge_group = _gh_json(["api", "repos/JovieInc/Jovie/actions/runs?event=merge_group&per_page=20"], timeout=timeout)
     if not isinstance(open_prs, list) or not isinstance(merged_prs, list):
@@ -1392,6 +1643,7 @@ def fetch_github_ship(
                     "security": aggregate_check_status(rollups, contains=("secret", "security", "gitleaks", "truffle")),
                     "visual": aggregate_check_status(rollups, contains=("visual", "playwright", "golden path")),
                     "all": aggregate_check_status(rollups),
+                    "admission": admission_status(pr, in_merge_queue=in_mq),
                 }
             )
         if fast_pending:
@@ -1416,10 +1668,20 @@ def fetch_github_ship(
     opened_24h = None if flow_counts is None else flow_counts["opened_24h"]
     merged_count = None if flow_counts is None else flow_counts["merged_24h"]
     merged_durations: list[float] = []
+    merged_rows: list[dict[str, Any]] = []
     for pr in merged_prs:
         if not isinstance(pr, dict):
             continue
         merged_at, created = _iso(pr.get("mergedAt")), _iso(pr.get("createdAt"))
+        merged_rows.append(
+            {
+                "kind": "merged",
+                "stage": "merged",
+                "number": pr.get("number") if isinstance(pr.get("number"), int) else None,
+                "title": _text(pr, ("title",)),
+                "merged_at": pr.get("mergedAt"),
+            }
+        )
         if created is not None and merged_at is not None and (merged_at - created).total_seconds() > 0:
             merged_durations.append((merged_at - created).total_seconds())
         ci_fast_durations.extend(_check_durs(pr.get("statusCheckRollup"), CI_FAST_NAMES))
@@ -1468,6 +1730,7 @@ def fetch_github_ship(
         "merged": merged_count,
         "merged_durations": merged_durations or None,
         "mq_durations": None,
+        "merged_rows": merged_rows,
     }
     if cache_path is not None:
         write_json(cache_path, result)
@@ -1530,7 +1793,7 @@ def _operator_health(
 
     payload = pressure if isinstance(pressure, dict) else {}
     metric_names = {
-        "cpu": "CPU / LOAD",
+        "cpu": "CPU LOAD / STALL",
         "memory": "MEMORY",
         "disk": "ROOT DISK",
         "io": "I/O FULL PSI",
@@ -1661,22 +1924,24 @@ def _table_header(widths: dict[str, int]) -> str:
         ("ST", "st", False),
         ("POS", "pos", True),
         ("ID", "id", False),
+        ("STAGE", "stage", False),
         ("TITLE", "title", False),
         ("TRY/TURN", "run", True),
         ("TOKENS", "tokens", True),
         ("ELAPSED", "elapsed", True),
-        ("WORKSPACE / PR", "ws", False),
+        ("EVIDENCE / PR", "ws", False),
     )
     return _rgb(DIM, "  ".join(_cell(name, widths[key], right=right) for name, key, right in columns))
 
 
 def _col_widths(width: int) -> dict[str, int]:
-    st, pos, ident, run, tokens, elapsed, ws = 2, 4, 12, 9, 10, 20, 24
-    remaining = width - (st + pos + ident + run + tokens + elapsed + ws + 14)
+    st, pos, ident, stage, run, tokens, elapsed, ws = 2, 4, 12, 14, 9, 10, 20, 48
+    remaining = width - (st + pos + ident + stage + run + tokens + elapsed + ws + 16)
     return {
         "st": st,
         "pos": pos,
         "id": ident,
+        "stage": stage,
         "title": min(180, max(20, remaining)),
         "run": run,
         "tokens": tokens,
@@ -1691,6 +1956,7 @@ def _cells(
     glyph: str,
     position: str,
     ident: str,
+    stage: str,
     title: str,
     attempt: str,
     turn: str,
@@ -1704,6 +1970,7 @@ def _cells(
             _rgb(color, _cell(glyph, widths["st"])),
             _rgb(DIM, _cell(position, widths["pos"], right=True)),
             _rgb(FG, _cell(ident, widths["id"]), bold=True),
+            _rgb(color, _cell(stage, widths["stage"]), bold=True),
             _rgb(FG, _cell(title, widths["title"])),
             _rgb(DIM, _cell(run, widths["run"], right=True)),
             _rgb(DIM, _cell(tokens, widths["tokens"], right=True)),
@@ -1711,6 +1978,63 @@ def _cells(
             _rgb(DIM, _cell(ws, widths["ws"], tail=True)),
         ]
     )
+
+
+def _work_stage(row: dict[str, Any]) -> str:
+    if row.get("stale"):
+        return UNKNOWN
+    if row.get("error") or str(row.get("last_event") or "").lower() in {"turn_failed", "turn_cancelled", "session_failed"}:
+        return "BLOCKED"
+    explicit = str(row.get("stage") or "").strip().lower().replace("_", " ")
+    aliases = {
+        "planning": "PLANNING",
+        "queued": "QUEUED",
+        "bootstrapping": "BOOTSTRAPPING",
+        "implementing": "IMPLEMENTING",
+        "verification": "VERIFICATION",
+        "verifying": "VERIFICATION",
+        "ready to merge": "READY TO MERGE",
+        "merging": "MERGING",
+        "merged": "MERGED",
+        "retrying": "RETRYING",
+        "blocked": "BLOCKED",
+    }
+    if explicit in aliases:
+        return aliases[explicit]
+    kind = str(row.get("kind") or "").lower()
+    if kind == "running":
+        return "IMPLEMENTING" if row.get("session_id") else "BOOTSTRAPPING"
+    return aliases.get(kind, UNKNOWN)
+
+
+def _stage_color(stage: str) -> tuple[int, int, int]:
+    if stage in {"BLOCKED"}:
+        return RED
+    if stage in {"RETRYING", "BOOTSTRAPPING"}:
+        return ORANGE
+    if stage in {"PLANNING", "QUEUED", "VERIFICATION"}:
+        return PURPLE
+    if stage == "IMPLEMENTING":
+        return BLUE
+    if stage in {"READY TO MERGE", "MERGING", "MERGED"}:
+        return MINT
+    return DIM
+
+
+def _execution_evidence(row: dict[str, Any]) -> str:
+    identities = [
+        str(value)
+        for value in (row.get("executed_model"), row.get("executed_provider"), row.get("executed_account_alias"))
+        if value not in {None, ""}
+    ]
+    message = row.get("error") or row.get("last_message")
+    parts = ["/".join(identities)] if identities else []
+    if message not in {None, ""}:
+        parts.append(str(message))
+    if parts:
+        return " · ".join(parts)
+    fallback = row.get("workspace") or row.get("url")
+    return str(fallback) if fallback not in {None, ""} else "UNKNOWN · execution evidence absent"
 
 
 def _job_row(
@@ -1721,28 +2045,32 @@ def _job_row(
     stage_baselines: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     kind = row.get("kind")
+    stage = _work_stage(row)
     if kind == "mq":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
         health = queue_age_health(row, (stage_baselines or {}).get("mq"), now=now)
-        color = _semantic_color(str(health.get("status") or "unknown"))
+        color = _stage_color("MERGING")
         glyph = "×" if health.get("status") == "failure" else "✓" if health.get("status") == "healthy" else "?"
-        return _cells(color, widths, glyph, dash(row.get("position")), ident, dash(row.get("title")), "-", "-", "-", str(health["label"]), "-")
+        return _cells(color, widths, glyph, dash(row.get("position")), ident, "MERGING", dash(row.get("title")), "-", "-", "-", str(health["label"]), "-")
+    if kind == "merged":
+        ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
+        return _cells(MINT, widths, "✓", "-", ident, "MERGED", dash(row.get("title")), "-", "-", "-", natural_time(row.get("merged_at"), now=now), "-")
     if row.get("stale"):
-        return _rgb(DIM, clip(f"STALE {row.get('id') or UNKNOWN} | historical attempt, current state UNKNOWN", sum(widths.values()) + 14))
+        return _cells(DIM, widths, "?", "-", dash(row.get("id")), UNKNOWN, dash(row.get("title") or "UNKNOWN · retained row; current :4041 truth unavailable"), dash(row.get("attempt")), dash(row.get("turn")), "-", UNKNOWN, "current source unavailable")
     if kind == "queued":
-        return _rgb(DIM, clip(f"QUEUED {row.get('id') or UNKNOWN} | {row.get('title') or UNKNOWN}", sum(widths.values()) + 14))
+        return _cells(PURPLE, widths, "…", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), "-", _execution_evidence(row))
     if kind == "retrying":
-        return _cells(PINK, widths, "↻", "-", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
+        return _cells(ORANGE, widths, "↻", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), _execution_evidence(row))
     if kind == "blocked":
-        return _cells(PINK, widths, "✕", "-", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace")))
-    return _cells(BLUE, widths, "●", "-", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
+        return _cells(RED, widths, "✕", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
+    return _cells(_stage_color(stage), widths, "●", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
 
 
 def _compact_work_header(width: int) -> list[str]:
-    ident, age = 12, 20
-    title = max(12, width - ident - age - 8)
-    heading = _rgb(FG, clip("CURRENT WORK · critical and stalled receipts first", width), bold=True)
-    columns = "  ".join((_cell("ST", 2), _cell("ID / POS", ident), _cell("TITLE", title), _cell("AGE / HEALTH", age, right=True)))
+    ident, stage, age = 12, 14, 16
+    title = max(12, width - ident - stage - age - 10)
+    heading = _rgb(FG, clip("CURRENT WORK · stable stage table · recent merges retained", width), bold=True)
+    columns = "  ".join((_cell("ST", 2), _cell("ID / POS", ident), _cell("STAGE", stage), _cell("TITLE", title), _cell("AGE", age, right=True)))
     return [heading, _rgb(DIM, clip(columns, width))]
 
 
@@ -1753,11 +2081,12 @@ def _compact_job_row(
     now: datetime,
     stage_baselines: dict[str, dict[str, Any]],
 ) -> str:
-    ident_width, age_width = 12, 20
-    title_width = max(12, width - ident_width - age_width - 8)
+    ident_width, stage_width, age_width = 12, 14, 16
+    title_width = max(12, width - ident_width - stage_width - age_width - 10)
     kind = str(row.get("kind") or "running")
     ident = dash(row.get("id"))
-    title = dash(row.get("title") or row.get("error") or row.get("last_message"))
+    title = dash(row.get("title") or "UNKNOWN · :4041 title absent")
+    stage = _work_stage(row)
     if row.get("stale"):
         return _rgb(DIM, clip(f"STALE {ident} | {title} | current execution UNKNOWN", width))
     if kind == "mq":
@@ -1768,6 +2097,12 @@ def _compact_job_row(
         status = str(health.get("status") or "unknown")
         glyph = "×" if status == "failure" else "✓" if status == "healthy" else "?"
         age = str(health.get("label") or "? UNMEASURED")
+        stage = "MERGING"
+    elif kind == "merged":
+        status, glyph = "success", "✓"
+        ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
+        stage = "MERGED"
+        age = natural_time(row.get("merged_at"), now=now)
     elif kind == "blocked":
         status, glyph = "failure", "×"
         title = f"BLOCKED · {title}"
@@ -1779,11 +2114,15 @@ def _compact_job_row(
     else:
         status, glyph = "healthy", "●"
         age = elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
+    evidence = _execution_evidence(row)
+    if evidence != "UNKNOWN · execution evidence absent":
+        title = f"{title} · {evidence}"
     color = _semantic_color(status)
     columns = "  ".join(
         (
             _cell(glyph, 2),
             _cell(ident, ident_width),
+            _cell(stage, stage_width),
             _cell(title, title_width),
             _cell(age, age_width, right=True),
         )
@@ -1874,10 +2213,9 @@ def _hero_metrics(
         contracts.append(_rgb(DIM, f"┃ {clip(contract, inner)} ┃"))
         bottoms.append(pad_visible(_rgb(color, clip(bottom, col_width)), col_width))
     spacer = " " * gap
-    throughput = "-" if tps is None else f"{compact_tokens(tps)} tps"
-    context = f"TELEMETRY · THROUGHPUT {throughput} · TOKENS {total} ({incoming} in · {outgoing} out) · Runtime {runtime_label(seconds)} · Rate limits {limits} · Symphony account limits · provider windows"
-    if isinstance(review, int) and review > 0:
-        context += f" · Review {review}"
+    throughput = UNKNOWN if tps is None else f"{compact_tokens(tps)} output tok/s"
+    review_text = f"{review} · Linear freshness UNKNOWN" if isinstance(review, int) else "UNKNOWN · Linear source unavailable"
+    context = f"TELEMETRY · REVIEW {review_text} · OUTPUT RATE {throughput} · 4–15s wall window · Symphony :4041 output counter · CUMULATIVE TOKENS {total} ({incoming} in · {outgoing} out) · AGENT EXECUTION RUNTIME {runtime_label(seconds)} · Rate limits {limits}"
     return [
         spacer.join(tops),
         spacer.join(values),
@@ -1892,12 +2230,8 @@ def _stage_bar(stage: dict[str, Any], max_p95: float | None, width: int) -> str:
     series = stage.get("series")
     if isinstance(series, list) and series:
         return sparkline(series)[: max(1, width)]
-    p95 = stage.get("p95")
-    if p95 is None or max_p95 is None or max_p95 <= 0:
-        return "-"
-    last = len(BARS) - 1
-    height = max(0, min(last, int(round((float(p95) / max_p95) * last))))
-    return BARS[height] * max(1, min(8, width))
+    # Do not visually normalize latency across incomparable source cohorts.
+    return "-"
 
 
 def _pr_flow_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
@@ -1918,7 +2252,7 @@ def _pr_flow_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) ->
         ("OPEN NOW", dash(_int(payload.get("open_count")) if known else None), FG),
         ("OPENED 24H", dash(opened), BLUE if opened else DIM),
         ("MERGED 24H", dash(merged), BLUE if merged else DIM),
-        ("NET FLOW", net_text, PINK if net is not None and net > 0 else BLUE if net is not None and net < 0 else DIM),
+        ("OPENED − MERGED", net_text, PINK if net is not None and net > 0 else BLUE if net is not None and net < 0 else DIM),
     ]
     gap = 4
     col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
@@ -1981,6 +2315,7 @@ def _metric_contract(metric: dict[str, Any], *, now: datetime, compact: bool = F
     unit = str(metric.get("unit") or "unit unknown")
     window = str(metric.get("window") or "window unknown")
     denominator = str(metric.get("denominator") or "denominator unknown")
+    cause = str(metric.get("cause") or "")
     stamp = natural_time(metric.get("sampled_at"), now=now) if metric.get("sampled_at") else "not sampled"
     if compact:
         source = source.replace(" + ", "+").replace(" ", "")
@@ -1988,8 +2323,10 @@ def _metric_contract(metric: dict[str, Any], *, now: datetime, compact: bool = F
         window = window.replace(" + ", "+").replace(" ", "")
         denominator = denominator.replace(" configured agents", " agents").replace("; ", ",")
         freshness = "now" if stamp == "just now" else stamp
-        return f"{source} · {unit} · {window} · /{denominator} · @{freshness}"
-    return f"{source} · {unit} · {window} · / {denominator} · Updated {stamp}"
+        cause_text = f" · cause:{cause.replace(' ', '')}" if cause else ""
+        return f"{source} · {unit} · {window} · /{denominator}{cause_text} · @{freshness}"
+    cause_text = f" · cause: {cause}" if cause else ""
+    return f"{source} · {unit} · {window} · / {denominator}{cause_text} · Updated {stamp}"
 
 
 def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
@@ -2009,18 +2346,37 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
     slots = payload.get("slots") if isinstance(payload.get("slots"), dict) else {}
     net_mbps = _num(network.get("mbps"))
     net_speed = _int(network.get("speed_mbps"))
+    net_interface = dash(network.get("interface"))
+    disk_free_gib = _num(disk.get("free_gib"))
+    disk_total_gib = _num(disk.get("total_gib"))
+    disk_free_text = "-" if disk_free_gib is None else f"{disk_free_gib:.0f}"
+    disk_total_text = "-" if disk_total_gib is None else f"{disk_total_gib:.0f}"
     load1 = _num(cpu.get("load1"))
     load_text = "-" if load1 is None else f"{load1:.1f}"
     stale = payload.get("retained_all") is True or (
         payload.get("stale") is True and payload.get("partial_stale") is not True
     )
     raw_cells = [
-        ("CPU / LOAD", _pct0(cpu.get("signal_pct")), f"load {load_text}/{dash(cpu.get('cores'))} · PSI {_pct0(cpu.get('psi'))}", cpu, cpu.get("signal_pct"), 125),
+        (
+            "CPU LOAD / STALL",
+            f"load {_pct0(cpu.get('load_pct'))} · PSI {_pct0(cpu.get('psi'))}",
+            f"load1 {load_text}/{dash(cpu.get('cores'))} · worst signal {_pct0(cpu.get('signal_pct'))}",
+            cpu,
+            cpu.get("signal_pct"),
+            125,
+        ),
         ("MEMORY", f"{_pct0(memory.get('available_pct'))} available", f"PSI {_pct0(memory.get('psi'))}", memory, memory.get("available_pct"), 100),
-        ("ROOT DISK FREE", f"{_pct0(disk.get('available_pct'))} free", f"{_pct0(disk.get('used_pct'))} used", disk, disk.get("available_pct"), 100),
+        (
+            "ROOT DISK FREE",
+            f"{_pct0(disk.get('available_pct'))} free",
+            f"{_pct0(disk.get('used_pct'))} used · {disk_free_text}/{disk_total_text} GiB · mount {dash(disk.get('mount'))}",
+            disk,
+            disk.get("available_pct"),
+            100,
+        ),
         ("I/O FULL PSI", f"{_pct0(io.get('full_avg10_pct'))} full", f"{_pct0(io.get('some_avg10_pct'))} some", io, io.get("full_avg10_pct"), 20),
-        ("NETWORK", "rate window pending" if net_mbps is None else f"{net_mbps:.1f} Mbps", f"{dash(net_speed)} Mbps link · {_pct0(network.get('util_pct'))}", network, network.get("util_pct"), 100),
-        ("WORKER SLOTS", f"{dash(slots.get('running'))}/{dash(slots.get('cap'))}", f"{_pct0(slots.get('util_pct'))} used", slots, slots.get("util_pct"), 100),
+        ("NETWORK", "rate window pending" if net_mbps is None else f"{net_mbps:.1f} Mbps", f"{net_interface} · {dash(net_speed)} Mbps link · {_pct0(network.get('util_pct'))}", network, network.get("util_pct"), 100),
+        ("WORKER SLOTS", f"{dash(slots.get('running'))}/{dash(slots.get('cap'))}", f"{_pct0(slots.get('util_pct'))} assigned", slots, slots.get("util_pct"), 100),
     ]
     cells = [
         (
@@ -2061,10 +2417,24 @@ def _matrix_status(status: Any, width: int) -> str:
     return _rgb(_semantic_color(normalized), _cell(text, width), bold=normalized == "failure")
 
 
+def _admission_cell(status: Any, width: int) -> str:
+    normalized = str(status or "unknown")
+    text = {
+        "clean": "◇ CLEAN",
+        "queued": "… QUEUED",
+        "review": "! REVIEW",
+        "blocked": "× HOLD",
+        "unknown": "? UNKNOWN",
+    }.get(normalized, "? UNKNOWN")
+    semantic = "pending" if normalized in {"queued", "review"} else "failure" if normalized == "blocked" else "unknown"
+    color = BLUE if normalized == "clean" else _semantic_color(semantic)
+    return _rgb(color, _cell(text, width), bold=normalized == "blocked")
+
+
 def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
     payload = flow if isinstance(flow, dict) else {}
-    rows = payload.get("ci_matrix") if isinstance(payload.get("ci_matrix"), list) else []
-    rows = [row for row in rows if isinstance(row, dict)][:8]
+    sampled_rows = [row for row in (payload.get("ci_matrix") or []) if isinstance(row, dict)] if isinstance(payload.get("ci_matrix"), list) else []
+    rows = sampled_rows[:8]
     known = payload.get("ok") is True
     freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
     if payload.get("stale") is True:
@@ -2073,15 +2443,17 @@ def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) 
     total = _int(payload.get("open_count")) if known else None
     heading = (
         _rgb(FG, SHIPPING_DISPLAY_IA["ci_matrix"]["label"], bold=True)
-        + _rgb(DIM, f"  ·  cached GitHub rollup  ·  {len(rows)}/{dash(total)} rows  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
+        + _rgb(DIM, f"  ·  cached GitHub rollup  ·  display {len(rows)} · sampled {len(sampled_rows)} · open {dash(total)}  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
     )
     status_width = 10
+    admission_width = 11
     gap = 2
-    item_width = max(30, width - (status_width * 5 + gap * 5))
+    item_width = max(30, width - (status_width * 5 + admission_width + gap * 6))
     header = "  ".join(
         [
             _cell("PR / WORK ITEM", item_width),
-            *(_cell(label, status_width) for label in ("FAST", "READY", "SECURITY", "VISUAL", "ALL")),
+            *(_cell(label, status_width) for label in ("FAST", "READY", "SECURITY", "VISUAL", "CI ALL")),
+            _cell("ADMISSION", admission_width),
         ]
     )
     result = [pad_visible(heading, width), _rgb(DIM, header), _rgb(DIM, "─" * width)]
@@ -2101,6 +2473,7 @@ def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) 
                     _matrix_status(row.get("security"), status_width),
                     _matrix_status(row.get("visual"), status_width),
                     _matrix_status(row.get("all"), status_width),
+                    _admission_cell(row.get("admission"), admission_width),
                 ]
             )
         )
@@ -2115,7 +2488,7 @@ def _ship_path_lines(ship_path: dict[str, Any] | None, width: int) -> list[str]:
         short_labels = {"todo": "T", "running": "R", "pr_open": "P", "ci_fast": "F", "pr_ready": "Y", "mq": "Q", "merge_group": "G", "merged": "M"}
         path_line = "SHIP  " + " → ".join(f"{short_labels.get(str(stage.get('id')), '?')}:{dash(stage.get('count'))}" for stage in stages)
         p95_line = "P95   " + " · ".join(
-            f"{short_labels.get(str(stage.get('id')), '?')}:{'STALE' if stage.get('stale') is True else '-' if stage.get('p95') is None else runtime_label(stage.get('p95'))}"
+            f"{short_labels.get(str(stage.get('id')), '?')}:s{stage.get('sample_count', 0)}/{'STALE' if stage.get('stale') is True else '-' if stage.get('p95') is None else runtime_label(stage.get('p95'))}"
             for stage in stages
         )
         named = f"#1 {bottleneck['reason']}" if bottleneck and bottleneck.get("reason") else "#1 unmeasured"
@@ -2130,7 +2503,18 @@ def _ship_path_lines(ship_path: dict[str, Any] | None, width: int) -> list[str]:
         color = ORANGE if stage.get("stale") is True else PINK if (bottleneck and bottleneck.get("id") == stage.get("id")) or stage.get("queued") else BLUE if stage.get("p95") is not None else DIM
         p95_text = "STALE" if stage.get("stale") is True else "-" if stage.get("p95") is None else runtime_label(stage.get("p95"))
         labels.append(pad_visible(_rgb(color, clip(str(stage.get("label") or "-"), col_width), bold=True), col_width))
-        stats.append(pad_visible(_rgb(DIM, clip(f"n={dash(stage.get('count'))} p95 {p95_text}", col_width)), col_width))
+        stats.append(
+            pad_visible(
+                _rgb(
+                    DIM,
+                    clip(
+                        f"now={dash(stage.get('count'))} samples={dash(stage.get('sample_count'))} p95 {p95_text}",
+                        col_width,
+                    ),
+                ),
+                col_width,
+            )
+        )
         bars.append(pad_visible(_rgb(color, clip(_stage_bar(stage, max_p95, col_width), col_width)), col_width))
     spacer = "  "
     named = f"#1 {bottleneck['reason']}" if bottleneck and bottleneck.get("reason") else "-"
@@ -2233,11 +2617,12 @@ def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[s
     model = row.get("executed_model") if executed else None
     provider = row.get("executed_provider") if executed else None
     account = row.get("executed_account_alias") if executed else None
-    cause = row.get("error") or row.get("last_event") or UNKNOWN
+    cause = row.get("error") or row.get("last_message") or row.get("last_event") or UNKNOWN
     retry = due_label(row.get("due_at"), now=now) if row.get("due_at") else UNKNOWN
     progress = natural_time(row.get("last_event_at"), now=now)
     first = f"{row.get('id') or UNKNOWN}  {stage}  |  {row.get('title') or UNKNOWN}"
-    second = f"  Executed: {model or UNKNOWN}  |  provider {provider or UNKNOWN}  |  account {account or UNKNOWN}  |  requested {row.get('requested_model') or UNKNOWN}"
+    source_gap = " (not reported by Symphony API)"
+    second = f"  Executed: {model or UNKNOWN}{source_gap if model is None else ''}  |  provider {provider or UNKNOWN}{source_gap if provider is None else ''}  |  account {account or UNKNOWN}{source_gap if account is None else ''}  |  requested {row.get('requested_model') or UNKNOWN}"
     third = f"  PID {row.get('pid') or UNKNOWN}  session {row.get('session_id') or UNKNOWN}  |  tokens {row.get('tokens_total') if row.get('tokens_total') is not None else UNKNOWN}  |  last event {progress}  |  {cause}  |  retry {retry}"
     color = DIM if stage == "STALE" else BLUE if executed else ORANGE
     if width < 160:
@@ -2254,19 +2639,23 @@ def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime) ->
     recent = sum(execution_state(row, now=now) == "SESSION / RECENT EVENT" for row in symphony.get("rows", [])) if fresh else UNKNOWN
     source = "FRESH" if fresh else "STALE / UNAVAILABLE"
     counts = "  ".join(f"{key} {symphony.get(key) if fresh and symphony.get(key) is not None else UNKNOWN}" for key in ("running", "queued", "retrying", "blocked"))
-    action = "Inspect blocked/retrying attempts; worker recovery owner controls intake"
+    blocked = _int(symphony.get("blocked"))
+    retrying = _int(symphony.get("retrying"))
+    action = "Active sessions are reporting recent progress"
     if not fresh:
         action = "Restore official API through runtime owner; cached attempts are not running proof"
+    elif (blocked or 0) > 0 or (retrying or 0) > 0:
+        action = "Inspect blocked/retrying attempts; worker recovery owner controls intake"
     elif not recent:
         action = "No recent session events evidenced; inspect launcher/capacity with runtime owner"
     if symphony.get("linear_gate_until"):
         action = f"Linear rate limit gate until {symphony['linear_gate_until']} · runtime owner controls recovery"
     lines = [
-        f"EXECUTION TRUTH  |  API {source}  |  service {symphony.get('service_state', UNKNOWN)}  |  remediation enabled UNKNOWN",
+        f"EXECUTION TRUTH  |  API {source}  |  service {symphony.get('service_state', UNKNOWN)}  |  remediation UNKNOWN (not exposed by :4041)",
         f"Sessions with recent events {recent} jobs  |  reserved {counts}  |  configured ceiling {symphony.get('cap') if symphony.get('cap') is not None else UNKNOWN} slots  |  usable capacity UNKNOWN",
         f"NEXT  {action}",
         f"Source: :4041/api/v1/state · jobs/tokens · snapshot {natural_time(symphony.get('generated_at'), now=now)} · activity window 120s · shipped work requires separate receipts",
-        f"Configuration only: model {symphony.get('configured_model', UNKNOWN)} · WORKFLOW.md | service/gate: systemd + linear-rate-limit.json · observed {natural_time(symphony.get('runtime_observed_at'), now=now)}",
+        f"Configuration only: model {symphony.get('configured_model', UNKNOWN)} · WORKFLOW.md (not execution proof) | service/gate: systemd + linear-rate-limit.json · observed {natural_time(symphony.get('runtime_observed_at'), now=now)}",
     ]
     return [_rgb(ORANGE if not fresh else FG, clip(line, width), bold=index == 0) for index, line in enumerate(lines)]
 
@@ -2419,7 +2808,7 @@ def render(
             "",
             *pressure_lines,
             "",
-            _rgb(FG, "CURRENT WORK · critical and stalled receipts first", bold=True),
+            _rgb(FG, "CURRENT WORK · stable stage table · recent merges retained", bold=True),
             _table_header(widths),
             _rgb(DIM, "─" * cols),
         ]
@@ -2439,7 +2828,7 @@ def render(
             "",
             *pressure_lines,
             "",
-            _rgb(FG, "CURRENT WORK · critical and stalled receipts first", bold=True),
+            _rgb(FG, "CURRENT WORK · stable stage table · recent merges retained", bold=True),
             _table_header(widths),
             _rgb(DIM, "─" * cols),
         ]
@@ -2470,12 +2859,14 @@ def render(
     lines[1:1] = [truth[0], truth[2]] if compact else truth
     blocks = []
     for row in symphony.get("rows", []):
-        detail = execution_lines(row, cols, now=clock)
-        blocks.append(detail if compact else [_job_row(row, widths, now=clock, stage_baselines=stage_baselines), *detail])
+        blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
     for row in mq.get("rows", []):
         blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
-    if review is not None and review > 0:
-        blocks.append([_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols))])
+    flow = pr_flow if isinstance(pr_flow, dict) else {}
+    if flow.get("ok") is True and flow.get("stale") is not True:
+        for row in (flow.get("merged_rows") or []):
+            if isinstance(row, dict):
+                blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
     available = max(0, rows - len(lines) - len(footer))
     # Preserve whole job cards and reserve an honest hidden-card count.
     work_rows = []
@@ -2488,21 +2879,14 @@ def render(
         work_rows.extend(block)
     if not blocks and available > 0:
         work_rows = [_rgb(DIM, clip("· No active work receipts", cols))]
-    if cols >= 300 and rows >= 60:
-        # Retain queue rows below the recovered ultrawide job board.
-        queue_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in mq.get("rows", [])]
-        if review is not None and review > 0:
-            queue_rows.insert(0, _rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
-        queue_budget = min(len(queue_rows), max(0, available - 9))
-        work_rows = execution_board(symphony, cols, max(0, available - queue_budget), now=clock)
-        work_rows.extend(queue_rows[:queue_budget])
     lines.extend(work_rows)
     lines.extend([""] * max(0, available - len(work_rows)))
     lines.extend(footer)
     lines = lines[:rows]
     lines.extend([""] * max(0, rows - len(lines)))
     lines = [pad_visible(line, cols) for line in lines]
-    return f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m" + "\n".join(lines) + "\033[0m"
+    background = "\033[40m" if os.environ.get("TERM") == "linux" else f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m"
+    return background + "\n".join(lines) + "\033[0m"
 
 
 def frame(
@@ -2519,7 +2903,7 @@ def frame(
     symphony.update(read_runtime_context(now=clock))
     symphony = current_execution_view(symphony, now=clock)
     mq = retain_last_good_source("mq", fetch_mq(), now=clock)
-    linear = retain_last_good_source("linear", fetch_linear_project(), now=clock)
+    linear = retain_last_good_source("linear", fetch_linear_project_cached(), now=clock)
     github_path = Path(os.environ.get("HUD_GITHUB_PATH", str(DEFAULT_GITHUB_STATE)))
     github = fetch_github_ship(
         cache_path=github_path,
@@ -2539,7 +2923,7 @@ def frame(
     return render(
         symphony=symphony,
         mq=mq,
-        review=linear.get("review") if linear.get("ok") else fetch_review(),
+        review=linear.get("review") if linear.get("ok") else None,
         measured=measured,
         width=cols,
         height=rows,

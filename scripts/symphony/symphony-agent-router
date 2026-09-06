@@ -38,10 +38,25 @@ cursor_adapter="${SYMPHONY_CURSOR_ADAPTER:-$home/.local/bin/cursor-appserver-ada
 auto_route="${SYMPHONY_AUTO_ROUTE:-$home/.local/bin/symphony-auto-route.mjs}"
 router_hotfix="${SYMPHONY_CODEX_ROUTER:-$home/.local/bin/symphony-codex-router-hotfix}"
 state_dir="${SYMPHONY_PROVIDER_ROUTE_STATE_DIR:-$home/.local/state/symphony-provider-router}"
+provider_locks_dir="${SYMPHONY_PROVIDER_LOCKS_DIR:-$state_dir/locks}"
 model="${SYMPHONY_CURSOR_MODEL:-gpt-5.6-luna-high}"
 probe_cooldown_seconds="${SYMPHONY_PROVIDER_PROBE_COOLDOWN_SECONDS:-60}"
 cooldown_state="$state_dir/provider-cooldowns.json"
 cooldown_lock="$state_dir/provider-cooldowns.lock"
+
+reserve_provider_slot() {
+  local provider="$1"
+  mkdir -p "$provider_locks_dir"
+  # The descriptor is intentionally inherited by the provider adapter. This
+  # makes the reservation cover the probe-to-spawn interval and the worker's
+  # lifetime; a crash releases it through the kernel.
+  exec 8>"$provider_locks_dir/$provider.lock"
+  if ! flock -n 8; then
+    exec 8>&-
+    return 1
+  fi
+  return 0
+}
 
 update_provider_cooldown() {
   local provider="$1" action="$2" reason="${3:-}"
@@ -164,14 +179,28 @@ write_receipt() {
   local provider="$1" selected_model="$2" reason="$3" temporary
   mkdir -p "$state_dir"
   temporary="$state_dir/.${issue}.tmp.$$"
-  python3 - "$issue" "$provider" "$selected_model" "$reason" >"$temporary" <<'PY'
+  python3 - "$issue" "$provider" "$selected_model" "$reason" "${SYMPHONY_POLICY_GENERATION:-symphony-routing-policy-v1}" >"$temporary" <<'PY'
 import datetime, json, sys
 print(json.dumps({
   "schema": "symphony-provider-route/v1",
+  "authority": "symphony-agent-router",
   "issue": sys.argv[1],
   "provider": sys.argv[2],
   "model": sys.argv[3],
   "reason": sys.argv[4],
+  "policyGeneration": sys.argv[5],
+  "selectedRoute": {"provider": sys.argv[2], "model": sys.argv[3]},
+  "reservation": {
+    "authority": "symphony-agent-router",
+    "scope": "issue",
+    "key": sys.argv[1],
+    "status": "held",
+  },
+  "lease": {
+    "authority": "symphony-agent-router",
+    "fd": 9,
+    "status": "held",
+  },
   "observedAt": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
 }, sort_keys=True))
 PY
@@ -194,6 +223,11 @@ launch_codex() {
   touch "${CODEX_ACCOUNTS_STATE:-$home/.codex-accounts/state.json}"
   write_receipt codex routed-subscription "eligible-codex-account"
   export SYMPHONY_ROUTING_USE_MATERIALIZED=1
+  # Jovie headless app-server needs no desktop app connectors. Keep this opt-in
+  # inside the selected Codex route so other providers retain their own CLI.
+  if [ "${SYMPHONY_CODEX_DISABLE_APPS:-0}" = "1" ]; then
+    set -- --disable apps "$@"
+  fi
   exec "$workspace/scripts/symphony/symphony-codex-router" "$@"
 }
 
@@ -230,16 +264,18 @@ else
   if [ "$provider_status" -ne 1 ]; then
     exit "$provider_status"
   fi
-  if [ -x "$cursor" ] && [ -x "$cursor_adapter" ] &&
-     "$cursor" status 2>/dev/null | grep -q 'Logged in' &&
-     "$cursor" models 2>/dev/null | awk -v model="$model" '$1 == model { found=1 } END { exit !found }'; then
-    update_provider_cooldown cursor clear
-    write_receipt cursor "$model" "eligible-primary-provider"
-    unset LINEAR_API_KEY CODEX_HOME OPENAI_API_KEY
-    export CURSOR_BIN="$cursor" CURSOR_MODEL="$model"
-    exec "$cursor_adapter" "$@"
-  elif [ -x "$cursor" ] && [ -x "$cursor_adapter" ]; then
-    update_provider_cooldown cursor mark "authenticated-capacity-probe-failed"
+  if reserve_provider_slot cursor; then
+    if [ -x "$cursor" ] && [ -x "$cursor_adapter" ] &&
+       "$cursor" status 2>/dev/null | grep -q 'Logged in' &&
+       "$cursor" models 2>/dev/null | awk -v model="$model" '$1 == model { found=1 } END { exit !found }'; then
+      update_provider_cooldown cursor clear
+      write_receipt cursor "$model" "eligible-primary-provider"
+      unset LINEAR_API_KEY CODEX_HOME OPENAI_API_KEY
+      export CURSOR_BIN="$cursor" CURSOR_MODEL="$model"
+      exec "$cursor_adapter" "$@"
+    elif [ -x "$cursor" ] && [ -x "$cursor_adapter" ]; then
+      update_provider_cooldown cursor mark "authenticated-capacity-probe-failed"
+    fi
   fi
 fi
 

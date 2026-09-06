@@ -16,6 +16,8 @@ overlay_targets=(
   /srv/scratch
   /srv/git
   /var/lib/jovie-symphony-workspaces
+  /home/timwhite/symphony-elixir-workspaces
+  /home/timwhite/codex-qualification
 )
 
 cleanup() {
@@ -32,9 +34,26 @@ for target in "${overlay_targets[@]}"; do
   mount --bind "$simulation_root$target" "$target"
 done
 
-issues=(JOV-9900000 JOV-9900001 JOV-9900008 JOV-9900002)
-for issue in "${issues[@]}"; do
-  logical="/srv/worktrees/jovie/$issue"
+specs=(
+  "legacy:JOV-9900000"
+  "legacy:JOV-9900001"
+  "legacy:JOV-9900008"
+  "legacy:JOV-9900002"
+  "elixir:JOV-9900010"
+  "qualification:qualification-boot-proof"
+)
+logical_root_for_namespace() {
+  case "$1" in
+    legacy) printf '/srv/worktrees/jovie\n' ;;
+    elixir) printf '/home/timwhite/symphony-elixir-workspaces\n' ;;
+    qualification) printf '/home/timwhite/codex-qualification\n' ;;
+    *) return 1 ;;
+  esac
+}
+for spec in "${specs[@]}"; do
+  namespace="${spec%%:*}"
+  issue="${spec#*:}"
+  logical="$(logical_root_for_namespace "$namespace")/$issue"
   install -d -o timwhite -g timwhite -m 0755 "$logical"
   "$helper" prepare "$logical" >/dev/null
   install -d -o timwhite -g timwhite -m 0755 "$logical/.git"
@@ -42,21 +61,25 @@ for issue in "${issues[@]}"; do
 done
 
 before_restore="$($helper status)"
-[[ "$(grep -c 'mounted=true' <<<"$before_restore")" -eq 4 ]] || { echo "activation count mismatch" >&2; exit 1; }
+[[ "$(grep -c 'mounted=true' <<<"$before_restore")" -eq 6 ]] || { echo "activation count mismatch" >&2; exit 1; }
 
-for issue in "${issues[@]}"; do
-  umount "/srv/worktrees/jovie/$issue"
+for spec in "${specs[@]}"; do
+  namespace="${spec%%:*}"
+  issue="${spec#*:}"
+  umount "$(logical_root_for_namespace "$namespace")/$issue"
 done
 lost_mounts="$($helper status)"
-[[ "$(grep -c 'mounted=false' <<<"$lost_mounts")" -eq 4 ]] || { echo "lost-mount simulation failed" >&2; exit 1; }
+[[ "$(grep -c 'mounted=false' <<<"$lost_mounts")" -eq 6 ]] || { echo "lost-mount simulation failed" >&2; exit 1; }
 
 "$helper" restore-all
 after_restore="$($helper status)"
-[[ "$(grep -c 'mounted=true' <<<"$after_restore")" -eq 4 ]] || { echo "restore-all count mismatch" >&2; exit 1; }
+[[ "$(grep -c 'mounted=true' <<<"$after_restore")" -eq 6 ]] || { echo "restore-all count mismatch" >&2; exit 1; }
 
-for issue in "${issues[@]}"; do
-  logical="/srv/worktrees/jovie/$issue"
-  route="$($helper route "$issue")"
+for spec in "${specs[@]}"; do
+  namespace="${spec%%:*}"
+  issue="${spec#*:}"
+  logical="$(logical_root_for_namespace "$namespace")/$issue"
+  route="$($helper route "$namespace" "$issue")"
   backing="$(awk -F= '$1 == "backing" {print $2}' <<<"$route")"
   [[ "$(stat -Lc '%d:%i' "$logical")" == "$(stat -Lc '%d:%i' "$backing")" ]] || {
     echo "restored inode mismatch: $issue" >&2

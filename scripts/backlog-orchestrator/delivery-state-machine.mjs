@@ -14,6 +14,10 @@ import { createHash } from 'node:crypto';
 import { mkdir, open, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import {
+  policyDigest,
+  readPrLifecycleContract,
+} from '../invariants/pr-lifecycle-contract.mjs';
+import {
   FX_BACKSTOP_FAILURES,
   fxBackstopRoute,
 } from '../lib/rolling-ci-handoff.mjs';
@@ -32,6 +36,10 @@ export const DELIVERY_RECEIPT_SCHEMA = 'jovie-delivery-receipt/v1';
 export const REPAIR_TASK_SCHEMA = 'jovie-symphony-repair-task/v1';
 export const STACK_HEALTH_ACTION_SCHEMA = 'jovie-stack-health-action/v1';
 export const STACK_REPAIR_ACTION = 'split-or-retarget-draft-stack'; // JOV-INV-020
+export const PR_LIFECYCLE_CONTRACT_ID = 'JOV-INV-029';
+export const PR_LIFECYCLE_POLICY_DIGEST = policyDigest(
+  readPrLifecycleContract()
+);
 export const DEFAULT_DELIVERY_STATE_DIR = resolve(
   process.env.GEM_WORKSPACE || '/home/timwhite/gem-workspace',
   'state/jovie-delivery-controller'
@@ -387,6 +395,11 @@ export function buildDeliveryReceipt(
     : 'received';
   return {
     schema: DELIVERY_RECEIPT_SCHEMA,
+    policy: {
+      id: PR_LIFECYCLE_CONTRACT_ID,
+      schema: 'jovie-pr-lifecycle/v1',
+      digest: PR_LIFECYCLE_POLICY_DIGEST,
+    },
     receiptKey: digest({
       repository: event.repository,
       deliveryKey: event.deliveryKey,
@@ -458,6 +471,11 @@ export function transitionDeliveryReceipt(
   }
   return {
     ...receipt,
+    policy: receipt.policy || {
+      id: PR_LIFECYCLE_CONTRACT_ID,
+      schema: 'jovie-pr-lifecycle/v1',
+      digest: PR_LIFECYCLE_POLICY_DIGEST,
+    },
     observedAt: now,
     stage,
     terminal: stage === 'external-blocked' || stage === 'production-proven',

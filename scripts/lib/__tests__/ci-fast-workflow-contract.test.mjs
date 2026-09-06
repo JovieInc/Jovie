@@ -563,8 +563,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/symphony/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation)|symphony-ui-pilot)\\.sh$|model-router\\.py$|summer_bottleneck_producer\\.py$|symphony-nvme-package-cache\\.sh$|symphony-reconciler\\.py$|systemd/gem-(disk-reclaim|pr-drain)\\.(service|timer)$)'
+      'install-(gem-(fleet-controller|pr-rehabilitation|symphony-storage)|symphony-ui-pilot)\\.sh$'
     );
+    expect(remaining).toContain('jovie-symphony-workspace(-create)?$');
     expect(remaining).toContain('gbrain-runtime-assets|merge-group');
     expect(CI_FAST_SOURCE).toContain(
       'GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts'
@@ -572,8 +573,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('--precision=2 --fail-under=78');
     expect(CI_FAST_SOURCE).toContain('elif [ "${CI:-}" = "true" ]');
     expect(CI_FAST_SOURCE).not.toContain('elif [[');
+    expect(remaining).toContain('jovie-symphony-workspace\\.test\\.py$');
+    expect(remaining).toContain('_gem_workspace_migrate)\\.py$');
+    expect(remaining).toContain('summer_bottleneck_producer\\.py$');
     expect(remaining).toContain(
-      'scripts/symphony/tests/(closure-health\\.test\\.py$|gem-(disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|hyperagent-lifecycle\\.test\\.py$|summer-bottleneck-producer\\.test\\.py$|symphony-(nvme-package-cache|reconciler)\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim)\\.py$)'
+      'summer-bottleneck-producer\\.test\\.py$'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
@@ -587,6 +591,8 @@ describe('ci-fast bounded parallel workflow', () => {
     for (const gemContractCommand of [
       'python3 scripts/symphony/tests/run-hud-proof-gate.py',
       'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
+      'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
+      'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
       'python3 scripts/symphony/tests/gem-pr-drain.test.py',
       'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
       'python3 scripts/symphony/tests/gem-priority-gate.test.py',
@@ -888,6 +894,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/evaluate-fleet-gate.sh',
       'scripts/symphony/fleet_admission_receipt.py',
       'scripts/symphony/gem-disk-reclaim.py',
+      'scripts/symphony/gem-workspace-migrate.py',
+      'scripts/symphony/install-gem-symphony-storage.sh',
+      'scripts/symphony/jovie-symphony-workspace',
       'scripts/symphony/install-gem-fleet-controller.sh',
       'scripts/symphony/install-symphony-ui-pilot.sh',
       'scripts/symphony/model-router.py',
@@ -906,6 +915,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/tests/symphony-nvme-package-cache.test.py',
       'scripts/symphony/tests/symphony-reconciler.test.py',
       'scripts/symphony/tests/test_gem_disk_reclaim.py',
+      'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+      'scripts/symphony/tests/test_gem_workspace_migrate.py',
       'scripts/symphony/tests/test-model-router.py',
       'scripts/symphony/tests/test_evaluate_fleet_gate.py',
       'scripts/symphony/tests/test_fleet_admission_receipt.py',

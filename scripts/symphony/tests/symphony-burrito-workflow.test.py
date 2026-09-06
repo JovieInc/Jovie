@@ -26,6 +26,7 @@ UNIT_PATH = ROOT / "scripts/symphony/systemd/symphony-elixir.service"
 UNIT = UNIT_PATH.read_text(encoding="utf-8")
 UPDATER = (ROOT / "scripts/symphony/update-symphony-burrito.sh").read_text(encoding="utf-8")
 HELPER_PATH = ROOT / "scripts/symphony/symphony_official_runtime.py"
+AUTHORITY_MAP_PATH = ROOT / "scripts/symphony/PROVIDER_ADMISSION_AUTHORITY.md"
 LIVE_TEAM_KEY = "JOV"
 TOKEN_RE = re.compile(r"lin_(?:api_|oauth_)?[A-Za-z0-9]{12,}|api_key:\s*(?!\$LINEAR_API_KEY\b)\S+")
 
@@ -112,14 +113,20 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
-            re.compile(r"^\s+command: symphony-agent-router app-server$", re.M),
+            re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
         )
+        authority_map = AUTHORITY_MAP_PATH.read_text(encoding="utf-8")
+        self.assertIn("`symphony-agent-router` | active", authority_map)
+        self.assertIn("`symphony-concurrency-controller.py` | observer/overlay", authority_map)
+        self.assertIn("`symphony-reconciler.py` | retired by the official updater", authority_map)
+        self.assertIn("symphony-provider-route/v1", authority_map)
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]
-        self.assertIn("git clone --depth 1 https://github.com/JovieInc/Jovie.git .", hook)
+        self.assertIn('jovie-symphony-workspace-create" "$PWD"', hook)
+        self.assertNotIn("git clone ", hook)
         self.assertTrue("git@" not in hook and "mix " not in hook)
-        self.assertIn("symphony-nvme-package-cache.sh after-create", hook)
+        self.assertIn('jovie-symphony-workspace cleanup "$PWD"', hook)
         self.assertIn("pnpm install --offline --frozen-lockfile --ignore-scripts", WORKFLOW)
         self.assertIn("before_remove:", WORKFLOW)
         self.assertIn("symphony-nvme-package-cache.sh before-remove", WORKFLOW)
@@ -389,6 +396,34 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     for error in missing_rework["errors"]
                 ),
                 missing_rework["errors"],
+            )
+
+            direct_clone = check(
+                WORKFLOW.replace(
+                    'exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"',
+                    "git clone --depth 1 https://github.com/JovieInc/Jovie.git .",
+                )
+            )
+            self.assertFalse(direct_clone["ok"])
+            self.assertIn(
+                "workflow_after_create_missing_managed_wrapper",
+                direct_clone["errors"],
+            )
+            self.assertIn(
+                "workflow_after_create_bypasses_managed_wrapper",
+                direct_clone["errors"],
+            )
+
+            missing_cleanup = check(
+                WORKFLOW.replace(
+                    '    sudo -n /usr/local/sbin/jovie-symphony-workspace cleanup "$PWD" || cleanup_status=$?\n',
+                    "",
+                )
+            )
+            self.assertFalse(missing_cleanup["ok"])
+            self.assertIn(
+                "workflow_before_remove_missing_managed_cleanup",
+                missing_cleanup["errors"],
             )
 
     def test_linear_eligible_count_uses_team_key_pagination(self):

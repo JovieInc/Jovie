@@ -625,6 +625,8 @@ function runStructural() {
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
     'python3 scripts/symphony/tests/run-hud-proof-gate.py',
     'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
+    'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
+    'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
     'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/gbrain-runtime-assets.test.mjs && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage combine "${RUNNER_TEMP:-/tmp}" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage report --include="*/scripts/symphony/gbrain-runtime/gbrain-mcp-http-proxy.py" --show-missing --precision=2 --fail-under=78; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local GBrain proxy coverage"; fi',
     'python3 scripts/symphony/tests/gem-pr-drain.test.py',
     'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
