@@ -4329,6 +4329,11 @@ class FallbackLockGcTests(unittest.TestCase):
                 return_value=(True, "admitted", {"issue_revision": "2026-08-22T00:00:00Z"}),
             ),
             mock.patch.object(
+                self.module,
+                "_provider_measured_capacity",
+                side_effect=lambda provider: 1 if provider == "grok" else 0,
+            ),
+            mock.patch.object(
                 self.module, "_control", side_effect=lambda command: launches.append(command) or True
             ),
             contextlib.redirect_stderr(stderr),
