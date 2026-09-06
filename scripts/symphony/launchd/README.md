@@ -23,7 +23,9 @@ the GitHub Actions production controller and release-marker recovery runbooks ar
 and
 [`release-marker-recovery.md`](../runbooks/release-marker-recovery.md);
 the backlog orchestrator / ownership inventory recovery runbook is
-[`backlog-orchestrator-ownership-inventory-recovery.md`](../runbooks/backlog-orchestrator-ownership-inventory-recovery.md).
+[`backlog-orchestrator-ownership-inventory-recovery.md`](../runbooks/backlog-orchestrator-ownership-inventory-recovery.md);
+the Summer governor runbook for the Eve/Ovie control plane in `apps/eve-pilot` is
+[`summer-governor-recovery.md`](../runbooks/summer-governor-recovery.md).
 
 | File | Schedule | Purpose |
 |---|---|---|
