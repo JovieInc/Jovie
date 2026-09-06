@@ -76,6 +76,33 @@ class ProviderCapacityTests(unittest.TestCase):
         self.assertEqual(state["providers"]["cursor"]["limit"], 3)
         self.assertEqual(state["providers"]["grok"]["limit"], 4)
 
+    def test_changed_live_measurement_adjusts_without_erasing_adaptive_pressure(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        state = capacity.apply_observation(
+            state, provider="cursor", kind="capacity_observed", event_id="seed",
+            observed_at="2026-09-05T12:00:00Z", observed_capacity=20,
+        )
+        state = capacity.apply_observation(
+            state, provider="cursor", kind="downstream_pressure", event_id="pressure",
+            observed_at="2026-09-05T12:01:00Z",
+        )
+        unchanged = capacity.apply_observation(
+            state, provider="cursor", kind="capacity_observed", event_id="same",
+            observed_at="2026-09-05T12:02:00Z", observed_capacity=20,
+        )
+        self.assertEqual(unchanged["providers"]["cursor"]["limit"], 10)
+        increased = capacity.apply_observation(
+            unchanged, provider="cursor", kind="capacity_observed", event_id="more",
+            observed_at="2026-09-05T12:03:00Z", observed_capacity=24,
+        )
+        self.assertEqual(increased["providers"]["cursor"]["limit"], 14)
+        decreased = capacity.apply_observation(
+            increased, provider="cursor", kind="capacity_observed", event_id="less",
+            observed_at="2026-09-05T12:04:00Z", observed_capacity=8,
+        )
+        self.assertEqual(decreased["providers"]["cursor"]["limit"], 0)
+        self.assertEqual(decreased["providers"]["cursor"]["observedCapacity"], 8)
+
     def test_each_pressure_decreases_and_sets_typed_cooldown(self):
         for kind in capacity.PRESSURE_KINDS:
             with self.subTest(kind=kind):

@@ -190,6 +190,54 @@ describe('Symphony launcher closed loop', () => {
     }
   });
 
+  it('refuses a Cursor CLI route at the Codex app-server launcher boundary', () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Fix README typo');
+      runRouter(env, issue);
+      rmSync(env.rotateLog, { force: true });
+      const receiptPath = join(env.workspace, '.symphony-routing.json');
+      const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+      writeFileSync(
+        receiptPath,
+        JSON.stringify({ ...receipt, model: 'cursor-grok-4.6-high' })
+      );
+      assert.throws(
+        () =>
+          execFileSync('bash', [ROUTER, 'app-server'], {
+            cwd: env.workspace,
+            env: {
+              ...process.env,
+              SYMPHONY_ROUTING_USE_MATERIALIZED: '1',
+              SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
+              SYMPHONY_WORKSPACE: env.workspace,
+              SYMPHONY_CODEX_ROTATE: env.stub,
+              SYMPHONY_FALLBACK_LEASE_DIR: join(env.root, 'fallback-leases'),
+              SYMPHONY_OPEN_PR_INDEX: 'empty',
+              SYMPHONY_CODEX_EXHAUSTED: new URL(
+                '../../symphony/symphony-codex-exhausted.py',
+                import.meta.url
+              ).pathname,
+              CODEX_ACCOUNTS_ROOT: env.accounts,
+              CODEX_ACCOUNTS_STATE: join(env.accounts, 'state.json'),
+            },
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }),
+        error => {
+          assert.equal(/** @type {any} */ (error).status, 78);
+          assert.match(
+            String(/** @type {any} */ (error).stderr),
+            /class=materialized-route-invalid/
+          );
+          return true;
+        }
+      );
+      assert.throws(() => readFileSync(env.rotateLog, 'utf8'));
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed on a tampered receipt model', () => {
     const env = fixture();
     try {
