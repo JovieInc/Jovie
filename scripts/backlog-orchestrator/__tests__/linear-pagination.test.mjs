@@ -2,11 +2,48 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { safeFailureReceipt } from '../../ownerless-recovery-sweeper.mjs';
 import {
+  activeLinearCooldown,
   collectLinearConnectionPages,
   fetchTeamActiveIssueSnapshot,
   fetchTeamFleetClosureIssueSnapshot,
   LinearTransportError,
 } from '../linear-client.mjs';
+
+describe('active Linear cooldown', () => {
+  it('recovers the latest future deadline through pagination wrapping', () => {
+    const now = 1_800_000_000_000;
+    const resetAt = now + 60_000;
+    const error = {
+      code: 'PAGE_FETCH_FAILED',
+      resetAt: resetAt - 1_000,
+      cause: {
+        code: 'RATE_LIMITED',
+        metadata: { resetAt },
+      },
+    };
+
+    assert.deepEqual(activeLinearCooldown(error, now), {
+      resetAt,
+      retryAt: new Date(resetAt).toISOString(),
+    });
+  });
+
+  it('rejects expired, untyped, malformed, and cyclic cooldown evidence', () => {
+    const now = 1_800_000_000_000;
+    assert.equal(
+      activeLinearCooldown({ code: 'RATE_LIMITED', resetAt: now }, now),
+      null
+    );
+    assert.equal(
+      activeLinearCooldown({ code: 'HTTP', resetAt: now + 60_000 }, now),
+      null
+    );
+
+    const cyclic = { code: 'RATE_LIMITED', resetAt: 'not-a-number' };
+    cyclic.cause = cyclic;
+    assert.equal(activeLinearCooldown(cyclic, now), null);
+  });
+});
 
 // Mirrors the production payload captured from Linear when the fleet-closure
 // snapshot exceeded the 10000 query-complexity ceiling (HTTP 400 INPUT_ERROR).

@@ -104,6 +104,34 @@ export class LinearPaginationError extends Error {
   }
 }
 
+/**
+ * Recover the active shared-budget deadline through transport/pagination error
+ * wrapping. Only a typed RATE_LIMITED cause authorizes a deferred retry.
+ * @param {unknown} error
+ * @param {number} [nowMs]
+ */
+export function activeLinearCooldown(error, nowMs = Date.now()) {
+  const seen = new Set();
+  let current = error;
+  let rateLimited = false;
+  let resetAt = 0;
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    const record =
+      /** @type {{ code?: string, resetAt?: number, metadata?: { resetAt?: number }, cause?: unknown }} */ (
+        current
+      );
+    if (record.code === 'RATE_LIMITED') rateLimited = true;
+    for (const candidate of [record.resetAt, record.metadata?.resetAt]) {
+      if (typeof candidate === 'number' && Number.isSafeInteger(candidate))
+        resetAt = Math.max(resetAt, candidate);
+    }
+    current = record.cause;
+  }
+  if (!rateLimited || resetAt <= nowMs) return null;
+  return { resetAt, retryAt: new Date(resetAt).toISOString() };
+}
+
 function paginationCoverage({
   complete,
   pages,

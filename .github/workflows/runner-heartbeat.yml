@@ -1,5 +1,9 @@
 name: Runner Heartbeat
 # clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted schedule can wake the canonical main-only recovery workflows without receiving Linear, Jovie Bot, or runner-host credentials.
+# revisit-trigger: Remove these dispatches when GitHub supports a durable delayed workflow retry at an upstream API reset timestamp.
 
 on:
   # GitHub cron delivery is best-effort and can be delayed well past its nominal
@@ -29,3 +33,19 @@ jobs:
     steps:
       - name: Record heartbeat
         run: echo "Self-hosted heartbeat from $RUNNER_NAME"
+
+  remediation-clock:
+    name: Retry deferred backlog remediation
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch canonical fleet refresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run fleet-gate-refresh.yml --ref main
+          gh workflow run ownerless-recovery-sweep.yml --ref main

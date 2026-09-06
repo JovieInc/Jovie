@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyQueueOwnership,
   countsAsRecoveryFailure,
+  ownerlessRecoveryFailureDisposition,
   readRecoveryEvent,
   recoveryEventDecision,
   recoveryIssueSnapshot,
@@ -45,6 +46,37 @@ const audit = (pullRequests, linearIssues, extra = {}) =>
   });
 
 describe('ownerless recovery policy', () => {
+  it('defers a nested Linear cooldown with its exact retry clock', () => {
+    const resetAt = Date.parse(now) + 60_000;
+    const cause = Object.assign(new Error('credential cooling down'), {
+      code: 'RATE_LIMITED',
+      attempts: 0,
+      metadata: { resetAt },
+    });
+    const error = Object.assign(
+      new Error('Linear pagination page fetch failed'),
+      {
+        name: 'LinearPaginationError',
+        code: 'PAGE_FETCH_FAILED',
+        attempts: 0,
+        resetAt,
+        cause,
+      }
+    );
+
+    expect(
+      ownerlessRecoveryFailureDisposition(error, Date.parse(now))
+    ).toMatchObject({
+      schema: 'jovie-ownerless-recovery-failure/v1',
+      status: 'deferred',
+      code: 'PAGE_FETCH_FAILED',
+      attempts: 0,
+      resetAt,
+      retryAt: new Date(resetAt).toISOString(),
+      cause: { code: 'RATE_LIMITED', attempts: 0 },
+    });
+  });
+
   it('admits focused green recovery work after one ownerless hour', () => {
     expect(
       evaluateRecoveryCandidate({
@@ -193,6 +225,7 @@ describe('tracker scan admission', () => {
     );
     expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
     expect(workflow).not.toContain('ready_for_review');
+    expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toMatch(
       /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
     );
