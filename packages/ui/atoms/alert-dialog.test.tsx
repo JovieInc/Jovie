@@ -252,6 +252,35 @@ describe('AlertDialog', () => {
   });
 
   describe('AlertDialogContent Options', () => {
+    it('uses the canonical cinematic motion token for modal entry', () => {
+      render(<TestAlertDialog open={true} />);
+
+      const content = screen.getByTestId('alert-dialog-content');
+      expect(content).toHaveClass('duration-cinematic');
+      expect(content).not.toHaveClass('duration-200');
+    });
+
+    it('deliberate-red: identifies a raw modal duration', () => {
+      const { container } = render(
+        <>
+          <TestAlertDialog open={true} />
+          <div
+            data-deliberate-red='raw-modal-duration'
+            className='duration-200'
+          />
+        </>
+      );
+
+      const fixture = container.querySelector(
+        '[data-deliberate-red="raw-modal-duration"]'
+      );
+      expect(fixture).toHaveClass('duration-200');
+      expect(fixture).not.toHaveClass('duration-cinematic');
+      expect(screen.getByTestId('alert-dialog-content')).toHaveClass(
+        'duration-cinematic'
+      );
+    });
+
     it('supports custom testId', () => {
       render(
         <AlertDialog open={true}>
