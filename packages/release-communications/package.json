@@ -1,0 +1,11 @@
+{
+  "name": "@jovie/release-communications",
+  "version": "26.8.2",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": { ".": "./index.ts" },
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "devDependencies": { "typescript": "^6.0.3", "vitest": "4.1.10" }
+}
