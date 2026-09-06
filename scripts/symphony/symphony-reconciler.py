@@ -599,9 +599,9 @@ def classify_launcher_failure(
 ) -> dict[str, object]:
     """Classify launcher and controller-exit evidence into a bounded retry policy.
 
-    Structured sentinels and sysexits EX_CONFIG (78) are terminal. EX_TEMPFAIL
-    (75) stays a distinct bounded capacity state. Unknown exits stay typed
-    unknown and bounded, never collapsed into exit 78.
+    Typed sentinels retain their classification and EX_CONFIG (78) is terminal.
+    Generic EX_TEMPFAIL (75) stays bounded transient unless positive provider
+    capacity evidence is present. Unknown exits never collapse into exit 78.
     """
     item = item or {}
     sentinel = parse_launcher_sentinel(error)
@@ -630,6 +630,13 @@ def classify_launcher_failure(
             retryable=False,
             max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
         )
+    if isinstance(sentinel, dict) and sentinel.get("retryable") is True:
+        return _failure(
+            str(sentinel.get("class") or "transient-launcher"),
+            str(sentinel.get("code") or "capacity-or-provider-unavailable"),
+            retryable=True,
+            max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+        )
     evidence = str(error or item.get("error") or "")
     if DETERMINISTIC_LAUNCHER_PATTERN.search(evidence):
         return _failure(
@@ -638,7 +645,7 @@ def classify_launcher_failure(
             retryable=False,
             max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
         )
-    if port_exit == EX_TEMPFAIL or re.search(
+    if re.search(
         r"CAPACITY_UNAVAILABLE|account_busy|provider capacity",
         evidence,
         re.IGNORECASE,
@@ -649,7 +656,7 @@ def classify_launcher_failure(
             retryable=True,
             max_attempts=PROVIDER_CAPACITY_MAX_ATTEMPTS,
         )
-    if TRANSIENT_LAUNCHER_PATTERN.search(evidence):
+    if port_exit == EX_TEMPFAIL or TRANSIENT_LAUNCHER_PATTERN.search(evidence):
         return _failure(
             "transient-launcher",
             "capacity-or-provider-unavailable",
@@ -660,13 +667,6 @@ def classify_launcher_failure(
         return _failure(
             "unknown-launcher",
             f"unclassified-port-exit-{port_exit}",
-            retryable=True,
-            max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
-        )
-    if isinstance(sentinel, dict) and sentinel.get("retryable") is True:
-        return _failure(
-            str(sentinel.get("class") or "transient-launcher"),
-            str(sentinel.get("code") or "capacity-or-provider-unavailable"),
             retryable=True,
             max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
         )
