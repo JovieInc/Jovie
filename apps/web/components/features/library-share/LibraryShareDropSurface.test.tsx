@@ -69,10 +69,14 @@ describe('web-171 library share drop source contract', () => {
     );
 
     expect(screen.getByRole('link', { name: 'Open smart link' })).toHaveClass(
-      'h-11'
+      'h-7',
+      'before:h-11',
+      'before:min-w-11'
     );
     expect(screen.getByRole('link', { name: 'Download preview' })).toHaveClass(
-      'h-11'
+      'h-7',
+      'before:h-11',
+      'before:min-w-11'
     );
   });
 
