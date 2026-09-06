@@ -865,6 +865,17 @@ describe('Public Profile Page Logic', () => {
 });
 
 describe('profile mode route redirects', () => {
+  it('keeps the canonical profile admission URL backed by the production canary', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+
+    expect(afterFiles).toContainEqual({
+      source: '/unfazed',
+      destination: '/authqaprod',
+    });
+  });
+
   it('does not shadow smart-link slugs with config-level redirects', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
