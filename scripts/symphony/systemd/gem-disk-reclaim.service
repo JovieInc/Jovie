@@ -8,7 +8,7 @@ Type=oneshot
 WorkingDirectory=%h/gem-workspace
 Environment=HOME=%h
 Environment=GEM_WORKSPACE=%h/gem-workspace
-Environment=GEM_DISK_RECLAIM_WORKSPACE_ROOTS=%h/symphony-workspaces
+Environment=GEM_DISK_RECLAIM_WORKSPACE_ROOTS=%h/symphony-elixir-workspaces:%h/symphony-workspaces:/srv/worktrees/jovie
 Environment=GEM_DISK_RECLAIM_RUNNER_ROOTS=%h/actions-runner:%h/actions-runner-1:%h/actions-runner-2:%h/actions-runner-3:%h/actions-runner-4:%h/actions-runner-5
 ExecStart=/usr/bin/flock -n /tmp/gem-disk-reclaim.lock /usr/bin/python3 %h/.local/bin/gem-disk-reclaim --apply --timeout-seconds 540
 TimeoutStartSec=10min

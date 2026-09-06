@@ -23,9 +23,9 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("excluded_labels:", workflow)
         self.assertIn("    - no-symphony", workflow)
         self.assertNotIn("    - needs-human", workflow)
-        self.assertIn(
-            "git clone --depth 1 https://github.com/JovieInc/Jovie.git .", workflow
-        )
+        self.assertIn('jovie-symphony-workspace-create" "$PWD"', workflow)
+        self.assertNotIn("git clone ", workflow.split("agent:", 1)[0])
+        self.assertIn('jovie-symphony-workspace cleanup "$PWD"', workflow)
         self.assertRegex(
             workflow,
             re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),

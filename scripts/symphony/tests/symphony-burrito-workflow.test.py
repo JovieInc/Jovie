@@ -123,9 +123,10 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]
-        self.assertIn("git clone --depth 1 https://github.com/JovieInc/Jovie.git .", hook)
+        self.assertIn('jovie-symphony-workspace-create" "$PWD"', hook)
+        self.assertNotIn("git clone ", hook)
         self.assertTrue("git@" not in hook and "mix " not in hook)
-        self.assertIn("symphony-nvme-package-cache.sh after-create", hook)
+        self.assertIn('jovie-symphony-workspace cleanup "$PWD"', hook)
         self.assertIn("pnpm install --offline --frozen-lockfile --ignore-scripts", WORKFLOW)
         self.assertIn("before_remove:", WORKFLOW)
         self.assertIn("symphony-nvme-package-cache.sh before-remove", WORKFLOW)
@@ -395,6 +396,34 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     for error in missing_rework["errors"]
                 ),
                 missing_rework["errors"],
+            )
+
+            direct_clone = check(
+                WORKFLOW.replace(
+                    'exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"',
+                    "git clone --depth 1 https://github.com/JovieInc/Jovie.git .",
+                )
+            )
+            self.assertFalse(direct_clone["ok"])
+            self.assertIn(
+                "workflow_after_create_missing_managed_wrapper",
+                direct_clone["errors"],
+            )
+            self.assertIn(
+                "workflow_after_create_bypasses_managed_wrapper",
+                direct_clone["errors"],
+            )
+
+            missing_cleanup = check(
+                WORKFLOW.replace(
+                    '    sudo -n /usr/local/sbin/jovie-symphony-workspace cleanup "$PWD" || cleanup_status=$?\n',
+                    "",
+                )
+            )
+            self.assertFalse(missing_cleanup["ok"])
+            self.assertIn(
+                "workflow_before_remove_missing_managed_cleanup",
+                missing_cleanup["errors"],
             )
 
     def test_linear_eligible_count_uses_team_key_pagination(self):

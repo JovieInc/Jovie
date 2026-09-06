@@ -14,9 +14,59 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 HELPER = ROOT / "scripts/symphony/jovie-symphony-workspace"
 WRAPPER = ROOT / "scripts/symphony/jovie-symphony-workspace-create"
 INSTALLER = ROOT / "scripts/symphony/install-gem-symphony-storage.sh"
+WORKFLOW = ROOT / "scripts/symphony/WORKFLOW.md"
+RECLAIMER_SERVICE = ROOT / "scripts/symphony/systemd/gem-disk-reclaim.service"
 
 
 class JovieSymphonyWorkspaceTests(unittest.TestCase):
+    def test_official_workflow_uses_managed_create_and_deferred_cleanup(self) -> None:
+        source = WORKFLOW.read_text()
+        self.assertIn('root: ~/symphony-elixir-workspaces', source)
+        self.assertIn('exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"', source)
+        self.assertIn('jovie-symphony-workspace cleanup "$PWD"', source)
+        self.assertNotIn('git clone --depth 1 https://github.com/JovieInc/Jovie.git .', source)
+        self.assertNotIn('rm -rf ./node_modules', source)
+
+    def test_elixir_root_has_isolated_manifest_and_backing_namespace(self) -> None:
+        source = HELPER.read_text()
+        self.assertIn('elixir_logical_root="/home/timwhite/symphony-elixir-workspaces"', source)
+        self.assertIn('/srv/worktrees/symphony-shards/jovie-elixir', source)
+        self.assertIn("jovie-symphony-workspace/v2", source)
+        self.assertIn('"$namespace" "$1"', source)
+
+    def test_namespace_routing_accepts_runtime_and_qualification_identifiers(self) -> None:
+        source = HELPER.read_text()
+        prefix = source.split("\nrequire_root\ninit_state\n", 1)[0]
+        commands = {
+            "select_namespace elixir; issue_from_logical /home/timwhite/symphony-elixir-workspaces/JOV-5122": "JOV-5122",
+            "select_namespace qualification; issue_from_logical /home/timwhite/codex-qualification/faq-a14f41af-runtime": "faq-a14f41af-runtime",
+        }
+        for command, expected in commands.items():
+            result = subprocess.run(
+                ["bash", "-c", f"{prefix}\n{command}"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(result.stdout.strip(), expected)
+        rejected = subprocess.run(
+            ["bash", "-c", f"{prefix}\nselect_namespace qualification; issue_from_logical /home/timwhite/codex-qualification/../escape"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(rejected.returncode, 0)
+
+    def test_reclaimer_scans_actual_and_legacy_logical_roots(self) -> None:
+        service = RECLAIMER_SERVICE.read_text()
+        self.assertIn('%h/symphony-elixir-workspaces', service)
+        self.assertIn('%h/symphony-workspaces', service)
+        self.assertIn('/srv/worktrees/jovie', service)
+        installer = INSTALLER.read_text()
+        self.assertIn('reclaimer_source="$source_root/gem-disk-reclaim.py"', installer)
+        self.assertIn('enable --now gem-disk-reclaim.timer', installer)
+        self.assertIn('migration_source="$source_root/gem-workspace-migrate.py"', installer)
+        self.assertIn('migration_target="/usr/local/sbin/gem-workspace-migrate"', installer)
+
     def test_installer_pins_offline_user_corepack_for_root_preflight(self) -> None:
         source = INSTALLER.read_text()
         self.assertIn('corepack_home="/home/$owner/.cache/node/corepack"', source)

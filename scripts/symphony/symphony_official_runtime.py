@@ -521,8 +521,12 @@ def validate_source(
             )
         if workflow.server_port != OFFICIAL_PORT:
             errors.append(f"workflow_server_port:{workflow.server_port}")
-        if "git clone --depth 1 https://github.com/JovieInc/Jovie.git ." not in workflow.after_create:
-            errors.append("workflow_after_create_missing_https_clone")
+        if 'jovie-symphony-workspace-create" "$PWD"' not in workflow.after_create:
+            errors.append("workflow_after_create_missing_managed_wrapper")
+        if "git clone " in workflow.after_create:
+            errors.append("workflow_after_create_bypasses_managed_wrapper")
+        if 'jovie-symphony-workspace cleanup "$PWD"' not in workflow.after_create:
+            errors.append("workflow_before_remove_missing_managed_cleanup")
         if "git@" in workflow.after_create:
             errors.append("workflow_after_create_uses_ssh")
         if "mix " in workflow.after_create:

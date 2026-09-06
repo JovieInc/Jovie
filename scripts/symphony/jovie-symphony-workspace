@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-logical_root="/srv/worktrees/jovie"
+legacy_logical_root="/srv/worktrees/jovie"
+elixir_logical_root="/home/timwhite/symphony-elixir-workspaces"
+qualification_logical_root="/home/timwhite/codex-qualification"
+namespace="legacy"
+logical_root="$legacy_logical_root"
 manifest_dir="/var/lib/jovie-symphony-workspaces/manifests"
 marker_dir="/var/lib/jovie-symphony-workspaces/markers"
 lock_file="/run/lock/jovie-symphony-workspaces.lock"
@@ -10,15 +14,63 @@ failed_root="/srv/scratch/symphony-failed-clones/jovie"
 quarantine_root="/srv/scratch/symphony-workspace-quarantine/jovie"
 owner="timwhite"
 group="timwhite"
-roots=(
+legacy_roots=(
   "/srv/worktrees/symphony-shards/jovie"
   "/srv/models/symphony-worktrees/jovie"
   "/srv/cache/symphony-worktrees/jovie"
   "/srv/scratch/symphony-worktrees/jovie"
 )
+elixir_roots=(
+  "/srv/worktrees/symphony-shards/jovie-elixir"
+  "/srv/models/symphony-worktrees/jovie-elixir"
+  "/srv/cache/symphony-worktrees/jovie-elixir"
+  "/srv/scratch/symphony-worktrees/jovie-elixir"
+)
+qualification_roots=(
+  "/srv/worktrees/codex-qualification/jovie"
+  "/srv/models/codex-qualification/jovie"
+  "/srv/cache/codex-qualification/jovie"
+  "/srv/scratch/codex-qualification/jovie"
+)
+roots=("${legacy_roots[@]}")
+
+select_namespace() {
+  namespace="$1"
+  case "$namespace" in
+    legacy)
+      logical_root="$legacy_logical_root"
+      roots=("${legacy_roots[@]}")
+      ;;
+    elixir)
+      logical_root="$elixir_logical_root"
+      roots=("${elixir_roots[@]}")
+      ;;
+    qualification)
+      logical_root="$qualification_logical_root"
+      roots=("${qualification_roots[@]}")
+      ;;
+    *) echo "unknown workspace namespace: $namespace" >&2; return 1 ;;
+  esac
+}
+
+select_namespace_for_logical() {
+  local logical="$1"
+  case "$logical" in
+    "$legacy_logical_root"/*) select_namespace legacy ;;
+    "$elixir_logical_root"/*) select_namespace elixir ;;
+    "$qualification_logical_root"/*) select_namespace qualification ;;
+    *) echo "logical path escapes managed roots: $logical" >&2; return 1 ;;
+  esac
+}
+
+select_namespace_for_manifest() {
+  local manifest="$1" stored
+  stored="$(read_manifest_value "$manifest" namespace)"
+  select_namespace "${stored:-legacy}"
+}
 
 usage() {
-  echo "usage: $0 route <JOV-N> | prepare|activate|abort|cleanup <logical-path> | restore-all | reconcile-cleanup | status" >&2
+  echo "usage: $0 route [legacy|elixir|qualification] <identifier> | prepare|activate|abort|cleanup <logical-path> | restore-all | reconcile-cleanup | status" >&2
   exit 64
 }
 
@@ -30,7 +82,7 @@ init_state() {
   install -d -o root -g root -m 0755 "$manifest_dir" "$marker_dir" "$(dirname "$lock_file")" "$receipt_dir"
   install -d -o "$owner" -g "$group" -m 0755 "$failed_root" "$quarantine_root"
   local root
-  for root in "${roots[@]}"; do
+  for root in "${legacy_roots[@]}" "${elixir_roots[@]}" "${qualification_roots[@]}"; do
     install -d -o "$owner" -g "$group" -m 0755 "$root"
   done
 }
@@ -39,14 +91,24 @@ issue_from_logical() {
   local logical="$1" issue
   [[ "$logical" == "$logical_root/"* ]] || { echo "logical path escapes root: $logical" >&2; return 1; }
   issue="${logical#"$logical_root/"}"
-  [[ "$issue" != */* && "$issue" =~ ^JOV-[0-9]+$ ]] || { echo "invalid issue path: $logical" >&2; return 1; }
+  identifier_is_valid "$issue" || { echo "invalid issue path: $logical" >&2; return 1; }
   [[ "$logical" == "$logical_root/$issue" ]] || return 1
   printf '%s\n' "$issue"
 }
 
+identifier_is_valid() {
+  local identifier="$1"
+  [[ "$identifier" != */* ]] || return 1
+  if [[ "$namespace" == qualification ]]; then
+    [[ "$identifier" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]
+  else
+    [[ "$identifier" =~ ^JOV-[0-9]+$ ]]
+  fi
+}
+
 bucket_for_issue() {
   local issue="$1" prefix
-  [[ "$issue" =~ ^JOV-[0-9]+$ ]] || { echo "invalid issue: $issue" >&2; return 1; }
+  identifier_is_valid "$issue" || { echo "invalid issue: $issue" >&2; return 1; }
   prefix="$(printf '%s' "$issue" | sha256sum | cut -c1-8)"
   printf '%s\n' "$((16#$prefix % 4))"
 }
@@ -58,11 +120,19 @@ expected_backing() {
 }
 
 manifest_for_issue() {
-  printf '%s/%s.env\n' "$manifest_dir" "$1"
+  if [[ "$namespace" == legacy ]]; then
+    printf '%s/%s.env\n' "$manifest_dir" "$1"
+  else
+    printf '%s/%s--%s.env\n' "$manifest_dir" "$namespace" "$1"
+  fi
 }
 
 marker_for_issue() {
-  printf '%s/%s.marker\n' "$marker_dir" "$1"
+  if [[ "$namespace" == legacy ]]; then
+    printf '%s/%s.marker\n' "$marker_dir" "$1"
+  else
+    printf '%s/%s--%s.marker\n' "$marker_dir" "$namespace" "$1"
+  fi
 }
 
 read_manifest_value() {
@@ -71,13 +141,19 @@ read_manifest_value() {
 }
 
 validate_manifest() {
-  local manifest="$1" issue logical backing bucket expected
+  local manifest="$1" issue logical backing bucket expected stored_namespace schema
   [[ -f "$manifest" && ! -L "$manifest" ]] || return 1
   issue="$(read_manifest_value "$manifest" issue)"
   logical="$(read_manifest_value "$manifest" logical)"
   backing="$(read_manifest_value "$manifest" backing)"
   bucket="$(read_manifest_value "$manifest" bucket)"
-  [[ "$issue" =~ ^JOV-[0-9]+$ ]] || return 1
+  stored_namespace="$(read_manifest_value "$manifest" namespace)"
+  schema="$(read_manifest_value "$manifest" schema)"
+  [[ -z "$stored_namespace" || "$stored_namespace" == "$namespace" ]] || return 1
+  [[ -z "$schema" || "$schema" == "jovie-symphony-workspace/v2" ]] || return 1
+  [[ "$namespace" == legacy || "$schema" == "jovie-symphony-workspace/v2" ]] || return 1
+  identifier_is_valid "$issue" || return 1
+  [[ "$manifest" == "$(manifest_for_issue "$issue")" ]] || return 1
   [[ "$logical" == "$logical_root/$issue" ]] || return 1
   [[ "$bucket" == "$(bucket_for_issue "$issue")" ]] || return 1
   expected="$(expected_backing "$issue")"
@@ -92,6 +168,8 @@ write_manifest() {
   manifest="$(manifest_for_issue "$issue")"
   tmp="$(mktemp "$manifest_dir/.${issue}.XXXXXX")"
   {
+    printf 'schema=jovie-symphony-workspace/v2\n'
+    printf 'namespace=%s\n' "$namespace"
     printf 'issue=%s\n' "$issue"
     printf 'logical=%s\n' "$logical"
     printf 'backing=%s\n' "$backing"
@@ -105,10 +183,11 @@ write_manifest() {
 write_receipt() {
   local action="$1" issue="$2" detail="${3:-}" timestamp receipt
   timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  receipt="$receipt_dir/${timestamp}-${issue}-${action}.txt"
+  receipt="$receipt_dir/${timestamp}-${namespace}-${issue}-${action}.txt"
   {
     printf 'timestamp=%s\n' "$timestamp"
     printf 'action=%s\n' "$action"
+    printf 'namespace=%s\n' "$namespace"
     printf 'issue=%s\n' "$issue"
     printf 'logical=%s/%s\n' "$logical_root" "$issue"
     printf 'backing=%s\n' "$(expected_backing "$issue")"
@@ -148,7 +227,7 @@ marker_valid() {
 quarantine_backing() {
   local issue="$1" backing="$2" reason="$3" destination
   [[ -e "$backing" ]] || return 0
-  destination="$quarantine_root/${issue}-$(date -u +%Y%m%dT%H%M%SZ)-$reason"
+  destination="$quarantine_root/${namespace}-${issue}-$(date -u +%Y%m%dT%H%M%SZ)-$reason"
   mv "$backing" "$destination"
   chown -R "$owner:$group" "$destination"
   write_receipt quarantine "$issue" "$destination"
@@ -167,6 +246,7 @@ delete_verified_backing() {
 
 prepare_workspace() {
   local logical="$1" issue backing manifest
+  select_namespace_for_logical "$logical"
   issue="$(issue_from_logical "$logical")"
   backing="$(expected_backing "$issue")"
   manifest="$(manifest_for_issue "$issue")"
@@ -184,6 +264,7 @@ prepare_workspace() {
 
 activate_workspace() {
   local logical="$1" issue backing manifest state marker marker_tmp
+  select_namespace_for_logical "$logical"
   issue="$(issue_from_logical "$logical")"
   backing="$(expected_backing "$issue")"
   manifest="$(manifest_for_issue "$issue")"
@@ -209,6 +290,7 @@ activate_workspace() {
 
 abort_workspace() {
   local logical="$1" issue backing manifest state destination
+  select_namespace_for_logical "$logical"
   issue="$(issue_from_logical "$logical")"
   backing="$(expected_backing "$issue")"
   manifest="$(manifest_for_issue "$issue")"
@@ -219,7 +301,7 @@ abort_workspace() {
   if mountpoint -q "$logical"; then
     umount "$logical" || umount --lazy "$logical"
   fi
-  destination="$failed_root/${issue}-$(date -u +%Y%m%dT%H%M%SZ)"
+  destination="$failed_root/${namespace}-${issue}-$(date -u +%Y%m%dT%H%M%SZ)"
   if [[ -e "$backing" ]]; then
     mv "$backing" "$destination"
     chown -R "$owner:$group" "$destination"
@@ -231,6 +313,7 @@ abort_workspace() {
 
 cleanup_workspace() {
   local logical="$1" issue backing manifest state
+  select_namespace_for_logical "$logical"
   issue="$(issue_from_logical "$logical")"
   manifest="$(manifest_for_issue "$issue")"
   if [[ ! -f "$manifest" ]]; then
@@ -262,6 +345,7 @@ cleanup_workspace() {
 
 restore_manifest() {
   local manifest="$1" issue logical backing state
+  select_namespace_for_manifest "$manifest" || { echo "invalid manifest namespace preserved: $manifest" >&2; return 1; }
   validate_manifest "$manifest" || { echo "invalid manifest preserved: $manifest" >&2; return 1; }
   issue="$(read_manifest_value "$manifest" issue)"
   logical="$(read_manifest_value "$manifest" logical)"
@@ -301,6 +385,7 @@ restore_all() {
   local manifest failed=0
   shopt -s nullglob
   for manifest in "$manifest_dir"/*.env; do
+    select_namespace_for_manifest "$manifest" || { failed=1; continue; }
     restore_manifest "$manifest" || failed=1
   done
   return "$failed"
@@ -310,6 +395,7 @@ status_all() {
   local manifest issue logical backing state mounted
   shopt -s nullglob
   for manifest in "$manifest_dir"/*.env; do
+    select_namespace_for_manifest "$manifest" || { printf 'invalid_manifest=%s\n' "$manifest"; continue; }
     validate_manifest "$manifest" || { printf 'invalid_manifest=%s\n' "$manifest"; continue; }
     issue="$(read_manifest_value "$manifest" issue)"
     logical="$(read_manifest_value "$manifest" logical)"
@@ -330,7 +416,8 @@ flock 9
 command="${1:-}"
 case "$command" in
   route)
-    [[ $# -eq 2 ]] || usage
+    [[ $# -eq 2 || $# -eq 3 ]] || usage
+    if [[ $# -eq 3 ]]; then select_namespace "$2"; shift; fi
     printf 'issue=%s\nbucket=%s\nbacking=%s\n' "$2" "$(bucket_for_issue "$2")" "$(expected_backing "$2")"
     ;;
   prepare|activate|abort|cleanup)

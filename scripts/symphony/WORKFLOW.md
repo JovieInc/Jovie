@@ -26,24 +26,17 @@ hooks:
   timeout_ms: 900000
   after_create: |
     export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
-    git clone --depth 1 https://github.com/JovieInc/Jovie.git .
-    git fetch --depth 1 origin main
-    git checkout -B main origin/main
-    skills_tmp="$(mktemp -d "${TMPDIR:-/tmp}/openai-symphony-skills.XXXXXX")"
-    trap 'rm -rf "$skills_tmp"' EXIT
-    git clone --depth 1 --filter=blob:none --sparse https://github.com/openai/symphony.git "$skills_tmp"
-    git -C "$skills_tmp" sparse-checkout set .codex/skills
-    mkdir -p .codex/skills
-    cp -R "$skills_tmp/.codex/skills/commit" "$skills_tmp/.codex/skills/push" "$skills_tmp/.codex/skills/pull" "$skills_tmp/.codex/skills/land" "$skills_tmp/.codex/skills/linear" .codex/skills/
-    SYMPHONY_TRUSTED_HOOK_PHASE=after_create bash ./scripts/symphony/symphony-nvme-package-cache.sh after-create
+    exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"
   before_remove: |
     export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
+    cache_status=0
     if [ -f ./scripts/symphony/symphony-nvme-package-cache.sh ]; then
-      SYMPHONY_TRUSTED_HOOK_PHASE=before_remove bash ./scripts/symphony/symphony-nvme-package-cache.sh before-remove
-    else
-      rm -rf ./node_modules ./.symphony/package-cache/pnpm-store
-      find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
+      SYMPHONY_TRUSTED_HOOK_PHASE=before_remove bash ./scripts/symphony/symphony-nvme-package-cache.sh before-remove || cache_status=$?
     fi
+    cleanup_status=0
+    sudo -n /usr/local/sbin/jovie-symphony-workspace cleanup "$PWD" || cleanup_status=$?
+    if [ "$cleanup_status" -ne 0 ]; then exit "$cleanup_status"; fi
+    exit "$cache_status"
 agent:
   max_concurrent_agents: 8
   max_turns: 20
