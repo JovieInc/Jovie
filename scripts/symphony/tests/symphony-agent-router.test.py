@@ -154,6 +154,32 @@ with path.open("a+") as challenger:
         self.assertEqual(receipt["provider"], "cursor")
         self.assertEqual(receipt["reason"], "eligible-primary-provider")
 
+    def test_busy_cursor_slot_holds_admission_before_probe_or_spawn(self) -> None:
+        guard = self.executable("guard", "exit 75\n")
+        probes = self.root / "cursor-probes"
+        cursor = self.executable(
+            "cursor",
+            f'echo probe >> "{probes}"\n'
+            'case "${1:-}" in status) echo "Logged in" ;; models) echo "gpt-5.6-luna-high - ready" ;; esac\n',
+        )
+        adapter = self.executable("adapter", f'echo spawned >> "{probes}"\n')
+        env = self.environment(guard, cursor, adapter)
+        locks = self.home / ".local/state/symphony-provider-router/locks"
+        locks.mkdir(parents=True)
+        slot = locks / "cursor.lock"
+        with slot.open("a+") as holder:
+            fcntl.flock(holder, fcntl.LOCK_EX)
+            result = subprocess.run(
+                [str(ROUTER), "app-server"],
+                cwd=self.workspace,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertIn("class=provider-capacity", result.stderr)
+        self.assertFalse(probes.exists())
+
     def test_ready_codex_is_preferred_without_requerying_linear(self) -> None:
         guard = self.executable("guard", "exit 0\n")
         cursor = self.executable(
