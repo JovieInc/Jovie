@@ -64,7 +64,10 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          bash scripts/symphony/update-symphony-burrito.sh --skip-binary
+          # Preserve the managed provider generation boundary. The next installer
+          # owns the exact workflow/service-unit overlay, and the explicit installs
+          # below own the adaptive controller; provider-only is not the whole activation.
+          bash scripts/symphony/update-symphony-burrito.sh --provider-runtime-only
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh
           install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"
