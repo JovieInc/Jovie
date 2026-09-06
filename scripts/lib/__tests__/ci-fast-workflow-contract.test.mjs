@@ -584,6 +584,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs'
+    );
     for (const gemContractCommand of [
       'python3 scripts/symphony/tests/run-hud-proof-gate.py',
       'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',

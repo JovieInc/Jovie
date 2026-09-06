@@ -1,10 +1,30 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+
+const previousBackoffDirectory = process.env.LINEAR_BACKOFF_STATE_DIR;
+const backoffDirectory = await mkdtemp(
+  resolve(tmpdir(), 'linear-client-suite-')
+);
+process.env.LINEAR_BACKOFF_STATE_DIR = backoffDirectory;
+after(async () => {
+  await rm(backoffDirectory, { recursive: true, force: true });
+  if (previousBackoffDirectory === undefined)
+    delete process.env.LINEAR_BACKOFF_STATE_DIR;
+  else process.env.LINEAR_BACKOFF_STATE_DIR = previousBackoffDirectory;
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCHESTRATOR_DIR = resolve(__dirname, '..');
