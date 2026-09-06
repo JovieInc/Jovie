@@ -318,6 +318,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+  'scripts/lib/__tests__/product-lane-classifier.test.mjs',
   'scripts/lib/__tests__/production-lane-range.test.mjs',
   'scripts/lib/__tests__/preview-env-contract.test.mjs',
 ];
