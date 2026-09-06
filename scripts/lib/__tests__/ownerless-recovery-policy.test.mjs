@@ -59,8 +59,7 @@ describe('ownerless recovery policy', () => {
     const result = await fetchOfficialSymphonyState({
       fetchImpl: async () => {
         calls += 1;
-        if (calls === 1) return { ok: true, json: async () => ({}) };
-        return { ok: true, json: async () => state };
+        return new Response(JSON.stringify(calls === 1 ? {} : state));
       },
       sleepImpl: async () => {},
     });

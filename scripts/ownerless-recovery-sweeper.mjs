@@ -235,10 +235,13 @@ export async function fetchOfficialSymphonyState({
       if (!response?.ok) {
         lastError = `http-${response?.status || 'unknown'}`;
       } else {
-        const body = await response.json();
+        const body = /** @type {Record<string, unknown> | null} */ (
+          await response.json()
+        );
         if (
           body &&
           typeof body === 'object' &&
+          !Array.isArray(body) &&
           typeof (body.observedAt || body.generated_at) === 'string' &&
           Array.isArray(body.running) &&
           Array.isArray(body.retrying) &&
