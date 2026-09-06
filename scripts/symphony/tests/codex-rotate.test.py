@@ -142,6 +142,108 @@ class CodexRotateTests(unittest.TestCase):
         self.assertTrue((self.events / "account-b.started").exists())
         self.assertEqual(json.loads((self.accounts / "state.json").read_text())["cooldowns"], cooldowns)
 
+    def test_all_cooling_accounts_return_typed_capacity_without_lock_or_launch(self):
+        now = int(time.time())
+        cooldowns = {"account-a": now + 900, "account-b": now + 300}
+        state_path = self.accounts / "state.json"
+        state_path.write_text(
+            json.dumps(
+                {
+                    "active": "account-a",
+                    "cooldowns": cooldowns,
+                    "last_error": {},
+                }
+            )
+        )
+        before = state_path.read_bytes()
+
+        result = subprocess.run(
+            [str(LAUNCHER), "exec", "test"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=self.env(CODEX_ACCOUNT_WAIT_SECONDS=0),
+            check=False,
+            timeout=5,
+        )
+
+        self.assertEqual(result.returncode, 75)
+        self.assertEqual(result.stdout, b"")
+        self.assertIn(b"CAPACITY_UNAVAILABLE", result.stderr)
+        self.assertIn(b"reason=account_cooldown", result.stderr)
+        self.assertIn(f"retryAt={cooldowns['account-b']}".encode(), result.stderr)
+        wait_seconds = int(result.stderr.split(b"waitSeconds=", 1)[1].split()[0])
+        self.assertGreaterEqual(wait_seconds, 295)
+        self.assertLessEqual(wait_seconds, 300)
+        self.assertEqual(list(self.events.iterdir()), [])
+        self.assertFalse((self.accounts / "locks/account-a.lock").exists())
+        self.assertFalse((self.accounts / "locks/account-b.lock").exists())
+        self.assertEqual(state_path.read_bytes(), before)
+
+    def test_malformed_account_state_fails_closed_without_lock_or_launch(self):
+        state_path = self.accounts / "state.json"
+        for malformed in (
+            "not-json",
+            json.dumps([]),
+            json.dumps({"active": None, "cooldowns": []}),
+            json.dumps(
+                {
+                    "active": None,
+                    "cooldowns": {"account-a": "not-an-epoch"},
+                }
+            ),
+        ):
+            with self.subTest(malformed=malformed):
+                state_path.write_text(malformed)
+                before = state_path.read_bytes()
+                shutil.rmtree(self.accounts / "locks", ignore_errors=True)
+                for event in self.events.iterdir():
+                    event.unlink()
+
+                result = subprocess.run(
+                    [str(LAUNCHER), "exec", "test"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=self.env(CODEX_ACCOUNT_WAIT_SECONDS=0),
+                    check=False,
+                    timeout=5,
+                )
+
+                self.assertEqual(result.returncode, 75)
+                self.assertEqual(result.stdout, b"")
+                self.assertIn(b"CAPACITY_UNAVAILABLE", result.stderr)
+                self.assertIn(b"reason=account_state_invalid", result.stderr)
+                self.assertEqual(list(self.events.iterdir()), [])
+                self.assertFalse((self.accounts / "locks/account-a.lock").exists())
+                self.assertFalse((self.accounts / "locks/account-b.lock").exists())
+                self.assertEqual(state_path.read_bytes(), before)
+
+    def test_expired_cooldowns_recover_without_state_mutation(self):
+        now = int(time.time())
+        state_path = self.accounts / "state.json"
+        state_path.write_text(
+            json.dumps(
+                {
+                    "active": "account-b",
+                    "cooldowns": {
+                        "account-a": now - 2,
+                        "account-b": now - 1,
+                    },
+                    "last_error": {},
+                }
+            )
+        )
+        result = self.start(FAKE_CODEX_SLEEP=0)
+
+        self.assertEqual(result.wait(timeout=5), 0)
+        self.assertFalse((self.events / "account-a.started").exists())
+        self.assertTrue((self.events / "account-b.started").exists())
+        state = json.loads(state_path.read_text())
+        self.assertEqual(state["active"], "account-b")
+        self.assertEqual(
+            state["cooldowns"],
+            {"account-a": now - 2, "account-b": now - 1},
+        )
+
     def test_no_codex_accounts_does_not_launch_or_change_state(self):
         for name in ("account-a", "account-b"):
             (self.accounts / name / "auth.json").write_text('{"auth_mode":"apikey"}\n')
