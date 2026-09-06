@@ -20,6 +20,7 @@ UNIT_DIR = ROOT / "scripts/symphony/systemd"
 SERVICE_UNIT = UNIT_DIR / "symphony-concurrency-controller.service"
 TIMER_UNIT = UNIT_DIR / "symphony-concurrency-controller.timer"
 INSTALLER = ROOT / "scripts/symphony/install-symphony-ui-pilot.sh"
+FLEET_INSTALLER = ROOT / "scripts/symphony/install-gem-fleet-controller.sh"
 ACTIVATION = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 SPEC = importlib.util.spec_from_file_location("symphony_concurrency_controller", SOURCE)
 if SPEC is None or SPEC.loader is None:
@@ -67,7 +68,12 @@ def provider(accounts: int = 8, locked: int = 4, available: int = 4) -> dict:
     }
 
 
-DOWNSTREAM = {"healthy": True, "headroom": 20}
+DOWNSTREAM = {
+    "healthy": True,
+    "headroom": 20,
+    "operationalHealthy": True,
+    "ownershipConflict": False,
+}
 RUNTIME = {"productive": 4, "running": 4, "retrying": 0, "codexTotals": {"seconds_running": 100}}
 SCOPE = {
     "kind": "gem-host-provider-accounts-workflow",
@@ -195,6 +201,29 @@ class EmpiricalCapacityTests(unittest.TestCase):
         self.assertEqual(self.decide(downstream={"healthy": True, "headroom": 0}), (1, 0, "downstream-backpressure"))
         self.assertEqual(self.decide(downstream={"healthy": True, "headroom": 1})[0], 41)
 
+    def test_duplicate_issue_ownership_vetoes_growth_without_stopping_running_work(self):
+        downstream = {
+            **DOWNSTREAM,
+            "healthy": False,
+            "newWorkAllowed": False,
+            "ownershipConflict": True,
+        }
+        self.assertEqual(
+            self.decide(current=4, downstream=downstream),
+            (4, 0, "duplicate-issue-ownership-conflict"),
+        )
+
+    def test_provider_or_operational_pressure_still_contracts_during_duplicate_conflict(self):
+        duplicate = {**DOWNSTREAM, "healthy": False, "ownershipConflict": True}
+        self.assertEqual(
+            self.decide(current=8, downstream=duplicate, provider={"eligible": False, "capacityFailure": True}),
+            (4, 0, "provider-capacity-failure"),
+        )
+        self.assertEqual(
+            self.decide(current=8, downstream={**duplicate, "operationalHealthy": False}),
+            (1, 0, "downstream-backpressure"),
+        )
+
     def test_unknown_and_normal_pressure_and_cpu_validation(self):
         for sample in ({**low_sample(), "cpuSomeAvg10": None}, {**low_sample(), "cpuCount": 0}):
             self.assertEqual(self.decide(sample=sample)[0], 1)
@@ -230,12 +259,17 @@ class EvidenceTests(unittest.TestCase):
                     "closureAdmission": {"newIssueIntakeAllowed": True, "newImplementationAllowed": True, "remediationContinues": True},
                     "remediationAdmission": {"allowed": True, "localAllowed": True, "pushAllowed": True},
                     "signals": {"main": {"status": "green"}, "production": {"status": "green"},
-                                "closureHealth": {"remediationContinues": True},
+                                "closureHealth": {
+                                    "remediationContinues": True,
+                                    "classifications": {"duplicateIssueLanes": []},
+                                },
                                 "queue": {"repository": "JovieInc/Jovie", "status": "known", "greenReadyPrs": 10, "target": 15}}}
             path.write_text(json.dumps(gate))
             result = MODULE.read_downstream(path, "JovieInc/Jovie", now)
             self.assertEqual(result["headroom"], 5)
             self.assertTrue(result["healthy"])
+            self.assertTrue(result["operationalHealthy"])
+            self.assertFalse(result["ownershipConflict"])
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/LogYourBody", now))
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now + 601))
             gate["state"] = "AMBER"
@@ -273,6 +307,31 @@ class EvidenceTests(unittest.TestCase):
             gate["state"] = "RED"
             path.write_text(json.dumps(gate))
             self.assertFalse(MODULE.read_downstream(path, "JovieInc/Jovie", now)["healthy"])
+            gate["state"] = "GREEN"
+            gate["workAdmission"]["allowed"] = False
+            gate["signals"]["closureHealth"]["classifications"]["duplicateIssueLanes"] = [
+                {"issue": "JOV-5995", "prs": [17411, 17412]}
+            ]
+            path.write_text(json.dumps(gate))
+            result = MODULE.read_downstream(path, "JovieInc/Jovie", now)
+            self.assertTrue(result["ownershipConflict"])
+            self.assertTrue(result["operationalHealthy"])
+            self.assertEqual(
+                MODULE.choose_target(
+                    current=4,
+                    state={"lowStreak": 2, "lastChangeEpoch": 0},
+                    sample=low_sample(),
+                    provider=provider(),
+                    runtime=RUNTIME,
+                    integrity_allowed=True,
+                    now_epoch=now,
+                    downstream=result,
+                ),
+                (4, 0, "duplicate-issue-ownership-conflict"),
+            )
+            gate["signals"]["closureHealth"].pop("classifications")
+            path.write_text(json.dumps(gate))
+            self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now))
             gate["signals"]["queue"]["target"] = True
             path.write_text(json.dumps(gate))
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now))
@@ -573,6 +632,12 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
                    "SOURCE_REVISION": "a" * 40, "LISTENER_PID": "123", "SERVICE_PID": "124", "SERVICE_CONTROL_GROUP": "/test"}
             for prefix in ("UNIT", "POLICY", "GATE", "CLOSURE"):
                 env[f"{prefix}_SOURCE_SHA"] = env[f"{prefix}_TARGET_SHA"] = "a" * 64
+            for prefix in (
+                "CONCURRENCY",
+                "CONCURRENCY_SERVICE",
+                "CONCURRENCY_TIMER",
+            ):
+                env[f"{prefix}_SOURCE_SHA"] = env[f"{prefix}_TARGET_SHA"] = "a" * 64
             with mock.patch.dict(MODULE.os.environ, env):
                 for value in ("1", "41", "128"):
                     installed.write_text(self.overlay(value))
@@ -662,16 +727,31 @@ class SystemdActivationTests(unittest.TestCase):
         fleet = text.index("bash scripts/symphony/install-gem-fleet-controller.sh")
         self.assertLess(provider, managed_controller)
         self.assertLess(managed_controller, fleet)
+
+    def test_fleet_installer_owns_controller_activation(self):
+        installer = FLEET_INSTALLER.read_text(encoding="utf-8")
         self.assertIn(
-            'install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"',
-            text,
+            'install_atomic "${CONCURRENCY_SOURCE}" "${CONCURRENCY_TARGET}" 0755',
+            installer,
         )
         self.assertIn(
             "systemctl --user enable --now symphony-concurrency-controller.timer",
-            text,
+            installer,
         )
         self.assertIn(
             "systemctl --user start symphony-concurrency-controller.service",
+            installer,
+        )
+        attestation = installer.index('destination = root / "state" / "gem-service-attestation.json"')
+        activation = installer.index(
+            "systemctl --user start symphony-concurrency-controller.service"
+        )
+        self.assertLess(attestation, activation)
+
+    def test_exact_production_activation_delegates_and_attests_controller(self):
+        text = ACTIVATION.read_text(encoding="utf-8")
+        self.assertIn(
+            "bash scripts/symphony/install-gem-fleet-controller.sh",
             text,
         )
         self.assertIn("--verify-workflow-overlay", text)

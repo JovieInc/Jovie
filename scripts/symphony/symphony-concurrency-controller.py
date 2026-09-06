@@ -13,6 +13,8 @@ Missing pressure, provider, integrity, runtime, or workflow evidence fails
 closed to the minimum concurrency. Scale-down is immediate; scale-up requires
 three consecutive low-pressure samples with useful work at the current target,
 downstream headroom, eligible provider routing, and a two-minute change cooldown.
+Duplicate issue/active-PR ownership evidence vetoes widening without terminating
+unrelated work that is already running.
 Account inventory and CPU count are not worker limits; each successful probe adds
 one future dispatch slot. This controller does not terminate existing workers.
 """
@@ -253,6 +255,25 @@ def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> di
         remediation = gate.get("remediationAdmission")
         if not all(isinstance(item, dict) for item in (closure, work, closure_admission, remediation)):
             return None
+        classifications = closure.get("classifications")
+        if not isinstance(classifications, dict):
+            return None
+        duplicate_issue_lanes = classifications.get("duplicateIssueLanes")
+        if not isinstance(duplicate_issue_lanes, list):
+            return None
+        for lane in duplicate_issue_lanes:
+            if not isinstance(lane, dict):
+                return None
+            issue = lane.get("issue")
+            prs = lane.get("prs")
+            if (
+                not isinstance(issue, str)
+                or not issue
+                or not isinstance(prs, list)
+                or len(prs) < 2
+                or any(type(number) is not int or number <= 0 for number in prs)
+            ):
+                return None
         remediation_continues = (
             closure.get("remediationContinues") is True
             and closure_admission.get("remediationContinues") is True
@@ -277,6 +298,13 @@ def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> di
             "headroom": max(0, budget - ready),
             "repository": repository,
             "newWorkAllowed": normal_intake,
+            "operationalHealthy": (
+                gate.get("state") != "RED"
+                and signals.get("main", {}).get("status") == "green"
+                and signals.get("production", {}).get("status") == "green"
+                and max(0, budget - ready) > 0
+            ),
+            "ownershipConflict": bool(duplicate_issue_lanes),
             "repairOnly": (
                 gate.get("state") != "RED"
                 and remediation_continues
@@ -453,14 +481,26 @@ def choose_target(
         return MIN_CONCURRENCY, 0, "required-telemetry-unavailable"
     if pressure == "severe":
         return MIN_CONCURRENCY, 0, "severe-pressure"
-    if downstream is not None and (downstream.get("healthy") is not True or downstream.get("headroom", 0) <= 0):
-        return MIN_CONCURRENCY, 0, "downstream-backpressure"
+    if downstream is not None:
+        operational_health = downstream.get("operationalHealthy")
+        if operational_health is False or (
+            operational_health is None
+            and (
+                downstream.get("healthy") is not True
+                or downstream.get("headroom", 0) <= 0
+            )
+        ):
+            return MIN_CONCURRENCY, 0, "downstream-backpressure"
     if provider.get("capacityFailure") is True:
         return max(MIN_CONCURRENCY, current // 2), 0, "provider-capacity-failure"
     if pressure == "high":
         return max(MIN_CONCURRENCY, current - 1), 0, "measured-saturation"
     if downstream is None:
         return current, 0, "downstream-evidence-unavailable"
+    if downstream.get("ownershipConflict") is True:
+        return current, 0, "duplicate-issue-ownership-conflict"
+    if downstream.get("healthy") is not True or downstream.get("headroom", 0) <= 0:
+        return MIN_CONCURRENCY, 0, "downstream-backpressure"
     if provider.get("eligible") is not True or runtime.get("retrying", 0) > 0:
         return current, 0, "provider-eligibility-unproven"
     if runtime.get("productive", 0) < current:
