@@ -14,6 +14,10 @@ Operational recovery runbooks for the critical units live in
 [`scripts/symphony/runbooks/`](../runbooks/). The control-plane liveness
 watchdog runbook is
 [`control-plane-liveness-recovery.md`](../runbooks/control-plane-liveness-recovery.md).
+The GitHub Actions production controller and release-marker recovery runbooks are
+[`production-controller-recovery.md`](../runbooks/production-controller-recovery.md)
+and
+[`release-marker-recovery.md`](../runbooks/release-marker-recovery.md).
 
 | File | Schedule | Purpose |
 |---|---|---|
