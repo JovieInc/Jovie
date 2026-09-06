@@ -191,6 +191,28 @@ describe('InputGroup', () => {
       expect(group.className).not.toContain('${');
     });
 
+    it('pads the wrapped input when icons occupy either edge', () => {
+      render(
+        <InputGroup data-testid='input-group'>
+          <MockIcon />
+          <Input />
+          <MockIcon />
+        </InputGroup>
+      );
+
+      const group = screen.getByTestId('input-group');
+      // Deliberate-red: the old selectors only matched a direct input child.
+      expect(group.className).toContain(
+        '[&:has(>[data-slot=icon]:first-child)_input]:pl-9'
+      );
+      expect(group.className).toContain(
+        '[&:has(>*+[data-slot=icon])_input]:pr-9'
+      );
+      expect(group.className).toContain(
+        '[&>*+[data-slot=icon]]:right-3'
+      );
+    });
+
     it('merges custom className', () => {
       render(
         <InputGroup className='custom-class' data-testid='input-group'>
