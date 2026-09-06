@@ -232,14 +232,17 @@ class CodexRotateTests(unittest.TestCase):
                 }
             )
         )
-        before = state_path.read_bytes()
-
         result = self.start(FAKE_CODEX_SLEEP=0)
 
         self.assertEqual(result.wait(timeout=5), 0)
         self.assertFalse((self.events / "account-a.started").exists())
         self.assertTrue((self.events / "account-b.started").exists())
-        self.assertEqual(state_path.read_bytes(), before)
+        state = json.loads(state_path.read_text())
+        self.assertEqual(state["active"], "account-b")
+        self.assertEqual(
+            state["cooldowns"],
+            {"account-a": now - 2, "account-b": now - 1},
+        )
 
     def test_no_codex_accounts_does_not_launch_or_change_state(self):
         for name in ("account-a", "account-b"):
