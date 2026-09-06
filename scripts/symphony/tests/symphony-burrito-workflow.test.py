@@ -26,6 +26,7 @@ UNIT_PATH = ROOT / "scripts/symphony/systemd/symphony-elixir.service"
 UNIT = UNIT_PATH.read_text(encoding="utf-8")
 UPDATER = (ROOT / "scripts/symphony/update-symphony-burrito.sh").read_text(encoding="utf-8")
 HELPER_PATH = ROOT / "scripts/symphony/symphony_official_runtime.py"
+AUTHORITY_MAP_PATH = ROOT / "scripts/symphony/PROVIDER_ADMISSION_AUTHORITY.md"
 LIVE_TEAM_KEY = "JOV"
 TOKEN_RE = re.compile(r"lin_(?:api_|oauth_)?[A-Za-z0-9]{12,}|api_key:\s*(?!\$LINEAR_API_KEY\b)\S+")
 
@@ -114,6 +115,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             WORKFLOW,
             re.compile(r"^\s+command: symphony-agent-router app-server$", re.M),
         )
+        authority_map = AUTHORITY_MAP_PATH.read_text(encoding="utf-8")
+        self.assertIn("`symphony-agent-router` | active", authority_map)
+        self.assertIn("`symphony-concurrency-controller.py` | observer/overlay", authority_map)
+        self.assertIn("`symphony-reconciler.py` | retired by the official updater", authority_map)
+        self.assertIn("symphony-provider-route/v1", authority_map)
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]
