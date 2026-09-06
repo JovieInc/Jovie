@@ -174,10 +174,7 @@ describe('Textarea', () => {
 
     it('renders help text after the textarea', () => {
       render(
-        <Textarea
-          label='Description'
-          helpText='Enter a detailed description'
-        />
+        <Textarea label='Description' helpText='Enter a detailed description' />
       );
 
       const textarea = screen.getByRole('textbox');
