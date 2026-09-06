@@ -1506,16 +1506,33 @@ ${selectedGateScript}`,
     expect(controller).toContain(
       "github.event.workflow_run.event == 'pull_request_review'"
     );
+    // A failed or canceled metadata signal must still invalidate stale success.
+    expect(controller).not.toContain('workflow_run.conclusion');
+    // Both event paths serialize publication for the same PR, independent of run id.
     expect(controller).toContain(
-      "github.event.workflow_run.conclusion == 'success'"
+      'group: source-policy-${{ github.repository }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}'
     );
+    expect(controller).toContain('every run reads the complete current PR policy');
+    expect(controller).toContain('cancel-in-progress: false');
     expect(controller).toContain('ref: main');
     expect(controller).toContain('persist-credentials: false');
     expect(controller).toContain('node scripts/source-admission-check.mjs');
-    expect(FORK_GATE_WORKFLOW).toContain('types: [submitted, dismissed]');
-    const signal = getJobBlock(FORK_GATE_WORKFLOW, 'review-signal');
+    const signal = readFileSync(
+      resolve(
+        REPO_ROOT,
+        '.github/workflows/source-admission-review-signal.yml'
+      ),
+      'utf8'
+    );
+    expect(signal).toContain('types: [submitted, dismissed]');
+    expect(signal).toContain('permissions: {}');
     expect(signal).not.toMatch(/secrets\.|uses:|GH_TOKEN/);
-    expect(signal).toContain("github.event_name == 'pull_request_review'");
+    const signalName = signal.match(/^name: (.+)$/m)[1];
+    const gateName = FORK_GATE_WORKFLOW.match(/^name: (.+)$/m)[1];
+    expect(signalName).not.toBe(gateName);
+    expect(FORK_GATE_WORKFLOW).toContain(`workflows: ['${signalName}']`);
+    expect(FORK_GATE_WORKFLOW).not.toContain(`workflows: ['${gateName}']`);
+    expect(FORK_GATE_WORKFLOW).not.toContain('  pull_request_review:');
   });
 
   it.each([

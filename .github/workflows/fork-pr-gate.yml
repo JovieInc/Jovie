@@ -8,10 +8,8 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled, unlabeled]
     branches: [main]
-  pull_request_review:
-    types: [submitted, dismissed]
   workflow_run:
-    workflows: ['Fork PR Gate']
+    workflows: ['Source Admission Review Signal']
     types: [completed]
   merge_group:
     types: [checks_requested]
@@ -20,18 +18,16 @@ concurrency:
   group: source-admission-${{ github.event_name }}-${{ github.event.merge_group.head_sha || github.event.pull_request.number || github.event.workflow_run.id }}
   cancel-in-progress: false
 jobs:
-  review-signal:
-    if: github.event_name == 'pull_request_review'
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    steps:
-      - run: echo 'Review metadata changed; trusted workflow_run revalidates current PR policy.'
   source-policy:
     if: >-
       (github.event_name == 'pull_request_target' && github.event.pull_request.base.ref == 'main') ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request_review' && github.event.workflow_run.conclusion == 'success')
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request_review')
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    concurrency:
+      group: source-policy-${{ github.repository }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+      # Pending wakes coalesce: every run reads the complete current PR policy.
+      cancel-in-progress: false
     permissions:
       contents: read
     steps:

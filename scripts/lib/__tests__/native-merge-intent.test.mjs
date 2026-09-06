@@ -272,6 +272,7 @@ test('owner-bound exact removal permits one request and retains immutable event 
   assert.equal(result.status, 'queued');
   assert.equal(f.mutations().length, 1);
   const receipt = JSON.parse(readFileSync(result.receipt, 'utf8'));
+  assert.equal(receipt.schema, 'jovie-native-merge-intent/v1');
   assert.equal(receipt.removalEventId, removalId);
   assert.equal(receipt.head, head);
   assert.equal(receipt.reconciliation.owner, 'test-owner');
