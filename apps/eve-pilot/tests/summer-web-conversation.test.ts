@@ -228,10 +228,49 @@ describe('authenticated persistent Summer conversation', () => {
       previousEventId: id(2),
     });
   });
+  it('recovers through the canonical tail when failed local history has no Eve receipt', async () => {
+    const f = fixture();
+    expect((await f.send(input(1))).status).toBe(202);
+    await readConversationResult({
+      store: f.store,
+      eventId: id(1),
+      principalHash: input().principalHash,
+      deploymentId: input().deploymentId,
+      stream: async () => stream(events(input(1))),
+    });
+    const staleLocalText = 'failed local turn must not become Eve context';
+    const recoveredInput: ConversationInput = {
+      ...input(2),
+      deploymentId: 'dpl_next',
+      canonicalTailRecovery: true,
+      history: [
+        { role: 'user', text: staleLocalText },
+        { role: 'assistant', text: '' },
+      ],
+    };
+    expect((await f.send(recoveredInput)).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+    expect(f.dispatch.mock.calls[1]?.[0]).toMatchObject({
+      history: [],
+      canonicalTailRecovery: true,
+    });
+    expect(f.dispatch.mock.calls[1]?.[1]).not.toContain(staleLocalText);
+    expect(f.dispatch.mock.calls[1]?.[2]).toBe('ses_summer');
+    expect((await f.send(recoveredInput)).status).toBe(200);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+  });
   it('fails closed when canonical-tail recovery is pending or crosses a binding', async () => {
     const pending = fixture();
     expect((await pending.send(input(1))).status).toBe(202);
-    const pendingResponse = await pending.send(input(2));
+    const recoveryHistory = [
+      { role: 'user' as const, text: 'local failed turn' },
+      { role: 'assistant' as const, text: '' },
+    ];
+    const pendingResponse = await pending.send({
+      ...input(2),
+      canonicalTailRecovery: true,
+      history: recoveryHistory,
+    });
     expect(pendingResponse.status).toBe(409);
     expect(await pendingResponse.json()).toMatchObject({
       code: 'conversation_busy',
@@ -257,12 +296,44 @@ describe('authenticated persistent Summer conversation', () => {
       status: 'completed',
       nextStartIndex: 3,
     });
-    const mismatchedResponse = await mismatched.send(input(2));
+    const mismatchedResponse = await mismatched.send({
+      ...input(2),
+      canonicalTailRecovery: true,
+      history: recoveryHistory,
+    });
     expect(mismatchedResponse.status).toBe(409);
     expect(await mismatchedResponse.json()).toMatchObject({
       code: 'canonical_binding_conflict',
     });
     expect(mismatched.dispatch).not.toHaveBeenCalled();
+  });
+  it('fails closed on malformed canonical recovery and rejects mixed predecessor recovery', async () => {
+    const malformed = fixture();
+    malformed.records.set(conversationPath('successors', 'root'), {
+      eventId: 'malformed',
+    });
+    const malformedResponse = await malformed.send({
+      ...input(2),
+      canonicalTailRecovery: true,
+      history: [{ role: 'user', text: 'preserved local turn' }],
+    });
+    expect(malformedResponse.status).toBe(503);
+    expect(await malformedResponse.json()).toMatchObject({
+      code: 'canonical_tail_unavailable',
+    });
+    expect(malformed.dispatch).not.toHaveBeenCalled();
+
+    const mixed = fixture();
+    const mixedResponse = await mixed.send({
+      ...input(2),
+      previousEventId: id(1),
+      canonicalTailRecovery: true,
+    });
+    expect(mixedResponse.status).toBe(422);
+    expect(await mixedResponse.json()).toMatchObject({
+      code: 'invalid_tail_recovery',
+    });
+    expect(mixed.dispatch).not.toHaveBeenCalled();
   });
   it('canonicalizes property order and permits only one same-event dispatch', async () => {
     const f = fixture();

@@ -112,6 +112,9 @@ export function createEveSummerSpeaker(
           history: input.previousEveEventId
             ? []
             : boundedMigrationHistory(input.history),
+          ...(input.canonicalTailRecovery
+            ? { canonicalTailRecovery: true }
+            : {}),
         });
         const response = await fetchShadow(prefix, {
           method: 'POST',
