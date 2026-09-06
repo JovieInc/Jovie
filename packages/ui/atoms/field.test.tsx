@@ -270,6 +270,20 @@ describe('Field', () => {
       expect(fieldDiv as HTMLElement).toHaveClass('grid', 'gap-1.5');
     });
 
+    it('allows long field content to shrink within responsive parents', () => {
+      const { container } = render(
+        <div className='grid w-32'>
+          <Field label='A label that must wrap'>
+            <Input />
+          </Field>
+        </div>
+      );
+
+      expect(container.firstElementChild?.firstElementChild).toHaveClass(
+        'min-w-0'
+      );
+    });
+
     it('merges custom className', () => {
       const { container } = render(
         <Field className='custom-class' label='Email'>
