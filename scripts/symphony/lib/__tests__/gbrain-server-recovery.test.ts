@@ -85,9 +85,20 @@ describe('gbrain server recovery runbook', () => {
       generatedAt: now.toISOString(),
       checks: [
         { name: 'http-health', ok: true, detail: 'ok', durationMs: 12 },
-        { name: 'doctor', ok: true, detail: 'status=ok', durationMs: 34, required: false },
+        {
+          name: 'doctor',
+          ok: true,
+          detail: 'status=ok',
+          durationMs: 34,
+          required: false,
+        },
         { name: 'source-freshness', ok: true, detail: 'fresh', durationMs: 56 },
-        { name: 'serve-processes', ok: true, detail: 'one process', durationMs: 7 },
+        {
+          name: 'serve-processes',
+          ok: true,
+          detail: 'one process',
+          durationMs: 7,
+        },
       ],
     });
     expect(summary.status).toBe('healthy');
