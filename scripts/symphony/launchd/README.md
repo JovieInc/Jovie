@@ -13,7 +13,9 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 Operational recovery runbooks for the critical units live in
 [`scripts/symphony/runbooks/`](../runbooks/). The control-plane liveness
 watchdog runbook is
-[`control-plane-liveness-recovery.md`](../runbooks/control-plane-liveness-recovery.md).
+[`control-plane-liveness-recovery.md`](../runbooks/control-plane-liveness-recovery.md);
+the delivery-liveness watchdog runbook is
+[`delivery-liveness-recovery.md`](../runbooks/delivery-liveness-recovery.md).
 
 | File | Schedule | Purpose |
 |---|---|---|
