@@ -189,13 +189,13 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             </label>
           )}
 
+          {textareaElement}
+
           {helpText && (
             <p id={helpTextId} className='text-xs text-tertiary-token'>
               {helpText}
             </p>
           )}
-
-          {textareaElement}
 
           <div className='min-h-5' aria-live='polite'>
             {error && (

@@ -172,6 +172,23 @@ describe('Textarea', () => {
       ).toBeInTheDocument();
     });
 
+    it('renders help text after the textarea', () => {
+      render(
+        <Textarea
+          label='Description'
+          helpText='Enter a detailed description'
+        />
+      );
+
+      const textarea = screen.getByRole('textbox');
+      const helpText = screen.getByText('Enter a detailed description');
+
+      expect(
+        textarea.compareDocumentPosition(helpText) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
     it('associates help text with textarea via aria-describedby', () => {
       render(<Textarea helpText='Help text' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
