@@ -18,7 +18,7 @@
       "jws": "4.0.1",
       "path-to-regexp": "8.4.2",
       "express>path-to-regexp": "0.1.13",
-      "esbuild": ">=0.28.1",
+      "esbuild": "0.28.2",
       "joi": "17.13.4",
       "js-yaml": "4.3.0",
       "protobufjs": "7.6.5",

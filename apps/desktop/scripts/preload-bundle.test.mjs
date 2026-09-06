@@ -108,3 +108,18 @@ test('every Electron launch and package path bundles the preload', async () => {
     assert.match(packageJson.scripts[scriptName], /pnpm run compile/);
   }
 });
+
+test('the production bundle command writes a sandbox-compatible preload', async () => {
+  const productionOutfile = join(desktopRoot, 'dist-electron', 'preload.js');
+  await rm(productionOutfile, { force: true });
+
+  await bundleDesktopPreload();
+
+  const source = await readFile(productionOutfile, 'utf8');
+  const requiredModules = [
+    ...source.matchAll(/require\(["']([^"']+)["']\)/g),
+  ].map(match => match[1]);
+  assert.deepEqual([...new Set(requiredModules)].sort(), ['electron']);
+  assert.match(source, /desktopChannel/);
+  assert.match(source, /notifyAppBooted/);
+});
