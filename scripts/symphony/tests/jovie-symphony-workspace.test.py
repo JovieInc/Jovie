@@ -64,6 +64,8 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         installer = INSTALLER.read_text()
         self.assertIn('reclaimer_source="$source_root/gem-disk-reclaim.py"', installer)
         self.assertIn('enable --now gem-disk-reclaim.timer', installer)
+        self.assertIn('migration_source="$source_root/gem-workspace-migrate.py"', installer)
+        self.assertIn('migration_target="/usr/local/sbin/gem-workspace-migrate"', installer)
 
     def test_installer_pins_offline_user_corepack_for_root_preflight(self) -> None:
         source = INSTALLER.read_text()

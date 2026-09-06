@@ -18,11 +18,13 @@ wrapper_source="$source_root/jovie-symphony-workspace-create"
 cache_source="$source_root/symphony-nvme-package-cache.sh"
 boot_simulation_source="$source_root/gem-symphony-workspace-boot-simulate"
 reclaimer_source="$source_root/gem-disk-reclaim.py"
+migration_source="$source_root/gem-workspace-migrate.py"
 helper_target="/usr/local/sbin/jovie-symphony-workspace"
 wrapper_target="/home/$owner/.local/bin/jovie-symphony-workspace-create"
 cache_target="/home/$owner/.local/bin/symphony-nvme-package-cache"
 boot_simulation_target="/home/$owner/.local/bin/gem-symphony-workspace-boot-simulate"
 reclaimer_target="/home/$owner/.local/bin/gem-disk-reclaim"
+migration_target="/usr/local/sbin/gem-workspace-migrate"
 node_target="/home/$owner/.nvm/versions/node/v22.23.2/bin/node"
 node_link="/home/$owner/.local/bin/node"
 pnpm_target="/home/$owner/.nvm/versions/node/v22.23.2/bin/pnpm"
@@ -33,6 +35,7 @@ user_dropin_dir="/home/$owner/.config/systemd/user/symphony-elixir.service.d"
 
 for path in "$helper_source" "$wrapper_source" "$cache_source" "$boot_simulation_source" \
   "$reclaimer_source" \
+  "$migration_source" \
   "$systemd_source/jovie-symphony-workspace-mounts.service" \
   "$systemd_source/jovie-symphony-workspace-cleanup.service" \
   "$systemd_source/jovie-symphony-workspace-cleanup.timer" \
@@ -44,7 +47,7 @@ done
 
 bash -n "$helper_source" "$wrapper_source" "$cache_source" "$boot_simulation_source"
 python3 -c 'import ast,pathlib,sys; [ast.parse(pathlib.Path(path).read_text(encoding="utf-8"), filename=path) for path in sys.argv[1:]]' \
-  "$reclaimer_source"
+  "$reclaimer_source" "$migration_source"
 systemd-analyze verify \
   "$systemd_source/jovie-symphony-workspace-mounts.service" \
   "$systemd_source/jovie-symphony-workspace-cleanup.service" \
@@ -98,6 +101,7 @@ backup_if_present "$wrapper_target" jovie-symphony-workspace-create
 backup_if_present "$cache_target" symphony-nvme-package-cache
 backup_if_present "$boot_simulation_target" gem-symphony-workspace-boot-simulate
 backup_if_present "$reclaimer_target" gem-disk-reclaim
+backup_if_present "$migration_target" gem-workspace-migrate
 backup_if_present /etc/systemd/system/jovie-symphony-workspace-mounts.service jovie-symphony-workspace-mounts.service
 backup_if_present /etc/systemd/system/jovie-symphony-workspace-cleanup.service jovie-symphony-workspace-cleanup.service
 backup_if_present /etc/systemd/system/jovie-symphony-workspace-cleanup.timer jovie-symphony-workspace-cleanup.timer
@@ -120,6 +124,7 @@ atomic_install "$wrapper_source" "$wrapper_target" 0755 "$owner" "$owner"
 atomic_install "$cache_source" "$cache_target" 0755 "$owner" "$owner"
 atomic_install "$boot_simulation_source" "$boot_simulation_target" 0755 "$owner" "$owner"
 atomic_install "$reclaimer_source" "$reclaimer_target" 0755 "$owner" "$owner"
+atomic_install "$migration_source" "$migration_target" 0755 root root
 atomic_install "$systemd_source/jovie-symphony-workspace-mounts.service" /etc/systemd/system/jovie-symphony-workspace-mounts.service 0644 root root
 atomic_install "$systemd_source/jovie-symphony-workspace-cleanup.service" /etc/systemd/system/jovie-symphony-workspace-cleanup.service 0644 root root
 atomic_install "$systemd_source/jovie-symphony-workspace-cleanup.timer" /etc/systemd/system/jovie-symphony-workspace-cleanup.timer 0644 root root
