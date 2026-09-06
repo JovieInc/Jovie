@@ -56,6 +56,26 @@ import time
 import fcntl
 from pathlib import Path
 
+def codex_account(path):
+    """Only ChatGPT-authenticated profiles using the OpenAI provider belong here."""
+    try:
+        import tomllib
+        auth = json.loads((path / "auth.json").read_text())
+        config = tomllib.loads((path / "config.toml").read_text())
+        if not isinstance(auth, dict) or auth.get("auth_mode") != "chatgpt":
+            return False
+        provider = config.get("model_provider", "openai")
+        profile = config.get("profile")
+        if profile is not None:
+            selected = config.get("profiles", {}).get(profile)
+            if not isinstance(selected, dict):
+                return False
+            provider = selected.get("model_provider", provider)
+        return provider == "openai"
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
 root = Path(os.environ["ACCOUNTS_ROOT"])
 state_path = Path(os.environ["STATE_FILE"])
 with open(str(state_path) + ".lock", "a+") as lock:
@@ -67,7 +87,7 @@ with open(str(state_path) + ".lock", "a+") as lock:
 accounts = sorted(
     path.name
     for path in root.iterdir()
-    if path.is_dir() and (path / "auth.json").is_file()
+    if path.is_dir() and codex_account(path)
 )
 now = int(time.time())
 cooldowns = state.get("cooldowns") or {}

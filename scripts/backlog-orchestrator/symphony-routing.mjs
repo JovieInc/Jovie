@@ -3,11 +3,12 @@
 import { createHash } from 'node:crypto';
 import {
   existsSync,
+  linkSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
@@ -450,9 +451,40 @@ export function materializeRoutingReceipt(issue, workspaceDir, options = {}) {
   if (!receipt) return null;
   mkdirSync(workspaceDir, { recursive: true });
   const target = join(workspaceDir, '.symphony-routing.json');
-  const tmp = `${target}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
-  renameSync(tmp, target);
+  const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
+  const matchesExisting = () => {
+    try {
+      return (
+        JSON.stringify(JSON.parse(readFileSync(target, 'utf8'))) ===
+        JSON.stringify(receipt)
+      );
+    } catch {
+      return false;
+    }
+  };
+  if (existsSync(target)) {
+    if (!matchesExisting())
+      throw new Error('symphony-routing-materialization-conflict');
+    return { path: target, receipt };
+  }
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, serialized, { mode: 0o600 });
+  try {
+    // Create the complete same-directory temp file atomically without ever
+    // replacing evidence written by another process.
+    linkSync(tmp, target);
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'EEXIST')
+      throw error;
+    if (!matchesExisting())
+      throw new Error('symphony-routing-materialization-conflict');
+  } finally {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      /* best-effort cleanup after the durable target has been created */
+    }
+  }
   return { path: target, receipt };
 }
 

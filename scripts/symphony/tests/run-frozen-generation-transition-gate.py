@@ -17,6 +17,8 @@ TARGET = ROOT / "scripts/symphony/symphony-frozen-generation-transition"
 SELECTED = {
     "verify_provider_generation",
     "workspace_snapshot",
+    "cgroup_pids",
+    "kill_frozen_cgroup",
     "process_snapshot",
     "atomic_install",
     "frozen_service_snapshot",

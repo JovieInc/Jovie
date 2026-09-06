@@ -78,8 +78,8 @@ class Systemd:
         result = run([*self.prefix, "list-units", "--type=service", "--state=running", "--plain", "--no-legend"])
         return [line.split()[0] for line in result.stdout.splitlines() if line.split()]
 
-    def signal(self, service: str, signal: str, whom: str) -> None:
-        run([*self.prefix, "kill", f"--signal={signal}", f"--kill-whom={whom}", service])
+    def signal(self, service: str, signal: str, whom: str, *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return run([*self.prefix, "kill", f"--signal={signal}", f"--kill-whom={whom}", service], check=check)
 
     def freeze(self, service: str) -> None:
         run([*self.prefix, "freeze", service])
@@ -180,12 +180,34 @@ def workspace_snapshot(entries: list[dict]) -> list[dict]:
     return snapshots
 
 
-def process_snapshot(cgroup: str, cgroup_root: Path, proc_root: Path, workspaces: list[dict], main_pid: int) -> list[dict]:
+def cgroup_pids(cgroup: str, cgroup_root: Path) -> list[int]:
     relative = cgroup.lstrip("/")
     procs_path = (cgroup_root / relative / "cgroup.procs").resolve(strict=True)
     if cgroup_root.resolve(strict=True) not in procs_path.parents:
         raise TransitionError("service cgroup escapes the cgroup root")
-    pids = sorted({int(value) for value in procs_path.read_text().split()})
+    try:
+        return sorted({int(value) for value in procs_path.read_text().split()})
+    except (OSError, ValueError) as exc:
+        raise TransitionError(f"cannot read service cgroup processes: {exc}") from exc
+
+
+def kill_frozen_cgroup(systemd: Systemd, service: str, cgroup: str, cgroup_root: Path) -> None:
+    # TERM can synchronously empty the frozen cgroup. On some systemd versions,
+    # a redundant kill then exits 1 even though the required postcondition is
+    # already true. Trust only the cgroup: skip it when empty, and require it to
+    # be empty after any best-effort KILL regardless of the command exit code.
+    if not cgroup_pids(cgroup, cgroup_root):
+        return
+    result = systemd.signal(service, "KILL", "all", check=False)
+    remaining = cgroup_pids(cgroup, cgroup_root)
+    if remaining:
+        detail = (result.stderr or result.stdout).strip()
+        suffix = f": {detail}" if detail else ""
+        raise TransitionError(f"official frozen cgroup still has live processes after KILL: {remaining}{suffix}")
+
+
+def process_snapshot(cgroup: str, cgroup_root: Path, proc_root: Path, workspaces: list[dict], main_pid: int) -> list[dict]:
+    pids = cgroup_pids(cgroup, cgroup_root)
     if main_pid not in pids:
         raise TransitionError("service MainPID is absent from its cgroup")
     roots = [Path(entry["path"]) for entry in workspaces]
@@ -362,7 +384,7 @@ def transition(manifest: dict, *, systemctl: str, cgroup_root: Path, proc_root: 
             # complete still-frozen cgroup prevents any old command from
             # executing between thaw and systemd's replacement generation.
             systemd.signal(OFFICIAL_SERVICE, "TERM", "main")
-            systemd.signal(OFFICIAL_SERVICE, "KILL", "all")
+            kill_frozen_cgroup(systemd, OFFICIAL_SERVICE, official["ControlGroup"], cgroup_root)
             systemd.thaw(OFFICIAL_SERVICE)
             deadline = time.monotonic() + timeout
             new_state = None
