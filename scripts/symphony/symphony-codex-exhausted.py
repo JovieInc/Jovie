@@ -8,6 +8,7 @@ import base64
 import calendar
 import fcntl
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -94,6 +95,7 @@ RUNTIME_NAMES = (
     "cursor-agent-std",
     "model-router.py",
     "model-registry.json",
+    "provider_capacity.py",
     "writer-owned-pr-promote.sh",
     "writer-owned-pr-promotion.mjs",
     "queue-deferral-receipt.mjs",
@@ -199,11 +201,11 @@ REMEDIATOR_RE = re.compile(
     r"failing checks?|create-bounded-ci-repair|bounded[- ]ci[- ]repair)\b",
     re.I,
 )
-OAUTH_PROVIDERS = ("grok", "kimi")
 REMEDIATOR_MODEL_IDS = {
     "grok": "grok-4.6",
     "kimi": "kimi-k3",
 }
+_PROVIDER_CAPACITY_MODULE = None
 GH_TIMEOUT_SECONDS = 20.0
 JOV_REPO = "JovieInc/Jovie"
 LYB_REPO = "JovieInc/LogYourBody"
@@ -321,7 +323,12 @@ def _grok_canary_ready() -> tuple[bool, str]:
 def _bundle_revision() -> str | None:
     try:
         digest = hashlib.sha256()
-        for name in ("symphony-codex-exhausted.py", "model-router.py", "model-registry.json"):
+        for name in (
+            "symphony-codex-exhausted.py",
+            "model-router.py",
+            "model-registry.json",
+            "provider_capacity.py",
+        ):
             path = pathlib.Path(__file__).resolve().parent / name
             if name == "model-registry.json" and not path.is_file():
                 path = path.parent / "config" / name
@@ -329,6 +336,60 @@ def _bundle_revision() -> str | None:
         return digest.hexdigest()
     except OSError:
         return None
+
+
+def _provider_capacity():
+    """Load the source sibling used by isolated fallback workers."""
+    global _PROVIDER_CAPACITY_MODULE
+    if _PROVIDER_CAPACITY_MODULE is not None:
+        return _PROVIDER_CAPACITY_MODULE
+    path = pathlib.Path(__file__).resolve().with_name("provider_capacity.py")
+    try:
+        spec = importlib.util.spec_from_file_location("symphony_provider_capacity", path)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _PROVIDER_CAPACITY_MODULE = module
+        return module
+    except (ImportError, OSError, TypeError, ValueError):
+        return None
+
+
+def _registry_models() -> list[dict]:
+    root = pathlib.Path(__file__).resolve().parent
+    path = root / "model-registry.json"
+    if not path.is_file():
+        path = root / "config" / "model-registry.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return []
+    models = payload.get("models") if isinstance(payload, dict) else None
+    return [model for model in models if isinstance(model, dict)] if isinstance(models, list) else []
+
+
+def _fallback_provider_models() -> dict[str, list[dict]]:
+    """Return subscription CLI executors, excluding the official Codex lane."""
+    providers: dict[str, list[dict]] = {}
+    capacity_module = _provider_capacity()
+    supported = getattr(capacity_module, "PROVIDERS", ())
+    for model in _registry_models():
+        provider = model.get("provider")
+        if (
+            model.get("channel") != "subscription"
+            or provider == "codex"
+            or not isinstance(provider, str)
+            or not isinstance(model.get("agent_argv"), list)
+            or (supported and provider not in supported)
+        ):
+            continue
+        providers.setdefault(provider, []).append(model)
+    return providers
+
+
+def _fallback_provider_names() -> tuple[str, ...]:
+    return tuple(sorted(_fallback_provider_models()))
 
 
 def _model_router_selection(
@@ -407,21 +468,26 @@ def _model_router_selection(
     return payload, "model_router_ready"
 
 
-def _oauth_fallback_selections() -> tuple[dict[str, dict] | None, str]:
-    """Ready grok-4.6 and kimi-k3 selections from live OAuth, independently."""
+def _fallback_selections() -> tuple[dict[str, dict] | None, str]:
+    """Select one isolated CLI executor per registry-derived provider."""
     selections: dict[str, dict] = {}
     last_reason = "model_router_no_fallback"
-    for provider, model_id in REMEDIATOR_MODEL_IDS.items():
+    for provider, models in _fallback_provider_models().items():
+        model_ids = tuple(
+            model["id"] for model in models if isinstance(model.get("id"), str)
+        )
+        if not model_ids:
+            continue
         payload, reason = _model_router_selection(
-            workflow="remediation", include_ids=(model_id,)
+            workflow="remediation", include_ids=model_ids
         )
         last_reason = reason
         selected = (payload or {}).get("selected") if payload else None
         if (
             payload is not None
             and isinstance(selected, dict)
-            and selected.get("id") == model_id
             and selected.get("provider") == provider
+            and selected.get("id") in model_ids
         ):
             selections[provider] = payload
     if not selections:
@@ -430,14 +496,17 @@ def _oauth_fallback_selections() -> tuple[dict[str, dict] | None, str]:
         if payload is None or not isinstance(selected, dict) or not selected.get("id"):
             return None, reason
         provider = selected.get("provider")
-        if provider in OAUTH_PROVIDERS:
+        if provider in _fallback_provider_names():
             selections[provider] = payload
         else:
-            # Leftover included Cursor/etc. still drains; remediator work
-            # refuses this payload because the model id is not grok-4.6/kimi-k3.
-            selections["grok"] = payload
+            return None, "model_router_no_fallback"
         return selections, "oauth_ready"
     return selections, "oauth_ready"
+
+
+# Existing callers use the old name; keep the alias while the implementation
+# derives providers from the canonical registry.
+_oauth_fallback_selections = _fallback_selections
 
 
 def _fleet_gate_allows_isolated() -> tuple[bool, str]:
@@ -628,6 +697,8 @@ def _unit_provider(unit: str) -> str:
     )
     if result is not None and result.returncode == 0:
         text = result.stdout.decode(errors="replace")
+        if "SYMPHONY_FALLBACK_PROVIDER=cursor" in text:
+            return "cursor"
         if "SYMPHONY_FALLBACK_PROVIDER=kimi" in text:
             return "kimi"
         if "SYMPHONY_FALLBACK_PROVIDER=grok" in text:
@@ -636,7 +707,7 @@ def _unit_provider(unit: str) -> str:
 
 
 def _active_provider_counts(active: list[str]) -> dict[str, int]:
-    counts = {"grok": 0, "kimi": 0}
+    counts = {provider: 0 for provider in _fallback_provider_names()}
     for unit in active:
         provider = _unit_provider(unit)
         if provider in counts:
@@ -651,13 +722,10 @@ def _started_counts(
     default_provider: str = "grok",
 ) -> tuple[int, int]:
     living = launched.intersection(survived)
-    fallback = default_provider if default_provider in OAUTH_PROVIDERS else "grok"
-    grok_started = sum(
-        1 for unit in living if unit_providers.get(unit, fallback) == "grok"
-    )
-    kimi_started = sum(
-        1 for unit in living if unit_providers.get(unit, fallback) == "kimi"
-    )
+    providers = _fallback_provider_names()
+    fallback = default_provider if default_provider in providers else (providers[0] if providers else "")
+    grok_started = sum(1 for unit in living if unit_providers.get(unit, fallback) == "grok")
+    kimi_started = sum(1 for unit in living if unit_providers.get(unit, fallback) == "kimi")
     return grok_started, kimi_started
 
 
@@ -921,6 +989,100 @@ def _provider_seat_limit(provider: str) -> int:
     if oauth is None:
         return env_cap
     return min(env_cap, oauth)
+
+
+def _provider_measured_capacity(provider: str) -> int:
+    """Read one provider's current measured budget without a global cap."""
+    env_key = f"SYMPHONY_{provider.upper()}_MAX"
+    raw = os.environ.get(env_key)
+    if raw is not None:
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return 0
+    if provider == "cursor":
+        # The registry proves the CLI executor, while one installed Cursor
+        # session is the only portable seat observation available here.
+        return 1 if _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") else 0
+    if provider in {"grok", "kimi"}:
+        measured = _probe_oauth_seats(provider)
+        return measured if measured is not None else _provider_seat_limit(provider)
+    return 0
+
+
+def _provider_capacity_state() -> tuple[object | None, pathlib.Path]:
+    module = _provider_capacity()
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_PROVIDER_CAPACITY_STATE",
+                "~/.local/state/symphony-fallback/provider-capacity.json",
+            )
+        )
+    )
+    if module is None:
+        return None, path
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    try:
+        state = module.read_state(path, now)
+        changed = False
+        for provider in _fallback_provider_names():
+            if provider in state["providers"]:
+                continue
+            state = module.apply_observation(
+                state,
+                provider=provider,
+                kind="capacity_observed",
+                event_id=f"seed:{provider}",
+                observed_at=now,
+                observed_capacity=_provider_measured_capacity(provider),
+            )
+            changed = True
+        if changed:
+            module.write_state(path, state)
+        return state, path
+    except (OSError, TypeError, ValueError):
+        return None, path
+
+
+def _lane_capacity_receipt() -> dict | None:
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_LANE_CAPACITY_RECEIPT",
+                os.environ.get(
+                    "GEM_FLEET_GATE_RECEIPT",
+                    "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+                ),
+            )
+        )
+    )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    receipt = payload.get("laneCapacity")
+    if isinstance(receipt, dict):
+        return receipt
+    queue = payload.get("queue")
+    receipt = queue.get("laneCapacity") if isinstance(queue, dict) else None
+    return receipt if isinstance(receipt, dict) else None
+
+
+def _lane_allows_provider(provider: str, *, remediator: bool) -> bool:
+    lane = os.environ.get("SYMPHONY_FALLBACK_LANE", "").strip()
+    if not lane:
+        return True
+    module = _provider_capacity()
+    receipt = _lane_capacity_receipt()
+    return bool(
+        module
+        and module.lane_allows(
+            receipt, provider=provider, lane=lane, remediation=remediator
+        )
+    )
 
 
 def _is_remediator_work(issue: dict | None, pr_verdict: str) -> bool:
@@ -1927,7 +2089,7 @@ def _selection_provider(selection: dict | None) -> str | None:
     if not isinstance(selected, dict):
         return None
     provider = selected.get("provider")
-    if provider in OAUTH_PROVIDERS:
+    if provider in _fallback_provider_names():
         return provider
     model_id = str(selected.get("id") or "").lower()
     if model_id.startswith("kimi"):
@@ -1941,17 +2103,20 @@ def _pick_provider(
     remaining: dict[str, int],
     selections: dict[str, dict],
     remediator: bool,
+    allowed: set[str] | None = None,
 ) -> str | None:
     eligible = [
         provider
-        for provider in OAUTH_PROVIDERS
+        for provider in _fallback_provider_names()
         if remaining.get(provider, 0) > 0 and provider in selections
+        and (allowed is None or provider in allowed)
     ]
     if remediator:
         preferred = [
             provider
             for provider in eligible
-            if (selections[provider].get("selected") or {}).get("id")
+            if provider in REMEDIATOR_MODEL_IDS
+            and (selections[provider].get("selected") or {}).get("id")
             == REMEDIATOR_MODEL_IDS[provider]
         ]
         if preferred:
@@ -1984,10 +2149,22 @@ def _launch_fallback_workers(
     if fallback_provider and fallback_provider not in provider_selections:
         provider_selections[fallback_provider] = selection
     counts = _active_provider_counts(sorted(active_units))
-    remaining = {
-        "grok": max(0, _provider_seat_limit("grok") - counts["grok"]),
-        "kimi": max(0, _provider_seat_limit("kimi") - counts["kimi"]),
-    }
+    capacity_state, _capacity_path = _provider_capacity_state()
+    capacity_module = _provider_capacity()
+    remaining: dict[str, int] = {}
+    if capacity_module is None or capacity_state is None:
+        return set(), 0
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    for provider in _fallback_provider_names():
+        try:
+            remaining[provider] = capacity_module.admitted_limit(
+                capacity_state,
+                provider,
+                active=counts.get(provider, 0),
+                now=now,
+            )
+        except (TypeError, ValueError):
+            remaining[provider] = 0
     capacity_used = counts["grok"] + counts["kimi"]
     launched_units: set[str] = set()
     lock_count = _fallback_lock_count()
@@ -1999,7 +2176,7 @@ def _launch_fallback_workers(
     closure_intake_open = _closure_intake_allowed()
     for identifier in identifiers:
         if len(launched_units) >= max(0, limit) or (
-            remaining["grok"] <= 0 and remaining["kimi"] <= 0
+            not any(value > 0 for value in remaining.values())
         ):
             if next_eligible == "":
                 next_eligible = identifier
@@ -2090,7 +2267,14 @@ def _launch_fallback_workers(
             print(f"fallback skip {identifier} {skip_label}", file=sys.stderr, flush=True)
             continue
         remediator = _is_remediator_work(issue, verdict)
-        provider = _pick_provider(remaining, provider_selections, remediator)
+        allowed = {
+            candidate
+            for candidate in provider_selections
+            if _lane_allows_provider(candidate, remediator=remediator)
+        }
+        provider = _pick_provider(
+            remaining, provider_selections, remediator, allowed=allowed
+        )
         if provider is None:
             if next_eligible == "":
                 next_eligible = identifier
@@ -2159,6 +2343,7 @@ def _grok_command(
     unit = _fallback_unit(identifier, issue_revision)
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     kimi_exe = _kimi_executable() or str(pathlib.Path.home() / ".local/bin/kimi")
+    cursor_exe = _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") or "cursor-agent"
     provider = _selection_provider(selection) or "grok"
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
@@ -2169,6 +2354,7 @@ def _grok_command(
         "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=GEM_KIMI_EXECUTABLE={kimi_exe}",
         "-p", f"Environment=GEM_KIMI_BIN={kimi_exe}",
+        "-p", f"Environment=GEM_CURSOR_EXECUTABLE={cursor_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_PROVIDER={provider}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
         "-p", f"Environment=SYMPHONY_FALLBACK_ISSUE_REVISION={issue_revision}",
@@ -2272,16 +2458,18 @@ def _drain_included_pools(
     selections, selection_reason = _oauth_fallback_selections()
     if selections is None:
         return f"drain_skipped={selection_reason}"
-    grok_limit = _grok_limit()
-    kimi_limit = _kimi_limit()
-    if grok_limit <= 0 and kimi_limit <= 0:
-        return "drain_skipped=grok_capacity_zero"
+    measured_limits = {
+        provider: _provider_measured_capacity(provider)
+        for provider in _fallback_provider_names()
+    }
+    if not any(value > 0 for value in measured_limits.values()):
+        return "drain_skipped=provider_capacity_zero"
     bundle_revision = _bundle_revision()
     if bundle_revision is None:
         return "drain_skipped=bundle_revision_unavailable"
-    limit = 1 if target_identifier is not None else grok_limit + kimi_limit
+    limit = 1 if target_identifier is not None else sum(measured_limits.values())
     if limit <= 0:
-        return "drain_skipped=grok_capacity_zero"
+        return "drain_skipped=provider_capacity_zero"
     unit_providers: dict[str, str] = {}
     primary = next(iter(selections.values()))
     launched, _used = _launch_fallback_workers(
@@ -2390,12 +2578,14 @@ def _continue_exhausted_reconcile(
             file=sys.stderr,
         )
         return 0
-    grok_limit = _grok_limit()
-    kimi_limit = _kimi_limit()
-    limit = 1 if target_identifier is not None else grok_limit + kimi_limit
-    if grok_limit <= 0 and kimi_limit <= 0 and not active:
+    measured_limits = {
+        provider: _provider_measured_capacity(provider)
+        for provider in _fallback_provider_names()
+    }
+    limit = 1 if target_identifier is not None else sum(measured_limits.values())
+    if not any(value > 0 for value in measured_limits.values()) and not active:
         print(
-            f"codex_exhausted {reason} grok_capacity_zero symphony_unchanged",
+            f"codex_exhausted {reason} provider_capacity_zero symphony_unchanged",
             file=sys.stderr,
         )
         return EXIT_SAFE_FAIL_CLOSED
@@ -2569,7 +2759,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
         return packaged if packaged.is_file() else source
 
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py")},
         "model-registry.json": registry,
         "writer-owned-pr-promote.sh": packaged_or_source(
             "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"
