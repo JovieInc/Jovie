@@ -2,7 +2,7 @@
 // JOV-INV-023: source intent does not depend on fleet or production observations.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,11 +11,12 @@ import { runSourceAdmission } from './lib/source-admission-policy.mjs';
 // GitHub owns waiting and merge-group enforcement. This command never polls,
 // updates branches, changes labels, retries admission, or uses admin privileges.
 export const QUERY = `query($owner:String!,$name:String!,$number:Int!){
+ viewer{login}
  repository(owner:$owner,name:$name){pullRequest(number:$number){
  headRefOid baseRefName state isDraft mergeable reviewDecision
  isMergeQueueEnabled isInMergeQueue mergeQueueEntry{position} autoMergeRequest{enabledAt}
  timelineItems(last:1,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{
- ... on RemovedFromMergeQueueEvent{beforeCommit{oid} reason}
+ ... on RemovedFromMergeQueueEvent{id beforeCommit{oid} reason}
  }}
  }}}`;
 
@@ -43,10 +44,12 @@ export function parseArgs(args) {
       '--head': 'head',
       '--base': 'base',
       '--receipt-dir': 'receiptDir',
+      '--reconcile-removal': 'reconcileRemoval',
+      '--reconciliation-receipt': 'reconciliationReceipt',
     }[args[i]];
     if (!key || !args[i + 1] || options[key] !== undefined) {
       throw new Error(
-        'Expected --repo OWNER/REPO --pr NUMBER --head 40SHA [--base main] [--receipt-dir PATH]'
+        'Expected --repo OWNER/REPO --pr NUMBER --head 40SHA [--base main] [--receipt-dir PATH] [--reconcile-removal NODE_ID --reconciliation-receipt PATH]'
       );
     }
     options[key] = args[i + 1];
@@ -56,8 +59,8 @@ export function parseArgs(args) {
 
 /**
  * @typedef {{code: number, stdout: string}} CommandResult
- * @typedef {{repo?: string, pr?: number | string, head?: string, receiptDir?: string, base?: string}} MergeIntentOptions
- * @typedef {{status: string, reason: string, repo?: string, pr: number, head?: string, position?: number, receipt?: string, requestExitCode?: number, blockers?: string[]}} MergeIntentResult
+ * @typedef {{repo?: string, pr?: number | string, head?: string, receiptDir?: string, base?: string, reconcileRemoval?: string, reconciliationReceipt?: string}} MergeIntentOptions
+ * @typedef {{status: string, reason: string, repo?: string, pr: number, head?: string, position?: number, receipt?: string, requestExitCode?: number, blockers?: string[], removalEventId?: string}} MergeIntentResult
  * @param {MergeIntentOptions} options
  * @param {{exec?: (args: string[]) => CommandResult | Promise<CommandResult>, policy?: import('./lib/source-admission-policy.mjs').AdmissionEvaluator}} [dependencies]
  * @returns {Promise<MergeIntentResult>}
@@ -71,6 +74,8 @@ export async function submitMergeIntent(
     head,
     receiptDir = join(homedir(), '.local/state/jovie/native-merge-intent'),
     base = 'main',
+    reconcileRemoval,
+    reconciliationReceipt,
   } = options;
   const pr = Number(options.pr);
   if (
@@ -84,6 +89,14 @@ export async function submitMergeIntent(
       'Explicit repository, positive PR number, and lowercase full 40-character head SHA required'
     );
   }
+  if (
+    Boolean(reconcileRemoval) !== Boolean(reconciliationReceipt) ||
+    (reconcileRemoval && !/^[A-Za-z0-9_+/=-]{1,512}$/.test(reconcileRemoval))
+  ) {
+    throw new Error(
+      'Reconciliation requires both an exact removal node ID and a receipt path'
+    );
+  }
   const [owner, name] = repo.split('/');
   const result = (status, reason, extra = {}) => ({
     status,
@@ -93,6 +106,36 @@ export async function submitMergeIntent(
     head,
     ...extra,
   });
+  // Explicit owner reconciliation is a new bounded attempt for one removal,
+  // never a generic retry flag. The file is evidence, not an alternate CI gate.
+  // Receipt JSON: {schema:"jovie-native-merge-reconciliation/v1", repository,
+  // prNumber, headSha, removalEventId, decision:"retry-once", owner, evidence}.
+  // owner must match this request's authenticated GraphQL viewer. Keep the
+  // persistent receipt directory when handing the operation to another host.
+  let reconciliation;
+  if (reconcileRemoval) {
+    try {
+      const text = readFileSync(reconciliationReceipt, 'utf8');
+      if (Buffer.byteLength(text) > 65536) throw new Error('oversized receipt');
+      reconciliation = JSON.parse(text);
+      if (
+        reconciliation?.schema !== 'jovie-native-merge-reconciliation/v1' ||
+        reconciliation.repository !== repo ||
+        reconciliation.prNumber !== pr ||
+        reconciliation.headSha !== head ||
+        reconciliation.removalEventId !== reconcileRemoval ||
+        reconciliation.decision !== 'retry-once' ||
+        typeof reconciliation.owner !== 'string' ||
+        !reconciliation.owner.trim() ||
+        typeof reconciliation.evidence !== 'string' ||
+        !reconciliation.evidence.trim()
+      ) {
+        throw new Error('unbound reconciliation');
+      }
+    } catch {
+      return result('blocked', 'reconciliation-receipt-invalid');
+    }
+  }
   const read = async () => {
     const response = await exec([
       'api',
@@ -118,7 +161,7 @@ export async function submitMergeIntent(
     ) {
       throw new Error('Incomplete PR readback');
     }
-    return state;
+    return { ...state, viewerLogin: data.data?.viewer?.login };
   };
   const disposition = state => {
     if (state.headRefOid !== head) return result('blocked', 'stale-head');
@@ -141,11 +184,21 @@ export async function submitMergeIntent(
     if (['CHANGES_REQUESTED', 'REVIEW_REQUIRED'].includes(state.reviewDecision))
       return result('blocked', 'review-required');
     const removal = state.timelineItems.nodes[0];
-    if (
-      removal &&
-      (!removal.beforeCommit?.oid || removal.beforeCommit.oid === head)
-    ) {
-      return result('blocked', 'queue-ejected-requires-owner-reconciliation');
+    // GitHub beforeCommit identifies the synthetic queue commit, not the PR
+    // source commit. Its inequality with head never proves an old ejection.
+    if (reconcileRemoval) {
+      if (removal?.id !== reconcileRemoval)
+        return result('blocked', 'reconciliation-removal-changed');
+      if (
+        typeof state.viewerLogin !== 'string' ||
+        !state.viewerLogin ||
+        state.viewerLogin.toLowerCase() !== reconciliation.owner.toLowerCase()
+      )
+        return result('blocked', 'reconciliation-owner-mismatch');
+    } else if (removal) {
+      return result('blocked', 'queue-ejected-requires-owner-reconciliation', {
+        removalEventId: typeof removal.id === 'string' ? removal.id : undefined,
+      });
     }
     return null;
   };
@@ -221,7 +274,9 @@ export async function submitMergeIntent(
   // Write-ahead, exclusive claim survives ambiguous responses and coordinator
   // restarts. Share this directory when moving this incident to another host.
   const key = createHash('sha256')
-    .update(`${repo.toLowerCase()}:${pr}:${head}`)
+    .update(
+      `${repo.toLowerCase()}:${pr}:${head}${reconcileRemoval ? `:removal:${reconcileRemoval}` : ''}`
+    )
     .digest('hex');
   const receipt = join(receiptDir, `${key}.json`);
   try {
@@ -233,7 +288,12 @@ export async function submitMergeIntent(
     writeFileSync(
       receipt,
       JSON.stringify(
-        result('unknown', 'request-attempted', { at: new Date().toISOString() })
+        result('unknown', 'request-attempted', {
+          at: new Date().toISOString(),
+          ...(reconcileRemoval
+            ? { removalEventId: reconcileRemoval, reconciliation }
+            : {}),
+        })
       ),
       { flag: 'wx', mode: 0o600 }
     );
