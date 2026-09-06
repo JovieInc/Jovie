@@ -124,14 +124,27 @@ jobs:
             = "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
           "$HOME/.local/bin/symphony-concurrency-controller" \
             --verify-workflow-overlay scripts/symphony/WORKFLOW.md "$HOME/.config/symphony/WORKFLOW.md"
-          jq -e '
+          jq -e --arg sha "$PRODUCTION_SHA" '
             .schema == "symphony-concurrency/v1" and
+            .sourceRevision == $sha and
             .mode == "applied" and
             .target >= 1 and
             .bounds.min == 1 and
             .bounds.max == null and
             .bounds.policy == "empirical-additive-probe"
           ' "$GEM_WORKSPACE/state/symphony-concurrency.json" >/dev/null
+          python3 - "$GEM_WORKSPACE/state/symphony-concurrency.json" <<'PY'
+          import datetime
+          import json
+          import pathlib
+          import sys
+
+          receipt = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          observed = datetime.datetime.fromisoformat(receipt["observedAt"].replace("Z", "+00:00"))
+          age = (datetime.datetime.now(datetime.timezone.utc) - observed).total_seconds()
+          if not 0 <= age <= 120:
+              raise SystemExit("symphony concurrency receipt is stale or from the future")
+          PY
           bash scripts/symphony/update-symphony-burrito.sh --check
           systemctl --user is-enabled --quiet symphony-elixir.service
           systemctl --user is-active --quiet symphony-elixir.service

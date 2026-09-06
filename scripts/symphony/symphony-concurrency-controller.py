@@ -4,7 +4,7 @@
 The controller is intentionally stdlib-only and runs on the Gem host from the
 existing event-driven fleet refresh. It samples Linux PSI, available memory,
 authenticated provider-route eligibility, the lane admission receipt, and
-Symphony's loopback status surface. A bounded hysteresis policy then atomically updates only
+Symphony's loopback status surface. A hysteresis policy then atomically updates only
 ``agent.max_concurrent_agents`` in the installed workflow. Symphony watches
 WORKFLOW.md and applies that value to future dispatch decisions without a
 restart.
@@ -52,6 +52,7 @@ HIGH_IO_FULL_AVG10 = 10.0
 SEVERE_IO_FULL_AVG10 = 20.0
 CONCURRENCY_LINE = re.compile(r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$", re.MULTILINE)
 CANONICAL_CONCURRENCY = re.compile(r"[1-9][0-9]*")
+CANONICAL_REVISION = re.compile(r"[0-9a-f]{40}")
 
 
 def utc_now() -> str:
@@ -82,6 +83,7 @@ def resource_scope(args: argparse.Namespace) -> dict[str, str]:
         "leaseGuard": str(args.lease_guard),
         "providerRoutes": str(args.provider_routes),
         "downstreamReceipt": str(args.downstream_receipt),
+        "sourceAttestation": str(args.source_attestation),
         "repository": args.repo,
     }
 
@@ -232,7 +234,7 @@ def read_router_capacity(directory: pathlib.Path, runtime: dict[str, Any] | None
 
 
 def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> dict[str, Any] | None:
-    """Read the existing lane gate, keeping ready inventory within its allowance."""
+    """Read the lane gate without turning repair permission into new-work permission."""
     try:
         gate = read_json(path)
         if gate.get("schema") != "jovie-fleet-gate/v1" or not recent_timestamp(gate.get("observedAt"), now_epoch):
@@ -246,23 +248,67 @@ def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> di
         if queue.get("status") != "known" or type(ready) is not int or ready < 0 or type(budget) is not int or budget <= 0:
             return None
         closure = signals.get("closureHealth")
+        work = gate.get("workAdmission")
+        closure_admission = gate.get("closureAdmission")
+        remediation = gate.get("remediationAdmission")
+        if not all(isinstance(item, dict) for item in (closure, work, closure_admission, remediation)):
+            return None
         remediation_continues = (
-            isinstance(closure, dict)
-            and closure.get("remediationContinues") is True
+            closure.get("remediationContinues") is True
+            and closure_admission.get("remediationContinues") is True
         )
         normal_intake = (
-            gate.get("workAdmission", {}).get("allowed") is True
-            and gate.get("closureAdmission", {}).get("newIssueIntakeAllowed") is True
+            work.get("allowed") is True
+            and work.get("newIssueLeaseAllowed") is True
+            and work.get("newImplementationAllowed") is True
+            and closure_admission.get("newIssueIntakeAllowed") is True
+            and closure_admission.get("newImplementationAllowed") is True
         )
         healthy = (
             gate.get("state") != "RED"
             and signals.get("main", {}).get("status") == "green"
             and signals.get("production", {}).get("status") == "green"
-            and (normal_intake or remediation_continues)
+            and normal_intake
         )
         # Do not consume gate.concurrency here: that is proof inventory, and
         # using it to authorize a probe would create a circular capacity gate.
-        return {"healthy": healthy, "headroom": max(0, budget - ready), "repository": repository}
+        return {
+            "healthy": healthy,
+            "headroom": max(0, budget - ready),
+            "repository": repository,
+            "newWorkAllowed": normal_intake,
+            "repairOnly": (
+                gate.get("state") != "RED"
+                and remediation_continues
+                and remediation.get("allowed") is True
+                and remediation.get("localAllowed") is True
+                and not normal_intake
+            ),
+            "remediationPushAllowed": remediation.get("pushAllowed") is True,
+        }
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def read_source_attestation(path: pathlib.Path, now_epoch: float) -> dict[str, Any] | None:
+    """Bind a controller decision to the fresh official runtime source revision."""
+    try:
+        receipt = read_json(path)
+        revision = receipt.get("sourceRevision")
+        listener = receipt.get("listener")
+        if (
+            receipt.get("schema") != "gem-service-attestation/v1"
+            or not isinstance(revision, str)
+            or not CANONICAL_REVISION.fullmatch(revision)
+            or not recent_timestamp(receipt.get("observedAt"), now_epoch)
+            or receipt.get("active") is not True
+            or receipt.get("healthy") is not True
+            or not isinstance(listener, dict)
+            or listener.get("port") != 4041
+            or listener.get("boundToService") is not True
+        ):
+            return None
+        return {"sourceRevision": revision, "observedAt": receipt["observedAt"]}
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
 
@@ -446,14 +492,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if provider is None and not args.provider_routes.exists():
         provider = read_provider_capacity(args.lease_guard)
     downstream = read_downstream(args.downstream_receipt, args.repo, now_epoch)
+    provenance = read_source_attestation(args.source_attestation, now_epoch)
     integrity_allowed, integrity_status = integrity_allows_scale(args.integrity_receipt)
+    decision_allowed = integrity_allowed and provenance is not None
+    decision_status = (
+        integrity_status if provenance is not None else "source-attestation-unavailable"
+    )
     target, low_streak, reason = choose_target(
         current=current,
         state=state,
         sample=sample,
         provider=provider,
         runtime=runtime,
-        integrity_allowed=integrity_allowed,
+        integrity_allowed=decision_allowed,
         now_epoch=now_epoch,
         downstream=downstream,
     )
@@ -471,6 +522,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         write_json_atomic(args.state, next_state)
     receipt = {
         "schema": SCHEMA,
+        "sourceRevision": provenance.get("sourceRevision") if provenance else None,
         "resourceScope": scope,
         "observedAt": utc_now(),
         "mode": "dry-run" if args.dry_run else "applied",
@@ -489,7 +541,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             if runtime is not None and target > 0
             else None
         ),
-        "integrity": {"allowed": integrity_allowed, "status": integrity_status},
+        "integrity": {"allowed": decision_allowed, "status": decision_status},
+        "provenance": provenance,
     }
     if not args.dry_run:
         write_json_atomic(args.receipt, receipt, mode=0o644)
@@ -527,6 +580,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--provider-routes", type=pathlib.Path, default=home / ".local/state/symphony-provider-router")
     parser.add_argument("--downstream-receipt", type=pathlib.Path, default=home / "gem-workspace/state/gem-priority-gate/latest.json")
+    parser.add_argument("--source-attestation", type=pathlib.Path, default=home / "gem-workspace/state/gem-service-attestation.json")
     parser.add_argument("--repo", default="JovieInc/Jovie")
     parser.add_argument("--proc-root", type=pathlib.Path, default=pathlib.Path("/proc"))
     parser.add_argument("--runtime-url", default="http://127.0.0.1:4041/api/v1/state")
