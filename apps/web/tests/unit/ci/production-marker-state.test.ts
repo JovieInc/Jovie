@@ -218,7 +218,10 @@ describe('production marker attempt state', () => {
     ];
     expect(
       classifyProductionMarkerEvidence(
-        evidence({ markers: [marker], latestRun: run(1, 'completed', 'success') })
+        evidence({
+          markers: [marker],
+          latestRun: run(1, 'completed', 'success'),
+        })
       )
     ).toMatchObject({
       state: 'manual',
