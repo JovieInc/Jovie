@@ -11,6 +11,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 # Pre-push leaks these into children and poisons fixture-repo git commands.
 _LEAKED_GIT_ENV_VARS = (
@@ -41,6 +43,12 @@ if SPEC is None or SPEC.loader is None:
 REGISTRY = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = REGISTRY
 SPEC.loader.exec_module(REGISTRY)
+
+CYCLE_SOURCE = HERMES / "gem-repo-drain-cycle.py"
+CYCLE_SPEC = importlib.util.spec_from_file_location("gem_repo_drain_cycle", CYCLE_SOURCE)
+assert CYCLE_SPEC and CYCLE_SPEC.loader
+CYCLE = importlib.util.module_from_spec(CYCLE_SPEC)
+CYCLE_SPEC.loader.exec_module(CYCLE)
 
 
 class RegistryContractTests(unittest.TestCase):
@@ -132,7 +140,56 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn("%h/gem-workspace/scripts/gem-repo-drain-cycle.py", service)
         self.assertIn("%h/gem-workspace/config/gem-repo-registry.json", service)
         self.assertIn("%h/gem-workspace/scripts/model-router.py", service)
+        self.assertIn(
+            "EnvironmentFile=-%h/.config/symphony/summer-bottleneck.env",
+            service,
+        )
         self.assertNotIn("/home/timwhite/Jovie/", service)
+
+    def test_jovie_producer_refreshes_once_even_when_jovie_drain_is_disabled(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append((args, kwargs))
+            return SimpleNamespace(returncode=2 if len(calls) == 1 else 0)
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run), mock.patch.dict(
+            CYCLE.os.environ,
+            {"GEM_WORKSPACE": "/tmp/gem-workspace"},
+            clear=False,
+        ):
+            self.assertEqual(CYCLE.run_summer_bottleneck_producer(), 0)
+
+        self.assertEqual(len(calls), 2)
+        gate_args = calls[0][0]
+        self.assertEqual(gate_args.count(CYCLE.JOVIE_REPOSITORY), 1)
+        self.assertIn("gem-priority-gate.py", gate_args[1])
+        self.assertIn("/tmp/gem-workspace/state/gem-priority-gate", gate_args)
+        self.assertEqual(calls[1][0][-1], "--submit")
+        self.assertIn("summer_bottleneck_producer.py", calls[1][0][1])
+
+    def test_producer_failure_is_isolated_after_all_repository_cycles(self):
+        repos = [
+            SimpleNamespace(github="JovieInc/LogYourBody"),
+            SimpleNamespace(github="JovieInc/ovie"),
+        ]
+        drains = []
+
+        def run_drain(args, **kwargs):
+            drains.append(kwargs["env"]["GEM_PR_DRAIN_REPO"])
+            return SimpleNamespace(returncode=0)
+
+        def summer():
+            self.assertEqual(drains, [repo.github for repo in repos])
+            return 1
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run_drain
+        ), mock.patch.object(CYCLE, "run_summer_bottleneck_producer", side_effect=summer) as producer:
+            self.assertEqual(CYCLE.main(), 0)
+
+        producer.assert_called_once_with()
+        self.assertEqual(drains, [repo.github for repo in repos])
 
     def test_activation_requires_exact_rehabilitation_attestation(self):
         workflow = ACTIVATION.read_text(encoding="utf-8")

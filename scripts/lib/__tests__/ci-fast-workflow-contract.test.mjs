@@ -563,7 +563,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/symphony/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation)|symphony-ui-pilot)\\.sh$|model-router\\.py$|symphony-nvme-package-cache\\.sh$|symphony-reconciler\\.py$|systemd/gem-(disk-reclaim|pr-drain)\\.(service|timer)$)'
+      'scripts/symphony/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gbrain-runtime/|gem-|gem_|hyperagent/|install-(gem-(fleet-controller|pr-rehabilitation)|symphony-ui-pilot)\\.sh$|model-router\\.py$|summer_bottleneck_producer\\.py$|symphony-nvme-package-cache\\.sh$|symphony-reconciler\\.py$|systemd/gem-(disk-reclaim|pr-drain)\\.(service|timer)$)'
     );
     expect(remaining).toContain('gbrain-runtime-assets|merge-group');
     expect(CI_FAST_SOURCE).toContain(
@@ -573,7 +573,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('elif [ "${CI:-}" = "true" ]');
     expect(CI_FAST_SOURCE).not.toContain('elif [[');
     expect(remaining).toContain(
-      'scripts/symphony/tests/(closure-health\\.test\\.py$|gem-(disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|hyperagent-lifecycle\\.test\\.py$|symphony-(nvme-package-cache|reconciler)\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim)\\.py$)'
+      'scripts/symphony/tests/(closure-health\\.test\\.py$|gem-(disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|hyperagent-lifecycle\\.test\\.py$|summer-bottleneck-producer\\.test\\.py$|symphony-(nvme-package-cache|reconciler)\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim)\\.py$)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
