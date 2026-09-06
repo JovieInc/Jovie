@@ -257,7 +257,7 @@ The source export is preparatory; deployment and commissioning require separate 
           '../vendor/agent-transport-contracts/index'
         )
     );
-    for (const path of ['index.ts', 'package.json'])
+    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json'])
       put(
         `vendor/agent-transport-contracts/${path}`,
         readFileSync(
@@ -280,6 +280,7 @@ The source export is preparatory; deployment and commissioning require separate 
     'scripts/templates/application-boundary.ts',
     'scripts/templates/application-boundary.test.ts',
     '../../packages/agent-transport-contracts/index.ts',
+    '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];
   const provenance = {
