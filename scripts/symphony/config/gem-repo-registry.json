@@ -17,7 +17,7 @@
       "kpi": "qualified PR handoff to landed",
       "local_path": "/home/timwhite/gem-workspace/Jovie-ship",
       "default_branch": "main",
-      "policies": { "health": true, "pr_drain": true, "issue_intake": true }
+      "policies": { "health": true, "pr_drain": false, "issue_intake": true }
     },
     {
       "id": "logyourbody",

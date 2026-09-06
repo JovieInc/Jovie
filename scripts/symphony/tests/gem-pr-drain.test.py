@@ -5,6 +5,9 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
+import subprocess
+import sys
 import pathlib
 import tempfile
 import unittest
@@ -26,6 +29,56 @@ if GATE_SPEC is None or GATE_SPEC.loader is None:
     raise RuntimeError(f"could not load {GATE_SOURCE}")
 GATE_MODULE = importlib.util.module_from_spec(GATE_SPEC)
 GATE_SPEC.loader.exec_module(GATE_MODULE)
+
+
+class JovieDrainRetirementTests(unittest.TestCase):
+    OTHER_REPOS = {
+        "JovieInc/LogYourBody", "JovieInc/ovie", "JovieInc/BubblegumFactory",
+        "JovieInc/gbrain", "JovieInc/retouching", "itstimwhite/gbrain",
+    }
+
+    def test_cycle_selects_six_other_repositories_without_dispatching_jovie(self):
+        cycle_path = ROOT / "scripts/symphony/gem-repo-drain-cycle.py"
+        spec = importlib.util.spec_from_file_location("retired_jovie_cycle", cycle_path)
+        cycle = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cycle)
+        with mock.patch.object(cycle.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run, \
+             mock.patch.object(cycle.sys, "argv", [str(cycle_path)]), redirect_stdout(io.StringIO()):
+            self.assertEqual(cycle.main(), 0)
+        self.assertEqual(len(run.call_args_list), 6)
+        self.assertEqual(
+            {call.kwargs["env"]["GEM_PR_DRAIN_REPO"] for call in run.call_args_list},
+            self.OTHER_REPOS,
+        )
+        from gem_repo_registry import by_github
+        jovie = by_github("JovieInc/Jovie")
+        self.assertFalse(jovie.pr_drain)
+        self.assertTrue(jovie.health)
+        self.assertTrue(jovie.issue_intake)
+
+    def test_direct_jovie_writer_refuses_before_any_external_tool(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            calls = root / "tool-calls"
+            for name in ("gh", "node", "curl", "git"):
+                tool = root / name
+                tool.write_text(f'#!/bin/sh\nprintf invoked >> "{calls}"\nexit 99\n')
+                tool.chmod(0o755)
+            result = subprocess.run(
+                [sys.executable, str(SOURCE)], cwd=ROOT, capture_output=True, text=True,
+                env={**os.environ, "PATH": str(root), "GEM_WORKSPACE": str(root),
+                     "GEM_PR_DRAIN_REPO": "JovieInc/Jovie",
+                     "GEM_REPO_REGISTRY": str(ROOT / "scripts/symphony/config/gem-repo-registry.json")},
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertFalse(calls.exists())
+            receipt = json.loads(result.stdout)
+            self.assertIn("PR drain disabled by Gem repo policy for JovieInc/Jovie", receipt["errors"][0])
+            self.assertEqual(receipt["status"], "error")
+            artifacts = list(root.glob("state/gem-pr-drain/**/latest.json"))
+            self.assertEqual(len(artifacts), 1)
+            self.assertEqual(json.loads(artifacts[0].read_text()), receipt)
 
 
 def stale_capacity_receipt():
