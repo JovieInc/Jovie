@@ -181,6 +181,42 @@ export async function recoveryEventDecision(
   return { required: true, reason: 'eligible-recovery-hold-released' };
 }
 
+// A PR event is recovery demand only while its exact head lacks a native owner.
+// Read current GitHub metadata, never treat the event payload as queue truth.
+export async function recoveryNativeAdmissionDecision(
+  event,
+  readQueueState = readPullRequestQueueState
+) {
+  if (event.name !== 'pull_request') return { required: true };
+  const pr = event.payload?.pull_request;
+  if (!Number.isInteger(pr?.number) || !EXACT_SHA.test(pr?.head?.sha ?? '')) {
+    throw new Error('Recovery event exact PR head is indeterminate');
+  }
+  const state = await readQueueState({ repository: repo, number: pr.number });
+  if (state?.number !== pr.number || state?.headRefOid !== pr.head.sha) {
+    throw new Error('Recovery event current head is indeterminate or changed');
+  }
+  if (
+    !['OPEN', 'CLOSED', 'MERGED'].includes(state.state) ||
+    typeof state.isDraft !== 'boolean'
+  ) {
+    throw new Error('Recovery event current PR state is indeterminate');
+  }
+  if (state.state !== 'OPEN' || state.isDraft === true) {
+    return { required: false, reason: 'current-pr-not-ready' };
+  }
+  if (
+    typeof state.queued !== 'boolean' ||
+    typeof state.autoMergeEnabled !== 'boolean'
+  ) {
+    throw new Error('Recovery event native admission is indeterminate');
+  }
+  if (state.queued || state.autoMergeEnabled) {
+    return { required: false, reason: 'exact-head-native-admission-owned' };
+  }
+  return { required: true };
+}
+
 export async function fetchOfficialSymphonyState({
   fetchImpl = globalThis.fetch,
   url = OFFICIAL_SYMPHONY_STATE_URL,
@@ -703,6 +739,7 @@ export async function processFleetClosureRemediationIntents(
 export async function run({
   eventContext = readRecoveryEvent(),
   readEventTimeline = readRecoveryTimeline,
+  readEventQueueState = readPullRequestQueueState,
   now = Date.now(),
   resolvePolicyHead = resolveExactMainPolicyHead,
   readOpenPulls = openPulls,
@@ -714,6 +751,14 @@ export async function run({
   });
   if (!event.required) {
     console.log(`Ownerless recovery skipped: ${event.reason}`);
+    return;
+  }
+  const admission = await recoveryNativeAdmissionDecision(
+    eventContext,
+    readEventQueueState
+  );
+  if (!admission.required) {
+    console.log(`Ownerless recovery skipped: ${admission.reason}`);
     return;
   }
   const mainSha = await resolvePolicyHead();
