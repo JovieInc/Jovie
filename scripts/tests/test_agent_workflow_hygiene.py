@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import stat
 import subprocess
 import textwrap
 from pathlib import Path
@@ -1669,3 +1670,167 @@ def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:
     assert (
         "if: ${{ github.event_name == '__retired_linear_only__' }}" in block
     )
+
+
+def _setup_doppler_install_script() -> str:
+    action = REPO_ROOT / ".github/actions/setup-doppler/action.yml"
+    lines = action.read_text().splitlines()
+    start = lines.index("    - name: Install Doppler CLI")
+    run = next(i for i in range(start, len(lines)) if lines[i] == "      run: |")
+    body: list[str] = []
+    for line in lines[run + 1 :]:
+        if line.startswith("        ") or not line:
+            body.append(line[8:] if line else line)
+            continue
+        break
+    return "\n".join(body) + "\n"
+
+
+def _write_executable(path: Path, body: str) -> None:
+    path.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + body)
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+
+def _run_setup_doppler_fixture(
+    tmp_path: Path, scenario: str
+) -> tuple[subprocess.CompletedProcess[str], Path, str]:
+    fake_bin = tmp_path / "bin"
+    fake_root = tmp_path / "root"
+    fake_bin.mkdir()
+    fake_root.mkdir()
+    log = tmp_path / "calls.log"
+
+    _write_executable(
+        fake_bin / "sudo",
+        textwrap.dedent(
+            """
+            printf 'sudo %s\\n' "$*" >> "$CALL_LOG"
+            if [ "$1" = apt-get ]; then
+              exit 0
+            fi
+            if [ "$1" = install ]; then
+              source_path="${@: -2:1}"
+              destination="${@: -1}"
+              mkdir -p "$FAKE_ROOT$(dirname "$destination")"
+              cp "$source_path" "$FAKE_ROOT$destination"
+              exit 0
+            fi
+            exit 64
+            """
+        ),
+    )
+    _write_executable(
+        fake_bin / "curl",
+        textwrap.dedent(
+            """
+            printf 'curl %s\\n' "$*" >> "$CALL_LOG"
+            output=''
+            previous=''
+            for argument in "$@"; do
+              if [ "$previous" = --output ]; then output="$argument"; fi
+              previous="$argument"
+            done
+            test -n "$output"
+            if [ "$SCENARIO" = empty ]; then
+              : > "$output"
+              exit 0
+            fi
+            if [ "$SCENARIO" = invalid ]; then
+              printf '<html>temporary upstream error</html>\\n' > "$output"
+              exit 0
+            fi
+            for required in --fail --show-error --location --retry-all-errors; do
+              case " $* " in
+                *" $required "*) ;;
+                *) exit 65 ;;
+              esac
+            done
+            printf 'transport-attempt=503\\ntransport-attempt=success\\n' >> "$CALL_LOG"
+            cat > "$output" <<'KEY'
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+            valid-test-key
+            -----END PGP PUBLIC KEY BLOCK-----
+            KEY
+            """
+        ),
+    )
+    _write_executable(
+        fake_bin / "gpg",
+        textwrap.dedent(
+            """
+            printf 'gpg %s\\n' "$*" >> "$CALL_LOG"
+            if [[ " $* " = *" --show-keys "* ]]; then
+              grep -q '^-----BEGIN PGP PUBLIC KEY BLOCK-----$' "${@: -1}"
+              exit 0
+            fi
+            output=''
+            previous=''
+            for argument in "$@"; do
+              if [ "$previous" = --output ]; then output="$argument"; fi
+              previous="$argument"
+            done
+            test -n "$output"
+            printf 'dearmored-test-key\\n' > "$output"
+            """
+        ),
+    )
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "CALL_LOG": str(log),
+            "FAKE_ROOT": str(fake_root),
+            "PATH": f"{fake_bin}:/usr/bin:/bin",
+            "SCENARIO": scenario,
+        }
+    )
+    result = subprocess.run(
+        ["bash", "-c", _setup_doppler_install_script()],
+        cwd=REPO_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, fake_root, log.read_text() if log.exists() else ""
+
+
+def test_setup_doppler_retries_then_installs_validated_key_atomically(
+    tmp_path: Path,
+) -> None:
+    result, fake_root, calls = _run_setup_doppler_fixture(tmp_path, "transient")
+
+    assert result.returncode == 0, result.stderr
+    assert "transport-attempt=503" in calls
+    assert "transport-attempt=success" in calls
+    assert "--retry-all-errors" in calls
+    assert (
+        fake_root / "usr/share/keyrings/doppler-archive-keyring.gpg"
+    ).read_text() == "dearmored-test-key\n"
+    assert (fake_root / "etc/apt/sources.list.d/doppler-cli.list").is_file()
+
+
+def test_setup_doppler_rejects_empty_body_before_keyring_mutation(
+    tmp_path: Path,
+) -> None:
+    result, fake_root, calls = _run_setup_doppler_fixture(tmp_path, "empty")
+
+    assert result.returncode != 0
+    assert "Doppler signing key download was empty." in result.stderr
+    assert "gpg " not in calls
+    assert not (
+        fake_root / "usr/share/keyrings/doppler-archive-keyring.gpg"
+    ).exists()
+
+
+def test_setup_doppler_rejects_non_pgp_body_before_keyring_mutation(
+    tmp_path: Path,
+) -> None:
+    result, fake_root, calls = _run_setup_doppler_fixture(tmp_path, "invalid")
+
+    assert result.returncode != 0
+    assert "was not an ASCII-armored PGP public key" in result.stderr
+    assert "gpg " not in calls
+    assert not (
+        fake_root / "usr/share/keyrings/doppler-archive-keyring.gpg"
+    ).exists()

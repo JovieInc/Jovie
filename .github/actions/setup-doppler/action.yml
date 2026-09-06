@@ -7,9 +7,53 @@ runs:
     - name: Install Doppler CLI
       shell: bash
       run: |
+        set -euo pipefail
+
         sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
-        curl -sLf --retry 3 --tlsv1.2 --proto "=https" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+
+        key_url='https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key'
+        key_file="$(mktemp)"
+        keyring_file="$(mktemp)"
+        repository_file="$(mktemp)"
+        cleanup() {
+          rm -f "$key_file" "$keyring_file" "$repository_file"
+        }
+        trap cleanup EXIT
+
+        curl \
+          --fail \
+          --show-error \
+          --silent \
+          --location \
+          --retry 5 \
+          --retry-delay 1 \
+          --retry-all-errors \
+          --tlsv1.2 \
+          --proto '=https' \
+          --output "$key_file" \
+          "$key_url"
+        test -s "$key_file" || {
+          echo 'Doppler signing key download was empty.' >&2
+          exit 1
+        }
+        grep -q '^-----BEGIN PGP PUBLIC KEY BLOCK-----$' "$key_file" || {
+          echo 'Doppler signing key download was not an ASCII-armored PGP public key.' >&2
+          exit 1
+        }
+        gpg --batch --quiet --show-keys "$key_file" >/dev/null
+        gpg --batch --yes --dearmor --output "$keyring_file" "$key_file"
+        test -s "$keyring_file" || {
+          echo 'Doppler signing keyring conversion produced an empty file.' >&2
+          exit 1
+        }
+        sudo install -o root -g root -m 0644 \
+          "$keyring_file" /usr/share/keyrings/doppler-archive-keyring.gpg
+
+        printf '%s\n' \
+          'deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main' \
+          > "$repository_file"
+        sudo install -o root -g root -m 0644 \
+          "$repository_file" /etc/apt/sources.list.d/doppler-cli.list
         sudo apt-get update && sudo apt-get install doppler
 
     - name: Verify Doppler installation
