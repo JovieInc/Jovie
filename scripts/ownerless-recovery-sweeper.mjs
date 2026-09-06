@@ -2,6 +2,7 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
+import { activeLinearCooldown } from './backlog-orchestrator/linear-client.mjs';
 import { TODO_STATE_ID } from './backlog-orchestrator/stale-lease-guard.mjs';
 import {
   buildPrFleetClosureAudit,
@@ -871,9 +872,26 @@ export function safeFailureReceipt(error) {
   };
 }
 
+export function ownerlessRecoveryFailureDisposition(error, now = Date.now()) {
+  const cooldown = activeLinearCooldown(error, now);
+  return {
+    ...safeFailureReceipt(error),
+    status: cooldown ? 'deferred' : 'blocked',
+    ...(cooldown ?? {}),
+  };
+}
+
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {
   run().catch(error => {
-    console.error(JSON.stringify(safeFailureReceipt(error)));
+    const disposition = ownerlessRecoveryFailureDisposition(error);
+    console.error(JSON.stringify(disposition));
+    if (disposition.status === 'deferred') {
+      console.error(
+        `Linear credential cooldown is active; the scheduled recovery clock will retry at or after ${disposition.retryAt}.`
+      );
+      process.exitCode = 0;
+      return;
+    }
     if (error instanceof Error && error.stack) console.error(error.stack);
     process.exitCode = 1;
   });

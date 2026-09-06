@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   access,
   mkdir,
@@ -55,6 +56,50 @@ describe('team production health contract', () => {
       /healthUrl: 'https:\/\/www\.logyourbody\.com\/robots\.txt'/
     );
     assert.doesNotMatch(source, /healthUrl: 'https:\/\/logyourbody\.com'/);
+  });
+});
+
+describe('remediation cooldown recovery', () => {
+  it('defers a shared Linear cooldown for the scheduled retry clock', async () => {
+    const executable = resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs');
+    const stateRoot = await mkdtemp(resolve(tmpdir(), 'linear-cooldown-cli-'));
+    const key = 'test-remediation-cooldown-key';
+    const resetAt = Date.now() + 60_000;
+    const scope = createHash('sha256')
+      .update(`https://api.linear.app/graphql\0${key}`)
+      .digest('hex');
+    const scopeDir = resolve(stateRoot, scope);
+    await mkdir(scopeDir, { recursive: true, mode: 0o700 });
+    await writeFile(
+      resolve(scopeDir, `${resetAt}-00000000-0000-4000-8000-000000000000.json`),
+      JSON.stringify({ schema: 1, resetAt }),
+      { mode: 0o600 }
+    );
+
+    try {
+      const result = await execFileAsync(
+        process.execPath,
+        [executable, 'remediate'],
+        {
+          env: {
+            ...process.env,
+            LINEAR_API_KEY: key,
+            LINEAR_BACKOFF_STATE_DIR: stateRoot,
+            XDG_CACHE_HOME: stateRoot,
+          },
+        }
+      );
+      const receipt = JSON.parse(
+        result.stderr.match(/Failure receipt: (\{.*\})/)?.[1] || '{}'
+      );
+      assert.equal(receipt.status, 'deferred');
+      assert.equal(receipt.code, 'RATE_LIMITED');
+      assert.equal(receipt.resetAt, resetAt);
+      assert.equal(receipt.retryAt, new Date(resetAt).toISOString());
+      assert.match(result.stderr, /scheduled remediation clock will retry/);
+    } finally {
+      await rm(stateRoot, { recursive: true, force: true });
+    }
   });
 });
 
