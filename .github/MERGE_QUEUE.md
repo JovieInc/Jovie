@@ -93,8 +93,17 @@ merged, blocked, stale or unknown separately. It rereads after mutation errors
 and does not blindly retry. Durable local attempt receipts must survive agent
 restart; cross-host uncertain attempts need the same receipt directory.
 
-Unchanged ejected heads return to their owner for diagnosis, not an automatic
-retry loop. Missing CI and conflicts remain repair work. Exact-head required
+Ejected PRs return to their owner for diagnosis, not an automatic retry loop.
+GitHub's removal `beforeCommit` identifies the synthetic group, not the PR head.
+After repairing and qualifying the current head, the owner may supply
+`--reconcile-removal NODE_ID --reconciliation-receipt PATH` to the command.
+The JSON receipt must use schema `jovie-native-merge-reconciliation/v1` and bind
+`repository`, `prNumber`, `headSha`, `removalEventId`, `decision: "retry-once"`,
+`owner` (the authenticated GitHub login), and nonempty diagnosis/qualification
+`evidence`. Both reads must still match that head, event and owner. Each removal
+gets one durable attempt; changing the receipt path or text cannot retry an
+ambiguous request. Existing holds and required checks still apply.
+Missing CI and conflicts remain repair work. Exact-head required
 checks cannot be replaced by labels or a successful observer run.
 
 The old drain, fleet queue freeze, auto-approval and landing sweep paths are

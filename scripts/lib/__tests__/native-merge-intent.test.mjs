@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { parseArgs, submitMergeIntent } from '../../native-merge-intent.mjs';
+import {
+  parseArgs,
+  QUERY,
+  submitMergeIntent,
+} from '../../native-merge-intent.mjs';
 
 const head = 'a'.repeat(40);
 const directories = [];
@@ -19,6 +23,7 @@ function fixture({
   checkCode = 0,
   mergeCode = 0,
   throwMerge = false,
+  viewer = 'test-owner',
 } = {}) {
   const receiptDir = mkdtempSync(join(tmpdir(), 'native-intent-'));
   directories.push(receiptDir);
@@ -34,6 +39,7 @@ function fixture({
         code: 0,
         stdout: JSON.stringify({
           data: {
+            viewer: { login: viewer },
             repository: {
               pullRequest: {
                 headRefOid: head,
@@ -191,25 +197,223 @@ test('concurrent completion events issue at most one mutation', async () => {
   assert.equal(f.mutations().length, 1);
 });
 
-test('ejected unchanged or unknown head requires reconciliation; new head permits intent', async () => {
+test('every removal blocks ordinary callers even when beforeCommit is a synthetic group SHA', async () => {
   for (const oid of [head, null, 'b'.repeat(40)]) {
     const f = fixture({
       states: [
         {
           timelineItems: {
-            nodes: [{ beforeCommit: oid ? { oid } : null, reason: 'failed' }],
+            nodes: [
+              {
+                id: 'MQR_latest-removal',
+                beforeCommit: oid ? { oid } : null,
+                reason: 'failed_checks',
+              },
+            ],
           },
         },
       ],
     });
     const result = await submitMergeIntent(f.options, f);
-    assert.equal(f.mutations().length, oid === 'b'.repeat(40) ? 1 : 0);
-    if (oid !== 'b'.repeat(40))
-      assert.equal(
-        result.reason,
-        'queue-ejected-requires-owner-reconciliation'
-      );
+    assert.equal(f.mutations().length, 0);
+    assert.equal(result.reason, 'queue-ejected-requires-owner-reconciliation');
+    assert.equal(result.removalEventId, 'MQR_latest-removal');
   }
+});
+
+const removalId = 'MQR_latest-removal';
+function removed(id = removalId) {
+  return {
+    timelineItems: {
+      nodes: [
+        {
+          id,
+          beforeCommit: { oid: 'f3e8fd874a474c57b65cb903b612792acade79d0' },
+          reason: 'failed_checks',
+        },
+      ],
+    },
+  };
+}
+function reconcile(
+  f,
+  patch = {},
+  path = join(f.options.receiptDir, 'owner-reconciliation.json')
+) {
+  const record = {
+    schema: 'jovie-native-merge-reconciliation/v1',
+    repository: f.options.repo,
+    prNumber: f.options.pr,
+    headSha: f.options.head,
+    removalEventId: removalId,
+    decision: 'retry-once',
+    owner: 'test-owner',
+    evidence:
+      'Independent review: transient infrastructure failure resolved; exact source checks requalified.',
+    ...patch,
+  };
+  writeFileSync(path, JSON.stringify(record));
+  return {
+    ...f.options,
+    reconcileRemoval: record.removalEventId,
+    reconciliationReceipt: path,
+  };
+}
+
+test('owner-bound exact removal permits one request and retains immutable event evidence', async () => {
+  const f = fixture({
+    states: [
+      removed(),
+      removed(),
+      { ...removed(), isInMergeQueue: true, mergeQueueEntry: { position: 2 } },
+    ],
+  });
+  const result = await submitMergeIntent(reconcile(f), f);
+  assert.equal(result.status, 'queued');
+  assert.equal(f.mutations().length, 1);
+  const receipt = JSON.parse(readFileSync(result.receipt, 'utf8'));
+  assert.equal(receipt.removalEventId, removalId);
+  assert.equal(receipt.head, head);
+  assert.equal(receipt.reconciliation.owner, 'test-owner');
+  assert.ok(f.calls[0].includes(`query=${QUERY}`));
+  assert.ok(QUERY.includes('RemovedFromMergeQueueEvent{id beforeCommit'));
+  assert.ok(QUERY.includes('viewer{login}'));
+});
+
+test('ambiguous reconciliation cannot replay with changed evidence, path, or coordinator instance', async () => {
+  const f = fixture({ states: [removed()], mergeCode: 1 });
+  const first = await submitMergeIntent(reconcile(f), f);
+  assert.equal(first.status, 'unknown');
+  assert.equal(f.mutations().length, 1);
+  const options = reconcile(
+    f,
+    { evidence: 'Another report for the same event is not a new operation.' },
+    join(f.options.receiptDir, 'different-proof.json')
+  );
+  const again = await submitMergeIntent(options, { ...f });
+  assert.equal(again.reason, 'previous-attempt-requires-owner-reconciliation');
+  assert.equal(again.receipt, first.receipt);
+  assert.equal(f.mutations().length, 1);
+});
+
+test('a later removal requires its own explicit reconciliation while preserving prior claim', async () => {
+  const f = fixture({ states: [removed()], mergeCode: 1 });
+  const first = await submitMergeIntent(reconcile(f), f);
+  const next = fixture({ states: [removed('MQR_new-removal')], mergeCode: 1 });
+  next.options.receiptDir = f.options.receiptDir;
+  const stale = await submitMergeIntent(reconcile(next), next);
+  assert.equal(stale.reason, 'reconciliation-removal-changed');
+  assert.equal(next.mutations().length, 0);
+  const second = await submitMergeIntent(
+    reconcile(next, { removalEventId: 'MQR_new-removal' }),
+    next
+  );
+  assert.equal(second.status, 'unknown');
+  assert.equal(next.mutations().length, 1);
+  assert.notEqual(first.receipt, second.receipt);
+  assert.equal(
+    JSON.parse(readFileSync(first.receipt, 'utf8')).removalEventId,
+    removalId
+  );
+});
+
+test('unbound, missing, oversized, and malformed reconciliation receipts never mutate', async () => {
+  const f = fixture({ states: [removed()] });
+  for (const patch of [
+    { schema: 'other' },
+    { repository: 'other/repo' },
+    { prNumber: 9 },
+    { headSha: 'c'.repeat(40) },
+    { decision: 'retry-forever' },
+    { owner: ' ' },
+    { evidence: ' ' },
+  ]) {
+    assert.equal(
+      (await submitMergeIntent(reconcile(f, patch), f)).reason,
+      'reconciliation-receipt-invalid'
+    );
+  }
+  const options = reconcile(f);
+  for (const content of ['not-json', 'x'.repeat(65537), 'null']) {
+    writeFileSync(options.reconciliationReceipt, content);
+    assert.equal(
+      (await submitMergeIntent(options, f)).reason,
+      'reconciliation-receipt-invalid'
+    );
+  }
+  rmSync(options.reconciliationReceipt);
+  assert.equal(
+    (await submitMergeIntent(options, f)).reason,
+    'reconciliation-receipt-invalid'
+  );
+  const wrongEvent = reconcile(f);
+  wrongEvent.reconcileRemoval = 'MQR_not-receipted';
+  assert.equal(
+    (await submitMergeIntent(wrongEvent, f)).reason,
+    'reconciliation-receipt-invalid'
+  );
+  assert.equal(f.mutations().length, 0);
+});
+
+test('latest removal and authenticated owner must match on both authoritative reads', async () => {
+  for (const viewer of ['another-owner', '']) {
+    const f = fixture({ states: [removed()], viewer });
+    assert.equal(
+      (await submitMergeIntent(reconcile(f), f)).reason,
+      'reconciliation-owner-mismatch'
+    );
+    assert.equal(f.mutations().length, 0);
+  }
+  for (const last of [
+    removed('MQR_new-removal'),
+    {},
+    { ...removed(), headRefOid: 'c'.repeat(40) },
+  ]) {
+    const f = fixture({ states: [removed(), last] });
+    assert.equal((await submitMergeIntent(reconcile(f), f)).status, 'blocked');
+    assert.equal(f.mutations().length, 0);
+  }
+  const f = fixture({ states: [removed()] });
+  const original = f.exec;
+  let reads = 0;
+  const outcome = await submitMergeIntent(reconcile(f), {
+    ...f,
+    exec: async args => {
+      const response = await original(args);
+      if (args[0] === 'api' && ++reads === 2) {
+        const data = JSON.parse(response.stdout);
+        data.data.viewer.login = 'new-owner';
+        response.stdout = JSON.stringify(data);
+      }
+      return response;
+    },
+  });
+  assert.equal(outcome.reason, 'reconciliation-owner-mismatch');
+  assert.equal(f.mutations().length, 0);
+});
+
+test('explicit reconciliation retains required check and source integrity policy gates', async () => {
+  const failed = fixture({
+    states: [removed()],
+    checks: [{ name: 'PR Ready', bucket: 'fail' }],
+    checkCode: 1,
+  });
+  assert.equal(
+    (await submitMergeIntent(reconcile(failed), failed)).status,
+    'blocked'
+  );
+  assert.equal(failed.mutations().length, 0);
+  const held = fixture({ states: [removed()] });
+  assert.equal(
+    (
+      await submitMergeIntent(reconcile(held), {
+        ...held,
+        policy: async () => ({ allowed: false, blockers: ['hold'] }),
+      })
+    ).reason,
+    'source-policy-blocked'
+  );
+  assert.equal(held.mutations().length, 0);
 });
 
 test('merged response is distinct; stale merged SHA never proves requested head', async () => {
@@ -240,6 +444,12 @@ test('explicit inputs reject shell-like or abbreviated identifiers', async () =>
     { head: 'abc' },
     { pr: -1 },
     { pr: '1;evil' },
+    { reconcileRemoval: removalId },
+    { reconciliationReceipt: '/tmp/proof.json' },
+    {
+      reconcileRemoval: 'node with spaces',
+      reconciliationReceipt: '/tmp/proof.json',
+    },
   ]) {
     await assert.rejects(submitMergeIntent({ ...f.options, ...patch }, f));
   }
@@ -248,6 +458,15 @@ test('explicit inputs reject shell-like or abbreviated identifiers', async () =>
     pr: '1',
     head,
   });
+  assert.deepEqual(
+    parseArgs([
+      '--reconcile-removal',
+      removalId,
+      '--reconciliation-receipt',
+      '/proof.json',
+    ]),
+    { reconcileRemoval: removalId, reconciliationReceipt: '/proof.json' }
+  );
   assert.throws(() => parseArgs(['--admin', 'true']));
   assert.throws(() => parseArgs(['--pr']));
   assert.throws(() => parseArgs(['--pr', '1', '--pr', '2']));
