@@ -209,7 +209,7 @@ describe('ProfileDesktopSurface', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
     const listenCta = screen.getByRole('button', { name: 'Listen' });
-    expect(listenCta).toHaveClass('h-8');
+    expect(listenCta).toHaveClass('h-7');
     expect(listenCta.className).toContain('before:h-11');
     expect(listenCta.className).toContain('before:min-w-11');
     expect(

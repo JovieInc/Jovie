@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
@@ -150,8 +150,8 @@ describe('Button', () => {
     const btn = screen.getByRole('button');
     expect(btn).toHaveAttribute('data-variant', 'primary');
     expect(btn).toHaveAttribute('data-size', 'md');
-    expect(btn.className).toContain('h-9');
-    expect(btn.className).toContain('text-app');
+    expect(btn.className).toContain('h-7');
+    expect(btn.className).toContain('text-xs');
     expect(btn.className).toContain('bg-btn-primary');
   });
 
@@ -166,7 +166,7 @@ describe('Button', () => {
     expect(btn.className).toContain('h-7');
   });
 
-  it('keeps the marketing text contract at 32px visible inside a 44px target', () => {
+  it('keeps the marketing text contract at 28px visible inside a 44px target', () => {
     render(
       <Button variant='primary' size='marketing'>
         Join the waitlist
@@ -175,11 +175,32 @@ describe('Button', () => {
 
     const btn = screen.getByRole('button', { name: 'Join the waitlist' });
     expect(btn).toHaveAttribute('data-size', 'marketing');
-    expect(btn.className).toContain('h-8');
+    expect(btn.className).toContain('h-7');
     expect(btn.className).toContain('before:h-11');
     expect(btn.className).toContain('before:min-w-11');
     expect(btn.className).toContain('before:w-full');
     expect(btn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+  });
+
+  it('makes every text size an equivalent control for primary and secondary', () => {
+    for (const variant of ['primary', 'secondary'] as const) {
+      const { unmount } = render(
+        (['sm', 'marketing', 'md', 'lg'] as const).map(size => (
+          <Button key={size} variant={variant} size={size}>
+            {size}
+          </Button>
+        ))
+      );
+      const controls = screen.getAllByRole('button');
+      expect(new Set(controls.map(control => control.className)).size).toBe(1);
+      for (const control of controls) {
+        expect(control.className).toContain('h-7');
+        expect(control.className).toContain('px-2.5');
+        expect(control.className).toContain('text-xs');
+        expect(control.className).toContain('before:h-11');
+      }
+      unmount();
+    }
   });
 
   it('keeps every text-button size inside a 44px minimum target', () => {
@@ -346,7 +367,7 @@ describe('Button', () => {
   it('uses the Jovie focus token', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('focus-visible:ring-focus/55');
+    expect(btn.className).toContain('focus-visible:ring-focus');
     expect(btn.className).toContain('focus-visible:ring-offset-surface-page');
   });
 
@@ -418,6 +439,152 @@ describe('Button', () => {
       </Button>
     );
     expect(screen.getByRole('link')).toBeInTheDocument();
+  });
+
+  it.each([
+    'disabled',
+    'loading',
+  ] as const)('prevents child and wrapper activation while asChild is %s', state => {
+    const onClick = vi.fn();
+    const onChildClick = vi.fn();
+    render(
+      <Button asChild {...{ [state]: true }} onClick={onClick}>
+        <a href='/destination' onClick={onChildClick}>
+          Continue
+        </a>
+      </Button>
+    );
+    const link = screen.getByRole('link', { name: 'Continue' });
+    // Keyboard and assistive technologies synthesize clicks independently
+    // of pointer-events. The default action must be cancelled as well.
+    expect(fireEvent.click(link, { detail: 0 })).toBe(false);
+    expect(onClick).not.toHaveBeenCalled();
+    expect(onChildClick).not.toHaveBeenCalled();
+  });
+
+  it('restores composed activation after leaving the disabled state', () => {
+    const onClick = vi.fn();
+    const onChildClick = vi.fn((event: React.MouseEvent) =>
+      event.preventDefault()
+    );
+    const child = (
+      <a href='/destination' onClick={onChildClick}>
+        Continue
+      </a>
+    );
+    const { rerender } = render(
+      <Button asChild disabled onClick={onClick}>
+        {child}
+      </Button>
+    );
+    fireEvent.click(screen.getByRole('link'));
+    rerender(
+      <Button asChild onClick={onClick}>
+        {child}
+      </Button>
+    );
+    fireEvent.click(screen.getByRole('link'));
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onChildClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks a disabled child capture handler before it performs an action', () => {
+    const onClickCapture = vi.fn();
+    const onWrapperCapture = vi.fn();
+    render(
+      <Button asChild disabled onClickCapture={onWrapperCapture}>
+        <a href='/destination' onClickCapture={onClickCapture}>
+          Continue
+        </a>
+      </Button>
+    );
+    expect(fireEvent.click(screen.getByRole('link'))).toBe(false);
+    expect(onClickCapture).not.toHaveBeenCalled();
+    expect(onWrapperCapture).not.toHaveBeenCalled();
+  });
+
+  it('cancels auxiliary activation on disabled slotted links', () => {
+    const onAuxClick = vi.fn();
+    render(
+      <Button asChild disabled>
+        <a href='/destination' onAuxClick={onAuxClick}>
+          Continue
+        </a>
+      </Button>
+    );
+    expect(
+      fireEvent(
+        screen.getByRole('link'),
+        new MouseEvent('auxclick', {
+          button: 1,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+    ).toBe(false);
+    expect(onAuxClick).not.toHaveBeenCalled();
+  });
+
+  it('keeps disabled slotted accessibility authoritative over child props', () => {
+    render(
+      <Button asChild loading>
+        <a href='/destination' aria-disabled={false} aria-busy={false}>
+          Continue
+        </a>
+      </Button>
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('link')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('blocks activation for opaque server children while loading', () => {
+    const onChildClick = vi.fn();
+    const serverElement = (
+      <a href='/destination' onClick={onChildClick}>
+        Continue
+      </a>
+    );
+    const payload = Object.assign(Promise.resolve(serverElement), {
+      status: 'fulfilled',
+      value: serverElement,
+    });
+    const serverChild = {
+      $$typeof: Symbol.for('react.lazy'),
+      _payload: payload,
+    } as unknown as React.ReactNode;
+    render(
+      <Button asChild loading>
+        {serverChild}
+      </Button>
+    );
+    expect(fireEvent.click(screen.getByRole('link'))).toBe(false);
+    expect(onChildClick).not.toHaveBeenCalled();
+  });
+
+  it('uses the primary action foreground for the loading indicator', () => {
+    render(<Button loading>Continue</Button>);
+    expect(screen.getByRole('status', { name: 'Loading' })).toHaveAttribute(
+      'data-tone',
+      'inverse'
+    );
+  });
+
+  it('preserves a 44px target for standalone icon links', () => {
+    for (const size of BUTTON_SIZE_NAMES.filter(size =>
+      size.startsWith('icon')
+    )) {
+      const { unmount } = render(
+        <Button variant='link' size={size} aria-label='Add'>
+          +
+        </Button>
+      );
+      const button = screen.getByRole('button', { name: 'Add' });
+      expect(button.className).toContain('before:block');
+      expect(button.className).toContain('before:h-11');
+      expect(button.className).toContain('before:w-11');
+      expect(button.className).not.toContain('before:hidden');
+      unmount();
+    }
   });
 
   it('respects disabled state', () => {
