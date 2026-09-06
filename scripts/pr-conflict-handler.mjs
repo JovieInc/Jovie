@@ -7,7 +7,7 @@ import {
   fetchNativeMergeQueue,
 } from './lib/github-merge-queue.mjs';
 import {
-  fetchOpenPrSummariesRest,
+  fetchCompleteOpenPrSummariesRest,
   hydrateOpenPrGraphqlMetadata,
   hydrateOpenPrStatusContexts,
 } from './lib/github-open-prs-rest.mjs';
@@ -231,7 +231,7 @@ async function fetchOpenPrs(options) {
   // generated `gh pr list` GraphQL connection into a controller-wide 502.
   // REST omits mergeability and diff totals, so hydrate those exact-identity
   // fields in small GraphQL batches before any classification or mutation.
-  const summaries = await fetchOpenPrSummariesRest({
+  const summaries = await fetchCompleteOpenPrSummariesRest({
     repo: options.repo,
     limit: options.limit,
     request: restRequest,

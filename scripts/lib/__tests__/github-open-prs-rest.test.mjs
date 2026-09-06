@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fetchCompleteOpenPrSummariesRest,
   fetchOpenPrSummariesRest,
   fetchOpenPrsRest,
   hydrateOpenPrGraphqlMetadata,
@@ -156,6 +157,51 @@ describe('REST open PR inventory', () => {
         request: async () => [],
       })
     ).rejects.toThrow('open PR limit must be between 1 and 500');
+  });
+
+  it('fails closed when a complete inventory reaches its ceiling', async () => {
+    const request = async endpoint => {
+      if (endpoint.endsWith('page=1')) {
+        return Array.from({ length: 100 }, (_, index) => ({
+          number: index + 1,
+        }));
+      }
+      return Array.from({ length: 100 }, (_, index) => ({
+        number: index + 101,
+      }));
+    };
+
+    await expect(
+      fetchCompleteOpenPrSummariesRest({
+        repo: 'JovieInc/Jovie',
+        limit: 200,
+        request,
+      })
+    ).rejects.toThrow(
+      'REST open-PR inventory reached its ceiling before proving completeness'
+    );
+  });
+
+  it('proves completeness by reading the terminating page', async () => {
+    const calls = [];
+    const request = async endpoint => {
+      calls.push(endpoint);
+      if (endpoint.endsWith('page=1')) {
+        return Array.from({ length: 100 }, (_, index) => ({
+          number: index + 1,
+        }));
+      }
+      return [{ number: 101 }];
+    };
+
+    const summaries = await fetchCompleteOpenPrSummariesRest({
+      repo: 'JovieInc/Jovie',
+      limit: 200,
+      request,
+    });
+
+    expect(summaries).toHaveLength(101);
+    expect(calls).toHaveLength(2);
   });
 
   it('paginates without GraphQL and hydrates exact-head checks', async () => {

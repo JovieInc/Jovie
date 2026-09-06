@@ -98,14 +98,21 @@ export function normalizeRestPullRequest(detail, statusCheckRollup) {
   };
 }
 
-export async function fetchOpenPrSummariesRest({ repo, limit = 200, request }) {
+export async function fetchOpenPrSummariesRest({
+  repo,
+  limit = 200,
+  request,
+  requireComplete = false,
+}) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
     throw new Error('open PR limit must be between 1 and 500');
   }
   const summaries = [];
   const seen = new Set();
-  for (let page = 1; summaries.length < limit; page += 1) {
-    const pageSize = Math.min(100, limit - summaries.length);
+  for (let page = 1; ; page += 1) {
+    const pageSize = requireComplete
+      ? 100
+      : Math.min(100, limit - summaries.length);
     const batch = await request(
       `repos/${repo}/pulls?state=open&per_page=${pageSize}&page=${page}`
     );
@@ -125,8 +132,29 @@ export async function fetchOpenPrSummariesRest({ repo, limit = 200, request }) {
       summaries.push(normalizeRestPullRequest(summary, []));
     }
     if (batch.length < pageSize) break;
+    if (summaries.length >= limit) {
+      if (requireComplete) {
+        throw new Error(
+          'REST open-PR inventory reached its ceiling before proving completeness'
+        );
+      }
+      break;
+    }
   }
   return summaries.slice(0, limit);
+}
+
+export async function fetchCompleteOpenPrSummariesRest({
+  repo,
+  limit = 500,
+  request,
+}) {
+  return fetchOpenPrSummariesRest({
+    repo,
+    limit,
+    request,
+    requireComplete: true,
+  });
 }
 
 export async function hydrateOpenPrGraphqlMetadata({
