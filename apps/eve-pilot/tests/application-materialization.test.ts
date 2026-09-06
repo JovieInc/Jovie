@@ -46,13 +46,15 @@ describe('independent application source export', () => {
           join(contractDirectory, 'index.ts'),
           'utf8'
         );
-        expect(entrypoint).toContain("export * from './symphony-outage'");
+        expect(entrypoint).toContain("export * from './symphony-outage.js'");
         for (const [, target] of entrypoint.matchAll(
           /from ['"](\.\/[^'"]+)['"]/gu
         ))
-          expect(existsSync(join(contractDirectory, `${target}.ts`))).toBe(
-            true
-          );
+          expect(
+            existsSync(
+              join(contractDirectory, `${target.replace(/\.js$/u, '')}.ts`)
+            )
+          ).toBe(true);
         expect(
           receipt.files['vendor/agent-transport-contracts/symphony-outage.ts']
         ).toBeDefined();
