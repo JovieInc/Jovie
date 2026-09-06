@@ -2,8 +2,11 @@ import { render, screen } from '@testing-library/react';
 import { Star } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 
+import { MENU_ITEM_BASE } from '../lib/dropdown-styles';
+
 import {
   CommonDropdownItemLabel,
+  renderActionItem,
   renderIcon,
 } from './common-dropdown-item-renderers';
 
@@ -37,5 +40,34 @@ describe('renderIcon', () => {
       <div>{renderIcon(<Star className='text-error' />, 'size-3.5')}</div>
     );
     expect(document.querySelector('svg')).toHaveClass('text-error', 'size-3.5');
+  });
+});
+
+describe('renderActionItem', () => {
+  it('uses the semantic badge text token with custom badge colors', () => {
+    render(
+      <>
+        {renderActionItem(
+          {
+            id: 'new-item',
+            type: 'action',
+            label: 'New item',
+            onClick: () => undefined,
+            badge: { text: 'NEW', color: '#7c3aed' },
+          },
+          {
+            kind: 'dropdown',
+            itemBase: MENU_ITEM_BASE,
+            disablePortal: false,
+          }
+        )}
+      </>
+    );
+
+    const badge = screen.getByText('NEW');
+    expect(badge).toHaveStyle({
+      backgroundColor: 'rgb(124, 58, 237)',
+      color: 'var(--color-badge-text)',
+    });
   });
 });
