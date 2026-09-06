@@ -2107,6 +2107,21 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
+      # This guard permits the trusted-classifier prerequisite to land before
+      # the app. Once present, Ovie must independently build and typecheck.
+      - name: Build independent Ovie app
+        if: hashFiles('apps/ovie/package.json') != ''
+        run: |
+          pnpm --filter @jovie/ovie typecheck
+          pnpm --filter @jovie/ovie build
+          test -f apps/ovie/.next/BUILD_ID
+          test -f apps/ovie/.next/standalone/apps/ovie/server.js
+          test ! -d apps/ovie/.next/standalone/apps/docs
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3105
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
@@ -3927,6 +3942,26 @@ jobs:
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
+
+      - name: Run Ovie route and private-boundary coverage
+        # One deterministic app suite, never repeated across the web shards.
+        if: >-
+          steps.check_changes.outputs.run_full_ci == 'true' &&
+          matrix.shard == '1/10' &&
+          hashFiles('apps/ovie/package.json') != ''
+        run: pnpm --filter @jovie/ovie test
+
+      - name: Preserve Ovie coverage evidence
+        if: >-
+          always() && !cancelled() &&
+          matrix.shard == '1/10' &&
+          hashFiles('apps/ovie/coverage/coverage-summary.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ovie-coverage-${{ github.sha }}-${{ github.run_attempt }}
+          path: apps/ovie/coverage/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run packages/ui unit tests
         # This suite is not sharded; running it in every web-test shard was
