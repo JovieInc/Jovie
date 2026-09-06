@@ -66,6 +66,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   pull-requests: write
   contents: write
 
@@ -140,6 +141,59 @@ jobs:
           persist-credentials: false
       - name: Verify GitHub CLI
         run: gh --version
+      - name: Resolve production release checkpoint
+        id: release-checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Default closed: a controller or API outage may delay a new queue
+          # admission, but it can never weaken exact-main production proof.
+          {
+            echo 'admission_allowed=false'
+            echo 'state=unavailable'
+            echo 'reason=checkpoint-unavailable'
+          } >>"$GITHUB_OUTPUT"
+
+          controller_workflow_id="$({
+            gh api "repos/$REPO/actions/workflows/production-controller.yml" \
+              --jq '.id // empty'
+          } 2>/dev/null)" || {
+            echo '::notice::Production checkpoint could not resolve the controller workflow; new admissions remain paused'
+            exit 0
+          }
+          if [[ ! "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]]; then
+            echo '::notice::Production checkpoint received no trusted controller workflow id; new admissions remain paused'
+            exit 0
+          fi
+
+          marker_json="$(node .github/scripts/production-marker-state.mjs \
+            --repo "$REPO" \
+            --sha "$MAIN_SHA" \
+            --controller-workflow-id "$controller_workflow_id")"
+          checkpoint_state="$(jq -r '.state // "manual"' <<<"$marker_json")"
+          checkpoint_reason="$(jq -r '.reason // "unclassified"' <<<"$marker_json")"
+          if [[ ! "$checkpoint_state" =~ ^[a-z_]+$ ]]; then
+            checkpoint_state='manual'
+          fi
+          if [[ ! "$checkpoint_reason" =~ ^[a-z0-9_-]+$ ]]; then
+            checkpoint_reason='malformed-evidence'
+          fi
+
+          {
+            echo "state=$checkpoint_state"
+            echo "reason=$checkpoint_reason"
+          } >>"$GITHUB_OUTPUT"
+          if [[ "$checkpoint_state" == 'verified' ]]; then
+            echo 'admission_allowed=true' >>"$GITHUB_OUTPUT"
+            echo "Exact current main $MAIN_SHA has a trusted production marker; new native admissions may continue"
+          else
+            echo "::notice::Production release checkpoint is $checkpoint_state ($checkpoint_reason) for current main $MAIN_SHA; existing queue entries continue, but new admissions remain paused"
+          fi
       - name: Resolve exact admission scope
         id: admission
         env:
@@ -149,6 +203,10 @@ jobs:
           MANUAL_PR: ${{ inputs.pr_number || '' }}
           MANUAL_HEAD: ${{ inputs.head_sha || '' }}
           FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          PRODUCTION_ADMISSION_ALLOWED: ${{ steps.release-checkpoint.outputs.admission_allowed }}
+          PRODUCTION_CHECKPOINT_STATE: ${{ steps.release-checkpoint.outputs.state }}
+          PRODUCTION_CHECKPOINT_REASON: ${{ steps.release-checkpoint.outputs.reason }}
+          FLEET_PROMOTION_MODE: ${{ needs.fleet-policy.outputs.mode }}
         run: |
           pr_number=''
           head_sha=''
@@ -298,6 +356,28 @@ jobs:
               ;;
           esac
 
+          if [[ "${PRODUCTION_ADMISSION_ALLOWED:-false}" != 'true' \
+            && "${FLEET_PROMOTION_MODE:-blocked}" != 'controller-repair-only' ]]; then
+            # This is a machine-owned release checkpoint, never a human hold.
+            # Existing merge-queue entries continue under GitHub's native
+            # ordering. New admissions reopen automatically after the exact
+            # current generation preserves a trusted production marker.
+            admission_disposition='neutral'
+            admission_reason="production-release-checkpoint-${PRODUCTION_CHECKPOINT_STATE:-unavailable}-${PRODUCTION_CHECKPOINT_REASON:-unclassified}"
+            pr_number=''
+            head_sha=''
+            recover_holds=0
+            deferred_release=0
+            reconcile_queue_reentry=0
+          elif [[ "${PRODUCTION_ADMISSION_ALLOWED:-false}" != 'true' ]]; then
+            # The fleet gate already constrains controller-repair-only to one
+            # exact PR/head/current-main Jovie Bot attestation, independently
+            # reviewed and valid for at most 15 minutes, with deployments denied.
+            # Preserve that existing bounded escape path so a failed rollout
+            # cannot seal out the source change that repairs its controller.
+            echo 'Production checkpoint preserving one attested controller-repair-only candidate'
+          fi
+
           if [[ "$admission_disposition" == 'neutral' ]]; then
             # Typed-neutral events can run bounded maintenance, but can never
             # carry an admission target into the mutating drain.
@@ -349,17 +429,17 @@ jobs:
           DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && needs.fleet-policy.outputs.mode != 'hold-intake' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
           # Bounded admission projection for isolated-only, hold-intake, draft-only, blocked.
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
-          DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
+          DRAIN_RECOVER_FLEET_HOLDS: ${{ steps.release-checkpoint.outputs.admission_allowed == 'true' && needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
           # Composite CI heads cannot map to source PRs. The drain consumes
           # only bot-authored exact-head native-admission receipts, with fresh
           # checks and the shared admission bound below; it is never a global sweep.
-          DRAIN_RECONCILE_QUEUE_REENTRY: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.reconcile_queue_reentry == '1' && '1' || '0' }}
+          DRAIN_RECONCILE_QUEUE_REENTRY: ${{ steps.release-checkpoint.outputs.admission_allowed == 'true' && needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.reconcile_queue_reentry == '1' && '1' || '0' }}
           # GitHub's single pending slot can replace an exact CI admission event
           # even with cancel-in-progress=false. Reconcile only in the same fleet
           # modes that already permit clean exact-head admission. Admissions are
           # uncapped (0): native queue depth is the sole bound; a positive
           # integer re-caps event + recovery admissions per run.
-          DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
+          DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.release-checkpoint.outputs.admission_allowed == 'true' && steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
           DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'
           # A non-draft main PR whose required source checks never registered a
           # check-run on its exact head can never turn green and never enroll
