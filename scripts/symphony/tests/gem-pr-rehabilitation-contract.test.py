@@ -44,9 +44,10 @@ SPEC.loader.exec_module(REGISTRY)
 
 
 class RegistryContractTests(unittest.TestCase):
-    def test_jovie_stabilization_is_allowlisted_without_changing_issue_policy(self):
+    def test_jovie_drain_is_retired_without_changing_health_or_issue_policy(self):
         policy = REGISTRY.by_github("JovieInc/Jovie")
-        self.assertTrue(policy.pr_drain)
+        self.assertFalse(policy.pr_drain)
+        self.assertTrue(policy.health)
         self.assertTrue(policy.issue_intake)
         self.assertEqual(policy.default_branch, "main")
 
