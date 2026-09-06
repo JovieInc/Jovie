@@ -4237,6 +4237,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(canaryIndex).toBeGreaterThan(inspectIndex);
     expect(stageStep).toContain('scripts/reconcile-vercel-build-env.ts');
     expect(stageStep).toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('NEXT_PUBLIC_GOOGLE_CLIENT_ID');
     expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
     expect(stageStep).toContain('--meta "githubCommitSha=${EXPECTED_SHA}"');
