@@ -17,7 +17,11 @@ watchdog runbook is
 the delivery-liveness watchdog runbook is
 [`delivery-liveness-recovery.md`](../runbooks/delivery-liveness-recovery.md);
 the merge-queue / fleet-gate runbook is
-[`merge-queue-fleet-gate-recovery.md`](../runbooks/merge-queue-fleet-gate-recovery.md).
+[`merge-queue-fleet-gate-recovery.md`](../runbooks/merge-queue-fleet-gate-recovery.md);
+the GitHub Actions production controller and release-marker recovery runbooks are
+[`production-controller-recovery.md`](../runbooks/production-controller-recovery.md)
+and
+[`release-marker-recovery.md`](../runbooks/release-marker-recovery.md).
 
 | File | Schedule | Purpose |
 |---|---|---|
