@@ -21,7 +21,9 @@ the merge-queue / fleet-gate runbook is
 the GitHub Actions production controller and release-marker recovery runbooks are
 [`production-controller-recovery.md`](../runbooks/production-controller-recovery.md)
 and
-[`release-marker-recovery.md`](../runbooks/release-marker-recovery.md).
+[`release-marker-recovery.md`](../runbooks/release-marker-recovery.md);
+the backlog orchestrator / ownership inventory recovery runbook is
+[`backlog-orchestrator-ownership-inventory-recovery.md`](../runbooks/backlog-orchestrator-ownership-inventory-recovery.md).
 
 | File | Schedule | Purpose |
 |---|---|---|
