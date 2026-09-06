@@ -1,0 +1,69 @@
+name: Symphony Control Bundle Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/symphony/**'
+      - 'scripts/backlog-orchestrator/**'
+      - 'scripts/ci-fast-lanes.mjs'
+      - 'scripts/lib/ci-repo-lanes.mjs'
+      - 'scripts/symphony/**'
+      - '.github/workflows/symphony-control-release.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    name: Build and attest control bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run focused control-plane contract tests
+        run: |
+          node --test scripts/symphony/tests/control-bundle-manifest.test.mjs
+          python3 scripts/symphony/tests/symphony-lease-guard.test.py
+      - name: Create reproducible control bundle
+        env:
+          VERSION: v0.0.0-jovie.${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/symphony-control"
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -czf "$RUNNER_TEMP/symphony-control/control-bundle.tar.gz" \
+            scripts/symphony scripts/backlog-orchestrator
+          printf '{"status":"PASS","command":"focused control-plane contract tests","runId":"%s"}\n' \
+            '${{ github.run_id }}' \
+            > "$RUNNER_TEMP/symphony-control/tests.json"
+          node scripts/symphony/control-bundle-manifest.mjs \
+            --repository "${{ github.repository }}" \
+            --sourceSha "${{ github.sha }}" \
+            --version "$VERSION" \
+            --artifact "$RUNNER_TEMP/symphony-control/control-bundle.tar.gz" \
+            --components 'scripts/symphony,scripts/backlog-orchestrator' \
+            --tests "$(cat "$RUNNER_TEMP/symphony-control/tests.json")" \
+            --toolchain '{"node":"22.x","pnpm":"9.15.4"}' \
+            --signature '{"type":"github-artifact-attestation","identity":"github-actions"}' \
+            --compatibility '{"workflow":"jovie-ui-pilot/v1","runtime":"openai/symphony"}' \
+            > "$RUNNER_TEMP/symphony-control/manifest.json"
+          cp "$RUNNER_TEMP/symphony-control/manifest.json" "$RUNNER_TEMP/symphony-control/control-bundle-manifest.json"
+      - name: Upload versioned control bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: symphony-control-bundle-${{ github.sha }}
+          path: ${{ runner.temp }}/symphony-control/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Attest control bundle provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab650dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/symphony-control/control-bundle.tar.gz
