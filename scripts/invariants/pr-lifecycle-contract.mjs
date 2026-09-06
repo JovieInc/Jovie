@@ -101,6 +101,6 @@ export function readPrLifecycleContract(repoRoot = ROOT) {
   const rows = readFileSync(resolve(repoRoot, 'canon/invariants.jsonl'), 'utf8')
     .split(/\r?\n/)
     .filter(Boolean)
-    .map(JSON.parse);
+    .map(line => JSON.parse(line));
   return contractFromRegistry({ invariants: rows.slice(1) });
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   policyDigest,
+  readPrLifecycleContract,
   validatePrLifecycleContract,
 } from './pr-lifecycle-contract.mjs';
 import { readInvariantRegistry } from './registry.mjs';
@@ -17,6 +18,10 @@ describe('JOV-INV-029 PR lifecycle contract', () => {
       ),
       /^[0-9a-f]{64}$/
     );
+  });
+
+  it('reads the lifecycle contract from the multi-row invariant registry', () => {
+    assert.equal(readPrLifecycleContract()?.schema, 'jovie-pr-lifecycle/v1');
   });
 
   it('fails closed when an exit rule conflicts', () => {
