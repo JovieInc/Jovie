@@ -1,0 +1,54 @@
+{
+  "schema": "jovie.component-ownership/v1",
+  "publicImport": "@/components/canonical",
+  "crossProductPrimitiveImport": "@jovie/ui",
+  "firstMigratedRoute": "apps/web/app/app/(shell)/settings/layout.tsx",
+  "families": {
+    "application-shell": {
+      "owner": "apps/web/components/organisms/AppShellFrame.tsx",
+      "publicImport": "@/components/canonical",
+      "exports": ["AppShellFrame", "AppShellContentPanel", "AppShellRightRail", "PageShell", "PageHeader", "PageContent"],
+      "contracts": ["rail-visibility", "content-plane", "scroll-ownership", "safe-area", "ultrawide", "narrow-fallback"]
+    },
+    "headers": {
+      "owner": "apps/web/components/organisms/HeaderNav.tsx",
+      "publicImport": "@/components/canonical",
+      "exports": ["HeaderNav"]
+    },
+    "cards": {
+      "owner": "packages/ui/atoms/card.tsx",
+      "publicImport": "@jovie/ui",
+      "exports": ["Card", "CardHeader", "CardContent", "CardFooter", "CardTitle", "CardDescription"]
+    },
+    "tables-and-lists": {
+      "owner": "apps/web/components/organisms/table/index.ts",
+      "publicImport": "@/components/canonical",
+      "exports": ["UnifiedTable", "UnifiedTableSkeleton"]
+    },
+    "form-fields-and-buttons": {
+      "owner": "packages/ui/atoms/index.ts",
+      "publicImport": "@jovie/ui",
+      "exports": ["Button", "IconButton", "Input", "Label", "Field", "Textarea"]
+    },
+    "dialogs-and-drawers": {
+      "owner": "apps/web/components/organisms/Dialog.tsx",
+      "publicImport": "@/components/canonical",
+      "exports": ["Dialog", "DialogBody", "DialogActions", "RightDrawer"]
+    },
+    "command-and-assistant": {
+      "owner": "apps/web/components/organisms/CommandPalette.tsx",
+      "publicImport": "@/components/canonical",
+      "exports": ["CommandPalette", "JovieChat"]
+    },
+    "status-empty-error": {
+      "owner": "apps/web/components/molecules/EmptyState.tsx",
+      "publicImport": "@/components/canonical",
+      "exports": ["EmptyState", "DashboardErrorFallback"]
+    },
+    "overlays-and-toasts": {
+      "owner": "apps/web/components/feedback/index.ts",
+      "publicImport": "@/components/canonical",
+      "exports": ["Banner", "FeedbackProvider", "toast", "JovieOverlay"]
+    }
+  }
+}

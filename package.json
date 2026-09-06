@@ -241,6 +241,7 @@
     "design:authority:check": "node scripts/design-authority-guard.mjs",
     "design:conformance:check": "node scripts/design-conformance-check.mjs",
     "design:conformance:test": "node --test scripts/design-conformance-check.test.mjs scripts/generate-design-tokens-export.test.mjs scripts/design-governance-audit.test.mjs scripts/invariant-stewardship/audit.test.mjs scripts/oklch-palette-guard.test.mjs scripts/shared-ui-visual-arbitrary-audit.test.mjs && pnpm --filter web exec vitest run --config vitest.config.mts tests/unit/design-system/ui-ownership-registry.test.ts tests/unit/design-system/app-screen-canvas-source-guard.test.ts tests/unit/design-system/app-screen-canvas-manifest.test.ts",
+    "component-ownership:test": "node --test scripts/component-ownership-check.test.mjs",
     "design:conformance:gate": "pnpm design:conformance:test && pnpm design:conformance:check && pnpm design:oklch-palette:check && pnpm design:shared-ui-visual-arbitrary:check",
     "design:governance:audit": "node scripts/design-governance-audit.mjs",
     "invariants:stewardship": "node scripts/invariant-stewardship/audit.mjs",

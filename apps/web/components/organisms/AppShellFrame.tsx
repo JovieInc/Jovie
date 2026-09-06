@@ -8,7 +8,7 @@ import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
-interface AppShellFrameProps {
+export interface AppShellFrameProps {
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
   readonly main: ReactNode;
