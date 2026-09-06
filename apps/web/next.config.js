@@ -301,6 +301,12 @@ const nextConfig = {
     ];
   },
   async redirects() {
+    // Redirect before the dynamic /[username] route so the canonical profile
+    // admission fixture remains backed by the monitored production canary.
+    const profileAdmissionRedirects = [
+      { source: '/unfazed', destination: '/authqaprod', permanent: false },
+    ];
+
     // VIP username aliases (case-insensitive handling)
     // Add both lowercase and mixed-case variants for each alias
     const vipUsernameRedirects = [
@@ -408,6 +414,7 @@ const nextConfig = {
     }));
 
     return [
+      ...profileAdmissionRedirects,
       // Legal page redirects
       {
         source: '/privacy',
