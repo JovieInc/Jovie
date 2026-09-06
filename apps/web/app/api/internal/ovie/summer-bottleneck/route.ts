@@ -39,6 +39,11 @@ const sourceFields = {
   sourceDigest: z.string().regex(DIGEST),
   sourceRevision: exactSha,
 };
+const runtimeSourceFields = {
+  observedAt: timestamp,
+  sourceDigest: z.string().regex(DIGEST),
+  sourceRevision: exactSha.nullable(),
+};
 const runnerAuthority = z
   .object({
     schema: z.enum([
@@ -47,7 +52,7 @@ const runnerAuthority = z
     ]),
     observedAt: timestamp,
     sourceDigest: z.string().regex(DIGEST),
-    sourceRevision: exactSha,
+    sourceRevision: exactSha.nullable(),
   })
   .strict();
 
@@ -128,7 +133,7 @@ const unsignedSnapshotSchema = z
           .object({
             schema: z.literal('jovie.eve.summer-runner-projection/v1'),
             sourceSchema: z.literal('symphony-runner-projection/v1'),
-            ...sourceFields,
+            ...runtimeSourceFields,
             blockedSince: timestamp.nullable(),
             capacitySource: runnerAuthority,
             workSource: runnerAuthority,
@@ -136,7 +141,7 @@ const unsignedSnapshotSchema = z
             queuedWork: safeCount.nullable(),
           })
           .strict(),
-        ciAudit: ciAuditSchema,
+        ciAudit: ciAuditSchema.nullable(),
         productPaths: summerProductPathsSchema.optional(),
       })
       .strict(),
@@ -147,7 +152,7 @@ const unsignedSnapshotSchema = z
       value.signals.closure.sourceRevision,
       value.signals.queue.sourceRevision,
       value.signals.release.sourceRevision,
-      value.signals.ciAudit.sourceRevision,
+      ...(value.signals.ciAudit ? [value.signals.ciAudit.sourceRevision] : []),
       value.signals.release.mainSha,
       ...(value.signals.productPaths
         ? [value.signals.productPaths.sourceRevision]
@@ -248,7 +253,7 @@ function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
     snapshot.signals.queue.observedAt,
     snapshot.signals.release.observedAt,
     snapshot.signals.runner.observedAt,
-    snapshot.signals.ciAudit.observedAt,
+    ...(snapshot.signals.ciAudit ? [snapshot.signals.ciAudit.observedAt] : []),
     snapshot.signals.runner.capacitySource.observedAt,
     snapshot.signals.runner.workSource.observedAt,
   ];
@@ -290,9 +295,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   if (
     !env.VERCEL_GIT_COMMIT_SHA ||
-    parsed.data.sourceVersion !== env.VERCEL_GIT_COMMIT_SHA
+    parsed.data.signals.release.productionSha !== env.VERCEL_GIT_COMMIT_SHA
   ) {
-    return json({ ok: false, code: 'invalid_source_revision' }, 409);
+    return json({ ok: false, code: 'invalid_deployment_revision' }, 409);
   }
   let destination: URL;
   try {

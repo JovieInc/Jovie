@@ -388,6 +388,93 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     ).toBe(true);
   });
 
+  it('accepts main ahead of the deployed bridge and preserves explicit unknown authorities', async () => {
+    const mainSha = 'b'.repeat(40);
+    const baseline = validSnapshot();
+    const input = {
+      ...baseline,
+      eventId: 'evt_release_lag_0001',
+      sourceVersion: mainSha,
+      signals: {
+        ...baseline.signals,
+        closure: { ...baseline.signals.closure, sourceRevision: mainSha },
+        queue: { ...baseline.signals.queue, sourceRevision: mainSha },
+        release: {
+          ...baseline.signals.release,
+          sourceRevision: mainSha,
+          mainSha,
+          productionSha: SOURCE,
+          unverifiedMerges: 1,
+        },
+        runner: {
+          ...baseline.signals.runner,
+          sourceRevision: null,
+          queuedWork: null,
+          capacitySource: {
+            ...baseline.signals.runner.capacitySource,
+            sourceRevision: mainSha,
+          },
+          workSource: {
+            ...baseline.signals.runner.workSource,
+            sourceRevision: null,
+          },
+        },
+        ciAudit: null,
+      },
+    };
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(input));
+
+    expect(response.status).toBe(202);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(delivered).toMatchObject({
+      sourceVersion: mainSha,
+      signals: {
+        release: { mainSha, productionSha: SOURCE },
+        runner: { sourceRevision: null, queuedWork: null },
+        ciAudit: null,
+      },
+    });
+  });
+
+  it.each([
+    null,
+    'd'.repeat(40),
+  ])('rejects production revision %s that does not identify this deployment', async productionSha => {
+    const baseline = validSnapshot();
+    const input = {
+      ...baseline,
+      signals: {
+        ...baseline.signals,
+        release: {
+          ...baseline.signals.release,
+          productionSha,
+          unverifiedMerges: Number(productionSha !== SOURCE),
+        },
+      },
+    };
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(input));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'invalid_deployment_revision',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['missing key', undefined, PRODUCER_KEY_ID],
     ['malformed key', 'not-a-private-key', PRODUCER_KEY_ID],

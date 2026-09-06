@@ -44,6 +44,18 @@ def digest(value: object) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
+def semantic_identity(value: object) -> object:
+    if isinstance(value, list):
+        return [semantic_identity(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: semantic_identity(child)
+            for key, child in value.items()
+            if key != "observedAt"
+        }
+    return value
+
+
 def record(value: object, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise TypeError(f"{label} is not an object")
@@ -110,9 +122,9 @@ def exact_digest(value: object, label: str) -> str:
 def source_fields(
     *,
     observed_at: str,
-    source_revision: str,
+    source_revision: str | None,
     source_value: object,
-) -> dict[str, str]:
+) -> dict[str, str | None]:
     return {
         "observedAt": observed_at,
         "sourceRevision": source_revision,
@@ -122,7 +134,9 @@ def source_fields(
 
 def audit_projection(
     value: object, source_version: str, now: datetime
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
     audit = record(value, "CI audit")
     if audit.get("schema") != "jovie-ci-bottleneck-audit/v1":
         raise ValueError("CI audit schema is invalid")
@@ -163,6 +177,23 @@ def audit_projection(
     }
 
 
+def attested_runtime_revision(signals: dict[str, Any]) -> str | None:
+    evidence = signals.get("concurrencyEvidence")
+    if not isinstance(evidence, dict) or evidence.get("accepted") is not True:
+        return None
+    identity = evidence.get("runtime")
+    if (
+        not isinstance(identity, dict)
+        or identity.get("schema") != "symphony-runtime-identity/v1"
+        or identity.get("service") != "symphony-elixir.service"
+    ):
+        return None
+    try:
+        return exact_sha(identity.get("sourceRevision"), "runtime identity source revision")
+    except ValueError:
+        return None
+
+
 def compose_snapshot(
     fleet: dict[str, Any], runtime: dict[str, Any], now: datetime
 ) -> dict[str, Any]:
@@ -187,9 +218,7 @@ def compose_snapshot(
     runtime_at = require_fresh(
         runtime.get("generated_at"), "Symphony runtime", now
     )
-    runtime_revision = exact_sha(
-        runtime.get("sourceRevision"), "Symphony runtime source revision"
-    )
+    runtime_revision = attested_runtime_revision(signals)
     main_sha = exact_sha(main.get("sha"), "main SHA")
     production_sha_raw = production.get("deployedSha")
     production_sha = (
@@ -257,7 +286,7 @@ def compose_snapshot(
     }
     runner_value = {
         "capacityAvailable": available,
-        "queuedWork": len(work_items),
+        "queuedWork": len(work_items) if runtime_revision is not None else None,
         "blockedSince": blocked_since,
         "capacitySource": capacity_source,
         "workSource": work_source,
@@ -272,7 +301,10 @@ def compose_snapshot(
     }
     snapshot = {
         "schema": "jovie.eve.summer-bottleneck-snapshot/v1",
-        "eventId": f"summer_{main_sha[:12]}_{digest(semantic_sources)[:16]}",
+        "eventId": (
+            f"summer_{main_sha[:12]}_"
+            f"{digest(semantic_identity(semantic_sources))[:16]}"
+        ),
         "observedAt": observed_at,
         "sourceVersion": main_sha,
         "signals": {
@@ -325,7 +357,7 @@ def compose_snapshot(
                 **source_fields(
                     observed_at=runtime_at,
                     source_revision=runtime_revision,
-                    source_value=runner_value,
+                    source_value=semantic_identity(runner_value),
                 ),
                 **runner_value,
             },
