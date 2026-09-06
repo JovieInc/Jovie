@@ -556,6 +556,25 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(controlTest).toBe('node scripts/run-affected-tests.mjs --control');
   });
 
+  it('enforces external shared health contract coverage for package and test changes', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    expect(remaining).toContain('packages/agent-transport-contracts/');
+    expect(remaining).toContain('symphony-health-contract\\.test\\.mjs');
+    expect(CI_FAST_SOURCE).toContain(
+      "selected.has('operations') || selected.has('web')"
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      '--coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts"'
+    );
+    expect(CI_FAST_SOURCE).toContain('--coverage.thresholds.lines=100');
+  });
+
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
