@@ -39,6 +39,60 @@ function intersectionArea(
 }
 
 test.describe('public profile browser admission', () => {
+  for (const viewport of [
+    { width: 1179, layout: 'compact' as const },
+    { width: 1180, layout: 'desktop' as const },
+  ]) {
+    test(`${viewport.width}px owns the expected public profile presentation`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: 932 });
+      const response = await page.goto(
+        '/renders/profile-admission?layout=public&state=unclaimed',
+        { waitUntil: 'domcontentloaded' }
+      );
+      expect(response?.status()).toBe(200);
+
+      const shell = page.getByTestId('public-profile-layout-shell');
+      await expect(shell).toHaveAttribute('data-layout', viewport.layout);
+      await expect(
+        page.getByTestId(
+          viewport.layout === 'desktop'
+            ? 'profile-desktop-surface'
+            : 'profile-compact-shell'
+        )
+      ).toBeVisible();
+      await expect(
+        page.getByTestId(
+          viewport.layout === 'desktop'
+            ? 'profile-desktop-surface'
+            : 'profile-compact-shell'
+        )
+      ).toHaveAttribute('data-interactive-ready', 'true');
+
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => resolve())
+        );
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => resolve())
+        );
+      });
+
+      if (viewport.layout === 'desktop') {
+        await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
+        await expect(page.getByTestId('profile-bottom-nav')).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+        await expect(page.getByTestId('profile-bottom-nav')).toBeVisible();
+      }
+
+      const audit = await auditPublicProfileLayout(page);
+      expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+    });
+  }
+
   test('1512px public route blocks the founder-reported compact desktop hybrid', async ({
     page,
   }, testInfo) => {
