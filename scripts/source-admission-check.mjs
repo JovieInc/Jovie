@@ -4,6 +4,12 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { runSourceAdmission } from './lib/source-admission-policy.mjs';
 
+/**
+ * @typedef {{headRefOid?: string, mergeQueueEntry?: {headCommit?: {oid?: string}}}} AdmissionQueueState
+ * @typedef {{data?: {repository?: {pullRequest?: AdmissionQueueState}}, errors?: unknown[]}} AdmissionApiResponse
+ * @typedef {{repository?: {full_name?: string}, pull_request?: {number?: number, head?: {sha?: string}}, workflow_run?: {event?: string, pull_requests?: {number?: number, head?: {sha?: string}}[]}}} AdmissionEvent
+ * @param {{event: AdmissionEvent, env?: NodeJS.ProcessEnv, evaluate?: import('./lib/source-admission-policy.mjs').AdmissionEvaluator, api?: (endpoint: string, payload?: object) => AdmissionApiResponse}} input
+ */
 export async function publishSourceAdmission({
   event,
   env = process.env,

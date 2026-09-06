@@ -1,3 +1,4 @@
+// JOV-INV-011: retain exact-head failure memory. JOV-INV-028: legacy human labels are inert.
 import { pathToFileURL } from 'node:url';
 import {
   evaluateForkMemberPolicy,
@@ -22,9 +23,51 @@ const TOMBSTONES = new Set([
   'jovie-native-unmergeable/v1',
 ]);
 
+/**
+ * @typedef {Object} AdmissionPullRequest
+ * @property {number} [number]
+ * @property {string} [state]
+ * @property {boolean} [draft]
+ * @property {{sha?: string, ref?: string, repo?: {fork?: boolean}}} [head]
+ * @property {{ref?: string}} [base]
+ * @property {{name?: string}[]} [labels]
+ * @property {number} [changed_files]
+ * @property {boolean | null} [mergeable]
+ *
+ * @typedef {Object} AdmissionReview
+ * @property {number} [id]
+ * @property {string} [state]
+ * @property {string} [submitted_at]
+ * @property {string} [commit_id]
+ * @property {{login?: string, type?: string}} [user]
+ * @property {string} [author_association]
+ *
+ * @typedef {Object} AdmissionStatus
+ * @property {string} [context]
+ * @property {string} [state]
+ * @property {string} [description]
+ * @property {{login?: string, type?: string} | null} [creator]
+ * @property {string} [target_url]
+ *
+ * @typedef {Object} SourceAdmissionEvidence
+ * @property {string} [repository]
+ * @property {string} [expectedHead]
+ * @property {AdmissionPullRequest} [pr]
+ * @property {{filename?: string}[]} [files]
+ * @property {AdmissionReview[]} [reviews]
+ * @property {AdmissionStatus[]} [statuses]
+ * @property {boolean} [complete]
+ *
+ * @typedef {{allowed: boolean, blockers?: string[]}} AdmissionDecision
+ * @typedef {{repository: string, prNumber: number, expectedHead: string, token?: string}} AdmissionRequest
+ * @typedef {(input: AdmissionRequest) => Promise<AdmissionDecision>} AdmissionEvaluator
+ */
+
 /** Complete, exact-head REST evidence only. Fleet health and production binding
  * intentionally have no authority over source admission. Native required checks
- * remain independently enforced by GitHub; this policy never substitutes for them. */
+ * remain independently enforced by GitHub; this policy never substitutes for them.
+ * @param {SourceAdmissionEvidence} [input]
+ */
 export function evaluateSourceAdmission({
   repository,
   expectedHead,
@@ -148,6 +191,7 @@ async function pages(path, options, request) {
   throw new Error('pagination limit exceeded');
 }
 
+/** @param {{ repository?: string, prNumber?: number, expectedHead?: string, token?: string, request?: typeof githubRequest, now?: () => number, deadlineMs?: number }} [options] */
 export async function runSourceAdmission({
   repository,
   prNumber,
