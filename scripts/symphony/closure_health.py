@@ -1555,11 +1555,7 @@ def _lifecycle_action(
         "issue": issue,
         **route,
     }
-    action_identity = {
-        key: value
-        for key, value in identity.items()
-        if not valid_number or key != "inventoryIndex"
-    }
+    action_identity = _lifecycle_action_identity(identity)
     return {
         "schema": LIFECYCLE_ACTION_SCHEMA,
         **identity,
@@ -1568,9 +1564,7 @@ def _lifecycle_action(
             if valid_number
             else f"{repository}:inventory-row:{inventory_index}"
         ),
-        "actionKey": hashlib.sha256(
-            json.dumps(action_identity, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest(),
+        "actionKey": _lifecycle_action_digest(action_identity),
         "observedAt": isoformat(now),
         "externalMutations": 0,
     }
@@ -1774,8 +1768,87 @@ def _episode_since(
     return parsed if parsed is not None and parsed <= now else now
 
 
+def _lifecycle_action_identity(action: dict[str, Any]) -> dict[str, Any]:
+    """Canonical content-addressed identity shared by emission and validation."""
+    fields = (
+        "repository",
+        "inventoryIndex",
+        "pr",
+        "headSha",
+        "issue",
+        "disposition",
+        "sourceState",
+        "owner",
+        "writer",
+        "action",
+        "reason",
+        "terminal",
+    )
+    identity = {field: action.get(field) for field in fields}
+    if isinstance(identity["pr"], int) and not isinstance(identity["pr"], bool):
+        identity.pop("inventoryIndex")
+    return identity
+
+
+def _lifecycle_action_digest(identity: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            identity,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode()
+    ).hexdigest()
+
+
+def _lifecycle_route_valid(action: dict[str, Any]) -> bool:
+    source_state = action.get("sourceState")
+    owner = action.get("owner")
+    next_action = action.get("action")
+    disposition = action.get("disposition")
+    route = (disposition, owner, next_action)
+    expected = {
+        "protected": ("terminal", "gem", "preserve-protected-pr-exclusion"),
+        "unclassified": (
+            "active-remediation",
+            "controller",
+            "collect-missing-pr-evidence",
+        ),
+        "close": ("terminal", "gem", "preserve-explicit-duplicate-terminal"),
+        "queued": (
+            "active-remediation",
+            "github-native-merge-queue",
+            "preserve-native-queue-ownership",
+        ),
+        "promote": (
+            "active-remediation",
+            "gem",
+            "reconcile-exact-head-queue-admission",
+        ),
+    }
+    if source_state in expected:
+        return route == expected[source_state]
+    if source_state == "held":
+        return route in {
+            ("active-remediation", "symphony", "reconcile-expired-machine-hold"),
+            (
+                "active-remediation",
+                "symphony",
+                "promote-or-supersede-before-expiry",
+            ),
+        }
+    if source_state != "repair":
+        return False
+    return route in {
+        ("active-remediation", "controller", "collect-missing-pr-evidence"),
+        ("active-remediation", "gem", "retarget-pr-base-to-main"),
+        ("active-remediation", "gem", "exact-head-branch-update"),
+        ("active-remediation", "symphony", "create-bounded-ci-repair-pr"),
+    }
+
+
 def _lifecycle_inventory_valid(
-    actions: object, open_prs: object
+    actions: object, open_prs: object, expected_repository: object
 ) -> bool:
     if (
         not isinstance(actions, list)
@@ -1785,29 +1858,84 @@ def _lifecycle_inventory_valid(
     ):
         return False
     lifecycle_keys: set[str] = set()
+    inventory_indexes: set[int] = set()
     for action in actions:
         if not isinstance(action, dict):
             return False
         lifecycle_key = action.get("lifecycleKey")
         action_key = action.get("actionKey")
+        repository = action.get("repository")
+        inventory_index = action.get("inventoryIndex")
+        pr = action.get("pr")
+        head_sha = action.get("headSha")
+        issue = action.get("issue")
         owner = action.get("owner")
         disposition = action.get("disposition")
+        source_state = action.get("sourceState")
+        next_action = action.get("action")
+        reason = action.get("reason")
+        observed_at = action.get("observedAt")
+        parsed_observed_at = parse_time(observed_at)
+        route = (disposition, owner, next_action)
+        valid_pr = isinstance(pr, int) and not isinstance(pr, bool) and pr > 0
+        expected_lifecycle_key = (
+            f"{repository}:pr:{pr}"
+            if valid_pr
+            else f"{repository}:inventory-row:{inventory_index}"
+        )
         if (
             action.get("schema") != LIFECYCLE_ACTION_SCHEMA
+            or not isinstance(repository, str)
+            or REPOSITORY_NAME.fullmatch(repository) is None
+            or repository != expected_repository
+            or not isinstance(inventory_index, int)
+            or isinstance(inventory_index, bool)
+            or inventory_index < 0
+            or inventory_index >= open_prs
+            or inventory_index in inventory_indexes
+            or (not valid_pr and pr is not None)
+            or (not valid_pr and source_state != "unclassified")
+            or (head_sha is not None and not _valid_oid(head_sha))
+            or (head_sha is None and source_state != "unclassified")
+            or (
+                issue is not None
+                and (
+                    not isinstance(issue, str)
+                    or ISSUE_REFERENCE.fullmatch(issue) is None
+                )
+            )
             or not isinstance(lifecycle_key, str)
-            or not lifecycle_key
+            or lifecycle_key != expected_lifecycle_key
             or lifecycle_key in lifecycle_keys
             or not isinstance(action_key, str)
             or re.fullmatch(r"[0-9a-f]{64}", action_key) is None
+            or action_key != _lifecycle_action_digest(
+                _lifecycle_action_identity(action)
+            )
             or owner not in LIFECYCLE_MACHINE_OWNERS
             or action.get("writer") != owner
             or disposition not in {"active-remediation", "terminal"}
+            or not isinstance(next_action, str)
+            or not next_action
+            or len(next_action) > 160
+            or not isinstance(reason, str)
+            or not reason
+            or len(reason) > 240
+            or parsed_observed_at is None
+            or isoformat(parsed_observed_at) != observed_at
+            or not _lifecycle_route_valid(action)
             or action.get("terminal") != (disposition == "terminal")
             or action.get("externalMutations") != 0
+            or (
+                pr == 17156
+                and route
+                != ("terminal", "gem", "preserve-protected-pr-exclusion")
+            )
         ):
             return False
         lifecycle_keys.add(lifecycle_key)
-    return True
+        inventory_indexes.add(inventory_index)
+    return inventory_indexes == set(range(open_prs))
 
 
 def _previous_for_repository(
@@ -1884,7 +2012,7 @@ def evaluate_closure_health(
     if lifecycle_actions is None:
         lifecycle_actions = []
     lifecycle_inventory_valid = _lifecycle_inventory_valid(
-        lifecycle_actions, open_prs
+        lifecycle_actions, open_prs, repository
     )
     observer_unknown = observer_unknown or not isinstance(lifecycle_actions, list)
     dispositions = dispositions if isinstance(dispositions, list) else []

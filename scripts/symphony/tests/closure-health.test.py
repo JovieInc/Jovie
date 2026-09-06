@@ -1226,6 +1226,26 @@ class ClosureClassificationTests(unittest.TestCase):
 
 
 class ClosureHealthEvaluationTests(unittest.TestCase):
+    def test_lifecycle_action_digest_is_cross_runtime_canonical(self):
+        identity = {
+            "repository": "JovieInc/Jovie",
+            "pr": 17001,
+            "headSha": "a" * 40,
+            "issue": None,
+            "disposition": "active-remediation",
+            "sourceState": "repair",
+            "owner": "symphony",
+            "writer": "symphony",
+            "action": "create-bounded-ci-repair-pr",
+            "reason": "required-checks-not-green",
+            "terminal": False,
+        }
+
+        self.assertEqual(
+            MODULE._lifecycle_action_digest(identity),
+            "5a34f15f28cdfed416aa498dd84fdf5d048f68f9f183f782c1a2b95800f28c52",
+        )
+
     def test_health_fails_closed_when_one_open_pr_lacks_owned_lifecycle_action(self):
         observed = snapshot()
         observed["classifications"]["lifecycleActions"] = observed[
@@ -1236,6 +1256,56 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
 
         self.assertEqual(health["status"], "red")
         self.assertIn("lifecycle-action-inventory-incomplete", health["reasons"])
+
+    def test_health_fails_closed_for_malformed_or_unbound_lifecycle_content(self):
+        mutations = {
+            "missing-pr": (lambda action: action.update(pr=None), True),
+            "missing-head": (lambda action: action.update(headSha=None), True),
+            "missing-action": (lambda action: action.pop("action"), True),
+            "missing-reason": (lambda action: action.pop("reason"), True),
+            "missing-observed-at": (lambda action: action.pop("observedAt"), True),
+            "unbound-lifecycle-key": (
+                lambda action: action.update(lifecycleKey="JovieInc/Jovie:pr:999"),
+                True,
+            ),
+            "wrong-repository": (
+                lambda action: action.update(repository="JovieInc/LogYourBody"),
+                True,
+            ),
+            "unbound-action-key": (
+                lambda action: action.update(headSha="b" * 40),
+                False,
+            ),
+            "wrong-native-queue-writer": (
+                lambda action: action.update(owner="gem", writer="gem"),
+                True,
+            ),
+        }
+
+        for name, (mutate, rebind_action_key) in mutations.items():
+            with self.subTest(name=name):
+                observed = snapshot()
+                action = dict(observed["classifications"]["lifecycleActions"][0])
+                mutate(action)
+                if rebind_action_key:
+                    action["actionKey"] = MODULE._lifecycle_action_digest(
+                        MODULE._lifecycle_action_identity(action)
+                    )
+                observed["classifications"] = {
+                    **observed["classifications"],
+                    "lifecycleActions": [
+                        action,
+                        observed["classifications"]["lifecycleActions"][1],
+                    ],
+                }
+
+                health = MODULE.evaluate_closure_health(observed, None, NOW)
+
+                self.assertEqual(health["status"], "red")
+                self.assertFalse(health["newIssueIntakeAllowed"])
+                self.assertIn(
+                    "lifecycle-action-inventory-incomplete", health["reasons"]
+                )
 
     def test_boundary_offset_timestamp_is_treated_as_missing_history(self):
         self.assertIsNone(MODULE.parse_time("0001-01-01T00:00:00+14:00"))
@@ -1462,10 +1532,19 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
             now=NOW,
         )
         current_now = NOW + timedelta(minutes=20)
+        lyb_classifications = MODULE.classify_open_prs(
+            [
+                pr(1, title="feat: ship LYB-1", queued=True),
+                pr(2, title="feat: ship LYB-2"),
+            ],
+            NOW,
+            repository="JovieInc/LogYourBody",
+        )
         current = MODULE.evaluate_closure_health(
             snapshot(
                 repository="JovieInc/LogYourBody",
                 nativeQueueCount=0,
+                classifications=lyb_classifications,
             ),
             previous=previous,
             now=current_now,

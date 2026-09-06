@@ -10,8 +10,16 @@
  * existing guarded controllers.
  */
 
-import { createHash } from 'node:crypto';
-import { mkdir, open, readdir, readFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  link,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  rename,
+  unlink,
+} from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import {
   policyDigest,
@@ -118,6 +126,19 @@ function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function canonicalDigest(value) {
+  const canonicalize = candidate => {
+    if (Array.isArray(candidate)) return candidate.map(canonicalize);
+    if (!candidate || typeof candidate !== 'object') return candidate;
+    return Object.fromEntries(
+      Object.keys(candidate)
+        .sort()
+        .map(key => [key, canonicalize(candidate[key])])
+    );
+  };
+  return digest(canonicalize(value));
+}
+
 function nonEmpty(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
@@ -136,6 +157,25 @@ function exactSha(value) {
 
 function exactPositiveInteger(value) {
   return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function lifecycleActionIdentity(action) {
+  const identity = {
+    repository: action.repository,
+    inventoryIndex: action.inventoryIndex,
+    pr: action.pr,
+    headSha: action.headSha,
+    issue: action.issue,
+    disposition: action.disposition,
+    sourceState: action.sourceState,
+    owner: action.owner,
+    writer: action.writer,
+    action: action.action,
+    reason: action.reason,
+    terminal: action.terminal,
+  };
+  if (action.pr) delete identity.inventoryIndex;
+  return identity;
 }
 
 function boundedLifecycleAction(action, repository) {
@@ -173,7 +213,7 @@ function boundedLifecycleAction(action, repository) {
   if (lifecycleKey !== expectedLifecycleKey || lifecycleKey.length > 180) {
     throw new Error('PR lifecycle action key is invalid');
   }
-  const actionKey = nonEmpty(action.actionKey);
+  const actionKey = nonEmpty(action.actionKey)?.toLowerCase();
   if (!actionKey || !/^[0-9a-f]{64}$/i.test(actionKey)) {
     throw new Error('PR lifecycle action requires a SHA-256 action key');
   }
@@ -229,7 +269,7 @@ function boundedLifecycleAction(action, repository) {
   if (!observedAt || !Number.isFinite(Date.parse(observedAt))) {
     throw new Error('PR lifecycle action observedAt is invalid');
   }
-  return {
+  const bounded = {
     ...action,
     repository,
     inventoryIndex,
@@ -238,7 +278,7 @@ function boundedLifecycleAction(action, repository) {
     issue: nonEmpty(action.issue),
     sourceState,
     lifecycleKey,
-    actionKey: actionKey.toLowerCase(),
+    actionKey,
     disposition,
     owner,
     writer,
@@ -246,6 +286,27 @@ function boundedLifecycleAction(action, repository) {
     reason,
     observedAt: new Date(observedAt).toISOString(),
   };
+  if (actionKey !== canonicalDigest(lifecycleActionIdentity(bounded))) {
+    throw new Error('PR lifecycle action key does not match its content');
+  }
+  return bounded;
+}
+
+async function quarantineLifecycleReceipt(directory, name) {
+  const source = join(directory, name);
+  const quarantineDirectory = join(directory, 'quarantine');
+  await mkdir(quarantineDirectory, { recursive: true, mode: 0o700 });
+  const destination = join(
+    quarantineDirectory,
+    `${name}.${Date.now()}-${randomUUID()}.malformed`
+  );
+  try {
+    await rename(source, destination);
+    return destination;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
 }
 
 async function loadLifecycleActions(stateDir) {
@@ -259,11 +320,31 @@ async function loadLifecycleActions(stateDir) {
   }
   const records = [];
   for (const name of names.filter(name => name.endsWith('.json')).sort()) {
-    const record = JSON.parse(await readFile(join(directory, name), 'utf8'));
-    if (record?.schema !== 'jovie-pr-lifecycle-action-receipt/v1') {
-      throw new Error('persisted PR lifecycle action is malformed');
+    try {
+      const record = JSON.parse(await readFile(join(directory, name), 'utf8'));
+      if (record?.schema !== 'jovie-pr-lifecycle-action-receipt/v1') {
+        throw new Error('persisted PR lifecycle action schema is malformed');
+      }
+      boundedLifecycleAction(
+        { ...record, schema: PR_LIFECYCLE_ACTION_SCHEMA },
+        repositoryName(record.repository)
+      );
+      if (
+        !Number.isInteger(record.generation) ||
+        record.generation < 0 ||
+        (record.supersedesActionKey !== null &&
+          !/^[0-9a-f]{64}$/.test(record.supersedesActionKey)) ||
+        record.outcome !== (record.terminal ? 'terminal' : 'open') ||
+        (record.terminal
+          ? record.nextProofAt !== null
+          : !Number.isFinite(Date.parse(record.nextProofAt)))
+      ) {
+        throw new Error('persisted PR lifecycle action metadata is malformed');
+      }
+      records.push(record);
+    } catch {
+      await quarantineLifecycleReceipt(directory, name);
     }
-    records.push(record);
   }
   return records;
 }
@@ -754,14 +835,18 @@ export function buildStackHealthReceipt(
 }
 
 async function atomicPersist(destination, value) {
-  await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+  const directory = dirname(destination);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const temporary = join(directory, `.${randomUUID()}.tmp`);
   try {
-    const handle = await open(destination, 'wx', 0o600);
+    const handle = await open(temporary, 'wx', 0o600);
     try {
       await handle.writeFile(`${JSON.stringify(value)}\n`, 'utf8');
+      await handle.sync();
     } finally {
       await handle.close();
     }
+    await link(temporary, destination);
     return { status: 'created', path: destination, value };
   } catch (error) {
     if (error?.code !== 'EEXIST') throw error;
@@ -770,6 +855,10 @@ async function atomicPersist(destination, value) {
       path: destination,
       value: JSON.parse(await readFile(destination, 'utf8')),
     };
+  } finally {
+    await unlink(temporary).catch(error => {
+      if (error?.code !== 'ENOENT') throw error;
+    });
   }
 }
 
@@ -1056,18 +1145,19 @@ export async function persistClosureHealthActions(
       lifecycleActions: lifecycle,
     };
   };
-  if (activeViolationRoots == null || dryRun) return persistSnapshot(false);
-  const watermark = {
-    schema: 'jovie-draft-stack-authority/v1',
-    observedAt,
-    snapshotKey: digest({
-      observedAt,
-      reasons: [...candidate.reasons].sort(),
-      roots: [...activeViolationRoots].sort((a, b) => a - b),
-      actions: boundedActions.map(action => action.taskKey).sort(),
-    }),
-  };
+  if (dryRun) return persistSnapshot(false);
   return withSummerQueueLock(stateDir, async () => {
+    if (activeViolationRoots == null) return persistSnapshot(true);
+    const watermark = {
+      schema: 'jovie-draft-stack-authority/v1',
+      observedAt,
+      snapshotKey: digest({
+        observedAt,
+        reasons: [...candidate.reasons].sort(),
+        roots: [...activeViolationRoots].sort((a, b) => a - b),
+        actions: boundedActions.map(action => action.taskKey).sort(),
+      }),
+    };
     const current = (await readSummerQueue(stateDir))?.draftStackAuthority;
     if (
       current &&
@@ -1222,9 +1312,12 @@ async function main() {
   }
   if (closureHealthFile) {
     const closureHealth = JSON.parse(await readFile(closureHealthFile, 'utf8'));
-    process.stdout.write(
-      `${JSON.stringify(await persistClosureHealthActions(closureHealth, { stateDir, dryRun: process.argv.includes('--dry-run') }))}\n`
-    );
+    const result = await persistClosureHealthActions(closureHealth, {
+      stateDir,
+      dryRun: process.argv.includes('--dry-run'),
+    });
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (result.failClosed) process.exitCode = 1;
     return;
   }
   let heartbeat = null;
