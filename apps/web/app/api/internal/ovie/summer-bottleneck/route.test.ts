@@ -34,10 +34,11 @@ const PRODUCER_PUBLIC_KEY = producerKeys.publicKey
 const PRODUCER_KEY_ID = 'jovie-production-2026-09';
 
 function oidcToken(
-  sub = 'owner:jovie:project:jovie:environment:production'
+  sub = 'owner:jovie:project:jovie:environment:production',
+  iss = 'https://oidc.vercel.com/jovie'
 ): string {
   return `${Buffer.from('{}').toString('base64url')}.${Buffer.from(
-    JSON.stringify({ sub })
+    JSON.stringify({ iss, sub })
   ).toString('base64url')}.signature`;
 }
 
@@ -608,6 +609,23 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
   it('rejects an OIDC token for another Vercel environment before delivery', async () => {
     mocks.getVercelOidcToken.mockResolvedValue(
       oidcToken('owner:jovie:project:jovie:environment:preview')
+    );
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'wrong_oidc_audience',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an OIDC token from another issuer before delivery', async () => {
+    mocks.getVercelOidcToken.mockResolvedValue(
+      oidcToken(undefined, 'https://oidc.vercel.com/other')
     );
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
