@@ -33,6 +33,14 @@ const PRODUCER_PUBLIC_KEY = producerKeys.publicKey
   .toString();
 const PRODUCER_KEY_ID = 'jovie-production-2026-09';
 
+function oidcToken(
+  sub = 'owner:jovie:project:jovie:environment:production'
+): string {
+  return `${Buffer.from('{}').toString('base64url')}.${Buffer.from(
+    JSON.stringify({ sub })
+  ).toString('base64url')}.signature`;
+}
+
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value !== null && typeof value === 'object') {
@@ -83,9 +91,17 @@ function validSnapshot(observedAt = NOW) {
       },
       runner: {
         schema: 'jovie.eve.summer-runner-projection/v1',
-        sourceSchema: 'symphony-lease-guard-report/v1',
+        sourceSchema: 'symphony-runner-projection/v1',
         ...source('4'),
         blockedSince: null,
+        capacitySource: {
+          schema: 'symphony-lease-guard-report/v1',
+          ...source('6'),
+        },
+        workSource: {
+          schema: 'symphony-runtime-state/v1',
+          ...source('7'),
+        },
         capacityAvailable: 1,
         queuedWork: 0,
       },
@@ -146,6 +162,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(NOW));
     vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', SOURCE);
     vi.stubEnv(
       'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
       'https://jovie-eve-shadow-abc123-jovie.vercel.app'
@@ -156,7 +173,7 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     );
     vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', PRODUCER_KEY_ID);
     mocks.verifyCronRequest.mockReturnValue(null);
-    mocks.getVercelOidcToken.mockResolvedValue('test-vercel-oidc-token');
+    mocks.getVercelOidcToken.mockResolvedValue(oidcToken());
   });
 
   afterEach(() => {
@@ -347,8 +364,8 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       method: 'POST',
       redirect: 'error',
       headers: {
-        authorization: 'Bearer test-vercel-oidc-token',
-        'x-vercel-trusted-oidc-idp-token': 'test-vercel-oidc-token',
+        authorization: `Bearer ${oidcToken()}`,
+        'x-vercel-trusted-oidc-idp-token': oidcToken(),
         'content-type': 'application/json',
       },
     });
@@ -369,6 +386,93 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
         Buffer.from(delivered.producerAttestation.signature, 'base64url')
       )
     ).toBe(true);
+  });
+
+  it('accepts main ahead of the deployed bridge and preserves explicit unknown authorities', async () => {
+    const mainSha = 'b'.repeat(40);
+    const baseline = validSnapshot();
+    const input = {
+      ...baseline,
+      eventId: 'evt_release_lag_0001',
+      sourceVersion: mainSha,
+      signals: {
+        ...baseline.signals,
+        closure: { ...baseline.signals.closure, sourceRevision: mainSha },
+        queue: { ...baseline.signals.queue, sourceRevision: mainSha },
+        release: {
+          ...baseline.signals.release,
+          sourceRevision: mainSha,
+          mainSha,
+          productionSha: SOURCE,
+          unverifiedMerges: 1,
+        },
+        runner: {
+          ...baseline.signals.runner,
+          sourceRevision: null,
+          queuedWork: null,
+          capacitySource: {
+            ...baseline.signals.runner.capacitySource,
+            sourceRevision: mainSha,
+          },
+          workSource: {
+            ...baseline.signals.runner.workSource,
+            sourceRevision: null,
+          },
+        },
+        ciAudit: null,
+      },
+    };
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(input));
+
+    expect(response.status).toBe(202);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(delivered).toMatchObject({
+      sourceVersion: mainSha,
+      signals: {
+        release: { mainSha, productionSha: SOURCE },
+        runner: { sourceRevision: null, queuedWork: null },
+        ciAudit: null,
+      },
+    });
+  });
+
+  it.each([
+    null,
+    'd'.repeat(40),
+  ])('rejects production revision %s that does not identify this deployment', async productionSha => {
+    const baseline = validSnapshot();
+    const input = {
+      ...baseline,
+      signals: {
+        ...baseline.signals,
+        release: {
+          ...baseline.signals.release,
+          productionSha,
+          unverifiedMerges: Number(productionSha !== SOURCE),
+        },
+      },
+    };
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(input));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'invalid_deployment_revision',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -393,6 +497,22 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       code: 'producer_signing_unavailable',
+    });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the Eve destination is missing or outside the allowlist', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'https://evil.example.com');
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'eve_destination_unavailable',
     });
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
@@ -483,6 +603,23 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       ok: false,
       code: 'replay_rejected',
     });
+  });
+
+  it('rejects an OIDC token for another Vercel environment before delivery', async () => {
+    mocks.getVercelOidcToken.mockResolvedValue(
+      oidcToken('owner:jovie:project:jovie:environment:preview')
+    );
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await POST(request(validSnapshot()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      code: 'wrong_oidc_audience',
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('fails closed outside production and when OIDC or Eve is unavailable', async () => {
