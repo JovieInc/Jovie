@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +11,13 @@ import {
   readGemCheckin,
   readMacCheckin,
 } from '../controller-liveness';
+
+const FIXTURES_DIR = resolve(
+  process.cwd(),
+  'scripts/symphony/lib/__tests__/fixtures'
+);
+const MAC_FIXTURE_PATH = resolve(FIXTURES_DIR, 'mac-ship-owner-lock.json');
+const GEM_FIXTURE_PATH = resolve(FIXTURES_DIR, 'gem-ship-hud-attestation.json');
 
 const NOW = new Date('2026-09-06T18:00:00.000Z');
 const FRESH = '2026-09-06T17:58:00.000Z'; // 2 minutes old
@@ -46,26 +55,20 @@ function gemCheckin(
 
 describe('read checkins', () => {
   it('reads the mac ship-owner lock format', () => {
-    const path = new URL('fixtures/mac-ship-owner-lock.json', import.meta.url)
-      .pathname;
-    const checkin = readMacCheckin(path);
+    const checkin = readMacCheckin(MAC_FIXTURE_PATH);
     expect(checkin).toMatchObject({
       kind: 'mac',
       pid: 12345,
-      evidence: `ship-owner.lock:${path}`,
+      evidence: `ship-owner.lock:${MAC_FIXTURE_PATH}`,
     });
   });
 
   it('reads the gem attestation format', () => {
-    const path = new URL(
-      'fixtures/gem-ship-hud-attestation.json',
-      import.meta.url
-    ).pathname;
-    const checkin = readGemCheckin(path);
+    const checkin = readGemCheckin(GEM_FIXTURE_PATH);
     expect(checkin).toMatchObject({
       kind: 'gem',
       pid: 12345,
-      evidence: `gem-ship-hud-attestation:${path}`,
+      evidence: `gem-ship-hud-attestation:${GEM_FIXTURE_PATH}`,
     });
   });
 
