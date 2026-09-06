@@ -79,7 +79,7 @@ const buttonVariants = cva(
           'icon-xl',
         ],
         className:
-          'h-auto min-h-0 w-auto min-w-0 px-0 py-0 before:hidden disabled:opacity-60',
+          'h-auto min-h-0 w-auto min-w-0 px-0 py-0 disabled:opacity-60',
       },
     ],
     defaultVariants: {
