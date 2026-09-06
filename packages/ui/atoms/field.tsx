@@ -93,7 +93,7 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
     return (
       <div
         ref={ref}
-        className={cn('grid gap-1.5', className)}
+        className={cn('grid min-w-0 gap-1.5', className)}
         data-slot='field'
         data-invalid={hasError || undefined}
         data-required={required || undefined}
