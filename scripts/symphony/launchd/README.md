@@ -25,7 +25,11 @@ and
 the backlog orchestrator / ownership inventory recovery runbook is
 [`backlog-orchestrator-ownership-inventory-recovery.md`](../runbooks/backlog-orchestrator-ownership-inventory-recovery.md);
 the Summer governor runbook for the Eve/Ovie control plane in `apps/eve-pilot` is
-[`summer-governor-recovery.md`](../runbooks/summer-governor-recovery.md).
+[`summer-governor-recovery.md`](../runbooks/summer-governor-recovery.md);
+the Hermes gateway runbook is
+[`hermes-gateway-recovery.md`](../runbooks/hermes-gateway-recovery.md); and
+the gbrain server runbook is
+[`gbrain-server-recovery.md`](../runbooks/gbrain-server-recovery.md).
 
 | File | Schedule | Purpose |
 |---|---|---|
