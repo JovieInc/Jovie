@@ -17,7 +17,9 @@ export default function HomeLayout({
     <PublicPageShell
       className='home-viewport dark min-h-svh overflow-x-clip bg-base text-primary-token'
       footerVariant='expanded'
-      headerVariant='landing'
+      headerVariant='homepage'
+      logoSize='sm'
+      logoVariant='icon'
       mainClassName='min-h-svh'
       mainOffset={false}
     >

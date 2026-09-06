@@ -125,7 +125,7 @@ export function MarketingFooter({
     >
       <div
         className={cn(
-          'mx-auto w-full max-w-linear-content px-[clamp(1.25rem,2.2vw,2rem)]',
+          'mx-auto w-full max-w-public-content px-5 sm:px-6 lg:px-8',
           isMinimal
             ? 'pt-[clamp(3rem,5vw,4.5rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
             : shouldShowCta
