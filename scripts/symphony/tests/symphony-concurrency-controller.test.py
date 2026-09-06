@@ -20,6 +20,7 @@ UNIT_DIR = ROOT / "scripts/symphony/systemd"
 SERVICE_UNIT = UNIT_DIR / "symphony-concurrency-controller.service"
 TIMER_UNIT = UNIT_DIR / "symphony-concurrency-controller.timer"
 INSTALLER = ROOT / "scripts/symphony/install-symphony-ui-pilot.sh"
+ACTIVATION = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 SPEC = importlib.util.spec_from_file_location("symphony_concurrency_controller", SOURCE)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {SOURCE}")
@@ -225,8 +226,11 @@ class EvidenceTests(unittest.TestCase):
             path = pathlib.Path(tmp) / "gate.json"
             now = 2000
             gate = {"schema": "jovie-fleet-gate/v1", "observedAt": datetime.fromtimestamp(now, timezone.utc).isoformat(), "state": "GREEN",
-                    "workAdmission": {"allowed": True}, "closureAdmission": {"newIssueIntakeAllowed": True},
+                    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True, "newImplementationAllowed": True},
+                    "closureAdmission": {"newIssueIntakeAllowed": True, "newImplementationAllowed": True, "remediationContinues": True},
+                    "remediationAdmission": {"allowed": True, "localAllowed": True, "pushAllowed": True},
                     "signals": {"main": {"status": "green"}, "production": {"status": "green"},
+                                "closureHealth": {"remediationContinues": True},
                                 "queue": {"repository": "JovieInc/Jovie", "status": "known", "greenReadyPrs": 10, "target": 15}}}
             path.write_text(json.dumps(gate))
             result = MODULE.read_downstream(path, "JovieInc/Jovie", now)
@@ -234,6 +238,38 @@ class EvidenceTests(unittest.TestCase):
             self.assertTrue(result["healthy"])
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/LogYourBody", now))
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now + 601))
+            gate["state"] = "AMBER"
+            gate["workAdmission"]["allowed"] = False
+            gate["workAdmission"]["newIssueLeaseAllowed"] = False
+            gate["workAdmission"]["newImplementationAllowed"] = False
+            gate["closureAdmission"]["newIssueIntakeAllowed"] = False
+            gate["closureAdmission"]["newImplementationAllowed"] = False
+            path.write_text(json.dumps(gate))
+            result = MODULE.read_downstream(path, "JovieInc/Jovie", now)
+            self.assertFalse(result["healthy"])
+            self.assertFalse(result["newWorkAllowed"])
+            self.assertTrue(result["repairOnly"])
+            self.assertTrue(result["remediationPushAllowed"])
+            target = MODULE.choose_target(
+                current=40,
+                state={"lowStreak": 2, "lastChangeEpoch": 0},
+                sample=low_sample(),
+                provider=provider(),
+                runtime={**RUNTIME, "running": 40, "productive": 40},
+                integrity_allowed=True,
+                now_epoch=now,
+                downstream=result,
+            )
+            self.assertEqual(target, (1, 0, "downstream-backpressure"))
+            gate["remediationAdmission"]["pushAllowed"] = False
+            path.write_text(json.dumps(gate))
+            result = MODULE.read_downstream(path, "JovieInc/Jovie", now)
+            self.assertFalse(result["healthy"])
+            self.assertTrue(result["repairOnly"])
+            self.assertFalse(result["remediationPushAllowed"])
+            gate["remediationAdmission"]["localAllowed"] = False
+            path.write_text(json.dumps(gate))
+            self.assertFalse(MODULE.read_downstream(path, "JovieInc/Jovie", now)["repairOnly"])
             gate["state"] = "RED"
             path.write_text(json.dumps(gate))
             self.assertFalse(MODULE.read_downstream(path, "JovieInc/Jovie", now)["healthy"])
@@ -251,6 +287,33 @@ class EvidenceTests(unittest.TestCase):
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode()
         with mock.patch.object(MODULE.urllib.request, "urlopen", return_value=response):
             self.assertEqual(MODULE.read_runtime_state("http://127.0.0.1/state")["productive"], 1)
+
+    def test_source_attestation_requires_fresh_bound_official_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "attestation.json"
+            now = 2000
+            receipt = {
+                "schema": "gem-service-attestation/v1",
+                "sourceRevision": "a" * 40,
+                "observedAt": datetime.fromtimestamp(now, timezone.utc).isoformat(),
+                "active": True,
+                "healthy": True,
+                "listener": {"port": 4041, "boundToService": True},
+            }
+            path.write_text(json.dumps(receipt))
+            self.assertEqual(MODULE.read_source_attestation(path, now)["sourceRevision"], "a" * 40)
+            for mutation in (
+                lambda value: value.update(sourceRevision="short"),
+                lambda value: value.update(active=False),
+                lambda value: value["listener"].update(boundToService=False),
+                lambda value: value["listener"].update(port=4042),
+            ):
+                broken = json.loads(json.dumps(receipt))
+                mutation(broken)
+                path.write_text(json.dumps(broken))
+                self.assertIsNone(MODULE.read_source_attestation(path, now))
+            path.write_text(json.dumps(receipt))
+            self.assertIsNone(MODULE.read_source_attestation(path, now + 601))
 
     def test_exhausted_retry_keeps_provider_failure_evidence(self):
         now = datetime.now(timezone.utc).isoformat()
@@ -277,7 +340,16 @@ class RuntimeIntegrationTests(unittest.TestCase):
             root = pathlib.Path(tmp)
             workflow = root / "WORKFLOW.md"
             workflow.write_text("agent:\n  max_concurrent_agents: 40\n  max_turns: 20\n")
-            with mock.patch.object(sys, "argv", ["controller", "--workflow", str(workflow), "--state", str(root / "state.json"), "--receipt", str(root / "receipt.json"), "--proc-root", str(root / "proc")]):
+            attestation = root / "attestation.json"
+            attestation.write_text(json.dumps({
+                "schema": "gem-service-attestation/v1",
+                "sourceRevision": "a" * 40,
+                "observedAt": datetime.now(timezone.utc).isoformat(),
+                "active": True,
+                "healthy": True,
+                "listener": {"port": 4041, "boundToService": True},
+            }))
+            with mock.patch.object(sys, "argv", ["controller", "--workflow", str(workflow), "--state", str(root / "state.json"), "--receipt", str(root / "receipt.json"), "--source-attestation", str(attestation), "--proc-root", str(root / "proc")]):
                 args = MODULE.parse_args()
             for name in ("cpu", "memory", "io"):
                 path = args.proc_root / "pressure" / name
@@ -291,7 +363,9 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 self.assertEqual(result["target"], 41)
                 self.assertEqual(workflow.read_text(), "agent:\n  max_concurrent_agents: 41\n  max_turns: 20\n")
                 self.assertIsNone(result["bounds"]["max"])
-                self.assertEqual(json.loads(args.receipt.read_text())["target"], 41)
+                persisted = json.loads(args.receipt.read_text())
+                self.assertEqual(persisted["target"], 41)
+                self.assertEqual(persisted["sourceRevision"], "a" * 40)
                 args.dry_run = True
                 before = workflow.read_text()
                 MODULE.run(args)
@@ -578,6 +652,26 @@ class SystemdActivationTests(unittest.TestCase):
             "systemctl --user enable --now symphony-concurrency-controller.timer",
             text,
         )
+
+    def test_exact_production_activation_installs_runs_and_attests_controller(self):
+        text = ACTIVATION.read_text(encoding="utf-8")
+        self.assertIn(
+            'install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"',
+            text,
+        )
+        self.assertIn(
+            "systemctl --user enable --now symphony-concurrency-controller.timer",
+            text,
+        )
+        self.assertIn(
+            "systemctl --user start symphony-concurrency-controller.service",
+            text,
+        )
+        self.assertIn("--verify-workflow-overlay", text)
+        self.assertIn('.bounds.max == null', text)
+        self.assertIn('.bounds.policy == "empirical-additive-probe"', text)
+        self.assertIn('.sourceRevision == $sha', text)
+        self.assertIn('symphony concurrency receipt is stale or from the future', text)
 
 
 if __name__ == "__main__":

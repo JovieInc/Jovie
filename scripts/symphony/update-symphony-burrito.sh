@@ -181,14 +181,14 @@ def normalized(path):
     if len(matches) != 1:
         return None
     value = int(matches[0][1])
-    if not 1 <= value <= 8:
+    if value < 1:
         return None
     return pattern.sub(r"\g<1>__RUNTIME_OVERLAY__\g<3>", text)
 
 raise SystemExit(0 if normalized(sys.argv[1]) == normalized(sys.argv[2]) else 1)
 PY
   then
-    echo "OK $dst (bounded max_concurrent_agents overlay accepted)"
+    echo "OK $dst (adaptive max_concurrent_agents overlay accepted)"
   else
     echo "DRIFT $dst"
     return 1

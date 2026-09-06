@@ -67,10 +67,15 @@ jobs:
           bash scripts/symphony/update-symphony-burrito.sh --skip-binary
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh
+          install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"
+          install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.service "$HOME/.config/systemd/user/symphony-concurrency-controller.service"
+          install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.timer "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
           install -D -m 0755 scripts/symphony/gem-disk-reclaim.py "$HOME/.local/bin/gem-disk-reclaim"
           install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.service "$HOME/.config/systemd/user/gem-disk-reclaim.service"
           install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.timer "$HOME/.config/systemd/user/gem-disk-reclaim.timer"
           systemctl --user daemon-reload
+          systemctl --user enable --now symphony-concurrency-controller.timer
+          systemctl --user start symphony-concurrency-controller.service
           systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
         env:
@@ -93,7 +98,13 @@ jobs:
             .unit.matches == true
           ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
           curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state \
-            | jq -e '.counts | has("running") and has("retrying") and has("blocked")' >/dev/null
+            | jq -e '
+                ((.generated_at // .observedAt) | type == "string") and
+                (.running | type == "array") and
+                (.retrying | type == "array") and
+                (.blocked | type == "array") and
+                (.counts | has("running") and has("retrying") and has("blocked"))
+              ' >/dev/null
           jq -e --arg sha "$PRODUCTION_SHA" '
             .schema == "gem-pr-rehabilitation-attestation/v1" and
             .sourceRevision == $sha and
@@ -104,6 +115,36 @@ jobs:
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
           systemctl --user is-enabled --quiet gem-pr-drain.timer
           systemctl --user is-active --quiet gem-pr-drain.timer
+          cmp -s scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"
+          cmp -s scripts/symphony/systemd/symphony-concurrency-controller.service "$HOME/.config/systemd/user/symphony-concurrency-controller.service"
+          cmp -s scripts/symphony/systemd/symphony-concurrency-controller.timer "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
+          systemctl --user is-enabled --quiet symphony-concurrency-controller.timer
+          systemctl --user is-active --quiet symphony-concurrency-controller.timer
+          test "$(systemctl --user show symphony-concurrency-controller.timer --property=FragmentPath --value)" \
+            = "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
+          "$HOME/.local/bin/symphony-concurrency-controller" \
+            --verify-workflow-overlay scripts/symphony/WORKFLOW.md "$HOME/.config/symphony/WORKFLOW.md"
+          jq -e --arg sha "$PRODUCTION_SHA" '
+            .schema == "symphony-concurrency/v1" and
+            .sourceRevision == $sha and
+            .mode == "applied" and
+            .target >= 1 and
+            .bounds.min == 1 and
+            .bounds.max == null and
+            .bounds.policy == "empirical-additive-probe"
+          ' "$GEM_WORKSPACE/state/symphony-concurrency.json" >/dev/null
+          python3 - "$GEM_WORKSPACE/state/symphony-concurrency.json" <<'PY'
+          import datetime
+          import json
+          import pathlib
+          import sys
+
+          receipt = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          observed = datetime.datetime.fromisoformat(receipt["observedAt"].replace("Z", "+00:00"))
+          age = (datetime.datetime.now(datetime.timezone.utc) - observed).total_seconds()
+          if not 0 <= age <= 120:
+              raise SystemExit("symphony concurrency receipt is stale or from the future")
+          PY
           bash scripts/symphony/update-symphony-burrito.sh --check
           systemctl --user is-enabled --quiet symphony-elixir.service
           systemctl --user is-active --quiet symphony-elixir.service

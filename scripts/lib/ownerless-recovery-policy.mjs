@@ -337,17 +337,17 @@ const fleet = {
     const observedMs = Date.parse(observedAt);
     if (!Number.isFinite(observedMs))
       return { healthy: false, reason: 'symphony-state-malformed' };
+    if (
+      !Array.isArray(raw.running) ||
+      !Array.isArray(raw.retrying) ||
+      !Array.isArray(raw.blocked)
+    )
+      return { healthy: false, reason: 'symphony-state-malformed' };
     const ageMs = now.getTime() - observedMs;
     if (ageMs < -30_000 || ageMs >= staleAfterMs)
       return { healthy: false, reason: 'symphony-state-stale' };
     const entries = key =>
-      new Set(
-        fleet.unique(
-          (Array.isArray(raw[key]) ? raw[key] : [])
-            .map(fleet.leaseId)
-            .filter(Boolean)
-        )
-      );
+      new Set(fleet.unique(raw[key].map(fleet.leaseId).filter(Boolean)));
     return {
       healthy: true,
       reason: null,
