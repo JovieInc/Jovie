@@ -1491,6 +1491,7 @@ jobs:
             'apps/web/lib/tracking/pac-**' \
             'apps/web/styles/design-system.css' \
             'apps/web/tests/e2e/profile-admission.spec.ts' \
+            ':(glob)apps/web/tests/e2e/utils/profile-admission-diagnostics*.mjs' \
             'apps/web/tests/e2e/utils/public-surface-helpers.ts')"
           if [[ -n "$CHANGED_FILES" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -1502,6 +1503,13 @@ jobs:
       - name: Setup Playwright (Chromium)
         if: steps.profile-browser.outputs.run == 'true'
         uses: ./.github/actions/setup-playwright
+      - name: Test profile admission diagnostic redaction
+        if: steps.profile-browser.outputs.run == 'true'
+        run: >-
+          node --experimental-strip-types --test --experimental-test-coverage
+          --test-coverage-include='apps/web/tests/e2e/utils/profile-admission-diagnostics.mjs'
+          --test-coverage-include='apps/web/app/(marketing)/renders/profile-admission/guard.ts'
+          apps/web/tests/e2e/utils/profile-admission-diagnostics.test.mjs
       - name: Run public-profile browser admission
         if: steps.profile-browser.outputs.run == 'true'
         env:
@@ -1515,6 +1523,7 @@ jobs:
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           PUBLIC_NOAUTH_SMOKE: '1'
+          PROFILE_ADMISSION_DIAGNOSTICS: '1'
         run: >-
           node .github/scripts/guard-playwright-artifacts.mjs --run --
           pnpm --filter @jovie/web exec playwright test
