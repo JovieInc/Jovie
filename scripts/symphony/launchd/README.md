@@ -15,7 +15,9 @@ Operational recovery runbooks for the critical units live in
 watchdog runbook is
 [`control-plane-liveness-recovery.md`](../runbooks/control-plane-liveness-recovery.md);
 the delivery-liveness watchdog runbook is
-[`delivery-liveness-recovery.md`](../runbooks/delivery-liveness-recovery.md).
+[`delivery-liveness-recovery.md`](../runbooks/delivery-liveness-recovery.md);
+the merge-queue / fleet-gate runbook is
+[`merge-queue-fleet-gate-recovery.md`](../runbooks/merge-queue-fleet-gate-recovery.md).
 
 | File | Schedule | Purpose |
 |---|---|---|
