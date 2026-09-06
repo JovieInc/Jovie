@@ -253,6 +253,18 @@ describe('Popover', () => {
       expect(content).toHaveAttribute('data-side', 'top');
       expect(content).toHaveAttribute('data-align', 'start');
     });
+
+    it('keeps content within narrow viewports and wraps long words', () => {
+      render(
+        <TestPopover open={true}>
+          A-long-unbroken-value-that-must-wrap-within-the-popover-viewport
+        </TestPopover>
+      );
+
+      const content = screen.getByTestId('popover-content');
+      expect(content).toHaveClass('max-w-full');
+      expect(content).toHaveClass('break-words');
+    });
   });
 
   describe('Interactive Content', () => {
