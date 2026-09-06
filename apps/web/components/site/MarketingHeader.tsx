@@ -9,13 +9,11 @@ import {
   type HeaderNavCta,
 } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
+import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import {
-  MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_NAV_LINKS,
-  MARKETING_NAV_UTILITIES,
-  MARKETING_TOOLS_FLYOUT_LINKS,
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
@@ -35,44 +33,23 @@ const NAV_LINK_BY_LABEL = Object.fromEntries(
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
   {
-    href: NAV_LINK_BY_LABEL.Product.href,
-    label: NAV_LINK_BY_LABEL.Product.label,
+    href: NAV_LINK_BY_LABEL.Customers.href,
+    label: NAV_LINK_BY_LABEL.Customers.label,
     treatment: 'leading',
   },
   {
-    href: NAV_LINK_BY_LABEL.Pricing.href,
-    label: NAV_LINK_BY_LABEL.Pricing.label,
-  },
-] as const;
-const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
-  {
-    id: 'for',
-    label: NAV_LINK_BY_LABEL.For.label,
-    heading: 'One system for every audience',
-    links: MARKETING_FOR_FLYOUT_LINKS,
-  },
-  {
-    id: 'tools',
-    label: NAV_LINK_BY_LABEL.Tools.label,
-    heading: 'Live tools',
-    links: MARKETING_TOOLS_FLYOUT_LINKS,
-  },
-] as const;
-const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
-  { href: APP_ROUTES.HOME, label: 'Jovie' },
-  {
     href: NAV_LINK_BY_LABEL.Product.href,
     label: NAV_LINK_BY_LABEL.Product.label,
   },
-  ...MARKETING_GLASS_FLYOUTS.flatMap(menu =>
-    menu.links.map(link => ({ href: link.href, label: link.label }))
-  ),
   {
     href: NAV_LINK_BY_LABEL.Pricing.href,
     label: NAV_LINK_BY_LABEL.Pricing.label,
   },
 ] as const;
-const DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1];
+const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
+  MARKETING_NAV_LINKS;
+const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
+  getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary;
 const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   Partial<Record<string, MarketingHeaderCta>>
 > = {
@@ -112,7 +89,7 @@ function resolveNavConfig(
     return { flyoutMenus: undefined, mobileNavLinks: [], desktopNavLinks: [] };
   }
   return {
-    flyoutMenus: MARKETING_GLASS_FLYOUTS,
+    flyoutMenus: undefined,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
     desktopNavLinks: MARKETING_GLASS_DESKTOP_LINKS,
   };
@@ -142,8 +119,8 @@ export function MarketingHeader({
   const centerNavEnabled =
     FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
     (!usesHomepageChrome || (isHomepage && showHomepageCenterNav));
-  const useCustomNav = !isMinimal && navLinks !== undefined && centerNavEnabled;
-  const hasSimpleNav = isMinimal || useCustomNav;
+  const useCanonicalSimpleNav = isHomepage || navLinks !== undefined;
+  const hasSimpleNav = isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
   const centerNavDisabled = !centerNavEnabled;
   const hideCenterNav = isMinimal || centerNavDisabled;
   const navConfig = resolveNavConfig(
@@ -171,9 +148,9 @@ export function MarketingHeader({
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}
-      minimalAuth={isMinimal || isHomepage}
+      minimalAuth={isMinimal}
       minimalAuthVariant='link'
-      minimalAuthLabel={isHomepage ? 'Log in' : 'Sign in'}
+      minimalAuthLabel='Sign in'
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}
