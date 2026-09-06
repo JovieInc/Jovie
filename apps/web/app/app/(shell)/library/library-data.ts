@@ -63,14 +63,20 @@ export type LibraryViewMode = 'grid' | 'list' | 'table';
 
 export type LibraryMediaOrientation = 'landscape' | 'portrait';
 
-export type LibraryAssetSourceProvider = 'youtube' | 'discography' | 'merch';
+export type LibraryAssetSourceProvider =
+  | 'youtube'
+  | 'discography'
+  | 'merch'
+  | 'document';
 
 export interface LibraryAssetSource {
   readonly provider: LibraryAssetSourceProvider;
   readonly canonicalId: string;
+  readonly providerId?: string;
 }
 
 export interface LibraryReleaseAsset {
+  readonly relatedReleaseId?: string | null;
   readonly itemKind?: LibraryItemKind;
   readonly id: string;
   readonly title: string;
@@ -239,6 +245,7 @@ export function buildLibraryReleaseAssets(
     if (hasVideoLinks) assetKinds.push('video');
 
     return {
+      source: { provider: 'discography', canonicalId: release.id },
       id: release.id,
       title: release.title,
       artist: release.artistNames?.[0]?.trim() || 'Unknown Artist',
@@ -299,7 +306,7 @@ function merchStatusToReleaseStatus(
   return 'draft';
 }
 
-function formatMerchStatus(status: LibraryMerchCard['status']): string {
+function formatMerchStatus(status: string): string {
   return status
     .split('_')
     .map(part => part.slice(0, 1).toUpperCase() + part.slice(1))
@@ -316,9 +323,9 @@ export function buildLibraryMerchAssets(
     const imageUrl = normalizeHttpUrl(card.primaryImageUrl);
     const assetId = `merch-${card.id}`;
     return {
+      source: { provider: 'merch', canonicalId: card.id },
       itemKind: 'merch',
       id: assetId,
-      source: { provider: 'merch', canonicalId: card.id },
       title: card.title,
       artist: artistName,
       artworkUrl: imageUrl,
@@ -392,6 +399,7 @@ export function buildLibraryDocumentAssets(
   return documents.map(document => {
     const assetId = `document-${document.id}`;
     const asset: LibraryReleaseAsset = {
+      source: { provider: 'document', canonicalId: document.id },
       itemKind: 'document',
       catalogType: 'document',
       id: assetId,
@@ -458,20 +466,25 @@ export function buildLibraryYouTubeAssets(
   return videos.map(video => {
     const assetId = `youtube-${video.id}`;
     const catalogType = youtubeCatalogType(video.contentType);
-    const thumbnail = normalizeHttpUrl(video.thumbnailUrl);
+    const artworkUrl = normalizeHttpUrl(video.thumbnailUrl);
+    const url = normalizeHttpUrl(video.url) ?? video.url;
     const asset: LibraryReleaseAsset = {
+      source: {
+        provider: 'youtube',
+        canonicalId: video.videoId,
+      },
+      relatedReleaseId: video.releaseLink?.releaseId ?? null,
       itemKind: 'video',
       catalogType,
-      source: { provider: 'youtube', canonicalId: video.videoId },
       linkedReleaseId: video.releaseLink?.releaseId ?? null,
       id: assetId,
       title: video.title,
       artist: artistName,
-      artworkUrl: thumbnail,
+      artworkUrl,
       previewUrl: null,
-      videoUrl: video.url,
+      videoUrl: url,
       waveformSeed: hashLibraryWaveformSeed(assetId),
-      smartLinkPath: video.url,
+      smartLinkPath: url,
       releaseDate: video.publishedAt,
       releaseType: 'single',
       status:
@@ -491,11 +504,11 @@ export function buildLibraryYouTubeAssets(
       lifecycleStatus: 'active',
       trackCount: 0,
       providerCount: 1,
-      providers: [{ key: 'youtube', label: 'YouTube', url: video.url }],
+      providers: [{ key: 'youtube', label: 'YouTube', url }],
       hasLyrics: false,
-      hasArtwork: Boolean(thumbnail),
+      hasArtwork: Boolean(artworkUrl),
       hasVideoLinks: true,
-      assetKinds: thumbnail ? ['artwork', 'video'] : ['video'],
+      assetKinds: artworkUrl ? ['video', 'artwork'] : ['video'],
       genres: [],
       spotifyPopularity: null,
       targetPlaylistCount: 0,
@@ -506,10 +519,16 @@ export function buildLibraryYouTubeAssets(
       distributor: null,
       totalDurationMs:
         video.durationSeconds === null ? null : video.durationSeconds * 1000,
-      itemStatusLabel: 'YouTube',
-      primaryActionLabel: 'Open Video',
-      primaryActionHref: video.url,
+      itemStatusLabel: video.releaseLink
+        ? 'Release Matched'
+        : 'Needs Release Match',
+      primaryActionLabel: 'Open YouTube',
+      primaryActionHref: url,
       privacyStatus: video.privacyStatus ?? null,
+      description:
+        video.contentType === 'music_video'
+          ? 'Music Video'
+          : formatMerchStatus(video.contentType),
     };
     return {
       ...asset,

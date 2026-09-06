@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
 
 const { discardDrafts, replace, search } = vi.hoisted(() => ({
   discardDrafts: vi.fn(),
@@ -37,6 +38,21 @@ vi.mock('./CreatorDocumentsWorkspace', () => ({
 
 import { LibraryPageClient } from './LibraryPageClient';
 
+const artistRule: ArtistRuleView = {
+  id: 'rule-1',
+  category: 'visual',
+  ruleKey: 'palette',
+  instruction: 'never use yellow; make blue primary',
+  strength: 'hard_constraint',
+  scope: 'artist',
+  scopeValue: null,
+  allowOverride: false,
+  status: 'active',
+  provenanceSource: 'artist',
+  confirmedAt: '2026-08-28T12:00:00.000Z',
+  createdAt: '2026-08-28T12:00:00.000Z',
+};
+
 describe('LibraryPageClient stages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,6 +79,21 @@ describe('LibraryPageClient stages', () => {
     expect(replace).toHaveBeenCalledWith('/app/library?stage=idea', {
       scroll: false,
     });
+  });
+
+  it('exposes artist rule controls from the library toolbar', async () => {
+    render(
+      <LibraryPageClient
+        creatorProfileId='profile-1'
+        merchCards={[]}
+        initialArtistRules={[artistRule]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Artist Rules' }));
+
+    expect(await screen.findByText(artistRule.instruction)).toBeInTheDocument();
+    expect(screen.getByText(/Cannot be overridden/)).toBeInTheDocument();
   });
 
   it('restores the Ideas stage from the URL, including the legacy documents section', () => {

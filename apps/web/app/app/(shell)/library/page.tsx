@@ -164,6 +164,11 @@ export default async function LibraryPage({
             userId: routeContext.userId,
             creatorProfileId: profileId,
             route: APP_ROUTES.LIBRARY,
+          }).catch(error => {
+            void captureError('YouTube connection lookup failed', error, {
+              route: APP_ROUTES.LIBRARY,
+            });
+            return false;
           }),
         ]);
         merchCards = merch;

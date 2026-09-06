@@ -7,7 +7,6 @@
  * Pro-only: returns 404 if the artist doesn't have Pro or no active downloads exist.
  */
 
-import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BASE_URL } from '@/constants/app';
@@ -18,6 +17,7 @@ import {
 import { db } from '@/lib/db';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { activeAttestedPromoDownloadsForRelease } from '@/lib/promo-downloads/query-filters';
 import {
   getContentBySlug,
   getCreatorByUsername,
@@ -85,12 +85,7 @@ export default async function PromoDownloadPage({ params }: PageProps) {
       fileSizeBytes: promoDownloads.fileSizeBytes,
     })
     .from(promoDownloads)
-    .where(
-      and(
-        eq(promoDownloads.releaseId, content.id),
-        eq(promoDownloads.isActive, true)
-      )
-    )
+    .where(activeAttestedPromoDownloadsForRelease(content.id))
     .orderBy(promoDownloads.position)
     .catch(error => {
       if (!isMissingPromoDownloadsRelation(error)) {

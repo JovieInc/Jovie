@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { PROMO_DOWNLOAD_RIGHTS_ACTIVATION_ERROR } from '@/lib/promo-downloads/rights-attestation';
 
 export const runtime = 'nodejs';
 
@@ -54,6 +55,29 @@ export async function PATCH(
         { error: 'Not found' },
         { status: 403, headers: NO_STORE_HEADERS }
       );
+    }
+
+    if (parsed.data.isActive === true) {
+      const [download] = await db
+        .select({
+          rightsControlAttested: promoDownloads.rightsControlAttested,
+        })
+        .from(promoDownloads)
+        .where(
+          and(
+            eq(promoDownloads.id, id),
+            eq(promoDownloads.creatorProfileId, profile.id)
+          )
+        )
+        .limit(1);
+      if (!download?.rightsControlAttested) {
+        return NextResponse.json(
+          {
+            error: PROMO_DOWNLOAD_RIGHTS_ACTIVATION_ERROR,
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     const [updated] = await db

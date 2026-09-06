@@ -107,6 +107,7 @@ function confirmRequest(body: Record<string, unknown>): Request {
       blobPathname: 'promo-downloads/track.mp3',
       fileName: 'track.mp3',
       fileSizeBytes: 1024,
+      rightsControlAttested: true,
       ...body,
     }),
   });
@@ -184,6 +185,20 @@ describe('promo downloads API', () => {
         isActive: false,
       })
     );
+  });
+
+  it('rejects uploads without explicit full-control attestation', async () => {
+    const { POST } = await import('@/app/api/promo-downloads/confirm/route');
+    const response = await POST(
+      confirmRequest({
+        fileName: 'track.mp3',
+        fileMimeType: 'audio/mpeg',
+        rightsControlAttested: false,
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(hoisted.insertMock).not.toHaveBeenCalled();
   });
 
   it('confirms an octet-stream MIME upload and persists the canonical MIME', async () => {

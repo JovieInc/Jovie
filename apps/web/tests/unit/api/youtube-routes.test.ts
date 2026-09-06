@@ -69,6 +69,9 @@ vi.mock('@/lib/http/server-fetch', () => ({ serverFetch: mocks.fetch }));
 vi.mock('@/lib/youtube-library/sync', () => ({
   syncChannelVideos: mocks.sync,
 }));
+vi.mock('@/lib/library/graph-store', () => ({
+  reconcileApprovedYouTubeCollaborators: vi.fn().mockResolvedValue(0),
+}));
 
 import { GET as authorize } from '@/app/api/connectors/youtube/authorize/route';
 import { GET as callback } from '@/app/api/connectors/youtube/callback/route';

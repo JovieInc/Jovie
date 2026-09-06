@@ -185,6 +185,7 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import { PostReleasePanel } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
   YouTubeOptimizationPanel,
@@ -2018,6 +2019,7 @@ function AssetDrawer({
   pressKitCandidates,
   merchProducts,
   relationships,
+  postReleaseBundle,
   onApprovalStatusChange,
   onShareChange,
 }: {
@@ -2038,6 +2040,7 @@ function AssetDrawer({
     readonly title: string;
   }[];
   readonly relationships: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle: LibraryPostReleaseBundle;
   readonly onApprovalStatusChange: (
     asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
@@ -2062,7 +2065,7 @@ function AssetDrawer({
     ? 'merch'
     : isYouTubeVideo
       ? 'relationships'
-      : 'details';
+      : 'post-release';
   const closedInteractiveProps = open ? {} : { tabIndex: -1 };
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
@@ -2178,6 +2181,22 @@ function AssetDrawer({
                 </DrawerSection>
               ) : (
                 <>
+                  {getLibraryItemKind(current) === 'release' ||
+                  current.relatedReleaseId ? (
+                    <DrawerSection
+                      sectionId='post-release'
+                      surface='card'
+                      title='Post-release'
+                      defaultOpen
+                    >
+                      <PostReleasePanel
+                        asset={current}
+                        creatorProfileId={profileId}
+                        bundle={postReleaseBundle}
+                        disabled={!open}
+                      />
+                    </DrawerSection>
+                  ) : null}
                   {isYouTubeVideo && current.source ? (
                     <>
                       <DrawerSection
@@ -3030,6 +3049,7 @@ export function LibrarySurface({
             : []
         )}
         relationships={relationships}
+        postReleaseBundle={postReleaseBundle}
         onApprovalStatusChange={handleApprovalStatusChange}
         onShareChange={handleShareChange}
       />
@@ -3046,6 +3066,7 @@ export function LibrarySurface({
       handleShareChange,
       handleTogglePreview,
       playingPreviewId,
+      postReleaseBundle,
       profileId,
       relationships,
       selectedAsset,
