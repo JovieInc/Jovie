@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 
 const MAX_DIFF = 18_000;
 const UI_FILE =
@@ -356,7 +356,13 @@ export function inspectReviewBackendConfiguration({ grok, codex }) {
 }
 export async function readTrustedCapture(artifactRoot, capturePath) {
   const requestedRoot = resolve(artifactRoot);
-  const requested = resolve(requestedRoot, capturePath);
+  const artifactDirectory = basename(requestedRoot);
+  const recordedPath = String(capturePath ?? '').replaceAll('\\', '/');
+  const artifactPrefix = `${artifactDirectory}/`;
+  const normalizedPath = recordedPath.startsWith(artifactPrefix)
+    ? recordedPath.slice(artifactPrefix.length)
+    : recordedPath;
+  const requested = resolve(requestedRoot, normalizedPath);
   const requestedRelative = relative(requestedRoot, requested);
   if (
     requestedRelative.startsWith('..') ||
