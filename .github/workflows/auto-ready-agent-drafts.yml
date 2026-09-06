@@ -1,62 +1,15 @@
 name: Auto-Ready Agent Drafts
 
-# Manual recovery for interrupted writer-owned promotion drift. Branch prefixes,
-# bot authors, and FX provenance never authorize promotion; an exact-head
-# jovie-writer-pr-proof/v1 receipt does. The owning writer's successful path is
-# scripts/writer-owned-pr-promote.sh, not this workflow.
-#
-# Manual dispatch is recovery-only for rare crash-window drift and must not
-# manufacture missing author proof.
-# Enable this workflow only after the provenance selector and App-token
-# mutation path land. Opt out per-PR with taste/security/hold labels or
-# explicit controlled-proof/canary markers.
-
+# Compatibility entrypoint only. An old proof cannot revive withdrawn readiness.
+# The completing writer owns scripts/writer-owned-pr-promote.sh.
 on:
   workflow_dispatch:
-
-concurrency:
-  group: auto-ready-agent-drafts
-  cancel-in-progress: false
-
-permissions:
-  contents: read
-
+permissions: {}
 jobs:
   auto-ready:
-    # Fleet controller: use the hosted image contract so `gh` is always
-    # available. Some self-hosted fast runners intentionally lack it.
+    name: Owner completion required
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      issues: write
-      pull-requests: write
+    timeout-minutes: 1
     steps:
-      - name: Generate short-lived Jovie App token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          # Use the installation identity for the paired PR mutations.
-          # Installation permissions stay unbounded here so commit and
-          # Rolling CI Dispatch run provenance can be read.
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
-      - name: Checkout main policy code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # pull_request events otherwise checkout the triggering merge ref,
-          # which may not contain the current fleet scripts or tests.
-          ref: main
-          persist-credentials: false
-
-      - name: Verify GitHub CLI
-        run: gh --version
-
-      - name: Recover proven writer-owned promotion drift
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          REPO: ${{ github.repository }}
-          GH_RETRY_ATTEMPTS: 8
-          GH_RETRY_MAX_DELAY: 60
-        run: bash scripts/auto-ready-agent-drafts.sh
+      - name: Report retired fleet promotion
+        run: echo 'owner-completion-required; fleet readiness recovery is retired; no action taken'

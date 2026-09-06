@@ -84,7 +84,11 @@ const EXPECTATIONS = [
   },
   {
     path: 'scripts/drain-pr-queue.sh',
-    includes: ['.repository == $repo'],
+    includes: [
+      'native-merge-intent.mjs --repo OWNER/REPO --pr NUMBER --head EXACT_SHA',
+      'exit 2',
+    ],
+    excludes: ['gh_mutate_retry', 'merge-queue-backend.mjs'],
   },
   {
     path: 'scripts/backlog-orchestrator/no-unattended-red.mjs',

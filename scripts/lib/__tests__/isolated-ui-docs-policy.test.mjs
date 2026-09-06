@@ -425,7 +425,7 @@ describe('isolated UI/docs promotion policy', () => {
     ).toBe(false);
   });
 
-  it('keeps one native controller, freezes deploy, and never treats labels as authority', () => {
+  it('separates native source intent from gated production promotion', () => {
     const queueWorkflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/merge-queue-autoenroll.yml'),
       'utf8'
@@ -447,44 +447,19 @@ describe('isolated UI/docs promotion policy', () => {
       'utf8'
     );
 
-    expect(queueWorkflow).toContain('fleet-policy:');
-    expect(queueWorkflow).toContain(
-      "workflows: ['CI', 'Production Controller']"
-    );
-    expect(queueWorkflow).toContain('DRAIN_PROMOTION_MODE:');
-    expect(queueWorkflow).toContain('DRAIN_RECOVER_FLEET_HOLDS:');
-    expect(queueWorkflow).toContain('merge-queue-drain-mutex');
-    expect(queueWorkflow).toContain('isolated-only');
-    expect(queueWorkflow).toContain('hold-intake');
-    expect(queueWorkflow).toContain(
-      'uses: ./.github/actions/evaluate-fleet-gate'
-    );
-    expect(queueWorkflow).toContain('steps.policy.outputs.promotion_mode');
+    expect(queueWorkflow).not.toContain('fleet-policy:');
+    expect(queueWorkflow).not.toContain('DRAIN_PROMOTION_MODE:');
+    expect(queueWorkflow).toContain('native-merge-intent.mjs');
+    expect(queueWorkflow).toContain('exit 2');
+    expect(queueWorkflow).not.toMatch(/run:\s*node|uses:|GH_TOKEN/);
     expect(evaluateFleetGate).toContain('.promotionMode');
     expect(productionWorkflow).toContain('fleet-promotion:');
     expect(productionWorkflow).toContain(
       "needs.fleet-promotion.outputs.deployment_allowed == 'true'"
     );
-    expect(drain).toContain('MAX_QUEUE_DEPTH=1');
-    expect(drain).toContain(
-      'scripts/lib/isolated-ui-docs-policy.mjs evaluate-live'
-    );
-    expect(drain).toContain(
-      'timeout "${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS}s"'
-    );
-    const isolatedClassification = drain.slice(
-      drain.indexOf('if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]'),
-      drain.indexOf('ENRICHED="[]"')
-    );
-    expect(isolatedClassification).toContain(
-      'stop_if_budget_exhausted && break'
-    );
+    expect(drain).toContain('exit 2');
     expect(policy.indexOf('changed file count exceeds')).toBeLessThan(
       policy.indexOf('pulls/${prNumber}/files?per_page=100')
     );
-    expect(drain).toContain('.authority.labelsUsed == false');
-    expect(drain).toContain('.authority.deploymentAllowed == false');
-    expect(drain).toContain('jovie-fleet-queue-hold/v1');
-    expect(drain).toContain('Fleet holds may recover only under normal GREEN');
   });
 });

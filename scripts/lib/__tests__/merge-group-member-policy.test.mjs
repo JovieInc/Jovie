@@ -492,7 +492,9 @@ describe('merge-group fork policy', () => {
       number: 101,
       state: 'open',
       base: { ref: 'main' },
-      head: { sha: SOURCE_101, repo: { fork: true } },
+      head: { sha: SOURCE_101, ref: 'codex/repair', repo: { fork: true } },
+      draft: false,
+      changed_files: 1,
       labels: [],
     };
 
@@ -518,6 +520,9 @@ describe('merge-group fork policy', () => {
             link: null,
           };
         }
+        if (path.includes('/files?'))
+          return { data: [{ filename: 'scripts/repair.mjs' }], link: null };
+        if (path.includes('/statuses?')) return { data: [], link: null };
         throw new Error(`unexpected request: ${path}`);
       },
     });
@@ -525,8 +530,171 @@ describe('merge-group fork policy', () => {
     expect(paths).toEqual([
       `/repos/JovieInc/Jovie/compare/${BASE}...${FIRST}`,
       '/repos/JovieInc/Jovie/pulls/101',
+      '/repos/JovieInc/Jovie/pulls/101',
+      '/repos/JovieInc/Jovie/pulls/101/files?per_page=100&page=1',
       '/repos/JovieInc/Jovie/pulls/101/reviews?per_page=100&page=1',
+      `/repos/JovieInc/Jovie/commits/${SOURCE_101}/statuses?per_page=100&page=1`,
+      '/repos/JovieInc/Jovie/pulls/101',
     ]);
+  });
+
+  async function integratedPolicy({
+    labels = [],
+    statuses = [],
+    reviews = [review(1, 'APPROVED')],
+    fork = false,
+    mutateFinal = null,
+    secondMember = false,
+  } = {}) {
+    const reads = new Map();
+    const logs = [];
+    await runPolicy({
+      argv: ['--policy=fork'],
+      env: { GH_TOKEN: 'test-token' },
+      event: secondMember
+        ? event()
+        : event({ head_sha: FIRST, head_commit: { id: FIRST } }),
+      now: () => 100,
+      log: line => logs.push(line),
+      async request(path, options) {
+        expect(options.deadlineMs).toBe(45100);
+        if (path.includes('/compare/'))
+          return {
+            data: comparison(
+              secondMember
+                ? [commit(FIRST, BASE, 101), commit(HEAD, FIRST, 102)]
+                : [commit(FIRST, BASE, 101)]
+            ),
+          };
+        const number = path.includes('/pulls/102') ? 102 : 101;
+        const applies = !secondMember || number === 102;
+        if (/\/pulls\/\d+$/.test(path)) {
+          const count = (reads.get(number) ?? 0) + 1;
+          reads.set(number, count);
+          const pr = {
+            number,
+            state: 'open',
+            draft: false,
+            changed_files: 1,
+            base: { ref: 'main' },
+            head: { sha: SOURCE_101, ref: 'codex/repair', repo: { fork } },
+            labels: applies ? labels.map(name => ({ name })) : [],
+          };
+          if (count === 3 && mutateFinal && applies) mutateFinal(pr);
+          return { data: pr };
+        }
+        if (path.includes('/files?'))
+          return { data: [{ filename: 'scripts/repair.mjs' }], link: null };
+        if (path.includes('/reviews?'))
+          return { data: applies ? reviews : [], link: null };
+        if (path.includes('/statuses?')) return { data: statuses, link: null };
+        throw new Error(`unexpected request: ${path}`);
+      },
+    });
+    return logs;
+  }
+
+  it('revalidates holds on internal as well as fork members, including a later cohort member', async () => {
+    for (const hold of [
+      'hold',
+      'gated',
+      'incident',
+      'queue-deferred',
+      'needs-conflict-resolution',
+    ]) {
+      await expect(integratedPolicy({ labels: [hold] })).rejects.toThrow(
+        /failed fork merge-group policy/
+      );
+    }
+    await expect(
+      integratedPolicy({ labels: ['hold'], secondMember: true })
+    ).rejects.toThrow(/PR #102 failed/);
+    await expect(
+      integratedPolicy({
+        mutateFinal: pr => {
+          pr.labels = [{ name: 'hold' }];
+        },
+      })
+    ).rejects.toThrow(/failed fork merge-group policy/);
+  });
+
+  it('rejects withdrawal to draft or closure during a stale completion revalidation', async () => {
+    for (const withdraw of [
+      pr => {
+        pr.draft = true;
+      },
+      pr => {
+        pr.state = 'closed';
+      },
+    ]) {
+      await expect(integratedPolicy({ mutateFinal: withdraw })).rejects.toThrow(
+        /failed fork merge-group policy/
+      );
+    }
+  });
+
+  it('blocks durable product and unmergeable tombstones despite source-green status', async () => {
+    for (const context of [
+      'jovie-queue-product-failure/v1',
+      'jovie-native-unmergeable/v1',
+    ]) {
+      const statuses = [
+        {
+          context,
+          state: 'success',
+          description: context.includes('product')
+            ? 'blocked:merge-group-product-failure'
+            : 'ejected:UNMERGEABLE',
+          creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+          target_url: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+        },
+      ];
+      await expect(integratedPolicy({ statuses })).rejects.toThrow(
+        /failed fork merge-group policy/
+      );
+    }
+  });
+
+  it('allows recovery source with offline Symphony and unbound production while requiring current reviews', async () => {
+    await expect(
+      integratedPolicy({
+        statuses: [
+          { context: 'symphony-health', state: 'failure' },
+          { context: 'production-binding', state: 'failure' },
+        ],
+      })
+    ).resolves.toContain('Validated 1 merge-group member(s) for fork policy.');
+    await expect(
+      integratedPolicy({ reviews: [review(1, 'CHANGES_REQUESTED')] })
+    ).rejects.toThrow(/failed fork merge-group policy/);
+    await expect(
+      integratedPolicy({
+        fork: true,
+        reviews: [review(1, 'APPROVED'), review(2, 'DISMISSED')],
+      })
+    ).rejects.toThrow(/failed fork merge-group policy/);
+    await expect(
+      integratedPolicy({
+        reviews: [review(1, 'CHANGES_REQUESTED'), review(2, 'APPROVED')],
+      })
+    ).resolves.toContain('Validated 1 merge-group member(s) for fork policy.');
+  });
+
+  it('fails closed when evidence changes head or files are truncated during admission read', async () => {
+    await expect(
+      integratedPolicy({
+        mutateFinal: pr => {
+          pr.head.sha = 'e'.repeat(40);
+        },
+      })
+    ).rejects.toThrow(/head changed/);
+    await expect(
+      integratedPolicy({
+        mutateFinal: pr => {
+          pr.changed_files = 2;
+        },
+      })
+    ).rejects.toThrow(/failed fork merge-group policy/);
   });
 
   it('rejects a dismissed or revoked latest approval on the current head', () => {

@@ -1594,8 +1594,8 @@ export function extractWorkflowJobBlock(workflowYaml = '', jobName = '') {
 }
 
 /**
- * Enroll hot path must stay lean: no pytest/Python bootstrap before drain.
- * Drain regression coverage lives in CI Structural Contract (ci-fast lanes).
+ * Explicit native-intent adapter stays independent of fleet and deployment state.
+ * Regression coverage lives in CI Structural Contract (ci-fast lanes).
  *
  * @param {string} workflowYaml
  */
@@ -1617,87 +1617,82 @@ export function validateMergeQueueEnrollHotPath(workflowYaml = '') {
     }
   }
 
-  if (!/drain-pr-queue\.sh/.test(enrollBlock)) {
-    errors.push('enroll hot path must invoke scripts/drain-pr-queue.sh');
-  }
-  if (!/MERGE_QUEUE_BACKEND:/.test(enrollBlock)) {
-    errors.push('enroll hot path must declare MERGE_QUEUE_BACKEND');
+  if (
+    !/workflow_dispatch:/.test(workflowYaml) ||
+    /schedule:|workflow_run:|pull_request:|push:/.test(workflowYaml)
+  ) {
+    errors.push(
+      'retired hosted adapter must accept explicit manual requests only'
+    );
   }
   if (
-    !/MERGE_QUEUE_NATIVE_AUTHORIZATION:\s*merge-queue-autoenroll/.test(
-      enrollBlock
+    /uses:|env:|GH_TOKEN|app-token|fleet-policy|DRAIN_|drain-pr-queue|MERGE_QUEUE_NATIVE_AUTHORIZATION/.test(
+      workflowYaml
     )
   ) {
     errors.push(
-      'enroll hot path must authorize only the native queue controller'
-    );
-  }
-
-  return { ok: errors.length === 0, errors };
-}
-
-const NATIVE_DRAIN_TRANSPORT_AREAS = Object.freeze(['enrollment', 'dequeue']);
-
-function extractNativeDrainTransportArea(script, area) {
-  const startMarker = `# native-queue-transport:${area}:start`;
-  const endMarker = `# native-queue-transport:${area}:end`;
-  const start = script.indexOf(startMarker);
-  const end = script.indexOf(endMarker, start + startMarker.length);
-  if (start < 0 || end < 0) return '';
-  return script.slice(start, end + endMarker.length);
-}
-
-/**
- * Native queue mutations must never use the queue-intent label as transport.
- * Marked transport regions make this invariant deterministic without trying to
- * parse arbitrary Bash control flow.
- *
- * @param {string} drainScript
- */
-export function validateNativeDrainQueueLabelIsolation(drainScript = '') {
-  const errors = [];
-  const areas = new Map();
-  const legacyLabelPatterns = [
-    /--(?:add|remove)-label\s+["']?merge-queue["']?/,
-    /index\(["']merge-queue["']\)/,
-    /(?:^|[\s"'=])merge-queue(?:[\s"']|$)/m,
-  ];
-
-  for (const area of NATIVE_DRAIN_TRANSPORT_AREAS) {
-    const block = extractNativeDrainTransportArea(drainScript, area);
-    areas.set(area, block);
-    if (!block) {
-      errors.push(`native drain ${area} transport markers are required`);
-      continue;
-    }
-    if (legacyLabelPatterns.some(pattern => pattern.test(block))) {
-      errors.push(
-        `native drain ${area} must not read, write, or require the legacy merge-queue label`
-      );
-    }
-  }
-
-  const enrollment = areas.get('enrollment') ?? '';
-  if (!/merge-queue-backend\.mjs enroll "\$n" "\$head_oid"/.test(enrollment)) {
-    errors.push(
-      'native drain enrollment must bind the exact head to backend enrollment'
+      'retired hosted adapter must not obtain credentials or execute external admission'
     );
   }
   if (
-    !/--arg expected_head "\$expected_head"/.test(enrollment) ||
-    !/\.headRefOid/.test(enrollment)
+    !/^permissions:\s*\{\}/m.test(workflowYaml) ||
+    /permissions:\s*\n/.test(workflowYaml)
+  ) {
+    errors.push('retired hosted adapter requires empty permissions');
+  }
+  const bodies = [
+    ...enrollBlock.matchAll(/^([ ]+)run: \|\s*\n((?:\1[ ]+[^\n]*(?:\n|$))*)/gm),
+  ];
+  const commands = bodies.flatMap(match =>
+    match[2]
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+  );
+  const safe =
+    bodies.length === 1 &&
+    (enrollBlock.match(/\brun:/g) ?? []).length === 1 &&
+    commands.length >= 2 &&
+    commands.at(-1) === 'exit 2' &&
+    commands
+      .slice(0, -1)
+      .every(
+        line =>
+          /^echo '[^']*'(?: >&2)?$/.test(line) ||
+          /^printf '%s\\n' '[^']*'(?: >&2)?$/.test(line)
+      );
+  if (
+    !safe ||
+    !commands.some(line => line.includes('native-merge-intent.mjs'))
   ) {
     errors.push(
-      'native drain enrollment must retain its exact-head postcondition'
+      'retired hosted adapter must print the persistent owner command and refuse unconditionally'
     );
   }
 
-  const dequeue = areas.get('dequeue') ?? '';
-  if (!/merge-queue-backend\.mjs dequeue "\$n"/.test(dequeue)) {
-    errors.push('native drain dequeue must prove the backend postcondition');
-  }
-
   return { ok: errors.length === 0, errors };
+}
+
+/** The compatibility drain must remain an unconditional refusal with no tools. */
+export function validateNativeDrainQueueLabelIsolation(drainScript = '') {
+  const commands = drainScript
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'));
+  const safe =
+    commands.length === 4 &&
+    commands[0] === 'set -euo pipefail' &&
+    commands[1] ===
+      "printf '%s\\n' 'ERROR: legacy external admission drain is retired; no action was taken.' >&2" &&
+    commands[2] ===
+      "printf '%s\\n' 'Submit a qualified task completion explicitly: node scripts/native-merge-intent.mjs --repo OWNER/REPO --pr NUMBER --head EXACT_SHA' >&2" &&
+    commands[3] === 'exit 2';
+  return {
+    ok: safe,
+    errors: safe
+      ? []
+      : ['legacy drain must refuse unconditionally without executing tools'],
+  };
 }
 
 export function requiredStatusDecision(statuses) {

@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ || ! "$EXPECTED_HEAD" =~ ^[0-9a-fA-F]{40}$ || -z "$ISSUE_ID" || -z "$WRITER_LOGIN" ]]; then usage; exit 2; fi
-EXPECTED_HEAD="${EXPECTED_HEAD,,}"
+EXPECTED_HEAD="$(printf '%s' "$EXPECTED_HEAD" | tr '[:upper:]' '[:lower:]')"
 normalize_login() { printf '%s' "$1" | sed 's/^@//' | tr '[:upper:]' '[:lower:]'; }
 upsert_status_comment() {
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would upsert writer promotion status on #$PR_NUMBER"; return 0; }
@@ -45,28 +45,35 @@ blocker_body() {
     | node "$PROMOTION_LIB" render-blocker
 }
 compensate_to_draft() {
-  local state pr_id queued
-  gh_retry pr merge "$PR_NUMBER" -R "$REPO" --disable-auto >/dev/null 2>&1 || true
-  state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
-  queued="$(jq -r '.queued == true' <<<"$state")"
-  pr_id="$(jq -r '.id // ""' <<<"$state")"
-  if [[ "$queued" == "true" && -n "$pr_id" ]]; then
-    gh_retry api graphql \
-      -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
-      -f id="$pr_id" >/dev/null 2>&1 || true
-  fi
-  gh_retry pr ready "$PR_NUMBER" -R "$REPO" --undo >/dev/null 2>&1 || true
-  state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
-  queued="$(jq -r '.queued == true' <<<"$state")"
-  pr_id="$(jq -r '.id // ""' <<<"$state")"
-  if [[ "$queued" == "true" && -n "$pr_id" ]]; then
-    gh_retry api graphql \
-      -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
-      -f id="$pr_id" >/dev/null 2>&1 || true
-  fi
+  local state pr_id
+  # Re-read before EVERY risky effect. Never compensate another writer's head,
+  # and never replay an uncertain dequeue/ready/disable response.
+  for operation in disable-auto dequeue draft; do
+    state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
+    if ! jq -e --arg head "$EXPECTED_HEAD" '.head == $head and .state == "OPEN"' <<<"$state" >/dev/null; then
+      printf '%s' "$state"; return 1
+    fi
+    case "$operation" in
+      disable-auto)
+        if [[ "$(jq -r '.autoMerge' <<<"$state")" == "true" ]]; then
+          gh pr merge "$PR_NUMBER" -R "$REPO" --disable-auto >/dev/null 2>&1 || { printf '%s' "$state"; return 1; }
+        fi ;;
+      dequeue)
+        if [[ "$(jq -r '.queued' <<<"$state")" == "true" ]]; then
+          pr_id="$(jq -r '.id // ""' <<<"$state")"
+          [[ -n "$pr_id" ]] || { printf '%s' "$state"; return 1; }
+          gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
+            -f id="$pr_id" >/dev/null 2>&1 || { printf '%s' "$state"; return 1; }
+        fi ;;
+      draft)
+        if [[ "$(jq -r '.draft' <<<"$state")" != "true" ]]; then
+          gh pr ready "$PR_NUMBER" -R "$REPO" --undo >/dev/null 2>&1 || { printf '%s' "$state"; return 1; }
+        fi ;;
+    esac
+  done
   state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
   printf '%s' "$state"
-  jq -e '.state != "OPEN" or (.draft == true and .autoMerge == false and .queued == false)' <<<"$state" >/dev/null
+  jq -e --arg head "$EXPECTED_HEAD" '.head == $head and (.state != "OPEN" or (.draft == true and .autoMerge == false and .queued == false))' <<<"$state" >/dev/null
 }
 emit_blocker_and_exit() {
   local phase="$1" reason="$2" should_compensate="${3:-0}"
@@ -107,6 +114,9 @@ if [[ "$receipt_rc" -ne 0 || "$action" == "block" ]]; then
   [[ "$current_ready" == "true" ]] && compensate=1 || compensate=0
   emit_blocker_and_exit "proof" "$reason" "$compensate"
 fi
+# A ready-but-unenrolled PR may be a prior ambiguous request. Reconcile through
+# the durable native-intent path instead of drafting it on each restart.
+if [[ "$action" == "compensate" && "$reason" == "ready-unenrolled" ]]; then action="promote"; fi
 [[ "$action" != "compensate" ]] || emit_blocker_and_exit "precondition" "$reason" 1
 [[ "$action" == "already-complete" ]] && { echo "writer promotion already complete for #$PR_NUMBER@$EXPECTED_HEAD"; exit 0; }
 [[ "$action" == "promote" ]] || emit_blocker_and_exit "precondition" "$reason" 0
@@ -115,9 +125,18 @@ new_body="$(jq -nc --arg body "$current_body" --argjson receipt "$receipt" '{bod
 [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would attach writer proof, mark ready, and request native auto-merge on #$PR_NUMBER@$EXPECTED_HEAD"; exit 0; }
 gh_retry pr edit "$PR_NUMBER" -R "$REPO" --body "$new_body" >/dev/null || emit_blocker_and_exit "proof-attach" "pr-body-update-failed" 0
 gh_retry pr ready "$PR_NUMBER" -R "$REPO" >/dev/null 2>&1 || emit_blocker_and_exit "ready" "gh-pr-ready-failed" 1
-gh_retry pr merge "$PR_NUMBER" -R "$REPO" --auto --squash --match-head-commit "$EXPECTED_HEAD" >/dev/null 2>&1 || emit_blocker_and_exit "native-intent" "auto-merge-request-failed" 1
-after="$(read_state)" || emit_blocker_and_exit "postcondition" "state-reread-failed" 1
+set +e
+native_result="$(node "$SCRIPT_DIR/native-merge-intent.mjs" --repo "$REPO" --pr "$PR_NUMBER" --head "$EXPECTED_HEAD")"
+native_rc=$?
+set -e
+native_status="$(jq -r '.status // "unknown"' <<<"$native_result" 2>/dev/null)" || native_status="unknown"
+case "$native_status" in
+  queued|intent-recorded|merged) ;;
+  blocked) emit_blocker_and_exit "native-intent" "$(jq -r '.reason' <<<"$native_result")" 1 ;;
+  *) emit_blocker_and_exit "native-intent-unknown" "request-outcome-unknown:exit-$native_rc; owner reconciliation required" 0 ;;
+esac
+after="$(read_state)" || emit_blocker_and_exit "postcondition-unknown" "state-reread-failed; owner reconciliation required" 0
 postcondition="$(decision_for "$receipt" "$after")"
-if [[ "$(jq -r '.action' <<<"$postcondition")" != "already-complete" ]]; then emit_blocker_and_exit "postcondition" "$(jq -r '.reason' <<<"$postcondition")" 1; fi
+if [[ "$(jq -r '.action' <<<"$postcondition")" != "already-complete" ]]; then emit_blocker_and_exit "postcondition-unknown" "$(jq -r '.reason' <<<"$postcondition"); owner reconciliation required" 0; fi
 upsert_status_comment "Writer-owned PR promotion completed for exact head \`$EXPECTED_HEAD\` using \`jovie-writer-pr-proof/v1\`. Native auto-merge/queue intent was verified in the same bounded operation."
 echo "writer promotion complete for #$PR_NUMBER@$EXPECTED_HEAD"

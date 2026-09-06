@@ -706,9 +706,9 @@ describe('pr-check-failures', () => {
     expect(autoReady).not.toContain('check_failures_for_pr');
     expect(autoReady).not.toContain('Verify Draft Agent PR');
     expect(autoReady).not.toContain('dependabot/');
-    expect(drain).toContain('--classify-queue');
-    expect(drain).toContain(`fail='["required check status unavailable"]'`);
-    expect(drain).not.toContain("fail='[]'");
+    expect(drain).toContain('exit 2');
+    expect(drain).toContain('native-merge-intent.mjs');
+    expect(drain).not.toContain('--classify-queue');
   });
 
   it('recognizes agent branches used by drain AGENT_RE', () => {
