@@ -687,6 +687,9 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
+            PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
+            mkdir -p "$PRODUCT_LANE_DIR"
+            git ls-files > "$PRODUCT_LANE_DIR/changed-paths.txt"
             TRUSTED_CI_REPO_LANES="scripts/lib/ci-repo-lanes.mjs"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
