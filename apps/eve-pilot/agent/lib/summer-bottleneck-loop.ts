@@ -452,6 +452,7 @@ export function rankSummerBottlenecks(
 ): readonly Candidate[] {
   const nowMs = now.getTime();
   const { ciAudit, closure, queue, release, runner } = snapshot.signals;
+  const queuedWork = runner.queuedWork;
   const candidates = [
     closure.status === 'red' && closure.openPullRequests > 0
       ? candidate(
@@ -501,11 +502,11 @@ export function rankSummerBottlenecks(
             item.handle
           )
     ),
-    runner.capacityAvailable === 0 && runner.queuedWork > 0
+    runner.capacityAvailable === 0 && queuedWork !== null && queuedWork > 0
       ? candidate(
           'runner-capacity-starvation',
           runner.blockedSince,
-          runner.queuedWork * 40,
+          queuedWork * 40,
           runner.sourceRevision,
           runner.sourceDigest,
           nowMs

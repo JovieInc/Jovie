@@ -302,6 +302,25 @@ describe('Summer bottleneck loop', () => {
     ).toBe(true);
   });
 
+  it.each([
+    { capacityAvailable: 0, queuedWork: null },
+    { capacityAvailable: null, queuedWork: 1 },
+  ])('does not infer runner starvation from an unknown runner signal: %o', runner => {
+    const ranking = rankSummerBottlenecks(
+      snapshot({
+        runner: {
+          ...runner,
+          blockedSince: '2026-09-02T04:00:00.000Z',
+        },
+      }),
+      NOW
+    );
+
+    expect(ranking.map(item => item.id)).not.toContain(
+      'runner-capacity-starvation'
+    );
+  });
+
   it.each(
     summerCiImprovementClassIds
   )('admits only the bounded source-repair task for CI class %s', async selectedId => {
