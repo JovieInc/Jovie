@@ -482,6 +482,7 @@ class FallbackTests(unittest.TestCase):
 
     def command(self, name, body):
         if name == "gh":
+            discovery_body = body
             # Grok shipper now performs an exact-head GraphQL promotion readback
             # after these tests' mocked agent creates or updates a PR. Keep that
             # boundary realistic instead of letting each narrow Git/Grok test's
@@ -553,6 +554,15 @@ PY
                   exit 0
                 fi
             ''' + body
+            # Preserve each test's PR inventory while expressing the new
+            # complete GraphQL connection, rather than reusing a single-PR read.
+            body = (
+                'case "$*" in *"pullRequests(first:100"*)\n'
+                '(\n' + discovery_body + '\n)'
+                ''' | /usr/bin/python3 -c 'import json,sys; nodes=json.load(sys.stdin); print(json.dumps({"data":{"repository":{"pullRequests":{"nodes":nodes,"pageInfo":{"hasNextPage":False,"endCursor":None}}}}}))'
+'''
+                '  exit 0;;\nesac\n'
+            ) + body
         path = self.bin / name
         path.write_text("#!/bin/sh\nset -eu\n" + textwrap.dedent(body))
         path.chmod(0o755)
@@ -2300,6 +2310,7 @@ PY
         )
         self.command(
             "gh",
+            'case "$*" in *headRefName*) echo "[]"; exit 0;; esac\n'
             '[ ! -f "$GROK_CREATED" ] && echo 0 || echo 1\n',
         )
         self.command(
@@ -2345,7 +2356,7 @@ PY
 
     def test_red_fleet_gate_blocks_fallback_before_workspace_or_provider(self):
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         red = self.root / "red-gate.json"
         red.write_text(json.dumps({
@@ -2371,7 +2382,7 @@ PY
 
     def test_closure_stop_line_blocks_new_fallback_before_workspace_or_provider(self):
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         self.gate.write_text(json.dumps({
             "schema": "jovie-fleet-gate/v1",
@@ -2561,7 +2572,7 @@ PY
         ]
         with (
             mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "live"}),
-            mock.patch.object(module, "_gh_json", return_value=listed),
+            mock.patch.object(module, "_complete_open_prs", side_effect=lambda repo: listed if repo == module.JOV_REPO else []),
             mock.patch.object(module, "_linear_identifiers", return_value=[]),
         ):
             remounts = module._github_remount_identifiers()
@@ -3664,7 +3675,7 @@ PY
         # label is incidental.
         created = self.root / "pr-created"
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         destination = self.install_runtime()
         url = self.grok_linear_url()
@@ -4147,7 +4158,7 @@ class FallbackLockGcTests(unittest.TestCase):
         ]
         with (
             mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": ""}),
-            mock.patch.object(self.module, "_gh_json", return_value=payload),
+            mock.patch.object(self.module, "_complete_open_prs", side_effect=lambda repo: payload if repo == self.module.JOV_REPO else []),
         ):
             index = self.module._autonomous_open_pr_index(None)
         self.assertEqual(index["JOV-5853"]["number"], 17017)

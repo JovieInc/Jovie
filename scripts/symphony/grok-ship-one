@@ -93,9 +93,13 @@ if VERDICT_JSON="$(symphony-codex-exhausted open-pr-verdict "$ID" 2>/dev/null)";
   EXISTING_NUMBER="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("number") or "")' "$VERDICT_JSON")"
   EXISTING_MERGE_STATE="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("mergeStateStatus") or "")' "$VERDICT_JSON")"
 else
-  VERDICT=none
+  VERDICT=unknown
   EXISTING_HEAD=""
   EXISTING_MERGE_STATE=""
+fi
+if [ "$VERDICT" = unknown ]; then
+  echo "$(date -u +%FT%TZ) $ID open_pr_inventory_unknown" >> "$LOG"
+  exit 75
 fi
 if [ "$VERDICT" = skip ]; then
   echo "$(date -u +%FT%TZ) $ID open_pr_exists" >> "$LOG"

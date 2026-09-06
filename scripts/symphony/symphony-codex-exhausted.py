@@ -56,6 +56,7 @@ DONE_LOCK_STATES = frozenset(("done", "canceled", "cancelled", "duplicate", "clo
 TYPED_PICKUP_REFUSE_REASONS = frozenset(
     (
         "open_pr_inflight",
+        "open_pr_inventory_unknown",
         "issue_in_review",
         "issue_done",
         "issue_canceled",
@@ -1507,8 +1508,8 @@ def _repo_for_identifier(identifier: str) -> str | None:
     return None
 
 
-def _gh_json(command: list[str]) -> object | None:
-    result = _captured(command, GH_TIMEOUT_SECONDS)
+def _gh_json(command: list[str], timeout: float = GH_TIMEOUT_SECONDS) -> object | None:
+    result = _captured(command, timeout)
     if result is None or result.returncode != 0:
         return None
     try:
@@ -1517,65 +1518,97 @@ def _gh_json(command: list[str]) -> object | None:
         return None
 
 
-def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str, dict]:
-    """Map identifier -> {number, head, repo} for open autonomous heads.
+class OpenPrIndex(dict):
+    """Only complete repository inventories can establish absence of work."""
 
-    identifiers=None lists every matching symphony/grok/fallback head so a
-    remount scan can find DIRTY work even when Linear's receipt list is empty.
-    Listing failure is fail-open (empty): better to risk a duplicate than to
-    starve leftover Todo work because `gh` blipped.
-    """
-    # Unit tests set SYMPHONY_OPEN_PR_INDEX=empty so reconcile never calls live gh.
+    def __init__(self):
+        super().__init__()
+        self.unknown_repos: set[str] = set()
+
+
+OPEN_PR_QUERY = """query($owner:String!,$name:String!,$cursor:String){
+  repository(owner:$owner,name:$name){pullRequests(first:100,states:OPEN,after:$cursor){
+    nodes{number headRefName mergeStateStatus mergeable}
+    pageInfo{hasNextPage endCursor}
+  }}
+}"""
+
+
+def _complete_open_prs(repo: str) -> list[dict] | None:
+    """Bound all pages to one request budget; partial results never prove absence."""
+    owner, name = repo.split("/", 1)
+    deadline = time.monotonic() + GH_TIMEOUT_SECONDS
+    cursor = None
+    seen_cursors = set()
+    seen_numbers = set()
+    result = []
+    for _ in range(100):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        command = ["gh", "api", "graphql", "-f", f"query={OPEN_PR_QUERY}",
+                   "-f", f"owner={owner}", "-f", f"name={name}"]
+        if cursor is not None:
+            command.extend(["-f", f"cursor={cursor}"])
+        payload = _gh_json(command, timeout=remaining)
+        if not isinstance(payload, dict) or payload.get("errors"):
+            return None
+        try:
+            connection = payload["data"]["repository"]["pullRequests"]
+            nodes, page = connection["nodes"], connection["pageInfo"]
+            more = page["hasNextPage"]
+        except (KeyError, TypeError):
+            return None
+        if not isinstance(nodes, list) or not isinstance(more, bool):
+            return None
+        for pr in nodes:
+            if (not isinstance(pr, dict) or type(pr.get("number")) is not int
+                    or pr["number"] <= 0 or not isinstance(pr.get("headRefName"), str)
+                    or pr["number"] in seen_numbers):
+                return None
+            seen_numbers.add(pr["number"])
+        result.extend(nodes)
+        if not more:
+            return result
+        cursor = page.get("endCursor")
+        if not isinstance(cursor, str) or not cursor or cursor in seen_cursors:
+            return None
+        seen_cursors.add(cursor)
+    return None
+
+
+def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str, dict]:
+    """Preserve sibling heads and repository-scoped unknown discovery evidence."""
+    index = OpenPrIndex()
+    # Hermetic tests explicitly opt out of live GitHub discovery.
     if os.environ.get("SYMPHONY_OPEN_PR_INDEX") == "empty":
-        return {}
-    index: dict[str, dict] = {}
+        return index
     wanted = set(identifiers) if identifiers is not None else None
-    if wanted is not None:
-        repos = {repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
-        if not repos:
-            return {}
-    else:
-        repos = {JOV_REPO, LYB_REPO}
-    for repo in repos:
-        payload = _gh_json(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--state",
-                "open",
-                "--limit",
-                "100",
-                "--json",
-                "number,headRefName,mergeStateStatus,mergeable",
-            ]
-        )
-        if not isinstance(payload, list):
+    repos = ({repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
+             if identifiers is not None else {JOV_REPO, LYB_REPO})
+    for repo in sorted(repos):
+        payload = _complete_open_prs(repo)
+        if payload is None:
+            index.unknown_repos.add(repo)
             continue
         for pr in payload:
-            if not isinstance(pr, dict):
-                continue
-            head = pr.get("headRefName") or ""
-            if not isinstance(head, str):
-                continue
+            head = pr["headRefName"]
             match = AUTONOMOUS_HEAD_RE.fullmatch(head)
             if match is None:
                 continue
-            # Group 2 covers the lowercase codex-lane identifier; normalize to
-            # the canonical JOV-/LYB- form used everywhere downstream.
             ident = (match.group(1) or match.group(2)).upper()
             if wanted is not None and ident not in wanted:
                 continue
-            if ident not in index:
-                index[ident] = {
-                    "number": pr.get("number"),
-                    "head": head,
-                    "repo": repo,
-                    "mergeStateStatus": pr.get("mergeStateStatus"),
-                    "mergeable": pr.get("mergeable"),
-                }
+            entry = {
+                "number": pr["number"], "head": head, "repo": repo,
+                "mergeStateStatus": pr.get("mergeStateStatus"),
+                "mergeable": pr.get("mergeable"),
+            }
+            if ident in index:
+                siblings = index[ident].setdefault("siblings", [dict(index[ident])])
+                siblings.append(entry)
+            else:
+                index[ident] = entry
     return index
 
 
@@ -1665,10 +1698,14 @@ def _pr_has_product_failure_tombstone(repo: str, number: int) -> bool:
 
 
 def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:
-    """Return (none|skip|remount, pr). skip = inflight green/pending open PR."""
+    """Return (none|skip|remount|unknown, pr); unknown never authorizes a writer."""
+    if _repo_for_identifier(identifier) in getattr(index, "unknown_repos", set()):
+        return "unknown", None
     pr = index.get(identifier)
     if pr is None:
         return "none", None
+    if len(pr.get("siblings", [])) > 1:
+        return "unknown", pr
     repo = pr.get("repo")
     number = pr.get("number")
     if not isinstance(repo, str) or not isinstance(number, int):
@@ -1710,8 +1747,10 @@ def open_pr_verdict_command(identifier: str) -> int:
         payload["head"] = pr.get("head")
         payload["repo"] = pr.get("repo")
         payload["mergeStateStatus"] = pr.get("mergeStateStatus")
+        if "siblings" in pr:
+            payload["siblings"] = pr["siblings"]
     print(json.dumps(payload))
-    return 0
+    return 75 if verdict == "unknown" else 0
 
 
 def _fallback_lease_dir() -> pathlib.Path:
@@ -2010,6 +2049,8 @@ def pickup_refuse_reason(
     """
     if not IDENTIFIER.fullmatch(identifier):
         return "malformed_identifier"
+    if pr_verdict == "unknown":
+        return "open_pr_inventory_unknown"
     if pr_verdict == "skip":
         return "open_pr_inflight"
     state = (_issue_state_name(issue) or "").strip().lower()
@@ -2046,9 +2087,17 @@ def pickup_check_command(identifier: str) -> int:
         )
         return 78
     open_prs = _autonomous_open_pr_index([identifier])
+    verdict, _pr = _open_pr_verdict(identifier, open_prs)
+    if verdict == "unknown":
+        print(
+            "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+            "class=pr-inventory-unknown retryable=true "
+            f'reason="open_pr_inventory_unknown {identifier}"',
+            file=sys.stderr,
+        )
+        return 75
     gc_fallback_locks()
     issue = _fetch_single_issue(identifier)
-    verdict, _pr = _open_pr_verdict(identifier, open_prs)
     lock_path = _fallback_lease_dir() / f"{identifier}.lock"
     held = _lock_held(lock_path) if lock_path.is_file() else False
     if _inherited_issue_lease_held(lock_path):
