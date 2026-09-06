@@ -80,6 +80,9 @@ def fetch_state(payload):
 class ExecutionTruthTests(unittest.TestCase):
     def setUp(self):
         HUD.FRAME_SOURCE_CACHE.clear()
+        HUD.LINEAR_PROJECT_CACHE.clear()
+        HUD.LINEAR_RETRY_AFTER_SECONDS = 0.0
+        HUD.LINEAR_REQUEST_ERROR = None
 
     def test_stale_cached_attempt_cannot_remain_running_or_retain_tokens(self):
         state, _ = fetch_state(official_state())
@@ -212,6 +215,12 @@ class ExecutionTruthTests(unittest.TestCase):
 
 
 class UltrawideHudTests(unittest.TestCase):
+    def setUp(self):
+        HUD.FRAME_SOURCE_CACHE.clear()
+        HUD.LINEAR_PROJECT_CACHE.clear()
+        HUD.LINEAR_RETRY_AFTER_SECONDS = 0.0
+        HUD.LINEAR_REQUEST_ERROR = None
+
     def test_banned_ops_labels_and_invented_zero_never_appear(self):
         output = paint({"ok": False, "running": None, "retrying": None, "blocked": None, "cap": None, "rows": [], "up": False}, {"ok": False, "count": None, "rows": []}, None, {})
         plain, source = strip(output), SOURCE.read_text(encoding="utf-8")
@@ -634,6 +643,18 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertFalse(rejected["ok"])
         self.assertIn("metadata incomplete", rejected["source_error"])
 
+        partial_metadata = {"data": {"project": {"issues": {"totalCount": 0, "nodes": [], "pageInfo": {}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=partial_metadata):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("metadata incomplete", rejected["source_error"])
+
+        invalid_metadata = {"data": {"project": {"issues": {"totalCount": True, "nodes": {}, "pageInfo": {"hasNextPage": False}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=invalid_metadata):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("metadata incomplete", rejected["source_error"])
+
         repeated = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "same"}}}}}
         with mock.patch.object(HUD, "_linear_request", side_effect=[repeated, repeated]):
             rejected = HUD.fetch_linear_project()
@@ -645,6 +666,67 @@ class UltrawideHudTests(unittest.TestCase):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("bounded total", rejected["source_error"])
+
+    def test_linear_pagination_has_one_overall_fetch_budget(self):
+        page_one = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}}}}
+        with (
+            mock.patch.object(HUD.time, "monotonic", side_effect=[10.0, 10.1, 18.1]),
+            mock.patch.object(HUD, "_linear_request", return_value=page_one) as request,
+        ):
+            rejected = HUD.fetch_linear_project(timeout=8.0)
+        self.assertFalse(rejected["ok"])
+        self.assertIn("overall fetch budget", rejected["source_error"])
+        self.assertEqual(request.call_count, 1)
+        self.assertAlmostEqual(request.call_args.kwargs["timeout"], 7.9)
+
+    def test_linear_cache_reuses_last_good_with_stale_error_and_backoff(self):
+        good = {
+            "ok": True,
+            "review": 3,
+            "todo": 20,
+            "pickup_durations": [60.0],
+            "total_count": 23,
+            "pages": 1,
+            "generated_at": STARTED,
+        }
+        failure = {
+            "ok": False,
+            "review": None,
+            "todo": None,
+            "pickup_durations": None,
+            "generated_at": None,
+            "source_error": "Linear HTTP 429 rate limited",
+        }
+        with mock.patch.object(HUD, "fetch_linear_project", side_effect=[good, failure]) as fetch:
+            first = HUD.fetch_linear_project_cached(monotonic_now=0.0)
+            cached = HUD.fetch_linear_project_cached(monotonic_now=30.0)
+            HUD.LINEAR_RETRY_AFTER_SECONDS = 120.0
+            stale = HUD.fetch_linear_project_cached(monotonic_now=61.0)
+            backed_off = HUD.fetch_linear_project_cached(monotonic_now=100.0)
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual((first["review"], cached["review"]), (3, 3))
+        self.assertNotIn("stale", cached)
+        self.assertTrue(stale["stale"])
+        self.assertEqual(stale["generated_at"], STARTED)
+        self.assertEqual(stale["source_error"], "Linear HTTP 429 rate limited")
+        self.assertEqual(backed_off, stale)
+        self.assertEqual(HUD.LINEAR_PROJECT_CACHE["next_fetch_at"], 181.0)
+
+    def test_linear_http_429_records_retry_window_and_current_error(self):
+        error = HUD.urllib.error.HTTPError(
+            HUD.LINEAR_API,
+            429,
+            "Too Many Requests",
+            {"Retry-After": "120"},
+            None,
+        )
+        with (
+            mock.patch.dict(HUD.os.environ, {"LINEAR_API_KEY": "test"}),
+            mock.patch.object(HUD.urllib.request, "urlopen", side_effect=error),
+        ):
+            self.assertIsNone(HUD._linear_request("query { viewer { id } }", timeout=1.0))
+        self.assertEqual(HUD.LINEAR_RETRY_AFTER_SECONDS, 120.0)
+        self.assertEqual(HUD.LINEAR_REQUEST_ERROR, "Linear HTTP 429 rate limited")
 
     def test_pressure_and_ci_matrix_keep_unknowns_semantic_and_bounded(self):
         pressure = {
@@ -1283,7 +1365,8 @@ class UltrawideHudTests(unittest.TestCase):
             mock.patch.object(HUD, "read_workflow_cap", return_value=4),
             mock.patch.object(HUD, "fetch_symphony", return_value=symphony),
             mock.patch.object(HUD, "fetch_mq", return_value={"ok": True, "count": 0, "rows": []}),
-            mock.patch.object(HUD, "fetch_linear_project", return_value={"ok": True, "review": 0, "todo": 0}),
+            mock.patch.object(HUD, "fetch_linear_project_cached", return_value={"ok": True, "review": 0, "todo": 0}),
+            mock.patch.object(HUD, "fetch_review", side_effect=AssertionError("frame must not issue a second Linear request")),
             mock.patch.object(HUD, "fetch_github_ship", return_value={"ok": False}),
             mock.patch.object(HUD, "load_measured", return_value={}),
             mock.patch.object(HUD, "load_tps_snapshots", return_value=[]),

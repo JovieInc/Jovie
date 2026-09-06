@@ -76,6 +76,10 @@ CHECK_SUCCESS = frozenset({"success", "successful", "neutral", "skipped"})
 HARD_ADMISSION_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred", "needs-conflict-resolution", "needs-manual-rebase"})
 MAX_LINEAR_PAGES = 50
 MAX_LINEAR_ISSUES = 5_000
+LINEAR_CACHE_SECONDS = 60.0
+LINEAR_PROJECT_CACHE: dict[str, Any] = {}
+LINEAR_RETRY_AFTER_SECONDS = 0.0
+LINEAR_REQUEST_ERROR: str | None = None
 P95_MIN_SAMPLES = 20
 P95_BASELINE_MAX_AGE_SECONDS = 300
 MIN_WIDTH = 80
@@ -1325,8 +1329,10 @@ def fetch_mq(*, timeout: float = 8.0) -> dict[str, Any]:
 
 
 def _linear_request(query: str, *, timeout: float, variables: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    global LINEAR_REQUEST_ERROR, LINEAR_RETRY_AFTER_SECONDS
     key = os.environ.get("LINEAR_API_KEY")
     if not key:
+        LINEAR_REQUEST_ERROR = "Linear API key unavailable"
         return None
     request = urllib.request.Request(
         LINEAR_API,
@@ -1337,8 +1343,26 @@ def _linear_request(query: str, *, timeout: float, variables: dict[str, Any] | N
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+    except urllib.error.HTTPError as error:
+        retry_after = 0.0
+        raw_retry = error.headers.get("Retry-After") if error.headers else None
+        raw_reset = error.headers.get("X-RateLimit-Reset") if error.headers else None
+        try:
+            retry_after = max(retry_after, float(raw_retry)) if raw_retry is not None else retry_after
+        except (TypeError, ValueError):
+            pass
+        try:
+            retry_after = max(retry_after, float(raw_reset) - _now().timestamp()) if raw_reset is not None else retry_after
+        except (TypeError, ValueError):
+            pass
+        LINEAR_RETRY_AFTER_SECONDS = max(0.0, retry_after)
+        LINEAR_REQUEST_ERROR = f"Linear HTTP {error.code}" + (" rate limited" if error.code == 429 else "")
         return None
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        LINEAR_REQUEST_ERROR = "Linear transport or response unavailable"
+        return None
+    LINEAR_RETRY_AFTER_SECONDS = 0.0
+    LINEAR_REQUEST_ERROR = None if isinstance(payload, dict) else "Linear response was not an object"
     return payload if isinstance(payload, dict) else None
 
 
@@ -1351,12 +1375,23 @@ def fetch_review(*, timeout: float = 8.0) -> int | None:
 
 
 def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
+    deadline = time.monotonic() + max(0.0, timeout)
     nodes: list[dict[str, Any]] = []
     cursor = None
     total_count = None
     pages = 0
     seen_cursors: set[str] = set()
     while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return {
+                "ok": False,
+                "review": None,
+                "todo": None,
+                "pickup_durations": None,
+                "generated_at": None,
+                "source_error": "Linear pagination exceeded overall fetch budget",
+            }
         if pages >= MAX_LINEAR_PAGES:
             return {
                 "ok": False,
@@ -1366,17 +1401,25 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "generated_at": None,
                 "source_error": f"Linear pagination exceeded {MAX_LINEAR_PAGES} pages",
             }
-        payload = _linear_request(LINEAR_STAGES_QUERY, timeout=timeout, variables={"after": cursor})
+        payload = _linear_request(LINEAR_STAGES_QUERY, timeout=remaining, variables={"after": cursor})
         project = (payload.get("data") or {}).get("project") if payload else None
         issues = project.get("issues") if isinstance(project, dict) else None
-        if not isinstance(issues, dict) or not isinstance(issues.get("totalCount"), int) or not isinstance(issues.get("pageInfo"), dict):
+        page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
+        if (
+            not isinstance(issues, dict)
+            or not isinstance(issues.get("nodes"), list)
+            or isinstance(issues.get("totalCount"), bool)
+            or not isinstance(issues.get("totalCount"), int)
+            or not isinstance(page_info, dict)
+            or not isinstance(page_info.get("hasNextPage"), bool)
+        ):
             return {
                 "ok": False,
                 "review": None,
                 "todo": None,
                 "pickup_durations": None,
                 "generated_at": None,
-                "source_error": "Linear project pagination metadata incomplete",
+                "source_error": LINEAR_REQUEST_ERROR or "Linear project pagination metadata incomplete",
             }
         pages += 1
         page_total = issues["totalCount"]
@@ -1399,7 +1442,7 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "source_error": "Linear totalCount changed during pagination",
             }
         total_count = page_total
-        nodes.extend(node for node in (issues.get("nodes") or []) if isinstance(node, dict))
+        nodes.extend(node for node in issues["nodes"] if isinstance(node, dict))
         if len(nodes) > MAX_LINEAR_ISSUES:
             return {
                 "ok": False,
@@ -1409,7 +1452,6 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "generated_at": None,
                 "source_error": f"Linear inventory exceeded bounded total {MAX_LINEAR_ISSUES}",
             }
-        page_info = issues["pageInfo"]
         if page_info.get("hasNextPage") is not True:
             break
         cursor = page_info.get("endCursor")
@@ -1459,6 +1501,32 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
         "pages": pages,
         "generated_at": _now().isoformat(),
     }
+
+
+def fetch_linear_project_cached(*, timeout: float = 8.0, monotonic_now: float | None = None) -> dict[str, Any]:
+    tick = time.monotonic() if monotonic_now is None else monotonic_now
+    next_fetch_at = _num(LINEAR_PROJECT_CACHE.get("next_fetch_at"))
+    cached = LINEAR_PROJECT_CACHE.get("value")
+    if isinstance(cached, dict) and next_fetch_at is not None and tick < next_fetch_at:
+        return copy.deepcopy(cached)
+    current = fetch_linear_project(timeout=timeout)
+    if current.get("ok") is True:
+        LINEAR_PROJECT_CACHE.update({"value": copy.deepcopy(current), "next_fetch_at": tick + LINEAR_CACHE_SECONDS})
+        return current
+    retry_delay = max(LINEAR_CACHE_SECONDS, LINEAR_RETRY_AFTER_SECONDS)
+    if isinstance(cached, dict) and cached.get("ok") is True:
+        retained = copy.deepcopy(cached)
+        retained.update(
+            {
+                "stale": True,
+                "source_error": current.get("source_error") or "Linear source unavailable",
+                "source_error_at": _now().isoformat(),
+            }
+        )
+        LINEAR_PROJECT_CACHE.update({"value": retained, "next_fetch_at": tick + retry_delay})
+        return retained
+    LINEAR_PROJECT_CACHE.update({"value": copy.deepcopy(current), "next_fetch_at": tick + retry_delay})
+    return current
 
 
 def _gh_json(args: list[str], *, timeout: float) -> Any | None:
@@ -2835,7 +2903,7 @@ def frame(
     symphony.update(read_runtime_context(now=clock))
     symphony = current_execution_view(symphony, now=clock)
     mq = retain_last_good_source("mq", fetch_mq(), now=clock)
-    linear = retain_last_good_source("linear", fetch_linear_project(), now=clock)
+    linear = retain_last_good_source("linear", fetch_linear_project_cached(), now=clock)
     github_path = Path(os.environ.get("HUD_GITHUB_PATH", str(DEFAULT_GITHUB_STATE)))
     github = fetch_github_ship(
         cache_path=github_path,
@@ -2855,7 +2923,7 @@ def frame(
     return render(
         symphony=symphony,
         mq=mq,
-        review=linear.get("review") if linear.get("ok") else fetch_review(),
+        review=linear.get("review") if linear.get("ok") else None,
         measured=measured,
         width=cols,
         height=rows,
