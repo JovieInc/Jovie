@@ -1363,10 +1363,8 @@ jobs:
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            apps/web/test-results/
-            apps/web/playwright-report/
-          if-no-files-found: ignore
+          path: apps/web/test-results/
+          if-no-files-found: error
           retention-days: 14
           allow-images: 'true'
           public-images: 'true'
