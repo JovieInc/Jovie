@@ -20,6 +20,12 @@ const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
 
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
+const alertDialogAnimation = centeredContentStyles.animation
+  .split(' ')
+  .filter((className) => !className.startsWith('duration-'))
+  .concat('duration-cinematic')
+  .join(' ');
+
 type AlertDialogOverlayProps = React.ComponentPropsWithoutRef<
   typeof AlertDialogPrimitive.Overlay
 >;
@@ -66,7 +72,7 @@ const AlertDialogContent = React.forwardRef<
     centeredContentStyles.position,
     centeredContentStyles.layout,
     centeredContentStyles.surface,
-    centeredContentStyles.animation,
+    alertDialogAnimation,
     centeredContentStyles.rounded,
     centeredContentStyles.reducedMotion,
     className
