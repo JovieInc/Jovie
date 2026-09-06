@@ -17,6 +17,7 @@ const trusted = new Map([
     keys.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
   ],
 ]);
+/** @type {Omit<import('../../../packages/agent-transport-contracts/index.ts').SymphonyOutageHealth, 'attestation'>} */
 const health = {
   schema: 'jovie-symphony-health-transition/v1',
   eventId: 'health-event-001',
@@ -61,7 +62,10 @@ describe('shared signed Symphony health contract', () => {
     ])
       expect(() =>
         signSymphonyOutageHealth(
-          { ...health, ...patch },
+          // Deliberately cross the static boundary to exercise runtime rejection.
+          /** @type {typeof health} */ (
+            /** @type {unknown} */ ({ ...health, ...patch })
+          ),
           'producer',
           privateKey
         )
@@ -75,13 +79,12 @@ describe('shared signed Symphony health contract', () => {
     ).toThrow();
   });
   it('keeps incident identity stable across observations but distinct across transitions', () => {
-    expect(
-      outageIncidentId({
-        ...health,
-        eventId: 'next-event',
-        observedAt: '2026-09-06T00:03:00Z',
-      })
-    ).toBe(outageIncidentId(health));
+    const nextObservation = {
+      ...health,
+      eventId: 'next-event',
+      observedAt: '2026-09-06T00:03:00Z',
+    };
+    expect(outageIncidentId(nextObservation)).toBe(outageIncidentId(health));
     expect(
       outageIncidentId({ ...health, lostAt: '2026-09-06T00:03:00Z' })
     ).not.toBe(outageIncidentId(health));
