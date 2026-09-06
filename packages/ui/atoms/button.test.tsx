@@ -193,6 +193,20 @@ describe('Button', () => {
     }
   });
 
+  it('keeps link buttons inside a 44px minimum hit target', () => {
+    render(
+      <Button variant='link'>
+        Learn more
+      </Button>
+    );
+
+    const btn = screen.getByRole('button', { name: 'Learn more' });
+    expect(btn.className).toContain('before:h-11');
+    expect(btn.className).toContain('before:min-w-11');
+    expect(btn.className).toContain('before:w-full');
+    expect(btn.className).not.toContain('before:hidden');
+  });
+
   it('renders every entry in the server-safe button registry', () => {
     render(
       <>
