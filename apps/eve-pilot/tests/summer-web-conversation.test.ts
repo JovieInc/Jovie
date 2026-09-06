@@ -347,6 +347,29 @@ describe('authenticated persistent Summer conversation', () => {
       deploymentId: 'dpl_other',
     });
   });
+  it.each([
+    'eventId',
+    'principalHash',
+    'sessionId',
+    'nextStartIndex',
+    'status',
+  ])('rejects malformed or misbound predecessor %s before dispatch', async field => {
+    const f = fixture();
+    await f.send(input());
+    await readConversationResult({
+      store: f.store,
+      eventId: id(1),
+      principalHash: input().principalHash,
+      deploymentId: input().deploymentId,
+      stream: async () => stream(events(input())),
+    });
+    const path = conversationPath('results', id(1));
+    f.records.set(path, { ...f.records.get(path), [field]: 'invalid' });
+    expect((await f.send({ ...input(2), previousEventId: id(1) })).status).toBe(
+      409
+    );
+    expect(f.dispatch).toHaveBeenCalledOnce();
+  });
   it('shares the commercial UTC budget and exposes its reset without dispatch', async () => {
     const f = fixture();
     for (let n = 1; n <= 25; n++)

@@ -230,8 +230,9 @@ export function createConversationIngress(
               )
             )
           : null;
+      let parsedPrevious = terminalResultSchema.safeParse(previousResult);
       let previous =
-        previousResult ??
+        (parsedPrevious.success ? parsedPrevious.data : null) ??
         (previousRejection?.success &&
         previousRejection.data.code === 'daily_turn_budget_exhausted'
           ? previousRejection.data.checkpoint
@@ -258,13 +259,14 @@ export function createConversationIngress(
           previousResult = await deps.read(
             conversationPath('results', candidate)
           );
+          parsedPrevious = terminalResultSchema.safeParse(previousResult);
           previousRejection = previousResult
             ? null
             : rejectedRecordSchema.safeParse(
                 await deps.read(conversationPath('rejected', candidate))
               );
           previous =
-            previousResult ??
+            (parsedPrevious.success ? parsedPrevious.data : null) ??
             (previousRejection?.success &&
             previousRejection.data.code === 'daily_turn_budget_exhausted'
               ? previousRejection.data.checkpoint
@@ -286,6 +288,7 @@ export function createConversationIngress(
       if (
         resolvedPreviousEventId &&
         (!previous ||
+          previous.eventId !== resolvedPreviousEventId ||
           previous.conversationId !== input.conversationId ||
           previous.principalHash !== input.principalHash)
       )
