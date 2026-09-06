@@ -26,6 +26,10 @@ readonly CONCURRENCY_SERVICE_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/sym
 readonly CONCURRENCY_TIMER_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-concurrency-controller.timer"
 readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/symphony/WORKFLOW.md"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-elixir.service"
+readonly RUNTIME_HELPER_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony_official_runtime.py"
+readonly AUTO_ROUTE_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony-auto-route.mjs"
+readonly SAFE_RESTART_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony-elixir-safe-restart"
+readonly FROZEN_TRANSITION_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony-frozen-generation-transition"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
 readonly CLOSURE_TARGET="${GEM_ROOT}/scripts/closure_health.py"
 readonly CONTRACT_TARGET="${GEM_ROOT}/scripts/gem_gate_contract.py"
@@ -96,7 +100,11 @@ for source in \
   "${CONCURRENCY_SERVICE_SOURCE}" \
   "${CONCURRENCY_TIMER_SOURCE}" \
   "${WORKFLOW_SOURCE}" \
-  "${SERVICE_UNIT_SOURCE}"
+  "${SERVICE_UNIT_SOURCE}" \
+  "${RUNTIME_HELPER_SOURCE}" \
+  "${AUTO_ROUTE_SOURCE}" \
+  "${SAFE_RESTART_SOURCE}" \
+  "${FROZEN_TRANSITION_SOURCE}"
 do
   [[ -f "${source}" ]] || { printf 'missing install source: %s\n' "${source}" >&2; exit 2; }
 done
@@ -114,6 +122,10 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/symphony/systemd/symphony-concurrency-controller.timer \
   scripts/symphony/WORKFLOW.md \
   scripts/symphony/systemd/symphony-elixir.service \
+  scripts/symphony/symphony_official_runtime.py \
+  scripts/symphony/symphony-auto-route.mjs \
+  scripts/symphony/symphony-elixir-safe-restart \
+  scripts/symphony/symphony-frozen-generation-transition \
   scripts/symphony/lib/user-systemd-context.sh
 git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/symphony/gem-priority-gate.py \
@@ -128,7 +140,11 @@ git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/symphony/systemd/symphony-concurrency-controller.timer \
   scripts/symphony/lib/user-systemd-context.sh \
   scripts/symphony/WORKFLOW.md \
-  scripts/symphony/systemd/symphony-elixir.service
+  scripts/symphony/systemd/symphony-elixir.service \
+  scripts/symphony/symphony_official_runtime.py \
+  scripts/symphony/symphony-auto-route.mjs \
+  scripts/symphony/symphony-elixir-safe-restart \
+  scripts/symphony/symphony-frozen-generation-transition
 
 SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
 if [[ -n "${EXPECTED_SOURCE_REVISION}" ]]; then
@@ -167,7 +183,11 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
     "${CONCURRENCY_SERVICE_SOURCE}" \
     "${CONCURRENCY_TIMER_SOURCE}" \
     "${WORKFLOW_SOURCE}" \
-    "${SERVICE_UNIT_SOURCE}"
+    "${SERVICE_UNIT_SOURCE}" \
+    "${RUNTIME_HELPER_SOURCE}" \
+    "${AUTO_ROUTE_SOURCE}" \
+    "${SAFE_RESTART_SOURCE}" \
+    "${FROZEN_TRANSITION_SOURCE}"
   exit 0
 fi
 prepare_user_systemd_context
@@ -380,171 +400,22 @@ LISTENER_PID="$(
 [[ "${LISTENER_PID}" =~ ^[1-9][0-9]*$ ]]
 grep -Fq "${SERVICE_CONTROL_GROUP}" "${PROC_ROOT}/${LISTENER_PID}/cgroup"
 
-# File writes are not runtime proof. Attest the exact source revision and both
-# deployed configuration surfaces only after daemon-reload, service activation,
-# and the local state endpoint have all succeeded. This receipt contains hashes
-# and state only; it never serializes credentials or configuration contents.
-UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"
-UNIT_TARGET_SHA="$(sha256sum "${SERVICE_UNIT_TARGET}" | awk '{print $1}')"
-POLICY_SOURCE_SHA="$(sha256sum "${POLICY_SOURCE}" | awk '{print $1}')"
-POLICY_TARGET_SHA="$(sha256sum "${POLICY_TARGET}" | awk '{print $1}')"
-GATE_SOURCE_SHA="$(sha256sum "${GATE_SOURCE}" | awk '{print $1}')"
-GATE_TARGET_SHA="$(sha256sum "${GATE_TARGET}" | awk '{print $1}')"
-CLOSURE_SOURCE_SHA="$(sha256sum "${CLOSURE_SOURCE}" | awk '{print $1}')"
-CLOSURE_TARGET_SHA="$(sha256sum "${CLOSURE_TARGET}" | awk '{print $1}')"
-CONCURRENCY_SOURCE_SHA="$(sha256sum "${CONCURRENCY_SOURCE}" | awk '{print $1}')"
-CONCURRENCY_TARGET_SHA="$(sha256sum "${CONCURRENCY_TARGET}" | awk '{print $1}')"
-CONCURRENCY_SERVICE_SOURCE_SHA="$(sha256sum "${CONCURRENCY_SERVICE_SOURCE}" | awk '{print $1}')"
-CONCURRENCY_SERVICE_TARGET_SHA="$(sha256sum "${CONCURRENCY_SERVICE_TARGET}" | awk '{print $1}')"
-CONCURRENCY_TIMER_SOURCE_SHA="$(sha256sum "${CONCURRENCY_TIMER_SOURCE}" | awk '{print $1}')"
-CONCURRENCY_TIMER_TARGET_SHA="$(sha256sum "${CONCURRENCY_TIMER_TARGET}" | awk '{print $1}')"
-export \
-  SOURCE_REVISION \
-  WORKFLOW_SOURCE \
-  WORKFLOW_TARGET \
-  UNIT_SOURCE_SHA \
-  UNIT_TARGET_SHA \
-  POLICY_SOURCE_SHA \
-  POLICY_TARGET_SHA \
-  GATE_SOURCE_SHA \
-  GATE_TARGET_SHA \
-  CLOSURE_SOURCE_SHA \
-  CLOSURE_TARGET_SHA \
-  CONCURRENCY_SOURCE_SHA \
-  CONCURRENCY_TARGET_SHA \
-  CONCURRENCY_SERVICE_SOURCE_SHA \
-  CONCURRENCY_SERVICE_TARGET_SHA \
-  CONCURRENCY_TIMER_SOURCE_SHA \
-  CONCURRENCY_TIMER_TARGET_SHA \
-  SERVICE_PID \
-  LISTENER_PID \
-  SERVICE_CONTROL_GROUP \
-  GEM_ROOT
-python3 - <<'PY'
-import hashlib
-import json
-import os
-import pathlib
-import re
-from datetime import datetime, timezone
-
-root = pathlib.Path(os.environ["GEM_ROOT"])
-destination = root / "state" / "gem-service-attestation.json"
-destination.parent.mkdir(parents=True, exist_ok=True)
-temporary = destination.with_suffix(".json.tmp")
-
-# The pressure controller owns exactly one bounded runtime overlay. It may
-# update this value while the official workflow hot-reloads, so attest that
-# semantic overlay without restarting or replacing the running Elixir process.
-concurrency_pattern = re.compile(
-    r"^(\s*max_concurrent_agents:\s*)([1-9][0-9]*)(\s*)$",
-    re.MULTILINE,
-)
-workflow_source_bytes = pathlib.Path(os.environ["WORKFLOW_SOURCE"]).read_bytes()
-workflow_installed_bytes = pathlib.Path(os.environ["WORKFLOW_TARGET"]).read_bytes()
-workflow_source = workflow_source_bytes.decode("utf-8")
-workflow_installed = workflow_installed_bytes.decode("utf-8")
-source_matches = list(concurrency_pattern.finditer(workflow_source))
-installed_matches = list(concurrency_pattern.finditer(workflow_installed))
-workflow_matches = False
-workflow_match_mode = "invalid"
-source_concurrency = None
-installed_concurrency = None
-if len(source_matches) == 1 and len(installed_matches) == 1:
-    source_concurrency = int(source_matches[0].group(2))
-    installed_concurrency = int(installed_matches[0].group(2))
-
-    def normalized(text: str) -> str:
-        return concurrency_pattern.sub(
-            lambda match: f"{match.group(1)}<runtime>{match.group(3)}", text
-        )
-
-    workflow_matches = (
-        normalized(workflow_source) == normalized(workflow_installed)
-    )
-    if workflow_matches:
-        workflow_match_mode = (
-            "exact"
-            if workflow_source == workflow_installed
-            else "bounded_concurrency_overlay"
-        )
-
-receipt = {
-    "schema": "gem-service-attestation/v1",
-    "observedAt": datetime.now(timezone.utc).isoformat(),
-    "sourceRevision": os.environ["SOURCE_REVISION"],
-    "daemonReloaded": True,
-    "service": "symphony-elixir.service",
-    "active": True,
-    "healthy": True,
-    "listener": {
-        "port": 4041,
-        "pid": int(os.environ["LISTENER_PID"]),
-        "wrapperPid": int(os.environ["SERVICE_PID"]),
-        "controlGroup": os.environ["SERVICE_CONTROL_GROUP"],
-        "boundToService": True,
-    },
-    "workflow": {
-        "sourceSha256": hashlib.sha256(workflow_source_bytes).hexdigest(),
-        "installedSha256": hashlib.sha256(workflow_installed_bytes).hexdigest(),
-        "matches": workflow_matches,
-        "matchMode": workflow_match_mode,
-        "sourceMaxConcurrentAgents": source_concurrency,
-        "installedMaxConcurrentAgents": installed_concurrency,
-    },
-    "unit": {
-        "sourceSha256": os.environ["UNIT_SOURCE_SHA"],
-        "installedSha256": os.environ["UNIT_TARGET_SHA"],
-        "matches": os.environ["UNIT_SOURCE_SHA"] == os.environ["UNIT_TARGET_SHA"],
-    },
-    "policy": {
-        "sourceSha256": os.environ["POLICY_SOURCE_SHA"],
-        "installedSha256": os.environ["POLICY_TARGET_SHA"],
-        "matches": os.environ["POLICY_SOURCE_SHA"] == os.environ["POLICY_TARGET_SHA"],
-    },
-    "gate": {
-        "sourceSha256": os.environ["GATE_SOURCE_SHA"],
-        "installedSha256": os.environ["GATE_TARGET_SHA"],
-        "matches": os.environ["GATE_SOURCE_SHA"] == os.environ["GATE_TARGET_SHA"],
-    },
-    "closureHealth": {
-        "sourceSha256": os.environ["CLOSURE_SOURCE_SHA"],
-        "installedSha256": os.environ["CLOSURE_TARGET_SHA"],
-        "matches": os.environ["CLOSURE_SOURCE_SHA"] == os.environ["CLOSURE_TARGET_SHA"],
-    },
-    "concurrencyController": {
-        "sourceSha256": os.environ["CONCURRENCY_SOURCE_SHA"],
-        "installedSha256": os.environ["CONCURRENCY_TARGET_SHA"],
-        "matches": os.environ["CONCURRENCY_SOURCE_SHA"] == os.environ["CONCURRENCY_TARGET_SHA"],
-    },
-    "concurrencyService": {
-        "sourceSha256": os.environ["CONCURRENCY_SERVICE_SOURCE_SHA"],
-        "installedSha256": os.environ["CONCURRENCY_SERVICE_TARGET_SHA"],
-        "matches": os.environ["CONCURRENCY_SERVICE_SOURCE_SHA"] == os.environ["CONCURRENCY_SERVICE_TARGET_SHA"],
-    },
-    "concurrencyTimer": {
-        "sourceSha256": os.environ["CONCURRENCY_TIMER_SOURCE_SHA"],
-        "installedSha256": os.environ["CONCURRENCY_TIMER_TARGET_SHA"],
-        "matches": os.environ["CONCURRENCY_TIMER_SOURCE_SHA"] == os.environ["CONCURRENCY_TIMER_TARGET_SHA"],
-    },
-}
-if not all(
-    receipt[artifact]["matches"]
-    for artifact in (
-        "workflow",
-        "unit",
-        "policy",
-        "gate",
-        "closureHealth",
-        "concurrencyController",
-        "concurrencyService",
-        "concurrencyTimer",
-    )
-):
-    raise SystemExit("refusing stale Gem service attestation")
-temporary.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
-temporary.replace(destination)
-PY
+# File writes are not runtime proof. Seed the recurring read-only verifier only
+# after the existing service/cgroup/listener checks establish official ownership.
+# The installed controller records exact source, build, and provider identities;
+# every later controller sample must revalidate those identities before widening.
+if ! "${CONCURRENCY_TARGET}" \
+  --runtime-home "${HOME}" \
+  --gem-root "${GEM_ROOT}" \
+  --workflow "${WORKFLOW_TARGET}" \
+  --source-attestation "${ATTESTATION_TARGET}" \
+  --initial-wrapper-pid "${SERVICE_PID}" \
+  --initial-listener-pid "${LISTENER_PID}" \
+  --initial-control-group "${SERVICE_CONTROL_GROUP}" \
+  --initialize-source-attestation "${SOURCE_ROOT}" "${SOURCE_REVISION}" >/dev/null; then
+  printf 'refusing stale Gem service attestation\n' >&2
+  exit 5
+fi
 
 # The fleet installer owns the workflow consumed by the existing adaptive
 # controller, so it must also make that controller durable. Run one sample

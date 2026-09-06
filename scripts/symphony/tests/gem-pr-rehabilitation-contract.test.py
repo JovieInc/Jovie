@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import pathlib
@@ -547,6 +548,7 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
         symphony.mkdir(parents=True)
         (home / ".config/symphony").mkdir(parents=True)
         (home / ".config/systemd/user").mkdir(parents=True)
+        (home / ".local/bin").mkdir(parents=True)
         fake_bin.mkdir()
         paths["gate"].write_text("old gate\n", encoding="utf-8")
         paths["closure"].write_text("old closure\n", encoding="utf-8")
@@ -562,6 +564,34 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
         )
         paths["registry_config"].write_text("{}\n", encoding="utf-8")
         paths["workflow"].write_text("old workflow\n", encoding="utf-8")
+        for source_name, target_name in (
+            ("symphony_official_runtime.py", "symphony-official-runtime"),
+            ("symphony-auto-route.mjs", "symphony-auto-route.mjs"),
+            ("symphony-elixir-safe-restart", "symphony-elixir-safe-restart"),
+            ("symphony-frozen-generation-transition", "symphony-frozen-generation-transition"),
+        ):
+            target = home / ".local/bin" / target_name
+            target.write_bytes((HERMES / source_name).read_bytes())
+            target.chmod(0o755)
+        runtime_binary = home / ".local/bin/symphony"
+        runtime_binary.write_bytes(b"exact fixture build\n")
+        runtime_binary.chmod(0o755)
+        provider_root = home / ".local/state/symphony-elixir/provider-generations"
+        generation = provider_root / "source-fixture"
+        generation.mkdir(parents=True)
+        provider_hashes = {}
+        for name in ("agent-router", "codex-router", "codex-probe", "cursor-adapter", "entry"):
+            artifact = generation / name
+            artifact.write_text(f"{name}\n", encoding="utf-8")
+            artifact.chmod(0o755)
+            provider_hashes[name] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        (generation / "manifest.json").write_text(
+            json.dumps({"schema": "symphony-provider-generation/v1", "sha256": provider_hashes}) + "\n",
+            encoding="utf-8",
+        )
+        (provider_root / "current").symlink_to(generation)
+        for alias in ("symphony-agent-router", "symphony-codex-entry"):
+            (home / ".local/bin" / alias).symlink_to(provider_root / "current" / "entry")
 
         systemctl = fake_bin / "systemctl"
         systemctl.write_text(
@@ -788,6 +818,16 @@ exit 0
         self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 8)
         self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
         self.assertEqual(attestation["listener"]["pid"], 4242)
+        self.assertEqual(attestation["reattest"]["schema"], "gem-service-reattest/v1")
+        self.assertTrue(all(
+            artifact["matches"]
+            for artifact in attestation["reattest"]["artifacts"].values()
+        ))
+        self.assertRegex(attestation["reattest"]["runtimeBuild"]["sha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(
+            attestation["reattest"]["providerGeneration"]["manifestSha256"],
+            r"^[0-9a-f]{64}$",
+        )
 
     def test_install_activates_existing_adaptive_controller_from_disabled_state(self):
         with tempfile.TemporaryDirectory() as directory:

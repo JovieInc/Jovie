@@ -94,7 +94,12 @@ jobs:
             .listener.wrapperPid > 0 and
             .listener.boundToService == true and
             .workflow.matches == true and
-            .unit.matches == true
+            .unit.matches == true and
+            .reattest.schema == "gem-service-reattest/v1" and
+            .reattest.lastVerifiedAt == .observedAt and
+            (.reattest.runtimeBuild.sha256 | test("^[0-9a-f]{64}$")) and
+            (.reattest.providerGeneration.manifestSha256 | test("^[0-9a-f]{64}$")) and
+            ([.reattest.artifacts[].matches] | all)
           ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
           curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state \
             | jq -e '
