@@ -20,7 +20,7 @@ the implementation slot only after its exact-head receipt is acknowledged.
 | --- | --- | --- |
 | Draft | Symphony | Evidence-complete draft and writer-owned handoff receipt |
 | Review | Writer | Exact-head review, CI, and ticket evidence |
-| Promotion | Gem | Native merge-queue admission at the same head |
+| Promotion | Writer | Native merge-queue admission at the same head |
 | Merge | GitHub native queue | Merge event; this is not activation |
 | Activation | Production controller | Exact deployed runtime proof |
 | Closure | Summer | Closure receipt referencing activation proof |
@@ -128,75 +128,52 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   preview status remains informational — see
   [`release.md`](../.claude/rules/release.md).
 
-## 3. Merge: autonomous, per-PR, self-healing
+## 3. Merge: agent intent, native enforcement
 
-- **Enrollment is automatic, exact-head, and bounded.**
-  `merge-queue-autoenroll` first revalidates the PR associated with the
-  triggering PR/CI event at that event's exact published head. Because GitHub's
-  shared concurrency group retains only one pending run, every surviving pass
-  may also recover a deterministic cohort whose source-required checks are
-  freshly green. The event target, native re-entry, and missed-event recovery
-  share one admission path bounded only by native queue depth (a positive
-  `DRAIN_QUEUE_REENTRY_MAX_PER_RUN` re-caps admissions per run; default `0` =
-  uncapped), the App-backed controller remains
-  the sole writer, and every mutation rechecks the live head, labels, base,
-  queue depth, and native postcondition. Enrollment uses GitHub's native queue
-  only. The `merge-queue` label is retired and must not be added, read, or
-  retained. You don't merge by hand.
-  Each proven native enrollment emits a `pull_request: enqueued` continuation.
-  Its already-queued exact-head target is an idempotent no-op while the surviving
-  pass advances the next bounded cohort; when no eligible remainder exists, no
-  new enrollment event is created and the chain converges.
-- **The queue tolerates transient state.** A PR is only dequeued on a real merge
-  conflict, `needs-conflict-resolution`, or a **terminal** failing check
-  (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
-  check is **not** a failure — `cancel-in-progress` leaves zombie cancelled
-  check-runs, and treating those as failures is what stripped enrollment every 20
-  min and starved the queue (#11727). Do not regress this.
-- **Don't bypass the queue as a habit.** The reversible admin bootstrap (ruleset →
-  `evaluate` → merge → `active`) exists only to land a fix that repairs the queue
-  itself, when the queue can't yet land it. It is not the normal path.
+After completing review and qualification, the owning agent uses
+`scripts/writer-owned-pr-promote.sh` to attach author proof, mark ready and submit
+native intent in one bounded action. Already-qualified ready PRs can use
+`node scripts/native-merge-intent.mjs --repo JovieInc/Jovie --pr NUMBER --head FULL_SHA`.
+This is an exact-head native merge/auto-merge request. GitHub stores waiting
+intent and owns required checks and combined-head merge-group validation.
+The agent does not need to remain alive polling. No admin bypass is allowed.
 
-### Native queue reconciliation
+The existing `merge-queue-autoenroll.yml` now refuses execution with an explicit
+retirement message. Its ephemeral runner cannot preserve ambiguous-attempt
+ownership; the persistent owning writer submits intent. Legacy drain and automatic approval/sweep writers are
+retired. A CI success alone never manufactures an independent review receipt.
 
-`drain-pr-queue.sh` reads authoritative GitHub queue state, not the audit
-label. Every enrollment uses the exact current head SHA and proves the PR is
-queued after mutation. Hard-gated, conflicting, or terminal-red entries are
-dequeued through the native API and then have their audit label removed.
-Pending, queued, and cancelled check runs are not terminal failures, preventing
-dequeue/re-enroll loops during ordinary CI cancellation or main movement.
-An agent conflict that already carries `needs-conflict-resolution` is reported
-without repeating the same label mutation on every drain pass.
-When a non-draft main PR's required source checks never registered any
-check-run on its exact head (missing, not failing), the drain re-fires source
-CI with a bounded close+reopen: at most two per run, heads at least two hours
-old, and never twice on the same exact head (a bot-comment marker is the
-idempotency record). Terminal red checks still route to the fix agent instead.
-When a merge-group run proves a classified product failure, Gem writes the
-bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
-refusal. That success status preserves source-head cleanliness while acting as
-an exact-head tombstone after bounded Actions history rolls over; only a new
-source commit resets the product-failure memory.
+`Fork PR Gate` runs trusted main policy for source metadata and every group
+member. It preserves genuine holds, fork approval, current requested changes,
+pre-land changelog restrictions and exact-head failure tombstones. Label,
+draft and review changes refresh the required gate; a new blocker also fails
+an active group. Event delivery is asynchronous, so withdrawing a PR already
+committing is not an instantaneous transactional cancellation.
 
-### Fleet degradation policy
+Native `PR Ready`, `Migration Guard`, `Fork PR Gate`, `PR Size Guard`, and
+required merge queue remain enforced. The live ruleset requires zero approving
+reviews; owner independent review obligations are not a claim of a GitHub
+approval-count rule. Missing checks wait/fail closed; cancelled checks are not
+permission to bypass. Conflicts and ejections return to the owning repair task;
+unchanged heads do not enter autonomous re-enqueue loops.
 
-The normal queue requires a fresh `GREEN` fleet receipt. When production is
-explicitly red but source `main` is green, the same controller may admit one
-exact-head UI/docs delta only after the semantic-isolation contract in
-`.github/MERGE_QUEUE.md` succeeds. All ordinary queue entries are held, and the
-production controller continues to reject deployment and promotion. Labels
-remain mechanical intent/hold signals and are never proof of isolation.
+An ambiguous merge request is reconciled with authoritative native state,
+never blindly retried. `intent-recorded`, positioned `queued`, and `merged`
+are distinct receipts. Preserve the command's durable receipt directory across
+agent restarts; sharing it is required for cross-host uncertain-attempt recovery.
 
-When source `main` is red, no PR may merge and no deployment may start; UI/docs
-work may exist only as a draft. Unknown or stale production/main/controller/
-integrity evidence and severe integrity incidents admit nothing. The exception
-never permits business logic, auth, data, API, runtime, dependency, config, or
-control-plane changes, and a path-only classification is insufficient.
+### Source admission and production promotion
+
+Symphony availability and deployed-production SHA binding do not gate safe,
+qualified source admission. This supersedes the former GREEN-fleet requirement
+and controller-failure/production-unbound source freeze. Required source
+integrity and per-PR policy remain enforced. Production deployment and runtime
+activation retain their independent health, artifact, and ownership gates.
 
 ### Summer closure-health stop-line
 
-Summer owns closure health; Gem remains the only native-queue and promotion
-writer. The closure observer classifies every open PR as `close`, `repair`,
+Summer owns closure health; GitHub owns native merging and the existing
+production writer owns promotion. The closure observer classifies every open PR as `close`, `repair`,
 `promote`, `queued`, or `held` with an owner, reason, and seven-day expiry.
 `close` requires the repository's explicit `duplicate` lifecycle label;
 matching titles or Linear issue IDs never prove semantic redundancy.

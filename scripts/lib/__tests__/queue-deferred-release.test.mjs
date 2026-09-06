@@ -84,23 +84,13 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(releaseScript).toContain('every queue-deferred hold stays in place');
   });
 
-  it('carries the exact bot receipt through the degraded release lifecycle', () => {
-    expect(autoenroll).toContain(
-      "steps.admission.outputs.deferred_release == '1'"
-    );
-    expect(autoenroll).toContain("'deferred-release-only'");
-    expect(autoenroll).toContain(
-      "needs.fleet-policy.outputs.mode != 'hold-intake'"
-    );
-    expect(drain).toContain(
-      'exact-head controller queue-deferred release receipt'
-    );
-    expect(drain).toContain(
-      'controller release evidence changed during native enrollment'
-    );
-    expect(drain).toContain(
-      'Fleet receipt does not authorize the exact queue-deferred release fallback'
-    );
+  it('cannot turn deferred-release events into external admission', () => {
+    expect(autoenroll).not.toContain('deferred-release-only');
+    expect(autoenroll).not.toContain('workflow_run:');
+    expect(autoenroll).toContain('native-merge-intent.mjs');
+    expect(autoenroll).toContain('exit 2');
+    expect(autoenroll).not.toMatch(/run:\s*node|uses:|GH_TOKEN/);
+    expect(drain).toContain('exit 2');
   });
 
   it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {

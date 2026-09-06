@@ -256,7 +256,7 @@ main() {
       log "TARGET REACHED: 0 PRs, 0 todos"
       exit 0
     fi
-    [[ ! -x "$ROOT/scripts/drain-pr-queue.sh" ]] || run_logged drain.log "$ROOT/scripts/drain-pr-queue.sh" || true
+    # Native intent is submitted by the owning writer; no drain observer loop.
     [[ ! -x "$ROOT/scripts/loop-train-drain.sh" ]] || run_logged train.log "$ROOT/scripts/loop-train-drain.sh" || true
     log "sleep ${INTERVAL}s"
     sleep "$INTERVAL"

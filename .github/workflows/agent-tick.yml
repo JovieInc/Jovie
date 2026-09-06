@@ -11,7 +11,7 @@
 #
 # CONSOLIDATED WORKFLOWS (removed their cron schedules; kept workflow_dispatch):
 #   agent-landing-sweep      — sweep eligible agent PRs into the merge queue
-#   auto-ready-agent-drafts  — audit writer-owned PR promotion drift
+#   auto-ready-agent-drafts  — report retired fleet readiness recovery
 #   github-ai-dispatcher     — dispatch agent-ready issues to the orchestrator
 #
 # RESTORED STANDALONE CRONS (no longer consolidated here):
@@ -151,37 +151,16 @@ jobs:
           echo "=== Sweep complete: landed=$LANDED skipped=$SKIPPED ==="
 
   # --------------------------------------------------------------------------
-  # JOB: auto-ready
-  # Observer-only audit for writer-owned promotion drift. Manual recovery lives
-  # in auto-ready-agent-drafts.yml; successful promotion belongs to the writer.
+  # JOB: auto-ready compatibility diagnostic; completing writer owns readiness.
   # --------------------------------------------------------------------------
   auto-ready:
-    name: Audit Writer-Owned Promotion Drift
+    name: Owner completion required
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      pull-requests: read
-      contents: read
-      checks: read
-
+    timeout-minutes: 1
+    permissions: {}
     steps:
-      - name: Checkout main policy code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          persist-credentials: false
-
-      - name: Verify GitHub CLI
-        run: gh --version
-
-      - name: Audit proven writer-owned promotion drift
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          GH_RETRY_ATTEMPTS: 8
-          GH_RETRY_MAX_DELAY: 60
-          DRY_RUN: '1'
-        run: bash scripts/auto-ready-agent-drafts.sh
+      - name: Report retired fleet promotion
+        run: echo 'owner-completion-required; fleet readiness recovery is retired; no action taken'
 
   # --------------------------------------------------------------------------
   # RETIRED JOB: dedicated cost-anomaly-gate.yml owns the alert-only observer.

@@ -1,4 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -124,102 +132,54 @@ function writerPromotion(receipt = proofReceipt(), state = prState()) {
   });
 }
 
-describe('Auto-Ready fleet live-state guard', () => {
-  it('does not wait for checks or mergeability before paired promotion', () => {
-    expect(fleetScript).not.toContain('check_failures_for_pr');
-    expect(fleetScript).not.toContain('gh pr checks');
-    expect(fleetScript).not.toContain('--classify-auto-ready');
-    expect(fleetScript).not.toContain('.mergeable == "MERGEABLE"');
-    expect(fleetScript).toContain(
-      'Existing source checks may still be pending'
-    );
-  });
-
-  it('pins promotion to the exact live head and hold-label snapshot', () => {
-    expect(fleetScript).toContain('headRefOid headRefName body state');
-    expect(fleetScript).toContain('labels(first:100){nodes{name}}');
-    expect(fleetScript).toContain('HOLD_LABEL_RE=');
-    expect(fleetScript).toContain('.head == $expected_head');
-    expect(fleetScript).toContain('.branch == $expected_branch');
-    expect(fleetScript).toContain('before_mutation="$(read_state "$n"');
-    expect(fleetScript.indexOf('before_mutation="$(read_state')).toBeLessThan(
-      fleetScript.indexOf(
-        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
-      )
-    );
-  });
-
-  it('pairs ready and auto-merge, then compensates any incomplete pair', () => {
-    const ready = 'gh_retry pr ready "$n" -R "$REPO"';
-    const autoMerge = 'gh_retry pr merge "$n" -R "$REPO" --auto --squash';
-    expect(fleetScript).toContain(ready);
-    expect(fleetScript).toContain(autoMerge);
-    expect(fleetScript.indexOf(ready)).toBeLessThan(
-      fleetScript.indexOf(autoMerge)
-    );
-    expect(fleetScript).toContain('auto-merge request failed after ready');
-    expect(fleetScript).toContain('--match-head-commit "$expected_head"');
-    expect(fleetScript).toContain(
-      'gh_retry pr merge "$n" -R "$REPO" --disable-auto'
-    );
-    expect(fleetScript).toContain('if ! undo_ready "$n"; then');
-    expect(fleetScript).toContain('after="$(read_state "$n"');
-    expect(fleetScript).toContain('auto_merge_after=');
-    expect(fleetScript).toContain('queued_after=');
-    expect(fleetScript).toContain(
-      '( "$auto_merge_after" == "true" || "$queued_after" == "true" )'
-    );
-    expect(fleetScript).toContain('held_after=');
-    expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
-    expect(fleetScript).toContain('restored="$(read_state "$n"');
-    expect(fleetScript.indexOf('after="$(read_state')).toBeGreaterThan(
-      fleetScript.indexOf(
-        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
-      )
-    );
-  });
-
-  it('reconciles an interrupted ready-without-auto-merge state', () => {
-    expect(fleetScript).toContain('recover_ready_without_auto_merge');
-    expect(fleetScript).toContain('state_needs_pairing');
-    expect(fleetScript).toContain(
-      '.draft == false and .autoMerge == false and .queued == false'
-    );
-    expect(fleetScript).not.toContain('undo_ready "$n" || true');
-    expect(fleetScript).toContain(
-      'stopping: #$n could not be returned to a closed-loop state'
-    );
+describe('Retired fleet draft promotion', () => {
+  it('cannot replay withdrawn author readiness, even with historical proof and recovery flags', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'retired-auto-ready-'));
+    try {
+      const marker = resolve(dir, 'effects');
+      for (const tool of ['gh', 'node', 'jq', 'curl']) {
+        writeFileSync(
+          resolve(dir, tool),
+          '#!/bin/sh\necho effect >> "$EFFECTS"\nexit 99\n',
+          { mode: 0o700 }
+        );
+      }
+      for (const dryRun of ['0', '1']) {
+        const result = spawnSync(
+          '/bin/bash',
+          [
+            resolve(repoRoot, 'scripts/auto-ready-agent-drafts.sh'),
+            '--pr',
+            String(prNumber),
+            '--head',
+            child,
+          ],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: dir,
+              EFFECTS: marker,
+              DRY_RUN: dryRun,
+              REPO: 'JovieInc/Jovie',
+              WRITER_PROOF: proofBody(),
+              ALLOW_LEGACY_ADMISSION: '1',
+            },
+          }
+        );
+        expect(result.status).toBe(2);
+        expect(result.stderr).toContain('owner completion required');
+        expect(existsSync(marker)).toBe(false);
+      }
+      expect(fleetScript).not.toContain('source ');
+      expect(fleetScript).not.toContain('gh_retry');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
-describe('Auto-Ready provenance selector', () => {
-  it('discovers PR author and exact head instead of trusting branch prefixes', () => {
-    expect(fleetScript).toContain(
-      '--json number,title,isDraft,labels,headRefName,headRefOid,author'
-    );
-    expect(fleetScript).toContain('author: (.author.login // "")');
-    expect(fleetScript).toContain('auto-ready-provenance.mjs');
-    expect(fleetScript).toContain('resolve_promotion');
-    expect(fleetScript).not.toContain(
-      'select((.head | test("^(tim/|codex/|agent/|claude/|linear/|codegen-bot/)"))'
-    );
-    expect(fleetScript).not.toContain('dependabot/');
-  });
-
-  it('revalidates provenance immediately before mutation', () => {
-    expect(fleetScript).toContain('mutation_verdict="$(resolve_promotion');
-    expect(
-      fleetScript.indexOf('mutation_verdict="$(resolve_promotion')
-    ).toBeLessThan(
-      fleetScript.indexOf(
-        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
-      )
-    );
-    expect(fleetScript).toContain('READY_ATTEMPTED_FOR=');
-    expect(fleetScript).toContain('refusing a second paired promotion');
-    expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
-  });
-
+describe('Auto-Ready provenance selector (diagnostic only)', () => {
   it('rejects an allowlisted bot author without an author-owned proof receipt', () => {
     expect(
       classifyAutoReadyPromotion({
@@ -408,7 +368,7 @@ describe('Writer-owned PR promotion proof', () => {
       'jovie-writer-pr-promotion-blocker/v1'
     );
     [
-      '--match-head-commit "$EXPECTED_HEAD"',
+      'native-merge-intent.mjs" --repo "$REPO" --pr "$PR_NUMBER" --head "$EXPECTED_HEAD"',
       'dequeuePullRequest',
       'compensate_to_draft',
       'render-blocker',
@@ -416,30 +376,19 @@ describe('Writer-owned PR promotion proof', () => {
   });
 });
 
-describe('Auto-Ready App-token workflow', () => {
-  it('mints a short-lived Jovie App token and never mutates with GITHUB_TOKEN', () => {
-    const tokenAction =
-      'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1';
-    expect(workflow).toContain(tokenAction);
-    expect(workflow).toContain('id: app-token');
-    expect(workflow).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
-    expect(workflow).toContain(
-      'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
-    );
-    expect(workflow).toContain(
-      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
-    );
-    expect(workflow).not.toContain('secrets.GITHUB_TOKEN');
-    expect(workflow).toContain('ref: main');
-    expect(workflow).toContain('persist-credentials: false');
-  });
-
-  it('keeps workflow recovery manual-only and never source-event driven', () => {
+describe('Retired Auto-Ready workflow compatibility', () => {
+  it('has no token or invocation that can revive fleet readiness recovery', () => {
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).not.toContain('workflow_run:');
-    expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
-    expect(workflow).not.toContain('types: [ready_for_review');
-    expect(workflow).not.toContain('ready_for_review/CI cascade');
+    expect(workflow).toContain('owner-completion-required');
+    expect(workflow).not.toContain('create-github-app-token');
+    expect(workflow).not.toContain('GH_TOKEN');
+    expect(workflow).not.toContain('run: bash');
+    expect(workflow).not.toContain('pull-requests: write');
+    const tick = readFileSync(
+      resolve(repoRoot, '.github/workflows/agent-tick.yml'),
+      'utf8'
+    );
+    expect(tick).toContain('owner-completion-required');
+    expect(tick).not.toContain('run: bash scripts/auto-ready-agent-drafts.sh');
   });
 });

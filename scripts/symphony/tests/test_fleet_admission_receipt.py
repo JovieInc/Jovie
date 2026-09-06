@@ -138,13 +138,6 @@ def inject_inventories(receipt: dict[str, object]) -> dict[str, object]:
     return {**receipt, "signals": signals_value}
 
 
-def drain_authorization_jq() -> str:
-    text = DRAIN.read_text(encoding="utf-8")
-    start = text.index('.schema == "jovie-fleet-gate/v1" and')
-    end = text.index("' <<<\"$FLEET_GATE_JSON\"", start)
-    return text[start:end]
-
-
 class FleetAdmissionReceiptTests(unittest.TestCase):
     def project_mode(self, **overrides):
         receipt = inject_inventories(evaluate_receipt(**overrides))
@@ -184,15 +177,6 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
             with self.subTest(mode=mode):
                 _source, projection = self.project_mode(**overrides)
                 self.assertEqual(projection["promotionMode"], mode)
-                if mode != "normal":
-                    accepted = subprocess.run(
-                        [jq, "-e", "--arg", "mode", mode, drain_authorization_jq()],
-                        input=json.dumps(projection),
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
-                    self.assertEqual(accepted.returncode, 0, accepted.stderr)
                 self.assertEqual(
                     projection["isolatedPromotionAdmission"]["allowed"],
                     _source["isolatedPromotionAdmission"]["allowed"],
@@ -285,17 +269,6 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertFalse(
             projection["productionUnboundRepairAdmission"]["deploymentsAllowed"]
         )
-        jq = shutil.which("jq")
-        self.assertIsNotNone(jq)
-        accepted = subprocess.run(
-            [jq, "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
-            input=json.dumps(projection),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        self.assertEqual(accepted.returncode, 0, accepted.stderr)
-
         serial = dict(hold)
         serial["productionUnboundRepairAdmission"] = {
             **hold["productionUnboundRepairAdmission"],
@@ -350,7 +323,7 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
 
 
 class LargeAdmissionDrainLaunchTests(unittest.TestCase):
-    def test_projected_large_receipt_launches_the_drain_path(self):
+    def test_projected_large_receipt_cannot_reactivate_retired_drain(self):
         receipt = inject_inventories(
             evaluate_receipt(production={"status": "red", "deployedSha": SHA})
         )
@@ -384,10 +357,10 @@ class LargeAdmissionDrainLaunchTests(unittest.TestCase):
                 text=True,
                 check=False,
             )
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 2, result.stderr)
         self.assertNotIn("Argument list too long", result.stderr)
         self.assertNotIn("malformed or stale fleet receipt", result.stderr)
-        self.assertIn("queue depth:", result.stdout)
+        self.assertIn("retired; no action was taken", result.stderr)
 
 
 if __name__ == "__main__":

@@ -56,8 +56,10 @@ export function validateFleetAutonomy(
       'admitter.mjs must not treat a queue snapshot gap as a promotion hold'
     );
   }
-  if (!drain.includes('RETARGET (base must be main)')) {
-    errors.push('drain-pr-queue.sh must retarget non-main PRs onto main');
+  if (!drain.includes('exit 2') || !drain.includes('native-merge-intent.mjs')) {
+    errors.push(
+      'drain-pr-queue.sh must be retired with an explicit native intent replacement'
+    );
   }
   if (HUMAN_ENROLL_BLOCK.test(drain)) {
     errors.push(

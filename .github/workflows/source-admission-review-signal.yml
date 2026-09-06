@@ -1,0 +1,12 @@
+# Metadata-only fork review signal. No checkout, artifacts, secrets or PR code.
+name: Source Admission Review Signal
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+permissions: {}
+jobs:
+  review-signal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo 'Review metadata changed; trusted main policy revalidates the current PR.'

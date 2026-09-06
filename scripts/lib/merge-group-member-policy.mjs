@@ -644,19 +644,26 @@ export async function runPolicy({
 
   let results;
   if (policy === 'fork') {
-    const reviews = await Promise.all(
-      pullRequests.map(pr =>
-        pr.head.repo.fork
-          ? githubPages(`/repos/${repository}/pulls/${pr.number}/reviews`, {
-              token,
-              deadlineMs,
-              request,
-            })
-          : []
-      )
+    // The required fork context also carries repository-specific source holds.
+    // Dynamic import avoids a cycle with the shared fork-review evaluator.
+    const { runSourceAdmission } = await import(
+      './source-admission-policy.mjs'
     );
-    results = pullRequests.map((pr, index) =>
-      evaluateForkMemberPolicy({ pr, reviews: reviews[index] })
+    results = await Promise.all(
+      pullRequests.map(async pr => {
+        const result = await runSourceAdmission({
+          repository,
+          prNumber: pr.number,
+          expectedHead: pr.head.sha,
+          token,
+          request,
+          deadlineMs,
+        });
+        return {
+          passed: result.allowed,
+          reason: result.blockers.join(', ') || 'source policy passed',
+        };
+      })
     );
   } else {
     const maxLines = Number(env.MAX_LINES ?? '800');

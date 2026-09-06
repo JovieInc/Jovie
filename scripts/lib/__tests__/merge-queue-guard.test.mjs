@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -505,7 +506,7 @@ describe('aggregate required checks', () => {
     );
     const enrollBlock = extractWorkflowJobBlock(autoenrollYaml, 'enroll');
 
-    expect(enrollBlock).toMatch(/drain-pr-queue\.sh/);
+    expect(enrollBlock).toMatch(/native-merge-intent\.mjs/);
     for (const rule of MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN) {
       expect(rule.pattern.test(enrollBlock), rule.id).toBe(false);
     }
@@ -513,6 +514,62 @@ describe('aggregate required checks', () => {
     const result = validateMergeQueueEnrollHotPath(autoenrollYaml);
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+  it('executes the retired hosted job without credentials or external tools', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
+      'utf8'
+    );
+    const body = workflow
+      .split('run: |\n')[1]
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n');
+    const result = spawnSync(
+      '/bin/bash',
+      ['--noprofile', '--norc', '-p', '-ex', '-c', body],
+      {
+        env: { PATH: '/nonexistent-retired-admission-tools' },
+        encoding: 'utf8',
+      }
+    );
+    expect(result.status).toBe(2);
+    expect(result.stdout).toContain('persistent owner storage');
+    expect(result.stderr).not.toContain('command not found');
+    expect(result.stderr.trim().split('\n')).toHaveLength(3);
+    expect(result.stderr).toContain('+ exit 2');
+  });
+
+  it.each([
+    'schedule:',
+    'workflow_run:',
+    'fleet-policy',
+    'DRAIN_PROMOTION_MODE',
+    'drain-pr-queue.sh',
+  ])('rejects reintroduced external admission dependency %s', dependency => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
+      'utf8'
+    );
+    expect(
+      validateMergeQueueEnrollHotPath(`${workflow}\n${dependency}`).ok
+    ).toBe(false);
+  });
+
+  it.each([
+    ['exit 2', 'exit 0'],
+    ['exit 2', 'node scripts/native-merge-intent.mjs'],
+    ['exit 2', 'echo $(gh pr merge 123)\n          exit 2'],
+    ['permissions: {}', 'permissions: write-all'],
+  ])('rejects executable or successful hosted fallback %s -> %s', (before, after) => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
+      'utf8'
+    );
+    expect(
+      validateMergeQueueEnrollHotPath(workflow.replace(before, after)).ok
+    ).toBe(false);
   });
 
   it('isolates the legacy label from native drain enrollment and dequeue', () => {
@@ -526,14 +583,11 @@ describe('aggregate required checks', () => {
       errors: [],
     });
 
-    const regressed = drainScript.replace(
-      '# native-queue-transport:enrollment:end',
-      'gh_retry pr edit "$n" --add-label merge-queue\n  # native-queue-transport:enrollment:end'
-    );
+    const regressed = `gh pr merge 123 --auto\n${drainScript}`;
     expect(validateNativeDrainQueueLabelIsolation(regressed)).toEqual({
       ok: false,
       errors: [
-        'native drain enrollment must not read, write, or require the legacy merge-queue label',
+        'legacy drain must refuse unconditionally without executing tools',
       ],
     });
   });
@@ -1934,39 +1988,6 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.reason).toContain('unchanged head');
     expect(decision.evidence.failureClass).toBe('repeated-product-check');
     expect(decision.evidence.failedAttempts).toBe(2);
-  });
-
-  it('annotates recent failed merge-group fronts, not only the latest run', () => {
-    const drain = readFileSync(
-      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
-      'utf8'
-    );
-    expect(drain).toContain('sort_by(.createdAt) | reverse | .[0:8][]? | .id');
-    expect(drain).not.toContain(
-      'sort_by(.createdAt) | reverse | .[0].id // empty'
-    );
-    expect(drain).toContain('runs?event=merge_group&per_page=100');
-    expect(drain).toContain(
-      'PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"'
-    );
-    expect(drain).toContain('null_creator_receipt_has_provenance');
-    expect(drain).toContain('receipt_actor_is_trusted');
-    expect(drain).not.toContain('fleet_hold_null_creator_has_provenance');
-    expect(drain).toContain('block-product');
-    expect(drain).toContain('block-transient');
-  });
-
-  it('normalizes GitHub REST run fields before matching failed fronts', () => {
-    const drain = readFileSync(
-      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
-      'utf8'
-    );
-    expect(drain).toContain(
-      '{id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}'
-    );
-    expect(drain).not.toContain(
-      '{id, headBranch, status, conclusion, headSha, createdAt, updatedAt}'
-    );
   });
 
   it('clears an earlier failure when the latest unchanged-head attempt succeeds', () => {

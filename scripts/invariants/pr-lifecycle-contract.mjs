@@ -15,7 +15,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const REQUIRED_PHASES = Object.freeze([
   ['draft', 'symphony', 'draft-pr'],
   ['review', 'writer', 'ci-pending'],
-  ['promotion', 'gem', 'queue-pending'],
+  ['promotion', 'writer', 'queue-pending'],
   ['merge', 'github-native-merge-queue', 'merged'],
   ['activation', 'production-controller', 'production-proven'],
   ['closure', 'summer', 'issue-closed'],
@@ -25,7 +25,7 @@ const REQUIRED_BINDINGS = Object.freeze([
   ['scripts/symphony/WORKFLOW.md', 'jovie-pr-lifecycle/v1'],
   ['scripts/backlog-orchestrator/delivery-state-machine.mjs', 'JOV-INV-029'],
   ['scripts/lib/writer-owned-pr-promotion.mjs', 'JOV-INV-029'],
-  ['.github/workflows/merge-queue-autoenroll.yml', 'JOV-INV-029'],
+  ['scripts/native-merge-intent.mjs', 'JOV-INV-029'],
   ['.github/workflows/production-controller.yml', 'JOV-INV-029'],
   ['docs/PR_FLOW.md', 'JOV-INV-029'],
 ]);

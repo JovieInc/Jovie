@@ -46,7 +46,8 @@ else
 fi
 
 echo "==> Merge into $INTEGRATION_BRANCH (no main CI wait)"
-gh pr merge "$PR_NUM" --squash --delete-branch
+echo "Integration-only publication does not authorize merging; use the owning writer promotion command after main-based qualification."
+exit 2
 
 echo "==> Refresh integration branch locally"
 git fetch origin "$INTEGRATION_BRANCH"

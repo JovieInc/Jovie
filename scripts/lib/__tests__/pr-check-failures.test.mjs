@@ -699,7 +699,7 @@ describe('pr-check-failures', () => {
     ).toEqual([]);
   });
 
-  it('keeps queue admission exact and auto-ready independent of check completion', () => {
+  it('retires fleet auto-ready and queue drains in favor of owner completion', () => {
     const autoReady = readFileSync(
       `${repoRoot}/scripts/auto-ready-agent-drafts.sh`,
       'utf8'
@@ -713,14 +713,16 @@ describe('pr-check-failures', () => {
       expect(source).not.toMatch(/Verify Draft\|E2E Smoke/);
     }
 
-    expect(autoReady).toContain('classify_promotion');
+    expect(autoReady).toContain('exit 2');
+    expect(autoReady).toContain('writer-owned-pr-promote.sh');
+    expect(autoReady).not.toContain('classify_promotion');
     expect(autoReady).not.toContain('--classify-auto-ready');
     expect(autoReady).not.toContain('check_failures_for_pr');
     expect(autoReady).not.toContain('Verify Draft Agent PR');
     expect(autoReady).not.toContain('dependabot/');
-    expect(drain).toContain('--classify-queue');
-    expect(drain).toContain(`fail='["required check status unavailable"]'`);
-    expect(drain).not.toContain("fail='[]'");
+    expect(drain).toContain('exit 2');
+    expect(drain).toContain('native-merge-intent.mjs');
+    expect(drain).not.toContain('--classify-queue');
   });
 
   it('recognizes agent branches used by drain AGENT_RE', () => {

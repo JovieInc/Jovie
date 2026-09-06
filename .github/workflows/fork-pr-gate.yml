@@ -1,66 +1,50 @@
-# Fork PR Gate
-#
-# PURPOSE: Prevents external/fork PRs from being merged without human approval.
-# Internal (non-fork) PRs — including agent PRs and team member PRs — pass
-# immediately. Fork PRs are blocked until a repo collaborator submits an
-# APPROVE review.
-#
-# WHY THIS EXISTS:
-# Branch protection requires 0 approvals for first-party queue throughput.
-# This means fork PRs from external contributors could also merge with zero
-# reviews if CI passes. This workflow closes that gap with a required status
-# check that only blocks fork PRs.
-#
-# TRIGGER: PR opened/synchronized/reopened + review submitted (to re-evaluate)
-#
-# HOW IT WORKS:
-# 1. Detects if PR is from a fork
-# 2. Non-fork PRs: sets commit status to success immediately
-# 3. Fork PRs: checks for at least one APPROVE review from a human collaborator
-#    - Also checks for sensitive file changes and warns via PR comment
-#    - Sets commit status to pending/success based on approval state
-#
-# SAFETY:
-# - Read-only for non-fork PRs (just sets a status)
-# - Fork PRs cannot bypass: the status check is required in branch protection
-# - Re-triggers on review submission so approval unblocks the PR
-
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Tim
+# necessary-trust-boundary: fork review events lack App secrets; workflow_run executes protected-main metadata policy without consuming untrusted artifacts or code.
+# revisit-trigger: remove the review signal bridge when GitHub supplies a trusted review-target metadata event with status-write permission.
+# Required metadata policy runs trusted main code only. Native GitHub owns merging.
 name: Fork PR Gate
-
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches: [main]
-  # pull_request_target gives the dependabot-gate job access to the Jovie Bot
-  # App secrets (regular Actions secrets are hidden from dependabot's
-  # pull_request context). The dependabot-gate only sets a status — it does
-  # not check out fork code — so this trigger is safe.
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled, unlabeled]
     branches: [main]
-  # Approval is a review event, not a pull_request synchronize event. This
-  # workflow never checks out PR code, so re-evaluating metadata is safe.
-  pull_request_review:
-    types: [submitted, dismissed]
-  # Active native-queue required-context producer. Source approval is mutable
-  # after its status turns green, so revalidate every member of the exact
-  # synthetic group before reproducing the required context on the combined head.
+  workflow_run:
+    workflows: ['Source Admission Review Signal']
+    types: [completed]
   merge_group:
     types: [checks_requested]
-
 permissions: {}
-
 concurrency:
-  # Include the event name so review re-evaluation does not cancel the initial
-  # metadata gate for the same PR.
-  group: fork-pr-gate-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
-  # pull_request/_target/review: never cancel — duplicate same-head-SHA
-  # deliveries must each reach a terminal state so this required context
-  # always resolves from a completed run (same JOV-3580 race as
-  # pr-size-guard). merge_group stays keyed by exact head SHA.
-  cancel-in-progress: ${{ github.event_name == 'merge_group' }}
-
+  group: source-admission-${{ github.event_name }}-${{ github.event.merge_group.head_sha || github.event.pull_request.number || github.event.workflow_run.id }}
+  cancel-in-progress: false
 jobs:
+  source-policy:
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.base.ref == 'main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request_review')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    concurrency:
+      group: source-policy-${{ github.repository }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+      # Pending wakes coalesce: every run reads the complete current PR policy.
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: scripts
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Publish exact-head required metadata policy
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/source-admission-check.mjs
   merge-group-gate:
     name: ${{ github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)' }}
     if: github.event_name == 'merge_group'
@@ -69,257 +53,14 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      statuses: read
     steps:
-      - name: Check out trusted queue policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # ALLGREEN may set base_sha to a prior synthetic group commit. Run
-          # policy only from the protected default branch, never queue refs.
           ref: main
           persist-credentials: false
-          sparse-checkout: |
-            scripts/lib/merge-group-member-policy.mjs
-            scripts/lib/pr-size-guard-policy.mjs
-            scripts/lib/repo-hygiene-limits.mjs
-          sparse-checkout-cone-mode: false
-
-      - name: Revalidate every merge-group member's fork policy
+          sparse-checkout: scripts
+      - name: Revalidate every native group member
         env:
-          # The synthetic head controls this workflow definition. Never expose
-          # an App private key here; the read-only ephemeral token is enough.
           GH_TOKEN: ${{ github.token }}
         run: node scripts/lib/merge-group-member-policy.mjs --policy=fork
-
-  # Fast path: Dependabot PRs are internal (not forks) but pull_request runs
-  # in dependabot's restricted secret context. Run via pull_request_target so
-  # the Jovie Bot App private key is available — the branch ruleset requires
-  # the Fork PR Gate status to be set by jovie-bot specifically. No code from
-  # the head branch is checked out here, so pull_request_target is safe.
-  dependabot-gate:
-    name: Fork PR Gate Dependabot Controller
-    if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    steps:
-      - name: Generate Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
-      - name: Auto-pass for Dependabot
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          SHA="${{ github.event.pull_request.head.sha }}"
-          echo "Dependabot PR — auto-passing gate via jovie-bot."
-          gh api repos/${{ github.repository }}/statuses/$SHA \
-            -f state="success" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -f description="Dependabot PR — no approval required" \
-            -f context="Fork PR Gate"
-
-  fork-gate:
-    name: Fork PR Gate Controller
-    # pull_request_target is safe here: this job only reads PR metadata/diffs
-    # through the API and sets a commit status; it never checks out head code.
-    # It gives fork PRs the bot credential required to update the required gate.
-    if: >-
-      (github.event_name == 'pull_request') ||
-      (github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]') ||
-      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == true)
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions: {}
-    steps:
-      - name: Generate Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
-      - name: Resolve PR metadata
-        id: pr-meta
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          # For pull_request events, metadata is directly available.
-          # For pull_request_review events, we need to fetch it.
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            IS_FORK="${{ github.event.pull_request.head.repo.fork }}"
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            # pull_request_review event
-            IS_FORK="${{ github.event.pull_request.head.repo.fork }}"
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          fi
-
-          echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "PR #$PR_NUMBER | fork=$IS_FORK | sha=$HEAD_SHA"
-
-      - name: Auto-pass for non-fork PRs
-        if: steps.pr-meta.outputs.is_fork != 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          echo "Non-fork PR — auto-passing gate."
-          gh api repos/${{ github.repository }}/statuses/${{ steps.pr-meta.outputs.head_sha }} \
-            -f state="success" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -f description="Internal PR — no approval required" \
-            -f context="Fork PR Gate"
-
-      - name: Check sensitive files (fork PRs only)
-        id: sensitive-check
-        if: steps.pr-meta.outputs.is_fork == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
-
-          CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "${{ github.repository }}" --name-only 2>/dev/null || echo "")
-
-          # Repository-sensitive paths that warrant explicit fork-review notice.
-          SENSITIVE_PATTERNS=(
-            "^\.github/"                         # CI/CD and workflow changes
-            "^drizzle/migrations/"               # Database migrations
-            "^apps/web/lib/auth/"                 # Authentication
-            "^apps/web/lib/db/"                   # Database layer
-            "^apps/web/app/api/.*/billing"        # Billing API routes
-            "^apps/web/lib/stripe/"               # Stripe/payment code
-            "^apps/web/middleware"                 # Middleware (security surface)
-            "^\.env"                              # Environment files
-            "^CODEOWNERS"                         # Code ownership
-            "^agents\.md"                         # Agent guidelines
-            "^CLAUDE\.md"                         # Agent guidelines
-            "package\.json$"                      # Dependency changes
-            "pnpm-lock\.yaml$"                    # Lock file changes
-          )
-
-          SENSITIVE_FOUND=""
-          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
-            MATCHES=$(echo "$CHANGED_FILES" | grep -E "$pattern" || true)
-            if [[ -n "$MATCHES" ]]; then
-              SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
-            fi
-          done
-
-          if [[ -n "$SENSITIVE_FOUND" ]]; then
-            echo "Sensitive files changed in fork PR:"
-            echo -e "$SENSITIVE_FOUND"
-            echo "has_sensitive=true" >> "$GITHUB_OUTPUT"
-            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -10 | tr '\n' ', ')" >> "$GITHUB_OUTPUT"
-          else
-            echo "No sensitive files changed"
-            echo "has_sensitive=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Comment on sensitive file changes
-        if: steps.pr-meta.outputs.is_fork == 'true' && steps.sensitive-check.outputs.has_sensitive == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        # Only comment once — check for existing comment marker first
-        run: |
-          PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
-          SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
-          MARKER="<!-- fork-pr-gate-sensitive -->"
-
-          EXISTING=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments \
-            --jq "[.[] | select(.body | contains(\"$MARKER\"))] | length" 2>/dev/null || echo "0")
-
-          if [[ "$EXISTING" -gt 0 ]]; then
-            echo "Sensitive file comment already exists. Skipping."
-            exit 0
-          fi
-
-          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "$MARKER
-          ## Fork PR: Sensitive Files Detected
-
-          This PR from a fork modifies files in sensitive areas that require careful human review:
-
-          \`\`\`
-          $SENSITIVE_FILES
-          \`\`\`
-
-          A repository collaborator must review and approve this PR before it can be merged.
-
-          **Sensitive areas include:** authentication, billing, database migrations, CI/CD workflows, middleware, dependencies, and agent configuration."
-
-      - name: Check for human approval (fork PRs only)
-        id: approval-check
-        if: steps.pr-meta.outputs.is_fork == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
-          HEAD_SHA="${{ steps.pr-meta.outputs.head_sha }}"
-
-          # Fail closed and paginate. Only the latest opinionated review per
-          # reviewer counts; dismissal, changes requested, or a new head SHA
-          # revokes an earlier approval.
-          REVIEWS_JSON="$(gh api --paginate --slurp \
-            "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews?per_page=100")"
-          REVIEWS="$(jq --arg head_sha "$HEAD_SHA" '
-            (add // [])
-            | map(select(
-                .state == "APPROVED" or
-                .state == "CHANGES_REQUESTED" or
-                .state == "DISMISSED"
-              ))
-            | group_by(.user.login | ascii_downcase)
-            | map(sort_by(.submitted_at, .id) | last)
-            | map(select(
-                .state == "APPROVED" and
-                .commit_id == $head_sha and
-                .user.type != "Bot" and
-                (
-                  .author_association == "OWNER" or
-                  .author_association == "MEMBER" or
-                  .author_association == "COLLABORATOR"
-                )
-              ))
-            | length
-          ' <<<"$REVIEWS_JSON")"
-
-          echo "Human APPROVE reviews: $REVIEWS"
-
-          if [[ "$REVIEWS" -gt 0 ]]; then
-            echo "approved=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "approved=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set gate status (fork PRs)
-        if: steps.pr-meta.outputs.is_fork == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          HEAD_SHA="${{ steps.pr-meta.outputs.head_sha }}"
-          APPROVED="${{ steps.approval-check.outputs.approved }}"
-          HAS_SENSITIVE="${{ steps.sensitive-check.outputs.has_sensitive }}"
-
-          if [[ "$APPROVED" == "true" ]]; then
-            STATE="success"
-            DESCRIPTION="Fork PR approved by human reviewer"
-          else
-            STATE="pending"
-            if [[ "$HAS_SENSITIVE" == "true" ]]; then
-              DESCRIPTION="Fork PR with sensitive files — awaiting human approval"
-            else
-              DESCRIPTION="Fork PR — awaiting human approval"
-            fi
-          fi
-
-          gh api repos/${{ github.repository }}/statuses/$HEAD_SHA \
-            -f state="$STATE" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            -f description="$DESCRIPTION" \
-            -f context="Fork PR Gate"
-
-          echo "Fork PR Gate: $STATE — $DESCRIPTION"

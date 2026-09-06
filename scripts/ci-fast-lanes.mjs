@@ -618,6 +618,7 @@ function runStructural() {
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
+    "node --experimental-test-coverage --test --test-coverage-include='scripts/native-merge-intent.mjs' --test-coverage-include='scripts/lib/source-admission-policy.mjs' --test-coverage-include='scripts/source-admission-check.mjs' --test-coverage-lines=98 scripts/lib/__tests__/native-merge-intent.test.mjs scripts/lib/__tests__/source-admission-policy.test.mjs scripts/lib/__tests__/source-admission-check.test.mjs scripts/lib/__tests__/writer-owned-pr-promote.test.mjs",
     'pnpm ci:typecheck-gate-guard',
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',
