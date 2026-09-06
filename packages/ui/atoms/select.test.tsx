@@ -224,6 +224,18 @@ describe('Select', () => {
   });
 
   describe('Styling', () => {
+    it('keeps the compact trigger visual while providing a 44px touch target', () => {
+      render(<TestSelect />);
+
+      const trigger = screen.getByRole('combobox');
+
+      expect(trigger).toHaveClass(
+        'before:absolute',
+        'before:h-11',
+        'before:min-w-11'
+      );
+    });
+
     it('applies custom className to trigger', () => {
       render(
         <Select>
