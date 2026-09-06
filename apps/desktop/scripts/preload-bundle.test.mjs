@@ -1,30 +1,38 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { bundleDesktopPreload } from './bundle-preload.mjs';
-import { bakeDesktopEnvAndIdentity } from './write-env.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('sandboxed preload bundle exposes identity and app boot APIs', async t => {
-  bakeDesktopEnvAndIdentity({
-    env: {
-      ELECTRON_APP_URL: 'http://localhost:3100',
-      ELECTRON_ENV: 'local',
-      JOVIE_DESKTOP_DISABLE_GIT: '1',
-    },
-  });
   const temporaryDirectory = await mkdtemp(
     join(tmpdir(), 'jovie-preload-bundle-')
   );
   t.after(() => rm(temporaryDirectory, { force: true, recursive: true }));
 
+  const entryPoint = join(temporaryDirectory, 'preload.ts');
   const outfile = join(temporaryDirectory, 'preload.js');
-  await bundleDesktopPreload({ outfile });
+  await Promise.all([
+    readFile(join(desktopRoot, 'src', 'preload.ts'), 'utf8').then(source =>
+      writeFile(entryPoint, source)
+    ),
+    writeFile(
+      join(temporaryDirectory, 'build-identity.generated.ts'),
+      `export const BAKED_DESKTOP_BUILD_IDENTITY = {
+  channel: 'local',
+  version: '26.8.2',
+  sourceRevision: null,
+  builtAt: null,
+} as const;
+`
+    ),
+  ]);
+  await bundleDesktopPreload({ entryPoint, outfile });
 
   const requiredModules = [];
   const exposedApis = new Map();
