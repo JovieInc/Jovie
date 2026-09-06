@@ -166,8 +166,10 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert 'gem-service-attestation/v1' in activation
     assert "ss -ltnp 'sport = :4041'" in installer
     assert "LISTENER_PID" in installer
-    assert '"boundToService": True' in installer
-    assert '"wrapperPid": int(os.environ["SERVICE_PID"])' in installer
+    controller = CONTROLLER.read_text()
+    assert '"boundToService": True' in controller
+    assert '"wrapperPid": args.initial_wrapper_pid' in controller
+    assert "refresh_source_attestation(" in controller
     assert ".listener.boundToService == true" in activation
     assert ".listener.wrapperPid > 0" in activation
 
