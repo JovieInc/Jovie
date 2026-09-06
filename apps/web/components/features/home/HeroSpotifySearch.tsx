@@ -371,7 +371,7 @@ export function HeroSpotifySearch({
       data-appearance={appearance}
     >
       <label htmlFor={inputId} className='sr-only'>
-        Search Spotify artists or paste a link
+        {isEditorial ? placeholder : 'Search Spotify artists or paste a link'}
       </label>
       <InputAuraFrame className={isEditorial ? 'rounded-full' : undefined}>
         <div className={fieldClassName}>

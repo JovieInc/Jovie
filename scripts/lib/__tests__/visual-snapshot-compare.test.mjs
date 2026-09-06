@@ -154,6 +154,9 @@ describe('visual snapshot compare (JOV-5459)', () => {
     expect(issues).toContain(
       'source PR Ready must fail closed when a homepage PR skips visual snapshot compare'
     );
+    expect(issues).toContain(
+      'homepage visual compare must render and compare the Playwright homepage snapshots'
+    );
 
     const gatedCompareJob = compareJob.replace(
       "    if: github.event_name == 'merge_group'",
@@ -161,6 +164,16 @@ describe('visual snapshot compare (JOV-5459)', () => {
         '    if: >-',
         "      github.event_name == 'merge_group' ||",
         "      needs.ci-path-changes.outputs.run_homepage_visual == 'true'",
+      ].join('\n')
+    );
+    const renderedCompareJob = gatedCompareJob.replace(
+      '      - run: node scripts/visual-snapshot-compare.mjs compare',
+      [
+        '      - run: node scripts/visual-snapshot-compare.mjs compare',
+        '      - uses: ./.github/actions/setup-node-pnpm',
+        '      - uses: ./.github/actions/setup-playwright',
+        '      - run: pnpm turbo build --filter=@jovie/web',
+        '      - run: node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts --project=chromium --grep homepage',
       ].join('\n')
     );
     const gatedSourceReady = [
@@ -175,7 +188,7 @@ describe('visual snapshot compare (JOV-5459)', () => {
     expect(
       assertVisualCompareWorkflowContract({
         visualRegressionYaml,
-        ciYaml: [gatedCompareJob, mergeReady, gatedSourceReady].join('\n'),
+        ciYaml: [renderedCompareJob, mergeReady, gatedSourceReady].join('\n'),
       })
     ).toEqual([]);
   });

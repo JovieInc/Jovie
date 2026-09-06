@@ -264,6 +264,22 @@ export function assertVisualCompareWorkflowContract({
     if (compareJob.includes('neon-create-branch')) {
       issues.push('compare job must not provision Neon');
     }
+    const renderedHomepageContract = [
+      './.github/actions/setup-node-pnpm',
+      './.github/actions/setup-playwright',
+      'pnpm turbo build --filter=@jovie/web',
+      '.github/scripts/guard-playwright-artifacts.mjs',
+      'playwright test tests/e2e/visual-regression.spec.ts',
+      '--project=chromium',
+      '--grep homepage',
+    ];
+    if (
+      renderedHomepageContract.some(fragment => !compareJob.includes(fragment))
+    ) {
+      issues.push(
+        'homepage visual compare must render and compare the Playwright homepage snapshots'
+      );
+    }
   }
 
   const mergeReady = extractJobBlock(ciYaml, 'ci-merge-group-ready');
