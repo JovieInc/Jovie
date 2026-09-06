@@ -28,7 +28,10 @@ import {
   redactSecretValues,
   resolveArtifactFiles,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
-import { validPlaywrightPng } from '../../../../../scripts/lib/playwright-png.mjs';
+import {
+  inspectPlaywrightPng,
+  validPlaywrightPng,
+} from '../../../../../scripts/lib/playwright-png.mjs';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -500,10 +503,16 @@ function chunk(type: string, data = Buffer.alloc(0)) {
 
 const pngSignature = Buffer.from('89504e470d0a1a0a', 'hex');
 const pngRows = Buffer.from([0, 0, 0, 0]);
-function png(extra: Buffer[] = [], idat?: Buffer, colorType = 2) {
+function png(
+  extra: Buffer[] = [],
+  idat?: Buffer,
+  colorType = 2,
+  width = 1,
+  height = 1
+) {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(1);
-  header.writeUInt32BE(1, 4);
+  header.writeUInt32BE(width);
+  header.writeUInt32BE(height, 4);
   Buffer.from([8, colorType, 0, 0, 0]).copy(header, 8);
   return Buffer.concat([
     pngSignature,
@@ -527,6 +536,9 @@ function baseEnv(workspace: string, runner: string, extra = {}) {
     GITHUB_RUN_ATTEMPT: '1',
     GITHUB_JOB: 'artifact-test',
     PLAYWRIGHT_ARTIFACT_PATHS: 'out',
+    ...(process.env.NODE_V8_COVERAGE
+      ? { NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE }
+      : {}),
     ...extra,
   };
 }
@@ -1832,31 +1844,79 @@ ${fixtureCheckout}
   it('accepts only decoded metadata-free Playwright PNG bytes', () => {
     const valid = png();
     expect(validPlaywrightPng(valid)).toBe(true);
+    expect(inspectPlaywrightPng(valid)).toEqual({
+      valid: true,
+      reason: 'valid',
+      width: 1,
+      height: 1,
+    });
     expect(validPlaywrightPng(png([], undefined, 6))).toBe(true);
     const badCrc = Buffer.from(valid);
     badCrc[badCrc.length - 1] ^= 1;
-    const invalid = [
-      Buffer.from('renamed plaintext'),
-      ...['tEXt', 'zTXt', 'iTXt', 'eXIf', 'vpAg', 'ABCD'].map(type =>
-        png([chunk(type, Buffer.from('metadata'))])
+    const oversized = png([], undefined, 2, 2_880, 12_000);
+    const invalid: Array<[string, Buffer]> = [
+      ['invalid-signature', Buffer.from('renamed plaintext')],
+      ...['tEXt', 'zTXt', 'iTXt', 'eXIf', 'vpAg', 'ABCD'].map<[string, Buffer]>(
+        type => [
+          'unexpected-chunk',
+          png([chunk(type, Buffer.from('metadata'))]),
+        ]
       ),
-      Buffer.concat([valid, Buffer.from('trailing')]),
-      badCrc,
-      Buffer.concat([
-        pngSignature,
-        chunk('IDAT', deflateSync(pngRows)),
-        chunk('IEND'),
-      ]),
-      png([], Buffer.from('not-zlib')),
-      png([], Buffer.concat([deflateSync(pngRows), Buffer.from('hidden')])),
-      png([], deflateSync(Buffer.from([5, 0, 0, 0]))),
-      png([], deflateSync(Buffer.from([0, 0]))),
-      png([], undefined, 3),
+      ['invalid-iend', Buffer.concat([valid, Buffer.from('trailing')])],
+      ['invalid-crc', badCrc],
+      [
+        'invalid-chunk-order',
+        Buffer.concat([
+          pngSignature,
+          chunk('IDAT', deflateSync(pngRows)),
+          chunk('IEND'),
+        ]),
+      ],
+      ['decode-error', png([], Buffer.from('not-zlib'))],
+      [
+        'trailing-compressed-data',
+        png([], Buffer.concat([deflateSync(pngRows), Buffer.from('hidden')])),
+      ],
+      ['invalid-row-filter', png([], deflateSync(Buffer.from([5, 0, 0, 0])))],
+      ['invalid-decoded-size', png([], deflateSync(Buffer.from([0, 0])))],
+      ['invalid-ihdr', png([], undefined, 3)],
+      ['truncated-chunk', valid.subarray(0, -1)],
+      ['decoded-size-limit', oversized],
     ];
-    for (const value of invalid) expect(validPlaywrightPng(value)).toBe(false);
+    for (const [reason, value] of invalid) {
+      expect(validPlaywrightPng(value)).toBe(false);
+      expect(inspectPlaywrightPng(value).reason).toBe(reason);
+    }
+    for (const value of [valid, ...invalid.map(([, value]) => value)])
+      expect(validPlaywrightPng(value)).toBe(inspectPlaywrightPng(value).valid);
+    expect(inspectPlaywrightPng(oversized)).toEqual({
+      valid: false,
+      reason: 'decoded-size-limit',
+      width: 2_880,
+      height: 12_000,
+    });
     const workspace = fixture();
     write(join(workspace, 'valid.png'), valid);
-    write(join(workspace, 'fake.png'), invalid[0]);
+    write(join(workspace, 'fake.png'), invalid[0][1]);
+    const accepted = spawnSync(process.execPath, [guardScript, 'valid.png'], {
+      cwd: workspace,
+      encoding: 'utf8',
+      env: baseEnv(workspace, fixture(), {
+        PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+      }),
+    });
+    expect(accepted.status).toBe(0);
+    for (const [index, [reason, value]] of invalid.entries()) {
+      const path = `out/invalid-${index}.png`;
+      write(join(workspace, path), value);
+      const result = spawnSync(process.execPath, [guardScript, path], {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture()),
+      });
+      expect(result.status).toBe(1);
+      expect(`${result.stdout}\n${result.stderr}`).toContain(`png:${reason}:`);
+    }
     expect(
       guardPlaywrightArtifacts(
         ['valid.png'],
@@ -1867,6 +1927,21 @@ ${fixtureCheckout}
     expect(
       guardPlaywrightArtifacts(['valid.png'], {}, { workspace })
     ).toHaveLength(1);
+    const secretPath = 'out/secret-path-value.png';
+    write(join(workspace, secretPath), png([], Buffer.from('not-zlib')));
+    const diagnostic = spawnSync(process.execPath, [guardScript, secretPath], {
+      cwd: workspace,
+      encoding: 'utf8',
+      env: baseEnv(workspace, fixture(), {
+        E2E_CLERK_USER_PASSWORD: 'secret-path-value',
+      }),
+    });
+    const diagnosticOutput = `${diagnostic.stdout}\n${diagnostic.stderr}`;
+    expect(diagnostic.status).toBe(1);
+    expect(diagnosticOutput).toContain('image-policy:1');
+    expect(diagnosticOutput).toContain('png:decode-error:1x1:path-index-1');
+    expect(diagnosticOutput).not.toContain(secretPath);
+    expect(diagnosticOutput).not.toContain('secret-path-value');
     expect(
       guardPlaywrightArtifacts(
         ['fake.png'],
