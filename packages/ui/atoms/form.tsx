@@ -125,15 +125,27 @@ const FormControl = React.forwardRef<
   const { error, formItemId, formDescriptionId, formMessageId } =
     useFormField();
 
+  const {
+    id: _id,
+    'aria-describedby': ariaDescribedBy,
+    'aria-invalid': ariaInvalid,
+    ...controlProps
+  } = props;
+  const describedBy = [
+    ariaDescribedBy,
+    formDescriptionId,
+    error ? formMessageId : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <Slot
+      {...controlProps}
       ref={ref}
       id={formItemId}
-      aria-describedby={
-        error ? `${formDescriptionId} ${formMessageId}` : `${formDescriptionId}`
-      }
-      aria-invalid={error ? true : undefined}
-      {...props}
+      aria-describedby={describedBy || undefined}
+      aria-invalid={error ? true : ariaInvalid}
     />
   );
 });

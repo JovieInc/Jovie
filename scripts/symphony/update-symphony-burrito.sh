@@ -24,12 +24,18 @@ HELPER_SRC="${REPO_ROOT}/scripts/symphony/symphony_official_runtime.py"
 HELPER_DST="${TARGET_HOME}/.local/bin/symphony-official-runtime"
 AGENT_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-agent-router"
 AGENT_ROUTER_DST="${TARGET_HOME}/.local/bin/symphony-agent-router"
+AUTO_ROUTE_SRC="${REPO_ROOT}/scripts/symphony/symphony-auto-route.mjs"
+AUTO_ROUTE_DST="${TARGET_HOME}/.local/bin/symphony-auto-route.mjs"
 CURSOR_ADAPTER_SRC="${REPO_ROOT}/scripts/symphony/cursor-appserver-adapter.py"
 CURSOR_ADAPTER_DST="${TARGET_HOME}/.local/bin/cursor-appserver-adapter"
 CODEX_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-codex-router"
 CODEX_ROUTER_DST="${TARGET_HOME}/.local/bin/symphony-codex-router-hotfix"
 CODEX_PROBE_SRC="${REPO_ROOT}/scripts/symphony/codex-account-probe.sh"
 CODEX_PROBE_DST="${TARGET_HOME}/.local/bin/codex-account-probe"
+SAFE_RESTART_SRC="${REPO_ROOT}/scripts/symphony/symphony-elixir-safe-restart"
+SAFE_RESTART_DST="${TARGET_HOME}/.local/bin/symphony-elixir-safe-restart"
+FROZEN_TRANSITION_SRC="${REPO_ROOT}/scripts/symphony/symphony-frozen-generation-transition"
+FROZEN_TRANSITION_DST="${TARGET_HOME}/.local/bin/symphony-frozen-generation-transition"
 LOG_DIR="${TARGET_HOME}/symphony-elixir-logs"
 STATE_DIR="${TARGET_HOME}/.local/state/symphony-elixir"
 STATE_URL="${SYMPHONY_STATE_URL:-http://127.0.0.1:4041/api/v1/state}"
@@ -39,6 +45,9 @@ DRY_RUN=0
 SKIP_BINARY=0
 CHECK_ONLY=0
 RUNTIME_READBACK=0
+PROVIDER_ONLY=0
+PROVIDER_ROLLBACK=0
+PROVIDER_STAGE=0
 RETIRE_LEGACY=0
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 # Genuinely retired units only. The grok/kimi sidecar
@@ -54,7 +63,7 @@ LEGACY_UNITS=(
   symphony-burrito-update.timer
 )
 
-usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--retire-legacy] [--runtime-readback]" >&2; }
+usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--retire-legacy] [--runtime-readback] [--provider-runtime-only] [--provider-runtime-rollback] [--stage-provider-runtime]" >&2; }
 
 for arg in "$@"; do
   case "$arg" in
@@ -64,10 +73,26 @@ for arg in "$@"; do
     --skip-binary) SKIP_BINARY=1 ;;
     --retire-legacy) RETIRE_LEGACY=1 ;;
     --runtime-readback) RUNTIME_READBACK=1 ;;
+    --provider-runtime-only) PROVIDER_ONLY=1 ;;
+    --provider-runtime-rollback) PROVIDER_ONLY=1; PROVIDER_ROLLBACK=1 ;;
+    --stage-provider-runtime) PROVIDER_ONLY=1; PROVIDER_STAGE=1 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
 done
+
+if [ "$PROVIDER_ONLY" -eq 1 ]; then
+  if [ "$PROVIDER_STAGE" -eq 1 ] && [ "$PROVIDER_ROLLBACK" -eq 1 ]; then
+    echo "PROVIDER_RED staging and rollback are separate operations" >&2
+    exit 2
+  fi
+  if [ "$RETIRE_LEGACY" -eq 1 ] || [ "$RUNTIME_READBACK" -eq 1 ] || [ "$CHECK_ONLY" -eq 1 ]; then
+    echo "PROVIDER_RED incompatible operation flags" >&2
+    exit 2
+  fi
+  exec python3 "$REPO_ROOT/scripts/symphony/provider_runtime_promotion.py" \
+    "$REPO_ROOT" "$TARGET_HOME" "$STATE_DIR" "$PROVIDER_ROLLBACK" "$DRY_RUN" "$PROVIDER_STAGE"
+fi
 
 if [ "$RESTART" -eq 1 ]; then
   RETIRE_LEGACY=1
@@ -370,6 +395,11 @@ if [ "$RUNTIME_READBACK" -eq 1 ]; then
   exit "$?"
 fi
 
+if [ "$DRY_RUN" -eq 0 ] && [ "$CHECK_ONLY" -eq 0 ] && [ -L "$STATE_DIR/provider-generations/current" ]; then
+  echo "PROVIDER_RED provider generation is managed; use --provider-runtime-only or --provider-runtime-rollback" >&2
+  exit 10
+fi
+
 if ! validate_source; then
   echo "SOURCE_INVALID refusing obsolete or over-budget Symphony config" >&2
   exit 4
@@ -388,8 +418,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "INSTALL $BIN_DST"
   echo "HELPER $HELPER_DST"
   echo "AGENT_ROUTER $AGENT_ROUTER_DST"
+  echo "AUTO_ROUTE $AUTO_ROUTE_DST"
   echo "CURSOR_ADAPTER $CURSOR_ADAPTER_DST"
   echo "CODEX_ROUTER $CODEX_ROUTER_DST"
+  echo "SAFE_RESTART $SAFE_RESTART_DST"
+  echo "FROZEN_TRANSITION $FROZEN_TRANSITION_DST"
   echo "UNIT $UNIT_DST"
   echo "WORKFLOW $WORKFLOW_DST"
   echo "SERVICE $SERVICE_NAME"
@@ -405,9 +438,12 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
   check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
   check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
+  check_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" || rc=1
   check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
   check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
   check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
+  check_one "$SAFE_RESTART_SRC" "$SAFE_RESTART_DST" || rc=1
+  check_one "$FROZEN_TRANSITION_SRC" "$FROZEN_TRANSITION_DST" || rc=1
   exit "$rc"
 fi
 
@@ -448,9 +484,12 @@ cleanup() {
       restore_target binary "$BIN_DST" 0755
       restore_target helper "$HELPER_DST" 0755
       restore_target agent-router "$AGENT_ROUTER_DST" 0755
+      restore_target auto-route "$AUTO_ROUTE_DST" 0755
       restore_target cursor-adapter "$CURSOR_ADAPTER_DST" 0755
       restore_target codex-router "$CODEX_ROUTER_DST" 0755
       restore_target codex-probe "$CODEX_PROBE_DST" 0755
+      restore_target safe-restart "$SAFE_RESTART_DST" 0755
+      restore_target frozen-transition "$FROZEN_TRANSITION_DST" 0755
       restore_target unit "$UNIT_DST" 0644
       restore_target workflow "$WORKFLOW_DST" 0644
     fi
@@ -504,9 +543,12 @@ rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
 backup_target binary "$BIN_DST"
 backup_target helper "$HELPER_DST"
 backup_target agent-router "$AGENT_ROUTER_DST"
+backup_target auto-route "$AUTO_ROUTE_DST"
 backup_target cursor-adapter "$CURSOR_ADAPTER_DST"
 backup_target codex-router "$CODEX_ROUTER_DST"
 backup_target codex-probe "$CODEX_PROBE_DST"
+backup_target safe-restart "$SAFE_RESTART_DST"
+backup_target frozen-transition "$FROZEN_TRANSITION_DST"
 backup_target unit "$UNIT_DST"
 backup_target workflow "$WORKFLOW_DST"
 promotion_started=1
@@ -516,9 +558,12 @@ if [ "$SKIP_BINARY" -eq 0 ]; then
 fi
 install_one "$HELPER_SRC" "$HELPER_DST" 0755
 install_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" 0755
+install_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" 0755
 install_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" 0755
 install_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" 0755
 install_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" 0755
+install_one "$SAFE_RESTART_SRC" "$SAFE_RESTART_DST" 0755
+install_one "$FROZEN_TRANSITION_SRC" "$FROZEN_TRANSITION_DST" 0755
 install_one "$UNIT_SRC" "$UNIT_DST"
 install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
 

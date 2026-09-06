@@ -8,6 +8,7 @@ import {
   attestGemService,
   buildDeliveryReceipt,
   DELIVERY_RECEIPT_SCHEMA,
+  PR_LIFECYCLE_POLICY_DIGEST,
   persistClosureHealthActions,
   persistDeliveryOutcome,
   reconcileDeliveryHeartbeat,
@@ -46,6 +47,7 @@ describe('delivery state machine', () => {
       assert.equal(receipt.next.action, action);
       assert.equal(receipt.next.mode, 'automated');
       assert.equal(receipt.externalMutations, 0);
+      assert.equal(receipt.policy.digest, PR_LIFECYCLE_POLICY_DIGEST);
     }
   });
 

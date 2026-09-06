@@ -1,4 +1,5 @@
 name: Merge Queue Auto-Enroll
+# JOV-INV-029: promotion is distinct from merge and requires exact-head handoff.
 
 # Event-driven, with ownerless recovery admitted only after exact main/head
 # validation. The existing ownerless-recovery-sweep cron remains the heartbeat.

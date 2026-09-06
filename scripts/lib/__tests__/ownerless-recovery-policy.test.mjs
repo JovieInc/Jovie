@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyQueueOwnership,
   countsAsRecoveryFailure,
+  readRecoveryEvent,
+  recoveryEventDecision,
+  recoveryIssueSnapshot,
+  run,
 } from '../../ownerless-recovery-sweeper.mjs';
 import {
   buildPrFleetClosureAudit,
@@ -107,5 +111,209 @@ describe('ownerless recovery policy', () => {
     expect(
       readFileSync(new URL('../upsert-pr-comment.sh', import.meta.url), 'utf8')
     ).toContain('${4:+:$4}');
+  });
+});
+
+describe('tracker scan admission', () => {
+  it('does not read Linear for empty or draft-only PR inventories', async () => {
+    for (const open of [[], [{ draft: true }], [{ isDraft: true }]]) {
+      expect(
+        await recoveryIssueSnapshot(open, () => {
+          throw new Error('unexpected tracker read');
+        })
+      ).toBeNull();
+    }
+  });
+  it('returns from the actual sweep before tracker reads when all PRs are drafts', async () => {
+    await run({
+      eventContext: { name: 'workflow_dispatch' },
+      resolvePolicyHead: async () => main,
+      readOpenPulls: async base => {
+        expect(base).toBe('main');
+        return [{ draft: true }];
+      },
+      readIssueSnapshot: async () => {
+        throw new Error('unexpected tracker read');
+      },
+    });
+  });
+  it('preserves exhaustive evidence and propagates unknown for real recovery demand', async () => {
+    const snapshot = {
+      issues: [],
+      coverage: {
+        complete: true,
+        pages: 1,
+        scanned: 0,
+        hasNextPage: false,
+        endCursor: null,
+        reason: null,
+      },
+    };
+    expect(
+      await recoveryIssueSnapshot([{ draft: false }], async () => snapshot)
+    ).toBe(snapshot);
+    await expect(
+      recoveryIssueSnapshot([{ draft: false }], async () => {
+        throw new Error('quota exhausted');
+      })
+    ).rejects.toThrow('quota exhausted');
+  });
+  it('skips draft scans while preserving existing workflow triggers', () => {
+    const workflow = readFileSync(
+      new URL(
+        '../../../.github/workflows/ownerless-recovery-sweep.yml',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
+    expect(workflow).not.toContain('ready_for_review');
+    expect(workflow).toMatch(
+      /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
+    );
+  });
+});
+
+describe('recovery event admission before tracker reads', () => {
+  it('reads the GitHub event payload and rejects missing or malformed context', () => {
+    expect(readRecoveryEvent({})).toEqual({ name: 'manual', payload: {} });
+    expect(
+      readRecoveryEvent({ GITHUB_EVENT_NAME: 'workflow_dispatch' })
+    ).toEqual({ name: 'workflow_dispatch', payload: {} });
+    expect(() =>
+      readRecoveryEvent({ GITHUB_EVENT_NAME: 'pull_request' })
+    ).toThrow('context is missing');
+    const environment = {
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_EVENT_PATH: '/event.json',
+    };
+    expect(
+      readRecoveryEvent(environment, (path, encoding) => {
+        expect(path).toBe('/event.json');
+        expect(encoding).toBe('utf8');
+        return '{"action":"opened"}';
+      })
+    ).toEqual({ name: 'pull_request', payload: { action: 'opened' } });
+    expect(() => readRecoveryEvent(environment, () => 'invalid')).toThrow();
+  });
+  const ready = {
+    number: 17298,
+    draft: false,
+    state: 'open',
+    base: { ref: 'main' },
+    created_at: '2026-08-15T00:00:00.000Z',
+    labels: [],
+    assignees: [],
+  };
+  const event = (
+    action,
+    changes = {},
+    label = 'needs-conflict-resolution'
+  ) => ({
+    name: 'pull_request',
+    payload: {
+      action,
+      pull_request: { ...ready, ...changes },
+      label: { name: label },
+    },
+  });
+  const unexpected = async () => {
+    throw new Error('unexpected external read');
+  };
+
+  it.each([
+    event('opened', { draft: true }),
+    event('reopened', { draft: true }),
+    event('synchronize'),
+    event('synchronize', { draft: true }),
+    event('labeled'),
+    event('unlabeled', {}, 'documentation'),
+    event('unlabeled', { labels: [{ name: 'hold' }] }),
+    event('unlabeled', { assignees: [{ login: 'owner' }] }),
+    event('unlabeled', { created_at: '2026-08-15T01:32:00.000Z' }),
+    event('unlabeled', { draft: true }),
+    event('opened', { base: { ref: 'feature' } }),
+    { name: 'push' },
+  ])('skips ineligible event %# before GitHub inventory or Linear', async eventContext => {
+    await expect(
+      run({
+        eventContext,
+        now: Date.parse(now),
+        readEventTimeline: unexpected,
+        resolvePolicyHead: unexpected,
+        readOpenPulls: unexpected,
+        readIssueSnapshot: unexpected,
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    event('opened'),
+    event('reopened'),
+    { name: 'workflow_dispatch' },
+    { name: 'manual' },
+  ])('preserves full closure audit for legitimate event %#', async eventContext => {
+    await expect(
+      run({
+        eventContext,
+        now: Date.parse(now),
+        resolvePolicyHead: async () => main,
+        readOpenPulls: async () => [ready],
+        readIssueSnapshot: async () => {
+          throw new Error('full closure audit reached');
+        },
+      })
+    ).rejects.toThrow('full closure audit reached');
+  });
+
+  it('requires a full ownerless hour after the most recent assignment transition', async () => {
+    for (const timeline of [
+      [{ event: 'unassigned', created_at: '2026-08-15T01:32:00.000Z' }],
+      [{ event: 'assigned', created_at: '2026-08-15T00:30:00.000Z' }],
+    ]) {
+      expect(
+        await recoveryEventDecision(event('unlabeled'), {
+          now: Date.parse(now),
+          readTimeline: async () => timeline,
+        })
+      ).toEqual({ required: false, reason: 'ownerless-under-threshold' });
+    }
+    expect(
+      await recoveryEventDecision(event('unlabeled'), {
+        now: Date.parse(now),
+        readTimeline: async number => {
+          expect(number).toBe(17298);
+          return [
+            { event: 'unassigned', created_at: '2026-08-15T01:00:00.000Z' },
+          ];
+        },
+      })
+    ).toEqual({ required: true, reason: 'eligible-recovery-hold-released' });
+  });
+
+  it('propagates incomplete event and timeline evidence before the tracker scan', async () => {
+    await expect(
+      recoveryEventDecision(event('unlabeled'), {
+        now: Date.parse(now),
+        readTimeline: async () => [
+          { event: 'unassigned', created_at: 'invalid' },
+        ],
+      })
+    ).rejects.toThrow('ownership timeline is indeterminate');
+    await expect(
+      recoveryEventDecision({
+        name: 'pull_request',
+        payload: { action: 'opened' },
+      })
+    ).rejects.toThrow('eligibility is indeterminate');
+    await expect(
+      recoveryEventDecision(event('unlabeled', { created_at: 'invalid' }))
+    ).rejects.toThrow('age is indeterminate');
+    await expect(
+      recoveryEventDecision(event('unlabeled'), {
+        now: Date.parse(now),
+        readTimeline: unexpected,
+      })
+    ).rejects.toThrow('unexpected external read');
   });
 });

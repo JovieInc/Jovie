@@ -177,6 +177,12 @@ export default defineConfig({
         'app/api/webhooks/**/*.ts': { branches: 42, lines: 48 },
         'app/api/dev/test-auth/**/*.ts': { branches: 74, lines: 85 },
         'lib/auth/test-mode.ts': { branches: 74, lines: 85 },
+        'app/api/internal/ovie/summer-bottleneck/route.ts': {
+          branches: 95,
+          lines: 100,
+        },
+        'lib/ovie/summer-product-paths.ts': { branches: 100, lines: 100 },
+        'lib/ovie/summer-shadow-client.ts': { branches: 100, lines: 100 },
       },
     },
 

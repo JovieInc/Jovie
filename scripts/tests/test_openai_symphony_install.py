@@ -28,7 +28,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         )
         self.assertRegex(
             workflow,
-            re.compile(r"^\s+command: symphony-agent-router app-server$", re.M),
+            re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
         )
         self.assertIn("symphony-agent-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)
@@ -48,6 +48,19 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("github.com/JovieInc/symphony/releases/download", updater)
         self.assertIn("symphony-elixir.service", updater)
         self.assertIn('SUM_NAME="${BIN_NAME}.sha256"', updater)
+        self.assertIn("symphony-elixir-safe-restart", updater)
+        self.assertIn("symphony-frozen-generation-transition", updater)
+        self.assertIn(
+            'AUTO_ROUTE_SRC="${REPO_ROOT}/scripts/symphony/symphony-auto-route.mjs"',
+            updater,
+        )
+        self.assertIn(
+            'install_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" 0755', updater
+        )
+        safe_restart = (ROOT / "scripts/symphony/symphony-elixir-safe-restart").read_text()
+        self.assertIn("--maintenance-replace", safe_restart)
+        self.assertIn("symphony-frozen-generation-transition", safe_restart)
+        self.assertIn("--lease-fd 9", safe_restart)
 
     def test_homemade_issue_pickup_is_disabled(self) -> None:
         self.assertFalse(

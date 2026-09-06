@@ -23,6 +23,11 @@ const sourceFields = {
   sourceDigest: z.string().regex(DIGEST),
   sourceRevision: exactSha,
 };
+const runtimeSourceFields = {
+  observedAt: timestamp,
+  sourceDigest: z.string().regex(DIGEST),
+  sourceRevision: exactSha.nullable(),
+};
 
 export const summerCiImprovementClassIds = [
   'merge-group-flake-baseline-ratchet',
@@ -40,6 +45,17 @@ export type SymphonyRepairAction =
   | 'remediate-selected-ci-audit-class';
 
 const ciClassId = z.enum(summerCiImprovementClassIds);
+const runnerAuthority = z
+  .object({
+    schema: z.enum([
+      'symphony-lease-guard-report/v1',
+      'symphony-runtime-state/v1',
+    ]),
+    observedAt: timestamp,
+    sourceDigest: z.string().regex(DIGEST),
+    sourceRevision: exactSha.nullable(),
+  })
+  .strict();
 const ciAuditSchema = z
   .object({
     schema: z.literal('jovie-ci-bottleneck-audit/v1'),
@@ -123,14 +139,16 @@ export const summerBottleneckSnapshotSchema = z
         runner: z
           .object({
             schema: z.literal('jovie.eve.summer-runner-projection/v1'),
-            sourceSchema: z.literal('symphony-lease-guard-report/v1'),
-            ...sourceFields,
+            sourceSchema: z.literal('symphony-runner-projection/v1'),
+            ...runtimeSourceFields,
             blockedSince: timestamp.nullable(),
-            capacityAvailable: z.number().int().nonnegative(),
-            queuedWork: z.number().int().nonnegative(),
+            capacitySource: runnerAuthority,
+            workSource: runnerAuthority,
+            capacityAvailable: z.number().int().nonnegative().nullable(),
+            queuedWork: z.number().int().nonnegative().nullable(),
           })
           .strict(),
-        ciAudit: ciAuditSchema,
+        ciAudit: ciAuditSchema.nullable(),
       })
       .strict(),
   })
@@ -140,8 +158,7 @@ export const summerBottleneckSnapshotSchema = z
       value.signals.closure.sourceRevision,
       value.signals.queue.sourceRevision,
       value.signals.release.sourceRevision,
-      value.signals.runner.sourceRevision,
-      value.signals.ciAudit.sourceRevision,
+      ...(value.signals.ciAudit ? [value.signals.ciAudit.sourceRevision] : []),
       value.signals.release.mainSha,
     ];
     if (revisions.some(revision => revision !== value.sourceVersion)) {
@@ -149,6 +166,37 @@ export const summerBottleneckSnapshotSchema = z
         code: 'custom',
         message: 'every projection must bind to the exact snapshot source',
         path: ['sourceVersion'],
+      });
+    }
+    if (
+      value.signals.runner.workSource.sourceRevision !==
+      value.signals.runner.sourceRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to the runner source revision',
+        path: ['signals', 'runner', 'workSource', 'sourceRevision'],
+      });
+    }
+    if (
+      value.signals.runner.capacityAvailable !== null &&
+      value.signals.runner.capacitySource.schema !==
+        'symphony-lease-guard-report/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner capacity must bind to lease authority',
+        path: ['signals', 'runner', 'capacitySource', 'schema'],
+      });
+    }
+    if (
+      value.signals.runner.queuedWork !== null &&
+      value.signals.runner.workSource.schema !== 'symphony-runtime-state/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to Symphony runtime authority',
+        path: ['signals', 'runner', 'workSource', 'schema'],
       });
     }
   });
@@ -328,6 +376,23 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function semanticIdentity(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(semanticIdentity);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => key !== 'observedAt')
+        .map(([key, child]) => [key, semanticIdentity(child)])
+    );
+  }
+  return value;
+}
+
+function semanticSnapshotIdentity(snapshot: SummerBottleneckSnapshot): unknown {
+  const { producerAttestation: _attestation, ...unsigned } = snapshot;
+  return semanticIdentity(unsigned);
+}
+
 function digest(value: unknown): string {
   return createHash('sha256').update(canonical(value)).digest('hex');
 }
@@ -364,7 +429,9 @@ function validateFreshness(
     snapshot.signals.queue.observedAt,
     snapshot.signals.release.observedAt,
     snapshot.signals.runner.observedAt,
-    snapshot.signals.ciAudit.observedAt,
+    ...(snapshot.signals.ciAudit ? [snapshot.signals.ciAudit.observedAt] : []),
+    snapshot.signals.runner.capacitySource.observedAt,
+    snapshot.signals.runner.workSource.observedAt,
   ];
   for (const value of timestamps) {
     const ageMs = nowMs - Date.parse(value);
@@ -407,6 +474,8 @@ export function rankSummerBottlenecks(
 ): readonly Candidate[] {
   const nowMs = now.getTime();
   const { ciAudit, closure, queue, release, runner } = snapshot.signals;
+  const queuedWork = runner.queuedWork;
+  const runnerSourceRevision = runner.sourceRevision;
   const candidates = [
     closure.status === 'red' && closure.openPullRequests > 0
       ? candidate(
@@ -441,27 +510,32 @@ export function rankSummerBottlenecks(
           'symphony'
         )
       : null,
-    ...ciAudit.classes.map(item =>
-      item.state === 'implemented'
-        ? null
-        : candidate(
-            item.id,
-            item.blockedSince,
-            item.impact,
-            ciAudit.sourceRevision,
-            ciAudit.sourceDigest,
-            nowMs,
-            true,
-            item.owner,
-            item.handle
-          )
-    ),
-    runner.capacityAvailable === 0 && runner.queuedWork > 0
+    ...(ciAudit
+      ? ciAudit.classes.map(item =>
+          item.state === 'implemented'
+            ? null
+            : candidate(
+                item.id,
+                item.blockedSince,
+                item.impact,
+                ciAudit.sourceRevision,
+                ciAudit.sourceDigest,
+                nowMs,
+                true,
+                item.owner,
+                item.handle
+              )
+        )
+      : []),
+    runner.capacityAvailable === 0 &&
+    queuedWork !== null &&
+    queuedWork > 0 &&
+    runnerSourceRevision !== null
       ? candidate(
           'runner-capacity-starvation',
           runner.blockedSince,
-          runner.queuedWork * 40,
-          runner.sourceRevision,
+          queuedWork * 40,
+          runnerSourceRevision,
           runner.sourceDigest,
           nowMs
         )
@@ -488,7 +562,7 @@ function fingerprintFor(
           ? snapshot.signals.release
           : selected.id === 'runner-capacity-starvation'
             ? snapshot.signals.runner
-            : snapshot.signals.ciAudit.classes.find(
+            : snapshot.signals.ciAudit?.classes.find(
                 item => item.id === selected.id
               );
   return digest({
@@ -497,7 +571,7 @@ function fingerprintFor(
     ...(summerCiImprovementClassIds.some(id => id === selected.id)
       ? { repairEnvelope: 'ci-audit-source-repair-v1' }
       : {}),
-    signal,
+    signal: semanticIdentity(signal),
     sourceVersion: snapshot.sourceVersion,
   });
 }
@@ -901,7 +975,24 @@ export async function ingestSummerBottleneckSnapshot(
   );
   if ((await dependencies.store.create(eventPath, eventReceipt)) === 'exists') {
     const existing = await dependencies.store.read(eventPath);
-    if (!existing || digest(existing) !== digest(eventReceipt)) {
+    const existingSnapshot = summerBottleneckSnapshotSchema.safeParse(
+      existing?.snapshot
+    );
+    if (
+      !existing ||
+      existing.schema !== 'jovie.eve.summer-bottleneck-event/v1' ||
+      !verifySummerBottleneckReceipt(
+        existing,
+        dependencies.receiptSigningKey,
+        eventPath
+      ) ||
+      !existingSnapshot.success ||
+      existing.eventId !== existingSnapshot.data.eventId ||
+      existing.sourceVersion !== existingSnapshot.data.sourceVersion ||
+      existing.snapshotDigest !== digest(existingSnapshot.data) ||
+      digest(semanticSnapshotIdentity(existingSnapshot.data)) !==
+        digest(semanticSnapshotIdentity(snapshot))
+    ) {
       throw new Error('bottleneck event conflict');
     }
     return signFor(dependencies, {

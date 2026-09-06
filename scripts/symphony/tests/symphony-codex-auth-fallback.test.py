@@ -35,6 +35,7 @@ GROK_SHIP = SOURCE_DIR / "grok-ship-one"
 CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
+PROVIDER_CAPACITY = SOURCE_DIR / "provider_capacity.py"
 PROMOTION_SCRIPT = ROOT / "scripts/writer-owned-pr-promote.sh"
 PROMOTION_LIB = ROOT / "scripts/lib/writer-owned-pr-promotion.mjs"
 QUEUE_DEFERRAL_LIB = ROOT / "scripts/lib/queue-deferral-receipt.mjs"
@@ -47,6 +48,7 @@ RUNTIME_ARTIFACTS = (
     CURSOR_STD,
     MODEL_ROUTER,
     MODEL_REGISTRY,
+    PROVIDER_CAPACITY,
     PROMOTION_SCRIPT,
     PROMOTION_LIB,
     QUEUE_DEFERRAL_LIB,
@@ -388,7 +390,9 @@ class FallbackTests(unittest.TestCase):
         python = self.bin / "python3"
         python.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
         python.chmod(0o755)
-        self.command("grok", "printf 'GROK_MODEL_READY\\n'")
+        # The registry probe requires the selected model name; the canary also
+        # needs its readiness marker.
+        self.command("grok", "printf 'grok-4.6 GROK_MODEL_READY\\n'")
         self.command(
             "gh",
             'case "$*" in\n'
@@ -411,11 +415,12 @@ class FallbackTests(unittest.TestCase):
         self.environment = mock.patch.dict(os.environ, {
             "SYMPHONY_OPEN_PR_INDEX": "empty",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
             "GEM_KIMI_EXECUTABLE": "/missing",
-            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": str(self.bin / "grok"),
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
         })
@@ -445,11 +450,12 @@ class FallbackTests(unittest.TestCase):
             "GEM_GROK_CANARY_TIMEOUT_SECONDS": "1.0",
             "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
             "GEM_KIMI_EXECUTABLE": "/missing",
-            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": str(self.bin / "grok"),
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
             "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(json.dumps({
@@ -476,6 +482,7 @@ class FallbackTests(unittest.TestCase):
 
     def command(self, name, body):
         if name == "gh":
+            discovery_body = body
             # Grok shipper now performs an exact-head GraphQL promotion readback
             # after these tests' mocked agent creates or updates a PR. Keep that
             # boundary realistic instead of letting each narrow Git/Grok test's
@@ -547,6 +554,15 @@ PY
                   exit 0
                 fi
             ''' + body
+            # Preserve each test's PR inventory while expressing the new
+            # complete GraphQL connection, rather than reusing a single-PR read.
+            body = (
+                'case "$*" in *"pullRequests(first:100"*)\n'
+                '(\n' + discovery_body + '\n)'
+                ''' | /usr/bin/python3 -c 'import json,sys; nodes=json.load(sys.stdin); print(json.dumps({"data":{"repository":{"pullRequests":{"nodes":nodes,"pageInfo":{"hasNextPage":False,"endCursor":None}}}}}))'
+'''
+                '  exit 0;;\nesac\n'
+            ) + body
         path = self.bin / name
         path.write_text("#!/bin/sh\nset -eu\n" + textwrap.dedent(body))
         path.chmod(0o755)
@@ -927,7 +943,7 @@ PY
     def test_targeted_drain_launches_only_the_exact_eligible_issue(self):
         module = self.load_controller_module()
         captured: dict[str, object] = {}
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
             captured.update(
                 identifiers=identifiers,
@@ -979,7 +995,7 @@ PY
         selection.assert_not_called()
     def test_targeted_drain_refuses_when_another_worker_owns_capacity(self):
         module = self.load_controller_module()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
@@ -1102,7 +1118,7 @@ PY
     def test_untargeted_drain_preserves_existing_capacity_and_issue_set(self):
         module = self.load_controller_module()
         captured: dict[str, object] = {}
-        selection = {"selected": {"id": "grok-4.6", "pool": "grok-build"}}
+        selection = {"selected": {"id": "grok-4.6", "provider": "grok", "pool": "grok-build"}}
         def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
             captured.update(identifiers=identifiers, limit=limit)
             providers = kwargs.get("unit_providers")
@@ -1157,7 +1173,7 @@ PY
         module = self.load_controller_module()
         final_active = mock.Mock()
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1194,7 +1210,7 @@ PY
         module = self.load_controller_module()
         target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1220,7 +1236,7 @@ PY
         unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
         controls: list[list[str]] = []
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1260,7 +1276,7 @@ PY
         target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
         unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1848,7 +1864,7 @@ PY
         events = self.events.read_text()
         self.assertNotIn("systemd-run", events)
         self.assertNotIn("systemctl --user stop", events)
-        self.assertIn("grok_capacity_zero symphony_unchanged", result.stderr)
+        self.assertIn("provider_capacity_zero symphony_unchanged", result.stderr)
 
     def test_grok_max_does_not_steal_kimi_chairs(self):
         module = self.load_controller_module()
@@ -2092,6 +2108,21 @@ PY
         module = self.load_controller_module()
         controls: list[list[str]] = []
         unit = module._fallback_unit("JOV-1", "2026-08-14T19:00:00Z") + ".service"
+        # The production selector now fails closed for registry-incompatible
+        # providers. Keep this cleanup test deterministic with a valid
+        # registry-backed Grok selection instead of relying on the old Qwen
+        # compatibility fixture.
+        grok_selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "grok-4.6",
+                "provider": "grok",
+                "pool": "grok-build",
+                "model": "grok-4.6",
+                "executor": {"executable": "/bin/true", "argv": ["-p", "{prompt}"]},
+            },
+        }
 
         def control(command):
             controls.append(command)
@@ -2104,6 +2135,11 @@ PY
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
             mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
+            mock.patch.object(
+                module,
+                "_oauth_fallback_selections",
+                return_value=( {"grok": grok_selection}, "oauth_ready"),
+            ),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit]]),
             mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
@@ -2274,6 +2310,7 @@ PY
         )
         self.command(
             "gh",
+            'case "$*" in *headRefName*) echo "[]"; exit 0;; esac\n'
             '[ ! -f "$GROK_CREATED" ] && echo 0 || echo 1\n',
         )
         self.command(
@@ -2319,7 +2356,7 @@ PY
 
     def test_red_fleet_gate_blocks_fallback_before_workspace_or_provider(self):
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         red = self.root / "red-gate.json"
         red.write_text(json.dumps({
@@ -2345,7 +2382,7 @@ PY
 
     def test_closure_stop_line_blocks_new_fallback_before_workspace_or_provider(self):
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         self.gate.write_text(json.dumps({
             "schema": "jovie-fleet-gate/v1",
@@ -2535,7 +2572,7 @@ PY
         ]
         with (
             mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "live"}),
-            mock.patch.object(module, "_gh_json", return_value=listed),
+            mock.patch.object(module, "_complete_open_prs", side_effect=lambda repo: listed if repo == module.JOV_REPO else []),
             mock.patch.object(module, "_linear_identifiers", return_value=[]),
         ):
             remounts = module._github_remount_identifiers()
@@ -2711,7 +2748,7 @@ PY
             mock.patch.object(
                 module,
                 "_model_router_selection",
-                return_value=({"selected": {"id": "grok", "pool": "grok"}}, "ok"),
+                return_value=({"selected": {"id": "grok", "provider": "grok", "pool": "grok"}}, "ok"),
             ),
             mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
             mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
@@ -3638,7 +3675,7 @@ PY
         # label is incidental.
         created = self.root / "pr-created"
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         destination = self.install_runtime()
         url = self.grok_linear_url()
@@ -3830,6 +3867,106 @@ class FallbackLockGcTests(unittest.TestCase):
             ("unknown", "lock_held_unverified"),
         )
 
+    def test_gc_never_splits_a_live_lock_inode_for_any_issue_state(self):
+        for state in ["In Progress", "In Review", "Done", "Canceled"]:
+            with self.subTest(state=state):
+                path = self.touch_lock("JOV-59999")
+                with path.open("a+") as holder:
+                    fcntl.flock(holder, fcntl.LOCK_EX)
+                    inode = os.fstat(holder.fileno()).st_ino
+                    self.module.gc_fallback_locks(
+                        open_prs={"JOV-59999": {"number": 1, "mergeStateStatus": "CLEAN"}},
+                        fetch_issue=lambda _: {"state": {"name": state}},
+                    )
+                    with path.open("a+") as challenger:
+                        self.assertEqual(os.fstat(challenger.fileno()).st_ino, inode)
+                        with self.assertRaises(BlockingIOError):
+                            fcntl.flock(challenger, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_unheld_slot_with_preopened_waiter_keeps_one_inode(self):
+        path = self.touch_lock("JOV-59998", self.module.FALLBACK_LEASE_TTL_SECONDS + 5)
+        with path.open("a+") as waiter:
+            inode = os.fstat(waiter.fileno()).st_ino
+            self.module.gc_fallback_locks(open_prs={}, fetch_issue=lambda _: None)
+            self.assertTrue(path.exists())
+            fcntl.flock(waiter, fcntl.LOCK_EX)
+            with path.open("a+") as newcomer:
+                self.assertEqual(os.fstat(newcomer.fileno()).st_ino, inode)
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(newcomer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_retained_unheld_slots_do_not_count_as_occupied_or_query_tracker(self):
+        for number in range(10):
+            self.touch_lock(f"JOV-{59000 + number}")
+        with mock.patch.object(self.module, "_autonomous_open_pr_index", side_effect=AssertionError("no GitHub scan")):
+            self.module.gc_fallback_locks(fetch_issue=lambda _: self.fail("no tracker read"))
+        self.assertEqual(self.module._fallback_lock_count(), 0)
+
+    @contextlib.contextmanager
+    def inherited_claim(self, path):
+        try:
+            saved = os.dup(9)
+        except OSError:
+            saved = None
+        descriptor = os.open(path, os.O_RDWR)
+        if descriptor != 9:
+            os.dup2(descriptor, 9)
+            os.close(descriptor)
+        try:
+            fcntl.flock(9, fcntl.LOCK_EX)
+            with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}):
+                yield
+        finally:
+            os.close(9)
+            if saved is not None:
+                os.dup2(saved, 9)
+                os.close(saved)
+
+    def test_inherited_claim_matches_kernel_inode_and_allows_own_pickup(self):
+        path = self.touch_lock("JOV-59997")
+        other = self.touch_lock("JOV-59996")
+        self.assertFalse(self.module._inherited_issue_lease_held(path))
+        with self.inherited_claim(path):
+            self.assertTrue(self.module._inherited_issue_lease_held(path))
+            self.assertFalse(self.module._inherited_issue_lease_held(other))
+            self.assertFalse(self.module._inherited_issue_lease_held(self.leases / "missing.lock"))
+            issue = {"identifier": "JOV-59997", "state": {"name": "In Progress"}}
+            with mock.patch.object(self.module, "_fetch_single_issue", return_value=issue), mock.patch.object(self.module, "_autonomous_open_pr_index", return_value={}):
+                self.assertEqual(self.module.pickup_check_command("JOV-59997"), 0)
+        self.assertEqual(self.module._fallback_lock_count(), 0)
+
+    def test_grok_release_closes_descriptor_without_unlinking_slot(self):
+        path = self.touch_lock("JOV-59995")
+        inode = path.stat().st_ino
+        function = re.search(r"release_fallback_lease\(\) \{.*?\n\}", GROK_SHIP.read_text(), re.S).group()
+        result = subprocess.run(["bash", "-c", function + '\nexec 9>>"$LEASE_FILE"\nrelease_fallback_lease\n'],
+            env={**os.environ, "LEASE_FILE": str(path)}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(path.stat().st_ino, inode)
+
+    def test_gc_unreadable_directory_is_unknown_not_zero_capacity(self):
+        with mock.patch.object(self.module, "_iter_fallback_locks", side_effect=PermissionError("denied")):
+            self.assertIsNone(self.module._fallback_lock_count())
+            receipt = self.module.gc_fallback_locks()
+        self.assertTrue(receipt["red"])
+        self.assertIsNone(receipt["lockCountAfter"])
+
+    def test_gc_unknown_holder_or_age_preserves_inode_and_reports_red(self):
+        path = self.touch_lock("JOV-59994")
+        for held in [None, False]:
+            with mock.patch.object(self.module, "_lock_held", return_value=held), mock.patch.object(self.module, "_lock_age_seconds", return_value=None):
+                receipt = self.module.gc_fallback_locks()
+            self.assertTrue(receipt["red"])
+            self.assertTrue(path.exists())
+
+    def test_gc_malformed_observation_and_unwritable_receipt_keep_slots(self):
+        path = self.leases / "malformed.lock"
+        path.touch()
+        with mock.patch.object(self.module, "_iter_fallback_locks", return_value=[path]), mock.patch.object(self.module, "_write_json_atomic", side_effect=PermissionError("denied")):
+            receipt = self.module.gc_fallback_locks()
+        self.assertTrue(receipt["red"])
+        self.assertTrue(path.exists())
+
     def test_gc_expires_in_review_and_ttl_leftovers_keeps_live_holder(self):
         stale = self.touch_lock("JOV-5257", age_seconds=30)
         leftover = self.touch_lock("JOV-5001", age_seconds=self.module.FALLBACK_LEASE_TTL_SECONDS + 5)
@@ -3847,13 +3984,13 @@ class FallbackLockGcTests(unittest.TestCase):
             now=time.time(),
             fetch_issue=lambda ident: issues.get(ident),
         )
-        self.assertFalse(stale.exists())
-        self.assertFalse(leftover.exists())
+        self.assertTrue(stale.exists())
+        self.assertTrue(leftover.exists())
         self.assertTrue(live.exists())
-        self.assertEqual(receipt["lockCountBefore"], 3)
+        self.assertEqual(receipt["lockCountBefore"], 1)
         self.assertEqual(receipt["lockCountAfter"], 1)
-        self.assertEqual({row["identifier"] for row in receipt["expired"]}, {"JOV-5257", "JOV-5001"})
-        self.assertEqual(receipt["kept"][0]["identifier"], "JOV-5002")
+        self.assertEqual({row["identifier"] for row in receipt["expired"]}, {"JOV-5001"})
+        self.assertEqual({row["identifier"] for row in receipt["kept"]}, {"JOV-5257", "JOV-5002"})
         self.assertFalse(receipt["red"])
 
     def test_gc_expires_open_pr_inflight_without_linear(self):
@@ -3863,9 +4000,9 @@ class FallbackLockGcTests(unittest.TestCase):
             open_prs={"JOV-5257": {"number": 16365, "head": "fallback/JOV-5257-fix", "mergeStateStatus": "CLEAN"}},
             fetch_issue=lambda ident: fetches.append(ident) or {"state": {"name": "In Progress"}},
         )
-        self.assertFalse(path.exists())
+        self.assertTrue(path.exists())
         self.assertEqual(fetches, [])
-        self.assertEqual(receipt["expired"][0]["reason"], "open_pr_inflight")
+        self.assertEqual(receipt["lockCountAfter"], 0)
 
     def test_pickup_refuses_in_review_and_unknown_is_red(self):
         self.assertEqual(
@@ -3950,7 +4087,7 @@ class FallbackLockGcTests(unittest.TestCase):
         )
         self.assertEqual(
             expire(held=True, state_name="Canceled", pr_verdict="remount", age_seconds=10),
-            ("expire", "issue_canceled"),
+            ("keep", "live_remount"),
         )
 
     def test_issue_meta_admits_done_state_for_remount_only(self):
@@ -4021,7 +4158,7 @@ class FallbackLockGcTests(unittest.TestCase):
         ]
         with (
             mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": ""}),
-            mock.patch.object(self.module, "_gh_json", return_value=payload),
+            mock.patch.object(self.module, "_complete_open_prs", side_effect=lambda repo: payload if repo == self.module.JOV_REPO else []),
         ):
             index = self.module._autonomous_open_pr_index(None)
         self.assertEqual(index["JOV-5853"]["number"], 17017)

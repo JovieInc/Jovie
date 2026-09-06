@@ -3,20 +3,24 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env';
+import { boundedFetch } from '@/lib/http/bounded-fetch';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
+import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
+import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const EVE_BOTTLENECK_URL =
-  'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app/ovie/v1/summer-bottleneck/events';
+const EVE_BOTTLENECK_PATH = '/ovie/v1/summer-bottleneck/events';
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
+const JOVIE_PRODUCTION_OIDC_SUBJECT =
+  'owner:jovie:project:jovie:environment:production';
 const timestamp = z.string().datetime({ offset: true });
 const exactSha = z.string().regex(SHA);
 const safeCount = z.number().int().nonnegative().safe();
@@ -35,6 +39,22 @@ const sourceFields = {
   sourceDigest: z.string().regex(DIGEST),
   sourceRevision: exactSha,
 };
+const runtimeSourceFields = {
+  observedAt: timestamp,
+  sourceDigest: z.string().regex(DIGEST),
+  sourceRevision: exactSha.nullable(),
+};
+const runnerAuthority = z
+  .object({
+    schema: z.enum([
+      'symphony-lease-guard-report/v1',
+      'symphony-runtime-state/v1',
+    ]),
+    observedAt: timestamp,
+    sourceDigest: z.string().regex(DIGEST),
+    sourceRevision: exactSha.nullable(),
+  })
+  .strict();
 
 const ciAuditSchema = z
   .object({
@@ -112,14 +132,17 @@ const unsignedSnapshotSchema = z
         runner: z
           .object({
             schema: z.literal('jovie.eve.summer-runner-projection/v1'),
-            sourceSchema: z.literal('symphony-lease-guard-report/v1'),
-            ...sourceFields,
+            sourceSchema: z.literal('symphony-runner-projection/v1'),
+            ...runtimeSourceFields,
             blockedSince: timestamp.nullable(),
-            capacityAvailable: safeCount,
-            queuedWork: safeCount,
+            capacitySource: runnerAuthority,
+            workSource: runnerAuthority,
+            capacityAvailable: safeCount.nullable(),
+            queuedWork: safeCount.nullable(),
           })
           .strict(),
-        ciAudit: ciAuditSchema,
+        ciAudit: ciAuditSchema.nullable(),
+        productPaths: summerProductPathsSchema.optional(),
       })
       .strict(),
   })
@@ -129,15 +152,48 @@ const unsignedSnapshotSchema = z
       value.signals.closure.sourceRevision,
       value.signals.queue.sourceRevision,
       value.signals.release.sourceRevision,
-      value.signals.runner.sourceRevision,
-      value.signals.ciAudit.sourceRevision,
+      ...(value.signals.ciAudit ? [value.signals.ciAudit.sourceRevision] : []),
       value.signals.release.mainSha,
+      ...(value.signals.productPaths
+        ? [value.signals.productPaths.sourceRevision]
+        : []),
     ];
     if (revisions.some(revision => revision !== value.sourceVersion)) {
       context.addIssue({
         code: 'custom',
         message: 'every projection must bind to the exact snapshot source',
         path: ['sourceVersion'],
+      });
+    }
+    if (
+      value.signals.runner.workSource.sourceRevision !==
+      value.signals.runner.sourceRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to the runner source revision',
+        path: ['signals', 'runner', 'workSource', 'sourceRevision'],
+      });
+    }
+    if (
+      value.signals.runner.capacityAvailable !== null &&
+      value.signals.runner.capacitySource.schema !==
+        'symphony-lease-guard-report/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner capacity must bind to lease authority',
+        path: ['signals', 'runner', 'capacitySource', 'schema'],
+      });
+    }
+    if (
+      value.signals.runner.queuedWork !== null &&
+      value.signals.runner.workSource.schema !== 'symphony-runtime-state/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to Symphony runtime authority',
+        path: ['signals', 'runner', 'workSource', 'schema'],
       });
     }
   });
@@ -178,6 +234,17 @@ function readInput(request: Request): Promise<unknown> {
   return readBoundedJson(request.body, request.headers.get('content-length'));
 }
 
+function hasExpectedProductionSubject(token: string): boolean {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')
+    ) as { sub?: unknown };
+    return payload.sub === JOVIE_PRODUCTION_OIDC_SUBJECT;
+  } catch {
+    return false;
+  }
+}
+
 function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
   if (!Number.isFinite(nowMs)) return false;
   const timestamps = [
@@ -186,7 +253,9 @@ function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
     snapshot.signals.queue.observedAt,
     snapshot.signals.release.observedAt,
     snapshot.signals.runner.observedAt,
-    snapshot.signals.ciAudit.observedAt,
+    ...(snapshot.signals.ciAudit ? [snapshot.signals.ciAudit.observedAt] : []),
+    snapshot.signals.runner.capacitySource.observedAt,
+    snapshot.signals.runner.workSource.observedAt,
   ];
   return timestamps.every(value => {
     const ageMs = nowMs - Date.parse(value);
@@ -224,6 +293,18 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!isFresh(parsed.data)) {
     return json({ ok: false, code: 'stale_bottleneck_snapshot' }, 422);
   }
+  if (
+    !env.VERCEL_GIT_COMMIT_SHA ||
+    parsed.data.signals.release.productionSha !== env.VERCEL_GIT_COMMIT_SHA
+  ) {
+    return json({ ok: false, code: 'invalid_deployment_revision' }, 409);
+  }
+  let destination: URL;
+  try {
+    destination = new URL(EVE_BOTTLENECK_PATH, getEveShadowOrigin());
+  } catch {
+    return json({ ok: false, code: 'eve_destination_unavailable' }, 503);
+  }
 
   const body = signSummerBottleneckSnapshot(
     parsed.data,
@@ -245,18 +326,25 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!oidcToken) {
     return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
   }
+  if (!hasExpectedProductionSubject(oidcToken)) {
+    return json({ ok: false, code: 'wrong_oidc_audience' }, 503);
+  }
 
   let upstream: Response;
   try {
     // No retry: an uncertain submission is resolved by Eve's immutable event ID.
-    upstream = await fetch(EVE_BOTTLENECK_URL, {
+    upstream = await boundedFetch(destination, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${oidcToken}`,
+        'x-vercel-trusted-oidc-idp-token': oidcToken,
         'content-type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
+      redirect: 'error',
+      timeoutMs: 15_000,
+      retry: { maxRetries: 0, baseDelayMs: 0 },
+      context: 'Summer bottleneck snapshot',
     });
   } catch {
     return json({ ok: false, code: 'eve_bottleneck_unavailable' }, 503);

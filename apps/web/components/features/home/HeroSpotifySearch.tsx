@@ -88,15 +88,18 @@ export function HeroSpotifySearch({
   const [showResults, setShowResults] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isNavigating, setIsNavigating] = useState(false);
+  const isNavigatingRef = useRef(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { results, state, search, clear } = useArtistSearchQuery({
-    debounceMs: 300,
-    limit: 5,
-  });
+  const { results, state, search, searchImmediate, clear } =
+    useArtistSearchQuery({
+      debounceMs: 300,
+      limit: 5,
+    });
+  const isLoading = state === 'loading';
 
   // Total items: results + "paste URL" option
   const totalItems = results.length + 1;
@@ -118,8 +121,12 @@ export function HeroSpotifySearch({
 
   const handleNavigateToStart = useCallback(
     (spotifyUrl: string, artistName?: string) => {
-      if (isNavigating) return;
+      if (isNavigatingRef.current) return;
+      isNavigatingRef.current = true;
       setIsNavigating(true);
+      clear();
+      setShowResults(false);
+      setActiveIndex(-1);
       if (submitAnalytics) {
         track(submitAnalytics.eventName, {
           ...submitAnalytics.properties,
@@ -139,7 +146,7 @@ export function HeroSpotifySearch({
       );
       router.push(`${APP_ROUTES.START}?${params.toString()}`);
     },
-    [router, isNavigating, submitAnalytics]
+    [clear, router, submitAnalytics]
   );
 
   const handleSearchInputChange = useCallback(
@@ -163,9 +170,10 @@ export function HeroSpotifySearch({
 
   const handleArtistSelect = useCallback(
     (artist: SpotifyArtistResult) => {
+      if (isLoading) return;
       handleNavigateToStart(artist.url, artist.name);
     },
-    [handleNavigateToStart]
+    [handleNavigateToStart, isLoading]
   );
 
   const handleClaimArtist = useCallback(() => {
@@ -178,6 +186,11 @@ export function HeroSpotifySearch({
 
     if (isSpotifyUrl(query)) {
       handleNavigateToStart(query);
+      return;
+    }
+
+    if (isLoading) {
+      inputRef.current?.focus();
       return;
     }
 
@@ -200,9 +213,15 @@ export function HeroSpotifySearch({
     activeIndex,
     results,
     isNavigating,
+    isLoading,
     handleNavigateToStart,
     handleArtistSelect,
   ]);
+
+  const handleRetry = useCallback(() => {
+    searchImmediate(searchQuery);
+    inputRef.current?.focus();
+  }, [searchImmediate, searchQuery]);
 
   const handlePasteUrlClick = useCallback(() => {
     setSearchQuery('');
@@ -287,7 +306,6 @@ export function HeroSpotifySearch({
   }, [showResults, state, results.length, searchQuery.length]);
 
   const trimmedQuery = searchQuery.trim();
-  const isLoading = state === 'loading';
   // Default: show the button once the user has typed; disable while loading.
   // Editorial: the submit pill is the hero's one primary action, so it stays
   // visible and enabled — an empty submit just focuses the field.
@@ -422,6 +440,7 @@ export function HeroSpotifySearch({
             <select
               id={resultsId}
               className='sr-only'
+              disabled={isLoading}
               size={Math.min(totalItems, 6)}
               aria-label='Spotify Artist Results'
               value={
@@ -493,7 +512,18 @@ export function HeroSpotifySearch({
             {/* Error state */}
             {state === 'error' && (
               <div className='p-4 text-center'>
-                <p className='text-sm text-error'>Search failed. Try again.</p>
+                <p role='alert' className='text-sm text-error'>
+                  Search failed.
+                </p>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='tertiary'
+                  className='mt-2'
+                  onClick={handleRetry}
+                >
+                  Try again
+                </Button>
               </div>
             )}
 
@@ -508,6 +538,7 @@ export function HeroSpotifySearch({
                   <button
                     key={artist.id}
                     type='button'
+                    disabled={isLoading}
                     tabIndex={0}
                     className={cn(
                       'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/20 focus-visible:ring-inset',
