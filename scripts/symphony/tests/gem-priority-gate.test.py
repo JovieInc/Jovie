@@ -2002,10 +2002,13 @@ class ScheduledFreshnessTests(unittest.TestCase):
 class WorkflowContractTests(unittest.TestCase):
     WORKFLOWS = ROOT / ".github" / "workflows"
 
-    def test_autoenroll_persists_fleet_receipt_without_dry_run(self):
-        content = (self.WORKFLOWS / "merge-queue-autoenroll.yml").read_text(encoding="utf-8")
+    def test_refresh_persists_fleet_receipt_without_source_admission_dependency(self):
+        content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         self.assertIn("dry-run: 'false'", content)
+        retired = (self.WORKFLOWS / "merge-queue-autoenroll.yml").read_text(encoding="utf-8")
+        self.assertNotIn("./.github/actions/evaluate-fleet-gate", retired)
+        self.assertIn("exit 2", retired)
         wrapper = (ROOT / "scripts/symphony/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
         self.assertIn('--consumer "$consumer"', wrapper)
         self.assertIn("fleet | deployment", wrapper)
