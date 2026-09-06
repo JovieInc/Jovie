@@ -655,6 +655,8 @@ class SystemdActivationTests(unittest.TestCase):
 
     def test_exact_production_activation_installs_runs_and_attests_controller(self):
         text = ACTIVATION.read_text(encoding="utf-8")
+        self.assertIn("controller-hop-exception: jovie-controller-hop/v1", text)
+        self.assertIn("accountable-writer: Gem", text)
         authorize = text.index("Authorize exact current Production Verified marker")
         install = text.index("Install and attest the exact controller configuration")
         first_installer = text.index(

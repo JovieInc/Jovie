@@ -1,5 +1,10 @@
 name: Activate Gem Delivery Controller
 
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The Gem self-hosted runner must independently verify the exact Production Verified marker and current main before replacing local controller state.
+# removal-trigger: Remove this hop when Production Controller can deliver its exact verified controller configuration to Gem atomically without a downstream workflow_run consumer.
+
 # A production receipt is the only authority to replace Gem's local controller
 # configuration. The installer refuses a dirty or mismatched source revision,
 # keeps a timestamped rollback copy, reloads systemd, enables and starts the
