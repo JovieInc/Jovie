@@ -1,5 +1,4 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -95,12 +94,12 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('navigates hero CTA to waitlist', async ({ page }) => {
+  test('navigates hero CTA to start', async ({ page }) => {
     await gotoLanding(page);
 
     await expect(
       page.getByTestId('homepage-v2-hero-primary-cta')
-    ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
   });
 
   test('routes deep links to artist profiles anchors', async ({ page }) => {

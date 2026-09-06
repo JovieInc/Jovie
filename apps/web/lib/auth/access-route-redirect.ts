@@ -147,10 +147,10 @@ export function getStartRouteRedirect(
 }
 
 /**
- * Redirect destination for /waitlist. Unauthenticated visitors stay so the
- * public waitlist-first handoff can render. Pre-receipt authenticated states
- * recover to /start. WAITLIST_PENDING stays so the page can render a durable
- * receipt or fail closed without false confirmation.
+ * Redirect destination for /waitlist. Signed-out visitors stay so the page can
+ * render the public waitlist entry. Pre-receipt authenticated states recover to
+ * /start. WAITLIST_PENDING stays so the page can render a durable receipt or
+ * fail closed without false confirmation.
  *
  * Paired with `getStartRouteRedirect`: a state must not bounce /start →
  * /waitlist → /start. Proxy already leaves /start un-rewritten for waitlist

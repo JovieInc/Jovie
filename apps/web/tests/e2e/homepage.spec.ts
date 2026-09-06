@@ -1,4 +1,3 @@
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -681,11 +680,13 @@ test.describe('Homepage', () => {
   });
 
   /**
-   * JOV-5334: Public waitlist-first conversion CTAs land on the production
-   * waitlist URL. /start remains the post-auth capture chat, not the public
-   * Get started.
+   * JOV-2065: Public CTAs with data-cta-sign-up="true" route through the
+   * canonical /start product entry before authenticated signup.
+   *
+   * Finds every element marked with data-cta-sign-up="true" and verifies it
+   * has an href starting with /start.
    */
-  test('all data-cta-sign-up elements navigate to the public waitlist (JOV-5334)', async ({
+  test('all data-cta-sign-up elements navigate to /start (JOV-2065)', async ({
     page,
   }) => {
     await gotoHomepage(page);
@@ -706,12 +707,10 @@ test.describe('Homepage', () => {
 
       if (tagName === 'a') {
         const href = await cta.getAttribute('href');
-        const isWaitlistRoute =
-          href === PUBLIC_WAITLIST_URL ||
-          (href?.startsWith('/waitlist') ?? false);
+        const isStartRoute = href?.startsWith('/start') ?? false;
         expect(
-          isWaitlistRoute,
-          `CTA at index ${i} (href="${href}") must route to the public waitlist`
+          isStartRoute,
+          `CTA at index ${i} (href="${href}") must route to /start`
         ).toBe(true);
       }
     }

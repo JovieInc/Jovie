@@ -79,28 +79,20 @@ function AuthFormColumn({
 
   return (
     <div
-      data-auth-form-column
       className={cn(
-        'relative flex min-h-0 flex-col items-center px-4 sm:px-8',
+        'relative flex min-h-0 flex-1 flex-col items-center justify-center px-4 sm:px-8',
         className
       )}
     >
-      {showLogo && isSplashB ? (
-        <div className='mb-8 size-11 shrink-0' data-auth-splash-logo-slot>
-          <Link
-            href={APP_ROUTES.HOME}
-            className={cn(
-              'inline-flex size-11 items-center justify-center text-white dark:text-white transition-[color,opacity] duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
-              isKeyboardVisible && 'pointer-events-none opacity-0'
-            )}
-            // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
-            aria-label='Go to homepage'
-            aria-hidden={isKeyboardVisible}
-            tabIndex={isKeyboardVisible ? -1 : undefined}
-          >
-            <BrandLogo size={32} tone='white' aria-hidden />
-          </Link>
-        </div>
+      {showLogo && isSplashB && !isKeyboardVisible ? (
+        <Link
+          href={APP_ROUTES.HOME}
+          className='mb-8 inline-flex size-11 shrink-0 items-center justify-center text-white dark:text-white transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+          // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
+          aria-label='Go to homepage'
+        >
+          <BrandLogo size={32} tone='white' aria-hidden />
+        </Link>
       ) : null}
 
       {showFormTitle && formTitle ? (
@@ -146,10 +138,7 @@ function SplitLayoutContent(props: AuthLayoutInnerProps) {
   return (
     <div className='relative z-10 flex w-full flex-1 items-stretch justify-center'>
       <div className='grid w-full max-w-360 gap-2 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:items-stretch'>
-        <AuthFormColumn
-          {...props}
-          className='flex-1 justify-center lg:max-w-120 lg:px-10'
-        />
+        <AuthFormColumn {...props} className='lg:max-w-120 lg:px-10' />
 
         {props.showLogo ? (
           <div
@@ -168,12 +157,7 @@ function StackLayoutContent(props: AuthLayoutInnerProps) {
   return (
     <AuthFormColumn
       {...props}
-      className={cn(
-        AUTH_FORM_MAX_WIDTH_CLASS,
-        props.contentPlacement === 'center'
-          ? 'flex-1 justify-center'
-          : 'justify-start'
-      )}
+      className={cn(props.contentPlacement === 'center' && 'flex-1')}
     />
   );
 }
