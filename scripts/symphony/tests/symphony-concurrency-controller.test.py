@@ -655,6 +655,24 @@ class SystemdActivationTests(unittest.TestCase):
 
     def test_exact_production_activation_installs_runs_and_attests_controller(self):
         text = ACTIVATION.read_text(encoding="utf-8")
+        authorize = text.index("Authorize exact current Production Verified marker")
+        install = text.index("Install and attest the exact controller configuration")
+        first_installer = text.index(
+            "update-symphony-burrito.sh --provider-runtime-only"
+        )
+        self.assertLess(authorize, install)
+        self.assertLess(install, first_installer)
+        self.assertIn("actions: read", text)
+        self.assertIn("production-marker-state.mjs", text)
+        self.assertIn('.state == "verified"', text)
+        self.assertIn("(.controllerRun | tostring) == $run", text)
+        self.assertIn("(.controllerAttempt | tostring) == $attempt", text)
+        self.assertIn("Refusing superseded Gem activation", text)
+        self.assertIn("Main advanced before Gem mutation", text)
+        self.assertGreaterEqual(
+            text.count('gh api "repos/$REPOSITORY/commits/main"'), 2
+        )
+        self.assertNotIn("A later main commit cannot invalidate", text)
         self.assertIn(
             'install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"',
             text,

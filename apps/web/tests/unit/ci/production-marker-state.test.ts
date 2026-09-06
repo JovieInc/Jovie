@@ -211,6 +211,21 @@ describe('production marker attempt state', () => {
     });
   });
 
+  it('rejects a successful controller run when Production Verified was skipped', () => {
+    const marker = primaryMarker('completed', 'success');
+    marker.attemptJobs = [
+      job('Production Verified', 1, 'completed', 'skipped'),
+    ];
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [marker], latestRun: run(1, 'completed', 'success') })
+      )
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'successful_attempt_without_verified_job',
+    });
+  });
+
   it('authorizes one full rerun only for one safe interrupted primary marker', () => {
     expect(classifyProductionMarkerEvidence(evidence())).toMatchObject({
       state: 'recovery_available',

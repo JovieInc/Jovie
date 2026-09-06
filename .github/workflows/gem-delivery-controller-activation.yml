@@ -10,6 +10,7 @@ on:
     types: [completed]
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -32,16 +33,55 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
-      - name: Attest immutable production receipt and Gem runner
+      - name: Authorize exact current Production Verified marker
         env:
+          GH_TOKEN: ${{ github.token }}
+          CONTROLLER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CONTROLLER_RUN_ID: ${{ github.event.workflow_run.id }}
           PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           test "$(id -un)" = timwhite
           test "$(git rev-parse HEAD)" = "$PRODUCTION_SHA"
-          # A later main commit cannot invalidate this immutable successful
-          # Production Controller receipt. The exact checkout and installer
-          # revision fence remain the activation authority.
+          [[ "$CONTROLLER_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CONTROLLER_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          controller_workflow_id="$(
+            gh api "repos/$REPOSITORY/actions/workflows/production-controller.yml" \
+              --jq '.id // empty'
+          )"
+          [[ "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Could not resolve the canonical Production Controller workflow."
+            exit 1
+          }
+          marker_state="$(
+            node .github/scripts/production-marker-state.mjs \
+              --sha "$PRODUCTION_SHA" \
+              --repo "$REPOSITORY" \
+              --controller-workflow-id "$controller_workflow_id" \
+              --actor-run-id "$CONTROLLER_RUN_ID" \
+              --actor-attempt "$CONTROLLER_RUN_ATTEMPT"
+          )"
+          jq -e \
+            --arg run "$CONTROLLER_RUN_ID" \
+            --arg attempt "$CONTROLLER_RUN_ATTEMPT" '
+              .state == "verified" and
+              (.controllerRun | tostring) == $run and
+              (.controllerAttempt | tostring) == $attempt and
+              (.deploymentId | type == "string" and length > 0)
+            ' <<<"$marker_state" >/dev/null || {
+            echo "::error::Triggering controller lacks its exact successful Production Verified marker."
+            jq -c . <<<"$marker_state" >&2
+            exit 1
+          }
+
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          if [ "$current_main_sha" != "$PRODUCTION_SHA" ]; then
+            echo "::error::Refusing superseded Gem activation: expected $PRODUCTION_SHA, current main is ${current_main_sha:-UNKNOWN}."
+            exit 1
+          fi
       - name: Establish lingering user-systemd session
         run: |
           set -euo pipefail
@@ -61,9 +101,19 @@ jobs:
           } >> "${GITHUB_ENV}"
       - name: Install and attest the exact controller configuration
         env:
+          GH_TOKEN: ${{ github.token }}
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
+          PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+          # Reassert immediately before the first runtime write so a main advance
+          # after marker authorization cannot install a superseded generation.
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          if [ "$current_main_sha" != "$PRODUCTION_SHA" ]; then
+            echo "::error::Main advanced before Gem mutation: expected $PRODUCTION_SHA, current main is ${current_main_sha:-UNKNOWN}."
+            exit 1
+          fi
           # Preserve the managed provider generation boundary. The next installer
           # owns the exact workflow/service-unit overlay, and the explicit installs
           # below own the adaptive controller; provider-only is not the whole activation.
