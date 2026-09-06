@@ -1,8 +1,10 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
 
 export type HomepageCertifiedSectionId =
@@ -67,9 +69,10 @@ function sectionMedia(
 /**
  * Sections 2-8 of the certified homepage. Copy is locked in
  * HOMEPAGE_LAUNCH_COPY.certified; this component only owns rhythm: one quiet
- * proof statement, then six top-ruled editorial sections on the shared
- * content column, alternating sides, with real product exports where they
- * exist and nothing where they do not.
+ * proof statement with verified logos on the page background, then six
+ * top-ruled editorial sections on the shared content column, alternating
+ * sides, with real product exports where they exist and nothing where they do
+ * not.
  */
 export function HomepageCertifiedSections({
   previews,
@@ -84,6 +87,15 @@ export function HomepageCertifiedSections({
         aria-label='Proof'
       >
         <p className='homepage-certified-proof__statement'>{proof.statement}</p>
+        <div className='homepage-certified-proof__logos system-b-mounted-home-trust-strip-shell'>
+          <HomeTrustSection
+            ariaLabel='People and teams who have created with Jovie'
+            // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Preserve the approved all-caps homepage proof label.
+            label="BUILT BY PEOPLE WHO'VE CREATED FOR"
+            logoIds={ARTIST_PROFILE_SOCIAL_PROOF.logos.map(logo => logo.id)}
+            presentation='inline-strip'
+          />
+        </div>
       </section>
       {sections.map((section, index) => {
         const headingId = `homepage-section-${section.id}-heading`;

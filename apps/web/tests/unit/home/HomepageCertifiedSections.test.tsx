@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -41,14 +42,23 @@ const PREVIEWS = {
 } as const;
 
 describe('HomepageCertifiedSections', () => {
-  it('renders sections 2-8 with the locked copy, in order, no logos', () => {
+  it('renders proof logos and sections 2-8 with the locked copy, in order', () => {
     render(<HomepageCertifiedSections previews={PREVIEWS} />);
 
     const proof = screen.getByTestId('homepage-proof');
     expect(proof).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.proof.statement
     );
-    expect(proof.querySelectorAll('img, svg')).toHaveLength(0);
+    expect(proof).toHaveTextContent("BUILT BY PEOPLE WHO'VE CREATED FOR");
+    expect(
+      proof.querySelector('[data-testid="homepage-trust"]')
+    ).toHaveAttribute('data-presentation', 'inline-strip');
+    expect(
+      proof.querySelector('[data-presentation="card"]')
+    ).not.toBeInTheDocument();
+    expect(proof.querySelectorAll('svg')).toHaveLength(
+      ARTIST_PROFILE_SOCIAL_PROOF.logos.length
+    );
 
     const headings = screen.getAllByRole('heading', { level: 2 });
     expect(headings.map(heading => heading.textContent)).toEqual(

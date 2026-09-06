@@ -2290,6 +2290,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: balance;
 }
 
+.homepage-certified-proof__logos {
+  margin-top: clamp(var(--space-8), 4vw, var(--space-12));
+}
+
 .homepage-certified-section__inner,
 .homepage-close__inner {
   width: min(
