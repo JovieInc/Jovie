@@ -570,7 +570,10 @@ function runProfileAdmission() {
     'apps/web/lib/tracking/pac-**',
     'apps/web/styles/design-system.css',
     'apps/web/tests/e2e/profile/**',
+    'apps/web/tests/e2e/profile-admission.spec.ts',
     'apps/web/tests/e2e/public-profile-smoke.spec.ts',
+    'apps/web/tests/e2e/utils/profile-route-matrix.ts',
+    'apps/web/tests/e2e/utils/public-profile-**',
     'apps/web/tests/e2e/utils/public-surface-**',
     'scripts/ci-fast-lanes.mjs',
   ]);

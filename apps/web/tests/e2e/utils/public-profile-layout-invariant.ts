@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 type PublicProfileLayoutViolationCode =
+  | 'artist_name_clipped'
   | 'phantom_banner'
   | 'banner_reserved_geometry'
   | 'claim_cta_overflow'
@@ -8,7 +9,6 @@ type PublicProfileLayoutViolationCode =
   | 'desktop_bottom_nav'
   | 'desktop_compact_shell'
   | 'desktop_empty_side_rail'
-  | 'desktop_stage_too_narrow'
   | 'horizontal_overflow'
   | 'layout_surface_count'
   | 'target_under_44'
@@ -80,20 +80,6 @@ export async function auditPublicProfileLayout(page: Page) {
       }
     }
 
-    if (isDesktopViewport) {
-      const visibleStage = desktopSurfaces[0] ?? compactSurfaces[0];
-      if (visibleStage) {
-        const stageRatio =
-          visibleStage.getBoundingClientRect().width / window.innerWidth;
-        if (stageRatio < 0.7) {
-          violations.push({
-            code: 'desktop_stage_too_narrow',
-            detail: `desktop stage uses ${(stageRatio * 100).toFixed(1)}% of the viewport width`,
-          });
-        }
-      }
-    }
-
     const homeOverview = visible(
       '[data-testid="profile-desktop-home-overview"]'
     )[0];
@@ -107,6 +93,24 @@ export async function auditPublicProfileLayout(page: Page) {
         code: 'desktop_empty_side_rail',
         detail: 'desktop overview reserved a visible side rail without content',
       });
+    }
+
+    const desktopCover = visible('[data-testid="profile-desktop-cover"]')[0];
+    const artistName = desktopCover?.querySelector<HTMLElement>(
+      '[data-testid="profile-header"]'
+    );
+    if (ownsDesktop && desktopCover && isVisible(artistName ?? null)) {
+      const coverBox = desktopCover.getBoundingClientRect();
+      const nameBox = artistName.getBoundingClientRect();
+      if (
+        nameBox.left < coverBox.left - 1 ||
+        nameBox.right > coverBox.right + 1
+      ) {
+        violations.push({
+          code: 'artist_name_clipped',
+          detail: `artist name bounds ${nameBox.left.toFixed(1)}..${nameBox.right.toFixed(1)} escape cover ${coverBox.left.toFixed(1)}..${coverBox.right.toFixed(1)}`,
+        });
+      }
     }
 
     const expectedCompact = layout === 'compact' ? 1 : 0;

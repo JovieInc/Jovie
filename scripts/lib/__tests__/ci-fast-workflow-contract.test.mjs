@@ -789,6 +789,16 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(browser).toContain('tests/e2e/profile-admission.spec.ts');
     expect(browser).toContain('--config=playwright.config.noauth.ts');
     expect(browser).toContain('--project=chromium');
+    expect(browser).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'");
+    expect(browser).toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'"
+    );
+    expect(browser).toContain(
+      "PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'"
+    );
+    expect(browser).toContain("allow-images: 'true'");
+    expect(browser).toContain("public-images: 'true'");
+    expect(browser).toContain('Upload profile admission evidence');
     expect(browser).toMatch(/github\.event_name.*merge_group/);
     expect(browser).toMatch(/github\.event_name.*pull_request/);
     expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');
@@ -816,6 +826,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/lib/cookies/**',
       'apps/web/lib/tracking/pac-**',
       'apps/web/styles/design-system.css',
+      'apps/web/tests/e2e/profile/**',
+      'apps/web/tests/e2e/utils/profile-route-matrix.ts',
+      'apps/web/tests/e2e/utils/public-profile-**',
+      'apps/web/tests/e2e/utils/public-surface-**',
     ]) {
       expect(browser).toContain(requiredPath);
       expect(CI_FAST_SOURCE).toContain(requiredPath);
