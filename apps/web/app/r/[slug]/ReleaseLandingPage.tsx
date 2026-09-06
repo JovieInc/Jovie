@@ -7,7 +7,7 @@
  * menu button top-right, streaming platform buttons below.
  */
 
-import { Share2, Sparkles, Users } from 'lucide-react';
+import { Download, Share2, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
@@ -430,16 +430,28 @@ export function ReleaseLandingPage({
           )}
 
           <div className='space-y-2'>
-            {clickableProviders.map(provider => {
+            {clickableProviders.map((provider, index) => {
               const logoConfig = DSP_LOGO_CONFIG[provider.key];
+              const isStreamNow = index === 0;
               return (
                 <SmartLinkProviderButton
                   key={provider.key}
                   href={appendUTMParamsToUrl(provider.url, resolvedUtmParams)}
                   onClick={() => handleProviderClick(provider.key)}
-                  label={logoConfig?.name ?? provider.label}
+                  label={
+                    isStreamNow
+                      ? 'Stream Now'
+                      : (logoConfig?.name ?? provider.label)
+                  }
                   iconPath={logoConfig?.iconPath}
                   iconColor={logoConfig?.color}
+                  ariaLabel={
+                    isStreamNow
+                      ? `Stream Now on ${logoConfig?.name ?? provider.label}`
+                      : undefined
+                  }
+                  providerKey={provider.key}
+                  primary={isStreamNow}
                 />
               );
             })}
@@ -521,6 +533,16 @@ export function ReleaseLandingPage({
               <Users className={SMART_LINK_MENU_ICON_CLASS} />
               Credits
             </button>
+          ) : null}
+          {downloadUrl ? (
+            <Link
+              href={appendUTMParamsToUrl(downloadUrl, resolvedUtmParams)}
+              className={SMART_LINK_MENU_ITEM_CLASS}
+              onClick={() => setMenuOpen(false)}
+            >
+              <Download className={SMART_LINK_MENU_ICON_CLASS} />
+              Download
+            </Link>
           ) : null}
           {soundsUrl ? (
             <Link

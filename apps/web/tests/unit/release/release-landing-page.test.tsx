@@ -30,6 +30,9 @@ vi.mock('lucide-react', () => ({
   Sparkles: (p: Record<string, unknown>) => (
     <span data-testid='icon-sparkles' {...p} />
   ),
+  Download: (p: Record<string, unknown>) => (
+    <span data-testid='icon-download' {...p} />
+  ),
   Users: (p: Record<string, unknown>) => (
     <span data-testid='icon-users' {...p} />
   ),
@@ -92,12 +95,19 @@ vi.mock('@/features/release/SmartLinkProviderButton', () => ({
   SmartLinkProviderButton: ({
     href,
     label,
+    primary,
   }: {
     href: string;
     label: string;
     onClick?: () => void;
+    primary?: boolean;
   }) => (
-    <div data-testid='provider-button' data-href={href} data-label={label}>
+    <div
+      data-testid='provider-button'
+      data-href={href}
+      data-label={label}
+      data-primary={primary ? 'true' : 'false'}
+    >
       {label}
     </div>
   ),
@@ -215,6 +225,34 @@ describe('@critical ReleaseLandingPage', () => {
     expect(buttons[1].getAttribute('data-href')).toBe(
       'https://music.apple.com/track/1?utm_source=jovie'
     );
+  });
+
+  it('makes the first available DSP the Stream Now primary action', () => {
+    render(<ReleaseLandingPage {...defaultProps} />);
+    const buttons = screen.getAllByTestId('provider-button');
+
+    expect(buttons[0]).toHaveAttribute('data-label', 'Stream Now');
+    expect(buttons[0]).toHaveAttribute('data-primary', 'true');
+    expect(buttons[1]).toHaveAttribute('data-label', 'Apple Music');
+    expect(buttons[1]).toHaveAttribute('data-primary', 'false');
+  });
+
+  it('keeps downloads in the secondary menu when streaming links exist', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        downloadUrl='/timwhite/midnight-drive/download'
+        soundsUrl='/timwhite/midnight-drive/sounds'
+        initialMenuOpen
+      />
+    );
+
+    const download = screen.getByRole('link', { name: 'Download' });
+    expect(download).toHaveAttribute(
+      'href',
+      '/timwhite/midnight-drive/download?utm_source=jovie'
+    );
+    expect(screen.getByText('Use this sound')).toBeDefined();
   });
 
   it('appends utm_source=jovie to provider links when no utmParams prop is given', () => {
