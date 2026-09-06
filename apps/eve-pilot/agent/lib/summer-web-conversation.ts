@@ -278,8 +278,42 @@ export function createConversationIngress(
             previousRejection.data.code === 'daily_turn_budget_exhausted'
               ? previousRejection.data.checkpoint
               : null);
-          if (!previous)
+          if (!previous) {
+            const pending =
+              acceptedRecordSchema.safeParse(
+                await deps.read(conversationPath('accepted', candidate))
+              ).data ??
+              admissionRecordSchema.safeParse(
+                await deps.read(conversationPath('admissions', candidate))
+              ).data;
+            if (
+              pending &&
+              pending.eventId === candidate &&
+              pending.conversationId === input.conversationId &&
+              pending.principalHash === input.principalHash
+            )
+              return json(
+                {
+                  ok: false,
+                  code: 'conversation_busy',
+                  blockingEvent: {
+                    eventId: candidate,
+                    deploymentId: pending.deploymentId,
+                  },
+                },
+                409
+              );
+            if (
+              pending &&
+              (pending.conversationId !== input.conversationId ||
+                pending.principalHash !== input.principalHash)
+            )
+              return json(
+                { ok: false, code: 'canonical_binding_conflict' },
+                409
+              );
             return json({ ok: false, code: 'conversation_busy' }, 409);
+          }
           if (
             previous.conversationId !== input.conversationId ||
             previous.principalHash !== input.principalHash

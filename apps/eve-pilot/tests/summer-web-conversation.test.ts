@@ -293,6 +293,24 @@ describe('authenticated persistent Summer conversation', () => {
     expect(pendingResponse.status).toBe(409);
     expect(await pendingResponse.json()).toMatchObject({
       code: 'conversation_busy',
+      blockingEvent: {
+        eventId: id(1),
+        deploymentId: input().deploymentId,
+      },
+    });
+    expect(pending.dispatch).toHaveBeenCalledOnce();
+
+    pending.records.delete(conversationPath('accepted', id(1)));
+    pending.records.delete(conversationPath('admissions', id(1)));
+    const unresolvedResponse = await pending.send({
+      ...input(3),
+      canonicalTailRecovery: true,
+      history: recoveryHistory,
+    });
+    expect(unresolvedResponse.status).toBe(409);
+    expect(await unresolvedResponse.json()).toEqual({
+      ok: false,
+      code: 'conversation_busy',
     });
     expect(pending.dispatch).toHaveBeenCalledOnce();
 
