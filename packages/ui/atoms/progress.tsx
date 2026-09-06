@@ -110,7 +110,7 @@ export function ProgressBar({
           data-part='indicator'
           data-state={state}
           className={cn(
-            'h-full rounded-full bg-accent transition-[width] duration-subtle ease-out motion-reduce:transition-none',
+            'h-full rounded-full bg-accent transition-[width] duration-subtle ease-subtle motion-reduce:transition-none',
             !hasDeterminateValue &&
               'w-1/3 animate-progress-indeterminate motion-reduce:animate-none',
             fillClassName
