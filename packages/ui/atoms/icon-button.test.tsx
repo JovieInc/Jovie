@@ -73,6 +73,21 @@ describe('IconButton', () => {
     }
   });
 
+  it('keeps compact circular chrome overflow-visible for the hit container', () => {
+    render(
+      <IconButton ariaLabel='Compact surface action' size='md' variant='surface'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Compact surface action',
+    });
+    expect(button.className).toContain('overflow-visible');
+    expect(button.className).toContain('before:h-11');
+    expect(button.className).toContain('before:w-11');
+  });
+
   it('keeps secondary controls unfilled at rest with circular interaction states', () => {
     render(
       <IconButton ariaLabel='Secondary action' size='md' variant='secondary'>
