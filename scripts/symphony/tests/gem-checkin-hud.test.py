@@ -80,6 +80,9 @@ def fetch_state(payload):
 class ExecutionTruthTests(unittest.TestCase):
     def setUp(self):
         HUD.FRAME_SOURCE_CACHE.clear()
+        HUD.LINEAR_PROJECT_CACHE.clear()
+        HUD.LINEAR_RETRY_AFTER_SECONDS = 0.0
+        HUD.LINEAR_REQUEST_ERROR = None
 
     def test_stale_cached_attempt_cannot_remain_running_or_retain_tokens(self):
         state, _ = fetch_state(official_state())
@@ -132,14 +135,33 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertIn("API STALE / UNAVAILABLE", text)
         self.assertIn("usable capacity UNKNOWN", text)
         self.assertIn("Linear rate limit gate until", text)
-        self.assertIn("remediation enabled UNKNOWN", text)
+        self.assertIn("remediation UNKNOWN (not exposed by :4041)", text)
 
-    def test_compact_shows_model_stage_and_whole_cards(self):
+    def test_notification_event_does_not_replace_useful_last_message(self):
+        row = {
+            "kind": "blocked",
+            "id": "JOV-9",
+            "title": "Recover worker",
+            "last_event": "notification",
+            "last_message": "provider quota exhausted",
+        }
+        text = strip("\n".join(HUD.execution_lines(row, 430, now=NOW)))
+        self.assertIn("provider quota exhausted", text)
+
+    def test_next_action_tracks_actual_failure_state(self):
+        active = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [{"kind": "running", "session_id": "s", "tokens_total": 1, "last_event_at": NOW.isoformat()}], "running": 1, "retrying": 0, "blocked": 0}, 430, now=NOW)))
+        retry = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [], "running": 0, "retrying": 1, "blocked": 0}, 430, now=NOW)))
+        self.assertIn("NEXT  Active sessions are reporting recent progress", active)
+        self.assertNotIn("Inspect blocked/retrying", active)
+        self.assertIn("NEXT  Inspect blocked/retrying attempts", retry)
+
+    def test_compact_shows_stable_stage_table_without_execution_cards(self):
         row = {"kind": "running", "id": "JOV-1", "title": "Visible work", "session_id": "session-1", "tokens_total": 10, "last_event_at": NOW.isoformat(), "executed_model": "gpt-5.6-sol"}
         state = {"ok": True, "generated_at": NOW.isoformat(), "rows": [row], "running": 1}
         text = strip(paint(state, width=120, height=40))
-        self.assertIn("gpt-5.6-sol", text)
-        self.assertIn("SESSION / RECENT EVENT", text)
+        self.assertIn("STAGE", text)
+        self.assertIn("IMPLEMENTING", text)
+        self.assertNotIn("SESSION / RECENT EVENT", text)
         failed = {**row, "last_event": "turn_failed"}
         self.assertEqual(HUD.execution_state(failed, now=NOW), "SESSION / ERROR")
         self.assertIn("Executed: UNKNOWN", strip("\n".join(HUD.execution_lines(failed, 430, now=NOW))))
@@ -147,8 +169,8 @@ class ExecutionTruthTests(unittest.TestCase):
             state["rows"] = [{**row, "id": f"JOV-{i}"} for i in range(4)]
             compact = strip(paint(state, width=width, height=height))
             self.assertIn("JOV-0", compact)
-            self.assertIn("gpt-5.6-sol", compact)
-            self.assertIn("SESSION / RECENT EVENT", compact)
+            self.assertIn("IMPLEMENTING", compact)
+            self.assertNotIn("SESSION / RECENT EVENT", compact)
         for width in (120, 200):
             state["rows"] = [{**row, "id": f"JOV-{i}", "kind": "queued"} for i in range(4)]
             text = strip(paint(state, width=width, height=40))
@@ -193,6 +215,12 @@ class ExecutionTruthTests(unittest.TestCase):
 
 
 class UltrawideHudTests(unittest.TestCase):
+    def setUp(self):
+        HUD.FRAME_SOURCE_CACHE.clear()
+        HUD.LINEAR_PROJECT_CACHE.clear()
+        HUD.LINEAR_RETRY_AFTER_SECONDS = 0.0
+        HUD.LINEAR_REQUEST_ERROR = None
+
     def test_banned_ops_labels_and_invented_zero_never_appear(self):
         output = paint({"ok": False, "running": None, "retrying": None, "blocked": None, "cap": None, "rows": [], "up": False}, {"ok": False, "count": None, "rows": []}, None, {})
         plain, source = strip(output), SOURCE.read_text(encoding="utf-8")
@@ -231,7 +259,7 @@ class UltrawideHudTests(unittest.TestCase):
         output = paint(width=200)
         plain, source = strip(output), SOURCE.read_text(encoding="utf-8")
         self.assertIn("get_terminal_size", source)
-        for token in ("ST", "TRY/TURN", "TOKENS", "ELAPSED", "WORKSPACE / PR"):
+        for token in ("ST", "TRY/TURN", "TOKENS", "ELAPSED", "EVIDENCE / PR"):
             self.assertIn(token, plain)
         header = plain.splitlines()[0]
         self.assertGreaterEqual(len(header), 80)
@@ -272,7 +300,7 @@ class UltrawideHudTests(unittest.TestCase):
             self.assertIn(token, plain)
         self.assertNotIn("OpenAI", plain)
         running_line = next(line for line in plain.splitlines() if line.startswith("●") and "JOV-5491" in line)
-        self.assertTrue(running_line.rstrip().endswith("JOV-5491") or "…/JOV-5491" in running_line or running_line.rstrip().endswith("…"))
+        self.assertIn("turn completed", running_line)
         self.assertLess(plain.index("JOV-5488"), plain.index("JOV-5491"))
         self.assertLess(plain.index("JOV-5491"), plain.index("#16796"))
         self.assertNotIn("GEM OPERATIONS", plain)
@@ -304,24 +332,35 @@ class UltrawideHudTests(unittest.TestCase):
         state, _ = fetch_state(official_state())
         self.assertEqual(state["seconds_running"], 942)
         self.assertEqual(state["totals"]["total_tokens"], 69134)
-        tps = HUD.compute_throughput(state["totals"], [{"at": "2026-08-31T11:59:55Z", "total_tokens": 64134, "seconds_running": 937}], now=NOW)
+        tps = HUD.compute_throughput(
+            state["totals"],
+            [{"at": "2026-08-31T11:59:55Z", "output_tokens": 18456, "scope": "symphony:4041", "unit": "output_tokens"}],
+            now=NOW,
+        )
         self.assertAlmostEqual(tps, 1000.0)
         plain = strip(paint(state, tps=tps, width=430))
-        for token in ("AGENTS", "1/8", "THROUGHPUT", "1K tps", "FAILURES", "TOKENS", "69.1K", "Runtime 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
+        for token in ("AGENTS", "1/8", "OUTPUT RATE", "1K output tok/s", "FAILURES", "CUMULATIVE TOKENS", "69.1K", "AGENT EXECUTION RUNTIME 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
             self.assertIn(token, plain)
-        self.assertAlmostEqual(HUD.compute_throughput(state["totals"], [], now=NOW), 69134 / 942)
+        self.assertIsNone(HUD.compute_throughput(state["totals"], [], now=NOW))
+
+    def test_output_rate_refuses_counter_reset_and_mixed_scope(self):
+        totals = {"output_tokens": 100}
+        self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:55Z", "output_tokens": 200, "scope": "symphony:4041", "unit": "output_tokens"}], now=NOW))
+        self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:55Z", "output_tokens": 50, "scope": "other", "unit": "output_tokens"}], now=NOW))
+        self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:55Z", "output_tokens": 50, "scope": "symphony:4041", "unit": "total_tokens"}], now=NOW))
+        self.assertIsNone(HUD.compute_throughput(totals, [{"at": "2026-08-31T11:59:59Z", "output_tokens": 50, "scope": "symphony:4041", "unit": "output_tokens"}], now=NOW))
 
     def test_null_rate_limits_render_dash_never_invented(self):
         state, _ = fetch_state(official_state(rate_limits=None))
         self.assertIsNone(state["rate_limits"])
         plain = strip(paint(state, width=430))
-        self.assertIn("Rate limits -", plain)
+        self.assertIn("Rate limits UNKNOWN (not reported by Symphony API)", plain)
         self.assertNotIn("4,950/5,000", plain)
         self.assertNotIn("unlimited", plain)
 
     def test_missing_ci_series_is_dash_not_zero(self):
         plain = strip(paint(width=430))
-        for token in ("AGENTS", "Todo/pickup", "ci-fast", "PR Ready", "merge_group CI", "n=- p95 -"):
+        for token in ("AGENTS", "Todo/pickup", "ci-fast", "PR Ready", "merge_group CI", "now=- samples=0 p95 -"):
             self.assertIn(token, plain)
         for token in ("p95 0", "p95 0s", "n=0 p95 0", "$0", "GEM OPERATIONS"):
             self.assertNotIn(token, plain)
@@ -341,7 +380,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(measured["bottleneck"]["id"], "running")
         painted = strip(paint(ship_path=measured, width=430))
         self.assertIn("retrying agents 2", painted)
-        self.assertIn("n=0 p95 -", painted)
+        self.assertIn("now=0 samples=0 p95 -", painted)
         self.assertNotIn("p95 0", painted)
 
     def test_p95_empty_is_none_and_queue_beats_worst_p95(self):
@@ -388,7 +427,7 @@ class UltrawideHudTests(unittest.TestCase):
 
     def test_shared_shipping_information_architecture_is_explicit(self):
         self.assertEqual(HUD.SHIPPING_DISPLAY_IA["capacity"]["representation"], "active-over-limit")
-        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["throughput"]["representation"], "token-rate")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["throughput"]["representation"], "output-token-wall-rate")
         self.assertEqual(HUD.SHIPPING_DISPLAY_IA["failures"]["representation"], "count-and-list")
         self.assertEqual(HUD.SHIPPING_DISPLAY_IA["tokens"]["representation"], "total-and-per-work-item")
         self.assertEqual(HUD.SHIPPING_DISPLAY_IA["queue"]["representation"], "count")
@@ -441,8 +480,8 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(HUD.compact_tokens(73.6), "74")
         state, _ = fetch_state(official_state())
         plain = strip(paint(state, width=240, height=60, tps=73.6))
-        self.assertIn("74 tps", plain)
-        self.assertNotIn("73 tps", plain)
+        self.assertIn("74 output tok/s", plain)
+        self.assertNotIn("73 output tok/s", plain)
 
     def test_token_notation_covers_rows_overview_and_footer(self):
         state, _ = fetch_state(
@@ -464,7 +503,7 @@ class UltrawideHudTests(unittest.TestCase):
             )
         )
         plain = strip(paint(state, width=240, height=70, tps=1_000))
-        for token in ("1K tps", "1B", "999.9K in · 1M out", "JOV-9000", "1M", "totals in 999.9K out 1M"):
+        for token in ("1K output tok/s", "1B", "999.9K in · 1M out", "JOV-9000", "1M", "totals in 999.9K out 1M"):
             self.assertIn(token, plain)
         self.assertIsNone(re.search(r"\b[0-9]+(?:,[0-9]{3})+\s+(?:in|out|tps)\b", plain))
         for token in ("1k", "999.9k", "1m", "1b"):
@@ -485,21 +524,90 @@ class UltrawideHudTests(unittest.TestCase):
             height=70,
         )
         plain = strip(output)
-        header = next(line for line in plain.splitlines() if "POS" in line and "WORKSPACE / PR" in line)
+        header = next(line for line in plain.splitlines() if "POS" in line and "EVIDENCE / PR" in line)
         pr_line = next(line for line in plain.splitlines() if "#16796" in line)
         missing_line = next(line for line in plain.splitlines() if "Missing PR" in line)
         pos_col = header.index("POS")
         id_col = header.index("ID")
+        stage_col = header.index("STAGE")
         title_col = header.index("TITLE")
-        workspace_col = header.index("WORKSPACE / PR")
+        workspace_col = header.index("EVIDENCE / PR")
         self.assertEqual(pr_line[pos_col:id_col].strip(), "5")
-        self.assertEqual(pr_line[id_col:title_col].strip(), "#16796")
+        self.assertEqual(pr_line[id_col:stage_col].strip(), "#16796")
         self.assertEqual(pr_line[workspace_col:].strip(), "-")
         self.assertEqual(missing_line[pos_col:id_col].strip(), "6")
-        self.assertEqual(missing_line[id_col:title_col].strip(), "-")
+        self.assertEqual(missing_line[id_col:stage_col].strip(), "-")
         self.assertEqual(missing_line[workspace_col:].strip(), "-")
         self.assertNotIn("pos 6", plain)
         self.assertNotIn("pos 5", plain)
+
+    def test_current_work_is_one_table_with_source_gap_and_recent_merge(self):
+        symphony = {
+            "ok": True,
+            "running": 1,
+            "retrying": 0,
+            "blocked": 0,
+            "cap": 1,
+            "rows": [{"kind": "running", "id": "JOV-1", "title": None, "session_id": None}],
+            "up": True,
+        }
+        flow = {
+            "ok": True,
+            "open_count": 0,
+            "opened_24h": 0,
+            "merged_24h": 1,
+            "ci_matrix": [],
+            "merged_rows": [{"kind": "merged", "stage": "merged", "number": 17323, "title": "Repair HUD", "merged_at": NOW.isoformat()}],
+        }
+        plain = strip(paint(symphony=symphony, pr_flow=flow, width=430, height=90))
+        self.assertEqual(plain.count("CURRENT WORK"), 1)
+        self.assertIn("BOOTSTRAPPING", plain)
+        self.assertIn("UNKNOWN · :4041 title absent", plain)
+        self.assertIn("MERGED", plain)
+        self.assertIn("#17323", plain)
+        self.assertNotIn("BLOCKED · 0 receipts", plain)
+        self.assertNotIn("SESSION / RECENT EVENT", plain)
+
+    def test_rendered_table_exposes_failure_message_and_execution_identity(self):
+        symphony = {
+            "ok": True,
+            "running": 1,
+            "retrying": 0,
+            "blocked": 0,
+            "cap": 4,
+            "rows": [
+                {
+                    "kind": "running",
+                    "id": "JOV-44",
+                    "title": "Repair provider",
+                    "session_id": "session-1",
+                    "last_event": "turn_failed",
+                    "last_message": "quota exhausted",
+                    "executed_model": "gpt-5.6-sol",
+                    "executed_provider": "codex",
+                    "executed_account_alias": "seat-b",
+                }
+            ],
+            "up": True,
+        }
+        plain = strip(paint(symphony=symphony, width=430, height=90))
+        row = next(line for line in plain.splitlines() if "JOV-44" in line)
+        self.assertIn("BLOCKED", row)
+        self.assertIn("gpt-5.6-sol/codex/seat-b", row)
+        self.assertIn("quota exhausted", row)
+
+    def test_ci_success_is_separate_from_admission_hold(self):
+        self.assertEqual(HUD.admission_status({"isDraft": False, "mergeStateStatus": "BLOCKED"}, in_merge_queue=False), "blocked")
+        self.assertEqual(HUD.admission_status({"isDraft": False, "mergeStateStatus": "CLEAN", "labels": [{"name": "hold"}]}, in_merge_queue=False), "blocked")
+        self.assertEqual(HUD.admission_status({"isDraft": False, "mergeStateStatus": "CLEAN", "labels": []}, in_merge_queue=False), "clean")
+        lines = HUD._ci_matrix_lines(
+            {"ok": True, "generated_at": NOW.isoformat(), "ci_matrix": [{"number": 17323, "title": "Green checks, held admission", "fast": "success", "ready": "success", "security": "success", "visual": "success", "all": "success", "admission": "blocked"}]},
+            200,
+            now=NOW,
+        )
+        plain = strip("\n".join(lines))
+        self.assertIn("PASS", plain)
+        self.assertIn("HOLD", plain)
 
     def test_pr_flow_uses_explicit_rolling_window_and_truthful_unknowns(self):
         known = strip(
@@ -508,17 +616,123 @@ class UltrawideHudTests(unittest.TestCase):
                 pr_flow={"ok": True, "open_count": 103, "opened_24h": 41, "merged_24h": 37, "generated_at": "2026-08-31T11:58:00Z"},
             )
         )
-        for token in ("PR FLOW", "rolling prior 24h", "GitHub", "Updated 2 minutes ago", "OPEN NOW", "103", "OPENED 24H", "41", "MERGED 24H", "37", "NET FLOW", "+4"):
+        for token in ("PR FLOW", "rolling prior 24h", "GitHub", "Updated 2 minutes ago", "OPEN NOW", "103", "OPENED 24H", "41", "MERGED 24H", "37", "OPENED − MERGED", "+4"):
             self.assertIn(token, known)
         unknown = strip(paint(width=430, pr_flow={"ok": False}))
         self.assertIn("source unavailable", unknown)
         self.assertNotIn("OPEN NOW 0", unknown)
 
+    def test_linear_inventory_paginates_and_rejects_incomplete_totals(self):
+        page_one = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}, "createdAt": STARTED, "startedAt": NOW.isoformat()}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}}}}
+        page_two = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "In Review"}}], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}
+        with mock.patch.object(HUD, "_linear_request", side_effect=[page_one, page_two]) as request:
+            result = HUD.fetch_linear_project()
+        self.assertTrue(result["ok"])
+        self.assertEqual((result["total_count"], result["pages"], result["todo"], result["review"]), (2, 2, 1, 1))
+        self.assertEqual(request.call_args_list[1].kwargs["variables"], {"after": "cursor-1"})
+
+        incomplete = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=incomplete):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("1/2", rejected["source_error"])
+
+        without_metadata = {"data": {"project": {"issues": {"nodes": []}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=without_metadata):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("metadata incomplete", rejected["source_error"])
+
+        partial_metadata = {"data": {"project": {"issues": {"totalCount": 0, "nodes": [], "pageInfo": {}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=partial_metadata):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("metadata incomplete", rejected["source_error"])
+
+        invalid_metadata = {"data": {"project": {"issues": {"totalCount": True, "nodes": {}, "pageInfo": {"hasNextPage": False}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=invalid_metadata):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("metadata incomplete", rejected["source_error"])
+
+        repeated = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "same"}}}}}
+        with mock.patch.object(HUD, "_linear_request", side_effect=[repeated, repeated]):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("cursor repeated", rejected["source_error"])
+
+        over_budget = {"data": {"project": {"issues": {"totalCount": HUD.MAX_LINEAR_ISSUES + 1, "nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=over_budget):
+            rejected = HUD.fetch_linear_project()
+        self.assertFalse(rejected["ok"])
+        self.assertIn("bounded total", rejected["source_error"])
+
+    def test_linear_pagination_has_one_overall_fetch_budget(self):
+        page_one = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}}}}
+        with (
+            mock.patch.object(HUD.time, "monotonic", side_effect=[10.0, 10.1, 18.1]),
+            mock.patch.object(HUD, "_linear_request", return_value=page_one) as request,
+        ):
+            rejected = HUD.fetch_linear_project(timeout=8.0)
+        self.assertFalse(rejected["ok"])
+        self.assertIn("overall fetch budget", rejected["source_error"])
+        self.assertEqual(request.call_count, 1)
+        self.assertAlmostEqual(request.call_args.kwargs["timeout"], 7.9)
+
+    def test_linear_cache_reuses_last_good_with_stale_error_and_backoff(self):
+        good = {
+            "ok": True,
+            "review": 3,
+            "todo": 20,
+            "pickup_durations": [60.0],
+            "total_count": 23,
+            "pages": 1,
+            "generated_at": STARTED,
+        }
+        failure = {
+            "ok": False,
+            "review": None,
+            "todo": None,
+            "pickup_durations": None,
+            "generated_at": None,
+            "source_error": "Linear HTTP 429 rate limited",
+        }
+        with mock.patch.object(HUD, "fetch_linear_project", side_effect=[good, failure]) as fetch:
+            first = HUD.fetch_linear_project_cached(monotonic_now=0.0)
+            cached = HUD.fetch_linear_project_cached(monotonic_now=30.0)
+            HUD.LINEAR_RETRY_AFTER_SECONDS = 120.0
+            stale = HUD.fetch_linear_project_cached(monotonic_now=61.0)
+            backed_off = HUD.fetch_linear_project_cached(monotonic_now=100.0)
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual((first["review"], cached["review"]), (3, 3))
+        self.assertNotIn("stale", cached)
+        self.assertTrue(stale["stale"])
+        self.assertEqual(stale["generated_at"], STARTED)
+        self.assertEqual(stale["source_error"], "Linear HTTP 429 rate limited")
+        self.assertEqual(backed_off, stale)
+        self.assertEqual(HUD.LINEAR_PROJECT_CACHE["next_fetch_at"], 181.0)
+
+    def test_linear_http_429_records_retry_window_and_current_error(self):
+        error = HUD.urllib.error.HTTPError(
+            HUD.LINEAR_API,
+            429,
+            "Too Many Requests",
+            {"Retry-After": "120"},
+            None,
+        )
+        with (
+            mock.patch.dict(HUD.os.environ, {"LINEAR_API_KEY": "test"}),
+            mock.patch.object(HUD.urllib.request, "urlopen", side_effect=error),
+        ):
+            self.assertIsNone(HUD._linear_request("query { viewer { id } }", timeout=1.0))
+        self.assertEqual(HUD.LINEAR_RETRY_AFTER_SECONDS, 120.0)
+        self.assertEqual(HUD.LINEAR_REQUEST_ERROR, "Linear HTTP 429 rate limited")
+
     def test_pressure_and_ci_matrix_keep_unknowns_semantic_and_bounded(self):
         pressure = {
             "ok": True,
             "generated_at": "2026-08-31T11:58:00Z",
-            "cpu": {"status": "failure", "signal_pct": 131, "load1": 49.0, "cores": 16, "psi": 74},
+            "cpu": {"status": "failure", "signal_pct": 131, "load_pct": 131, "load1": 49.0, "cores": 16, "psi": 74},
             "memory": {"status": "healthy", "available_pct": 62, "psi": 1},
             "disk": {
                 "status": "warning",
@@ -555,11 +769,11 @@ class UltrawideHudTests(unittest.TestCase):
         }
         output = paint(width=430, height=90, pr_flow=matrix, system_pressure=pressure)
         plain = strip(output)
-        for token in ("SYSTEM PRESSURE", "CPU / LOAD", "131%", "MEMORY", "62% available", "ROOT DISK FREE", "9% free", "I/O FULL PSI", "12% full", "NETWORK", "rate window pending", "WORKER SLOTS", "6/8", "CI MATRIX", "cached GitHub rollup", "8/103 rows", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
+        for token in ("SYSTEM PRESSURE", "CPU LOAD / STALL", "load 131%", "MEMORY", "62% available", "ROOT DISK FREE", "9% free", "I/O FULL PSI", "12% full", "NETWORK", "rate window pending", "WORKER SLOTS", "6/8", "CI MATRIX", "cached GitHub rollup", "display 8 · sampled 11 · open 103", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
             self.assertIn(token, plain)
         self.assertNotIn("DISK / I/O", plain)
         self.assertNotIn("#9 Work 9", plain)
-        self.assertIn("\033[38;2;255;103;125m131%", output)
+        self.assertIn("\033[38;2;255;103;125mload 131%", output)
 
     def test_disk_capacity_and_io_pressure_are_separate_source_metrics(self):
         psi_samples = (
@@ -590,6 +804,9 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(disk["source"], "shutil.disk_usage('/')")
         self.assertEqual(disk["unit"], "capacity percent")
         self.assertEqual(disk["state"], "fresh")
+        self.assertEqual(disk["mount"], "/")
+        self.assertAlmostEqual(disk["free_gib"], 23 / (1024**3))
+        self.assertAlmostEqual(disk["total_gib"], 100 / (1024**3))
         self.assertEqual(io["some_avg10_pct"], 24)
         self.assertEqual(io["full_avg10_pct"], 12)
         self.assertEqual(io["status"], "warning")
@@ -707,12 +924,33 @@ class UltrawideHudTests(unittest.TestCase):
             ("disk", HUD.disk_health_status, ((15, "healthy"), (14.99, "warning"), (5, "warning"), (4.99, "failure"), (None, "unknown"))),
             ("io", HUD.io_health_status, ((10, "healthy"), (10.01, "warning"), (19.99, "warning"), (20, "failure"), (None, "unknown"))),
             ("network", HUD.network_health_status, ((59.99, "healthy"), (60, "warning"), (84.99, "warning"), (85, "failure"), (None, "unknown"))),
-            ("worker slots", HUD.worker_slot_health_status, ((74.99, "healthy"), (75, "warning"), (94.99, "warning"), (95, "failure"), (None, "unknown"))),
+            ("worker slots", HUD.worker_slot_health_status, ((100, "healthy"), (100.01, "warning"), (124.99, "warning"), (125, "failure"), (None, "unknown"))),
         )
         for metric, classifier, boundaries in cases:
             for value, expected in boundaries:
                 with self.subTest(metric=metric, value=value):
                     self.assertEqual(classifier(value), expected)
+
+    def test_network_uses_physical_default_route_and_parses_sysfs_speed(self):
+        files = {
+            "/proc/net/dev": "Inter-| Receive | Transmit\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed\n enp9s0: 1000 0 0 0 0 0 0 0 2000 0 0 0 0 0 0 0\n docker0: 9000 0 0 0 0 0 0 0 10000 0 0 0 0 0 0 0\n veth1: 8000 0 0 0 0 0 0 0 7000 0 0 0 0 0 0 0\n",
+            "/proc/net/route": "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\nenp9s0 00000000 00000000 0001 0 0 0 00000000 0 0 0\n",
+            "/sys/class/net/enp9s0/operstate": "up\n",
+            "/sys/class/net/enp9s0/speed": "1000\n",
+        }
+
+        def read_text(path, *args, **kwargs):
+            key = str(path)
+            if key in files:
+                return files[key]
+            raise OSError(key)
+
+        def exists(path):
+            return str(path) == "/sys/class/net/enp9s0/device"
+
+        with mock.patch.object(HUD.Path, "read_text", autospec=True, side_effect=read_text), mock.patch.object(HUD.Path, "exists", autospec=True, side_effect=exists):
+            sample = HUD._net_sample()
+        self.assertEqual(sample, {"interface": "enp9s0", "rx": 1000, "tx": 2000, "speed_mbps": 1000})
 
         memory_cases = (
             (20, 9.99, "healthy"),
@@ -753,7 +991,7 @@ class UltrawideHudTests(unittest.TestCase):
         pressure = {
             "ok": True,
             "generated_at": sampled_at,
-            "cpu": {"status": "failure", "state": "fresh", "signal_pct": 125, "load1": 20, "cores": 16, "psi": 125, "source": "getloadavg + /proc/pressure/cpu", "unit": "load/PSI percent", "window": "load1 + PSI avg10", "denominator": "16 cores; red at 125%", "sampled_at": sampled_at},
+            "cpu": {"status": "failure", "state": "fresh", "signal_pct": 125, "load_pct": 125, "load1": 20, "cores": 16, "psi": 125, "source": "getloadavg + /proc/pressure/cpu", "unit": "load/PSI percent", "window": "load1 + PSI avg10", "denominator": "16 cores; red at 125%", "sampled_at": sampled_at},
             "memory": {"status": "healthy", "state": "fresh", "available_pct": 50, "psi": 2, "source": "/proc/meminfo + /proc/pressure/memory", "unit": "free/PSI percent", "window": "point + PSI avg10", "denominator": "100% memory; PSI red at 30%", "sampled_at": sampled_at},
             "disk": {"status": "warning", "state": "fresh", "available_pct": 10, "used_pct": 90, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "window": "point", "denominator": "100% root volume", "sampled_at": sampled_at},
             "io": {"status": "healthy", "state": "fresh", "some_avg10_pct": 8, "full_avg10_pct": 4, "source": "/proc/pressure/io", "unit": "stall percent", "window": "avg10", "denominator": "red at 20% full stall", "sampled_at": sampled_at},
@@ -788,7 +1026,7 @@ class UltrawideHudTests(unittest.TestCase):
         )
         self.assertIn("┌─ × CRITICAL · OPERATOR HEALTH", plain)
         self.assertIn("STALLED/BLOCKED 1", plain)
-        self.assertIn("CPU / LOAD RED", plain)
+        self.assertIn("CPU LOAD / STALL RED", plain)
         order = ["OPERATOR HEALTH", "AGENTS", "PRIMARY CAPACITY / PRESSURE", "CURRENT WORK", "SHIP", "PR FLOW", "CI MATRIX", "BUSINESS SIGNALS"]
         for before, after in zip(order, order[1:]):
             self.assertLess(plain.index(before), plain.index(after))
@@ -811,7 +1049,8 @@ class UltrawideHudTests(unittest.TestCase):
             self.assertIn(label, output)
         self.assertNotIn("┏━ THROUGHPUT", output)
         self.assertNotIn("┏━ TOKENS", output)
-        self.assertIn("TELEMETRY · THROUGHPUT", output)
+        self.assertIn("TELEMETRY · REVIEW", output)
+        self.assertIn("OUTPUT RATE", output)
         self.assertLess(output.index("┏━ AGENTS"), output.index("PRIMARY CAPACITY / PRESSURE"))
         hero_top = next(line for line in output.splitlines() if "┏━ AGENTS" in line)
         self.assertEqual(hero_top.count("┓"), 4)
@@ -842,6 +1081,20 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("PRIMARY CAPACITY / PRESSURE", narrow)
         self.assertNotIn("CI MATRIX", narrow)
         self.assertNotIn("BUSINESS SIGNALS", narrow)
+
+    def test_linux_console_uses_kernel_palette_sgr_without_truecolor(self):
+        failure_pressure = {
+            "ok": True,
+            "generated_at": NOW.isoformat(),
+            "cpu": {"status": "failure", "state": "fresh", "signal_pct": 130},
+            **{name: {"status": "unknown", "state": "unknown"} for name in ("memory", "disk", "io", "network", "slots")},
+        }
+        with mock.patch.dict(HUD.os.environ, {"TERM": "linux"}, clear=False):
+            frame = paint(width=120, height=40, system_pressure=failure_pressure)
+        self.assertTrue(frame.startswith("\033[40m"))
+        self.assertIn("\033[91m", frame)
+        self.assertNotIn("38;2;", frame)
+        self.assertNotIn("48;2;", frame)
 
     def test_metric_gauges_and_contracts_are_fixed_width_and_source_visible(self):
         self.assertEqual(HUD.metric_gauge(50, 100), "[█████░░░░░]")
@@ -976,7 +1229,7 @@ class UltrawideHudTests(unittest.TestCase):
         HUD.retain_last_good_source("pressure", good, now=NOW)
         partial = json.loads(json.dumps(good))
         partial["generated_at"] = NOW.isoformat()
-        partial["cpu"].update({"signal_pct": 60, "sampled_at": NOW.isoformat()})
+        partial["cpu"].update({"signal_pct": 60, "load_pct": 60, "sampled_at": NOW.isoformat()})
         partial["disk"] = {
             "status": "unknown",
             "state": "error",
@@ -992,7 +1245,7 @@ class UltrawideHudTests(unittest.TestCase):
         plain = strip(paint(width=430, height=90, system_pressure=retained))
         self.assertIn("DEGRADED/ERROR", plain)
         self.assertIn("? STALE · 23% free", plain)
-        self.assertIn("60% · ✓ NORMAL", plain)
+        self.assertIn("load 60% · PSI - · ✓ NORMAL", plain)
 
     def test_compact_critical_rows_and_medium_review_are_visible(self):
         path = HUD.empty_ship_path()
@@ -1026,7 +1279,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("#17/p3", compact)
 
         medium = strip(paint(review=3, width=200, height=40))
-        self.assertIn("!  REVIEW QUEUE 3", medium)
+        self.assertIn("REVIEW 3", medium)
         crowded = strip(
             paint(
                 symphony={
@@ -1080,7 +1333,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("SYMPHONY SOURCE ERROR · LAST GOOD RETAINED", events)
         self.assertIn("PRESSURE SOURCE ERROR · LAST GOOD RETAINED", events)
         self.assertIn("MQ SOURCE ERROR · LAST GOOD RETAINED", events)
-        self.assertIn("n=4 p95 STALE", strip("\n".join(HUD._ship_path_lines(stale_path, 200))))
+        self.assertIn("now=4 samples=0 p95 ST", strip("\n".join(HUD._ship_path_lines(stale_path, 200))))
         _, stale_events = HUD._operator_health(
             symphony=symphony_good,
             pressure={
@@ -1112,7 +1365,8 @@ class UltrawideHudTests(unittest.TestCase):
             mock.patch.object(HUD, "read_workflow_cap", return_value=4),
             mock.patch.object(HUD, "fetch_symphony", return_value=symphony),
             mock.patch.object(HUD, "fetch_mq", return_value={"ok": True, "count": 0, "rows": []}),
-            mock.patch.object(HUD, "fetch_linear_project", return_value={"ok": True, "review": 0, "todo": 0}),
+            mock.patch.object(HUD, "fetch_linear_project_cached", return_value={"ok": True, "review": 0, "todo": 0}),
+            mock.patch.object(HUD, "fetch_review", side_effect=AssertionError("frame must not issue a second Linear request")),
             mock.patch.object(HUD, "fetch_github_ship", return_value={"ok": False}),
             mock.patch.object(HUD, "load_measured", return_value={}),
             mock.patch.object(HUD, "load_tps_snapshots", return_value=[]),
