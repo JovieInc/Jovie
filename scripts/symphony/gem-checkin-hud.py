@@ -1106,6 +1106,76 @@ def _issue_fields(item: dict[str, Any]) -> tuple[str | None, str | None, str | N
     return ident, title, url
 
 
+def _execution_proof(
+    item: dict[str, Any],
+    running: dict[str, Any],
+    *,
+    issue_identifier: str | None,
+    attempt: int | None,
+    attempt_id: str | None,
+    session_id: str | None,
+) -> dict[str, Any] | None:
+    """Accept execution identity only when the producer bound every dimension.
+
+    The state API may expose the proof under ``execution`` or
+    ``execution_proof``.  Flat fields are accepted as a compatibility shape,
+    but are still subject to the same complete-proof checks.  Configuration
+    and routing fields never participate in this proof.
+    """
+    nested = item.get("execution") or item.get("execution_proof")
+    if not isinstance(nested, dict):
+        nested = running.get("execution") or running.get("execution_proof")
+    candidate = dict(nested) if isinstance(nested, dict) else {}
+    runtime = candidate.get("runtime")
+    if isinstance(runtime, dict):
+        candidate.update(runtime)
+    aliases = {
+        "issue_id": "issue_identifier", "attempt_id": "attempt_id",
+        "process_start": "process_started_at", "instance_id": "process_instance_id",
+        "artifact_digest": "artifact_sha256", "artifact_digest_sha256": "artifact_sha256",
+        "workflow_config_digest": "workflow_config_sha256", "config_digest": "workflow_config_sha256",
+        "account": "account_alias",
+    }
+    for source, target in aliases.items():
+        if target not in candidate and candidate.get(source) is not None:
+            candidate[target] = candidate[source]
+    for key in (
+        "issue_identifier", "session_id", "lease_id", "service",
+        "host", "pid", "process_started_at", "process_instance_id",
+        "artifact_sha256", "source_revision", "workflow_config_sha256",
+        "observed_at", "provider", "model", "account_alias",
+    ):
+        if key not in candidate:
+            value = item.get(key)
+            if value is None:
+                value = running.get(key)
+            if value is not None:
+                candidate[key] = value
+    if candidate.get("issue_identifier") != issue_identifier:
+        return None
+    attempt_matches = candidate.get("attempt") == attempt
+    if attempt_id is not None:
+        attempt_matches = candidate.get("attempt_id") == attempt_id
+    if not attempt_matches or candidate.get("session_id") != session_id:
+        return None
+    observed_pid = item.get("codex_app_server_pid") or running.get("codex_app_server_pid")
+    if observed_pid is not None and candidate.get("pid") != observed_pid:
+        return None
+    required = (
+        "issue_identifier", "attempt", "session_id", "lease_id", "service",
+        "host", "pid", "process_started_at", "process_instance_id",
+        "artifact_sha256", "source_revision", "workflow_config_sha256",
+        "observed_at", "provider", "model", "account_alias",
+    )
+    if any(candidate.get(key) in (None, "") for key in required) or candidate.get("attempt") in (None, "") and candidate.get("attempt_id") in (None, ""):
+        return None
+    if not isinstance(candidate["pid"], int) or isinstance(candidate["pid"], bool):
+        return None
+    if _iso(candidate["process_started_at"]) is None or _iso(candidate["observed_at"]) is None:
+        return None
+    return candidate
+
+
 def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
     issue = item.get("issue") if isinstance(item.get("issue"), dict) else {}
     running = item.get("running") if isinstance(item.get("running"), dict) else {}
@@ -1119,9 +1189,13 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         error = error.splitlines()[0].strip()
         for marker in ("}, [{", " [{SymphonyElixir", "[file:"):
             error = error.split(marker, 1)[0].rstrip()
+    attempt = _int(item.get("attempt") or running.get("attempt") or retry.get("attempt"))
+    attempt_id = _text(item, ("attempt_id",)) or _text(running, ("attempt_id",))
+    session_id = _text(item, ("session_id",)) or _text(running, ("session_id",))
+    proof = _execution_proof(item, running, issue_identifier=ident, attempt=attempt, attempt_id=attempt_id, session_id=session_id)
     return {
         "kind": kind, "id": ident, "title": title, "url": url,
-        "attempt": _int(item.get("attempt") or running.get("attempt") or retry.get("attempt")),
+        "attempt": attempt, "attempt_id": attempt_id,
         "turn": _int(item.get("turn_count") or running.get("turn_count")),
         "tokens_in": incoming, "tokens_out": outgoing, "tokens_total": total,
         "started": item.get("started_at") or item.get("startedAt") or running.get("started_at") or running.get("startedAt"),
@@ -1132,14 +1206,16 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         "last_event": _text(item, ("last_event",)) or _text(running, ("last_event",)),
         "error": error,
         "owner": _text(item, ("owner", "agent", "account")) or _text(running, ("owner", "agent")),
-        "session_id": _text(item, ("session_id",)) or _text(running, ("session_id",)),
+        "session_id": session_id,
         "pid": _int(item.get("codex_app_server_pid") or running.get("codex_app_server_pid")),
         "last_event_at": item.get("last_event_at") or running.get("last_event_at"),
         # A selected route/configuration is deliberately not execution evidence.
         "requested_model": _text(item, ("model", "requested_model")) or _text(running, ("model", "requested_model")),
-        "executed_model": _text(item, ("executed_model",)) or _text(running, ("executed_model",)),
-        "executed_provider": _text(item, ("executed_provider",)) or _text(running, ("executed_provider",)),
-        "executed_account_alias": _text(item, ("executed_account_alias",)) or _text(running, ("executed_account_alias",)),
+        "execution_proof_valid": proof is not None,
+        "execution_proof": proof,
+        "executed_model": proof.get("model") if proof else None,
+        "executed_provider": proof.get("provider") if proof else None,
+        "executed_account_alias": proof.get("account_alias") if proof else None,
     }
 
 
