@@ -370,6 +370,38 @@ exit 0
         self.assertTrue(receipt["timerEnabled"])
         self.assertTrue(receipt["timerActive"])
 
+    def test_installer_ships_priority_gate_runtime_dependencies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, _, _, _ = self._install_runtime(directory)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            installed_gate = (
+                pathlib.Path(directory) / "gem/scripts/gem-priority-gate.py"
+            )
+            installed_context = (
+                pathlib.Path(directory) / "gem/scripts/symphony_proof_context.py"
+            )
+            self.assertTrue(installed_context.is_file())
+            import_check = subprocess.run(
+                [sys.executable, str(installed_gate), "--help"],
+                cwd=installed_gate.parent,
+                env={
+                    "HOME": str(pathlib.Path(directory) / "home"),
+                    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            receipt = json.loads(
+                (
+                    pathlib.Path(directory)
+                    / "gem/state/gem-pr-rehabilitation-attestation.json"
+                ).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(import_check.returncode, 0, import_check.stderr)
+        self.assertTrue(receipt["artifacts"]["proofContext"]["matches"])
+
     def test_failed_install_restores_every_prior_timer_state(self):
         for prior_enabled in (False, True):
             for prior_active in (False, True):
