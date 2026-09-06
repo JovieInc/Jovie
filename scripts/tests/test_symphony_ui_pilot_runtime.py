@@ -161,7 +161,11 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert "ref: ${{ github.event.workflow_run.head_sha }}" in activation
     assert 'test "$(id -un)" = timwhite' in activation
     assert "git ls-remote origin refs/heads/main" not in activation
-    assert "immutable successful" in activation
+    assert "production-marker-state.mjs" in activation
+    assert '.state == "verified"' in activation
+    assert "Refusing superseded Gem activation" in activation
+    assert "Main advanced before Gem mutation" in activation
+    assert "A later main commit cannot invalidate" not in activation
     assert "GEM_CONTROLLER_EXPECTED_REVISION" in activation
     assert 'gem-service-attestation/v1' in activation
     assert "ss -ltnp 'sport = :4041'" in installer
