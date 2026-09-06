@@ -485,6 +485,9 @@ jobs:
       run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || 'false' }}
       run_e2e: ${{ steps.detect.outputs.run_e2e || 'false' }}
       run_golden_path: ${{ steps.detect.outputs.run_golden_path || 'false' }}
+      # JOV-5960: selects the source-lane visual snapshot compare on homepage
+      # PRs so a skipped compare can never read as green there.
+      run_homepage_visual: ${{ steps.homepage-visual.outputs.run_homepage_visual || 'false' }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
@@ -900,6 +903,20 @@ jobs:
 
           emit_ci_lanes
 
+      - name: Select rendered homepage visual gate
+        id: homepage-visual
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
+          test -f "$CHANGED_PATHS"
+          HOMEPAGE_VISUAL_PATTERN='^(\.github/workflows/(ci|pr-visual-review)\.yml|\.github/actions/setup-playwright/|\.github/scripts/guard-playwright-artifacts\.mjs|scripts/(lib/(__tests__/)?)?visual-snapshot-compare\.mjs|apps/web/app/\(home\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(homepage/|features/home/|site/(MarketingHeader|PublicPageShell|MarketingFooter|Container)\.|organisms/HeaderNav\.)|apps/web/data/homepage.*\.ts|apps/web/lib/(flags/marketing-static|screenshots/registry)|apps/web/public/product-screenshots/|apps/web/playwright\.config\.ts|apps/web/tests/e2e/(homepage|cookies|visual-regression)\.spec\.ts|apps/web/tests/e2e/__snapshots__/visual-regression\.spec\.ts/|packages/ui/)'
+          if grep -q -E "$HOMEPAGE_VISUAL_PATTERN" "$CHANGED_PATHS"; then
+            echo "run_homepage_visual=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_homepage_visual=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Preserve intake product-lane receipt
         if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1243,23 +1260,114 @@ jobs:
 
   ci-visual-snapshot-compare:
     name: Visual Snapshot Compare
-    # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. No Neon and no
-    # Playwright. Snapshot refresh stays on visual-regression.yml.
-    if: github.event_name == 'merge_group'
+    # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. Snapshot refresh
+    # stays on visual-regression.yml. JOV-5960: changed homepage source also
+    # renders and compares the committed homepage baselines on the source lane.
+    needs: [ci-path-changes]
+    if: >-
+      github.event_name == 'merge_group' ||
+      (
+        github.event_name == 'pull_request' &&
+        needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+      )
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
-      # Dependency-free Node stdlib compare. Avoid setup-node-pnpm so this
-      # merge-group gate stays off the Neon/Playwright path.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
-      - name: Fail-closed visual snapshot compare
+      - name: Validate snapshot inventory and workflow contract
         run: node scripts/visual-snapshot-compare.mjs compare
+      - uses: ./.github/actions/setup-node-pnpm
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+      - uses: ./.github/actions/setup-playwright
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+      - name: Build homepage for rendered snapshot compare
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
+          CLERK_SECRET_KEY: sk_test_mock
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          VERCEL_ENV: development
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          E2E_CLERK_USER_ID: user_test
+      - name: Render and compare homepage snapshots
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+        run: |
+          set -euo pipefail
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found; homepage visual compare cannot start."
+            exit 1
+          fi
+
+          export HOSTNAME=localhost
+          PORT=3100 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/homepage-visual-server.log" 2>&1 &
+          SERVER_PID=$!
+          SERVER_READY=false
+          for _attempt in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$SERVER_READY" = "false" ]; then
+            cat "$RUNNER_TEMP/homepage-visual-server.log"
+            exit 1
+          fi
+
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line --grep homepage
+        env:
+          BASE_URL: http://localhost:3100
+          CI: 'true'
+          E2E_SKIP_WEB_SERVER: '1'
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
+          CLERK_SECRET_KEY: sk_test_mock
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          E2E_CLERK_USER_ID: user_test
+      - name: Upload homepage visual failure evidence
+        if: ${{ failure() && needs.ci-path-changes.outputs.run_homepage_visual == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: 'true'
+          public-images: 'true'
 
   ci-fast-typecheck:
     name: ci-fast (typecheck)
@@ -5366,7 +5474,7 @@ jobs:
     # GitHub's merge_group producer reuses the same required context name for
     # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
     # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -5382,6 +5490,8 @@ jobs:
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
+          RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"
+          VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
 
           {
             echo "### PR Ready"
@@ -5395,6 +5505,7 @@ jobs:
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
+            echo "| Visual Snapshot Compare (homepage PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
             echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
@@ -5419,6 +5530,13 @@ jobs:
 
           if [[ "$FAST_RESULT" != "success" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
+            exit 1
+          fi
+
+          # JOV-5960: on homepage PRs the visual snapshot compare runs on the
+          # source lane and skipped is not green (JOV-5960).
+          if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
+            echo "❌ Visual Snapshot Compare did not pass on a homepage PR; skipped is not green (JOV-5960) (result: $VISUAL_COMPARE_RESULT)"
             exit 1
           fi
 

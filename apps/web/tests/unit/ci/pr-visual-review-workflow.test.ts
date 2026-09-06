@@ -70,4 +70,10 @@ describe('PR visual review workflow', () => {
     expect(capture).toContain('if: always()');
     expect(review).toContain('continue-on-error: true');
   });
+
+  it('captures homepage stills when locked homepage copy changes (JOV-5960)', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(workflow).toContain("- 'apps/web/data/homepage*.ts'");
+  });
 });

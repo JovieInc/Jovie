@@ -75,7 +75,9 @@ test.describe('Homepage', () => {
         'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeVisible();
-    await expect(hero.getByPlaceholder('Search your name')).toBeVisible();
+    const nameSearch = hero.getByPlaceholder('Search your name');
+    await expect(nameSearch).toBeVisible();
+    await expect(nameSearch).toHaveAccessibleName('Search your name');
     await expect(
       hero.getByRole('button', { name: 'Find me', exact: true })
     ).toBeEnabled();
