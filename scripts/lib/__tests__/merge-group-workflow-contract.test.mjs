@@ -1512,7 +1512,9 @@ ${selectedGateScript}`,
     expect(controller).toContain(
       'group: source-policy-${{ github.repository }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}'
     );
-    expect(controller).toContain('every run reads the complete current PR policy');
+    expect(controller).toContain(
+      'every run reads the complete current PR policy'
+    );
     expect(controller).toContain('cancel-in-progress: false');
     expect(controller).toContain('ref: main');
     expect(controller).toContain('persist-credentials: false');
