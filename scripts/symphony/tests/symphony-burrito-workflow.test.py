@@ -113,7 +113,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
-            re.compile(r"^\s+command: symphony-agent-router app-server$", re.M),
+            re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
         )
         authority_map = AUTHORITY_MAP_PATH.read_text(encoding="utf-8")
         self.assertIn("`symphony-agent-router` | active", authority_map)

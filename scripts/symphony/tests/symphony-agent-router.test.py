@@ -63,6 +63,53 @@ class SymphonyAgentRouterTests(unittest.TestCase):
             "CODEX_ACCOUNTS_STATE": str(state),
         }
 
+    def assert_headless_arguments(self, provider: str, opt_in: str | None) -> None:
+        guard = self.executable("guard", "exit 0\n" if provider == "codex" else "exit 75\n")
+        cursor = self.executable(
+            "cursor",
+            'case "$1" in status) echo "Logged in";; models) echo "gpt-5.6-luna-high";; esac\n',
+        )
+        capture = self.executable("capture", 'printf "%s\\n" "$@"\n')
+        env = self.environment(guard, cursor, capture)
+        # Deliberately isolate the inherited host environment from this opt-in.
+        env.pop("SYMPHONY_CODEX_DISABLE_APPS", None)
+        if opt_in is not None:
+            env["SYMPHONY_CODEX_DISABLE_APPS"] = opt_in
+        env["SYMPHONY_CODEX_ROUTER"] = str(capture)
+        env["PS4"] = '+${LINENO}: '
+        self.write_route()
+        arguments = ["app-server", "--config", 'model="gpt-5.6-sol"']
+        result = subprocess.run(
+            ["bash", "-x", str(ROUTER), *arguments], cwd=self.workspace,
+            env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = (["--disable", "apps"] if provider == "codex" and opt_in == "1" else []) + arguments
+        self.assertEqual(result.stdout.splitlines(), expected)
+        injection_line = next(
+            n for n, line in enumerate(ROUTER.read_text().splitlines(), 1)
+            if 'set -- --disable apps "$@"' in line
+        )
+        trace = f"+{injection_line}: set -- --disable apps app-server"
+        if provider == "codex" and opt_in == "1":
+            self.assertIn(trace, result.stderr)
+        else:
+            self.assertNotIn(trace, result.stderr)
+        receipt = json.loads((self.home / ".local/state/symphony-provider-router/JOV-5954.json").read_text())
+        self.assertEqual(receipt["provider"], provider)
+
+    def test_headless_codex_disables_apps_with_real_argv_and_changed_line_execution(self):
+        self.assert_headless_arguments("codex", "1")
+
+    def test_headless_cursor_never_receives_codex_flags(self):
+        self.assert_headless_arguments("cursor", "1")
+
+    def test_default_codex_keeps_existing_arguments(self):
+        self.assert_headless_arguments("codex", None)
+
+    def test_disabled_opt_in_keeps_existing_codex_arguments(self):
+        self.assert_headless_arguments("codex", "0")
+
     def write_route(self, model: str = "gpt-5.6-sol") -> None:
         (self.workspace / ".symphony-routing.json").write_text(
             json.dumps({"schema": "symphony-routing/v1", "issue": "JOV-5954", "model": model})

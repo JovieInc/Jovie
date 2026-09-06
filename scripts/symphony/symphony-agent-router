@@ -223,6 +223,11 @@ launch_codex() {
   touch "${CODEX_ACCOUNTS_STATE:-$home/.codex-accounts/state.json}"
   write_receipt codex routed-subscription "eligible-codex-account"
   export SYMPHONY_ROUTING_USE_MATERIALIZED=1
+  # Jovie headless app-server needs no desktop app connectors. Keep this opt-in
+  # inside the selected Codex route so other providers retain their own CLI.
+  if [ "${SYMPHONY_CODEX_DISABLE_APPS:-0}" = "1" ]; then
+    set -- --disable apps "$@"
+  fi
   exec "$workspace/scripts/symphony/symphony-codex-router" "$@"
 }
 
