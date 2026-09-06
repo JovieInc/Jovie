@@ -175,6 +175,72 @@ class ProviderCapacityTests(unittest.TestCase):
             self.assertTrue(path.with_name("provider-capacity.json.lock").is_file())
             json.loads(path.read_text())
 
+    def test_equivalent_failures_share_one_incident_and_preserve_attempts(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        for index in range(50):
+            state = capacity.apply_observation(
+                state,
+                provider="grok",
+                kind="quota_pressure",
+                event_id=f"attempt-{index}",
+                observed_at=f"2026-09-05T12:{index // 60:02d}:{index % 60:02d}Z",
+                issue_identifier=f"JOV-{7000 + index}",
+                evidence_reference=f"receipt-{index}",
+                root_reason="account_busy",
+            )
+        self.assertEqual(len(state["incidents"]), 1)
+        incident = next(iter(state["incidents"].values()))
+        self.assertEqual(len(incident["affectedIssues"]), 50)
+        self.assertEqual(len(incident["attempts"]), 50)
+        self.assertEqual(incident["nextAction"], "bounded_recovery_probe")
+        self.assertEqual(incident["probeCount"], 0)
+
+    def test_materially_different_failure_gets_distinct_incident(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        for kind in ("quota_pressure", "auth_pressure"):
+            state = capacity.apply_observation(
+                state, provider="grok", kind=kind, event_id=kind,
+                observed_at="2026-09-05T12:00:00Z", root_reason="different",
+            )
+        self.assertEqual(len(state["incidents"]), 2)
+
+    def test_useful_completion_resolves_without_erasing_incident_evidence(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        state = capacity.apply_observation(
+            state, provider="kimi", kind="quota_pressure", event_id="pressure",
+            observed_at="2026-09-05T12:00:00Z", issue_identifier="JOV-1",
+        )
+        state = capacity.apply_observation(
+            state, provider="kimi", kind="useful_completion", event_id="done",
+            observed_at="2026-09-05T13:00:00Z",
+        )
+        incident = next(iter(state["incidents"].values()))
+        self.assertEqual(incident["status"], "resolved")
+        self.assertEqual(incident["affectedIssues"], ["JOV-1"])
+        self.assertEqual(len(incident["attempts"]), 1)
+
+    def test_recovery_probes_are_idempotent_and_bounded(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        state = capacity.apply_observation(
+            state, provider="grok", kind="quota_pressure", event_id="pressure",
+            observed_at="2026-09-05T12:00:00Z",
+        )
+        fingerprint = next(iter(state["incidents"]))
+        for index in range(5):
+            state = capacity.request_recovery_probe(
+                state, fingerprint=fingerprint, probe_id=f"probe-{index}",
+                observed_at="2026-09-05T13:00:00Z",
+            )
+        incident = state["incidents"][fingerprint]
+        self.assertEqual(incident["probeCount"], capacity.MAX_INCIDENT_PROBES)
+        self.assertEqual(incident["remainingRecoveryBudget"], 0)
+        self.assertEqual(incident["nextAction"], "escalate_provider_capacity_incident")
+        replay = capacity.request_recovery_probe(
+            state, fingerprint=fingerprint, probe_id="probe-2",
+            observed_at="2026-09-05T13:00:00Z",
+        )
+        self.assertEqual(replay, state)
+
 
 if __name__ == "__main__":
     unittest.main()
