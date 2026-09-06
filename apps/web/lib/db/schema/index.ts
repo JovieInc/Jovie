@@ -974,6 +974,7 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+export { releaseDailyPostDismissals, releaseDailyPostEntries, releaseDailyPosts, releaseMergeEvents } from './release-communications';
 // Provider-neutral artist search monitoring and issue evidence
 export {
   type ProfileSearchQuery,
