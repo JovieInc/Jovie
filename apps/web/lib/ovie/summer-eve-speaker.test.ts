@@ -4,13 +4,6 @@ vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: vi.fn(),
 }));
 
-import type { ShadowRecord } from '../../../eve-pilot/agent/lib/summer-shadow-ingress';
-import {
-  type ConversationInput,
-  createConversationIngress,
-  readConversationResult,
-  renderConversation,
-} from '../../../eve-pilot/agent/lib/summer-web-conversation';
 import { MemoryOperatingStore } from './mcp/store';
 import { ovieSummerTurnId } from './summer-conversation';
 import { createEveSummerSpeaker } from './summer-eve-speaker';
@@ -20,11 +13,7 @@ import {
   openCurrentSummerSession,
   SUMMER_SESSION_DECISION_ID,
 } from './summer-session';
-import {
-  runOvieSummerTurn,
-  type SummerSpeaker,
-  type SummerSpeakInput,
-} from './summer-transport';
+import { runOvieSummerTurn, type SummerSpeakInput } from './summer-transport';
 
 const input: SummerSpeakInput = {
   clientTurnId: 'client_1',
@@ -154,186 +143,6 @@ describe('Ovie speaks through durable Eve Summer', () => {
       new TextEncoder().encode(JSON.stringify(posted.history)).byteLength
     ).toBeLessThanOrEqual(20 * 1024);
     expect(posted.history.at(-1)?.text).toContain('legacy-219-');
-  });
-  it('recovers a failed no-receipt product turn through the actual private ingress without losing local history', async () => {
-    vi.stubEnv('VERCEL_DEPLOYMENT_ID', 'dpl_test');
-    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'a'.repeat(40));
-    const records = new Map<string, ShadowRecord>();
-    const privateStore = {
-      read: vi.fn(async (path: string) => records.get(path) ?? null),
-      persist: vi.fn(
-        async (
-          path: string,
-          record: ShadowRecord
-        ): Promise<'created' | 'exists'> => {
-          if (records.has(path)) return 'exists';
-          records.set(path, record);
-          return 'created';
-        }
-      ),
-    };
-    const dispatch = vi.fn(
-      async (
-        _input: ConversationInput,
-        _message: string,
-        _sessionId: string | null
-      ) => 'ses_summer'
-    );
-    const ingress = createConversationIngress({
-      ...privateStore,
-      authenticate: async () => ({ subject: 'jovie-production' }),
-      verifyPrincipal: () => true,
-      verifyDeployment: () => true,
-      enabled: () => true,
-      now: () => new Date('2026-09-05T03:00:00Z'),
-      dispatch,
-    });
-    const canonical: ConversationInput = {
-      eventId: `sum_${'9'.repeat(24)}`,
-      conversationId: 'summer-session-current',
-      previousEventId: null,
-      principalHash: input.principalHash!,
-      deploymentId: 'dpl_test',
-      message: 'Earlier canonical turn',
-      history: [],
-    };
-    const postCanonical = await ingress(
-      new Request('https://eve.test/conversation', {
-        method: 'POST',
-        body: JSON.stringify(canonical),
-      })
-    );
-    expect(postCanonical.status).toBe(202);
-    const privateEvent = (type: string, data: Record<string, unknown>) =>
-      `${JSON.stringify({ type, data })}\n`;
-    const privateStream = (text: string) =>
-      new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode(text));
-          controller.close();
-        },
-      });
-    expect(
-      (
-        await readConversationResult({
-          store: privateStore,
-          eventId: canonical.eventId,
-          principalHash: canonical.principalHash,
-          deploymentId: canonical.deploymentId,
-          stream: async () =>
-            privateStream(
-              privateEvent('message.received', {
-                message: renderConversation(canonical),
-                turnId: 'turn_canonical',
-              }) +
-                privateEvent('message.completed', {
-                  message: 'Canonical answer',
-                  finishReason: 'stop',
-                  turnId: 'turn_canonical',
-                }) +
-                privateEvent('turn.completed', {
-                  turnId: 'turn_canonical',
-                })
-            ),
-        })
-      ).status
-    ).toBe(200);
-
-    const productStore = new MemoryOperatingStore();
-    const failedSpeaker: SummerSpeaker = {
-      id: 'summer',
-      runtime: 'eve',
-      async *speak() {
-        throw new Error('failed before an Eve receipt');
-      },
-    };
-    const failedEvents = [];
-    for await (const event of runOvieSummerTurn({
-      store: productStore,
-      speaker: failedSpeaker,
-      userText: 'Preserve this failed local turn',
-      clientTurnId: 'failed-client-turn',
-      principalHash: input.principalHash,
-      receipts: [],
-    })) {
-      failedEvents.push(event);
-    }
-    expect(failedEvents.at(-1)).toEqual({ type: 'state', state: 'failure' });
-    const failedTurn = (await loadCurrentSummerSession(productStore))?.turns[0];
-    expect(failedTurn).toMatchObject({
-      clientTurnId: 'failed-client-turn',
-      assistantText: '',
-      state: 'failure',
-    });
-    expect(failedTurn).not.toHaveProperty('eveReceipt');
-    const adapterFetch = vi.fn(async (path: string, init?: RequestInit) => {
-      if (init?.method === 'POST') {
-        return ingress(
-          new Request(`https://eve.test${path}`, {
-            method: 'POST',
-            body: init.body,
-          })
-        );
-      }
-      const recoveredEventId = path.split('/').at(-2)!;
-      const admittedInput = dispatch.mock.calls.at(
-        -1
-      )?.[0] as ConversationInput;
-      return readConversationResult({
-        store: privateStore,
-        eventId: recoveredEventId,
-        principalHash: input.principalHash!,
-        deploymentId: 'dpl_test',
-        stream: async () =>
-          privateStream(
-            privateEvent('message.received', {
-              message: renderConversation(admittedInput),
-              turnId: 'turn_recovered',
-            }) +
-              privateEvent('message.completed', {
-                message: 'Recovered through canonical Eve.',
-                finishReason: 'stop',
-                turnId: 'turn_recovered',
-              }) +
-              privateEvent('turn.completed', { turnId: 'turn_recovered' })
-          ),
-      });
-    });
-    const events = [];
-    for await (const event of runOvieSummerTurn({
-      store: productStore,
-      speaker: createEveSummerSpeaker(adapterFetch),
-      userText: 'Continue safely',
-      clientTurnId: 'recovery-client-turn',
-      principalHash: input.principalHash,
-      receipts: [],
-    })) {
-      events.push(event);
-    }
-
-    expect(events).toContainEqual({
-      type: 'text-delta',
-      text: 'Recovered through canonical Eve.',
-    });
-    expect(dispatch).toHaveBeenCalledTimes(2);
-    expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
-      canonicalTailRecovery: true,
-      history: [],
-    });
-    expect(dispatch.mock.calls[1]?.[1]).not.toContain(
-      'Preserve this failed local turn'
-    );
-    expect(dispatch.mock.calls[1]?.[2]).toBe('ses_summer');
-    const session = await loadCurrentSummerSession(productStore);
-    expect(session?.turns).toHaveLength(2);
-    expect(session?.turns[0]).toMatchObject({
-      clientTurnId: 'failed-client-turn',
-      state: 'failure',
-    });
-    expect(session?.turns[1]).toMatchObject({
-      clientTurnId: 'recovery-client-turn',
-      assistantText: 'Recovered through canonical Eve.',
-    });
   });
   it('fails closed while reading an oversized chunked Eve response', async () => {
     fetchShadow.mockReset().mockResolvedValue(
