@@ -20,15 +20,34 @@ _LEAKED_GIT_ENV_VARS = (
     "GIT_WORK_TREE",
     "GIT_PREFIX",
     "GIT_INDEX_FILE",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
 )
 
 
 def _git_env() -> dict[str, str]:
-    return {
+    env = {
         key: value
         for key, value in os.environ.items()
         if key not in _LEAKED_GIT_ENV_VARS
+        and not key.startswith("GIT_CONFIG_KEY_")
+        and not key.startswith("GIT_CONFIG_VALUE_")
     }
+    # Fixture repositories are deleted immediately after their assertions. Keep
+    # Git from starting detached maintenance that can race TemporaryDirectory's
+    # cleanup and leave a newly-created file under .git after rmtree scans it.
+    env.update(
+        {
+            "GIT_CONFIG_COUNT": "3",
+            "GIT_CONFIG_KEY_0": "maintenance.auto",
+            "GIT_CONFIG_VALUE_0": "false",
+            "GIT_CONFIG_KEY_1": "maintenance.autoDetach",
+            "GIT_CONFIG_VALUE_1": "false",
+            "GIT_CONFIG_KEY_2": "gc.auto",
+            "GIT_CONFIG_VALUE_2": "0",
+        }
+    )
+    return env
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -450,6 +469,23 @@ exit 0
 
 
 class FleetControllerInstallerContractTests(unittest.TestCase):
+    def test_fixture_git_runs_without_detached_maintenance(self):
+        env = _git_env()
+
+        def config_value(key: str) -> str:
+            result = subprocess.run(
+                ["git", "config", "--get", key],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            return result.stdout.strip()
+
+        self.assertEqual(config_value("maintenance.auto"), "false")
+        self.assertEqual(config_value("maintenance.autoDetach"), "false")
+        self.assertEqual(config_value("gc.auto"), "0")
+
     def _fixture(
         self, directory: str, *, policy_source=None
     ) -> pathlib.Path:
