@@ -7,11 +7,12 @@ import { build } from 'esbuild';
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export async function bundleDesktopPreload({
+  entryPoint = join(desktopRoot, 'src', 'preload.ts'),
   outfile = join(desktopRoot, 'dist-electron', 'preload.js'),
 } = {}) {
   await build({
     bundle: true,
-    entryPoints: [join(desktopRoot, 'src', 'preload.ts')],
+    entryPoints: [entryPoint],
     external: ['electron'],
     format: 'cjs',
     logLevel: 'info',
