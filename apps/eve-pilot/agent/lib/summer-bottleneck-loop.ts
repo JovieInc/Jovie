@@ -40,6 +40,17 @@ export type SymphonyRepairAction =
   | 'remediate-selected-ci-audit-class';
 
 const ciClassId = z.enum(summerCiImprovementClassIds);
+const runnerAuthority = z
+  .object({
+    schema: z.enum([
+      'symphony-lease-guard-report/v1',
+      'symphony-runtime-state/v1',
+    ]),
+    observedAt: timestamp,
+    sourceDigest: z.string().regex(DIGEST),
+    sourceRevision: exactSha,
+  })
+  .strict();
 const ciAuditSchema = z
   .object({
     schema: z.literal('jovie-ci-bottleneck-audit/v1'),
@@ -123,11 +134,13 @@ export const summerBottleneckSnapshotSchema = z
         runner: z
           .object({
             schema: z.literal('jovie.eve.summer-runner-projection/v1'),
-            sourceSchema: z.literal('symphony-lease-guard-report/v1'),
+            sourceSchema: z.literal('symphony-runner-projection/v1'),
             ...sourceFields,
             blockedSince: timestamp.nullable(),
-            capacityAvailable: z.number().int().nonnegative(),
-            queuedWork: z.number().int().nonnegative(),
+            capacitySource: runnerAuthority,
+            workSource: runnerAuthority,
+            capacityAvailable: z.number().int().nonnegative().nullable(),
+            queuedWork: z.number().int().nonnegative().nullable(),
           })
           .strict(),
         ciAudit: ciAuditSchema,
@@ -140,7 +153,6 @@ export const summerBottleneckSnapshotSchema = z
       value.signals.closure.sourceRevision,
       value.signals.queue.sourceRevision,
       value.signals.release.sourceRevision,
-      value.signals.runner.sourceRevision,
       value.signals.ciAudit.sourceRevision,
       value.signals.release.mainSha,
     ];
@@ -149,6 +161,37 @@ export const summerBottleneckSnapshotSchema = z
         code: 'custom',
         message: 'every projection must bind to the exact snapshot source',
         path: ['sourceVersion'],
+      });
+    }
+    if (
+      value.signals.runner.workSource.sourceRevision !==
+      value.signals.runner.sourceRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to the runner source revision',
+        path: ['signals', 'runner', 'workSource', 'sourceRevision'],
+      });
+    }
+    if (
+      value.signals.runner.capacityAvailable !== null &&
+      value.signals.runner.capacitySource.schema !==
+        'symphony-lease-guard-report/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner capacity must bind to lease authority',
+        path: ['signals', 'runner', 'capacitySource', 'schema'],
+      });
+    }
+    if (
+      value.signals.runner.queuedWork !== null &&
+      value.signals.runner.workSource.schema !== 'symphony-runtime-state/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to Symphony runtime authority',
+        path: ['signals', 'runner', 'workSource', 'schema'],
       });
     }
   });
@@ -365,6 +408,8 @@ function validateFreshness(
     snapshot.signals.release.observedAt,
     snapshot.signals.runner.observedAt,
     snapshot.signals.ciAudit.observedAt,
+    snapshot.signals.runner.capacitySource.observedAt,
+    snapshot.signals.runner.workSource.observedAt,
   ];
   for (const value of timestamps) {
     const ageMs = nowMs - Date.parse(value);

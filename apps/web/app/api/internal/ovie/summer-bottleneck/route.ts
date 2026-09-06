@@ -19,6 +19,8 @@ const MAX_CLOCK_SKEW_MS = 60 * 1000;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
+const JOVIE_PRODUCTION_OIDC_SUBJECT =
+  'owner:jovie:project:jovie:environment:production';
 const timestamp = z.string().datetime({ offset: true });
 const exactSha = z.string().regex(SHA);
 const safeCount = z.number().int().nonnegative().safe();
@@ -37,6 +39,17 @@ const sourceFields = {
   sourceDigest: z.string().regex(DIGEST),
   sourceRevision: exactSha,
 };
+const runnerAuthority = z
+  .object({
+    schema: z.enum([
+      'symphony-lease-guard-report/v1',
+      'symphony-runtime-state/v1',
+    ]),
+    observedAt: timestamp,
+    sourceDigest: z.string().regex(DIGEST),
+    sourceRevision: exactSha,
+  })
+  .strict();
 
 const ciAuditSchema = z
   .object({
@@ -114,11 +127,13 @@ const unsignedSnapshotSchema = z
         runner: z
           .object({
             schema: z.literal('jovie.eve.summer-runner-projection/v1'),
-            sourceSchema: z.literal('symphony-lease-guard-report/v1'),
+            sourceSchema: z.literal('symphony-runner-projection/v1'),
             ...sourceFields,
             blockedSince: timestamp.nullable(),
-            capacityAvailable: safeCount,
-            queuedWork: safeCount,
+            capacitySource: runnerAuthority,
+            workSource: runnerAuthority,
+            capacityAvailable: safeCount.nullable(),
+            queuedWork: safeCount.nullable(),
           })
           .strict(),
         ciAudit: ciAuditSchema,
@@ -132,7 +147,6 @@ const unsignedSnapshotSchema = z
       value.signals.closure.sourceRevision,
       value.signals.queue.sourceRevision,
       value.signals.release.sourceRevision,
-      value.signals.runner.sourceRevision,
       value.signals.ciAudit.sourceRevision,
       value.signals.release.mainSha,
       ...(value.signals.productPaths
@@ -144,6 +158,37 @@ const unsignedSnapshotSchema = z
         code: 'custom',
         message: 'every projection must bind to the exact snapshot source',
         path: ['sourceVersion'],
+      });
+    }
+    if (
+      value.signals.runner.workSource.sourceRevision !==
+      value.signals.runner.sourceRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to the runner source revision',
+        path: ['signals', 'runner', 'workSource', 'sourceRevision'],
+      });
+    }
+    if (
+      value.signals.runner.capacityAvailable !== null &&
+      value.signals.runner.capacitySource.schema !==
+        'symphony-lease-guard-report/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner capacity must bind to lease authority',
+        path: ['signals', 'runner', 'capacitySource', 'schema'],
+      });
+    }
+    if (
+      value.signals.runner.queuedWork !== null &&
+      value.signals.runner.workSource.schema !== 'symphony-runtime-state/v1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runner work must bind to Symphony runtime authority',
+        path: ['signals', 'runner', 'workSource', 'schema'],
       });
     }
   });
@@ -184,6 +229,17 @@ function readInput(request: Request): Promise<unknown> {
   return readBoundedJson(request.body, request.headers.get('content-length'));
 }
 
+function hasExpectedProductionSubject(token: string): boolean {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')
+    ) as { sub?: unknown };
+    return payload.sub === JOVIE_PRODUCTION_OIDC_SUBJECT;
+  } catch {
+    return false;
+  }
+}
+
 function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
   if (!Number.isFinite(nowMs)) return false;
   const timestamps = [
@@ -193,6 +249,8 @@ function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
     snapshot.signals.release.observedAt,
     snapshot.signals.runner.observedAt,
     snapshot.signals.ciAudit.observedAt,
+    snapshot.signals.runner.capacitySource.observedAt,
+    snapshot.signals.runner.workSource.observedAt,
   ];
   return timestamps.every(value => {
     const ageMs = nowMs - Date.parse(value);
@@ -230,7 +288,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!isFresh(parsed.data)) {
     return json({ ok: false, code: 'stale_bottleneck_snapshot' }, 422);
   }
-
+  if (
+    !env.VERCEL_GIT_COMMIT_SHA ||
+    parsed.data.sourceVersion !== env.VERCEL_GIT_COMMIT_SHA
+  ) {
+    return json({ ok: false, code: 'invalid_source_revision' }, 409);
+  }
   let destination: URL;
   try {
     destination = new URL(EVE_BOTTLENECK_PATH, getEveShadowOrigin());
@@ -257,6 +320,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   if (!oidcToken) {
     return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
+  }
+  if (!hasExpectedProductionSubject(oidcToken)) {
+    return json({ ok: false, code: 'wrong_oidc_audience' }, 503);
   }
 
   let upstream: Response;
