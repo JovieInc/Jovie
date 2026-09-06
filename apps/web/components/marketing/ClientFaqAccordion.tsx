@@ -48,7 +48,7 @@ export function ClientFaqAccordion({
               type='button'
               aria-expanded={isOpen}
               aria-controls={panelId}
-              className='faq-accordion__trigger focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-6 text-left text-lg font-semibold leading-snug tracking-[-0.018em] text-primary-token transition-opacity duration-subtle hover:opacity-90'
+              className='faq-accordion__trigger focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-6 text-left text-lg font-semibold leading-snug tracking-[-0.018em] text-primary-token transition-opacity duration-subtle hover:opacity-90 focus-visible:transition-[box-shadow,border-color]'
               onClick={() => {
                 const nextIndex = isOpen ? null : index;
                 setOpenIndex(nextIndex);
