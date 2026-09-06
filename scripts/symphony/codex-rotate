@@ -82,18 +82,32 @@ with open(str(state_path) + ".lock", "a+") as lock:
     fcntl.flock(lock, fcntl.LOCK_SH)
     try:
         state = json.loads(state_path.read_text())
-    except Exception:
-        state = {"active": None, "cooldowns": {}}
+        if not isinstance(state, dict):
+            raise ValueError("account state must be an object")
+        cooldowns = state.get("cooldowns", {})
+        if not isinstance(cooldowns, dict):
+            raise ValueError("cooldowns must be an object")
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        print("__CODEX_ROTATE_CAPACITY__:account_state_invalid")
+        raise SystemExit
 accounts = sorted(
     path.name
     for path in root.iterdir()
     if path.is_dir() and codex_account(path)
 )
+eligible_cooldowns = {}
+for name in accounts:
+    value = cooldowns.get(name, 0)
+    if isinstance(value, bool) or not isinstance(value, int):
+        print("__CODEX_ROTATE_CAPACITY__:account_state_invalid")
+        raise SystemExit
+    eligible_cooldowns[name] = value
 now = int(time.time())
-cooldowns = state.get("cooldowns") or {}
-ready = [name for name in accounts if int(cooldowns.get(name) or 0) <= now]
+ready = [name for name in accounts if eligible_cooldowns[name] <= now]
 if not ready and accounts:
-    ready = [min(accounts, key=lambda name: int(cooldowns.get(name) or 0))]
+    earliest_retry = min(eligible_cooldowns.values())
+    print(f"__CODEX_ROTATE_CAPACITY__:account_cooldown:{earliest_retry}")
+    raise SystemExit
 active = state.get("active")
 if active in ready:
     ready.remove(active)
@@ -207,9 +221,20 @@ started_at=$(date +%s)
 last_heartbeat=$started_at
 account=""
 account_lock_fd=""
+capacity_reason=""
+capacity_retry_at=""
 while [[ -z "$account" ]]; do
   while IFS= read -r candidate; do
     [[ -n "$candidate" ]] || continue
+    if [[ "$candidate" == "__CODEX_ROTATE_CAPACITY__:account_cooldown:"* ]]; then
+      capacity_reason="account_cooldown"
+      capacity_retry_at="${candidate##*:}"
+      break
+    fi
+    if [[ "$candidate" == "__CODEX_ROTATE_CAPACITY__:account_state_invalid" ]]; then
+      capacity_reason="account_state_invalid"
+      break
+    fi
     exec {candidate_fd}>"$LOCKS_DIR/$candidate.lock"
     if flock -n "$candidate_fd"; then
       account="$candidate"
@@ -218,6 +243,19 @@ while [[ -z "$account" ]]; do
     fi
     exec {candidate_fd}>&-
   done < <(account_order)
+
+  if [[ -n "$capacity_reason" ]]; then
+    if [[ "$capacity_reason" == "account_cooldown" ]]; then
+      now=$(date +%s)
+      wait_seconds=$(( capacity_retry_at > now ? capacity_retry_at - now : 0 ))
+      capacity="CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason=$capacity_reason retryAt=$capacity_retry_at waitSeconds=$wait_seconds"
+    else
+      capacity="CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason=$capacity_reason retryAt=unknown waitSeconds=unknown"
+    fi
+    log "$capacity"
+    echo "codex-rotate: $capacity" >&2
+    exit 75
+  fi
 
   if [[ -n "$account" ]]; then
     break
