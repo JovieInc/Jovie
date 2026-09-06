@@ -47,7 +47,7 @@ agent:
   max_concurrent_agents: 8
   max_turns: 20
 codex:
-  command: symphony-agent-router app-server
+  command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server
   approval_policy: never
   thread_sandbox: workspace-write
   turn_sandbox_policy:
