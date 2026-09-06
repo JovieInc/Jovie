@@ -98,6 +98,13 @@ def signals(**overrides):
         "concurrencyEvidence": capacity_evidence(),
     }
     payload.update(overrides)
+    if payload.get("controller", {}).get("status") == "failed":
+        payload["controller"] = {
+            "kind": "symphony",
+            "url": "http://127.0.0.1:4041/api/v1/state",
+            "error": "controller-observation-failed: Connection refused",
+            **payload["controller"],
+        }
     return payload
 
 
@@ -170,10 +177,11 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertEqual(projection["promotionMode"], source["promotionMode"])
         self.assertEqual(projection["state"], source["state"])
 
-    def test_normal_isolated_draft_hold_and_blocked_preserve_admission_fields(self):
+    def test_all_promotion_modes_preserve_admission_fields(self):
         cases = [
             ({}, "normal"),
             ({"production": {"status": "red", "deployedSha": SHA}}, "isolated-only"),
+            ({"controller": {"status": "failed"}}, "controller-repair-only"),
             ({"main": {"status": "red", "sha": SHA}}, "draft-only"),
             ({"production": {"status": "green", "deployedSha": "b" * 40}}, "hold-intake"),
             ({"integrity": {"status": "active", "reason": "credential-compromise", "detail": "keys leaked"}}, "blocked"),
@@ -204,6 +212,10 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
                 self.assertEqual(
                     projection["productionUnboundRepairAdmission"]["allowed"],
                     _source["productionUnboundRepairAdmission"]["allowed"],
+                )
+                self.assertEqual(
+                    projection["controllerRepairAdmission"]["allowed"],
+                    _source["controllerRepairAdmission"]["allowed"],
                 )
                 self.assertEqual(
                     projection["signals"]["main"]["sha"],
@@ -263,6 +275,61 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertNotIn("stackHealth", blocked["signals"]["closureHealth"])
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
         self.assertEqual(blocked["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
+
+    def test_controller_repair_projection_binds_provenance_and_rejects_forgery(self):
+        receipt = evaluate_receipt(controller={"status": "failed"})
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+
+        projection = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(
+            projection["signals"]["controller"],
+            {
+                "status": "failed",
+                "kind": "symphony",
+                "url": "http://127.0.0.1:4041/api/v1/state",
+                "error": "controller-observation-failed: Connection refused",
+            },
+        )
+        self.assertEqual(
+            projection["reviewAdmission"]["headSha"],
+            projection["controllerRepairAdmission"]["mainSha"],
+        )
+        self.assertEqual(projection["reviewAdmission"]["reviewer"], "Gem")
+        self.assertEqual(
+            projection["reviewAdmission"]["reason"],
+            "fresh-exact-head-independent-review",
+        )
+
+        forged = json.loads(json.dumps(receipt))
+        forged_closure = {
+            **forged["signals"]["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["closure-observation-unknown"],
+        }
+        forged["signals"]["closureHealth"] = forged_closure
+        forged["closureAdmission"] = {
+            **forged["closureAdmission"],
+            "allowed": False,
+            "newIssueIntakeAllowed": False,
+            "newImplementationAllowed": False,
+            "fallbackPrGenerationAllowed": False,
+            "status": "red",
+            "reasons": ["closure-observation-unknown"],
+        }
+        with self.assertRaisesRegex(
+            PROJECT.AdmissionProjectionError,
+            "controller repair closure evidence is unsafe",
+        ):
+            PROJECT.project_fleet_admission_receipt(forged)
+
+        wrong_review = json.loads(json.dumps(receipt))
+        wrong_review["reviewAdmission"]["headSha"] = "b" * 40
+        with self.assertRaisesRegex(
+            PROJECT.AdmissionProjectionError,
+            "controller repair requires exact-main review",
+        ):
+            PROJECT.project_fleet_admission_receipt(wrong_review)
 
     def test_unbound_repair_receipt_accepts_max_concurrent_above_one(self):
         hold = evaluate_receipt(
