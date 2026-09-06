@@ -73,6 +73,7 @@ const rejectedRecordSchema = z.discriminatedUnion('code', [
     })
     .strict(),
 ]);
+const MAX_CANONICAL_TAIL_HOPS = 200;
 export type ConversationStore = {
   read(path: string): Promise<ShadowRecord | null>;
   persist(path: string, record: ShadowRecord): Promise<'created' | 'exists'>;
@@ -212,29 +213,84 @@ export function createConversationIngress(
         if (admission)
           return json({ ok: false, code: 'dispatch_unknown' }, 503);
       }
-      const previousResult = input.previousEventId
-        ? await deps.read(conversationPath('results', input.previousEventId))
+      let resolvedPreviousEventId =
+        existing &&
+        typeof existing.previousEventId === 'string' &&
+        eventIdSchema.safeParse(existing.previousEventId).success
+          ? existing.previousEventId
+          : input.previousEventId;
+      let previousResult = resolvedPreviousEventId
+        ? await deps.read(conversationPath('results', resolvedPreviousEventId))
         : null;
-      const previousRejection =
-        input.previousEventId && !previousResult
+      let previousRejection =
+        resolvedPreviousEventId && !previousResult
           ? rejectedRecordSchema.safeParse(
               await deps.read(
-                conversationPath('rejected', input.previousEventId)
+                conversationPath('rejected', resolvedPreviousEventId)
               )
             )
           : null;
-      const previous =
-        previousResult ??
+      let parsedPrevious = terminalResultSchema.safeParse(previousResult);
+      let previous =
+        (parsedPrevious.success ? parsedPrevious.data : null) ??
         (previousRejection?.success &&
         previousRejection.data.code === 'daily_turn_budget_exhausted'
           ? previousRejection.data.checkpoint
           : null);
+
+      // A product datastore can be restored or replaced while Eve's canonical
+      // conversation remains durable. Resume an empty local session from the
+      // verified terminal Eve tail instead of trying to create a second root.
+      // Never merge a non-empty local history or cross a binding/pending edge.
+      if (!existing && !resolvedPreviousEventId && input.history.length === 0) {
+        const visited = new Set<string>();
+        let successor = await deps.read(conversationPath('successors', 'root'));
+        for (let hop = 0; successor; hop += 1) {
+          const candidate = successor.eventId;
+          if (
+            hop >= MAX_CANONICAL_TAIL_HOPS ||
+            typeof candidate !== 'string' ||
+            !eventIdSchema.safeParse(candidate).success ||
+            visited.has(candidate)
+          )
+            return json({ ok: false, code: 'canonical_tail_unavailable' }, 503);
+          visited.add(candidate);
+
+          previousResult = await deps.read(
+            conversationPath('results', candidate)
+          );
+          parsedPrevious = terminalResultSchema.safeParse(previousResult);
+          previousRejection = previousResult
+            ? null
+            : rejectedRecordSchema.safeParse(
+                await deps.read(conversationPath('rejected', candidate))
+              );
+          previous =
+            (parsedPrevious.success ? parsedPrevious.data : null) ??
+            (previousRejection?.success &&
+            previousRejection.data.code === 'daily_turn_budget_exhausted'
+              ? previousRejection.data.checkpoint
+              : null);
+          if (!previous)
+            return json({ ok: false, code: 'conversation_busy' }, 409);
+          if (
+            previous.conversationId !== input.conversationId ||
+            previous.principalHash !== input.principalHash
+          )
+            return json({ ok: false, code: 'canonical_binding_conflict' }, 409);
+
+          resolvedPreviousEventId = candidate;
+          successor = await deps.read(
+            conversationPath('successors', candidate)
+          );
+        }
+      }
       if (
-        input.previousEventId &&
+        resolvedPreviousEventId &&
         (!previous ||
+          previous.eventId !== resolvedPreviousEventId ||
           previous.conversationId !== input.conversationId ||
-          previous.principalHash !== input.principalHash ||
-          previous.deploymentId !== input.deploymentId)
+          previous.principalHash !== input.principalHash)
       )
         return json({ ok: false, code: 'previous_turn_not_terminal' }, 409);
       if (
@@ -243,7 +299,7 @@ export function createConversationIngress(
           bodySHA256,
           eventId: input.eventId,
           conversationId: input.conversationId,
-          previousEventId: input.previousEventId,
+          previousEventId: resolvedPreviousEventId,
           principalHash: input.principalHash,
           deploymentId: input.deploymentId,
         })) !== 'created'
@@ -259,7 +315,7 @@ export function createConversationIngress(
       // event can resume this immutable fence after a crash or UTC-day rollover.
       const successorPath = conversationPath(
         'successors',
-        input.previousEventId ?? 'root'
+        resolvedPreviousEventId ?? 'root'
       );
       if (
         (await deps.persist(successorPath, { eventId: input.eventId })) !==
