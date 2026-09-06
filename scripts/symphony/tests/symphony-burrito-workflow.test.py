@@ -1534,7 +1534,13 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn('readonly SERVICE="symphony-elixir.service"', fleet)
         self.assertIn("scripts/symphony/systemd/symphony-elixir.service", fleet)
         self.assertNotIn("scripts/symphony/systemd/symphony-ui-pilot.service", fleet)
-        self.assertIn('"service": "symphony-elixir.service"', fleet)
+        self.assertIn("--initialize-source-attestation", fleet)
+        self.assertIn(
+            '"service": "symphony-elixir.service"',
+            (ROOT / "scripts/symphony/symphony-concurrency-controller.py").read_text(
+                encoding="utf-8"
+            ),
+        )
         self.assertIn('ss -ltnp \'sport = :4041\'', fleet)
         self.assertIn("symphony-elixir.service", activation)
         self.assertIn("LoadState --value", activation)

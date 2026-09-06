@@ -4,8 +4,10 @@
 The controller is intentionally stdlib-only and runs on the Gem host from the
 existing event-driven fleet refresh. It samples Linux PSI, available memory,
 authenticated provider-route eligibility, the lane admission receipt, and
-Symphony's loopback status surface. A hysteresis policy then atomically updates only
-``agent.max_concurrent_agents`` in the installed workflow. Symphony watches
+Symphony's loopback status surface. Before each decision it also reattests the
+installer-pinned source, binary, provider generation, and live service identity.
+A hysteresis policy then atomically updates only ``agent.max_concurrent_agents``
+in the installed workflow. Symphony watches
 WORKFLOW.md and applies that value to future dispatch decisions without a
 restart.
 
@@ -22,6 +24,7 @@ one future dispatch slot. This controller does not terminate existing workers.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -55,10 +58,32 @@ SEVERE_IO_FULL_AVG10 = 20.0
 CONCURRENCY_LINE = re.compile(r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$", re.MULTILINE)
 CANONICAL_CONCURRENCY = re.compile(r"[1-9][0-9]*")
 CANONICAL_REVISION = re.compile(r"[0-9a-f]{40}")
+CANONICAL_SHA256 = re.compile(r"[0-9a-f]{64}")
+REATTEST_SCHEMA = "gem-service-reattest/v1"
+
+SOURCE_ARTIFACTS = {
+    "unit": ("scripts/symphony/systemd/symphony-elixir.service", ".config/systemd/user/symphony-elixir.service"),
+    "policy": ("scripts/symphony/gem_rehabilitation_policy.py", "gem-workspace/scripts/gem_rehabilitation_policy.py"),
+    "gate": ("scripts/symphony/gem-priority-gate.py", "gem-workspace/scripts/gem-priority-gate.py"),
+    "closureHealth": ("scripts/symphony/closure_health.py", "gem-workspace/scripts/closure_health.py"),
+    "contract": ("scripts/symphony/gem_gate_contract.py", "gem-workspace/scripts/gem_gate_contract.py"),
+    "consumer": ("scripts/symphony/gem-pr-drain.py", "gem-workspace/scripts/gem-pr-drain.py"),
+    "registryModule": ("scripts/symphony/gem_repo_registry.py", "gem-workspace/scripts/gem_repo_registry.py"),
+    "registryConfig": ("scripts/symphony/config/gem-repo-registry.json", "gem-workspace/config/gem-repo-registry.json"),
+    "concurrencyController": ("scripts/symphony/symphony-concurrency-controller.py", ".local/bin/symphony-concurrency-controller"),
+    "concurrencyService": ("scripts/symphony/systemd/symphony-concurrency-controller.service", ".config/systemd/user/symphony-concurrency-controller.service"),
+    "concurrencyTimer": ("scripts/symphony/systemd/symphony-concurrency-controller.timer", ".config/systemd/user/symphony-concurrency-controller.timer"),
+    "runtimeHelper": ("scripts/symphony/symphony_official_runtime.py", ".local/bin/symphony-official-runtime"),
+    "autoRoute": ("scripts/symphony/symphony-auto-route.mjs", ".local/bin/symphony-auto-route.mjs"),
+    "safeRestart": ("scripts/symphony/symphony-elixir-safe-restart", ".local/bin/symphony-elixir-safe-restart"),
+    "frozenTransition": ("scripts/symphony/symphony-frozen-generation-transition", ".local/bin/symphony-frozen-generation-transition"),
+}
+PROVIDER_FILES = {"agent-router", "codex-router", "codex-probe", "cursor-adapter", "entry"}
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+def utc_now(now_epoch: float | None = None) -> str:
+    instant = datetime.now(timezone.utc) if now_epoch is None else datetime.fromtimestamp(now_epoch, timezone.utc)
+    return instant.isoformat().replace("+00:00", "Z")
 
 
 def read_json(path: pathlib.Path) -> dict[str, Any]:
@@ -74,6 +99,119 @@ def write_json_atomic(path: pathlib.Path, value: dict[str, Any], mode: int = 0o6
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.chmod(temporary, mode)
     os.replace(temporary, path)
+
+
+def sha256_file(path: pathlib.Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def workflow_semantic_sha(text: str) -> str:
+    matches = list(CONCURRENCY_LINE.finditer(text))
+    if len(matches) != 1 or not CANONICAL_CONCURRENCY.fullmatch(matches[0].group(2)):
+        raise ValueError("workflow must contain one bounded max_concurrent_agents scalar")
+    normalized = CONCURRENCY_LINE.sub(
+        lambda match: f"{match.group(1)}<runtime>{match.group(3)}", text, count=1
+    )
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def artifact_targets(runtime_home: pathlib.Path, gem_root: pathlib.Path) -> dict[str, pathlib.Path]:
+    targets: dict[str, pathlib.Path] = {}
+    for name, (_, relative) in SOURCE_ARTIFACTS.items():
+        targets[name] = (
+            gem_root / relative.removeprefix("gem-workspace/")
+            if relative.startswith("gem-workspace/")
+            else runtime_home / relative
+        )
+    return targets
+
+
+def provider_generation_identity(runtime_home: pathlib.Path) -> dict[str, Any]:
+    root = runtime_home / ".local/state/symphony-elixir/provider-generations"
+    current = root / "current"
+    if not current.is_symlink():
+        raise ValueError("managed provider generation is missing")
+    target = current.resolve(strict=True)
+    if target.parent != root.resolve() or not target.is_dir():
+        raise ValueError("provider generation is outside the managed store")
+    manifest_path = target / "manifest.json"
+    manifest = read_json(manifest_path)
+    hashes = manifest.get("sha256")
+    if manifest.get("schema") != "symphony-provider-generation/v1" or not isinstance(hashes, dict):
+        raise ValueError("provider generation manifest is invalid")
+    if set(hashes) != PROVIDER_FILES:
+        raise ValueError("provider generation manifest inventory is invalid")
+    for name in PROVIDER_FILES:
+        expected = hashes.get(name)
+        path = target / name
+        if (
+            not isinstance(expected, str)
+            or not CANONICAL_SHA256.fullmatch(expected)
+            or path.is_symlink()
+            or not path.is_file()
+            or not os.access(path, os.X_OK)
+            or sha256_file(path) != expected
+        ):
+            raise ValueError(f"provider generation integrity mismatch: {name}")
+    aliases = [runtime_home / ".local/bin/symphony-agent-router", runtime_home / ".local/bin/symphony-codex-entry"]
+    for alias in aliases:
+        if not alias.is_symlink() or alias.resolve(strict=True) != target / "entry":
+            raise ValueError(f"provider alias integrity mismatch: {alias.name}")
+    return {
+        "currentPath": str(current),
+        "targetPath": str(target),
+        "manifestSha256": sha256_file(manifest_path),
+        "sha256": hashes,
+        "aliases": [str(alias) for alias in aliases],
+    }
+
+
+def live_service_identity(
+    runtime_home: pathlib.Path,
+    proc_root: pathlib.Path,
+    runtime_healthy: bool,
+) -> dict[str, Any]:
+    if not runtime_healthy:
+        raise ValueError("official Symphony state endpoint is unhealthy")
+
+    def command(*parts: str) -> str:
+        return subprocess.run(
+            list(parts), check=True, capture_output=True, text=True, timeout=5
+        ).stdout.strip()
+
+    command("systemctl", "--user", "is-active", "--quiet", "symphony-elixir.service")
+    wrapper_raw = command("systemctl", "--user", "show", "symphony-elixir.service", "--property=MainPID", "--value")
+    control_group = command("systemctl", "--user", "show", "symphony-elixir.service", "--property=ControlGroup", "--value")
+    fragment = command("systemctl", "--user", "show", "symphony-elixir.service", "--property=FragmentPath", "--value")
+    if not wrapper_raw.isdigit() or int(wrapper_raw) <= 0:
+        raise ValueError("official Symphony wrapper pid is invalid")
+    if not control_group.endswith("/symphony-elixir.service"):
+        raise ValueError("official Symphony cgroup is invalid")
+    if pathlib.Path(fragment) != runtime_home / ".config/systemd/user/symphony-elixir.service":
+        raise ValueError("official Symphony unit fragment drifted")
+    wrapper_pid = int(wrapper_raw)
+    if control_group not in (proc_root / str(wrapper_pid) / "cgroup").read_text(encoding="utf-8"):
+        raise ValueError("official Symphony wrapper escaped its service cgroup")
+    wrapper_cmdline = (proc_root / str(wrapper_pid) / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8")
+    if "symphony-official-runtime" not in wrapper_cmdline:
+        raise ValueError("official Symphony wrapper identity mismatch")
+    listeners = command("ss", "-H", "-ltnp", "sport = :4041")
+    match = re.search(r"pid=([1-9][0-9]*)[,]", listeners)
+    if match is None:
+        raise ValueError("official Symphony listener is missing")
+    listener_pid = int(match.group(1))
+    if control_group not in (proc_root / str(listener_pid) / "cgroup").read_text(encoding="utf-8"):
+        raise ValueError("official Symphony listener escaped its service cgroup")
+    listener_cmdline = (proc_root / str(listener_pid) / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8")
+    if ".burrito/symphony_erts-" not in listener_cmdline or "--port 4041" not in listener_cmdline or "symphony-ui-pilot" in listener_cmdline:
+        raise ValueError("official Symphony listener identity mismatch")
+    return {
+        "port": 4041,
+        "pid": listener_pid,
+        "wrapperPid": wrapper_pid,
+        "controlGroup": control_group,
+        "boundToService": True,
+    }
 
 
 def resource_scope(args: argparse.Namespace) -> dict[str, str]:
@@ -318,6 +456,163 @@ def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> di
         return None
 
 
+def initialize_source_attestation(
+    *,
+    source_root: pathlib.Path,
+    source_revision: str,
+    runtime_home: pathlib.Path,
+    gem_root: pathlib.Path,
+    workflow: pathlib.Path,
+    destination: pathlib.Path,
+    listener: dict[str, Any],
+    now_epoch: float,
+) -> dict[str, Any]:
+    """Create the immutable identity baseline after installer-owned checks pass."""
+    if not CANONICAL_REVISION.fullmatch(source_revision):
+        raise ValueError("source revision must be a full lowercase SHA")
+    targets = artifact_targets(runtime_home, gem_root)
+    artifacts: dict[str, Any] = {}
+    for name, (source_relative, _) in SOURCE_ARTIFACTS.items():
+        source = source_root / source_relative
+        target = targets[name]
+        source_hash, installed_hash = sha256_file(source), sha256_file(target)
+        if source_hash != installed_hash:
+            raise ValueError(f"refusing stale Gem service attestation: {name} drifted")
+        artifacts[name] = {
+            "path": str(target),
+            "sourceSha256": source_hash,
+            "installedSha256": installed_hash,
+            "matches": True,
+        }
+    source_workflow = (source_root / "scripts/symphony/WORKFLOW.md").read_text(encoding="utf-8")
+    installed_workflow = workflow.read_text(encoding="utf-8")
+    installed_concurrency = verify_concurrency_overlay(source_workflow, installed_workflow)
+    source_concurrency = read_current_target(source_root / "scripts/symphony/WORKFLOW.md")[1]
+    runtime_binary = runtime_home / ".local/bin/symphony"
+    build_hash = sha256_file(runtime_binary)
+    provider_identity = provider_generation_identity(runtime_home)
+    observed_at = utc_now(now_epoch)
+    receipt = {
+        "schema": "gem-service-attestation/v1",
+        "observedAt": observed_at,
+        "sourceRevision": source_revision,
+        "daemonReloaded": True,
+        "service": "symphony-elixir.service",
+        "active": True,
+        "healthy": True,
+        "listener": listener,
+        "workflow": {
+            "sourceSha256": hashlib.sha256(source_workflow.encode("utf-8")).hexdigest(),
+            "installedSha256": hashlib.sha256(installed_workflow.encode("utf-8")).hexdigest(),
+            "semanticSha256": workflow_semantic_sha(source_workflow),
+            "matches": True,
+            "matchMode": "exact" if source_workflow == installed_workflow else "bounded_concurrency_overlay",
+            "sourceMaxConcurrentAgents": source_concurrency,
+            "installedMaxConcurrentAgents": installed_concurrency,
+        },
+        "unit": artifacts["unit"],
+        "policy": artifacts["policy"],
+        "gate": artifacts["gate"],
+        "closureHealth": artifacts["closureHealth"],
+        "concurrencyController": artifacts["concurrencyController"],
+        "concurrencyService": artifacts["concurrencyService"],
+        "concurrencyTimer": artifacts["concurrencyTimer"],
+        "reattest": {
+            "schema": REATTEST_SCHEMA,
+            "lastVerifiedAt": observed_at,
+            "artifacts": artifacts,
+            "runtimeBuild": {"path": str(runtime_binary), "sha256": build_hash},
+            "providerGeneration": provider_identity,
+        },
+    }
+    write_json_atomic(destination, receipt)
+    return receipt
+
+
+def refresh_source_attestation(
+    *,
+    path: pathlib.Path,
+    now_epoch: float,
+    runtime_home: pathlib.Path,
+    gem_root: pathlib.Path,
+    workflow: pathlib.Path,
+    proc_root: pathlib.Path,
+    runtime_healthy: bool,
+    write: bool,
+) -> dict[str, Any] | None:
+    """Revalidate exact installed identity and refresh only a verified receipt."""
+    try:
+        receipt = read_json(path)
+        reattest = receipt.get("reattest")
+        revision = receipt.get("sourceRevision")
+        if (
+            receipt.get("schema") != "gem-service-attestation/v1"
+            or not isinstance(revision, str)
+            or not CANONICAL_REVISION.fullmatch(revision)
+            or not isinstance(reattest, dict)
+            or reattest.get("schema") != REATTEST_SCHEMA
+        ):
+            return None
+        artifacts = reattest.get("artifacts")
+        expected_targets = artifact_targets(runtime_home, gem_root)
+        if not isinstance(artifacts, dict) or set(artifacts) != set(expected_targets):
+            return None
+        for name, target in expected_targets.items():
+            identity = artifacts.get(name)
+            if not isinstance(identity, dict):
+                return None
+            expected_hash = identity.get("sourceSha256")
+            if (
+                identity.get("path") != str(target)
+                or not isinstance(expected_hash, str)
+                or not CANONICAL_SHA256.fullmatch(expected_hash)
+                or sha256_file(target) != expected_hash
+            ):
+                return None
+        workflow_text = workflow.read_text(encoding="utf-8")
+        semantic_hash = receipt.get("workflow", {}).get("semanticSha256")
+        if not isinstance(semantic_hash, str) or workflow_semantic_sha(workflow_text) != semantic_hash:
+            return None
+        _, installed_concurrency = read_current_target(workflow)
+        build = reattest.get("runtimeBuild")
+        runtime_binary = runtime_home / ".local/bin/symphony"
+        if (
+            not isinstance(build, dict)
+            or build.get("path") != str(runtime_binary)
+            or not isinstance(build.get("sha256"), str)
+            or not CANONICAL_SHA256.fullmatch(build["sha256"])
+            or sha256_file(runtime_binary) != build["sha256"]
+        ):
+            return None
+        if provider_generation_identity(runtime_home) != reattest.get("providerGeneration"):
+            return None
+        listener = live_service_identity(runtime_home, proc_root, runtime_healthy)
+        observed_at = utc_now(now_epoch)
+        refreshed = json.loads(json.dumps(receipt))
+        refreshed.update({"observedAt": observed_at, "active": True, "healthy": True, "listener": listener})
+        refreshed["workflow"].update({
+            "installedSha256": hashlib.sha256(workflow_text.encode("utf-8")).hexdigest(),
+            "installedMaxConcurrentAgents": installed_concurrency,
+            "matches": True,
+            "matchMode": (
+                "exact"
+                if refreshed["workflow"].get("sourceSha256") == hashlib.sha256(workflow_text.encode("utf-8")).hexdigest()
+                else "bounded_concurrency_overlay"
+            ),
+        })
+        for name, target in expected_targets.items():
+            refreshed["reattest"]["artifacts"][name]["installedSha256"] = sha256_file(target)
+            refreshed["reattest"]["artifacts"][name]["matches"] = True
+        for legacy in ("unit", "policy", "gate", "closureHealth", "concurrencyController", "concurrencyService", "concurrencyTimer"):
+            refreshed[legacy] = refreshed["reattest"]["artifacts"][legacy]
+        refreshed["reattest"]["lastVerifiedAt"] = observed_at
+        if write:
+            write_json_atomic(path, refreshed)
+        return {"sourceRevision": revision, "observedAt": observed_at, "reattested": True}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
+        return None
+
+
 def read_source_attestation(path: pathlib.Path, now_epoch: float) -> dict[str, Any] | None:
     """Bind a controller decision to the fresh official runtime source revision."""
     try:
@@ -334,9 +629,12 @@ def read_source_attestation(path: pathlib.Path, now_epoch: float) -> dict[str, A
             or not isinstance(listener, dict)
             or listener.get("port") != 4041
             or listener.get("boundToService") is not True
+            or not isinstance(receipt.get("reattest"), dict)
+            or receipt["reattest"].get("schema") != REATTEST_SCHEMA
+            or receipt["reattest"].get("lastVerifiedAt") != receipt.get("observedAt")
         ):
             return None
-        return {"sourceRevision": revision, "observedAt": receipt["observedAt"]}
+        return {"sourceRevision": revision, "observedAt": receipt["observedAt"], "reattested": True}
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
 
@@ -532,7 +830,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if provider is None and not args.provider_routes.exists():
         provider = read_provider_capacity(args.lease_guard)
     downstream = read_downstream(args.downstream_receipt, args.repo, now_epoch)
-    provenance = read_source_attestation(args.source_attestation, now_epoch)
+    provenance = refresh_source_attestation(
+        path=args.source_attestation,
+        now_epoch=now_epoch,
+        runtime_home=args.runtime_home,
+        gem_root=args.gem_root,
+        workflow=args.workflow,
+        proc_root=args.proc_root,
+        runtime_healthy=runtime is not None,
+        write=not args.dry_run,
+    )
     integrity_allowed, integrity_status = integrity_allows_scale(args.integrity_receipt)
     decision_allowed = integrity_allowed and provenance is not None
     decision_status = (
@@ -593,6 +900,8 @@ def parse_args() -> argparse.Namespace:
     home = pathlib.Path.home()
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--runtime-home", type=pathlib.Path, default=home)
+    parser.add_argument("--gem-root", type=pathlib.Path, default=pathlib.Path("/home/timwhite/gem-workspace"))
     parser.add_argument(
         "--workflow",
         type=pathlib.Path,
@@ -631,6 +940,15 @@ def parse_args() -> argparse.Namespace:
         type=pathlib.Path,
         help="exit 0 when INSTALLED matches SOURCE except a bounded concurrency overlay",
     )
+    parser.add_argument(
+        "--initialize-source-attestation",
+        nargs=2,
+        metavar=("SOURCE_ROOT", "SOURCE_REVISION"),
+        help="seed exact installed identity after installer-owned runtime checks",
+    )
+    parser.add_argument("--initial-wrapper-pid", type=int)
+    parser.add_argument("--initial-listener-pid", type=int)
+    parser.add_argument("--initial-control-group")
     return parser.parse_args()
 
 
@@ -648,6 +966,35 @@ def main() -> int:
                 print(f"DRIFT {installed_path}")
                 return 1
             print(f"OK {installed_path} (runtime max_concurrent_agents={target})")
+            return 0
+        if args.initialize_source_attestation is not None:
+            source_root, source_revision = args.initialize_source_attestation
+            if (
+                args.initial_wrapper_pid is None
+                or args.initial_wrapper_pid <= 0
+                or args.initial_listener_pid is None
+                or args.initial_listener_pid <= 0
+                or not isinstance(args.initial_control_group, str)
+                or not args.initial_control_group.endswith("/symphony-elixir.service")
+            ):
+                raise ValueError("installer-proven service identity is required")
+            receipt = initialize_source_attestation(
+                source_root=pathlib.Path(source_root),
+                source_revision=source_revision,
+                runtime_home=args.runtime_home,
+                gem_root=args.gem_root,
+                workflow=args.workflow,
+                destination=args.source_attestation,
+                listener={
+                    "port": 4041,
+                    "pid": args.initial_listener_pid,
+                    "wrapperPid": args.initial_wrapper_pid,
+                    "controlGroup": args.initial_control_group,
+                    "boundToService": True,
+                },
+                now_epoch=time.time(),
+            )
+            print(json.dumps(receipt, indent=2, sort_keys=True))
             return 0
         receipt = run(args)
         print(json.dumps(receipt, indent=2, sort_keys=True))

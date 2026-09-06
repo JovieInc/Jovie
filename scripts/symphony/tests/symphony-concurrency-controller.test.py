@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import pathlib
 import re
 import tempfile
@@ -82,6 +83,65 @@ SCOPE = {
     "runtimeUrl": "http://127.0.0.1:4041/api/v1/state",
     "leaseGuard": "/bin/symphony-lease-guard",
 }
+
+
+def service_identity_fixture(root: pathlib.Path, now_epoch: float = 1000.0):
+    source_root = root / "source"
+    runtime_home = root / "home"
+    gem_root = root / "gem-workspace"
+    for index, (name, (source_relative, _)) in enumerate(MODULE.SOURCE_ARTIFACTS.items()):
+        source = source_root / source_relative
+        target = MODULE.artifact_targets(runtime_home, gem_root)[name]
+        source.parent.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        contents = f"{name}-{index}\n"
+        source.write_text(contents, encoding="utf-8")
+        target.write_text(contents, encoding="utf-8")
+    source_workflow = source_root / "scripts/symphony/WORKFLOW.md"
+    workflow = runtime_home / ".config/symphony/WORKFLOW.md"
+    source_workflow.parent.mkdir(parents=True, exist_ok=True)
+    workflow.parent.mkdir(parents=True, exist_ok=True)
+    source_workflow.write_text("agent:\n  max_concurrent_agents: 8\n  max_turns: 20\n", encoding="utf-8")
+    workflow.write_text("agent:\n  max_concurrent_agents: 4\n  max_turns: 20\n", encoding="utf-8")
+    runtime_binary = runtime_home / ".local/bin/symphony"
+    runtime_binary.parent.mkdir(parents=True, exist_ok=True)
+    runtime_binary.write_bytes(b"exact-build\n")
+    runtime_binary.chmod(0o755)
+    provider_root = runtime_home / ".local/state/symphony-elixir/provider-generations"
+    generation = provider_root / "source-test"
+    generation.mkdir(parents=True)
+    hashes = {}
+    for name in MODULE.PROVIDER_FILES:
+        path = generation / name
+        path.write_text(f"{name}\n", encoding="utf-8")
+        path.chmod(0o755)
+        hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    (generation / "manifest.json").write_text(
+        json.dumps({"schema": "symphony-provider-generation/v1", "sha256": hashes}) + "\n",
+        encoding="utf-8",
+    )
+    (provider_root / "current").symlink_to(generation)
+    for name in ("symphony-agent-router", "symphony-codex-entry"):
+        (runtime_home / ".local/bin" / name).symlink_to(provider_root / "current" / "entry")
+    attestation = gem_root / "state/gem-service-attestation.json"
+    listener = {
+        "port": 4041,
+        "pid": 4242,
+        "wrapperPid": 3131,
+        "controlGroup": "/user.slice/symphony-elixir.service",
+        "boundToService": True,
+    }
+    MODULE.initialize_source_attestation(
+        source_root=source_root,
+        source_revision="a" * 40,
+        runtime_home=runtime_home,
+        gem_root=gem_root,
+        workflow=workflow,
+        destination=attestation,
+        listener=listener,
+        now_epoch=now_epoch,
+    )
+    return source_root, runtime_home, gem_root, workflow, attestation, listener
 
 
 class PressureParsingTests(unittest.TestCase):
@@ -358,6 +418,10 @@ class EvidenceTests(unittest.TestCase):
                 "active": True,
                 "healthy": True,
                 "listener": {"port": 4041, "boundToService": True},
+                "reattest": {
+                    "schema": MODULE.REATTEST_SCHEMA,
+                    "lastVerifiedAt": datetime.fromtimestamp(now, timezone.utc).isoformat(),
+                },
             }
             path.write_text(json.dumps(receipt))
             self.assertEqual(MODULE.read_source_attestation(path, now)["sourceRevision"], "a" * 40)
@@ -373,6 +437,86 @@ class EvidenceTests(unittest.TestCase):
                 self.assertIsNone(MODULE.read_source_attestation(path, now))
             path.write_text(json.dumps(receipt))
             self.assertIsNone(MODULE.read_source_attestation(path, now + 601))
+
+    def test_fake_clock_expiry_refresh_and_identity_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            _, runtime_home, gem_root, workflow, path, listener = service_identity_fixture(
+                root, now_epoch=1000
+            )
+            self.assertIsNone(MODULE.read_source_attestation(path, 1601))
+            with mock.patch.object(MODULE, "live_service_identity", return_value=listener):
+                refreshed = MODULE.refresh_source_attestation(
+                    path=path,
+                    now_epoch=1601,
+                    runtime_home=runtime_home,
+                    gem_root=gem_root,
+                    workflow=workflow,
+                    proc_root=root / "proc",
+                    runtime_healthy=True,
+                    write=True,
+                )
+            self.assertEqual(refreshed["observedAt"], MODULE.utc_now(1601))
+            self.assertEqual(
+                MODULE.read_source_attestation(path, 1601)["sourceRevision"], "a" * 40
+            )
+            persisted = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["reattest"]["lastVerifiedAt"], MODULE.utc_now(1601))
+
+            drift_cases = [
+                MODULE.artifact_targets(runtime_home, gem_root)["gate"],
+                runtime_home / ".local/bin/symphony",
+                pathlib.Path(persisted["reattest"]["providerGeneration"]["targetPath"]) / "entry",
+            ]
+            for drifted in drift_cases:
+                with self.subTest(drifted=drifted.name):
+                    original = drifted.read_bytes()
+                    drifted.write_bytes(original + b"drift")
+                    before = path.read_bytes()
+                    with mock.patch.object(MODULE, "live_service_identity", return_value=listener):
+                        self.assertIsNone(MODULE.refresh_source_attestation(
+                            path=path,
+                            now_epoch=1700,
+                            runtime_home=runtime_home,
+                            gem_root=gem_root,
+                            workflow=workflow,
+                            proc_root=root / "proc",
+                            runtime_healthy=True,
+                            write=True,
+                        ))
+                    self.assertEqual(path.read_bytes(), before)
+                    drifted.write_bytes(original)
+
+    def test_live_reattest_binds_wrapper_listener_and_unit_fragment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            home, proc = root / "home", root / "proc"
+            cgroup = "/user.slice/symphony-elixir.service"
+            for pid, cmdline in (
+                (3131, b"python\0/home/test/.local/bin/symphony-official-runtime\0"),
+                (4242, b"/home/test/.burrito/symphony_erts-test/bin/beam.smp\0--port\x004041\0"),
+            ):
+                directory = proc / str(pid)
+                directory.mkdir(parents=True)
+                (directory / "cgroup").write_text(f"0::{cgroup}\n", encoding="utf-8")
+                (directory / "cmdline").write_bytes(cmdline)
+
+            def completed(args, **_kwargs):
+                joined = " ".join(args)
+                outputs = {
+                    "--property=MainPID --value": "3131\n",
+                    "--property=ControlGroup --value": f"{cgroup}\n",
+                    "--property=FragmentPath --value": str(home / ".config/systemd/user/symphony-elixir.service") + "\n",
+                    "ss -H -ltnp sport = :4041": 'LISTEN users:(("beam.smp",pid=4242,fd=42))\n',
+                }
+                return MODULE.subprocess.CompletedProcess(args, 0, next((value for key, value in outputs.items() if key in joined), ""), "")
+
+            with mock.patch.object(MODULE.subprocess, "run", side_effect=completed):
+                identity = MODULE.live_service_identity(home, proc, True)
+                self.assertEqual((identity["wrapperPid"], identity["pid"]), (3131, 4242))
+                (proc / "4242/cmdline").write_bytes(b"symphony-ui-pilot\0--port\x004041\0")
+                with self.assertRaisesRegex(ValueError, "listener identity"):
+                    MODULE.live_service_identity(home, proc, True)
 
     def test_exhausted_retry_keeps_provider_failure_evidence(self):
         now = datetime.now(timezone.utc).isoformat()
@@ -417,7 +561,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
             (args.proc_root / "meminfo").write_text("MemAvailable: 64000000 kB\n")
             scope = MODULE.resource_scope(args)
             MODULE.write_json_atomic(args.state, {"schema": MODULE.STATE_SCHEMA, "resourceScope": scope, "target": 40, "lowStreak": 2, "lastChangeEpoch": 0})
-            with mock.patch.object(MODULE, "read_cpu_count", return_value=8), mock.patch.object(MODULE, "read_runtime_state", return_value={**RUNTIME, "running": 40, "productive": 40}), mock.patch.object(MODULE, "read_router_capacity", return_value={"eligible": True}), mock.patch.object(MODULE, "read_downstream", return_value=DOWNSTREAM), mock.patch.object(MODULE, "integrity_allows_scale", return_value=(True, "clear")):
+            with mock.patch.object(MODULE, "read_cpu_count", return_value=8), mock.patch.object(MODULE, "read_runtime_state", return_value={**RUNTIME, "running": 40, "productive": 40}), mock.patch.object(MODULE, "read_router_capacity", return_value={"eligible": True}), mock.patch.object(MODULE, "read_downstream", return_value=DOWNSTREAM), mock.patch.object(MODULE, "integrity_allows_scale", return_value=(True, "clear")), mock.patch.object(MODULE, "refresh_source_attestation", return_value={"sourceRevision": "a" * 40, "observedAt": MODULE.utc_now(), "reattested": True}):
                 result = MODULE.run(args)
                 self.assertEqual(result["target"], 41)
                 self.assertEqual(workflow.read_text(), "agent:\n  max_concurrent_agents: 41\n  max_turns: 20\n")
@@ -429,8 +573,13 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 before = workflow.read_text()
                 MODULE.run(args)
                 self.assertEqual(workflow.read_text(), before)
-            with mock.patch.object(MODULE, "read_runtime_state", return_value=RUNTIME), mock.patch.object(MODULE, "read_router_capacity", return_value=None), mock.patch.object(MODULE, "read_provider_capacity", return_value=None):
+            with mock.patch.object(MODULE, "read_runtime_state", return_value=RUNTIME), mock.patch.object(MODULE, "read_router_capacity", return_value=None), mock.patch.object(MODULE, "read_provider_capacity", return_value=None), mock.patch.object(MODULE, "refresh_source_attestation", return_value=None):
                 self.assertEqual(MODULE.run(args)["target"], 1)
+            with mock.patch.object(MODULE, "read_cpu_count", return_value=8), mock.patch.object(MODULE, "read_runtime_state", return_value={**RUNTIME, "running": 40, "productive": 40}), mock.patch.object(MODULE, "read_router_capacity", return_value={"eligible": True}), mock.patch.object(MODULE, "read_downstream", return_value=DOWNSTREAM), mock.patch.object(MODULE, "integrity_allows_scale", return_value=(True, "clear")), mock.patch.object(MODULE, "refresh_source_attestation", return_value=None):
+                result = MODULE.run(args)
+                self.assertEqual(result["target"], 1)
+                self.assertEqual(result["reason"], "integrity-blocked")
+                self.assertEqual(result["integrity"]["status"], "source-attestation-unavailable")
 
     def test_io_failures_and_invalid_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -622,32 +771,38 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
         self.assertEqual(MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("128")), 128)
 
     def test_fleet_installer_attests_high_overlay_and_rejects_other_drift(self):
-        installer = ROOT / "scripts/symphony/install-gem-fleet-controller.sh"
-        code = installer.read_text().rsplit("python3 - <<'PY'\n", 1)[1].split("\nPY", 1)[0]
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
-            source, installed = root / "source", root / "installed"
-            source.write_text(self.SOURCE)
-            env = {"GEM_ROOT": str(root), "WORKFLOW_SOURCE": str(source), "WORKFLOW_TARGET": str(installed),
-                   "SOURCE_REVISION": "a" * 40, "LISTENER_PID": "123", "SERVICE_PID": "124", "SERVICE_CONTROL_GROUP": "/test"}
-            for prefix in ("UNIT", "POLICY", "GATE", "CLOSURE"):
-                env[f"{prefix}_SOURCE_SHA"] = env[f"{prefix}_TARGET_SHA"] = "a" * 64
-            for prefix in (
-                "CONCURRENCY",
-                "CONCURRENCY_SERVICE",
-                "CONCURRENCY_TIMER",
-            ):
-                env[f"{prefix}_SOURCE_SHA"] = env[f"{prefix}_TARGET_SHA"] = "a" * 64
-            with mock.patch.dict(MODULE.os.environ, env):
-                for value in ("1", "41", "128"):
-                    installed.write_text(self.overlay(value))
-                    exec(compile(code, str(installer), "exec"), {})
-                    receipt = json.loads((root / "state/gem-service-attestation.json").read_text())
-                    self.assertTrue(receipt["workflow"]["matches"])
-                    self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], int(value))
-                for text in (self.overlay("01"), self.overlay("0"), self.overlay("41").replace("max_turns: 24", "max_turns: 99")):
-                    installed.write_text(text)
-                    with self.assertRaises(SystemExit): exec(compile(code, str(installer), "exec"), {})
+            source_root, runtime_home, gem_root, installed, destination, listener = service_identity_fixture(root)
+            source = source_root / "scripts/symphony/WORKFLOW.md"
+            source.write_text(self.SOURCE, encoding="utf-8")
+            for value in ("1", "41", "128"):
+                installed.write_text(self.overlay(value), encoding="utf-8")
+                receipt = MODULE.initialize_source_attestation(
+                    source_root=source_root,
+                    source_revision="a" * 40,
+                    runtime_home=runtime_home,
+                    gem_root=gem_root,
+                    workflow=installed,
+                    destination=destination,
+                    listener=listener,
+                    now_epoch=1000,
+                )
+                self.assertTrue(receipt["workflow"]["matches"])
+                self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], int(value))
+            for text in (self.overlay("01"), self.overlay("0"), self.overlay("41").replace("max_turns: 24", "max_turns: 99")):
+                installed.write_text(text, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    MODULE.initialize_source_attestation(
+                        source_root=source_root,
+                        source_revision="a" * 40,
+                        runtime_home=runtime_home,
+                        gem_root=gem_root,
+                        workflow=installed,
+                        destination=destination,
+                        listener=listener,
+                        now_epoch=1000,
+                    )
 
     def test_any_other_workflow_drift_fails_closed(self):
         drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")
@@ -732,7 +887,9 @@ class SystemdActivationTests(unittest.TestCase):
             "systemctl --user start symphony-concurrency-controller.service",
             installer,
         )
-        attestation = installer.index('destination = root / "state" / "gem-service-attestation.json"')
+        self.assertIn("--initialize-source-attestation", installer)
+        self.assertIn("refresh_source_attestation(", SOURCE.read_text(encoding="utf-8"))
+        attestation = installer.index("--initialize-source-attestation")
         activation = installer.index(
             "systemctl --user start symphony-concurrency-controller.service"
         )
