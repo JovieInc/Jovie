@@ -234,7 +234,7 @@ describe('Summer Symphony consumer contract foundation', () => {
         { linearOrigin: 'https://api.linear.app/graphql', linearApiKey: 'key' },
         async (_url, request) =>
           Response.json({
-            data: JSON.parse(request.body).query.includes('mutation')
+            data: JSON.parse(String(request.body)).query.includes('mutation')
               ? { issueCreate: { success: true, issue } }
               : {
                   teams: {
