@@ -32,6 +32,21 @@ export async function digestPath(path, root = process.cwd()) {
   return hash.digest('hex');
 }
 
+/**
+ * @param {{
+ *   repository: string,
+ *   sourceSha: string,
+ *   version: string,
+ *   artifactPath: string,
+ *   artifactName?: string,
+ *   componentPaths?: string[],
+ *   testReceipt?: { status?: string, command?: string },
+ *   toolchain?: Record<string, string>,
+ *   signature?: { type?: string, identity?: string },
+ *   compatibility?: { workflow?: string, runtime?: string },
+ *   root?: string,
+ * }} options
+ */
 export async function buildManifest({
   repository,
   sourceSha,
@@ -69,6 +84,16 @@ export async function buildManifest({
   };
 }
 
+/**
+ * @param {{
+ *   schema?: string,
+ *   sourceSha?: string,
+ *   artifact?: { path?: string, sha256?: string },
+ *   components?: { path: string, sha256: string }[],
+ *   signature?: { type?: string, identity?: string },
+ * }} manifest
+ * @param {{ artifactPath?: string, sourceSha?: string, root?: string }} [options]
+ */
 export async function verifyManifest(
   manifest,
   { artifactPath, sourceSha, root = process.cwd() } = {}
