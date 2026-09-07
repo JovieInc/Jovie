@@ -662,7 +662,7 @@ function runStructural() {
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails
     // closed when the file cannot be resolved or contains no tests.
-    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts',
     // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
     // JOV-5951, gbrain ops/reviewed-invariants/blocking-ui-invariants-v1),
     // governed by certify-only-working-v1: unproven is hidden, not green.
