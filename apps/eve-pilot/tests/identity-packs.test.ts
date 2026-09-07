@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import eveAgent from '../agent/agent';
 import {
   assertEvePilotFactoryLock,
@@ -24,6 +24,14 @@ function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
 }
 
 describe('eve identity instruction packs', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('pins the Eve Gateway OIDC speaker model without a Summer root label', () => {
     expect(eveAgent).toEqual({ model: 'zai/glm-5.3-flash' });
   });
@@ -58,7 +66,7 @@ describe('eve identity instruction packs', () => {
     ).toThrow(EvePilotCapabilityDeniedError);
   });
 
-  it('binds private presentation to Summer without an Ovie identity', () => {
+  it('binds private presentation to Summer in admit/route mode by default', () => {
     const turn = bindEvePilotIdentity('summer');
     expect(turn.instructions).toContain('You are Summer Jovi — AI Agent');
     expect(turn.instructions).toContain(
@@ -73,14 +81,35 @@ describe('eve identity instruction packs', () => {
     );
     expect(() => turn.require('governor-admit')).not.toThrow();
     expect(() => turn.require('governor-route')).not.toThrow();
-    expect(() => turn.require('governor-enforce')).not.toThrow();
+    expect(() => turn.require('governor-enforce')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
     expect(() => turn.require('privileged-gbrain-write')).toThrow(
       EvePilotCapabilityDeniedError
     );
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
   });
 
+  it('flips Summer into enforce mode when SUMMER_GOVERNOR_ENFORCE_ENABLED=true', () => {
+    vi.stubEnv('SUMMER_GOVERNOR_ENFORCE_ENABLED', 'true');
+    const turn = bindEvePilotIdentity('summer');
+    expect(turn.pack).toMatchObject({
+      id: 'summer',
+      role: 'company-operator',
+      canIngestAck: false,
+      canReadGbrain: false,
+      canGovernorAdmit: true,
+      canGovernorRoute: true,
+      canGovernorEnforce: true,
+    });
+    expect(() => turn.require('governor-admit')).not.toThrow();
+    expect(() => turn.require('governor-route')).not.toThrow();
+    expect(() => turn.require('governor-enforce')).not.toThrow();
+    expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
+  });
+
   it('keeps the Summer shadow route read-only while the Summer pack has the governor path', () => {
+    vi.stubEnv('SUMMER_GOVERNOR_ENFORCE_ENABLED', 'true');
     const turn = eveIdentityForChannel('ovie-summer-shadow');
     expect(turn.pack).toMatchObject({
       id: 'summer',
@@ -126,6 +155,9 @@ describe('eve identity instruction packs', () => {
     const turn = eveIdentityForChannel('telegram');
     expect(turn.pack.id).toBe('summer');
     expect(() => turn.require('ingest-ack')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
+    expect(() => turn.require('governor-enforce')).toThrow(
       EvePilotCapabilityDeniedError
     );
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();

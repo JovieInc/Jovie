@@ -551,6 +551,9 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/symphony/jovie-symphony-workspace',
   'scripts/symphony/jovie-symphony-workspace-create',
   'scripts/symphony/symphony-reconciler.py',
+  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
+  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
   'scripts/symphony/systemd/gem-disk-reclaim.service',
   'scripts/symphony/systemd/gem-disk-reclaim.timer',
   'scripts/symphony/systemd/gem-pr-drain.service',
@@ -589,6 +592,9 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
 ];
 const GEM_PR_REHABILITATION_PYTEST_TESTS = [
   'scripts/tests/test_symphony_ui_pilot_runtime.py',
+];
+const GEM_PR_REHABILITATION_NODE_TESTS = [
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/symphony/WORKFLOW.md',
@@ -674,6 +680,9 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/symphony/gem_repo_registry.py',
   'scripts/symphony/gem_rehabilitation_policy.py',
   'scripts/symphony/symphony-reconciler.py',
+  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
+  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
   'scripts/symphony/install-gem-fleet-controller.sh',
   'scripts/symphony/install-gem-pr-rehabilitation.sh',
   'scripts/symphony/install-symphony-ui-pilot.sh',
@@ -1218,7 +1227,11 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
-      nodeTests: [],
+      nodeTests: files.includes(
+        'scripts/symphony/summer-symphony-outbox-consumer.test.mjs'
+      )
+        ? ['scripts/symphony/summer-symphony-outbox-consumer.test.mjs']
+        : GEM_PR_REHABILITATION_NODE_TESTS,
     };
   }
   const isBoundedNoUnattendedRedChange =

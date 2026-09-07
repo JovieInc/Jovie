@@ -53,7 +53,7 @@ jq -e '
   (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
   (.promotionAdmission.allowed | type == "boolean") and
   (.isolatedPromotionAdmission.allowed | type == "boolean") and
-  (.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked")) and
+  (.promotionMode | IN("normal", "isolated-only", "controller-repair-only", "draft-only", "hold-intake", "blocked")) and
   (.workAdmission.allowed | type == "boolean")
 ' "$receipt" >/dev/null || {
   echo '::error::Fleet gate emitted a malformed receipt.' >&2
