@@ -945,6 +945,7 @@ jobs:
       current_queue_state: ${{ steps.admission.outputs.current_queue_state || '' }}
       replacement_combined_head: ${{ steps.admission.outputs.replacement_combined_head || '' }}
     permissions:
+      actions: read
       checks: read
       contents: read
       pull-requests: read
