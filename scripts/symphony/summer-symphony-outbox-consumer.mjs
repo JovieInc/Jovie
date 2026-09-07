@@ -752,10 +752,10 @@ export async function runCycle({
   journal,
   transport,
   keys,
-  projector,
-  outcomePrivateKey,
-  outcomePublicKey,
-  outcomeKeyId,
+  projector = null,
+  outcomePrivateKey = null,
+  outcomePublicKey = null,
+  outcomeKeyId = null,
 }) {
   let state = journal.read();
   if (state.active?.record?.task?.schema === 'jovie-symphony-repair-task/v1') {

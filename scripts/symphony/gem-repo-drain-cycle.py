@@ -52,6 +52,20 @@ def run_summer_bottleneck_producer() -> int:
     return producer.returncode
 
 
+def run_summer_symphony_consumer() -> int:
+    """Consume at most one verified Summer task on the existing timer cadence."""
+    consumer = subprocess.run(
+        [
+            "node",
+            str(Path(__file__).with_name("summer-symphony-outbox-consumer.mjs")),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return consumer.returncode
+
+
 def main() -> int:
     results: list[tuple[str, int]] = []
     for repo in pr_drain_repos():
@@ -71,10 +85,17 @@ def main() -> int:
         summer_returncode = run_summer_bottleneck_producer()
     except (OSError, subprocess.SubprocessError):
         summer_returncode = 1
+    # Consumer failure is separately observable and cannot suppress repository
+    # drains or the next producer refresh.
+    try:
+        consumer_returncode = run_summer_symphony_consumer()
+    except (OSError, subprocess.SubprocessError):
+        consumer_returncode = 1
     print("Gem PR rehabilitation cycle:")
     for repo, returncode in results:
         print(f"  {repo}: rc={returncode}")
     print(f"Summer Jovie bottleneck snapshot: rc={summer_returncode}")
+    print(f"Summer Symphony outbox consumer: rc={consumer_returncode}")
     return 0 if all(returncode == 0 for _, returncode in results) else 1
 
 
