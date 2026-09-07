@@ -379,6 +379,8 @@ V2_PROOF_SCHEMA = "symphony-useful-turn-proof/v2"
 
 V2_PROOF_SOURCE = "authenticated-completion-probe/v2"
 
+V2_ACCEPTED_COMPLETION_SOURCE = "accepted-provider-completion/v1"
+
 V2_RUNTIME_IDENTITY_SCHEMA = "symphony-runtime-identity/v1"
 
 V2_OFFICIAL_RUNTIME_SERVICE = "symphony-elixir.service"
@@ -466,8 +468,9 @@ def v2_validate_useful_turn_proof(
         or not V2_MODEL_ID.fullmatch(strings[2])
     ):
         return None, "malformed"
+    producer = value.get("producer")
     if (
-        value.get("producer") != V2_PROOF_SOURCE
+        producer not in {V2_PROOF_SOURCE, V2_ACCEPTED_COMPLETION_SOURCE}
         or value.get("agentProfile") != V2_CODER_AGENT_PROFILE
         or not isinstance(value.get("probeId"), str)
         or not V2_SHA256.fullmatch(value["probeId"])
@@ -494,10 +497,11 @@ def v2_validate_useful_turn_proof(
         return None, "completion-unproven"
     if completed_at is None or not timedelta(0) <= now - completed_at <= max_age:
         return None, "stale-or-future"
-    if any(not isinstance(value.get(key), str) or not V2_SHA256.fullmatch(value[key]) for key in ("runtimeGeneration", "codexSha256", "accountStateSha256")):
+    executable_binding = "codexSha256" if producer == V2_PROOF_SOURCE else "executorSha256"
+    if any(not isinstance(value.get(key), str) or not V2_SHA256.fullmatch(value[key]) for key in ("runtimeGeneration", executable_binding, "accountStateSha256")):
         return None, "missing-live-bindings"
-    return {
-        **{key: value[key] for key in ("runtimeGeneration", "codexSha256", "accountStateSha256")},
+    accepted = {
+        **{key: value[key] for key in ("runtimeGeneration", executable_binding, "accountStateSha256")},
         "schema": V2_PROOF_SCHEMA,
         "provider": strings[0],
         "profile": strings[1],
@@ -508,13 +512,58 @@ def v2_validate_useful_turn_proof(
         "outputDigest": value["outputDigest"],
         "outputBytes": value.get("outputBytes", 0),
         "outputTokens": value.get("outputTokens", 0),
-        "producer": V2_PROOF_SOURCE,
+        "producer": producer,
         "probeId": value["probeId"],
         "agentProfile": V2_CODER_AGENT_PROFILE,
         "attested": True,
         "contractSha256": value["contractSha256"],
         "runtime": runtime,
-    }, "accepted"
+    }
+    if producer == V2_ACCEPTED_COMPLETION_SOURCE:
+        issue = value.get("issue")
+        source = value.get("source")
+        ci = value.get("ci")
+        lease = value.get("lease")
+        checks = ci.get("requiredChecks") if isinstance(ci, dict) else None
+        expected_repository = "JovieInc/Jovie" if isinstance(issue, str) and issue.startswith("JOV-") else "JovieInc/LogYourBody"
+        if (
+            not isinstance(issue, str)
+            or not re.fullmatch(r"(?:JOV|LYB)-[1-9][0-9]*", issue)
+            or not isinstance(source, dict)
+            or not isinstance(source.get("repository"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", source["repository"])
+            or type(source.get("pr")) is not int
+            or source["pr"] < 1
+            or not isinstance(source.get("headSha"), str)
+            or not V2_SOURCE_REVISION.fullmatch(source["headSha"])
+            or not isinstance(ci, dict)
+            or ci.get("conclusion") != "SUCCESS"
+            or not isinstance(ci.get("requiredChecksSha256"), str)
+            or not V2_SHA256.fullmatch(ci["requiredChecksSha256"])
+            or not isinstance(checks, dict)
+            or not checks
+            or any(not isinstance(name, str) or not name or result != "SUCCESS" for name, result in checks.items())
+            or hashlib.sha256(json.dumps(checks, sort_keys=True, separators=(",", ":")).encode()).hexdigest() != ci["requiredChecksSha256"]
+            or not isinstance(lease, dict)
+            or lease.get("schema") != "symphony-fallback-lease/v1"
+            or not isinstance(lease.get("receiptSha256"), str)
+            or not V2_SHA256.fullmatch(lease["receiptSha256"])
+            or not isinstance(lease.get("leaseIdentity"), str)
+            or not V2_SHA256.fullmatch(lease["leaseIdentity"])
+            or lease.get("issueRevision") is None
+            or not isinstance(lease.get("issueRevision"), str)
+            or not lease["issueRevision"]
+            or source["repository"] != expected_repository
+        ):
+            return None, "unaccepted-completion"
+        payload = {"issue": issue, "source": source, "ci": ci, "lease": lease}
+        payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        payload_digest = hashlib.sha256(payload_bytes).hexdigest()
+        if (payload_digest != value["outputDigest"] or payload_digest != value["probeId"]
+            or value.get("outputBytes") != len(payload_bytes) or value.get("outputTokens") != 0):
+            return None, "unaccepted-completion"
+        accepted.update({"issue": issue, "source": source, "ci": ci, "lease": lease})
+    return accepted, "accepted"
 
 def v2_accepted_useful_turn_proofs(
     rows: list[object],
@@ -528,6 +577,7 @@ def v2_accepted_useful_turn_proofs(
     by_seat: dict[tuple[str, str], dict[str, Any]] = {}
     contradictory: set[tuple[str, str]] = set()
     probe_seats: dict[str, tuple[str, str]] = {}
+    source_probes: dict[tuple[str, int, str], tuple[str, tuple[str, str]]] = {}
     rejected: dict[str, int] = {}
     for row in rows:
         proof, reason = v2_validate_useful_turn_proof(
@@ -544,6 +594,17 @@ def v2_accepted_useful_turn_proofs(
         if attestations is None or attestations.get(proof["probeId"]) != row:
             rejected["unattested"] = rejected.get("unattested", 0) + 1
             continue
+        if proof["producer"] == V2_ACCEPTED_COMPLETION_SOURCE:
+            source = proof["source"]
+            source_key = (source["repository"], source["pr"], source["headSha"])
+            prior_source = source_probes.get(source_key)
+            if prior_source is not None and prior_source[0] != proof["probeId"]:
+                by_seat.pop(prior_source[1], None)
+                by_seat.pop(seat, None)
+                contradictory.update((prior_source[1], seat))
+                rejected["duplicate-source"] = rejected.get("duplicate-source", 0) + 2
+                continue
+            source_probes[source_key] = (proof["probeId"], seat)
         prior_seat = probe_seats.get(proof["probeId"])
         if prior_seat is not None and prior_seat != seat:
             by_seat.pop(prior_seat, None)
@@ -558,11 +619,19 @@ def v2_accepted_useful_turn_proofs(
         if prior is None:
             by_seat[seat] = proof
             continue
-        binding_fields = ("provider", "profile", "model", "contractSha256", "runtime")
+        binding_fields = ("provider", "profile", "model", "producer", "contractSha256", "runtime")
         if any(prior[field] != proof[field] for field in binding_fields):
             by_seat.pop(seat, None)
             contradictory.add(seat)
             rejected["contradictory-seat"] = rejected.get("contradictory-seat", 0) + 2
+            continue
+        if proof["producer"] == V2_ACCEPTED_COMPLETION_SOURCE:
+            # Accepted completions are events from one enrolled seat, not
+            # competing claims for that seat. Keep the deterministic newest
+            # event while the append-only ledger retains every useful merge.
+            prior_key = (v2_parse_time(prior["completedAt"]), prior["probeId"])
+            proof_key = (v2_parse_time(proof["completedAt"]), proof["probeId"])
+            by_seat[seat] = max((prior_key, prior), (proof_key, proof), key=lambda item: item[0])[1]
             continue
         rejected["duplicate-seat"] = rejected.get("duplicate-seat", 0) + 1
         by_seat.pop(seat, None)
