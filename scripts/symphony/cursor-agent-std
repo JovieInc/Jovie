@@ -5,7 +5,9 @@ The official `cursor-agent` binary stays in ~/.local/share/cursor-agent/versions
 This wrapper is the PATH / GEM_CURSOR_EXECUTABLE entry. It strips bracketed
 `fast=` parameters so JOV-5235's rejected `cursor-grok-4.6-high[fast=false]`
 form never reaches the binary. Live Cursor inventory is the `*-fast` catalog
-id (`cursor-grok-4.6-high-fast`); do not strip that suffix.
+id (`cursor-grok-4.6-high-fast`); do not strip that suffix. Named-model
+routing is fail-closed: silent Codex / Opus / auto / composer alternatives
+are refused instead of rewritten.
 """
 from __future__ import annotations
 
@@ -15,6 +17,17 @@ import re
 import sys
 
 VERSIONS = pathlib.Path.home() / ".local/share/cursor-agent/versions"
+SILENT_ALTERNATIVE_MARKERS = frozenset({
+    "opus",
+    "newest",
+    "auto",
+    "codex",
+    "composer",
+    "claude",
+    "live-cheapest-capable",
+    "cheapest",
+    "sonnet",
+})
 PASSTHROUGH = {
     "login",
     "logout",
@@ -71,6 +84,38 @@ def lock_model(name: str) -> str:
     return f"{base}[{','.join(kept)}]" if kept else base
 
 
+def is_silent_alternative(name: str) -> bool:
+    text = (name or "").strip().lower()
+    if not text:
+        return False
+    if text in SILENT_ALTERNATIVE_MARKERS:
+        return True
+    parts = re.split(r"[-_\[\]=,\s/.]+", text)
+    return any(part in SILENT_ALTERNATIVE_MARKERS for part in parts if part)
+
+
+def refused_model(argv: list[str]):
+    tokens = [arg for arg in argv if not arg.startswith("-")]
+    if tokens and tokens[0] in PASSTHROUGH:
+        return None
+    rewritten = rewrite(argv)
+    index = 0
+    while index < len(rewritten):
+        arg = rewritten[index]
+        if arg == "--model" and index + 1 < len(rewritten):
+            model = rewritten[index + 1]
+            if is_silent_alternative(model):
+                return model
+            index += 2
+            continue
+        if arg.startswith("--model="):
+            model = arg.split("=", 1)[1]
+            if is_silent_alternative(model):
+                return model
+        index += 1
+    return None
+
+
 def rewrite(argv: list[str]) -> list[str]:
     tokens = [a for a in argv if not a.startswith("-")]
     if tokens and tokens[0] in PASSTHROUGH:
@@ -93,6 +138,10 @@ def rewrite(argv: list[str]) -> list[str]:
 
 
 def main() -> int:
+    refused = refused_model(sys.argv[1:])
+    if refused:
+        print(f"REFUSED silent Cursor alternative: {refused}", file=sys.stderr)
+        return 2
     binary = real_binary()
     os.execv(str(binary), [str(binary), *rewrite(sys.argv[1:])])
     return 1

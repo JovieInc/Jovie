@@ -3130,6 +3130,23 @@ PY
             module.rewrite(["-p", "--force", "--model", "cursor-grok-4.6-high-fast", "fix it"]),
             ["-p", "--force", "--model", "cursor-grok-4.6-high-fast", "fix it"],
         )
+        self.assertFalse(module.is_silent_alternative("cursor-grok-4.6-high-fast"))
+        self.assertFalse(module.is_silent_alternative("gpt-5.6-luna"))
+        self.assertTrue(module.is_silent_alternative("auto"))
+        self.assertTrue(module.is_silent_alternative("codex"))
+        self.assertTrue(module.is_silent_alternative("claude-opus-4-8"))
+        self.assertEqual(
+            module.refused_model(["-p", "--force", "--model", "auto", "fix it"]),
+            "auto",
+        )
+        self.assertEqual(
+            module.refused_model(["-p", "--force", "--model", "composer-2.5", "fix it"]),
+            "composer-2.5",
+        )
+        self.assertIsNone(
+            module.refused_model(["-p", "--force", "--model", "cursor-grok-4.6-high-fast", "fix it"])
+        )
+        self.assertIsNone(module.refused_model(["models"]))
 
     def test_grok_ship_one_changelog_push_failure_still_invokes_grok(self):
         """Live JOV-5238: changelog autoresolve then pre-push typecheck failed, no END."""
