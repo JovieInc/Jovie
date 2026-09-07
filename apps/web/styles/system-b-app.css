@@ -575,7 +575,8 @@
    skeleton min dimensions, rail allocation) is unchanged.
    ============================================ */
 
-[data-app-shell-frame="true"] {
+.dark [data-app-shell-frame="true"],
+[data-app-shell-frame="true"].dark {
   /* Surfaces — neutral graphite elevation; Ion stays reserved for intent. */
   --app-shell-content-surface: #101114; /* panel canvas */
   --app-shell-frame-seam: rgba(255, 255, 255, 0.07);
