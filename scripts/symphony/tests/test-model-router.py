@@ -108,6 +108,8 @@ class RegistryTests(unittest.TestCase):
         cursor = next(model for model in cfg["models"] if model["id"] == "cursor-grok-4.6")
         self.assertEqual(cursor["model"], "cursor-grok-4.6-high-fast")
         self.assertEqual(cursor["executable_default"], "cursor-agent-std")
+        luna = next(model for model in cfg["models"] if model["id"] == "cursor-luna")
+        self.assertEqual(luna["model"], "gpt-5.6-luna-high")
         self.assertGreater(
             cfg["route_chains"]["new_pr"].index("qwen-coder-local"),
             cfg["route_chains"]["new_pr"].index("cursor-luna"),

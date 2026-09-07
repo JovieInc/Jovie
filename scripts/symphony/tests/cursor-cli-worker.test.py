@@ -20,7 +20,7 @@ HEALTHY = (
     "case \"$1\" in\n"
     "  --version) echo cursor-agent 2026.09.07-abcd;;\n"
     "  status|whoami) echo logged in as testdriver;;\n"
-    "  models) echo 'Available models: auto, cursor-grok-4.6-high-fast, cursor-grok-4.6-high, gpt-5.6-luna';;\n"
+    "  models) echo 'Available models: auto, cursor-grok-4.6-high-fast, cursor-grok-4.6-high, gpt-5.6-luna-high';;\n"
     "  update) echo updated;;\n"
     "  *) exit 2;;\n"
     "esac\n"
@@ -59,6 +59,9 @@ class CursorCliWorkerContractTests(unittest.TestCase):
         registry = json.loads((SOURCE_DIR / "config/model-registry.json").read_text())
         cursor = next(model for model in registry["models"] if model["id"] == "cursor-grok-4.6")
         self.assertEqual(cursor["model"], "cursor-grok-4.6-high-fast")
+        luna = next(model for model in registry["models"] if model["id"] == "cursor-luna")
+        self.assertEqual(luna["model"], "gpt-5.6-luna-high")
+        self.assertNotEqual(luna["model"], "gpt-5.6-luna")
 
 
 class CursorCliWorkerBehaviorTests(unittest.TestCase):
@@ -110,8 +113,11 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
             ("gem", "gem", "ops_grok_bot", "reference_only"),
         )
         self.assertIn("cursor-grok-4.6-high-fast", payload["models"])
+        self.assertIn("gpt-5.6-luna-high", payload["enrolledModels"])
+        self.assertNotIn("gpt-5.6-luna", payload["enrolledModels"])
         self.assertIn("cursor-grok-4.6-high", payload["catalogGap"])
         self.assertNotIn("auto", payload["catalogGap"])
+        self.assertNotIn("gpt-5.6-luna", payload["catalogGap"])
         unauth = self._healthy_env(
             "case \"$1\" in\n  --version) echo cursor-agent 2026.09.07-abcd;;\n"
             "  status|whoami) echo not logged in >&2; exit 1;;\n"
