@@ -974,7 +974,6 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
-export { releaseDailyPostDismissals, releaseDailyPostEntries, releaseDailyPosts, releaseMergeEvents } from './release-communications';
 // Provider-neutral artist search monitoring and issue evidence
 export {
   type ProfileSearchQuery,
@@ -1103,6 +1102,12 @@ export {
   selectReferralCommissionSchema,
   selectReferralSchema,
 } from './referrals';
+export {
+  releaseDailyPostDismissals,
+  releaseDailyPostEntries,
+  releaseDailyPosts,
+  releaseMergeEvents,
+} from './release-communications';
 // Release Tasks (Templates, Template Items, Tasks, Catalog, Clusters, Snapshots, Telemetry)
 export {
   type CustomTaskTelemetry,
