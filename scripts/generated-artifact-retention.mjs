@@ -240,16 +240,16 @@ async function inspectTree(root) {
 async function planTechDebtReports(repoRoot) {
   const root = path.join(repoRoot, '.tech-debt');
   const rootStats = await lstatOrNull(root);
-  if (!rootStats) return { candidates: [], eligible: 0, retained: 0 };
+  if (!rootStats) return { candidates: [], debt: [], eligible: 0, retained: 0 };
   if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
     console.warn('  Preserved .tech-debt because it is not a real directory');
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const rootRealPath = await realpath(root);
   if (!isDescendant(repoRoot, rootRealPath)) {
     console.warn('  Preserved .tech-debt because it resolves outside the repo');
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const reports = [];
@@ -272,6 +272,7 @@ async function planTechDebtReports(repoRoot) {
   reports.sort((left, right) => right.name.localeCompare(left.name));
   return {
     candidates: reports.slice(TECH_DEBT_REPORT_LIMIT),
+    debt: [],
     eligible: reports.length,
     retained: Math.min(reports.length, TECH_DEBT_REPORT_LIMIT),
   };
@@ -359,12 +360,12 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
   } = config;
   const root = path.join(repoRoot, relativeRoot);
   const rootStats = await lstatOrNull(root);
-  if (!rootStats) return { candidates: [], eligible: 0, retained: 0 };
+  if (!rootStats) return { candidates: [], debt: [], eligible: 0, retained: 0 };
   if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
     console.warn(
       `  Preserved ${relativeRoot} because it is not a real directory`
     );
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const rootRealPath = await realpath(root);
@@ -372,7 +373,7 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
     console.warn(
       `  Preserved ${relativeRoot} because it resolves outside the repo`
     );
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   let currentPaths;
@@ -382,7 +383,7 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
     console.warn(
       `  Preserved ${relativeRoot} after current-pointer error: ${error.message}`
     );
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const completed = [];
