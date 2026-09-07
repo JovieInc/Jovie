@@ -194,11 +194,7 @@ describe('Button', () => {
   });
 
   it('keeps link buttons inside a 44px minimum hit target', () => {
-    render(
-      <Button variant='link'>
-        Learn more
-      </Button>
-    );
+    render(<Button variant='link'>Learn more</Button>);
 
     const btn = screen.getByRole('button', { name: 'Learn more' });
     expect(btn.className).toContain('before:h-11');
