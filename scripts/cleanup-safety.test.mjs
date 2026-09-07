@@ -17,6 +17,7 @@ import test from 'node:test';
 const scripts = resolve('scripts');
 const old = new Date(Date.now() - 30 * 86400_000);
 
+/** @param {string | Uint8Array} value */
 function put(root, relative, value = 'preserve me') {
   const target = join(root, relative);
   mkdirSync(dirname(target), { recursive: true });
