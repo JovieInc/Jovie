@@ -609,8 +609,10 @@ test('missing, running, and unknown terminal values remain reported debt under d
   const root = createFixture();
   try {
     const config = GENERATED_RUN_ROOTS.find(
-      candidate => candidate.namePrefix === 'launch-check-'
+      candidate =>
+        'namePrefix' in candidate && candidate.namePrefix === 'launch-check-'
     );
+    assert.ok(config && 'completionJson' in config && config.completionJson);
     const preserved = [];
     for (const [suffix, value] of [
       ['missing', undefined],
