@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/shell/__tests__/AudioBar.test.tsx
 'use client';
 
 import {

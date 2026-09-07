@@ -85,7 +85,11 @@ describe('MobilePlayerCard', () => {
         onPlay={onPlay}
       />
     );
-    fireEvent.click(screen.getByLabelText('Play'));
+    const playButton = screen.getByRole('button', { name: 'Play' });
+    expect(playButton).toHaveAttribute('type', 'button');
+    expect(playButton).toHaveClass('h-9', 'w-9', 'rounded-full');
+
+    fireEvent.click(playButton);
     expect(onPlay).toHaveBeenCalledOnce();
   });
 });
