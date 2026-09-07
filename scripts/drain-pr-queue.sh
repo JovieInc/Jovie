@@ -126,6 +126,7 @@ native_state_to_snap() {
       q: (.queued == true),
       qs: (.mergeQueueEntry.state // null),
       qp: (.mergeQueueEntry.position // null),
+      qa: (.mergeQueueEntry.enqueuedAt // null),
       oid: .headRefOid
     } | select(.n | type == "number") ]
   '
@@ -766,8 +767,8 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
 # without changing the source revision. The receipt is never sufficient on its
 # own; recovery still re-reads current PR state, current source checks, and the
 # native queue postcondition.
-queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url]
-  local n="$1" head="$2" expected_target="${3:-}" statuses latest
+queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint-main] [enqueued-at]
+  local n="$1" head="$2" expected_target="${3:-}" expected_main="${4:-}" enqueued_at="${5:-}" statuses latest
   [[ "$n" =~ ^[1-9][0-9]*$ && "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 1
@@ -776,7 +777,9 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url]
     --arg context "$QUEUE_REENTRY_CONTEXT" \
     --arg repo "$REPO" \
     --argjson pr "$n" \
-    --arg expected_target "$expected_target" '
+    --arg expected_target "$expected_target" \
+    --arg expected_main "$expected_main" \
+    --arg enqueued_at "$enqueued_at" '
     [ .statuses[]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
@@ -786,8 +789,18 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url]
         $receipt != null
         and $receipt.state == "success"
         and (($binding.pr | tonumber) == $pr)
+        and ($expected_main == "" or $binding.main == $expected_main)
         and ($receipt.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
         and ($expected_target == "" or $receipt.target_url == $expected_target)
+        and (
+          $enqueued_at == ""
+          or (
+            ($receipt.updated_at | fromdateiso8601) as $receipt_at
+            | ($enqueued_at | fromdateiso8601) as $admitted_at
+            | $receipt_at >= $admitted_at
+              and ($receipt_at - $admitted_at) <= 300
+          )
+        )
       )
   ' <<<"$statuses" 2>/dev/null)" || true
   [[ -n "$latest" ]] || return 1
@@ -2016,6 +2029,44 @@ echo "$SNAP" | jq -r '
     "  hard-gated: " + ([.[] | select(main_target and hard_gated)] | length | tostring),
     "  non-main: " + ([.[] | select(main_target | not)] | length | tostring)
   ] | .[]'
+
+# Queue membership is not admission authority. When the exact production
+# checkpoint is verified, remove any native entry that cannot prove a fresh,
+# exact-head v2 receipt for that checkpoint. The same sole writer may then
+# re-enroll an otherwise eligible PR and persist new evidence after the new
+# AddedToMergeQueueEvent. Missing queue timestamps fail closed before mutation.
+if [[ "${DRAIN_RECONCILE_ADMISSION_RECEIPTS:-0}" == "1" ]]; then
+  if [[ "$MERGE_QUEUE_BACKEND" != "native" \
+    || "$DRAIN_PROMOTION_MODE" != "normal" \
+    || "${DRAIN_PRODUCTION_CHECKPOINT_STATE:-}" != "verified" \
+    || ! "${FLEET_POLICY_MAIN_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "::error::Admission receipt reconciliation requires native normal mode and an exact verified checkpoint" >&2
+    exit 1
+  fi
+  echo "=== DEQUEUE (unproven native admission -> canonical re-entry) ==="
+  while read -r pr; do
+    n="$(jq -r '.n' <<<"$pr")"
+    expected_head="$(jq -r '.headOid' <<<"$pr")"
+    enqueued_at="$(jq -r '.qa // empty' <<<"$pr")"
+    if [[ ! "$enqueued_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z$ ]]; then
+      echo "::error::Queued PR #$n has no authoritative enqueue timestamp; refusing admission mutation" >&2
+      exit 1
+    fi
+    if queue_reentry_receipt_is_recoverable \
+      "$n" "$expected_head" "" "$FLEET_POLICY_MAIN_SHA" "$enqueued_at"; then
+      echo "  #$n  =fresh exact-checkpoint native admission"
+      continue
+    fi
+    echo "  #$n  stale or missing exact-checkpoint admission; canonical dequeue"
+    if ! dequeue_strict "$n" "$expected_head"; then
+      echo "::error::Failed to remove unproven native admission for #$n" >&2
+      exit 1
+    fi
+    SNAP="$(jq -c --argjson n "$n" '
+      map(if .n == $n then .q = false | .qs = null | .qp = null | .qa = null else . end)
+    ' <<<"$SNAP")"
+  done < <(jq -c '.[] | select(.q == true)' <<<"$SNAP")
+fi
 
 # --- DEQUEUE: hard-gated PRs must not occupy queue slots ---
 echo "=== DEQUEUE (hard gates → queue removal) ==="

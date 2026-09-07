@@ -761,6 +761,7 @@ describe('queue workflow mutation safety', () => {
     );
     expect(drain).toContain('qs: (.mergeQueueEntry.state // null)');
     expect(drain).toContain('qp: (.mergeQueueEntry.position // null)');
+    expect(drain).toContain('qa: (.mergeQueueEntry.enqueuedAt // null)');
     expect(drain).toContain('select(.qp == 1)');
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
@@ -931,6 +932,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.workflow_run.event // empty');
     expect(scope).toContain('== "merge_group"');
     expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
+    expect(enroll).toContain('DRAIN_RECONCILE_ADMISSION_RECEIPTS:');
     expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
     expect(enroll).toContain("steps.admission.outputs.deferred_release != '1'");
     expect(enroll).toContain(
@@ -983,7 +985,7 @@ describe('queue workflow mutation safety', () => {
       enroll.match(
         /steps\.release-checkpoint\.outputs\.admission_allowed == 'true'/g
       )
-    ).toHaveLength(3);
+    ).toHaveLength(4);
 
     const blocked = executeAdmissionScope({
       productionAdmissionAllowed: false,
@@ -2827,6 +2829,11 @@ describe('authoritative native state listing', () => {
     const queries = runner.mock.calls.map(call => queryText(call[0]));
     expect(
       queries.some(query => query.includes('MergeQueuePullRequestState'))
+    ).toBe(true);
+    expect(
+      queries.some(query =>
+        query.includes('mergeQueueEntry { id state position enqueuedAt }')
+      )
     ).toBe(true);
     expect(
       queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))

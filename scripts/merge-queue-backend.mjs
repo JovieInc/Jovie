@@ -42,7 +42,7 @@ const NATIVE_QUEUE_ENTRY_STATES = new Set([
 ]);
 
 const INVENTORY_PAGE_SIZE = 30;
-const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
+const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position enqueuedAt } autoMergeRequest { enabledAt }`;
 const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
