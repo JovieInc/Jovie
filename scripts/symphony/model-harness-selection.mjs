@@ -202,7 +202,7 @@ export function buildComparisonReceipt({
 
 export function promoteFromReceipt({
   receipt,
-  incumbent,
+  incumbent = null,
   policy = selectionPolicy(),
 }) {
   if (
@@ -230,7 +230,7 @@ export function promoteFromReceipt({
   return { route: receipt.challenger.adapter, receipt: promotion };
 }
 
-export function dedupeTrigger({ trigger, registryVersion, previous }) {
+export function dedupeTrigger({ trigger, registryVersion, previous = null }) {
   const key = hash({ trigger, registryVersion });
   return { key, shouldEvaluate: previous?.key !== key };
 }
