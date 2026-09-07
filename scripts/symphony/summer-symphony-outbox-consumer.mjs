@@ -1026,6 +1026,11 @@ export function createLinearProjector(config, fetchImpl = fetch) {
 }
 
 export function createHttpTransport(config, fetchImpl = fetch) {
+  const protectionHeaders = config.vercelAutomationBypassSecret
+    ? {
+        'x-vercel-protection-bypass': config.vercelAutomationBypassSecret,
+      }
+    : {};
   return {
     async readPage(cursor, limit) {
       const target = `${OUTBOX_PATH}?limit=${limit}${
@@ -1040,7 +1045,7 @@ export function createHttpTransport(config, fetchImpl = fetch) {
       );
       return responseJson(
         await fetchImpl(`${config.summerOrigin}${target}`, {
-          headers,
+          headers: { ...headers, ...protectionHeaders },
           redirect: 'error',
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         })
@@ -1050,7 +1055,10 @@ export function createHttpTransport(config, fetchImpl = fetch) {
       const acknowledgement = await responseJson(
         await fetchImpl(`${config.summerOrigin}${OUTCOME_PATH}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: {
+            'content-type': 'application/json',
+            ...protectionHeaders,
+          },
           body: JSON.stringify(outcome),
           redirect: 'error',
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -1097,6 +1105,19 @@ export function configFromEnvironment(environment = process.env) {
   }
   const workspace = required('GEM_WORKSPACE');
   if (!isAbsolute(workspace)) throw new Error('GEM_WORKSPACE-must-be-absolute');
+  const vercelAutomationBypassSecret =
+    environment.SUMMER_BOTTLENECK_VERCEL_AUTOMATION_BYPASS_SECRET?.trim() ||
+    null;
+  if (
+    vercelAutomationBypassSecret &&
+    (vercelAutomationBypassSecret.length < 16 ||
+      vercelAutomationBypassSecret.length > 512 ||
+      /[\r\n]/u.test(vercelAutomationBypassSecret))
+  ) {
+    throw new Error(
+      'SUMMER_BOTTLENECK_VERCEL_AUTOMATION_BYPASS_SECRET-invalid'
+    );
+  }
   const outcomePrivateKey = createPrivateKey(
     required('SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY')
   );
@@ -1129,6 +1150,7 @@ export function configFromEnvironment(environment = process.env) {
     outcomePublicKey: createPublicKey(outcomePrivateKey),
     outcomeKeyId,
     keys,
+    vercelAutomationBypassSecret,
     linearOrigin: 'https://api.linear.app/graphql',
     linearApiKey: environment.SUMMER_LINEAR_GOVERNOR_API_KEY?.trim() || null,
   };

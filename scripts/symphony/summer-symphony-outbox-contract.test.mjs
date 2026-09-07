@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 
 import {
   canonical,
+  createHttpTransport,
   discoverOne,
   OUTBOX_DOMAIN,
   OUTBOX_DOMAIN_V2,
@@ -161,5 +162,46 @@ describe('Summer Symphony consumer contract foundation', () => {
         error.message === 'outbox-page-limit-exceeded' &&
         error.nextCursor === '4'
     );
+  });
+
+  it('sends the Vercel protection bypass only as a request header', async () => {
+    const requests = [];
+    const transport = createHttpTransport(
+      {
+        summerOrigin: 'https://summer.example',
+        outcomePrivateKey: summer.privateKey,
+        outcomeKeyId: 'host-outcome',
+        vercelAutomationBypassSecret: 'scoped-bypass-secret',
+      },
+      async (url, options) => {
+        requests.push({ url, options });
+        if (options.method === 'POST') {
+          return Response.json({
+            schema: 'summer.symphony-outcome-ack/v1',
+            taskKey,
+            status: 'recorded',
+          });
+        }
+        return Response.json({
+          schema: PAGE_SCHEMA,
+          records: [],
+          cursor: null,
+          hasMore: false,
+          scanned: 0,
+        });
+      }
+    );
+    await transport.readPage(null, 25);
+    await transport.writeOutcome({ taskKey });
+    assert.equal(requests.length, 2);
+    for (const request of requests) {
+      assert.equal(
+        request.options.headers['x-vercel-protection-bypass'],
+        'scoped-bypass-secret'
+      );
+      assert.equal(request.url.includes('scoped-bypass-secret'), false);
+    }
+    assert.equal(requests[0].options.method, undefined);
+    assert.equal(requests[1].options.method, 'POST');
   });
 });

@@ -10,6 +10,13 @@ const ADMISSION_RECEIPT_PATTERN =
 const ADMISSION_RECEIPT_MAX_DELAY_MS = 5 * 60_000;
 const ADMISSION_WORKFLOW_NAME = 'Merge Queue Auto-Enroll';
 const ADMISSION_WORKFLOW_PATH = '.github/workflows/merge-queue-autoenroll.yml';
+const ADMISSION_PRODUCER_EVENTS = new Set([
+  'pull_request',
+  'push',
+  'repository_dispatch',
+  'workflow_dispatch',
+  'workflow_run',
+]);
 const QUEUE_HEAD_PR_PATTERN =
   /^refs\/heads\/gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[0-9a-f]+$/;
 const REQUIRED_CHECKS = Object.freeze(['Fork PR Gate', 'PR Size Guard']);
@@ -183,6 +190,7 @@ export function validateMergeGroupAdmissionEvent(
 
 export function classifyCanonicalAdmissionProvenance({
   evidence,
+  lineagePayload = null,
   runPayload,
   sourceHeadSha,
   statusPayload,
@@ -250,6 +258,7 @@ export function classifyCanonicalAdmissionProvenance({
     String(receipt.description ?? '')
   );
   const receiptAt = Date.parse(String(receipt.updated_at ?? ''));
+  const [, checkpoint, mainSha, receiptPr] = match ?? [];
   if (
     receipt.state !== 'success' ||
     !match ||
@@ -270,18 +279,57 @@ export function classifyCanonicalAdmissionProvenance({
   if (targetRunId !== runPayload.id) {
     fail('canonical admission receipt is malformed or untrusted');
   }
-  const [, checkpoint, mainSha, receiptPr] = match;
-  if (Number(receiptPr) !== evidence.prNumber) {
-    fail('canonical admission receipt is not bound to the merge-group PR');
+  const producerEvent = runPayload.event;
+  if (!ADMISSION_PRODUCER_EVENTS.has(producerEvent)) {
+    fail('canonical admission producer is not bound to its admission scope');
   }
-  if (mainSha !== evidence.baseSha) {
-    fail('canonical admission receipt is not bound to the merge-group base');
+  if (
+    !SHA_PATTERN.test(String(runPayload.head_sha ?? '')) ||
+    typeof runPayload.head_branch !== 'string' ||
+    runPayload.head_branch.length === 0 ||
+    (producerEvent !== 'pull_request' && runPayload.head_branch !== 'main')
+  ) {
+    fail('canonical admission producer is not bound to its admission scope');
   }
   if (
     receiptAt < admittedAt ||
     receiptAt - admittedAt > ADMISSION_RECEIPT_MAX_DELAY_MS
   ) {
     fail('canonical admission receipt is not bound to the admission time');
+  }
+  if (
+    NONTERMINAL_CHECK_STATUSES.has(runPayload.status) &&
+    runPayload.status !== 'in_progress'
+  ) {
+    return {
+      state: 'pending',
+      detail: 'canonical admission producer has not started',
+    };
+  }
+  const runCreatedAt = Date.parse(String(runPayload.created_at ?? ''));
+  const runUpdatedAt = Date.parse(String(runPayload.updated_at ?? ''));
+  if (
+    !['in_progress', 'completed'].includes(runPayload.status) ||
+    (runPayload.status === 'in_progress' && runPayload.conclusion !== null) ||
+    (runPayload.status === 'completed' &&
+      !TERMINAL_CHECK_CONCLUSIONS.has(runPayload.conclusion)) ||
+    !Number.isFinite(runCreatedAt) ||
+    !Number.isFinite(runUpdatedAt) ||
+    runCreatedAt > admittedAt ||
+    runUpdatedAt < runCreatedAt ||
+    (runPayload.status === 'completed' && runUpdatedAt < receiptAt)
+  ) {
+    fail('canonical admission producer run identity is inconsistent');
+  }
+  if (Number(receiptPr) !== evidence.prNumber) {
+    fail('canonical admission receipt is not bound to the merge-group PR');
+  }
+  if (mainSha !== evidence.baseSha) {
+    validatePreservedCheckpointLineage({
+      baseSha: evidence.baseSha,
+      checkpointMainSha: mainSha,
+      lineagePayload,
+    });
   }
   return {
     state: 'verified',
@@ -290,6 +338,24 @@ export function classifyCanonicalAdmissionProvenance({
     checkpointMainSha: mainSha,
     receiptAt: new Date(receiptAt).toISOString(),
   };
+}
+
+function validatePreservedCheckpointLineage({
+  baseSha,
+  checkpointMainSha,
+  lineagePayload,
+}) {
+  if (
+    !lineagePayload ||
+    lineagePayload.status !== 'ahead' ||
+    lineagePayload.base_commit?.sha !== checkpointMainSha ||
+    lineagePayload.merge_base_commit?.sha !== checkpointMainSha ||
+    lineagePayload.commits?.at(-1)?.sha !== baseSha
+  ) {
+    fail(
+      'preserved admission checkpoint is not an ancestor of merge-group base'
+    );
+  }
 }
 
 function canonicalAdmissionRunId(receipt, repository) {
@@ -862,12 +928,26 @@ function createGitHubAdmissionApi({
             )
           ).data
         : null;
+      const v2Binding = receipt
+        ? ADMISSION_RECEIPT_PATTERN.exec(String(receipt.description ?? ''))
+        : null;
+      const checkpointMainSha = v2Binding?.[2] ?? null;
+      const lineagePayload =
+        checkpointMainSha && checkpointMainSha !== baseSha
+          ? (
+              await githubRequest(
+                `/repos/${encodedRepository}/compare/${checkpointMainSha}...${baseSha}`,
+                { deadlineMs, env, fetchImpl, token }
+              )
+            ).data
+          : null;
       return classifyCanonicalAdmissionProvenance({
         evidence: {
           baseSha,
           prNumber,
           repository,
         },
+        lineagePayload,
         runPayload,
         sourceHeadSha,
         statusPayload: {
