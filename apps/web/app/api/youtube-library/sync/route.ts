@@ -12,7 +12,6 @@ import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
-import { reconcileApprovedYouTubeCollaborators } from '@/lib/library/graph-store';
 import { syncChannelVideos } from '@/lib/youtube-library/sync';
 
 export const runtime = 'nodejs';
@@ -89,14 +88,6 @@ export async function POST(request: Request) {
       provider: createYouTubeLibraryProvider({ accessToken }),
       now,
     });
-    try {
-      await reconcileApprovedYouTubeCollaborators(profileId, now);
-    } catch (error) {
-      await captureError('YouTube collaborator reconcile failed', error, {
-        route: '/api/youtube-library/sync',
-        method: 'POST',
-      });
-    }
     await db
       .update(connectorAccounts)
       .set({

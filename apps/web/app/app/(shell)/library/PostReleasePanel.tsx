@@ -24,7 +24,7 @@ const EVIDENCE_LABELS: Record<
 
 function subjectIdsForAsset(asset: LibraryReleaseAsset): ReadonlySet<string> {
   return new Set(
-    [asset.id, asset.source?.canonicalId, asset.relatedReleaseId].filter(
+    [asset.id, asset.source?.canonicalId, asset.linkedReleaseId].filter(
       (value): value is string => Boolean(value)
     )
   );
@@ -51,7 +51,7 @@ function rightsholdersForAsset(
 }
 
 function releaseIdForAsset(asset: LibraryReleaseAsset): string | null {
-  if (asset.relatedReleaseId) return asset.relatedReleaseId;
+  if (asset.linkedReleaseId) return asset.linkedReleaseId;
   return asset.source?.provider === 'discography'
     ? asset.source.canonicalId
     : null;

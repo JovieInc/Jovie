@@ -81,21 +81,6 @@ export const optimizationExperimentStatusEnum = pgEnum(
 
 export type LibraryJsonPayload = Record<string, unknown>;
 
-export interface LibraryRelationshipEvidence {
-  readonly source: string;
-  readonly sourceId?: string;
-  readonly rationale?: string;
-  readonly observedAt?: string;
-  readonly reviewerNote?: string;
-}
-
-export interface ArtistRuleProvenance {
-  readonly source: 'artist' | 'authorized_team' | 'memory' | 'contract';
-  readonly sourceId?: string;
-  readonly quote?: string;
-  readonly capturedAt: string;
-}
-
 export const artistRules = pgTable(
   'artist_rules',
   {
@@ -111,7 +96,7 @@ export const artistRules = pgTable(
     scopeValue: text('scope_value'),
     allowOverride: boolean('allow_override').default(false).notNull(),
     status: artistRuleStatusEnum('status').notNull().default('suggested'),
-    provenance: jsonb('provenance').$type<ArtistRuleProvenance>().notNull(),
+    provenance: jsonb('provenance').$type<LibraryJsonPayload>().notNull(),
     confirmedBy: uuid('confirmed_by').references(() => users.id, {
       onDelete: 'set null',
     }),
@@ -253,7 +238,7 @@ export const libraryRelationships = pgTable(
       .notNull()
       .default('suggested'),
     confidence: decimal('confidence', { precision: 5, scale: 4 }),
-    evidence: jsonb('evidence').$type<LibraryRelationshipEvidence>().notNull(),
+    evidence: jsonb('evidence').$type<LibraryJsonPayload>().notNull(),
     reviewedBy: uuid('reviewed_by').references(() => users.id, {
       onDelete: 'set null',
     }),

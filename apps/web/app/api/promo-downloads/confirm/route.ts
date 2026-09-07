@@ -35,7 +35,6 @@ const confirmSchema = z.object({
   fileName: z.string().min(1),
   fileMimeType: z.string(),
   fileSizeBytes: z.number().int().positive().optional(),
-  rightsControlAttested: z.literal(true),
 });
 
 function slugify(title: string): string {
@@ -94,7 +93,6 @@ export async function POST(request: NextRequest) {
       fileName,
       fileMimeType,
       fileSizeBytes,
-      rightsControlAttested,
     } = parsed.data;
 
     // Enforce the promo audio policy server-side: resolve the canonical MIME
@@ -199,9 +197,6 @@ export async function POST(request: NextRequest) {
         fileName,
         fileSizeBytes: verifiedBlob.sizeBytes,
         fileMimeType: verifiedBlob.canonicalMimeType,
-        rightsControlAttested,
-        rightsControlAttestedBy: user.id,
-        rightsControlAttestedAt: new Date(),
         isActive: false,
         position: nextPosition,
       })

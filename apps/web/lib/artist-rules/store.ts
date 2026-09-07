@@ -202,36 +202,3 @@ export async function activateSuggestedArtistRule(input: {
 
   return toView(activated);
 }
-
-export async function suggestArtistRuleFromMemory(input: {
-  readonly creatorProfileId: string;
-  readonly memoryId: string;
-  readonly category: string;
-  readonly ruleKey: string;
-  readonly instruction: string;
-  readonly strength: ArtistRuleStrength;
-  readonly allowOverride: boolean;
-}): Promise<ArtistRuleView> {
-  const now = new Date();
-  const [created] = await db
-    .insert(artistRules)
-    .values({
-      creatorProfileId: input.creatorProfileId,
-      category: input.category,
-      ruleKey: input.ruleKey,
-      instruction: input.instruction,
-      strength: input.strength,
-      allowOverride: input.allowOverride,
-      status: 'suggested',
-      provenance: {
-        source: 'memory',
-        sourceId: input.memoryId,
-        capturedAt: now.toISOString(),
-      },
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
-  if (!created) throw new Error('Artist rule suggestion insert failed');
-  return toView(created);
-}

@@ -21,7 +21,6 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { requestEmailOtp } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
-import { isPromoDownloadAvailable } from '@/lib/promo-downloads/rights-attestation';
 import { decodeCityHeader } from '../_geo';
 
 export const runtime = 'nodejs';
@@ -57,7 +56,7 @@ export async function POST(
       );
     }
 
-    // Fetch promo download + verify active + rights-attested + artist is Pro
+    // Fetch promo download + verify active + artist is Pro
     const [download] = await db
       .select({
         id: promoDownloads.id,
@@ -66,7 +65,6 @@ export async function POST(
         title: promoDownloads.title,
         artworkUrl: promoDownloads.artworkUrl,
         isActive: promoDownloads.isActive,
-        rightsControlAttested: promoDownloads.rightsControlAttested,
         artistName: creatorProfiles.displayName,
         isPro: users.isPro,
       })
@@ -79,7 +77,7 @@ export async function POST(
       .where(eq(promoDownloads.id, id))
       .limit(1);
 
-    if (!isPromoDownloadAvailable(download)) {
+    if (!download?.isActive || !download?.isPro) {
       return NextResponse.json(
         { error: 'Not found' },
         { status: 404, headers: NO_STORE_HEADERS }

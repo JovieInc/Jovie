@@ -2065,7 +2065,7 @@ function AssetDrawer({
     ? 'merch'
     : isYouTubeVideo
       ? 'relationships'
-      : 'post-release';
+      : 'details';
   const closedInteractiveProps = open ? {} : { tabIndex: -1 };
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
@@ -2182,7 +2182,7 @@ function AssetDrawer({
               ) : (
                 <>
                   {getLibraryItemKind(current) === 'release' ||
-                  current.relatedReleaseId ? (
+                  current.linkedReleaseId ? (
                     <DrawerSection
                       sectionId='post-release'
                       surface='card'

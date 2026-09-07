@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   listLibraryPostReleaseBundle: vi.fn(),
   listLibraryRelationshipsForProfile: vi.fn(),
   listVideosForLibraryProjection: vi.fn(),
-  hasConnectedYouTubeAccount: vi.fn(),
   loadAppShellRouteContext: vi.fn(),
   loadArchivedReleaseMatrixForProfile: vi.fn(),
   loadArtistHandleForProfile: vi.fn(),
@@ -31,9 +30,6 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/creator-documents/access', () => ({
   requireCreatorDocumentAccess: mocks.requireCreatorDocumentAccess,
-}));
-vi.mock('@/lib/artist-rules/store', () => ({
-  listArtistRulesForProfile: mocks.listArtistRulesForProfile,
 }));
 vi.mock('@/lib/db/creator-documents/store', () => ({
   listCreatorDocuments: mocks.listCreatorDocuments,
@@ -67,7 +63,6 @@ vi.mock('@/lib/queries/server', () => ({
 }));
 vi.mock('@/lib/youtube-library', () => ({
   listVideosForLibraryProjection: mocks.listVideosForLibraryProjection,
-  hasConnectedYouTubeAccount: mocks.hasConnectedYouTubeAccount,
 }));
 vi.mock('@/lib/releases/release-matrix-loader', () => ({
   loadArchivedReleaseMatrixForProfile:
@@ -93,20 +88,6 @@ const privateDocument = {
   content: { type: 'doc' as const, content: [] },
   plainText: 'Private body',
   updatedAt: '2026-08-18T00:00:00.000Z',
-};
-const artistRule = {
-  id: '33333333-3333-4333-8333-333333333333',
-  category: 'visual',
-  ruleKey: 'palette',
-  instruction: 'never use yellow',
-  strength: 'hard_constraint' as const,
-  scope: 'artist' as const,
-  scopeValue: null,
-  allowOverride: false,
-  status: 'active' as const,
-  provenanceSource: 'artist' as const,
-  confirmedAt: '2026-08-28T12:00:00.000Z',
-  createdAt: '2026-08-28T12:00:00.000Z',
 };
 
 function getClientProps(result: Awaited<ReturnType<typeof LibraryPage>>) {
@@ -143,7 +124,6 @@ describe('LibraryPage private document boundary', () => {
       nextCursor: 'older-documents',
     });
     mocks.listVideosForLibraryProjection.mockResolvedValue([]);
-    mocks.hasConnectedYouTubeAccount.mockResolvedValue(false);
     mocks.listArtistRulesForProfile.mockResolvedValue([]);
     mocks.listLibraryRelationshipsForProfile.mockResolvedValue([]);
     mocks.listLibraryPostReleaseBundle.mockResolvedValue({
@@ -156,7 +136,6 @@ describe('LibraryPage private document boundary', () => {
     mocks.loadArchivedReleaseMatrixForProfile.mockResolvedValue([]);
     mocks.getLibraryMerchCardsForProfile.mockResolvedValue([]);
     mocks.getLibraryProfileStateMapForProfile.mockResolvedValue(new Map());
-    mocks.listArtistRulesForProfile.mockResolvedValue([]);
     mocks.loadArtistHandleForProfile.mockResolvedValue(null);
     mocks.getLibraryAssetShareMapForProfile.mockResolvedValue(new Map());
   });
@@ -216,16 +195,5 @@ describe('LibraryPage private document boundary', () => {
     );
     expect(mocks.listLibraryPostReleaseBundle).toHaveBeenCalledWith(profileId);
     expect(mocks.listArtistRulesForProfile).toHaveBeenCalledWith(profileId);
-  });
-
-  it('passes artist rules into the library client', async () => {
-    mocks.listArtistRulesForProfile.mockResolvedValueOnce([artistRule]);
-
-    const result = await renderLibraryPage();
-
-    expect(mocks.listArtistRulesForProfile).toHaveBeenCalledWith(profileId);
-    expect(getClientProps(result)).toMatchObject({
-      initialArtistRules: [artistRule],
-    });
   });
 });

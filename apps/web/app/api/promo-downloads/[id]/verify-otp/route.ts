@@ -6,7 +6,7 @@
  * Analytics writes are best-effort (never block the download).
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
@@ -28,8 +28,6 @@ import {
   verifyEmailOtp,
 } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
-import { activeAttestedPromoDownloadsForRelease } from '@/lib/promo-downloads/query-filters';
-import { isPromoDownloadAvailable } from '@/lib/promo-downloads/rights-attestation';
 import { decodeCityHeader } from '../_geo';
 
 export const runtime = 'nodejs';
@@ -65,7 +63,6 @@ export async function POST(
         title: promoDownloads.title,
         artworkUrl: promoDownloads.artworkUrl,
         isActive: promoDownloads.isActive,
-        rightsControlAttested: promoDownloads.rightsControlAttested,
         artistName: creatorProfiles.displayName,
         artistHandle: creatorProfiles.username,
         isPro: users.isPro,
@@ -79,7 +76,7 @@ export async function POST(
       .where(eq(promoDownloads.id, id))
       .limit(1);
 
-    if (!isPromoDownloadAvailable(download)) {
+    if (!download?.isActive || !download?.isPro) {
       return NextResponse.json(
         { error: 'Not found' },
         { status: 404, headers: NO_STORE_HEADERS }
@@ -111,7 +108,12 @@ export async function POST(
         fileSizeBytes: promoDownloads.fileSizeBytes,
       })
       .from(promoDownloads)
-      .where(activeAttestedPromoDownloadsForRelease(download.releaseId))
+      .where(
+        and(
+          eq(promoDownloads.releaseId, download.releaseId),
+          eq(promoDownloads.isActive, true)
+        )
+      )
       .orderBy(promoDownloads.position);
 
     // Map files with their blob URLs (revealed only after OTP verification)

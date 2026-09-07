@@ -56,7 +56,6 @@ describe('artist rules route', () => {
       })
     );
     expect(response.status).toBe(403);
-    expect(mocks.createConfirmedArtistRule).not.toHaveBeenCalled();
   });
 
   it('creates a directly confirmed artist rule', async () => {

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildPublicPromoDownloadSeedRow,
   buildPublicReleaseApprovalSeedRow,
   isMissingPromoDownloadsRelationError,
   isRetryableSeedDatabaseError,
@@ -15,29 +14,6 @@ describe('buildPublicReleaseApprovalSeedRow', () => {
       assetId: 'release-456',
       itemKind: 'release',
       approvalStatus: 'approved',
-    });
-  });
-});
-
-describe('buildPublicPromoDownloadSeedRow', () => {
-  it('attests active promo download fixtures with the profile owner', () => {
-    const attestedAt = new Date('2026-08-31T21:20:00.000Z');
-
-    expect(
-      buildPublicPromoDownloadSeedRow({
-        creatorProfileId: 'profile-123',
-        releaseId: 'release-456',
-        attestedByUserId: 'user-789',
-        attestedAt,
-      })
-    ).toMatchObject({
-      creatorProfileId: 'profile-123',
-      releaseId: 'release-456',
-      slug: 'neon-skyline-radio-edit',
-      isActive: true,
-      rightsControlAttested: true,
-      rightsControlAttestedBy: 'user-789',
-      rightsControlAttestedAt: attestedAt,
     });
   });
 });

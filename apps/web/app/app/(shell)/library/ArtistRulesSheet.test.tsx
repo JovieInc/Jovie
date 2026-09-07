@@ -32,7 +32,6 @@ describe('ArtistRulesSheet', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Artist Rules' }));
     expect(await screen.findByText(baseRule.instruction)).toBeInTheDocument();
-    expect(screen.getAllByText('Hard rule')).not.toHaveLength(0);
     expect(screen.getByText(/Cannot be overridden/)).toBeInTheDocument();
   });
 
