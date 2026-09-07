@@ -2,8 +2,12 @@
 # install-cursor-cli-worker.sh — deterministic installer for the versioned
 # Symphony Cursor CLI worker units and known-good GEM_CURSOR_EXECUTABLE path.
 #
+# Target host is gem (Ubuntu Symphony), not a Mac. Tim owns multiple Macs —
+# never say "the Mac." MacBook Pro (mac.lan) may hold a logged-in Cursor for
+# reference only; MacBook Air is a separate host and is often offline.
+#
 # The repo is the source of truth for the worker, wrapper, service, and timer.
-# This script installs those files onto the host ONLY from an exact origin/main
+# This script installs those files onto gem ONLY from an exact origin/main
 # checkout (HEAD must equal origin/main and the sources must be clean), then
 # writes an install receipt binding the exact source SHA and file hashes.
 # It NEVER starts, stops, enables, or disables any unit and never runs

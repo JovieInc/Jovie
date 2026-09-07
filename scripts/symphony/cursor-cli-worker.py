@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Gem Cursor CLI worker: install path, auto-update, fail-closed health.
 
-This is the isolated Cursor lane's host contract on gem (Ubuntu Symphony).
-It never selects a Symphony route, never leases an issue, and never claims
-useful-turn capacity. Official Codex app-server on :4041 stays untouched.
-Controller (symphony-elixir / burrito) updates stay on
+Symphony and this Cursor CLI keep-alive run on gem (Ubuntu), not a Mac.
+Tim owns multiple Macs — never say "the Mac." Cursor install, auto-update,
+and uptime work target gem only. Tim's MacBook Pro (mac.lan) may hold a
+logged-in Cursor for reference and is the only Mac with Grok Bot local
+tools right now. MacBook Air is a separate host and is often offline.
+
+This worker never selects a Symphony route, never leases an issue, and never
+claims useful-turn capacity. Official Codex app-server on :4041 stays
+untouched. Controller (symphony-elixir / burrito) updates stay on
 update-symphony-burrito.sh --managed-controller-only. This worker updates
 only the Cursor CLI and never stops running fallback-ship / grok-sidecar
 units. JOV-5492 capacity evidence (maxConcurrent=0) is an admission gate,
@@ -41,11 +46,13 @@ EXIT_DEGRADED = 3
 AUTH_FAILURE = re.compile(r"not authenticated|not logged in|unauthori[sz]ed|\b401\b", re.I)
 VERSION_STAMP = re.compile(r"(20\d{2}\.\d{2}\.\d{2})")
 HOST_ROLE = "gem"
-HOST_LABEL = "Ubuntu Symphony"
+HOST_LABEL = "gem (Ubuntu Symphony)"
+CURSOR_CLI_TARGET = "gem"
+PRO_CURSOR_ROLE = "reference_only"
 HOSTS = {
-    "gem": "Ubuntu Symphony",
-    "pro": "mac.lan",
-    "air": "off",
+    "gem": "gem (Ubuntu) — Symphony + Cursor CLI install/auto-update/uptime target",
+    "pro": "Tim's MacBook Pro (mac.lan) — only Mac with Grok Bot local tools; Cursor login is reference only",
+    "air": "Tim's MacBook Air — separate, often offline",
     "pc": "dead",
 }
 PINNED_EXECUTABLE = "/home/timwhite/.local/bin/cursor-agent-std"
@@ -431,6 +438,8 @@ def probe_health(env=None, now=None):
         "reasons": reasons,
         "hostRole": HOST_ROLE,
         "hostLabel": HOST_LABEL,
+        "cursorCliTarget": CURSOR_CLI_TARGET,
+        "proCursorRole": PRO_CURSOR_ROLE,
         "hosts": dict(HOSTS),
         "codex": CODEX_STATUS,
         "throughput": "unknown",

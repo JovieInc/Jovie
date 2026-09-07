@@ -1,5 +1,5 @@
 [Unit]
-Description=Keep the Symphony Cursor CLI worker current
+Description=Keep the gem (Ubuntu) Symphony Cursor CLI worker current
 
 [Timer]
 OnBootSec=30s

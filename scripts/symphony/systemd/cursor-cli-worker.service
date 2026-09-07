@@ -1,5 +1,5 @@
 [Unit]
-Description=Symphony Cursor CLI worker health and auto-update
+Description=Gem (Ubuntu) Symphony Cursor CLI worker health and auto-update
 
 [Service]
 Type=oneshot
