@@ -43,7 +43,12 @@ const HEAD = 'a'.repeat(40);
 const OTHER_HEAD = 'b'.repeat(40);
 const PR_ID = 'PR_kwDO_native_pr';
 const ENTRY_ID = 'MQE_kwDO_native_entry';
-const QUEUE_ENTRY = { id: ENTRY_ID, state: 'QUEUED', position: 1 };
+const QUEUE_ENTRY = {
+  id: ENTRY_ID,
+  state: 'QUEUED',
+  position: 1,
+  enqueuedAt: '2026-07-15T00:00:00Z',
+};
 const AUTO_MERGE = { enabledAt: '2026-07-15T00:00:00Z' };
 const VALID_REPOSITORY = Object.freeze(
   JSON.parse(
@@ -761,6 +766,7 @@ describe('queue workflow mutation safety', () => {
     );
     expect(drain).toContain('qs: (.mergeQueueEntry.state // null)');
     expect(drain).toContain('qp: (.mergeQueueEntry.position // null)');
+    expect(drain).toContain('qa: (.mergeQueueEntry.enqueuedAt // null)');
     expect(drain).toContain('select(.qp == 1)');
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
@@ -931,6 +937,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.workflow_run.event // empty');
     expect(scope).toContain('== "merge_group"');
     expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
+    expect(enroll).toContain('DRAIN_RECONCILE_ADMISSION_RECEIPTS:');
     expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
     expect(enroll).toContain("steps.admission.outputs.deferred_release != '1'");
     expect(enroll).toContain(
@@ -983,7 +990,7 @@ describe('queue workflow mutation safety', () => {
       enroll.match(
         /steps\.release-checkpoint\.outputs\.admission_allowed == 'true'/g
       )
-    ).toHaveLength(3);
+    ).toHaveLength(4);
 
     const blocked = executeAdmissionScope({
       productionAdmissionAllowed: false,
@@ -2321,6 +2328,8 @@ describe('native enrollment', () => {
     ['missing id', { state: 'QUEUED', position: 1 }],
     ['unknown state', { ...QUEUE_ENTRY, state: 'UNKNOWN' }],
     ['missing position', { id: ENTRY_ID, state: 'QUEUED' }],
+    ['missing enqueuedAt', { id: ENTRY_ID, state: 'QUEUED', position: 1 }],
+    ['malformed enqueuedAt', { ...QUEUE_ENTRY, enqueuedAt: 'not-a-date' }],
     ['zero position', { ...QUEUE_ENTRY, position: 0 }],
     ['negative position', { ...QUEUE_ENTRY, position: -1 }],
     ['fractional position', { ...QUEUE_ENTRY, position: 1.5 }],
@@ -2408,6 +2417,22 @@ describe('native enrollment', () => {
 });
 
 describe('native dequeue', () => {
+  it('rejects guarded CLI dequeue without the sole-writer authorization', async () => {
+    const runner = vi.fn();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({ code: 'native_mutation_unauthorized' });
+    expect(runner).not.toHaveBeenCalled();
+  });
+
   it('dequeues the queue entry and disables auto-merge using the PullRequest id', async () => {
     const runner = createNativeRunner({
       states: [
@@ -2446,6 +2471,178 @@ describe('native dequeue', () => {
     await expect(dequeue(runner)).rejects.toMatchObject({
       code: 'dequeue_postcondition_failed',
     });
+  });
+
+  it('runs the guarded CLI through live entry revalidation and external mutations', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: AUTO_MERGE,
+    });
+    const readRunner = createNativeRunner({
+      states: [
+        queued,
+        queued,
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState(),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+    const write = vi.fn();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write,
+      })
+    ).resolves.toMatchObject({
+      changed: true,
+      guardedQueueEntry: {
+        id: ENTRY_ID,
+        enqueuedAt: QUEUE_ENTRY.enqueuedAt,
+      },
+    });
+
+    expect(
+      readRunner.mock.calls.filter(([args]) =>
+        queryText(args).includes('MergeQueuePullRequestState')
+      )
+    ).toHaveLength(4);
+    expect(invokedNativeMutation(readRunner)).toBe(false);
+    expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('dequeuePullRequest')
+      )
+    ).toBe(true);
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('disablePullRequestAutoMerge')
+      )
+    ).toBe(true);
+    expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({
+      changed: true,
+      state: { headRefOid: HEAD, isInMergeQueue: false },
+    });
+  });
+
+  it('suppresses the guarded CLI when the exact head changed before mutation', async () => {
+    const readRunner = createNativeRunner({
+      states: [
+        prState({
+          headRefOid: OTHER_HEAD,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+    });
+    expect(invokedNativeMutation(mutationRunner)).toBe(false);
+  });
+
+  it.each([
+    ['id', { id: 'MQE_kwDO_replacement_entry' }],
+    ['enqueuedAt', { enqueuedAt: '2026-07-15T00:01:00Z' }],
+  ])('suppresses mutation when the live queue entry %s changed after observation', async (_field, replacement) => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const replaced = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: {
+        ...QUEUE_ENTRY,
+        ...replacement,
+      },
+    });
+    const readRunner = createNativeRunner({ states: [queued, replaced] });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'queue-entry-changed',
+      guardedQueueEntry: {
+        id: ENTRY_ID,
+        enqueuedAt: QUEUE_ENTRY.enqueuedAt,
+      },
+    });
+    expect(invokedNativeMutation(mutationRunner)).toBe(false);
+  });
+
+  it('reports a head race after dequeue without mutating replacement auto-merge', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const readRunner = createNativeRunner({
+      states: [
+        queued,
+        queued,
+        prState({ headRefOid: OTHER_HEAD, autoMergeRequest: AUTO_MERGE }),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({
+      code: 'dequeue_head_raced',
+      details: { expectedHeadOid: HEAD },
+    });
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('dequeuePullRequest')
+      )
+    ).toBe(true);
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('disablePullRequestAutoMerge')
+      )
+    ).toBe(false);
   });
 });
 
@@ -2827,6 +3024,11 @@ describe('authoritative native state listing', () => {
     const queries = runner.mock.calls.map(call => queryText(call[0]));
     expect(
       queries.some(query => query.includes('MergeQueuePullRequestState'))
+    ).toBe(true);
+    expect(
+      queries.some(query =>
+        query.includes('mergeQueueEntry { id state position enqueuedAt }')
+      )
     ).toBe(true);
     expect(
       queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))

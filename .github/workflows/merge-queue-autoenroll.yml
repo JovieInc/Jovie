@@ -515,6 +515,10 @@ jobs:
           # only bot-authored exact-head native-admission receipts, with fresh
           # checks and the shared admission bound below; it is never a global sweep.
           DRAIN_RECONCILE_QUEUE_REENTRY: ${{ steps.release-checkpoint.outputs.admission_allowed == 'true' && needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.reconcile_queue_reentry == '1' && '1' || '0' }}
+          # Native membership created outside this controller is not admission
+          # authority. Under an exact verified checkpoint, the sole writer
+          # replaces stale/unbound entries with fresh machine receipts.
+          DRAIN_RECONCILE_ADMISSION_RECEIPTS: ${{ steps.release-checkpoint.outputs.admission_allowed == 'true' && needs.fleet-policy.outputs.mode == 'normal' && '1' || '0' }}
           # GitHub's single pending slot can replace an exact CI admission event
           # even with cancel-in-progress=false. Reconcile only in the same fleet
           # modes that already permit clean exact-head admission. Admissions are

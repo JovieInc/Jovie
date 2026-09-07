@@ -5336,3 +5336,183 @@ JSON
         assert "--remove-label queue-deferred" in log
         assert "pr ready" not in log
         assert "--add-label queue-deferred" not in log, "no compensating restore expected"
+
+
+class TestNativeAdmissionReceiptReconciliation:
+    @staticmethod
+    def _write_fixture(
+        tmp_path: Path,
+        *,
+        receipt_main: str,
+        receipt_at: str | None,
+        enqueued_at: str | None = "2026-09-07T12:00:00Z",
+        dequeue_response: str = '{"skipped":false,"state":{"queued":false}}',
+    ) -> tuple[str, Path]:
+        head = "c" * 40
+        dequeue_log = tmp_path / "dequeued"
+        dequeue_log.write_text("", encoding="utf-8")
+        node_calls = tmp_path / "node-calls"
+        node_calls.write_text("", encoding="utf-8")
+        queue_timestamp = (
+            f',"enqueuedAt":"{enqueued_at}"' if enqueued_at is not None else ""
+        )
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                echo "${{2:-}}" >>"{node_calls}"
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state)
+                    echo '{{"1001":{{"id":"PR_1001","number":1001,"state":"OPEN","isDraft":false,"title":"Receipt reconciliation","body":"","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefName":"codex/receipt","headRefOid":"{head}","baseRefName":"main","labels":{{"nodes":[]}},"isInMergeQueue":true,"mergeQueueEntry":{{"id":"MQE_1001","state":"QUEUED","position":1{queue_timestamp}}},"autoMergeRequest":null,"queued":true,"backend":"native"}}}}'
+                    ;;
+                  dequeue-ineligible)
+                    echo "${{3:?}}" >>"{dequeue_log}"
+                    echo '{dequeue_response}'
+                    ;;
+                  max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-unmergeable"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        status_json = (
+            '{"statuses":[]}'
+            if receipt_at is None
+            else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint=verified;main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
+        )
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+                  echo '{status_json}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+        return head, dequeue_log
+
+    @pytest.mark.parametrize(
+        ("receipt_main", "receipt_at", "expected_dequeue"),
+        [
+            ("a" * 40, "2026-09-07T12:00:02Z", False),
+            ("a" * 40, "2026-09-07T11:59:59Z", True),
+            ("b" * 40, "2026-09-07T12:00:02Z", True),
+            ("a" * 40, None, True),
+        ],
+    )
+    def test_reconciles_only_fresh_current_checkpoint_receipts(
+        self,
+        tmp_path: Path,
+        receipt_main: str,
+        receipt_at: str | None,
+        expected_dequeue: bool,
+    ) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path,
+            receipt_main=receipt_main,
+            receipt_at=receipt_at,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_PROMOTION_MODE=normal "
+                    "DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=0"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        dequeued = dequeue_log.read_text(encoding="utf-8").splitlines()
+        assert dequeued == (["1001"] if expected_dequeue else [])
+        if expected_dequeue:
+            assert "stale or missing exact-checkpoint admission" in result.stdout
+        else:
+            assert "=fresh exact-checkpoint native admission" in result.stdout
+
+    def test_guarded_dequeue_skip_does_not_clear_the_queue_snapshot(
+        self, tmp_path: Path
+    ) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path,
+            receipt_main="b" * 40,
+            receipt_at="2026-09-07T12:00:02Z",
+            dequeue_response=(
+                '{"skipped":true,"reason":"queue-entry-changed",'
+                '"state":{"queued":true}}'
+            ),
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_PROMOTION_MODE=normal "
+                    "DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=0"
+                ),
+            )
+        )
+
+        assert result.returncode != 0
+        assert dequeue_log.read_text(encoding="utf-8").splitlines() == ["1001"]
+        assert "stale dequeue suppressed" in result.stdout
+        assert "Failed to remove unproven native admission" in result.stderr
+        node_commands = (tmp_path / "node-calls").read_text(encoding="utf-8").splitlines()
+        assert "enroll" not in node_commands
+        assert "record-reentry" not in node_commands
+
+    def test_missing_enqueue_timestamp_stops_before_mutation(self, tmp_path: Path) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path,
+            receipt_main="a" * 40,
+            receipt_at="2026-09-07T12:00:02Z",
+            enqueued_at=None,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_PROMOTION_MODE=normal "
+                    "DRAIN_RECONCILE_ADMISSION_RECEIPTS=1"
+                ),
+            )
+        )
+
+        assert result.returncode == 1
+        assert "no authoritative enqueue timestamp" in result.stderr
+        assert dequeue_log.read_text(encoding="utf-8") == ""
