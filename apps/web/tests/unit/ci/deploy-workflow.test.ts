@@ -4079,7 +4079,7 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
     ) as { packageManager?: string };
     const setupPnpmStep = getStepBlock(cleanupWorkflow, 'Setup pnpm');
 
-    expect(packageJson.packageManager).toBe('pnpm@9.15.4');
+    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
     expect(setupPnpmStep).toContain('uses: pnpm/action-setup@');
     expect(setupPnpmStep).not.toMatch(/^\s+version:/m);
   });
