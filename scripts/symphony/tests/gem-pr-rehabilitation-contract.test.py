@@ -207,7 +207,9 @@ class DeploymentContractTests(unittest.TestCase):
             CYCLE.subprocess, "run", side_effect=run_drain
         ), mock.patch.object(CYCLE, "run_summer_bottleneck_producer", side_effect=summer) as producer, mock.patch.object(
             CYCLE, "run_summer_symphony_consumer", return_value=78
-        ) as consumer:
+        ) as consumer, mock.patch.object(
+            CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 1}
+        ):
             self.assertEqual(CYCLE.main(), 0)
 
         producer.assert_called_once_with()
@@ -409,6 +411,8 @@ exit 0
                 / "gem/scripts/summer-symphony-outbox-consumer.mjs"
             )
             self.assertTrue(installed_consumer.is_file())
+            for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py"):
+                self.assertTrue((installed_gate.parent / name).is_file(), name)
             import_check = subprocess.run(
                 [sys.executable, str(installed_gate), "--help"],
                 cwd=installed_gate.parent,
@@ -430,6 +434,9 @@ exit 0
         self.assertEqual(import_check.returncode, 0, import_check.stderr)
         self.assertTrue(receipt["artifacts"]["proofContext"]["matches"])
         self.assertTrue(receipt["artifacts"]["summerSymphonyConsumer"]["matches"])
+        self.assertTrue(receipt["artifacts"]["acceptedCompletion"]["matches"])
+        self.assertTrue(receipt["artifacts"]["capacityEvidence"]["matches"])
+        self.assertTrue(receipt["artifacts"]["providerCapacity"]["matches"])
 
     def test_failed_install_restores_every_prior_timer_state(self):
         for prior_enabled in (False, True):

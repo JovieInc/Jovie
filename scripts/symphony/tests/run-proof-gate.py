@@ -11,12 +11,16 @@ import types
 
 ROOT = Path(__file__).resolve().parents[3]
 SUITES = [ROOT / "scripts/symphony/tests/useful-turn-proof.test.py",
+          ROOT / "scripts/symphony/tests/accepted-completion.test.py",
+          ROOT / "scripts/symphony/tests/provider-capacity.test.py",
           ROOT / "scripts/symphony/tests/symphony-concurrency-controller.test.py"]
 TARGETS = {
     "gem_gate_contract.py": {"v2_parse_time", "v2_validate_runtime_identity", "v2_validate_useful_turn_proof", "v2_accepted_useful_turn_proofs", "v2_validate_capacity_receipt"},
     "symphony_proof_context.py": None,
     "symphony_useful_turn_probe.py": None,
     "symphony_capacity_evidence.py": None,
+    "symphony_accepted_completion.py": {"validate_lease", "validate_result", "validate_github_outcome", "github_outcome", "build_proof", "persist_proof", "reconcile"},
+    "provider_capacity.py": {"provider_record", "apply_observation", "record_observation"},
     "symphony-concurrency-controller.py": None,
 }
 

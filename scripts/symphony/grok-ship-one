@@ -41,7 +41,8 @@ LOG_DIR="${GROK_SHIP_LOG_DIR:-$HOME/grok-ship-logs}"
 LOG="$LOG_DIR/$ID.log"
 LEASE_DIR="${SYMPHONY_FALLBACK_LEASE_DIR:-$HOME/.local/state/symphony-fallback/leases}"
 RECEIPT_DIR="${SYMPHONY_FALLBACK_RECEIPT_DIR:-$HOME/.local/state/symphony-fallback/receipts}"
-mkdir -p "$LOG_DIR" "$WS_ROOT" "$LEASE_DIR" "$RECEIPT_DIR"
+COMPLETION_DIR="${SYMPHONY_FALLBACK_COMPLETION_DIR:-$RECEIPT_DIR/completions}"
+mkdir -p "$LOG_DIR" "$WS_ROOT" "$LEASE_DIR" "$RECEIPT_DIR" "$COMPLETION_DIR"
 : "${SYMPHONY_FALLBACK_SELECTION_B64:?router selection is required}"
 : "${SYMPHONY_FALLBACK_ISSUE_REVISION:?issue revision is required}"
 : "${SYMPHONY_FALLBACK_BUNDLE_REVISION:?bundle revision is required}"
@@ -87,6 +88,9 @@ EXISTING_NUMBER=""
 EXISTING_MERGE_STATE=""
 CHANGELOG_ONLY_REMOUNT=0
 SKIP_GROK=0
+EXECUTOR_RAN=0
+EXECUTOR_BASE_HEAD=""
+EXECUTOR_FINAL_HEAD=""
 if VERDICT_JSON="$(symphony-codex-exhausted open-pr-verdict "$ID" 2>/dev/null)"; then
   VERDICT="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("verdict") or "none")' "$VERDICT_JSON")"
   EXISTING_HEAD="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("head") or "")' "$VERDICT_JSON")"
@@ -323,8 +327,9 @@ fi
 RECEIPT="$RECEIPT_DIR/$ID.json"
 RECEIPT_PATH="$RECEIPT" RECEIPT_ID="$ID" RECEIPT_ISSUE_REVISION="$ISSUE_REVISION" \
 RECEIPT_BUNDLE_REVISION="$SYMPHONY_FALLBACK_BUNDLE_REVISION" RECEIPT_SELECTION="$SELECTION_JSON" \
-RECEIPT_BASE_REVISION="$(git -C "$WS" rev-parse HEAD)" RECEIPT_UNIT="$SYMPHONY_FALLBACK_UNIT" python3 - <<'PY'
-import hashlib, json, os, pathlib, re, tempfile, time
+RECEIPT_BASE_REVISION="$(git -C "$WS" rev-parse HEAD)" RECEIPT_UNIT="$SYMPHONY_FALLBACK_UNIT" \
+RECEIPT_REPOSITORY="$REPO" python3 - <<'PY'
+import hashlib, json, os, pathlib, re, shutil, tempfile, time
 selection = json.loads(os.environ["RECEIPT_SELECTION"])["selected"]
 identifier = os.environ["RECEIPT_ID"]
 issue_revision = os.environ["RECEIPT_ISSUE_REVISION"]
@@ -337,6 +342,40 @@ if (
     or os.environ["RECEIPT_UNIT"] != expected_unit
 ):
     raise SystemExit("fallback provenance is invalid")
+configured = selection["executor"]["executable"]
+identity_provider = selection["provider"]
+if pathlib.Path(configured).name == "hermes":
+    # The worker's existing compatibility path rewrites this legacy registry
+    # entry to the installed Grok CLI. Bind evidence to what will execute; a
+    # missing rewrite target remains fail closed and Hermes is never attested.
+    configured = os.environ.get("GEM_GROK_EXECUTABLE") or os.environ.get("GEM_GROK_BIN") or ""
+    identity_provider = "grok"
+resolved = pathlib.Path(configured).expanduser() if pathlib.Path(configured).is_absolute() else pathlib.Path(shutil.which(configured) or "")
+if (not resolved.is_file() or resolved.is_symlink() or not os.access(resolved, os.X_OK)
+        or resolved.name == "hermes"):
+    raise SystemExit("fallback executor identity is invalid")
+executor_sha = hashlib.sha256(resolved.read_bytes()).hexdigest()
+executor_profile = hashlib.sha256(json.dumps(
+    [identity_provider, selection["model"], str(resolved.resolve()), executor_sha]
+).encode()).hexdigest()
+auth_defaults = {
+    "cursor": pathlib.Path.home() / ".cursor" / "cli-config.json",
+    "grok": pathlib.Path.home() / ".grok" / "auth.json",
+    "kimi": pathlib.Path.home() / ".kimi-code" / "credentials" / "kimi-code.json",
+}
+auth_path = pathlib.Path(os.environ.get("SYMPHONY_FALLBACK_AUTH_STATE_PATH") or auth_defaults.get(identity_provider, ""))
+auth_info = auth_path.stat() if not auth_path.is_symlink() and auth_path.is_file() else None
+if (auth_info is None or auth_info.st_uid != os.getuid() or auth_info.st_mode & 0o022):
+    raise SystemExit("fallback auth pool identity is invalid")
+auth_sha = hashlib.sha256(auth_path.read_bytes()).hexdigest()
+profile = hashlib.sha256(json.dumps(
+    [executor_profile, str(auth_path.resolve()), auth_sha]
+).encode()).hexdigest()
+lease_stat = os.fstat(9)
+lease_identity = hashlib.sha256(json.dumps([
+    identifier, issue_revision, bundle_revision, os.environ["RECEIPT_UNIT"],
+    identity_provider, selection["model"], lease_stat.st_dev, lease_stat.st_ino,
+]).encode()).hexdigest()
 payload = {
     "schema": "symphony-fallback-lease/v1",
     "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -345,9 +384,18 @@ payload = {
     "baseRevision": base_revision,
     "bundleRevision": bundle_revision,
     "unit": expected_unit,
-    "provider": selection["provider"],
+    "provider": identity_provider,
     "model": selection["model"],
     "modelId": selection["id"],
+    "repository": os.environ["RECEIPT_REPOSITORY"],
+    "executorPath": str(resolved.resolve()),
+    "executorSha256": executor_sha,
+    "executorProfile": executor_profile,
+    "authStatePath": str(auth_path.resolve()),
+    "authStateSha256": auth_sha,
+    "authPoolIdentity": profile,
+    "profile": profile,
+    "leaseIdentity": lease_identity,
     "ownership": "isolated-implementation-only",
     "forbidden": ["merge", "deploy", "direct-ready", "direct-auto-merge-without-proof", "remove-queue-deferred"],
 }
@@ -360,6 +408,7 @@ try:
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, path)
+    os.chmod(path, 0o600)
 finally:
     if os.path.exists(temporary):
         os.unlink(temporary)
@@ -380,14 +429,18 @@ if [ "$CHANGELOG_ONLY_REMOUNT" = 1 ]; then
 fi
 
 attempt_log="$(mktemp "$LOG_DIR/.${ID}.attempt.XXXXXX")"
-trap 'rm -f "$attempt_log"; release_fallback_lease' EXIT
+execution_outcome="$(mktemp "$LOG_DIR/.${ID}.outcome.XXXXXX")"
+trap 'rm -f "$attempt_log" "$execution_outcome"; release_fallback_lease' EXIT
 echo "START $ID $(date -u +%FT%TZ) repo=$REPO" | tee -a "$LOG"
 set +e
 if [ "$SKIP_GROK" = 1 ]; then
   rc=0
 else
+EXECUTOR_BASE_HEAD="$(git -C "$WS" rev-parse HEAD)"
+EXECUTOR_RAN=1
 SYMPHONY_PROVIDER_CAPACITY_MODULE="$RUNTIME_DIR/provider_capacity.py" \
-SELECTION_JSON="$SELECTION_JSON" FALLBACK_PROMPT="$PROMPT" FALLBACK_CWD="$WS" python3 - <<'PY' 2>&1 | tee -a "$LOG" "$attempt_log"
+SELECTION_JSON="$SELECTION_JSON" FALLBACK_PROMPT="$PROMPT" FALLBACK_CWD="$WS" \
+EXECUTION_OUTCOME="$execution_outcome" python3 - <<'PY' 2>&1 | tee -a "$LOG" "$attempt_log"
 import importlib.util
 import json, os, pathlib, re, subprocess, time
 selected = json.loads(os.environ["SELECTION_JSON"])["selected"]
@@ -402,10 +455,14 @@ executable = executor["executable"]
 env = os.environ.copy()
 grok = os.environ.get("GEM_GROK_EXECUTABLE") or os.environ.get("GEM_GROK_BIN") or ""
 hermes = pathlib.Path(executable).name == "hermes"
+actual_provider = selected["provider"]
+actual_model = selected["model"]
 if hermes and grok and os.access(grok, os.X_OK):
     # Hermes on Gem uses OpenRouter (max_tokens 65536) and 402s. Prefer included grok.
     print("rewrite_hermes_openrouter_to_grok", grok, flush=True)
     executable = grok
+    actual_provider = "grok"
+    actual_model = "grok-4.6"
     argv = [
         "-m", "grok-4.6",
         "--always-approve",
@@ -465,6 +522,7 @@ for _ in range(2):
     tried.add(nxt)
     print(f"retry_cursor_grok_model {nxt}", flush=True)
     result = run_executor(with_model(argv, nxt))
+    actual_model = nxt
     sys_out = (result.stdout or "") + (result.stderr or "")
     print(sys_out, end="")
 
@@ -478,7 +536,9 @@ def pressure_kind(output, returncode):
         return "host_pressure"
     if re.search(r"timed out|timeout|connection reset|connection refused|linear|github api|downstream", text):
         return "downstream_pressure"
-    return "useful_completion" if returncode == 0 else None
+    # Executor success is only a candidate. Capacity can increase only after
+    # an immutable exact-head result is merged with current required CI green.
+    return None
 
 kind = pressure_kind(sys_out, result.returncode)
 capacity_path = os.environ.get("SYMPHONY_PROVIDER_CAPACITY_STATE")
@@ -503,11 +563,18 @@ if kind and capacity_module_path and pathlib.Path(capacity_module_path).is_file(
         print(f"provider_capacity_observation_failed kind={kind} reason={type(error).__name__}", flush=True)
 if "402" in sys_out and ("max_tokens" in sys_out or "can only afford" in sys_out):
     raise SystemExit(2)
+if result.returncode == 0:
+    outcome = pathlib.Path(os.environ["EXECUTION_OUTCOME"])
+    outcome.write_text(json.dumps({"provider": actual_provider, "model": actual_model}, sort_keys=True))
+    outcome.chmod(0o600)
 raise SystemExit(result.returncode)
 PY
 rc=${PIPESTATUS[0]}
 fi
 set -e
+if [ "$rc" -eq 0 ] && [ "$EXECUTOR_RAN" -eq 1 ]; then
+  EXECUTOR_FINAL_HEAD="$(git -C "$WS" rev-parse HEAD)"
+fi
 
 pr_count="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)"
 if [ "$pr_count" -gt 0 ]; then
@@ -560,6 +627,76 @@ if [ "$pr_count" -gt 0 ]; then
 
   promotion_state="$(read_pr_promotion_state)"
   promotion_head="$(jq -r '.head // ""' <<<"$promotion_state")"
+  if [ "$rc" -eq 0 ] && [ "$EXECUTOR_RAN" -eq 1 ] \
+      && [[ "$promotion_head" =~ ^[0-9a-f]{40}$ ]] \
+      && [ "$promotion_head" = "$EXECUTOR_FINAL_HEAD" ] \
+      && [ "$EXECUTOR_FINAL_HEAD" != "$EXECUTOR_BASE_HEAD" ]; then
+    result_path="$COMPLETION_DIR/${ID}-${promotion_head}.json"
+    RESULT_PATH="$result_path" RESULT_RECEIPT="$RECEIPT" RESULT_PR="$pr_number" \
+    RESULT_HEAD="$promotion_head" RESULT_BASE_HEAD="$EXECUTOR_BASE_HEAD" \
+    RESULT_OUTCOME="$execution_outcome" python3 - <<'PY'
+import hashlib, json, os, pathlib, tempfile, time
+
+lease_path = pathlib.Path(os.environ["RESULT_RECEIPT"])
+lease_bytes = lease_path.read_bytes()
+lease = json.loads(lease_bytes)
+execution = json.loads(pathlib.Path(os.environ["RESULT_OUTCOME"]).read_text())
+if execution.get("provider") != lease["provider"]:
+    raise SystemExit("completion provider changed during execution")
+auth_state = pathlib.Path(lease["authStatePath"])
+auth_info = auth_state.stat() if not auth_state.is_symlink() and auth_state.is_file() else None
+if (auth_info is None or auth_info.st_uid != os.getuid() or auth_info.st_mode & 0o022
+        or hashlib.sha256(auth_state.read_bytes()).hexdigest() != lease["authStateSha256"]):
+    raise SystemExit("completion auth pool changed during execution")
+executor_profile = hashlib.sha256(json.dumps([
+    execution["provider"], execution["model"], lease["executorPath"], lease["executorSha256"]
+]).encode()).hexdigest()
+profile = hashlib.sha256(json.dumps([
+    executor_profile, lease["authStatePath"], lease["authStateSha256"]
+]).encode()).hexdigest()
+payload = {
+    "schema": "symphony-fallback-result/v1",
+    "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "identifier": lease["identifier"],
+    "issueRevision": lease["issueRevision"],
+    "repository": lease["repository"],
+    "provider": execution["provider"],
+    "model": execution["model"],
+    "modelId": lease["modelId"],
+    "executorPath": lease["executorPath"],
+    "executorSha256": lease["executorSha256"],
+    "executorProfile": executor_profile,
+    "authStatePath": lease["authStatePath"],
+    "authStateSha256": lease["authStateSha256"],
+    "authPoolIdentity": profile,
+    "profile": profile,
+    "selectedModel": lease["model"],
+    "selectedProfile": lease["profile"],
+    "leaseIdentity": lease["leaseIdentity"],
+    "leaseReceiptSha256": hashlib.sha256(lease_bytes).hexdigest(),
+    "executionBaseHead": os.environ["RESULT_BASE_HEAD"],
+    "executionFinalHead": os.environ["RESULT_HEAD"],
+    "headSha": os.environ["RESULT_HEAD"],
+    "prNumber": int(os.environ["RESULT_PR"]),
+    "executorRc": 0,
+}
+canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+payload["resultId"] = hashlib.sha256(canonical).hexdigest()
+encoded = json.dumps(payload, indent=2, sort_keys=True).encode() + b"\n"
+path = pathlib.Path(os.environ["RESULT_PATH"])
+path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+try:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+except FileExistsError:
+    if path.read_bytes() != encoded:
+        raise SystemExit("completion result replay conflicts")
+else:
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(encoded)
+        handle.flush()
+        os.fsync(handle.fileno())
+PY
+  fi
   writer_login="${GITHUB_ACTOR:-$(gh api user --jq .login 2>/dev/null || true)}"
   promotion_decision="$(jq -nc \
     --argjson state "$promotion_state" \

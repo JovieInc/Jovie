@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gem_repo_registry import pr_drain_repos
+import symphony_accepted_completion
 
 JOVIE_REPOSITORY = "JovieInc/Jovie"
 
@@ -67,6 +68,16 @@ def run_summer_symphony_consumer() -> int:
 
 
 def main() -> int:
+    # Completion acceptance is independent of remediationAdmission. Running it
+    # first lets a previously merged provider result restore measured capacity
+    # when the prior receipt correctly failed closed at zero.
+    try:
+        symphony_accepted_completion.reconcile(
+            symphony_accepted_completion.parser().parse_args([])
+        )
+        completion_returncode = 0
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        completion_returncode = 78
     results: list[tuple[str, int]] = []
     for repo in pr_drain_repos():
         environment = os.environ.copy()
@@ -92,6 +103,7 @@ def main() -> int:
     except (OSError, subprocess.SubprocessError):
         consumer_returncode = 1
     print("Gem PR rehabilitation cycle:")
+    print(f"Accepted completion reconciliation: rc={completion_returncode}")
     for repo, returncode in results:
         print(f"  {repo}: rc={returncode}")
     print(f"Summer Jovie bottleneck snapshot: rc={summer_returncode}")
