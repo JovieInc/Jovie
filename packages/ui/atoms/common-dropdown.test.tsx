@@ -57,7 +57,9 @@ const basicItems: CommonDropdownItem[] = [
 describe('CommonDropdown', () => {
   describe('Far-edge placement (deliberate-red regression)', () => {
     it('keeps dropdown and context surfaces inside the viewport collision gutter', () => {
-      const dropdown = render(<CommonDropdown items={basicItems} open={true} />);
+      const dropdown = render(
+        <CommonDropdown items={basicItems} open={true} />
+      );
       expect(capturedDropdownContentProps.at(-1)?.collisionPadding).toBe(8);
       dropdown.unmount();
 
