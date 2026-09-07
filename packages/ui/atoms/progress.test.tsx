@@ -20,9 +20,9 @@ describe('ProgressBar', () => {
   it('uses the canonical subtle motion easing for width changes', () => {
     render(<ProgressBar value={42} />);
 
-    const indicator = screen.getByRole('progressbar').querySelector(
-      '[data-part="indicator"]'
-    );
+    const indicator = screen
+      .getByRole('progressbar')
+      .querySelector('[data-part="indicator"]');
     expect(indicator).toHaveClass('duration-subtle', 'ease-subtle');
     expect(indicator).not.toHaveClass('ease-out');
   });
