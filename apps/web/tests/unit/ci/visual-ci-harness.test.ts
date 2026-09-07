@@ -173,7 +173,35 @@ describe('visual CI harness', () => {
     );
   });
 
-  it('does not gate homepage viewport screenshots on whole-page network idle', () => {
+  it('keeps legacy homepage screenshots on document and visual readiness, not network idle', () => {
+    const source = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/visual-regression.spec.ts'),
+      'utf8'
+    );
+    const start = source.indexOf('async function openHomepageForScreenshot(');
+    const end = source.indexOf("test.describe('auth pages dark-mode", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const legacy = source.slice(start, end);
+    expect(legacy).not.toContain("waitUntil: 'networkidle'");
+    expect(legacy).not.toContain('test.skip(');
+    expect(legacy).toContain("waitUntil: 'domcontentloaded'");
+    expect(legacy).toContain(
+      "expect(response?.status(), 'homepage document must succeed').toBe(200)"
+    );
+    expect(legacy).toContain("expect(new URL(page.url()).pathname).toBe('/')");
+    expect(legacy).toContain("page.getByTestId('homepage-hero-shell')");
+    expect(legacy).toContain("page.locator('h1').first()");
+    expect(legacy).toContain('document.fonts.status');
+    expect(legacy).toContain('image.complete');
+    expect(legacy).toContain('image.naturalWidth === 0');
+    expect(
+      legacy.match(/await openHomepageForScreenshot\(page\)/g)
+    ).toHaveLength(3);
+    expect(legacy.match(/toHaveScreenshot\('homepage-/g)).toHaveLength(3);
+  });
+
+  it('does not gate any homepage viewport navigation on whole-page network idle', () => {
     const source = readFileSync(
       resolve(webWorkspace, 'tests/e2e/visual-regression.spec.ts'),
       'utf8'
@@ -190,6 +218,7 @@ describe('visual CI harness', () => {
     expect(blockEnd).toBeGreaterThan(blockStart);
 
     const homepageViewportBlock = source.slice(blockStart, blockEnd);
+    expect(homepageViewportBlock).not.toContain("waitUntil: 'networkidle'");
     const screenshotStart = homepageViewportBlock.indexOf(
       'test(`homepage screenshot at ${viewport.label}px`'
     );
