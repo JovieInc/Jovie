@@ -15,8 +15,12 @@ import {
 function pair() {
   const keys = generateKeyPairSync('ed25519');
   return {
-    privateKey: keys.privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
-    publicKey: keys.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
+    privateKey: keys.privateKey
+      .export({ format: 'pem', type: 'pkcs8' })
+      .toString(),
+    publicKey: keys.publicKey
+      .export({ format: 'pem', type: 'spki' })
+      .toString(),
   };
 }
 
@@ -62,7 +66,11 @@ function taskV2(overrides = {}) {
   };
 }
 
-function signedOutbox(task = taskV2(), signing = summer, keyId = 'summer-outbox') {
+function signedOutbox(
+  task = taskV2(),
+  signing = summer,
+  keyId = 'summer-outbox'
+) {
   const domain =
     task.schema === 'jovie-symphony-repair-task/v2'
       ? OUTBOX_DOMAIN_V2
@@ -105,7 +113,8 @@ describe('Summer Symphony consumer contract foundation', () => {
       /projection-cross-bound/
     );
     assert.throws(
-      () => verifyOutboxRecord(signedOutbox(taskV2(), foreign, 'foreign'), keys),
+      () =>
+        verifyOutboxRecord(signedOutbox(taskV2(), foreign, 'foreign'), keys),
       /outbox-signing-key-unknown/
     );
   });
@@ -124,7 +133,9 @@ describe('Summer Symphony consumer contract foundation', () => {
       () =>
         parseVerificationKeys(
           JSON.stringify({
-            wrong: p256.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+            wrong: p256.publicKey
+              .export({ type: 'spki', format: 'pem' })
+              .toString(),
           })
         ),
       /verification-keys-invalid/

@@ -12,17 +12,17 @@ import {
   createHash,
   createPrivateKey,
   createPublicKey,
-  randomBytes,
   sign as nodeSign,
   verify as nodeVerify,
+  randomBytes,
 } from 'node:crypto';
 import {
   closeSync,
   constants as fsConstants,
   fstatSync,
   fsyncSync,
-  lstatSync,
   linkSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -162,9 +162,7 @@ export function validateTask(task) {
     !SHA.test(task.selected.sourceRevision ?? '') ||
     !DIGEST.test(task.selected.sourceDigest ?? '') ||
     !/^[A-Za-z0-9][A-Za-z0-9:_-]{1,63}$/u.test(task.selected.owner ?? '') ||
-    !/^[A-Za-z0-9][A-Za-z0-9:#/_-]{1,127}$/u.test(
-      task.selected.handle ?? ''
-    ) ||
+    !/^[A-Za-z0-9][A-Za-z0-9:#/_-]{1,127}$/u.test(task.selected.handle ?? '') ||
     !SHA.test(task.source.sourceVersion ?? '') ||
     !DIGEST.test(task.source.snapshotDigest ?? '') ||
     task.selected.sourceRevision !== task.source.sourceVersion
@@ -239,7 +237,10 @@ export function parseVerificationKeys(value) {
       if (error?.message === 'outbox-verification-keys-invalid') throw error;
     }
     const publicKey = createPublicKey(key);
-    if (publicKey.type !== 'public' || publicKey.asymmetricKeyType !== 'ed25519') {
+    if (
+      publicKey.type !== 'public' ||
+      publicKey.asymmetricKeyType !== 'ed25519'
+    ) {
       throw new Error('outbox-verification-keys-invalid');
     }
     keys.set(id, publicKey);
@@ -536,7 +537,8 @@ export function createFileJournal(workspace, keys, outcomePublicKey = null) {
       (exactMode === null
         ? (metadata.mode & 0o022) !== 0
         : (metadata.mode & 0o777) !== exactMode) ||
-      (typeof process.getuid === 'function' && metadata.uid !== process.getuid())
+      (typeof process.getuid === 'function' &&
+        metadata.uid !== process.getuid())
     ) {
       throw new Error('consumer-state-directory-unsafe');
     }
@@ -575,7 +577,8 @@ export function createFileJournal(workspace, keys, outcomePublicKey = null) {
     if (
       !metadata.isFile() ||
       (metadata.mode & 0o777) !== 0o600 ||
-      (typeof process.getuid === 'function' && metadata.uid !== process.getuid())
+      (typeof process.getuid === 'function' &&
+        metadata.uid !== process.getuid())
     ) {
       throw new Error('consumer-state-file-unsafe');
     }
@@ -641,11 +644,7 @@ export function createFileJournal(workspace, keys, outcomePublicKey = null) {
     read() {
       ensureDirectory();
       try {
-        return validateState(
-          readOwnedJson(path),
-          keys,
-          outcomePublicKey
-        );
+        return validateState(readOwnedJson(path), keys, outcomePublicKey);
       } catch (error) {
         if (error?.code === 'ENOENT') return emptyState();
         throw error;
@@ -764,9 +763,7 @@ export async function runCycle({
   outcomeKeyId,
 }) {
   let state = journal.read();
-  if (
-    state.active?.record?.task?.schema === 'jovie-symphony-repair-task/v1'
-  ) {
+  if (state.active?.record?.task?.schema === 'jovie-symphony-repair-task/v1') {
     return {
       status: 'execution-held',
       taskKey: state.active.taskKey,
@@ -871,7 +868,10 @@ async function boundedJsonBody(response, prefix) {
       }
       chunks.push(value);
     }
-    const bytes = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), length);
+    const bytes = Buffer.concat(
+      chunks.map(chunk => Buffer.from(chunk)),
+      length
+    );
     return JSON.parse(bytes.toString('utf8'));
   } catch (error) {
     if (error?.message === `${prefix}-response-too-large`) throw error;
@@ -1157,7 +1157,10 @@ async function main() {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   try {
     await main();
   } catch (error) {
