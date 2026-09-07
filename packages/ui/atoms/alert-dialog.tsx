@@ -22,7 +22,7 @@ const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
 const alertDialogAnimation = centeredContentStyles.animation
   .split(' ')
-  .filter((className) => !className.startsWith('duration-'))
+  .filter(className => !className.startsWith('duration-'))
   .concat('duration-cinematic')
   .join(' ');
 
