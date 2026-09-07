@@ -35,10 +35,18 @@ describe('MarketingFooter', () => {
   it('renders the full marketing footer when the full-footer flag is enabled', () => {
     render(<MarketingFooter />);
 
-    expect(screen.getByTestId('marketing-footer')).toHaveAttribute(
+    const footer = screen.getByTestId('marketing-footer');
+    expect(footer).toHaveAttribute(
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.footer
     );
+    expect(footer.firstElementChild).toHaveClass(
+      'max-w-public-content',
+      'px-5',
+      'sm:px-6',
+      'lg:px-8'
+    );
+    expect(footer.firstElementChild).not.toHaveClass('max-w-linear-content');
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',

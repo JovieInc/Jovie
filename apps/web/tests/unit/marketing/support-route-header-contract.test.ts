@@ -31,11 +31,14 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}'
     );
+    expect(headerSource).toContain('getHomepageFrontDoorCtaContract');
     expect(headerSource).toContain(
-      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
+      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
     expect(headerSource).toContain("treatment: 'wordmark'");
-    expect(headerSource).toContain('MARKETING_GLASS_FLYOUTS');
+    expect(headerSource).toContain('NAV_LINK_BY_LABEL.Customers');
+    expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
+    expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
     expect(headerSource).toContain('showContactLink={false}');
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
@@ -48,13 +51,11 @@ describe('support route header contract', () => {
     }
   });
 
-  it('keeps the homepage header as Log in text without a second Get started', () => {
+  it('keeps public sign-in copy and the shared front-door CTA contract', () => {
     const headerSource = readWebSource('components/site/MarketingHeader.tsx');
 
-    expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
-    expect(headerSource).toContain(
-      "minimalAuthLabel={isHomepage ? 'Log in' : 'Sign in'}"
-    );
+    expect(headerSource).toContain('minimalAuth={isMinimal}');
+    expect(headerSource).toContain("minimalAuthLabel='Sign in'");
     expect(headerSource).not.toContain('HOMEPAGE_LAUNCH_COPY.hero.primaryCta');
   });
 
