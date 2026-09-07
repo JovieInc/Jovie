@@ -908,6 +908,7 @@ jobs:
 
       - name: Select rendered homepage visual gate
         id: homepage-visual
+        if: ${{ steps.detect.outputs.is_noop_merge_group != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
