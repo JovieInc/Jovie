@@ -141,6 +141,7 @@ function admissionRun(overrides = {}) {
     id: 123456789,
     name: 'Merge Queue Auto-Enroll',
     path: '.github/workflows/merge-queue-autoenroll.yml',
+    pull_requests: [],
     repository: { full_name: 'JovieInc/Jovie' },
     run_attempt: 1,
     status: 'completed',
@@ -441,6 +442,7 @@ describe('merge-group admission evidence', () => {
         runPayload: admissionRun({
           event: 'pull_request',
           head_sha: SOURCE_HEAD,
+          pull_requests: [{ head: { sha: SOURCE_HEAD } }],
         }),
         sourceHeadSha: SOURCE_HEAD,
         statusPayload: {
@@ -461,9 +463,9 @@ describe('merge-group admission evidence', () => {
     });
   });
 
-  it('rejects an earlier per-PR receipt when its producer ultimately fails', () => {
+  it('preserves an earlier per-PR receipt when later cohort work makes the producer fail', () => {
     const checkpointMainSha = '9'.repeat(40);
-    expect(() =>
+    expect(
       classifyCanonicalAdmissionProvenance({
         evidence: {
           baseSha: BASE,
@@ -487,7 +489,11 @@ describe('merge-group admission evidence', () => {
         },
         timelinePayload: admissionTimeline(),
       })
-    ).toThrow(/identity is inconsistent/);
+    ).toMatchObject({
+      checkpoint: 'verified',
+      checkpointMainSha,
+      state: 'verified',
+    });
   });
 
   it('waits for a canonical admission producer that has not started', () => {
@@ -871,10 +877,11 @@ describe('merge-group admission evidence', () => {
   it.each([
     ['unsupported producer event', { event: 'schedule' }],
     [
-      'pull-request run at a different source head',
+      'pull-request run head absent from its triggering PR evidence',
       {
         event: 'pull_request',
         head_sha: '8'.repeat(40),
+        pull_requests: [{ head: { sha: '7'.repeat(40) } }],
       },
     ],
     [
@@ -902,6 +909,31 @@ describe('merge-group admission evidence', () => {
         timelinePayload: admissionTimeline(),
       })
     ).toThrow(/not bound to its admission scope/);
+  });
+
+  it('preserves a cohort receipt when a pull-request producer was triggered by another exact head', () => {
+    const producerHead = '8'.repeat(40);
+    expect(
+      classifyCanonicalAdmissionProvenance({
+        evidence: {
+          baseSha: BASE,
+          prNumber: 123,
+          repository: 'JovieInc/Jovie',
+        },
+        runPayload: admissionRun({
+          event: 'pull_request',
+          head_sha: producerHead,
+          pull_requests: [{ head: { sha: producerHead } }],
+        }),
+        sourceHeadSha: SOURCE_HEAD,
+        statusPayload: {
+          link: null,
+          sha: SOURCE_HEAD,
+          statuses: [admissionStatus()],
+        },
+        timelinePayload: admissionTimeline(),
+      })
+    ).toMatchObject({ state: 'verified' });
   });
 
   it('requires the exact live queue ref and head SHA', () => {

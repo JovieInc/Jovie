@@ -280,12 +280,17 @@ export function classifyCanonicalAdmissionProvenance({
     fail('canonical admission receipt is malformed or untrusted');
   }
   const producerEvent = runPayload.event;
-  const expectedProducerHead =
-    producerEvent === 'pull_request' ? sourceHeadSha : mainSha;
-  if (
-    !ADMISSION_PRODUCER_EVENTS.has(producerEvent) ||
-    runPayload.head_sha !== expectedProducerHead
-  ) {
+  if (!ADMISSION_PRODUCER_EVENTS.has(producerEvent)) {
+    fail('canonical admission producer is not bound to its admission scope');
+  }
+  if (producerEvent === 'pull_request') {
+    const producerHeadIsBound = runPayload.pull_requests?.some(
+      pullRequest => pullRequest?.head?.sha === runPayload.head_sha
+    );
+    if (!producerHeadIsBound) {
+      fail('canonical admission producer is not bound to its admission scope');
+    }
+  } else if (runPayload.head_sha !== mainSha) {
     fail('canonical admission producer is not bound to its admission scope');
   }
   if (
@@ -309,7 +314,7 @@ export function classifyCanonicalAdmissionProvenance({
     !['in_progress', 'completed'].includes(runPayload.status) ||
     (runPayload.status === 'in_progress' && runPayload.conclusion !== null) ||
     (runPayload.status === 'completed' &&
-      runPayload.conclusion !== 'success') ||
+      !TERMINAL_CHECK_CONCLUSIONS.has(runPayload.conclusion)) ||
     !Number.isFinite(runCreatedAt) ||
     !Number.isFinite(runUpdatedAt) ||
     runCreatedAt > admittedAt ||
