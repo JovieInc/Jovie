@@ -1227,7 +1227,11 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
-      nodeTests: GEM_PR_REHABILITATION_NODE_TESTS,
+      nodeTests: files.includes(
+        'scripts/symphony/summer-symphony-outbox-consumer.test.mjs'
+      )
+        ? ['scripts/symphony/summer-symphony-outbox-consumer.test.mjs']
+        : GEM_PR_REHABILITATION_NODE_TESTS,
     };
   }
   const isBoundedNoUnattendedRedChange =

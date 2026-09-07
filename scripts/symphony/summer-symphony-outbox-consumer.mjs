@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-/**
- * Authenticate and durably discover one Summer-to-Symphony v1 outbox task.
- *
- * The v1 task's `issue: "JOV-5853"` is provenance, not an execution target.
- * This consumer therefore holds a verified task after discovery. It performs no
- * Linear mutation, Symphony dispatch, or outcome acknowledgement until a later
- * versioned wire schema supplies an explicit target and decision fingerprint.
- */
-
 import {
   createHash,
   createPrivateKey,
@@ -127,7 +118,6 @@ function validTimestamp(value) {
   );
 }
 
-/** Match the private Summer v1 Zod contract without importing private code. */
 export function validateTask(task) {
   const isV1 = task?.schema === 'jovie-symphony-repair-task/v1';
   const isV2 = task?.schema === 'jovie-symphony-repair-task/v2';
@@ -263,7 +253,6 @@ function publicKeyFingerprint(key) {
     .digest('hex');
 }
 
-/** Verify the outer signature and all inner source/action/task bindings. */
 export function verifyOutboxRecord(record, keys) {
   const domain =
     record?.schema === OUTBOX_DOMAIN
@@ -449,7 +438,6 @@ function assertPage(page, previousCursor) {
   }
 }
 
-/** Follow corrupt-only pages and return at most one independently verified task. */
 export async function discoverOne(transport, keys, startCursor = null) {
   if (
     !(
@@ -760,7 +748,6 @@ export function createFileJournal(workspace, keys, outcomePublicKey = null) {
   };
 }
 
-/** WIP=1. Replays return the identical held task and make no provider write. */
 export async function runCycle({
   journal,
   transport,
