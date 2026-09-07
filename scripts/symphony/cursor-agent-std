@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Cursor CLI wrapper that bans Fast mode.
+"""Cursor CLI wrapper that preserves live catalog ids.
 
 The official `cursor-agent` binary stays in ~/.local/share/cursor-agent/versions.
-This wrapper is the PATH / GEM_CURSOR_EXECUTABLE entry: it rewrites --model
-so *-fast slugs never reach the binary. Do not inject [fast=false] — Cursor
-catalog ids like cursor-grok-4.6-high are distinct from the parameterized
-form cursor-grok-4.6-high[fast=false], which live JOV-5235 rejected.
+This wrapper is the PATH / GEM_CURSOR_EXECUTABLE entry. It strips bracketed
+`fast=` parameters so JOV-5235's rejected `cursor-grok-4.6-high[fast=false]`
+form never reaches the binary. Live Cursor inventory is the `*-fast` catalog
+id (`cursor-grok-4.6-high-fast`); do not strip that suffix.
 """
 from __future__ import annotations
 
@@ -57,9 +57,8 @@ def real_binary() -> pathlib.Path:
 
 
 def lock_model(name: str) -> str:
-    """Map Fast catalog ids to the non-fast id without bracket injection."""
+    """Keep live catalog ids; drop only bracketed fast= parameters."""
     name = name.strip()
-    name = re.sub(r"-fast(?=(?:\[|$))", "", name)
     match = re.match(r"^(.*)\[(.*)\]$", name)
     if not match:
         return name

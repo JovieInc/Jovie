@@ -105,6 +105,9 @@ class RegistryTests(unittest.TestCase):
             cfg["route_chains"]["remediation"][:3],
             ["grok-4.6", "kimi-k3", "cursor-grok-4.6"],
         )
+        cursor = next(model for model in cfg["models"] if model["id"] == "cursor-grok-4.6")
+        self.assertEqual(cursor["model"], "cursor-grok-4.6-high-fast")
+        self.assertEqual(cursor["executable_default"], "cursor-agent-std")
         self.assertGreater(
             cfg["route_chains"]["new_pr"].index("qwen-coder-local"),
             cfg["route_chains"]["new_pr"].index("cursor-luna"),
@@ -286,6 +289,35 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(selected["id"], "cursor-grok-4.6")
             self.assertEqual(selected["pool"], "cursor-models")
             self.assertEqual(selected["provider"], "cursor")
+            self.assertEqual(selected["model"], "cursor-grok-4.6-high-fast")
+
+    def test_codex_exhausted_admits_cursor_and_never_selects_codex(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            cursor = self._ready(root, "cursor-agent-std", "echo cursor-agent 2026.09.07\n")
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                "--exclude-pool", "codex",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_CURSOR_EXECUTABLE": str(cursor),
+                    "GEM_GROK_EXECUTABLE": "/missing",
+                    "GEM_KIMI_EXECUTABLE": "/missing",
+                    "GEM_CLAUDE_EXECUTABLE": "/missing",
+                    "GEM_DEEPSEEK_EXECUTABLE": "/missing",
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            document = json.loads(result.stdout)
+            selected = document["selected"]
+            self.assertEqual(selected["id"], "cursor-grok-4.6")
+            self.assertEqual(selected["provider"], "cursor")
+            self.assertEqual(selected["model"], "cursor-grok-4.6-high-fast")
+            self.assertNotEqual(selected["provider"], "codex")
+            reasons = {item["id"]: item.get("reason") for item in document["candidates"]}
+            for model_id in ("codex-sol", "codex-terra", "codex-luna"):
+                self.assertIn(reasons[model_id], {"excluded_pool", "executable_missing", "pool_exhausted"})
 
     def test_exhausted_cursor_pool_degrades_to_grok_build_then_kimi(self):
         with tempfile.TemporaryDirectory() as td:
