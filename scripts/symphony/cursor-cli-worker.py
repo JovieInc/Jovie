@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Gem Cursor CLI worker: install path, auto-update, fail-closed health.
 
-Symphony and this Cursor CLI keep-alive run on gem (Ubuntu), not a Mac.
-Tim owns multiple Macs — never say "the Mac." Cursor install, auto-update,
-and uptime work target gem only. Tim's MacBook Pro (mac.lan) may hold a
-logged-in Cursor for reference and is the only Mac with Grok Bot local
-tools right now. MacBook Air is a separate host and is often offline.
+Symphony and this Cursor CLI keep-alive run on gem (Ubuntu Symphony).
+Never say "the Mac." Locked inventory: gem=Ubuntu Symphony; Pro=Tim's
+MacBook Pro (mac.lan / M5 32GB — Ops/Grok Bot local tools); Air=MacBook
+Air powered off on desk; PC=dead. Cursor CLI install and auto-update
+target gem only. Pro may hold a logged-in Cursor for reference only.
 
 This worker never selects a Symphony route, never leases an issue, and never
 claims useful-turn capacity. Official Codex app-server on :4041 stays
@@ -46,13 +46,14 @@ EXIT_DEGRADED = 3
 AUTH_FAILURE = re.compile(r"not authenticated|not logged in|unauthori[sz]ed|\b401\b", re.I)
 VERSION_STAMP = re.compile(r"(20\d{2}\.\d{2}\.\d{2})")
 HOST_ROLE = "gem"
-HOST_LABEL = "gem (Ubuntu Symphony)"
+HOST_LABEL = "Ubuntu Symphony"
 CURSOR_CLI_TARGET = "gem"
+PRO_ROLE = "ops_grok_bot"
 PRO_CURSOR_ROLE = "reference_only"
 HOSTS = {
-    "gem": "gem (Ubuntu) — Symphony + Cursor CLI install/auto-update/uptime target",
-    "pro": "Tim's MacBook Pro (mac.lan) — only Mac with Grok Bot local tools; Cursor login is reference only",
-    "air": "Tim's MacBook Air — separate, often offline",
+    "gem": "Ubuntu Symphony",
+    "pro": "Tim's MacBook Pro (mac.lan / M5 32GB — Ops/Grok Bot local tools)",
+    "air": "MacBook Air powered off on desk",
     "pc": "dead",
 }
 PINNED_EXECUTABLE = "/home/timwhite/.local/bin/cursor-agent-std"
@@ -439,6 +440,7 @@ def probe_health(env=None, now=None):
         "hostRole": HOST_ROLE,
         "hostLabel": HOST_LABEL,
         "cursorCliTarget": CURSOR_CLI_TARGET,
+        "proRole": PRO_ROLE,
         "proCursorRole": PRO_CURSOR_ROLE,
         "hosts": dict(HOSTS),
         "codex": CODEX_STATUS,
