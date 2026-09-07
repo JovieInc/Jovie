@@ -46,13 +46,15 @@ class CursorCliWorkerContractTests(unittest.TestCase):
         self.assertEqual(ini_value(service, "Type"), "oneshot")
         self.assertEqual(ini_value(service, "ExecStart"), "%h/.local/bin/cursor-cli-worker reconcile")
         self.assertIn("GEM_CURSOR_EXECUTABLE=%h/.local/bin/cursor-agent-std", service)
+        self.assertIn("CURSOR_AGENT_UPDATE=1", service)
+        self.assertNotIn("systemctl", WORKER.read_text(encoding="utf-8"))
         self.assertEqual(ini_value(service, "Restart"), "on-failure")
         success = set((ini_value(service, "SuccessExitStatus") or "").split())
         self.assertEqual(success, {"0", str(module.EXIT_UNHEALTHY)})
         self.assertNotIn(str(module.EXIT_DEGRADED), success)
         timer = TIMER.read_text(encoding="utf-8")
-        self.assertEqual(ini_value(timer, "OnBootSec"), "1m")
-        self.assertEqual(ini_value(timer, "OnUnitInactiveSec"), "15min")
+        self.assertEqual(ini_value(timer, "OnBootSec"), "30s")
+        self.assertEqual(ini_value(timer, "OnUnitInactiveSec"), "2min")
         self.assertEqual(ini_value(timer, "Persistent"), "true")
 
     def test_registry_requests_live_fast_catalog_id(self):
@@ -101,6 +103,14 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
         env = {**self.env, "CURSOR_AGENT_REAL": str(binary), "GEM_CURSOR_EXECUTABLE": str(wrapper)}
         payload = self.module.probe_health(env)
         self.assertEqual(payload["status"], "ready", payload)
+        self.assertEqual(payload["throughput"], "unknown")
+        self.assertEqual(payload["hostRole"], "gem")
+        self.assertEqual(payload["hostLabel"], "Ubuntu Symphony")
+        self.assertEqual(payload["hosts"]["pro"], "mac.lan")
+        self.assertEqual(payload["hosts"]["air"], "off")
+        self.assertEqual(payload["hosts"]["pc"], "dead")
+        self.assertEqual(payload["pinnedExecutable"], self.module.PINNED_EXECUTABLE)
+        self.assertEqual(payload["codex"], "out_until_weekly_reset")
         self.assertTrue(payload["authenticated"])
         self.assertIn("cursor-grok-4.6-high-fast", payload["models"])
 
@@ -161,6 +171,165 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
             self.module.hud_projection({"schema": self.module.SCHEMA, "status": "ready", "requestedModel": "cursor-grok-4.6-high-fast"}),
             {"status": "ready", "detail": "cursor-cli cursor-grok-4.6-high-fast"},
         )
+        self.assertEqual(
+            self.module.hud_projection({
+                "schema": self.module.SCHEMA,
+                "status": "admission_held",
+                "throughput": "admission_held",
+                "reasons": [],
+            }),
+            {"status": "admission_held", "detail": "cursor-cli admission_held"},
+        )
+        self.assertEqual(
+            self.module.hud_projection({
+                "schema": self.module.SCHEMA,
+                "status": "unhealthy",
+                "throughput": "dormant_with_capacity",
+                "reasons": ["dormant_with_capacity"],
+            }),
+            {"status": "unhealthy", "detail": "cursor-cli dormant_with_capacity"},
+        )
+
+    def _healthy_env(self, models="auto, cursor-grok-4.6-high-fast, cursor-grok-4.6-high, gpt-5.6-luna"):
+        binary = self.write_binary(
+            "case \"$1\" in\n"
+            "  --version) echo cursor-agent 2026.09.07-abcd;;\n"
+            "  status|whoami) echo logged in as testdriver;;\n"
+            f"  models) echo 'Available models: {models}';;\n"
+            "  update) echo updated;;\n"
+            "  *) exit 2;;\n"
+            "esac\n"
+        )
+        wrapper = self.module.install_wrapper(self.env)
+        return {
+            **self.env,
+            "CURSOR_AGENT_REAL": str(binary),
+            "GEM_CURSOR_EXECUTABLE": str(wrapper),
+            "GEM_FLEET_GATE_RECEIPT": str(self.home / "fleet-gate.json"),
+            "SYMPHONY_FALLBACK_PICKUP_RECEIPT": str(self.home / "pickup.json"),
+            "SYMPHONY_PROVIDER_CAPACITY_STATE": str(self.home / "capacity.json"),
+        }
+
+    def _write_json(self, path, payload):
+        pathlib.Path(path).write_text(json.dumps(payload), encoding="utf-8")
+
+    def test_catalog_gap_is_observational_and_does_not_enroll(self):
+        env = self._healthy_env()
+        payload = self.module.probe_health(env)
+        self.assertEqual(payload["status"], "ready", payload)
+        self.assertIn("cursor-grok-4.6-high", payload["catalogGap"])
+        self.assertNotIn("auto", payload["catalogGap"])
+        self.assertNotIn("cursor-grok-4.6-high-fast", payload["catalogGap"])
+        self.assertEqual(payload["enrolledModels"], ["cursor-grok-4.6-high-fast", "gpt-5.6-luna"])
+
+    def test_admission_held_is_jov_5492_gate_not_useful_turn(self):
+        env = self._healthy_env()
+        self._write_json(env["GEM_FLEET_GATE_RECEIPT"], {
+            "schema": self.module.FLEET_GATE_SCHEMA,
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+            "concurrency": {"gem": {"maxConcurrent": 0}},
+        })
+        payload = self.module.probe_health(env)
+        self.assertEqual(payload["status"], "admission_held", payload)
+        self.assertEqual(payload["throughput"], "admission_held")
+        self.assertEqual(payload["admissionGate"], "JOV-5492")
+        self.assertNotIn("usefulCompletions", payload)
+
+    def test_dormant_with_capacity_fails_when_seats_exist_and_pickup_is_idle(self):
+        env = self._healthy_env()
+        self._write_json(env["SYMPHONY_PROVIDER_CAPACITY_STATE"], {
+            "schema": self.module.CAPACITY_SCHEMA,
+            "observedAt": "2026-09-07T16:20:00Z",
+            "providers": {"grok": {"limit": 4, "status": "available", "pressureCount": 0, "usefulCompletions": 0}},
+            "events": {},
+        })
+        self._write_json(env["SYMPHONY_FALLBACK_PICKUP_RECEIPT"], {
+            "schema": self.module.PICKUP_SCHEMA,
+            "observedAt": "2026-09-07T16:20:00Z",
+            "event": "idle",
+            "reason": "capacity_full",
+            "lockCount": 0,
+        })
+        now = time.mktime(time.strptime("2026-09-07T16:21:00Z", "%Y-%m-%dT%H:%M:%SZ"))
+        payload = self.module.probe_health(env, now=now)
+        self.assertEqual(payload["status"], "unhealthy", payload)
+        self.assertEqual(payload["throughput"], "dormant_with_capacity")
+        self.assertIn("dormant_with_capacity", payload["reasons"])
+
+    def test_idle_no_work_stays_ready_and_delivering_is_not_dormant(self):
+        env = self._healthy_env()
+        now = time.mktime(time.strptime("2026-09-07T16:21:00Z", "%Y-%m-%dT%H:%M:%SZ"))
+        self._write_json(env["SYMPHONY_FALLBACK_PICKUP_RECEIPT"], {
+            "schema": self.module.PICKUP_SCHEMA,
+            "observedAt": "2026-09-07T16:20:00Z",
+            "event": "idle",
+            "reason": "no_eligible_issue",
+            "lockCount": 0,
+        })
+        idle = self.module.probe_health(env, now=now)
+        self.assertEqual(idle["status"], "ready", idle)
+        self.assertEqual(idle["throughput"], "idle_no_work")
+        self._write_json(env["SYMPHONY_FALLBACK_PICKUP_RECEIPT"], {
+            "schema": self.module.PICKUP_SCHEMA,
+            "observedAt": "2026-09-07T16:20:00Z",
+            "event": "lease_start",
+            "reason": "lease_start",
+            "lockCount": 1,
+        })
+        delivering = self.module.probe_health(env, now=now)
+        self.assertEqual(delivering["status"], "ready", delivering)
+        self.assertEqual(delivering["throughput"], "delivering")
+
+    def test_stale_override_fails_closed_when_newer_version_exists(self):
+        newest = self.home / ".local/share/cursor-agent/versions/2026.09.07/cursor-agent"
+        newest.parent.mkdir(parents=True)
+        newest.write_text(
+            "#!/bin/sh\n"
+            "case \"$1\" in\n"
+            "  --version) echo cursor-agent 2026.09.07;;\n"
+            "  status|whoami) echo logged in;;\n"
+            "  models) echo cursor-grok-4.6-high-fast;;\n"
+            "  *) exit 0;;\n"
+            "esac\n",
+            encoding="utf-8",
+        )
+        newest.chmod(0o755)
+        stale = self.write_binary(
+            "case \"$1\" in\n"
+            "  --version) echo cursor-agent 2026.08.11-e8db854;;\n"
+            "  status|whoami) echo logged in;;\n"
+            "  models) echo cursor-grok-4.6-high-fast;;\n"
+            "  *) exit 0;;\n"
+            "esac\n",
+            name="stale-agent",
+        )
+        wrapper = self.module.install_wrapper(self.env)
+        env = {**self.env, "CURSOR_AGENT_REAL": str(stale), "GEM_CURSOR_EXECUTABLE": str(wrapper)}
+        payload = self.module.probe_health(env)
+        self.assertEqual(payload["status"], "unhealthy")
+        self.assertIn("stale_binary_selected", payload["reasons"])
+
+    def test_reconcile_updates_asap_when_authorized_and_rebinds_wrapper(self):
+        marker = self.home / "updated"
+        binary = self.write_binary(
+            "case \"$1\" in\n"
+            "  --version) echo cursor-agent 2026.09.07-abcd;;\n"
+            "  status|whoami) echo logged in;;\n"
+            "  models) echo cursor-grok-4.6-high-fast;;\n"
+            f"  update) echo updated > {marker};;\n"
+            "  *) exit 2;;\n"
+            "esac\n"
+        )
+        env = {
+            **self.env,
+            "CURSOR_AGENT_REAL": str(binary),
+            "CURSOR_AGENT_UPDATE": "1",
+        }
+        code, payload = self.module.reconcile(env)
+        self.assertEqual(code, self.module.EXIT_OK, payload)
+        self.assertTrue(marker.is_file())
+        self.assertTrue((self.home / ".local/bin/cursor-agent-std").is_file())
+        self.assertEqual(payload["status"], "ready")
 
 
 class CursorCliInstallerTests(unittest.TestCase):

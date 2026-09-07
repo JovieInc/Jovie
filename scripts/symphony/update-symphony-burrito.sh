@@ -61,6 +61,8 @@ MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 # scripts/symphony/install-symphony-grok-sidecar.sh — never mask it here.
 # cursor-cli-worker.{service,timer} is the Cursor CLI keep-alive owned by
 # scripts/symphony/install-cursor-cli-worker.sh — never mask it here.
+# Controller (elixir) restart is separate from Cursor CLI / fallback-ship
+# workers. Restart only $SERVICE_NAME; never stop those units here.
 LEGACY_UNITS=(
   symphony-ui-pilot.service
   symphony-reconciler.service

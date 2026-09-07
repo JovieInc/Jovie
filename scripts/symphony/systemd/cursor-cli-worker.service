@@ -5,13 +5,16 @@ Description=Symphony Cursor CLI worker health and auto-update
 Type=oneshot
 Environment=GEM_CURSOR_EXECUTABLE=%h/.local/bin/cursor-agent-std
 Environment=GEM_CURSOR_BIN=%h/.local/bin/cursor-agent-std
+Environment=CURSOR_AGENT_UPDATE=1
 Environment=PATH=%h/.local/bin:/usr/bin:/bin
 ExecStart=%h/.local/bin/cursor-cli-worker reconcile
 # Exit-status contract (scripts/symphony/cursor-cli-worker.py):
-#   0  ready — wrapper, official binary, auth, and requested model proven
-#   2  typed unhealthy fail-closed — missing/stale/unauthed after recover
-#      attempt. Receipt is red for HUD; do not restart-loop.
+#   0  ready — CLI proven and throughput is delivering / idle_no_work / unknown
+#   2  typed fail-closed — missing/stale/unauthed, dormant-with-seats, or
+#      JOV-5492 admission_held. Receipt is red for HUD; do not restart-loop.
 #   3  degraded — wrapper install or host mutation crashed.
+# Health is not HTTP 200. This unit updates the Cursor CLI only and never
+# stops fallback-ship / grok-sidecar / symphony-elixir.
 # Every other non-zero status remains a failure.
 SuccessExitStatus=0 2
 Restart=on-failure

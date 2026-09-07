@@ -2729,6 +2729,19 @@ def read_runtime_context(*, now: datetime) -> dict[str, Any]:
     cursor_health = load_json_dict(DEFAULT_CURSOR_HEALTH)
     if cursor_health.get("schema") == CURSOR_HEALTH_SCHEMA and cursor_health.get("status") == "ready":
         cursor_cli = "ready"
+    elif cursor_health.get("schema") == CURSOR_HEALTH_SCHEMA and (
+        cursor_health.get("status") == "admission_held"
+        or cursor_health.get("throughput") == "admission_held"
+    ):
+        cursor_cli = "admission_held"
+    elif cursor_health.get("schema") == CURSOR_HEALTH_SCHEMA and (
+        cursor_health.get("throughput") == "dormant_with_capacity"
+        or (
+            isinstance(cursor_health.get("reasons"), list)
+            and "dormant_with_capacity" in cursor_health["reasons"]
+        )
+    ):
+        cursor_cli = "dormant_with_capacity"
     elif cursor_health.get("schema") == CURSOR_HEALTH_SCHEMA:
         reasons = cursor_health.get("reasons") if isinstance(cursor_health.get("reasons"), list) else []
         cursor_cli = ",".join(str(reason) for reason in reasons) or "unhealthy"

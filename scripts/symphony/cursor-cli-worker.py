@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Gem Cursor CLI worker: install path, auto-update, fail-closed health.
 
-This is the isolated Cursor lane's host contract. It never selects a Symphony
-route, never leases an issue, and never claims useful-turn capacity. Official
-Codex app-server on :4041 stays untouched.
+This is the isolated Cursor lane's host contract on gem (Ubuntu Symphony).
+It never selects a Symphony route, never leases an issue, and never claims
+useful-turn capacity. Official Codex app-server on :4041 stays untouched.
+Controller (symphony-elixir / burrito) updates stay on
+update-symphony-burrito.sh --managed-controller-only. This worker updates
+only the Cursor CLI and never stops running fallback-ship / grok-sidecar
+units. JOV-5492 capacity evidence (maxConcurrent=0) is an admission gate,
+not a useful-turn proof. Health is throughput classification, not HTTP 200.
 """
 from __future__ import annotations
 
@@ -19,16 +24,33 @@ import sys
 import time
 
 SCHEMA = "symphony-cursor-cli-health/v1"
+PICKUP_SCHEMA = "symphony-fallback-pickup/v1"
+CAPACITY_SCHEMA = "symphony-provider-capacity/v1"
+FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
 REQUESTED_MODEL = "cursor-grok-4.6-high-fast"
+ENROLLED_CURSOR_MODELS = frozenset({"cursor-grok-4.6-high-fast", "gpt-5.6-luna"})
+NON_ENROLLMENT_MODELS = frozenset({"auto"})
 WRAPPER_NAME = "cursor-agent-std"
 WORKER_NAME = "cursor-cli-worker.py"
 DEFAULT_INSTALL_URL = "https://cursor.com/install"
-STALE_AFTER_DAYS = 21
+STALE_AFTER_DAYS = 2
+DORMANT_AFTER_SECONDS = 600
 EXIT_OK = 0
 EXIT_UNHEALTHY = 2
 EXIT_DEGRADED = 3
 AUTH_FAILURE = re.compile(r"not authenticated|not logged in|unauthori[sz]ed|\b401\b", re.I)
 VERSION_STAMP = re.compile(r"(20\d{2}\.\d{2}\.\d{2})")
+HOST_ROLE = "gem"
+HOST_LABEL = "Ubuntu Symphony"
+HOSTS = {
+    "gem": "Ubuntu Symphony",
+    "pro": "mac.lan",
+    "air": "off",
+    "pc": "dead",
+}
+PINNED_EXECUTABLE = "/home/timwhite/.local/bin/cursor-agent-std"
+CODEX_STATUS = "out_until_weekly_reset"
+ADMISSION_GATE = "JOV-5492"
 
 
 def _home(env=None):
@@ -67,25 +89,79 @@ def health_path(env=None):
     return state_dir(env) / "health.json"
 
 
+def pickup_path(env=None):
+    configured = (env or os.environ).get("SYMPHONY_FALLBACK_PICKUP_RECEIPT")
+    if configured:
+        return pathlib.Path(configured)
+    return _home(env) / ".local/state/symphony-fallback/pickup/latest.json"
+
+
+def capacity_path(env=None):
+    configured = (env or os.environ).get("SYMPHONY_PROVIDER_CAPACITY_STATE")
+    if configured:
+        return pathlib.Path(configured)
+    return _home(env) / ".local/state/symphony-fallback/provider-capacity.json"
+
+
+def fleet_gate_path(env=None):
+    configured = (env or os.environ).get("GEM_FLEET_GATE_RECEIPT")
+    if configured:
+        return pathlib.Path(configured)
+    return _home(env) / ".local/state/gem-priority-gate/latest.json"
+
+
+def registry_path(env=None):
+    configured = (env or os.environ).get("SYMPHONY_MODEL_REGISTRY")
+    if configured:
+        return pathlib.Path(configured)
+    return pathlib.Path(__file__).resolve().with_name("config") / "model-registry.json"
+
+
+def load_json_dict(path):
+    try:
+        payload = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def _runnable(path):
     return bool(path) and pathlib.Path(path).is_file() and os.access(path, os.X_OK)
+
+
+def newest_version_binary(env=None):
+    versions = versions_dir(env)
+    if not versions.is_dir():
+        return None
+    folders = sorted((p for p in versions.iterdir() if p.is_dir()), key=lambda p: p.name)
+    for folder in reversed(folders):
+        candidate = folder / "cursor-agent"
+        if _runnable(candidate):
+            return candidate
+    return None
 
 
 def official_binary(env=None):
     override = (env or os.environ).get("CURSOR_AGENT_REAL")
     if override and _runnable(override):
         return pathlib.Path(override)
-    versions = versions_dir(env)
-    if versions.is_dir():
-        folders = sorted((p for p in versions.iterdir() if p.is_dir()), key=lambda p: p.name)
-        for folder in reversed(folders):
-            candidate = folder / "cursor-agent"
-            if _runnable(candidate):
-                return candidate
+    newest = newest_version_binary(env)
+    if newest is not None:
+        return newest
     path_hit = shutil.which("cursor-agent")
     if path_hit and _runnable(path_hit):
         return pathlib.Path(path_hit)
     return None
+
+
+def selected_is_newest(binary, env=None):
+    newest = newest_version_binary(env)
+    if newest is None or binary is None:
+        return True
+    try:
+        return pathlib.Path(binary).resolve() == newest.resolve()
+    except OSError:
+        return False
 
 
 def install_wrapper(env=None):
@@ -157,6 +233,151 @@ def parse_models(text):
     return names
 
 
+def enrolled_cursor_models(env=None):
+    registry = load_json_dict(registry_path(env))
+    models = registry.get("models")
+    enrolled = set()
+    if isinstance(models, list):
+        for item in models:
+            if not isinstance(item, dict) or item.get("provider") != "cursor":
+                continue
+            model = item.get("model")
+            if isinstance(model, str) and model.strip():
+                enrolled.add(model.strip())
+    return enrolled or set(ENROLLED_CURSOR_MODELS)
+
+
+def catalog_gap(listed, env=None):
+    enrolled = enrolled_cursor_models(env)
+    observed = {name for name in listed if name and name not in NON_ENROLLMENT_MODELS}
+    return sorted(observed - enrolled)
+
+
+def pickup_age_seconds(pickup, now=None):
+    observed = pickup.get("observedAt") if isinstance(pickup, dict) else None
+    if not isinstance(observed, str) or not observed:
+        return None
+    try:
+        parsed = time.strptime(observed, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+    now = now or time.time()
+    return max(0, now - time.mktime(parsed))
+
+
+def admission_blocked(gate):
+    if not isinstance(gate, dict) or gate.get("schema") != FLEET_GATE_SCHEMA:
+        return False
+    gem = (gate.get("concurrency") or {}).get("gem") or {}
+    work = gate.get("workAdmission") or {}
+    if not isinstance(gem, dict):
+        gem = {}
+    if not isinstance(work, dict):
+        work = {}
+    return (
+        gem.get("maxConcurrent") == 0
+        or work.get("newIssueLeaseAllowed") is False
+        or work.get("allowed") is False
+    )
+
+
+def provider_seats_available(capacity):
+    if not isinstance(capacity, dict) or capacity.get("schema") != CAPACITY_SCHEMA:
+        return False
+    providers = capacity.get("providers")
+    if not isinstance(providers, dict):
+        return False
+    for name in ("cursor", "grok", "kimi"):
+        item = providers.get(name)
+        if not isinstance(item, dict) or item.get("status") != "available":
+            continue
+        for key in ("limit", "observedCapacity", "verifiedIdentityCapacity"):
+            value = item.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                return True
+    return False
+
+
+def classify_throughput(*, cli_ready, env=None, now=None):
+    now = now or time.time()
+    gate = load_json_dict(fleet_gate_path(env))
+    pickup = load_json_dict(pickup_path(env))
+    capacity = load_json_dict(capacity_path(env))
+    gate_present = gate.get("schema") == FLEET_GATE_SCHEMA
+    pickup_present = pickup.get("schema") == PICKUP_SCHEMA
+    capacity_present = capacity.get("schema") == CAPACITY_SCHEMA
+    if admission_blocked(gate):
+        return {
+            "throughput": "admission_held",
+            "admissionGate": ADMISSION_GATE,
+            "detail": "JOV-5492 capacity evidence still blocks admission (maxConcurrent=0)",
+        }
+    seats = bool(cli_ready or provider_seats_available(capacity))
+    if pickup_present:
+        event = pickup.get("event")
+        reason = pickup.get("reason")
+        lock_count = pickup.get("lockCount")
+        age = pickup_age_seconds(pickup, now)
+        fresh = age is not None and age <= DORMANT_AFTER_SECONDS
+        if event == "lease_start" or (isinstance(lock_count, int) and not isinstance(lock_count, bool) and lock_count > 0):
+            return {
+                "throughput": "delivering",
+                "admissionGate": "",
+                "detail": "pickup lease in progress",
+            }
+        if fresh and event == "idle" and reason == "no_eligible_issue":
+            return {
+                "throughput": "idle_no_work",
+                "admissionGate": "",
+                "detail": "no eligible issue",
+            }
+        if seats and (not fresh or event in {"idle", "refuse", "red"}):
+            return {
+                "throughput": "dormant_with_capacity",
+                "admissionGate": "",
+                "detail": "dormant while seats exist",
+            }
+    elif seats and (gate_present or capacity_present):
+        return {
+            "throughput": "dormant_with_capacity",
+            "admissionGate": "",
+            "detail": "dormant while seats exist",
+        }
+    return {
+        "throughput": "unknown",
+        "admissionGate": "",
+        "detail": "throughput unobserved",
+    }
+
+
+def apply_throughput(payload, env=None, now=None):
+    cli_reasons = [
+        reason
+        for reason in (payload.get("reasons") or [])
+        if reason not in {"dormant_with_capacity"}
+    ]
+    cli_ready = payload.get("authenticated") is True and not cli_reasons
+    classification = classify_throughput(cli_ready=cli_ready, env=env, now=now)
+    payload["throughput"] = classification["throughput"]
+    payload["admissionGate"] = classification["admissionGate"]
+    payload["throughputDetail"] = classification["detail"]
+    reasons = list(cli_reasons)
+    if reasons:
+        status = "unhealthy"
+        if classification["throughput"] == "dormant_with_capacity" and "dormant_with_capacity" not in reasons:
+            reasons.append("dormant_with_capacity")
+    elif classification["throughput"] == "admission_held":
+        status = "admission_held"
+    elif classification["throughput"] == "dormant_with_capacity":
+        reasons.append("dormant_with_capacity")
+        status = "unhealthy"
+    else:
+        status = "ready"
+    payload["reasons"] = reasons
+    payload["status"] = status
+    return payload
+
+
 def probe_health(env=None, now=None):
     reasons = []
     wrapper = wrapper_path(env)
@@ -169,6 +390,8 @@ def probe_health(env=None, now=None):
     authenticated = False
     models = set()
     if binary is not None:
+        if not selected_is_newest(binary, env):
+            reasons.append("stale_binary_selected")
         version_result, version_text = _probe_text(binary, ["--version"], env=env)
         version = parse_version(version_text)
         if version_result is None or version_result.returncode != 0:
@@ -192,19 +415,29 @@ def probe_health(env=None, now=None):
         age = version_age_days(version, now=now)
         if age is not None and age > STALE_AFTER_DAYS:
             reasons.append("binary_stale")
-    status = "ready" if not reasons else "unhealthy"
-    return {
+    payload = {
         "schema": SCHEMA,
         "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now or time.time())),
-        "status": status,
+        "status": "unhealthy" if reasons else "ready",
         "requestedModel": REQUESTED_MODEL,
         "wrapperPath": str(wrapper),
         "executable": str(binary) if binary is not None else "",
+        "pinnedExecutable": PINNED_EXECUTABLE,
         "version": version or "",
         "authenticated": authenticated,
         "models": sorted(models),
+        "enrolledModels": sorted(enrolled_cursor_models(env)),
+        "catalogGap": catalog_gap(models, env),
         "reasons": reasons,
+        "hostRole": HOST_ROLE,
+        "hostLabel": HOST_LABEL,
+        "hosts": dict(HOSTS),
+        "codex": CODEX_STATUS,
+        "throughput": "unknown",
+        "admissionGate": "",
+        "throughputDetail": "throughput unobserved",
     }
+    return apply_throughput(payload, env=env, now=now)
 
 
 def write_receipt(payload, env=None):
@@ -221,8 +454,13 @@ def hud_projection(payload):
         return {"status": "unknown", "detail": "cursor-cli health receipt missing"}
     status = payload.get("status")
     reasons = payload.get("reasons") if isinstance(payload.get("reasons"), list) else []
+    throughput = payload.get("throughput")
     if status == "ready":
         return {"status": "ready", "detail": f"cursor-cli {payload.get('requestedModel')}"}
+    if status == "admission_held" or throughput == "admission_held":
+        return {"status": "admission_held", "detail": "cursor-cli admission_held"}
+    if throughput == "dormant_with_capacity" or "dormant_with_capacity" in reasons:
+        return {"status": "unhealthy", "detail": "cursor-cli dormant_with_capacity"}
     detail = ",".join(str(reason) for reason in reasons) or "unhealthy"
     return {"status": "unhealthy", "detail": f"cursor-cli {detail}"}
 
@@ -254,6 +492,12 @@ def run_official_install(env=None):
     return result.returncode == 0, "installed" if result.returncode == 0 else "install_failed"
 
 
+def _should_update(reasons, env=None):
+    if "binary_stale" in reasons or "stale_binary_selected" in reasons:
+        return True
+    return (env or os.environ).get("CURSOR_AGENT_UPDATE") == "1"
+
+
 def reconcile(env=None, now=None):
     try:
         install_wrapper(env)
@@ -272,14 +516,32 @@ def reconcile(env=None, now=None):
             return EXIT_UNHEALTHY, payload
         payload = probe_health(env, now=now)
         reasons = set(payload.get("reasons") or [])
-    if "binary_stale" in reasons:
+    if _should_update(reasons, env) and official_binary(env) is not None:
         ok, _detail = run_update(official_binary(env), env)
-        payload = probe_health(env, now=now)
-        if not ok and payload.get("status") != "ready":
+        try:
+            install_wrapper(env)
+        except OSError:
+            payload = probe_health(env, now=now)
+            payload["reasons"] = list(payload.get("reasons") or []) + ["wrapper_install_failed"]
+            payload["status"] = "unhealthy"
             write_receipt(payload, env)
-            return EXIT_UNHEALTHY, payload
+            return EXIT_DEGRADED, payload
+        payload = probe_health(env, now=now)
+        if not ok and payload.get("status") == "ready":
+            write_receipt(payload, env)
+            return EXIT_OK, payload
+        if not selected_is_newest(official_binary(env), env) or "binary_stale" in (
+            payload.get("reasons") or []
+        ):
+            extra = list(payload.get("reasons") or [])
+            if "stale_binary_selected" not in extra:
+                extra.append("stale_binary_selected")
+            payload["reasons"] = extra
+            payload["status"] = "unhealthy"
     write_receipt(payload, env)
-    return (EXIT_OK if payload.get("status") == "ready" else EXIT_UNHEALTHY), payload
+    if payload.get("status") == "ready":
+        return EXIT_OK, payload
+    return EXIT_UNHEALTHY, payload
 
 
 def receipt_digest(path):

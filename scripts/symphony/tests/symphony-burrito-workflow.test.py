@@ -2076,6 +2076,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         legacy_block = UPDATER.split("LEGACY_UNITS=(", 1)[1].split(")", 1)[0]
         self.assertNotIn("symphony-grok-sidecar", legacy_block)
         self.assertNotIn("cursor-cli-worker", legacy_block)
+        self.assertNotIn("fallback-ship", legacy_block)
+        self.assertNotIn("systemctl --user stop cursor-cli-worker", UPDATER)
+        self.assertNotIn("systemctl --user restart cursor-cli-worker", UPDATER)
+        self.assertIn('systemctl --user restart "$SERVICE_NAME"', UPDATER)
+        self.assertIn("never stop those units here", UPDATER)
         self.assertIn('temporary="${dst}.tmp.$$"', UPDATER)
         self.assertIn('mv "$temporary" "$dst"', UPDATER)
         self.assertIn("PROMOTION_ROLLED_BACK", UPDATER)

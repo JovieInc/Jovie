@@ -2,8 +2,8 @@
 Description=Keep the Symphony Cursor CLI worker current
 
 [Timer]
-OnBootSec=1m
-OnUnitInactiveSec=15min
+OnBootSec=30s
+OnUnitInactiveSec=2min
 Persistent=true
 
 [Install]
