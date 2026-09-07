@@ -1563,8 +1563,9 @@ dequeue_strict() {  # dequeue_strict <num> [expected-head]
     if [[ -n "$expected_head" ]]; then
       # GitHub exposes no atomic expected-head field on dequeuePullRequest.
       # This is bounded best-effort compensation: the backend re-reads the
-      # head and ineligibility before mutation, suppresses a known replacement,
-      # and reports any post-write head race instead of claiming a guarantee.
+      # exact head, queue-entry id, and enqueuedAt before mutation, suppresses a
+      # replacement, and reports any post-write head race instead of claiming a
+      # guarantee.
       if ! dequeue_receipt="$(node scripts/merge-queue-backend.mjs dequeue-ineligible "$n" "$expected_head")"; then
         echo "    !! failed to revalidate and dequeue ineligible PR #$n" >&2
         return 1
