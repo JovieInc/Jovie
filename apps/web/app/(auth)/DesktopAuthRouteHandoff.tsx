@@ -1,14 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  DesktopAuthHandoffActions,
+  type DesktopAuthOpenState,
+} from '@/app/desktop-auth/DesktopAuthClient';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
-import {
-  isElectronRuntime,
-  openDesktopAuthUrl,
-} from '@/lib/desktop/electron-bridge';
-
-type BrowserOpenState = 'idle' | 'opening' | 'opened' | 'error';
+import { isElectronRuntime } from '@/lib/desktop/electron-bridge';
 
 interface SearchParamReader {
   get(key: string): string | null;
@@ -40,40 +39,12 @@ export function useShouldRenderDesktopAuthHandoff(
   return isElectron || hasRuntimeHint;
 }
 
-function formatOpenError(reason?: string): string {
-  if (reason === 'blocked-url' || reason === 'invalid-auth-url') {
-    return 'Sign-in could not start. Close this window and try again from Jovie.';
-  }
-
-  return 'The browser did not open. Try again from this window.';
-}
-
 export function DesktopAuthRouteHandoff() {
-  const [openState, setOpenState] = useState<BrowserOpenState>('idle');
-  const [openError, setOpenError] = useState<string | null>(null);
-
-  const openAuthUrl = useCallback(async () => {
-    if (openState === 'opening') return;
-
-    setOpenState('opening');
-    setOpenError(null);
-    try {
-      const result = await openDesktopAuthUrl(globalThis.location.href);
-      if (result.ok) {
-        setOpenState('opened');
-        return;
-      }
-
-      setOpenState('error');
-      setOpenError(formatOpenError(result.reason));
-    } catch {
-      setOpenState('error');
-      setOpenError(formatOpenError());
-    }
-  }, [openState]);
-
-  const isWaitingInBrowser = openState === 'opened';
-  const statusText = openState === 'opened' ? 'Check your browser.' : openError;
+  const [openState, setOpenState] = useState<DesktopAuthOpenState>('idle');
+  const resolveAuthUrl = useCallback(
+    () => globalThis.location?.href ?? null,
+    []
+  );
 
   return (
     <main
@@ -85,25 +56,10 @@ export function DesktopAuthRouteHandoff() {
       <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
         <BrandLogo aria-hidden size={60} tone='white' />
         <h1 className='sr-only'>Sign In To Jovie</h1>
-        {isWaitingInBrowser ? null : (
-          <button
-            type='button'
-            className='mt-8 inline-flex h-11 w-full items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 text-app font-medium text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55'
-            disabled={openState === 'opening'}
-            onClick={openAuthUrl}
-          >
-            {openState === 'opening'
-              ? 'Opening Browser...'
-              : 'Continue in Browser'}
-          </button>
-        )}
-        <p
-          aria-live='polite'
-          role='status'
-          className='mt-3 min-h-5 text-xs leading-5 text-white/56'
-        >
-          {statusText}
-        </p>
+        <DesktopAuthHandoffActions
+          onOpenStateChange={setOpenState}
+          resolveAuthUrl={resolveAuthUrl}
+        />
       </section>
     </main>
   );
