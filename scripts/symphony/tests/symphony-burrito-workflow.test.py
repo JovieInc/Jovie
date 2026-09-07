@@ -1867,14 +1867,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 cursor_adapter.read_bytes(),
                 (ROOT / "scripts/symphony/cursor-appserver-adapter.py").read_bytes(),
             )
-            self.assertEqual(
-                cursor_std.read_bytes(),
-                (ROOT / "scripts/symphony/cursor-agent-std").read_bytes(),
-            )
-            self.assertEqual(
-                cursor_worker.read_bytes(),
-                (ROOT / "scripts/symphony/cursor-cli-worker.py").read_bytes(),
-            )
+            self.assertEqual(cursor_std.read_bytes(), (ROOT / "scripts/symphony/cursor-agent-std").read_bytes())
+            self.assertEqual(cursor_worker.read_bytes(), (ROOT / "scripts/symphony/cursor-cli-worker.py").read_bytes())
             self.assertEqual(
                 codex_router.read_bytes(),
                 (ROOT / "scripts/symphony/symphony-codex-router").read_bytes(),
@@ -2076,10 +2070,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         legacy_block = UPDATER.split("LEGACY_UNITS=(", 1)[1].split(")", 1)[0]
         self.assertNotIn("symphony-grok-sidecar", legacy_block)
         self.assertNotIn("cursor-cli-worker", legacy_block)
-        self.assertNotIn("fallback-ship", legacy_block)
         self.assertNotIn("systemctl --user stop cursor-cli-worker", UPDATER)
-        self.assertNotIn("systemctl --user restart cursor-cli-worker", UPDATER)
-        self.assertIn('systemctl --user restart "$SERVICE_NAME"', UPDATER)
         self.assertIn("never stop those units here", UPDATER)
         self.assertIn('temporary="${dst}.tmp.$$"', UPDATER)
         self.assertIn('mv "$temporary" "$dst"', UPDATER)

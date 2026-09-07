@@ -7,10 +7,9 @@ The canonical Symphony router remains the only dispatch-selection owner.
 The classify CLI is diagnostic and cannot certify terminal success; journal-bound
 Python callers must provide the persisted expected job.
 
-ha-land-not-complete/v1: a finished thread is not useful until it lands to
-production. Temp roster agents (instruction eval, Skills Audit Tranche 4,
-copies) are never Symphony dispatch targets. Dupe / stale / failed-burn
-pileups HOLD new dispatch so usage is not burned without shipping.
+ha-land-not-complete/v1: finished work is not useful until it lands to
+production. Pair with symphony-meaningful-throughput/v1. Ban duplicate,
+miss, failed-burn, and stale threads that consume usage without shipping.
 """
 from __future__ import annotations
 
@@ -23,6 +22,7 @@ from decimal import Decimal, InvalidOperation
 
 SCHEMA = "symphony-hyperagent-lifecycle/v1"
 LAND_SCHEMA = "ha-land-not-complete/v1"
+THROUGHPUT_SCHEMA = "symphony-meaningful-throughput/v1"
 MAX_OBSERVATION_AGE_SECONDS = 300
 MAX_LIVE_FACT_AGE_SECONDS = 900
 PILEUP_STALE_AFTER_SECONDS = 3600
@@ -36,28 +36,15 @@ NAMED_AGENTS = {
     "mechanical": {"agent_name": "Flash", "model_id": "Flash"},
 }
 DISPATCH_AGENT_NAMES = frozenset(agent["agent_name"] for agent in NAMED_AGENTS.values())
-TEMP_ROSTER_MARKERS = (
-    "temporary",
-    "instruction eval",
-    "skills audit",
-    "tranche",
-    "(copy)",
-)
+TEMP_ROSTER_MARKERS = ("temporary", "instruction eval", "skills audit", "tranche", "(copy)")
 TEMP_ROSTER_NAMES = frozenset({
     "Jovie instruction eval — temporary",
     "Jovie Skills Audit Tranche 4 — GLM Flash",
     "GLM 5.3 Flash Developer (copy)",
 })
 SILENT_ALTERNATIVE_MARKERS = frozenset({
-    "opus",
-    "newest",
-    "auto",
-    "codex",
-    "composer",
-    "claude",
-    "live-cheapest-capable",
-    "cheapest",
-    "sonnet",
+    "opus", "newest", "auto", "codex", "composer", "claude",
+    "live-cheapest-capable", "cheapest", "sonnet",
 })
 TERMINAL_STATES = frozenset(
     {"useful_success", "terminal_failed", "declined", "cancelled", "land_not_complete", "failed_burn"}
@@ -222,6 +209,7 @@ def classify_roster(agents):
         return {
             "schema": LAND_SCHEMA,
             "kind": "roster",
+            "pairedThroughput": THROUGHPUT_SCHEMA,
             "eligible": [],
             "excluded": [],
             "reason": "invalid_roster",
@@ -244,18 +232,20 @@ def classify_roster(agents):
     return {
         "schema": LAND_SCHEMA,
         "kind": "roster",
+        "pairedThroughput": THROUGHPUT_SCHEMA,
         "eligible": eligible,
         "excluded": excluded,
     }
 
 
 def classify_pileup(threads, now=None):
-    """Detect dupe / stale / failed-burn pileups that burn usage without a land."""
+    """Detect dupe / miss / stale / failed-burn pileups that burn usage without a land."""
     now = now or datetime.now(timezone.utc)
     if not isinstance(threads, list):
         return {
             "schema": LAND_SCHEMA,
             "kind": "pileup",
+            "pairedThroughput": THROUGHPUT_SCHEMA,
             "status": "unknown",
             "burns": [],
             "reason": "invalid_threads",
@@ -296,11 +286,14 @@ def classify_pileup(threads, now=None):
             burns.append({"kind": "stale", "thread_id": thread_id})
         if terminal == "failed" and not landed:
             burns.append({"kind": "failed_burn", "thread_id": thread_id})
+        if terminal in {"completed", "cancelled"} and not landed:
+            burns.append({"kind": "miss", "thread_id": thread_id})
         if terminal == "completed" and not landed:
             burns.append({"kind": "land_not_complete", "thread_id": thread_id})
     return {
         "schema": LAND_SCHEMA,
         "kind": "pileup",
+        "pairedThroughput": THROUGHPUT_SCHEMA,
         "status": "pileup" if burns else "clear",
         "burns": burns,
     }
@@ -576,6 +569,7 @@ def classify_observation(observation, now=None, expected_job=None, land_proof=No
             return {
                 "state": "land_not_complete",
                 "reason": "thread_complete_without_production_land",
+                "pairedThroughput": THROUGHPUT_SCHEMA,
                 "job": job,
             }
         return {

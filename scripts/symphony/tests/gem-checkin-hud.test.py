@@ -278,32 +278,19 @@ class ExecutionTruthTests(unittest.TestCase):
 
     def test_runtime_context_surfaces_cursor_cli_health_receipt(self):
         gate = {"schema": "symphony-linear-rate-limit-gate/v1", "recordedAt": STARTED, "resetAt": "2026-08-31T13:00:00Z"}
-        health = {
-            "schema": HUD.CURSOR_HEALTH_SCHEMA,
-            "status": "unhealthy",
-            "reasons": ["wrapper_missing", "binary_missing"],
-        }
+        health = {"schema": HUD.CURSOR_HEALTH_SCHEMA, "status": "unhealthy", "reasons": ["wrapper_missing", "binary_missing"]}
 
         def load(path):
             return health if "symphony-cursor-cli" in str(path) else gate
 
-        with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")), mock.patch.object(HUD, "load_json_dict", side_effect=load), mock.patch.object(HUD.Path, "read_text", return_value='command: cursor-agent --model "cursor-grok-4.6-high-fast"'):
+        patches = (mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")), mock.patch.object(HUD, "load_json_dict", side_effect=load), mock.patch.object(HUD.Path, "read_text", return_value='command: cursor-agent --model "cursor-grok-4.6-high-fast"'))
+        with patches[0], patches[1], patches[2]:
             context = HUD.read_runtime_context(now=NOW)
             self.assertEqual(context["cursor_cli"], "wrapper_missing,binary_missing")
-            summary = "\n".join(HUD.execution_summary({"ok": True, "rows": [], **context}, 430, now=NOW))
-            self.assertIn("cursor-cli wrapper_missing,binary_missing", summary)
-        health.update({"status": "admission_held", "throughput": "admission_held", "reasons": []})
-        with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")), mock.patch.object(HUD, "load_json_dict", side_effect=load), mock.patch.object(HUD.Path, "read_text", return_value='command: cursor-agent --model "cursor-grok-4.6-high-fast"'):
-            context = HUD.read_runtime_context(now=NOW)
-            self.assertEqual(context["cursor_cli"], "admission_held")
-        health.update({
-            "status": "unhealthy",
-            "throughput": "dormant_with_capacity",
-            "reasons": ["dormant_with_capacity"],
-        })
-        with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")), mock.patch.object(HUD, "load_json_dict", side_effect=load), mock.patch.object(HUD.Path, "read_text", return_value='command: cursor-agent --model "cursor-grok-4.6-high-fast"'):
-            context = HUD.read_runtime_context(now=NOW)
-            self.assertEqual(context["cursor_cli"], "dormant_with_capacity")
+        for update, expected in (({"status": "admission_held", "throughput": "admission_held", "reasons": []}, "admission_held"), ({"status": "unhealthy", "throughput": "dormant_with_capacity", "reasons": ["dormant_with_capacity"]}, "dormant_with_capacity")):
+            health.update(update)
+            with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")), mock.patch.object(HUD, "load_json_dict", side_effect=load), mock.patch.object(HUD.Path, "read_text", return_value='command: cursor-agent --model "cursor-grok-4.6-high-fast"'):
+                self.assertEqual(HUD.read_runtime_context(now=NOW)["cursor_cli"], expected)
 
 
 class ReadableWorkTests(unittest.TestCase):

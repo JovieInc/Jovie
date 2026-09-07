@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 """Cursor CLI wrapper that preserves live catalog ids.
 
-The official `cursor-agent` binary stays in ~/.local/share/cursor-agent/versions.
-This wrapper is the PATH / GEM_CURSOR_EXECUTABLE entry. It strips bracketed
-`fast=` parameters so JOV-5235's rejected `cursor-grok-4.6-high[fast=false]`
-form never reaches the binary. Live Cursor inventory is the `*-fast` catalog
-id (`cursor-grok-4.6-high-fast`); do not strip that suffix. Named-model
-routing is fail-closed: silent Codex / Opus / auto / composer alternatives
-are refused instead of rewritten.
+PATH / GEM_CURSOR_EXECUTABLE wrapper. Keep live `*-fast` catalog ids.
+Strip only bracketed `fast=`. Refuse silent Codex/Opus/auto/composer.
 """
 from __future__ import annotations
 
@@ -18,15 +13,8 @@ import sys
 
 VERSIONS = pathlib.Path.home() / ".local/share/cursor-agent/versions"
 SILENT_ALTERNATIVE_MARKERS = frozenset({
-    "opus",
-    "newest",
-    "auto",
-    "codex",
-    "composer",
-    "claude",
-    "live-cheapest-capable",
-    "cheapest",
-    "sonnet",
+    "opus", "newest", "auto", "codex", "composer", "claude",
+    "live-cheapest-capable", "cheapest", "sonnet",
 })
 PASSTHROUGH = {
     "login",

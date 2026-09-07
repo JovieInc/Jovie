@@ -153,34 +153,12 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 self.assertGreater(chain.index(model["id"]), last_subscription)
 
     def test_named_agent_is_selected_by_task_class(self):
-        self.assertEqual(
-            lifecycle.select_named_agent("architecture"),
-            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
-        )
-        self.assertEqual(
-            lifecycle.select_named_agent("mechanical"),
-            {"agent_name": "Flash", "model_id": "Flash"},
-        )
-        self.assertEqual(
-            lifecycle.select_named_agent("code"),
-            {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
-        )
-        self.assertEqual(
-            lifecycle.select_named_agent("tests"),
-            {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
-        )
-        self.assertEqual(
-            lifecycle.select_named_agent("review"),
-            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
-        )
-        self.assertEqual(
-            lifecycle.select_named_agent("design"),
-            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
-        )
-        self.assertEqual(
-            lifecycle.select_named_agent("root-cause"),
-            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
-        )
+        for task, agent in (
+            ("architecture", "Fable 5.1"), ("root-cause", "Fable 5.1"),
+            ("review", "Fable 5.1"), ("design", "Fable 5.1"),
+            ("code", "GLM 5.3"), ("tests", "GLM 5.3"), ("mechanical", "Flash"),
+        ):
+            self.assertEqual(lifecycle.select_named_agent(task), {"agent_name": agent, "model_id": agent})
         with self.assertRaises(lifecycle.LifecycleError):
             lifecycle.select_named_agent("newest")
         with self.assertRaises(lifecycle.LifecycleError):
@@ -544,10 +522,9 @@ class HyperagentLifecycleTests(unittest.TestCase):
         classified = lifecycle.classify_observation(success, self.now, expected_job)
         self.assertEqual(classified["state"], "useful_success")
         unfinished = {k: v for k, v in success.items() if k != "land"}
-        self.assertEqual(
-            lifecycle.classify_observation(unfinished, self.now, expected_job)["state"],
-            "land_not_complete",
-        )
+        unfinished_state = lifecycle.classify_observation(unfinished, self.now, expected_job)
+        self.assertEqual(unfinished_state["state"], "land_not_complete")
+        self.assertEqual(unfinished_state["pairedThroughput"], lifecycle.THROUGHPUT_SCHEMA)
         self.assertEqual(
             lifecycle.plan_resolution(
                 lifecycle.classify_observation(unfinished, self.now, expected_job)
@@ -669,16 +646,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
             {"id": "named-glm", "name": "GLM 5.3"},
             {"id": "named-fable", "name": "Fable 5.1"},
             {"id": "named-flash", "name": "Flash"},
-            {
-                "id": "cmto9hsuk01wl06adf6f8632n",
-                "name": "Jovie instruction eval — temporary",
-                "description": "Temporary isolated synthetic decision trials",
-            },
-            {
-                "id": "cmtqr4e1e0fff07advjvz1xft",
-                "name": "Jovie Skills Audit Tranche 4 — GLM Flash",
-                "description": "Temporary read-only auditor",
-            },
+            {"id": "eval", "name": "Jovie instruction eval — temporary", "description": "Temporary isolated synthetic decision trials"},
+            {"id": "audit", "name": "Jovie Skills Audit Tranche 4 — GLM Flash", "description": "Temporary read-only auditor"},
             {"id": "copy", "name": "GLM 5.3 Flash Developer (copy)"},
             {"id": "eve", "name": "Eve - Prodcut"},
             "bad",
@@ -689,9 +658,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
             {"GLM 5.3", "Fable 5.1", "Flash"},
         )
         excluded_reasons = {item.get("name"): item["reason"] for item in roster["excluded"] if item.get("name")}
-        self.assertEqual(excluded_reasons["Jovie instruction eval — temporary"], "temp_roster_agent")
-        self.assertEqual(excluded_reasons["Jovie Skills Audit Tranche 4 — GLM Flash"], "temp_roster_agent")
-        self.assertEqual(excluded_reasons["GLM 5.3 Flash Developer (copy)"], "temp_roster_agent")
+        self.assertEqual(excluded_reasons.get("Jovie instruction eval — temporary"), "temp_roster_agent")
+        self.assertEqual({excluded_reasons.get("Jovie Skills Audit Tranche 4 — GLM Flash"), excluded_reasons.get("GLM 5.3 Flash Developer (copy)")}, {"temp_roster_agent"})
         self.assertEqual(excluded_reasons["Eve - Prodcut"], "not_named_dispatch_agent")
         self.assertTrue(any(item["reason"] == "invalid_agent" for item in roster["excluded"]))
         self.assertEqual(lifecycle.classify_roster({})["reason"], "invalid_roster")
@@ -700,46 +668,20 @@ class HyperagentLifecycleTests(unittest.TestCase):
         stale = (now - timedelta(hours=2)).isoformat()
         pileup = lifecycle.classify_pileup(
             [
-                {
-                    "id": "eval-1",
-                    "name": "Agent Policy Decision Evaluation",
-                    "agent_name": "Jovie instruction eval — temporary",
-                    "updatedAt": now.isoformat(),
-                    "terminal_state": "completed",
-                },
-                {
-                    "id": "eval-2",
-                    "name": "Agent Policy Decision Evaluation",
-                    "agent_name": "Jovie instruction eval — temporary",
-                    "updatedAt": now.isoformat(),
-                    "terminal_state": "completed",
-                },
-                {
-                    "id": "stale-1",
-                    "name": "JOV-1 land",
-                    "agent_name": "GLM 5.3",
-                    "is_running": True,
-                    "updated_at": stale,
-                },
-                {
-                    "id": "fail-1",
-                    "name": "JOV-2 land",
-                    "agent_name": "Flash",
-                    "terminal_state": "failed",
-                },
+                {"id": "eval-1", "name": "Agent Policy Decision Evaluation", "agent_name": "Jovie instruction eval — temporary", "updatedAt": now.isoformat(), "terminal_state": "completed"},
+                {"id": "eval-2", "name": "Agent Policy Decision Evaluation", "agent_name": "Jovie instruction eval — temporary", "updatedAt": now.isoformat(), "terminal_state": "completed"},
+                {"id": "stale-1", "name": "JOV-1 land", "agent_name": "GLM 5.3", "is_running": True, "updated_at": stale},
+                {"id": "fail-1", "name": "JOV-2 land", "agent_name": "Flash", "terminal_state": "failed"},
+                {"id": "miss-1", "name": "JOV-4", "agent_name": "GLM 5.3", "terminal_state": "cancelled"},
                 {"id": ""},
                 "bad",
             ],
             now=now,
         )
         self.assertEqual(pileup["status"], "pileup")
+        self.assertEqual(pileup["pairedThroughput"], lifecycle.THROUGHPUT_SCHEMA)
         kinds = {item["kind"] for item in pileup["burns"]}
-        self.assertIn("duplicate", kinds)
-        self.assertIn("temp_roster_burn", kinds)
-        self.assertIn("stale", kinds)
-        self.assertIn("failed_burn", kinds)
-        self.assertIn("land_not_complete", kinds)
-        self.assertIn("invalid_thread", kinds)
+        self.assertTrue({"duplicate", "temp_roster_burn", "stale", "failed_burn", "miss", "land_not_complete", "invalid_thread"} <= kinds)
         self.assertEqual(lifecycle.classify_pileup({}, now=now)["status"], "unknown")
         clear = lifecycle.classify_pileup(
             [{
@@ -755,56 +697,18 @@ class HyperagentLifecycleTests(unittest.TestCase):
             now=now,
         )
         self.assertEqual(clear["status"], "clear")
-        burned = lifecycle.plan_resolution({
-            "state": "failed_burn",
-            "job": {"thread_id": "fail-1", "idempotency_key": "job-1"},
-        })
-        self.assertEqual(burned["action"], "quarantine_failed_burn")
-        self.assertFalse(burned["execute"])
-        self.assertEqual(
-            lifecycle.plan_resolution({"state": "land_not_complete"})["action"],
-            "hold_unknown",
-        )
-        self.assertEqual(
-            lifecycle.plan_resolution({"state": "failed_burn"})["action"],
-            "hold_unknown",
-        )
+        burned = lifecycle.plan_resolution({"state": "failed_burn", "job": {"thread_id": "fail-1", "idempotency_key": "job-1"}})
+        self.assertEqual((burned["action"], burned["execute"]), ("quarantine_failed_burn", False))
+        self.assertEqual(lifecycle.plan_resolution({"state": "land_not_complete"})["action"], "hold_unknown")
+        self.assertEqual(lifecycle.plan_resolution({"state": "failed_burn"})["action"], "hold_unknown")
         self.assertEqual(lifecycle.plan_resolution(None)["action"], "hold_unknown")
-        self.assertEqual(
-            lifecycle.validate_dispatch(
-                {**self.envelope, "agent_id": "Jovie instruction eval — temporary"},
-                self.now,
-            )["decision"],
-            "HOLD",
-        )
-        described = lifecycle.validate_dispatch(
-            {
-                **self.envelope,
-                "roster": [{
-                    "name": "GLM 5.3",
-                    "description": "temporary isolated eval copy",
-                }],
-            },
-            self.now,
-        )
+        self.assertEqual(lifecycle.validate_dispatch({**self.envelope, "agent_id": "Jovie instruction eval — temporary"}, self.now)["decision"], "HOLD")
+        described = lifecycle.validate_dispatch({**self.envelope, "roster": [{"name": "GLM 5.3", "description": "temporary isolated eval copy"}]}, self.now)
         self.assertIn("temp_roster_agent", [item["code"] for item in described["reasons"]])
-        self.assertEqual(
-            lifecycle.validate_dispatch({**self.envelope, "open_threads": []}, self.now)["decision"],
-            "PROCEED",
-        )
-        self.assertFalse(lifecycle.is_temp_roster_agent(""))
-        self.assertFalse(lifecycle.is_temp_roster_agent(None))
+        self.assertEqual(lifecycle.validate_dispatch({**self.envelope, "open_threads": []}, self.now)["decision"], "PROCEED")
+        self.assertFalse(lifecycle.is_temp_roster_agent("") or lifecycle.is_temp_roster_agent(None))
         mismatch_land = lifecycle.classify_observation(
-            {
-                **self.observation(
-                    is_running=False, terminal_state="completed",
-                    account_alias="workspace-a", destination="local-artifact",
-                    model_id="GLM 5.3", useful_outcome_verified=True,
-                    final_output_sha256="d" * 64, usage_receipt_sha256="e" * 64,
-                    cost_usd=0.5,
-                ),
-                "land": self.land_proof(idempotency_key="other", merged_pr=True),
-            },
+            {**self.observation(is_running=False, terminal_state="completed", account_alias="workspace-a", destination="local-artifact", model_id="GLM 5.3", useful_outcome_verified=True, final_output_sha256="d" * 64, usage_receipt_sha256="e" * 64, cost_usd=0.5), "land": self.land_proof(idempotency_key="other", merged_pr=True)},
             self.now,
             self.expected_job(),
         )

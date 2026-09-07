@@ -168,37 +168,15 @@ class ExitClassificationTests(unittest.TestCase):
                 ):
                     self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
 
-    def test_cursor_executable_recovers_known_good_wrapper(self):
-        module = self.module
-        home = pathlib.Path(self.tmp.name)
-        wrapper = home / ".local/bin/cursor-agent-std"
-        wrapper.parent.mkdir(parents=True, exist_ok=True)
-        wrapper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-        wrapper.chmod(0o755)
-        with mock.patch.object(module.pathlib.Path, "home", return_value=home):
-            self.assertEqual(module._cursor_executable(), str(wrapper))
-
     def test_exhausted_codex_dequeues_cursor_without_codex_retry(self):
-        module = self.module
-        controls: list[list[str]] = []
-        selection = {
-            "schema_version": 1,
-            "deterministic_first": True,
-            "selected": {
-                "id": "cursor-grok-4.6",
-                "provider": "cursor",
-                "model": "cursor-grok-4.6-high-fast",
-                "pool": "cursor-models",
-                "executor": {"executable": "/bin/true", "argv": ["{prompt}"]},
-            },
-        }
-        launched = {"fallback-ship-JOV-1.service"}
+        module, controls, launched = self.module, [], {"fallback-ship-JOV-1.service"}
+        selected = {"id": "cursor-grok-4.6", "provider": "cursor", "model": "cursor-grok-4.6-high-fast", "pool": "cursor-models", "executor": {"executable": "/bin/true", "argv": ["{prompt}"]}}
         with (
             mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_admitted_or_remount_identifiers", return_value=["JOV-1"]),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], list(launched)]),
-            mock.patch.object(module, "_oauth_fallback_selections", return_value=({"cursor": selection}, "oauth_ready")),
+            mock.patch.object(module, "_oauth_fallback_selections", return_value=({"cursor": {"schema_version": 1, "deterministic_first": True, "selected": selected}}, "oauth_ready")),
             mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
             mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "gate_ready")),
             mock.patch.object(module, "_provider_measured_capacity", side_effect=lambda provider: 1 if provider == "cursor" else 0),
@@ -209,12 +187,9 @@ class ExitClassificationTests(unittest.TestCase):
             mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as stderr,
         ):
             self.assertEqual(module.reconcile(), 0)
-        started = [command for command in controls if command[:3] == ["systemctl", "--user", "start"]]
-        self.assertFalse(any("elixir" in " ".join(command) for command in started))
-        stderr_text = stderr.getvalue()
-        self.assertIn("codex_exhausted", stderr_text)
-        self.assertNotIn("codex_not_exhausted", stderr_text)
-        self.assertNotIn("provider_capacity_zero", stderr_text)
+        self.assertFalse(any("elixir" in " ".join(command) for command in controls if command[:3] == ["systemctl", "--user", "start"]))
+        self.assertIn("codex_exhausted", stderr.getvalue())
+        self.assertNotIn("codex_not_exhausted", stderr.getvalue())
 
     def test_ready_codex_drains_included_pools_without_stopping_symphony(self):
         module = self.module

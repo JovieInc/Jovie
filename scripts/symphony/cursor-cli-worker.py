@@ -1,25 +1,12 @@
 #!/usr/bin/env python3
-"""Gem Cursor CLI worker: install path, auto-update, fail-closed health.
-
-Symphony and this Cursor CLI keep-alive run on gem (Ubuntu Symphony).
-Never say "the Mac." Locked inventory: gem=Ubuntu Symphony; Pro=Tim's
-MacBook Pro (mac.lan / M5 32GB — where Ops/Grok Bot local tools run);
-Air=MacBook Air powered off on desk; PC=dead. Cursor CLI install and
-auto-update target gem only. Pro may hold a logged-in Cursor for
-reference only.
-
-This worker never selects a Symphony route, never leases an issue, and never
-claims useful-turn capacity. Official Codex app-server on :4041 stays
-untouched. Controller (symphony-elixir / burrito) updates stay on
-update-symphony-burrito.sh --managed-controller-only. This worker updates
-only the Cursor CLI and never stops running fallback-ship / grok-sidecar
-units. JOV-5492 capacity evidence (maxConcurrent=0) is an admission gate,
-not a useful-turn proof. Health is throughput classification, not HTTP 200.
+"""Gem Cursor CLI worker on gem (Ubuntu Symphony). Never say "the Mac."
+Pro=Tim's MacBook Pro (mac.lan / M5 32GB — where Ops/Grok Bot local tools run);
+Air=MacBook Air powered off on desk; PC=dead. Pairs symphony-meaningful-throughput/v1
+with ha-land-not-complete/v1. Never leases work or claims useful-turns.
 """
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import pathlib
@@ -30,6 +17,8 @@ import sys
 import time
 
 SCHEMA = "symphony-cursor-cli-health/v1"
+THROUGHPUT_SCHEMA = "symphony-meaningful-throughput/v1"
+LAND_SCHEMA = "ha-land-not-complete/v1"
 PICKUP_SCHEMA = "symphony-fallback-pickup/v1"
 CAPACITY_SCHEMA = "symphony-provider-capacity/v1"
 FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
@@ -71,59 +60,33 @@ def _home(env=None):
 def wrapper_source():
     return pathlib.Path(__file__).resolve().with_name(WRAPPER_NAME)
 
-
 def dest_bin(env=None):
     return _home(env) / ".local/bin"
 
+def _path(env, key, *parts):
+    configured = (env or os.environ).get(key)
+    return pathlib.Path(configured) if configured else _home(env).joinpath(*parts)
 
 def wrapper_path(env=None):
-    configured = (env or os.environ).get("GEM_CURSOR_EXECUTABLE")
-    if configured:
-        return pathlib.Path(configured)
-    return dest_bin(env) / WRAPPER_NAME
-
+    return _path(env, "GEM_CURSOR_EXECUTABLE", ".local/bin", WRAPPER_NAME)
 
 def versions_dir(env=None):
     return _home(env) / ".local/share/cursor-agent/versions"
 
-
-def state_dir(env=None):
-    return _home(env) / ".local/state/symphony-cursor-cli"
-
-
 def health_path(env=None):
-    configured = (env or os.environ).get("GEM_CURSOR_HEALTH_RECEIPT")
-    if configured:
-        return pathlib.Path(configured)
-    return state_dir(env) / "health.json"
-
+    return _path(env, "GEM_CURSOR_HEALTH_RECEIPT", ".local/state/symphony-cursor-cli", "health.json")
 
 def pickup_path(env=None):
-    configured = (env or os.environ).get("SYMPHONY_FALLBACK_PICKUP_RECEIPT")
-    if configured:
-        return pathlib.Path(configured)
-    return _home(env) / ".local/state/symphony-fallback/pickup/latest.json"
-
+    return _path(env, "SYMPHONY_FALLBACK_PICKUP_RECEIPT", ".local/state/symphony-fallback/pickup/latest.json")
 
 def capacity_path(env=None):
-    configured = (env or os.environ).get("SYMPHONY_PROVIDER_CAPACITY_STATE")
-    if configured:
-        return pathlib.Path(configured)
-    return _home(env) / ".local/state/symphony-fallback/provider-capacity.json"
-
+    return _path(env, "SYMPHONY_PROVIDER_CAPACITY_STATE", ".local/state/symphony-fallback/provider-capacity.json")
 
 def fleet_gate_path(env=None):
-    configured = (env or os.environ).get("GEM_FLEET_GATE_RECEIPT")
-    if configured:
-        return pathlib.Path(configured)
-    return _home(env) / ".local/state/gem-priority-gate/latest.json"
-
+    return _path(env, "GEM_FLEET_GATE_RECEIPT", ".local/state/gem-priority-gate/latest.json")
 
 def registry_path(env=None):
-    configured = (env or os.environ).get("SYMPHONY_MODEL_REGISTRY")
-    if configured:
-        return pathlib.Path(configured)
-    return pathlib.Path(__file__).resolve().with_name("config") / "model-registry.json"
+    return _path(env, "SYMPHONY_MODEL_REGISTRY") if (env or os.environ).get("SYMPHONY_MODEL_REGISTRY") else pathlib.Path(__file__).resolve().with_name("config") / "model-registry.json"
 
 
 def load_json_dict(path):
@@ -307,6 +270,10 @@ def provider_seats_available(capacity):
     return False
 
 
+def _throughput(name, detail, gate=""):
+    return {"throughput": name, "admissionGate": gate, "detail": detail}
+
+
 def classify_throughput(*, cli_ready, env=None, now=None):
     now = now or time.time()
     gate = load_json_dict(fleet_gate_path(env))
@@ -316,47 +283,21 @@ def classify_throughput(*, cli_ready, env=None, now=None):
     pickup_present = pickup.get("schema") == PICKUP_SCHEMA
     capacity_present = capacity.get("schema") == CAPACITY_SCHEMA
     if admission_blocked(gate):
-        return {
-            "throughput": "admission_held",
-            "admissionGate": ADMISSION_GATE,
-            "detail": "JOV-5492 capacity evidence still blocks admission (maxConcurrent=0)",
-        }
+        return _throughput("admission_held", "JOV-5492 capacity evidence still blocks admission (maxConcurrent=0)", ADMISSION_GATE)
     seats = bool(cli_ready or provider_seats_available(capacity))
     if pickup_present:
-        event = pickup.get("event")
-        reason = pickup.get("reason")
-        lock_count = pickup.get("lockCount")
+        event, reason, lock_count = pickup.get("event"), pickup.get("reason"), pickup.get("lockCount")
         age = pickup_age_seconds(pickup, now)
         fresh = age is not None and age <= DORMANT_AFTER_SECONDS
         if event == "lease_start" or (isinstance(lock_count, int) and not isinstance(lock_count, bool) and lock_count > 0):
-            return {
-                "throughput": "delivering",
-                "admissionGate": "",
-                "detail": "pickup lease in progress",
-            }
+            return _throughput("delivering", "pickup lease in progress")
         if fresh and event == "idle" and reason == "no_eligible_issue":
-            return {
-                "throughput": "idle_no_work",
-                "admissionGate": "",
-                "detail": "no eligible issue",
-            }
+            return _throughput("idle_no_work", "no eligible issue")
         if seats and (not fresh or event in {"idle", "refuse", "red"}):
-            return {
-                "throughput": "dormant_with_capacity",
-                "admissionGate": "",
-                "detail": "dormant while seats exist",
-            }
+            return _throughput("dormant_with_capacity", "dormant while seats exist")
     elif seats and (gate_present or capacity_present):
-        return {
-            "throughput": "dormant_with_capacity",
-            "admissionGate": "",
-            "detail": "dormant while seats exist",
-        }
-    return {
-        "throughput": "unknown",
-        "admissionGate": "",
-        "detail": "throughput unobserved",
-    }
+        return _throughput("dormant_with_capacity", "dormant while seats exist")
+    return _throughput("unknown", "throughput unobserved")
 
 
 def apply_throughput(payload, env=None, now=None):
@@ -445,6 +386,9 @@ def probe_health(env=None, now=None):
         "proCursorRole": PRO_CURSOR_ROLE,
         "hosts": dict(HOSTS),
         "codex": CODEX_STATUS,
+        "throughputSchema": THROUGHPUT_SCHEMA,
+        "landSchema": LAND_SCHEMA,
+        "pairedLocks": [THROUGHPUT_SCHEMA, LAND_SCHEMA],
         "throughput": "unknown",
         "admissionGate": "",
         "throughputDetail": "throughput unobserved",
@@ -554,10 +498,6 @@ def reconcile(env=None, now=None):
     if payload.get("status") == "ready":
         return EXIT_OK, payload
     return EXIT_UNHEALTHY, payload
-
-
-def receipt_digest(path):
-    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
 
 
 def main(argv=None):

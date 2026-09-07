@@ -59,10 +59,7 @@ MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 # (symphony-grok-sidecar.{service,timer}) is the ACTIVE coding lane while
 # Codex seats are exhausted (Tim, 2026-09-03) and is installed/owned by
 # scripts/symphony/install-symphony-grok-sidecar.sh — never mask it here.
-# cursor-cli-worker.{service,timer} is the Cursor CLI keep-alive owned by
-# scripts/symphony/install-cursor-cli-worker.sh — never mask it here.
-# Controller (elixir) restart is separate from Cursor CLI / fallback-ship
-# workers. Restart only $SERVICE_NAME; never stop those units here.
+# cursor-cli-worker keep-alive is owned by install-cursor-cli-worker.sh; never stop those units here.
 LEGACY_UNITS=(
   symphony-ui-pilot.service
   symphony-reconciler.service
