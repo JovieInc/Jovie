@@ -5346,10 +5346,13 @@ class TestNativeAdmissionReceiptReconciliation:
         receipt_main: str,
         receipt_at: str | None,
         enqueued_at: str | None = "2026-09-07T12:00:00Z",
+        dequeue_response: str = '{"skipped":false,"state":{"queued":false}}',
     ) -> tuple[str, Path]:
         head = "c" * 40
         dequeue_log = tmp_path / "dequeued"
         dequeue_log.write_text("", encoding="utf-8")
+        node_calls = tmp_path / "node-calls"
+        node_calls.write_text("", encoding="utf-8")
         queue_timestamp = (
             f',"enqueuedAt":"{enqueued_at}"' if enqueued_at is not None else ""
         )
@@ -5359,6 +5362,7 @@ class TestNativeAdmissionReceiptReconciliation:
                 f"""\
                 #!/usr/bin/env bash
                 set -euo pipefail
+                echo "${{2:-}}" >>"{node_calls}"
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
                   list-state)
@@ -5366,7 +5370,7 @@ class TestNativeAdmissionReceiptReconciliation:
                     ;;
                   dequeue-ineligible)
                     echo "${{3:?}}" >>"{dequeue_log}"
-                    echo '{{"skipped":false,"state":{{"queued":false}}}}'
+                    echo '{dequeue_response}'
                     ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-unmergeable"}}' ;;
@@ -5456,6 +5460,39 @@ class TestNativeAdmissionReceiptReconciliation:
             assert "stale or missing exact-checkpoint admission" in result.stdout
         else:
             assert "=fresh exact-checkpoint native admission" in result.stdout
+
+    def test_guarded_dequeue_skip_does_not_clear_the_queue_snapshot(
+        self, tmp_path: Path
+    ) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path,
+            receipt_main="b" * 40,
+            receipt_at="2026-09-07T12:00:02Z",
+            dequeue_response=(
+                '{"skipped":true,"reason":"queue-entry-changed",'
+                '"state":{"queued":true}}'
+            ),
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_PROMOTION_MODE=normal "
+                    "DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=0"
+                ),
+            )
+        )
+
+        assert result.returncode != 0
+        assert dequeue_log.read_text(encoding="utf-8").splitlines() == ["1001"]
+        assert "stale dequeue suppressed" in result.stdout
+        assert "Failed to remove unproven native admission" in result.stderr
+        node_commands = (tmp_path / "node-calls").read_text(encoding="utf-8").splitlines()
+        assert "enroll" not in node_commands
+        assert "record-reentry" not in node_commands
 
     def test_missing_enqueue_timestamp_stops_before_mutation(self, tmp_path: Path) -> None:
         _, dequeue_log = self._write_fixture(

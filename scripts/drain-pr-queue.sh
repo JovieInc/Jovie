@@ -1572,7 +1572,10 @@ dequeue_strict() {  # dequeue_strict <num> [expected-head]
       fi
       if [[ "$(jq -r '.skipped // false' <<<"$dequeue_receipt")" == "true" ]]; then
         echo "    =native-queue on #$n ($(jq -r '.reason' <<<"$dequeue_receipt")); stale dequeue suppressed"
-        return 0
+        # A guarded refusal proves that no dequeue occurred. Keep that distinct
+        # from success so callers cannot clear their queue snapshot or proceed
+        # as if the native entry had been removed.
+        return 2
       fi
     elif ! dequeue_receipt="$(node scripts/merge-queue-backend.mjs dequeue "$n")"; then
       echo "    !! failed to prove native dequeue for held PR #$n" >&2
