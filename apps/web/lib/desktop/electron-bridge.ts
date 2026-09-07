@@ -57,6 +57,11 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /** Copy a main-process-validated desktop auth URL. */
+  readonly copyDesktopAuthUrl?: (authUrl: string) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
   /** Open the current isolated public profile in the system browser. */
   readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
@@ -484,6 +489,24 @@ export async function openDesktopAuthUrl(
   return openBrowserFallback(authUrl);
 }
 
+export async function copyDesktopAuthUrl(
+  authUrl: string
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.copyDesktopAuthUrl === 'function') {
+    const result = await api.copyDesktopAuthUrl(authUrl);
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason ?? 'desktop-auth-copy-failed',
+    };
+  }
+  if (api) {
+    reportMissingBridgeMethod('copyDesktopAuthUrl');
+  }
+  return { ok: false, reason: 'desktop-auth-copy-bridge-unavailable' };
+}
+
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
   const api = getRawElectronAPI();
   if (api && typeof api.openPublicProfileInBrowser === 'function') {
@@ -737,6 +760,7 @@ export const __testing = {
   safeOnUpdateDownloaded,
   startDesktopAuthHandoff,
   openDesktopAuthUrl,
+  copyDesktopAuthUrl,
   openPublicProfileInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,
