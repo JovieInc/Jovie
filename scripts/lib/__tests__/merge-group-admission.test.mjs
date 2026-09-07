@@ -134,6 +134,7 @@ function admissionRun(overrides = {}) {
   return {
     conclusion: 'success',
     created_at: '2026-09-06T20:29:00Z',
+    event: 'workflow_run',
     head_repository: { full_name: 'JovieInc/Jovie' },
     head_sha: BASE,
     html_url: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
@@ -403,7 +404,11 @@ describe('merge-group admission evidence', () => {
           repository: 'JovieInc/Jovie',
         },
         lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({ conclusion: null, status: 'in_progress' }),
+        runPayload: admissionRun({
+          conclusion: null,
+          head_sha: checkpointMainSha,
+          status: 'in_progress',
+        }),
         sourceHeadSha: SOURCE_HEAD,
         statusPayload: {
           link: null,
@@ -456,9 +461,9 @@ describe('merge-group admission evidence', () => {
     });
   });
 
-  it('preserves an earlier per-PR receipt when later work makes the multi-PR producer fail', () => {
+  it('rejects an earlier per-PR receipt when its producer ultimately fails', () => {
     const checkpointMainSha = '9'.repeat(40);
-    expect(
+    expect(() =>
       classifyCanonicalAdmissionProvenance({
         evidence: {
           baseSha: BASE,
@@ -466,7 +471,10 @@ describe('merge-group admission evidence', () => {
           repository: 'JovieInc/Jovie',
         },
         lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({ conclusion: 'failure' }),
+        runPayload: admissionRun({
+          conclusion: 'failure',
+          head_sha: checkpointMainSha,
+        }),
         sourceHeadSha: SOURCE_HEAD,
         statusPayload: {
           link: null,
@@ -479,11 +487,7 @@ describe('merge-group admission evidence', () => {
         },
         timelinePayload: admissionTimeline(),
       })
-    ).toMatchObject({
-      checkpoint: 'verified',
-      checkpointMainSha,
-      state: 'verified',
-    });
+    ).toThrow(/identity is inconsistent/);
   });
 
   it('waits for a canonical admission producer that has not started', () => {
@@ -496,7 +500,11 @@ describe('merge-group admission evidence', () => {
           repository: 'JovieInc/Jovie',
         },
         lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun({ conclusion: null, status: 'queued' }),
+        runPayload: admissionRun({
+          conclusion: null,
+          head_sha: checkpointMainSha,
+          status: 'queued',
+        }),
         sourceHeadSha: SOURCE_HEAD,
         statusPayload: {
           link: null,
@@ -550,7 +558,10 @@ describe('merge-group admission evidence', () => {
           repository: 'JovieInc/Jovie',
         },
         lineagePayload: preservedLineage(checkpointMainSha),
-        runPayload: admissionRun(runOverrides),
+        runPayload: admissionRun({
+          head_sha: checkpointMainSha,
+          ...runOverrides,
+        }),
         sourceHeadSha: SOURCE_HEAD,
         statusPayload: {
           link: null,
@@ -577,6 +588,7 @@ describe('merge-group admission evidence', () => {
         },
         lineagePayload: preservedLineage(checkpointMainSha),
         runPayload: admissionRun({
+          head_sha: checkpointMainSha,
           updated_at: '2026-09-06T20:29:24Z',
         }),
         sourceHeadSha: SOURCE_HEAD,
@@ -754,6 +766,7 @@ describe('merge-group admission evidence', () => {
     expect(() =>
       classifyCanonicalAdmissionProvenance({
         ...input,
+        runPayload: admissionRun({ head_sha: '9'.repeat(40) }),
         statusPayload: {
           link: null,
           sha: SOURCE_HEAD,
@@ -853,6 +866,42 @@ describe('merge-group admission evidence', () => {
         runPayload: admissionRun({ id: 987654321 }),
       })
     ).toThrow(/malformed or untrusted/);
+  });
+
+  it.each([
+    ['unsupported producer event', { event: 'schedule' }],
+    [
+      'pull-request run at a different source head',
+      {
+        event: 'pull_request',
+        head_sha: '8'.repeat(40),
+      },
+    ],
+    [
+      'main-scoped run at a different checkpoint',
+      {
+        event: 'workflow_dispatch',
+        head_sha: '8'.repeat(40),
+      },
+    ],
+  ])('rejects a receipt from %s', (_label, runOverrides) => {
+    expect(() =>
+      classifyCanonicalAdmissionProvenance({
+        evidence: {
+          baseSha: BASE,
+          prNumber: 123,
+          repository: 'JovieInc/Jovie',
+        },
+        runPayload: admissionRun(runOverrides),
+        sourceHeadSha: SOURCE_HEAD,
+        statusPayload: {
+          link: null,
+          sha: SOURCE_HEAD,
+          statuses: [admissionStatus()],
+        },
+        timelinePayload: admissionTimeline(),
+      })
+    ).toThrow(/not bound to its admission scope/);
   });
 
   it('requires the exact live queue ref and head SHA', () => {

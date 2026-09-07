@@ -10,6 +10,13 @@ const ADMISSION_RECEIPT_PATTERN =
 const ADMISSION_RECEIPT_MAX_DELAY_MS = 5 * 60_000;
 const ADMISSION_WORKFLOW_NAME = 'Merge Queue Auto-Enroll';
 const ADMISSION_WORKFLOW_PATH = '.github/workflows/merge-queue-autoenroll.yml';
+const ADMISSION_PRODUCER_EVENTS = new Set([
+  'pull_request',
+  'push',
+  'repository_dispatch',
+  'workflow_dispatch',
+  'workflow_run',
+]);
 const QUEUE_HEAD_PR_PATTERN =
   /^refs\/heads\/gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[0-9a-f]+$/;
 const REQUIRED_CHECKS = Object.freeze(['Fork PR Gate', 'PR Size Guard']);
@@ -272,6 +279,15 @@ export function classifyCanonicalAdmissionProvenance({
   if (targetRunId !== runPayload.id) {
     fail('canonical admission receipt is malformed or untrusted');
   }
+  const producerEvent = runPayload.event;
+  const expectedProducerHead =
+    producerEvent === 'pull_request' ? sourceHeadSha : mainSha;
+  if (
+    !ADMISSION_PRODUCER_EVENTS.has(producerEvent) ||
+    runPayload.head_sha !== expectedProducerHead
+  ) {
+    fail('canonical admission producer is not bound to its admission scope');
+  }
   if (
     receiptAt < admittedAt ||
     receiptAt - admittedAt > ADMISSION_RECEIPT_MAX_DELAY_MS
@@ -293,7 +309,7 @@ export function classifyCanonicalAdmissionProvenance({
     !['in_progress', 'completed'].includes(runPayload.status) ||
     (runPayload.status === 'in_progress' && runPayload.conclusion !== null) ||
     (runPayload.status === 'completed' &&
-      !TERMINAL_CHECK_CONCLUSIONS.has(runPayload.conclusion)) ||
+      runPayload.conclusion !== 'success') ||
     !Number.isFinite(runCreatedAt) ||
     !Number.isFinite(runUpdatedAt) ||
     runCreatedAt > admittedAt ||
