@@ -133,7 +133,10 @@ test('keeps the newest 14 debt reports and preserves unrelated debt artifacts', 
     const dryRun = runRetention(root, '--dry-run');
     assert.equal(dryRun.status, 0, dryRun.stderr);
     assert.equal(reportNames(root).length, 18);
-    assert.match(dryRun.stdout, /eligible=16 retained=14 would-remove=2/);
+    assert.match(
+      dryRun.stdout,
+      /eligible=16 retained=14 debt=0 would-remove=2/
+    );
 
     const apply = runRetention(root, '--apply');
     assert.equal(apply.status, 0, apply.stderr);
@@ -216,7 +219,7 @@ test('bounds old profile cycles while preserving current, young, invalid, and sy
       assert.equal(existsSync(path.join(root, relativeRoot, 'old-2')), false);
       assert.equal(
         existsSync(path.join(root, relativeRoot, 'stale-incomplete')),
-        false
+        true
       );
       for (const name of [
         'old-3',
@@ -320,7 +323,7 @@ test('bounds completed old QA runs while preserving active and unsafe siblings',
       assert.equal(existsSync(path.join(root, relativeRoot, 'old-2')), false);
       assert.equal(
         existsSync(path.join(root, relativeRoot, 'stale-incomplete')),
-        false
+        true
       );
       for (const name of [
         'old-3',
@@ -463,7 +466,7 @@ test('bounds every timestamped perf, overnight, QA swarm, and releases history p
     );
     assert.equal(
       existsSync(path.join(root, '.context/perf/homepage-abandoned-running')),
-      false
+      true
     );
     assert.ok(
       existsSync(path.join(root, '.context/perf/homepage-young-running'))
@@ -506,7 +509,7 @@ test('bounds every timestamped perf, overnight, QA swarm, and releases history p
       existsSync(
         path.join(root, '.context/qa-swarm/runs/qa-swarm-stale-incomplete')
       ),
-      false
+      true
     );
     assert.ok(
       existsSync(
@@ -560,15 +563,15 @@ test('apply revalidates current pointers and completion state before deletion', 
       config,
       Date.now()
     );
-    assert.equal(plan.candidates.length, 2);
+    assert.equal(plan.candidates.length, 1);
     const completedCandidate = plan.candidates.find(
       candidate => candidate.name === 'homepage-1'
     );
-    const incompleteCandidate = plan.candidates.find(
+    const incompleteDebt = plan.debt.find(
       candidate => candidate.name === 'homepage-stale'
     );
     assert.ok(completedCandidate);
-    assert.ok(incompleteCandidate);
+    assert.ok(incompleteDebt);
     writeFileSync(
       path.join(perfRoot, 'homepage-current.json'),
       JSON.stringify({ artifactDir: completedCandidate.path })
@@ -590,15 +593,60 @@ test('apply revalidates current pointers and completion state before deletion', 
       /Refusing changed run state/
     );
 
-    markCycle(
-      incompleteCandidate.path,
-      'state.json',
-      JSON.stringify({ status: 'stalled' }),
-      240
-    );
+    // Missing completion is reported separately, never sent to deletion.
+    assert.ok(existsSync(incompleteDebt.path));
+    assert.equal(plan.candidates.includes(incompleteDebt), false);
     await assert.rejects(
-      validateApplyCandidates([incompleteCandidate], Date.now()),
-      /Refusing changed run state/
+      validateApplyCandidates([incompleteDebt], Date.now()),
+      /without terminal completion evidence/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('missing, running, and unknown terminal values remain reported debt under direct apply', async () => {
+  const root = createFixture();
+  try {
+    const config = GENERATED_RUN_ROOTS.find(
+      candidate => candidate.namePrefix === 'launch-check-'
+    );
+    const preserved = [];
+    for (const [suffix, value] of [
+      ['missing', undefined],
+      ['running', { status: 'running' }],
+      ['unknown', { status: 'unknown' }],
+      ['empty', {}],
+    ]) {
+      const cycle = createCycle(
+        root,
+        config.relativeRoot,
+        `launch-check-${suffix}`,
+        240
+      );
+      if (value)
+        markCycle(
+          cycle,
+          config.completionJson.relativePath,
+          JSON.stringify(value),
+          240
+        );
+      preserved.push(cycle);
+    }
+    const plan = await planCompletedRuns(
+      realpathSync(root),
+      config,
+      Date.now()
+    );
+    assert.equal(plan.candidates.length, 0);
+    assert.equal(plan.debt.length, 4);
+    const result = runRetention(root, '--apply');
+    assert.equal(result.status, 0, result.stderr);
+    for (const cycle of preserved) assert.ok(existsSync(cycle), cycle);
+    assert.equal(
+      (result.stdout.match(/missing terminal completion evidence/g) ?? [])
+        .length,
+      4
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -646,6 +694,7 @@ test('loop logs rotate atomically to two bounded generations', () => {
   const root = path.join(fixtureRoot, 'loop-logs');
   try {
     const script = [
+      'set -euo pipefail',
       `source ${JSON.stringify(loopOrchestratorScript)}`,
       'ensure_log_root',
       `printf '12345678901234567890' > "$LOG/test.log"`,
@@ -681,6 +730,7 @@ test('run_logged stays bounded while a verbose child is still active', () => {
   const root = path.join(fixtureRoot, 'loop-logs');
   try {
     const script = [
+      'set -euo pipefail',
       `source ${JSON.stringify(loopOrchestratorScript)}`,
       'ensure_log_root',
       "verbose_child() { for _ in 1 2 3 4 5 6; do head -c 8192 /dev/zero | tr '\\0' x; sleep 0.05; done; }",
@@ -716,6 +766,10 @@ test('run_logged stays bounded while a verbose child is still active', () => {
 });
 
 test('loop log rotation rejects symlink escapes without touching external files', () => {
+  assert.ok(
+    existsSync(loopOrchestratorScript),
+    'loop orchestrator test dependency is required'
+  );
   const fixtureRoot = realpathSync(
     mkdtempSync(path.join(tmpdir(), 'jovie-loop-logs-'))
   );
@@ -728,7 +782,10 @@ test('loop log rotation rejects symlink escapes without touching external files'
   const runGuard = (logRoot, command = 'ensure_log_root') =>
     spawnSync(
       'bash',
-      ['-c', `source ${JSON.stringify(loopOrchestratorScript)}\n${command}`],
+      [
+        '-c',
+        `set -euo pipefail\nsource ${JSON.stringify(loopOrchestratorScript)}\n${command}`,
+      ],
       {
         cwd: repoRoot,
         encoding: 'utf8',
@@ -747,7 +804,7 @@ test('loop log rotation rejects symlink escapes without touching external files'
       'bash',
       [
         '-c',
-        `source ${JSON.stringify(loopOrchestratorScript)}\nensure_log_root`,
+        `set -euo pipefail\nsource ${JSON.stringify(loopOrchestratorScript)}\nensure_log_root`,
       ],
       {
         cwd: repoRoot,
@@ -806,6 +863,7 @@ test('loop log rotation rejects symlink escapes without touching external files'
     mkdirSync(raceRoot, { recursive: true });
     writeFileSync(path.join(raceRoot, 'test.log'), '12345678901234567890');
     const raceScript = [
+      'set -euo pipefail',
       `source ${JSON.stringify(loopOrchestratorScript)}`,
       'tail() { command tail "$@"; ln -s "$EXTERNAL_SENTINEL" "$LOG/test.log.2"; }',
       'rotate_log_if_needed test.log',

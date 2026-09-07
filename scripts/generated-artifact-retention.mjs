@@ -21,6 +21,7 @@ const PROFILE_RUN_ROOTS = [
   {
     completionJson: {
       expectedValue: true,
+      failedValues: [false],
       property: 'passed',
       relativePath: 'summary.json',
     },
@@ -291,7 +292,15 @@ async function inspectCompletionEvidence(target, config) {
       ) {
         return 'complete';
       }
-      return config.completionJson.nonMatchingState ?? 'failed';
+      if (
+        config.completionJson.failedValues?.includes(
+          parsed?.[config.completionJson.property]
+        )
+      ) {
+        return 'failed';
+      }
+      // A parseable marker with an unknown/running value is not a failed run.
+      return 'absent';
     }
   }
 
@@ -469,12 +478,9 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
       right.name.localeCompare(left.name)
   );
   return {
-    candidates: [
-      ...completed.slice(limit),
-      ...failed.slice(failedLimit),
-      ...staleIncomplete,
-    ],
-    eligible: completed.length + failed.length + staleIncomplete.length,
+    candidates: [...completed.slice(limit), ...failed.slice(failedLimit)],
+    debt: staleIncomplete,
+    eligible: completed.length + failed.length,
     retained:
       Math.min(completed.length, limit) + Math.min(failed.length, failedLimit),
   };
@@ -482,6 +488,14 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
 
 export async function validateApplyCandidates(candidates, nowMs) {
   for (const candidate of candidates) {
+    if (
+      candidate.kind === 'directory' &&
+      !['complete', 'failed'].includes(candidate.completionState)
+    ) {
+      throw new Error(
+        `Refusing run without terminal completion evidence: ${candidate.path}`
+      );
+    }
     const currentStats = await lstat(candidate.path);
     if (
       currentStats.isSymbolicLink() ||
@@ -557,7 +571,12 @@ async function main() {
   const candidates = plans.flatMap(plan => plan.candidates);
   for (const plan of plans) {
     console.log(
-      `  ${plan.label}: eligible=${plan.eligible} retained=${plan.retained} ${mode === 'apply' ? 'remove' : 'would-remove'}=${plan.candidates.length}`
+      `  ${plan.label}: eligible=${plan.eligible} retained=${plan.retained} debt=${plan.debt?.length ?? 0} ${mode === 'apply' ? 'remove' : 'would-remove'}=${plan.candidates.length}`
+    );
+  }
+  for (const debt of plans.flatMap(plan => plan.debt ?? [])) {
+    console.log(
+      `  Cleanup debt ${path.relative(repoRealPath, debt.path)} (${debt.bytes} bytes): missing terminal completion evidence, preserved`
     );
   }
   for (const candidate of candidates) {
