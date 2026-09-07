@@ -1307,6 +1307,23 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 (ROOT / "scripts/symphony/codex-account-probe.sh").read_bytes(),
             )
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
+            unmanaged_controller = subprocess.run(
+                [
+                    "bash",
+                    str(updater),
+                    "--managed-controller-only",
+                    "--no-restart",
+                ],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(unmanaged_controller.returncode, 10)
+            self.assertIn(
+                "requires a managed provider generation",
+                unmanaged_controller.stderr,
+            )
             existing.write_text(
                 existing.read_text().replace(
                     "max_concurrent_agents: 8", "max_concurrent_agents: 4"
@@ -1362,7 +1379,16 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 managed_readback.stdout + managed_readback.stderr,
             )
             self.assertIn("PROVIDER_OK", managed_readback.stdout)
+            provider_current = (
+                target_home / ".local/state/symphony-elixir/provider-generations/current"
+            )
+            provider_before = provider_current.resolve(strict=True)
+            provider_alias_before = agent_router.resolve(strict=True)
             helper.write_text("drifted non-provider helper\n")
+            frozen_transition = (
+                target_home / ".local/bin/symphony-frozen-generation-transition"
+            )
+            frozen_transition.unlink()
             helper_drift = subprocess.run(
                 ["bash", str(updater), "--check", "--no-restart"],
                 cwd=ROOT,
@@ -1372,9 +1398,40 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
             self.assertEqual(helper_drift.returncode, 1)
             self.assertIn(f"DRIFT {helper}", helper_drift.stdout)
-            helper.write_bytes(
-                (ROOT / "scripts/symphony/symphony_official_runtime.py").read_bytes()
+            self.assertIn(f"MISSING {frozen_transition}", helper_drift.stdout)
+            repaired = subprocess.run(
+                [
+                    "bash",
+                    str(updater),
+                    "--managed-controller-only",
+                    "--no-restart",
+                ],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
             )
+            self.assertEqual(repaired.returncode, 0, repaired.stdout + repaired.stderr)
+            self.assertEqual(provider_current.resolve(strict=True), provider_before)
+            self.assertEqual(agent_router.resolve(strict=True), provider_alias_before)
+            self.assertEqual(helper.read_bytes(), HELPER_PATH.read_bytes())
+            self.assertEqual(
+                frozen_transition.read_bytes(),
+                (ROOT / "scripts/symphony/symphony-frozen-generation-transition").read_bytes(),
+            )
+            managed_repaired_readback = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                managed_repaired_readback.returncode,
+                0,
+                managed_repaired_readback.stdout + managed_repaired_readback.stderr,
+            )
+            self.assertIn("PROVIDER_OK", managed_repaired_readback.stdout)
             existing.write_text(
                 existing.read_text().replace("interval_ms: 30000", "interval_ms: 31000")
             )
@@ -1387,6 +1444,21 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
             self.assertEqual(drift.returncode, 1, drift.stdout + drift.stderr)
             self.assertIn(f"DRIFT {existing}", drift.stdout)
+
+    def test_provider_and_managed_controller_promotions_are_separate(self):
+        result = subprocess.run(
+            [
+                "bash",
+                str(ROOT / "scripts/symphony/update-symphony-burrito.sh"),
+                "--provider-runtime-only",
+                "--managed-controller-only",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("separate operations", result.stderr)
 
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
         account_guard = UPDATER.index("assert_account_environment_ready\n")
@@ -1522,10 +1594,14 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         provider = activation.index(
             "update-symphony-burrito.sh --provider-runtime-only"
         )
+        managed_controller = activation.index(
+            "update-symphony-burrito.sh --managed-controller-only"
+        )
         controller = activation.index("install-gem-fleet-controller.sh")
         adaptive = activation.index("symphony-concurrency-controller.py")
         provider_check = activation.index("update-symphony-burrito.sh --check")
-        self.assertLess(provider, controller)
+        self.assertLess(provider, managed_controller)
+        self.assertLess(managed_controller, controller)
         self.assertLess(controller, adaptive)
         self.assertLess(adaptive, provider_check)
         self.assertNotIn("update-symphony-burrito.sh --skip-binary", activation)
