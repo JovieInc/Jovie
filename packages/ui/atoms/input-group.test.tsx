@@ -208,9 +208,7 @@ describe('InputGroup', () => {
       expect(group.className).toContain(
         '[&:has(>*+[data-slot=icon])_input]:pr-9'
       );
-      expect(group.className).toContain(
-        '[&>*+[data-slot=icon]]:right-3'
-      );
+      expect(group.className).toContain('[&>*+[data-slot=icon]]:right-3');
     });
 
     it('merges custom className', () => {
