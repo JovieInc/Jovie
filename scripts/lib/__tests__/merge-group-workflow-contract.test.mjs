@@ -821,6 +821,50 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('materializes an empty path artifact for typed no-op merge groups', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const noopStart = detectStep.indexOf(
+      'if [[ "${IS_NOOP:-}" == "true" ]]; then'
+    );
+    const noopEnd = detectStep.indexOf('exit 0', noopStart);
+    const noopBranch = detectStep.slice(noopStart, noopEnd);
+    expect(noopStart).toBeGreaterThanOrEqual(0);
+    expect(noopEnd).toBeGreaterThan(noopStart);
+    expect(noopBranch).toContain(
+      'PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"'
+    );
+    expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
+    expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+
+    const homepageVisualScript = getStepRunScript(
+      pathChanges,
+      'Select rendered homepage visual gate'
+    );
+    const testRoot = mkdtempSync(join(tmpdir(), 'noop-path-artifact-'));
+    const productLaneDir = join(testRoot, 'product-lane-classification');
+    const visualOutput = join(testRoot, 'visual-output');
+    mkdirSync(productLaneDir, { recursive: true });
+    writeFileSync(join(productLaneDir, 'changed-paths.txt'), '');
+    writeFileSync(visualOutput, '');
+
+    const visual = spawnSync('bash', ['-c', homepageVisualScript], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: visualOutput,
+        RUNNER_TEMP: testRoot,
+      },
+    });
+    expect(visual.status, visual.stderr || visual.stdout).toBe(0);
+    expect(readFileSync(visualOutput, 'utf8')).toContain(
+      'run_homepage_visual=false'
+    );
+  });
+
   it('materializes the path artifact before a manual dispatch exits', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectScript = materializeWorkflowDispatchScript(

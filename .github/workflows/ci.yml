@@ -634,6 +634,9 @@ jobs:
               # merge-group admission, ci-fast, secret, migration, and PR Ready
               # still validate the exact combined head. The typed no-op output
               # lets only unit and build/layout skip their expensive work.
+              PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
+              mkdir -p "$PRODUCT_LANE_DIR"
+              : > "$PRODUCT_LANE_DIR/changed-paths.txt"
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
               for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
