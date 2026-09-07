@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep the Symphony Cursor CLI worker current
+
+[Timer]
+OnBootSec=1m
+OnUnitInactiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

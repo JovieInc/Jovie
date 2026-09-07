@@ -1853,6 +1853,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             helper = pathlib.Path(tmp) / "home/.local/bin/symphony-official-runtime"
             agent_router = pathlib.Path(tmp) / "home/.local/bin/symphony-agent-router"
             cursor_adapter = pathlib.Path(tmp) / "home/.local/bin/cursor-appserver-adapter"
+            cursor_std = pathlib.Path(tmp) / "home/.local/bin/cursor-agent-std"
+            cursor_worker = pathlib.Path(tmp) / "home/.local/bin/cursor-cli-worker"
             codex_router = pathlib.Path(tmp) / "home/.local/bin/symphony-codex-router-hotfix"
             codex_probe = pathlib.Path(tmp) / "home/.local/bin/codex-account-probe"
             self.assertTrue(unit.is_file())
@@ -1864,6 +1866,14 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(
                 cursor_adapter.read_bytes(),
                 (ROOT / "scripts/symphony/cursor-appserver-adapter.py").read_bytes(),
+            )
+            self.assertEqual(
+                cursor_std.read_bytes(),
+                (ROOT / "scripts/symphony/cursor-agent-std").read_bytes(),
+            )
+            self.assertEqual(
+                cursor_worker.read_bytes(),
+                (ROOT / "scripts/symphony/cursor-cli-worker.py").read_bytes(),
             )
             self.assertEqual(
                 codex_router.read_bytes(),
@@ -2065,6 +2075,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         # retire or mask it, so it must not appear in LEGACY_UNITS.
         legacy_block = UPDATER.split("LEGACY_UNITS=(", 1)[1].split(")", 1)[0]
         self.assertNotIn("symphony-grok-sidecar", legacy_block)
+        self.assertNotIn("cursor-cli-worker", legacy_block)
         self.assertIn('temporary="${dst}.tmp.$$"', UPDATER)
         self.assertIn('mv "$temporary" "$dst"', UPDATER)
         self.assertIn("PROMOTION_ROLLED_BACK", UPDATER)

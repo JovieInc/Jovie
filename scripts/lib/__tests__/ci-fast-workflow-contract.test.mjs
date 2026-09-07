@@ -787,6 +787,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
       'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
       'python3 scripts/symphony/tests/test-model-router.py',
+      'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
       'python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py',
       'python3 scripts/symphony/tests/symphony-github-poke.test.py',
     ]) {

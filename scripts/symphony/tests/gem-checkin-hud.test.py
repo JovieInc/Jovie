@@ -276,6 +276,23 @@ class ExecutionTruthTests(unittest.TestCase):
         with mock.patch.object(HUD.subprocess, "run", side_effect=OSError), mock.patch.object(HUD, "load_json_dict", return_value={}), mock.patch.object(HUD.Path, "read_text", side_effect=OSError):
             self.assertEqual(HUD.read_runtime_context(now=NOW)["service_state"], "UNKNOWN")
 
+    def test_runtime_context_surfaces_cursor_cli_health_receipt(self):
+        gate = {"schema": "symphony-linear-rate-limit-gate/v1", "recordedAt": STARTED, "resetAt": "2026-08-31T13:00:00Z"}
+        health = {
+            "schema": HUD.CURSOR_HEALTH_SCHEMA,
+            "status": "unhealthy",
+            "reasons": ["wrapper_missing", "binary_missing"],
+        }
+
+        def load(path):
+            return health if "symphony-cursor-cli" in str(path) else gate
+
+        with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")), mock.patch.object(HUD, "load_json_dict", side_effect=load), mock.patch.object(HUD.Path, "read_text", return_value='command: cursor-agent --model "cursor-grok-4.6-high-fast"'):
+            context = HUD.read_runtime_context(now=NOW)
+            self.assertEqual(context["cursor_cli"], "wrapper_missing,binary_missing")
+            summary = "\n".join(HUD.execution_summary({"ok": True, "rows": [], **context}, 430, now=NOW))
+            self.assertIn("cursor-cli wrapper_missing,binary_missing", summary)
+
 
 class ReadableWorkTests(unittest.TestCase):
     def test_titles_join_by_identifier_without_inventing_execution(self):

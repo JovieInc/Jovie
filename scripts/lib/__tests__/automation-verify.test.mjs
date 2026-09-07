@@ -295,6 +295,17 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const CURSOR_CLI_WORKER_LANE = [
+  'scripts/symphony/cursor-agent-std',
+  'scripts/symphony/cursor-cli-worker.py',
+  'scripts/symphony/install-cursor-cli-worker.sh',
+  'scripts/symphony/systemd/cursor-cli-worker.service',
+  'scripts/symphony/systemd/cursor-cli-worker.timer',
+  'scripts/symphony/tests/cursor-cli-worker.test.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const GEM_CHECKIN_HUD_LANE = [
   'scripts/symphony/WORKFLOW.md',
   'scripts/symphony/symphony_official_runtime.py',
@@ -307,6 +318,12 @@ const GEM_CHECKIN_HUD_LANE = [
   'scripts/symphony/update-symphony-burrito.sh',
   'scripts/symphony/tests/gem-checkin-hud.test.py',
   'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  'scripts/symphony/cursor-agent-std',
+  'scripts/symphony/cursor-cli-worker.py',
+  'scripts/symphony/install-cursor-cli-worker.sh',
+  'scripts/symphony/systemd/cursor-cli-worker.service',
+  'scripts/symphony/systemd/cursor-cli-worker.timer',
+  'scripts/symphony/tests/cursor-cli-worker.test.py',
   '.github/workflows/reusable-ci-lint.yml',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
@@ -921,6 +938,26 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...GEM_CHECKIN_HUD_LANE,
+        'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded Cursor CLI worker contract and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(CURSOR_CLI_WORKER_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/symphony/tests/cursor-cli-worker.test.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...CURSOR_CLI_WORKER_LANE,
         'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');

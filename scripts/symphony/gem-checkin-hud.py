@@ -40,6 +40,13 @@ DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
 DEFAULT_TPS_STATE = Path.home() / ".local/state/gem-checkin-hud/symphony-tps.json"
 DEFAULT_PRESSURE_STATE = Path.home() / ".local/state/gem-checkin-hud/system-pressure.json"
 DEFAULT_GITHUB_STATE = Path.home() / ".local/state/gem-checkin-hud/github-projection.json"
+DEFAULT_CURSOR_HEALTH = Path(
+    os.environ.get(
+        "GEM_CURSOR_HEALTH_RECEIPT",
+        str(Path.home() / ".local/state/symphony-cursor-cli/health.json"),
+    )
+)
+CURSOR_HEALTH_SCHEMA = "symphony-cursor-cli-health/v1"
 DEFAULT_SYMPHONY = os.environ.get("SYMPHONY_STATE_URL", "http://127.0.0.1:4041/api/v1/state")
 DEFAULT_WORKFLOW = Path(
     os.environ.get("SYMPHONY_WORKFLOW_PATH", str(Path.home() / ".config/symphony/WORKFLOW.md"))
@@ -2719,6 +2726,14 @@ def read_runtime_context(*, now: datetime) -> dict[str, Any]:
     gate_until = None
     if gate.get("schema") == "symphony-linear-rate-limit-gate/v1" and recorded and recorded <= now and reset and reset > now:
         gate_until = reset.isoformat()
+    cursor_health = load_json_dict(DEFAULT_CURSOR_HEALTH)
+    if cursor_health.get("schema") == CURSOR_HEALTH_SCHEMA and cursor_health.get("status") == "ready":
+        cursor_cli = "ready"
+    elif cursor_health.get("schema") == CURSOR_HEALTH_SCHEMA:
+        reasons = cursor_health.get("reasons") if isinstance(cursor_health.get("reasons"), list) else []
+        cursor_cli = ",".join(str(reason) for reason in reasons) or "unhealthy"
+    else:
+        cursor_cli = UNKNOWN
     configured = UNKNOWN
     try:
         match = re.search(r"model=[\"']([^\"']+)[\"']", DEFAULT_WORKFLOW.read_text(encoding="utf-8"))
@@ -2726,7 +2741,7 @@ def read_runtime_context(*, now: datetime) -> dict[str, Any]:
             configured = match.group(1)
     except OSError:
         pass
-    return {"service_state": service, "linear_gate_until": gate_until, "configured_model": configured, "runtime_observed_at": now.isoformat()}
+    return {"service_state": service, "linear_gate_until": gate_until, "configured_model": configured, "cursor_cli": cursor_cli, "runtime_observed_at": now.isoformat()}
 
 
 def execution_state(row: dict[str, Any], *, now: datetime) -> str:
@@ -2785,7 +2800,7 @@ def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime, ma
     cap = symphony.get("cap") if isinstance(symphony.get("cap"), int) and symphony.get("cap") >= 0 else None
     freshness = natural_time(symphony.get("generated_at"), now=now)
     count_text = f"{running}/{cap}" if isinstance(running, int) and cap is not None else f"{running}/{cap if cap is not None else UNKNOWN}"
-    title = f"ACTIVE SLOTS · RUNNING: {count_text} · service {symphony.get('service_state', UNKNOWN)}"
+    title = f"ACTIVE SLOTS · RUNNING: {count_text} · service {symphony.get('service_state', UNKNOWN)} · cursor-cli {symphony.get('cursor_cli', UNKNOWN)}"
     corner = f"API {source} · {freshness}"
     fill = max(1, width - len(title) - len(corner) - 7)
     border_color = MINT if fresh and running == 0 else BLUE if fresh else ORANGE
