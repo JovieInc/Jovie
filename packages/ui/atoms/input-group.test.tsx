@@ -89,7 +89,7 @@ describe('InputGroup', () => {
       const group = screen.getByTestId('input-group');
       // md size uses specific padding classes for icons
       expect(group.className).toContain(
-        '[&>[data-slot=icon]:first-child~input]:pl-9'
+        '[&:has(>[data-slot=icon]:first-child)_input]:pl-9'
       );
     });
 
@@ -101,7 +101,7 @@ describe('InputGroup', () => {
       );
       const group = screen.getByTestId('input-group');
       expect(group.className).toContain(
-        '[&>[data-slot=icon]:first-child~input]:pl-8'
+        '[&:has(>[data-slot=icon]:first-child)_input]:pl-8'
       );
     });
 
@@ -113,7 +113,7 @@ describe('InputGroup', () => {
       );
       const group = screen.getByTestId('input-group');
       expect(group.className).toContain(
-        '[&>[data-slot=icon]:first-child~input]:pl-12'
+        '[&:has(>[data-slot=icon]:first-child)_input]:pl-12'
       );
     });
   });
@@ -187,7 +187,7 @@ describe('InputGroup', () => {
       expect(group.className).toContain(
         '[&>[data-slot=icon]:first-child]:left-3.5'
       );
-      expect(group.className).toContain('[&>input~[data-slot=icon]]:right-3.5');
+      expect(group.className).toContain('[&>*+[data-slot=icon]]:right-3.5');
       expect(group.className).not.toContain('${');
     });
 
