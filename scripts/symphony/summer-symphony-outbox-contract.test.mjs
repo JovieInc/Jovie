@@ -10,6 +10,7 @@ import {
   OUTBOX_DOMAIN_V2,
   PAGE_SCHEMA,
   parseVerificationKeys,
+  runCycle,
   verifyOutboxRecord,
 } from './summer-symphony-outbox-consumer.mjs';
 
@@ -159,7 +160,9 @@ describe('Summer Symphony consumer contract foundation', () => {
         keys
       ),
       error =>
+        error instanceof Error &&
         error.message === 'outbox-page-limit-exceeded' &&
+        'nextCursor' in error &&
         error.nextCursor === '4'
     );
   });
@@ -203,5 +206,61 @@ describe('Summer Symphony consumer contract foundation', () => {
     }
     assert.equal(requests[0].options.method, undefined);
     assert.equal(requests[1].options.method, 'POST');
+  });
+
+  it('journals one projection and replays the exact outcome after restart', async () => {
+    const task = taskV2();
+    let state = {
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active: null,
+    };
+    let projections = 0;
+    const posts = [];
+    const options = {
+      journal: {
+        read: () => state,
+        write: next => {
+          state = structuredClone(next);
+        },
+      },
+      keys,
+      transport: {
+        readPage: async () => ({
+          schema: PAGE_SCHEMA,
+          records: [signedOutbox(task)],
+          cursor: null,
+          hasMore: false,
+          scanned: 1,
+        }),
+        writeOutcome: async outcome => {
+          posts.push(canonical(outcome));
+          if (posts.length === 1) throw new Error('ambiguous-network');
+          return {
+            schema: 'summer.symphony-outcome-ack/v1',
+            taskKey,
+            status: 'replay',
+          };
+        },
+      },
+      projector: {
+        project: async current => {
+          projections += 1;
+          return {
+            identifier: 'JOV-6001',
+            createdAt: '2026-09-07T03:00:00Z',
+            ...current.linearProjection,
+          };
+        },
+      },
+      outcomePrivateKey: foreign.privateKey,
+      outcomePublicKey: foreign.publicKey,
+      outcomeKeyId: 'host-outcome',
+    };
+    await assert.rejects(runCycle(options), /ambiguous-network/);
+    assert.equal(state.active.phase, 'outcome-pending');
+    await runCycle(options);
+    assert.equal(projections, 1);
+    assert.equal(posts[1], posts[0]);
+    assert.equal(state.active, null);
   });
 });

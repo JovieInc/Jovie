@@ -57,6 +57,14 @@ const MAX_PAGES = 4;
 const PAGE_LIMIT = 25;
 const RESPONSE_BYTE_LIMIT = 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
+
+class OutboxPageLimitError extends Error {
+  constructor(nextCursor) {
+    super('outbox-page-limit-exceeded');
+    this.nextCursor = nextCursor;
+  }
+}
+
 const ACTIONS = new Set([
   'reconcile-release-certification-starvation',
   'remediate-selected-ci-audit-class',
@@ -472,9 +480,7 @@ export async function discoverOne(transport, keys, startCursor = null) {
     if (!page.hasMore) return null;
     cursor = page.cursor;
   }
-  const error = new Error('outbox-page-limit-exceeded');
-  error.nextCursor = cursor;
-  throw error;
+  throw new OutboxPageLimitError(cursor);
 }
 
 function emptyState() {
@@ -554,10 +560,12 @@ export function createFileJournal(workspace, keys, outcomePublicKey = null) {
     ) {
       throw new Error('GEM_WORKSPACE-unsafe');
     }
-    for (const [candidate, mode] of [
+    /** @type {Array<[string, number | null]>} */
+    const directories = [
       [sharedStateDirectory, null],
       [privateStateDirectory, 0o700],
-    ]) {
+    ];
+    for (const [candidate, mode] of directories) {
       try {
         mkdirSync(candidate, { mode: 0o700 });
       } catch (error) {
@@ -777,7 +785,7 @@ export async function runCycle({
       discovered = await discoverOne(transport, keys, discoveryCursor);
     } catch (error) {
       if (
-        error?.message !== 'outbox-page-limit-exceeded' ||
+        !(error instanceof OutboxPageLimitError) ||
         typeof journal.writeDiscoveryCursor !== 'function'
       ) {
         throw error;

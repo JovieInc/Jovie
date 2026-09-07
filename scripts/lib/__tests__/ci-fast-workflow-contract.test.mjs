@@ -577,6 +577,12 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).toContain('_gem_workspace_migrate)\\.py$');
     expect(remaining).toContain('summer_bottleneck_producer\\.py$');
     expect(remaining).toContain('summer-bottleneck-producer\\.test\\.py$');
+    expect(remaining).toContain(
+      'summer-symphony-outbox-(consumer(?:\\.test)?|contract\\.test)\\.mjs$'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=45 --test-coverage-branches=50 --test-coverage-functions=65 scripts/symphony/summer-symphony-outbox-contract.test.mjs'
+    );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
     );
@@ -903,6 +909,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/model-router.py',
       'scripts/symphony/symphony-nvme-package-cache.sh',
       'scripts/symphony/symphony-reconciler.py',
+      'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+      'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
       'scripts/symphony/systemd/gem-disk-reclaim.service',
       'scripts/symphony/systemd/gem-disk-reclaim.timer',
       'scripts/symphony/systemd/gem-pr-drain.service',
