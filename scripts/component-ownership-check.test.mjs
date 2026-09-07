@@ -2,16 +2,30 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { checkRepository, findOwnershipViolations, readOwnershipMap } from './component-ownership-check.mjs';
+import {
+  checkRepository,
+  findOwnershipViolations,
+  readOwnershipMap,
+} from './component-ownership-check.mjs';
 
 test('ownership map has one public owner for every required family', () => {
   const map = readOwnershipMap();
   const families = Object.values(map.families);
-  assert.equal(new Set(families.map(family => family.owner)).size, families.length);
+  assert.equal(
+    new Set(families.map(family => family.owner)).size,
+    families.length
+  );
   assert.ok(families.every(family => family.publicImport));
-  assert.ok(families.every(family => fs.existsSync(path.resolve(family.owner))));
-  assert.ok(families.some(family => family.contracts?.includes('scroll-ownership')));
-  const firstRoute = fs.readFileSync(path.resolve(map.firstMigratedRoute), 'utf8');
+  assert.ok(
+    families.every(family => fs.existsSync(path.resolve(family.owner)))
+  );
+  assert.ok(
+    families.some(family => family.contracts?.includes('scroll-ownership'))
+  );
+  const firstRoute = fs.readFileSync(
+    path.resolve(map.firstMigratedRoute),
+    'utf8'
+  );
   assert.match(firstRoute, /from ['"]@\/components\/canonical['"]/);
   assert.match(firstRoute, /<PageShell/);
 });
