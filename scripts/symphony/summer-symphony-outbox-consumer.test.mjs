@@ -80,6 +80,7 @@ function task(overrides = {}) {
   };
 }
 
+/** @param {any} taskValue */
 function signedOutbox(
   taskValue = task(),
   signing = summer,
@@ -204,6 +205,7 @@ describe('Summer Symphony authenticated transport', () => {
   });
 
   it('transmits the once-encoded cursor and never sends proof material in the URL', async () => {
+    /** @type {any} */
     let request;
     const transport = createHttpTransport(
       {
@@ -217,6 +219,7 @@ describe('Summer Symphony authenticated transport', () => {
       }
     );
     await transport.readPage('a/b?c', 25);
+    assert.ok(request);
     assert.equal(
       request.url,
       `https://summer.example${OUTBOX_PATH}?limit=25&cursor=a%2Fb%3Fc`
@@ -470,13 +473,13 @@ describe('bounded discovery and durable WIP=1 hold', () => {
     roots.push(root);
     const firstJournal = createFileJournal(root, keys);
     const secondJournal = createFileJournal(root, keys);
-    let releaseFirst;
-    let firstEntered;
+    let releaseFirst = () => {};
+    let firstEntered = () => {};
     const entered = new Promise(resolve => {
-      firstEntered = resolve;
+      firstEntered = () => resolve();
     });
     const release = new Promise(resolve => {
-      releaseFirst = resolve;
+      releaseFirst = () => resolve();
     });
     const first = runCycle({
       journal: firstJournal,
@@ -535,6 +538,7 @@ describe('bounded discovery and durable WIP=1 hold', () => {
         state = structuredClone(next);
       },
     };
+    /** @type {any} */
     let posted;
     const result = await runCycle({
       journal,
@@ -563,6 +567,7 @@ describe('bounded discovery and durable WIP=1 hold', () => {
       issueIdentifier: 'JOV-6001',
       acknowledgement: 'recorded',
     });
+    assert.ok(posted);
     assert.equal(posted.decisionFingerprint, taskKey);
     assert.deepEqual(posted.linearProjection, v2Task.linearProjection);
     assert.equal(state.active, null);
@@ -758,7 +763,16 @@ describe('bounded discovery and durable WIP=1 hold', () => {
       },
     };
     const transport = { readPage: async () => page([record]) };
-    await runCycle({ journal, transport, keys });
+    const v1OnlyOptions = {
+      journal,
+      transport,
+      keys,
+      projector: null,
+      outcomePrivateKey: null,
+      outcomePublicKey: null,
+      outcomeKeyId: null,
+    };
+    await runCycle(v1OnlyOptions);
     state.active.record.task.source.sourceVersion = 'e'.repeat(40);
     assert.throws(
       () => verifyOutboxRecord(state.active.record, keys),
@@ -767,7 +781,7 @@ describe('bounded discovery and durable WIP=1 hold', () => {
     state.active = null; // simulated local loss; no provider mutation can duplicate
     const recoveredRecord = signedOutbox();
     transport.readPage = async () => page([recoveredRecord]);
-    await runCycle({ journal, transport, keys });
+    await runCycle(v1OnlyOptions);
     assert.equal(writes, 2);
     assert.equal(state.active.taskKey, taskKey);
   });
@@ -946,11 +960,13 @@ describe('configuration boundaries', () => {
       outcomeKeyId: 'host-outcome',
       vercelAutomationBypassSecret: 'scoped-vercel-bypass-secret',
     };
+    /** @type {any} */
     let options;
     await createHttpTransport(config, async (_url, received) => {
       options = received;
       return Response.json(page([]));
     }).readPage(null, 25);
+    assert.ok(options);
     assert.equal(options.redirect, 'error');
     assert.equal(options.signal instanceof AbortSignal, true);
     assert.equal(
