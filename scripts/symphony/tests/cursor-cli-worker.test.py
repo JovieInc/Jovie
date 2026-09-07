@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import shutil
 import tempfile
 import time
 import unittest
@@ -124,6 +125,7 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
         )
         now = time.mktime(time.strptime("2026.09.07", "%Y.%m.%d"))
         self.assertIn("binary_stale", self.module.probe_health(stale, now=now)["reasons"])
+        env = self._healthy_env()
         self._write_json(env["GEM_FLEET_GATE_RECEIPT"], {
             "schema": self.module.FLEET_GATE_SCHEMA,
             "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
@@ -177,6 +179,7 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
         )
         wrapper = self.module.install_wrapper(self.env)
         self.assertIn("stale_binary_selected", self.module.probe_health({**self.env, "CURSOR_AGENT_REAL": str(stale), "GEM_CURSOR_EXECUTABLE": str(wrapper)})["reasons"])
+        shutil.rmtree(self.home / ".local/share/cursor-agent/versions", ignore_errors=True)
         marker = self.home / "updated"
         binary = self.write_binary(
             "case \"$1\" in\n  --version) echo cursor-agent 2026.09.07-abcd;;\n  status|whoami) echo logged in;;\n"
