@@ -12,7 +12,9 @@ describe('Summer shadow runtime identity', () => {
     });
 
     expect(instructions).toMatchObject({
-      content: expect.stringContaining('Do not write Linear, GitHub, GBrain'),
+      content: expect.stringContaining(
+        'The `ovie-summer-shadow` source stays Read-only'
+      ),
     });
   });
 

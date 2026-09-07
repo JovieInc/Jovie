@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Run the CI unittest selector with stdlib line coverage; no dependency install."""
+import ast
+import dis
+import json
+from pathlib import Path
+import runpy
+import sys
+import trace
+import types
+
+ROOT = Path(__file__).resolve().parents[3]
+SUITES = [ROOT / "scripts/symphony/tests/useful-turn-proof.test.py",
+          ROOT / "scripts/symphony/tests/accepted-completion.test.py",
+          ROOT / "scripts/symphony/tests/provider-capacity.test.py",
+          ROOT / "scripts/symphony/tests/symphony-concurrency-controller.test.py"]
+TARGETS = {
+    "gem_gate_contract.py": {"v2_parse_time", "v2_validate_runtime_identity", "v2_validate_useful_turn_proof", "v2_accepted_useful_turn_proofs", "v2_validate_capacity_receipt"},
+    "symphony_proof_context.py": None,
+    "symphony_useful_turn_probe.py": None,
+    "symphony_capacity_evidence.py": None,
+    "symphony_accepted_completion.py": {"validate_lease", "validate_result", "validate_github_outcome", "github_outcome", "build_proof", "persist_proof", "reconcile"},
+    "provider_capacity.py": {"provider_record", "apply_observation", "record_observation"},
+    "symphony-concurrency-controller.py": None,
+}
+
+
+def lines(code):
+    result = {line for _, line in dis.findlinestarts(code) if line > 0}
+    for child in code.co_consts:
+        if isinstance(child, types.CodeType):
+            result.update(lines(child))
+    return result
+
+
+sys.path.insert(0, str(SUITES[0].parent))
+tracer = trace.Trace(count=True, trace=False)
+status = 0
+for suite in SUITES:
+    sys.argv = [str(suite)]
+    try:
+        tracer.runfunc(runpy.run_path, str(suite), run_name="__main__")
+    except SystemExit as exc:
+        status = max(status, int(exc.code or 0))
+counts = tracer.results().counts
+report = {}
+for name, selected in TARGETS.items():
+    path = ROOT / "scripts/symphony" / name
+    source = path.read_text()
+    executable = lines(compile(source, str(path), "exec"))
+    tree = ast.parse(source)
+    if selected:
+        scope = set()
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef) and node.name in selected:
+                scope.update(range(node.lineno, node.end_lineno + 1))
+        executable &= scope
+    executed = {line for (file, line), count in counts.items() if file == str(path) and count}
+    missing = sorted(executable - executed)
+    percent = 100 * (len(executable) - len(missing)) / len(executable)
+    report[name] = {"percent": round(percent, 2), "executed": len(executable) - len(missing), "statements": len(executable), "missing": missing}
+    if percent < 90:
+        status = 1
+print(json.dumps({"selectors": [str(suite.relative_to(ROOT)) for suite in SUITES], "coverage": report}, indent=2))
+raise SystemExit(status)

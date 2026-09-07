@@ -5,7 +5,7 @@
 # already-ready PR so native autoenrollment revalidates and owns queue admission.
 # Untyped holds (missing receipt) on a ready green PR are lifted — they are
 # not a permanent manual trap. Stale typed receipts missing repository scope
-# stay held. Human-policy holds (taste, net-new, outbound) stay held.
+# stay held. Separate machine-verifiable holds stay held.
 # Mutations are re-read and compensated.
 #
 # Env:
@@ -43,9 +43,9 @@ RELEASE_ADMISSION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release
 # Receipt comments are controller authority, not public-input authority. These
 # are the only identities used by the current workflow/Symphony writers.
 TRUSTED_DEFERRAL_AUTHORS='["itstimwhite","jovie-bot[bot]"]'
-# `queue-deferred` itself is expected; every OTHER hold label blocks release.
-# Canonical set lives in queue-deferral-receipt.mjs (taste/net-new/outbound).
-OTHER_HOLD_RE="$(node "$LIB" human-policy-re)"
+# `queue-deferred` itself is expected; every separate machine hold blocks release.
+# Human/taste policy labels are retired and never participate in admission.
+OTHER_HOLD_RE="$(node "$LIB" mechanical-hold-re)"
 now_epoch="$(date -u +%s)"
 
 request_retry_after() {  # request_retry_after <seconds> — shortest request wins

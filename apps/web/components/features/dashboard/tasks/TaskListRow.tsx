@@ -1,9 +1,10 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/TaskListRow.test.tsx
 import { UserAvatar } from '@jovie/ui';
 import { Disc3, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
-import { ShellListRowFrame } from '@/components/organisms/table';
+import { TaskProjectionListRow } from '@/components/organisms/table';
 import { DueChip } from '@/components/shell/DueChip';
 import { toDueIso } from '@/lib/tasks/task-due-date';
 import type { TaskView } from '@/lib/tasks/types';
@@ -170,36 +171,18 @@ export const TaskListRow = memo(function TaskListRow({
   );
 
   return (
-    <ShellListRowFrame
-      data-testid={`task-list-row-${task.id}`}
+    <TaskProjectionListRow
+      testId={`task-list-row-${task.id}`}
       isSelected={isSelected}
-      interaction='none'
-      className={cn(
-        'group/row flex h-full w-full items-center gap-2 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
-        isDone && !isSelected && 'opacity-75',
-        isCancelled && !isSelected && 'opacity-60'
+      opacity={isCancelled ? 'quiet' : isDone ? 'muted' : 'full'}
+      leading={<TaskStageGlyph task={task} />}
+      title={hideTitle ? undefined : task.title}
+      titleAfter={agentWorking ? <TaskAgentWorkingGlyph /> : null}
+      titleClassName={cn(
+        isDone && 'text-secondary-token',
+        isCancelled && 'text-tertiary-token'
       )}
-    >
-      <span className='flex shrink-0 items-center'>
-        <TaskStageGlyph task={task} />
-      </span>
-
-      <div className='min-w-0 flex-1'>
-        {hideTitle ? null : (
-          <div className='flex min-w-0 items-center gap-1.5'>
-            <p
-              className={cn(
-                'min-w-0 truncate text-app font-semibold leading-tight text-primary-token',
-                isDone && 'text-secondary-token',
-                isCancelled && 'text-tertiary-token'
-              )}
-            >
-              {task.title}
-            </p>
-            {agentWorking ? <TaskAgentWorkingGlyph /> : null}
-          </div>
-        )}
-
+      metadata={
         <div
           data-testid={`task-list-row-meta-${task.id}`}
           className={cn(
@@ -247,9 +230,8 @@ export const TaskListRow = memo(function TaskListRow({
             </button>
           ) : null}
         </div>
-      </div>
-
-      <div className='flex shrink-0 items-center justify-end'>{actionSlot}</div>
-    </ShellListRowFrame>
+      }
+      actionSlot={actionSlot}
+    />
   );
 });

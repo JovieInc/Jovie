@@ -32,9 +32,6 @@ if (data.errors) {
 const skip = i => {
   const ls = (i.labels?.nodes ?? []).map(l => l.name.toLowerCase());
   const t = (i.title + (i.description ?? '')).toLowerCase();
-  if (ls.includes('human-review-required')) return true;
-  if ((i.description ?? '').includes('This issue requires human review'))
-    return true;
   if (
     /lyb-|storekit|revenuecat|body_metric|candidate follow-up|jovieinc\/ci|loop [abc] —/i.test(
       t

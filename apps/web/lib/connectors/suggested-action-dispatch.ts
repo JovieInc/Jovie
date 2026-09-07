@@ -4,9 +4,11 @@ import { isReportKind } from './opportunity-inbox-report';
 import {
   BRAND_DEAL_OPPORTUNITY_KIND,
   CALENDAR_CREATE_EVENT_KIND,
-  isThumbnailDecisionKind,
   WORKFLOW_CAPTURE_REQUEST_KIND,
+  YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
+  YOUTUBE_THUMBNAIL_PLAYBOOK_KIND,
 } from './suggested-action-kinds';
+import { parseYouTubeThumbnailCandidate } from './youtube-thumbnail-candidate';
 
 const CalendarPayloadSchema = z.object({
   title: z.string().trim().min(1),
@@ -98,7 +100,13 @@ export function resolveSuggestedActionDispatch(input: {
       : { mode: 'invalid', error: 'invalid-calendar-payload' };
   }
 
-  if (isThumbnailDecisionKind(input.kind)) {
+  if (input.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND) {
+    return parseYouTubeThumbnailCandidate(input.kind, input.payload)
+      ? { mode: 'decision-only', family: 'youtube-thumbnail' }
+      : { mode: 'invalid', error: 'invalid-youtube-thumbnail-candidate' };
+  }
+
+  if (input.kind === YOUTUBE_THUMBNAIL_PLAYBOOK_KIND) {
     return { mode: 'decision-only', family: 'youtube-thumbnail' };
   }
 

@@ -1,3 +1,7 @@
+---
+paths: ["apps/web/**/auth/**", "apps/web/**/clerk*", "apps/web/proxy.ts", "apps/web/tests/**"]
+---
+
 # Auth (Clerk Proxy + E2E Bypass)
 
 Read this before touching anything Clerk-related, the `proxy.ts` middleware, or local/E2E auth flows.

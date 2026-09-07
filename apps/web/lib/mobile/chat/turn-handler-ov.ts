@@ -30,8 +30,13 @@ import {
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import { assertModelMustNotSelfIdentifyAsOvie } from '@/lib/ovie/program';
-import { bindCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
+import { bindEveSummerSpeaker } from '@/lib/ovie/summer-eve-speaker';
 import {
+  authorizeFounderSummerUser,
+  founderPrincipalHash,
+} from '@/lib/ovie/summer-founder-auth';
+import {
+  getBoundSummerSpeaker,
   isSummerTransportEnabled,
   runOvieSummerTurn,
   type SummerSpeaker,
@@ -121,6 +126,7 @@ function streamSummerTurn(input: {
   readonly speaker: SummerSpeaker;
   readonly store: ReturnType<typeof getOvieOperatingStore>;
   readonly signal: AbortSignal;
+  readonly principalHash: string;
 }): Response {
   const { reservation, parsed } = input;
   return new Response(
@@ -179,6 +185,7 @@ function streamSummerTurn(input: {
             store: input.store,
             signal: input.signal,
             clientTurnId: parsed.clientTurnId,
+            principalHash: input.principalHash,
           })) {
             if (event.type === 'binding') {
               bound = true;
@@ -347,6 +354,22 @@ export async function handleMobileOvChatTurn(input: {
       'OV_CHAT_FORBIDDEN',
       'Admin role required for Ovie chat.'
     );
+  }
+
+  const summerTransportRequested = isSummerTransportEnabled();
+  if (summerTransportRequested) {
+    const founderAuthorization = authorizeFounderSummerUser(userId);
+    if (founderAuthorization !== 'authorized') {
+      return ndjsonError(
+        founderAuthorization === 'unconfigured' ? 503 : 403,
+        founderAuthorization === 'unconfigured'
+          ? 'SUMMER_FOUNDER_IDENTITY_UNCONFIGURED'
+          : 'SUMMER_FOUNDER_ACCESS_REQUIRED',
+        founderAuthorization === 'unconfigured'
+          ? 'Founder Summer identity is not configured.'
+          : 'Founder Summer access required.'
+      );
+    }
   }
 
   if (parsed.conversationId) {
@@ -526,9 +549,8 @@ export async function handleMobileOvChatTurn(input: {
   await tagOvConversationTitle(reservation.conversationId);
 
   const ovieStore = getOvieOperatingStore();
-  const speaker = isSummerTransportEnabled()
-    ? bindCurrentSummerQueueSpeaker(ovieStore)
-    : null;
+  if (summerTransportRequested) bindEveSummerSpeaker();
+  const speaker = summerTransportRequested ? getBoundSummerSpeaker() : null;
   const { generation, receipts } = await prepareOvieChatTurn(
     'ov',
     parsed.text,
@@ -571,5 +593,6 @@ export async function handleMobileOvChatTurn(input: {
     speaker,
     store: ovieStore,
     signal: input.signal,
+    principalHash: founderPrincipalHash(userId),
   });
 }

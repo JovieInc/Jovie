@@ -543,6 +543,34 @@ function previewRobotsPolicyValid(
   );
 }
 
+function stagingReceiptRobotsPolicyValid(robotsBody: string): boolean {
+  const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+  const receiptJob = getJobBlock(workflow, 'staging-deployment-receipt');
+  const step = getStepBlock(
+    receiptJob,
+    'Prove exact staging identity, privacy, and representative routes'
+  );
+  const start = step.indexOf('preview_robots_policy_valid() {');
+  const end = step.indexOf(
+    '\n\n          robots="$(curl "${curl_args[@]}"',
+    start
+  );
+  expect(start).toBeGreaterThan(0);
+  expect(end).toBeGreaterThan(start);
+  const source = step
+    .slice(start, end)
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+
+  return (
+    spawnSync('bash', ['-c', `${source}\npreview_robots_policy_valid`], {
+      input: robotsBody,
+      encoding: 'utf8',
+    }).status === 0
+  );
+}
+
 function runTestFlightMarkerBootstrapGate(
   authorizationJob: string,
   candidateCount: number,
@@ -607,6 +635,7 @@ describe('deploy workflow Vercel env resolution', () => {
     const workflowHeader = testflight.slice(0, testflight.indexOf('\njobs:'));
     const authorization = getJobBlock(testflight, 'authorize-release');
     const beta = getJobBlock(testflight, 'beta');
+    const fullRegression = getJobBlock(testflight, 'full-regression');
     const uploadMarker = getJobBlock(testflight, 'record-upload');
 
     expect(trigger).toContain('workflow_dispatch:');
@@ -719,7 +748,13 @@ describe('deploy workflow Vercel env resolution', () => {
       "'.github/workflows/ios-testflight.yml'"
     );
 
-    expect(beta).toContain('needs: [authorize-release]');
+    expect(fullRegression).toContain('uses: ./.github/workflows/ios-ci.yml');
+    expect(fullRegression).toContain('full-regression: true');
+    expect(fullRegression).toContain(
+      'checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}'
+    );
+    expect(beta).toContain('needs: [authorize-release, full-regression]');
+    expect(beta).toContain("needs.full-regression.result == 'success'");
     expect(beta).toContain(
       "needs.authorize-release.outputs.should_release == 'true'"
     );
@@ -2489,8 +2524,10 @@ describe('canary health gate workflow', () => {
     expect(prove).toContain('https://staging.jov.ie/robots.txt');
     expect(prove).toContain('staging-homepage-headers.txt');
     expect(prove).toContain("grep -Eiq '^x-robots-tag:.*noindex'");
-    expect(prove).toContain("$'User-Agent: *\\nDisallow: /'");
-    expect(prove).toContain('[[ "$robots" == *\'Sitemap:\'* ]]');
+    expect(prove).toContain('preview_robots_policy_valid()');
+    expect(prove).toContain(
+      `! printf '%s\\n' "$robots" | preview_robots_policy_valid; then`
+    );
     expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
     expect(writeReceipt).toContain(
       'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
@@ -2520,6 +2557,25 @@ describe('canary health gate workflow', () => {
     expect(release.indexOf('  promote-production:')).toBeLessThan(
       release.indexOf('  staging-deployment-receipt:')
     );
+  });
+
+  it.each([
+    ['Next serialization', 'User-agent: *\nDisallow: /', true],
+    ['case-insensitive directives', 'uSeR-aGeNt: *\ndIsAlLoW: /', true],
+    [
+      'unrelated crawler block',
+      'User-agent: *\nDisallow:\n\nUser-agent: BadBot\nDisallow: /',
+      false,
+    ],
+    ['partial wildcard policy', 'User-agent: *\nDisallow:', false],
+    ['root allow', 'User-agent: *\nDisallow: /\nAllow: /', false],
+    [
+      'case-insensitive sitemap',
+      'User-agent: *\nDisallow: /\nsItEmAp: https://preview.example/sitemap.xml',
+      false,
+    ],
+  ])('parses the staging robots %s', (_name, robotsBody, expected) => {
+    expect(stagingReceiptRobotsPolicyValid(robotsBody)).toBe(expected);
   });
 
   it('waits through a malformed alias inspect before writing an exact staging receipt', () => {
@@ -2595,7 +2651,7 @@ case "$url" in
       '{commitSha: $sha, environment: "preview"}'
     ;;
   */robots.txt)
-    printf 'User-Agent: *\\nDisallow: /\\n'
+    printf 'User-agent: *\\nDisallow: /\\n'
     ;;
   */)
     printf 'HTTP/2 200\\nx-robots-tag: noindex\\n\\n' > "$header_path"
@@ -4013,6 +4069,21 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 });
 
 describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
+  it('uses the root packageManager as the single pnpm version source', () => {
+    const cleanupWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
+      'utf8'
+    );
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+    ) as { packageManager?: string };
+    const setupPnpmStep = getStepBlock(cleanupWorkflow, 'Setup pnpm');
+
+    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
+    expect(setupPnpmStep).toContain('uses: pnpm/action-setup@');
+    expect(setupPnpmStep).not.toMatch(/^\s+version:/m);
+  });
+
   it('deletes prefixed CI branches when a PR closes', () => {
     const cleanupWorkflow = readFileSync(
       resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
@@ -4055,9 +4126,10 @@ describe('ci-fast critical deploy contract', () => {
   it('targets the web test directly so a zero-task Turbo run cannot pass', () => {
     const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
     const command =
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts';
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts';
 
     expect(ciFastLanes).toContain(command);
+    expect(command).toContain('tests/unit/ci/setup-doppler-action.test.ts');
     expect(command).not.toContain('turbo');
     expect(command).not.toContain('--affected');
     expect(command).not.toContain('--passWithNoTests');

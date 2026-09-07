@@ -2,6 +2,7 @@
 # Captures demo-route screenshots (no database needed), checks if they
 # differ from the committed versions, and opens/updates a single PR.
 name: Product Screenshots
+# clock-class: skip-if-unchanged
 
 on:
   push:

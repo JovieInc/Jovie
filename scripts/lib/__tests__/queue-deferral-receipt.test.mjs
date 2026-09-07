@@ -3,9 +3,9 @@ import {
   classifyQueueDeferredHold,
   classifyReceipt,
   extractReceiptFromComment,
-  HUMAN_POLICY_HOLD_LABELS,
-  humanPolicyHoldRegex,
-  humanPolicyHoldsOn,
+  MECHANICAL_HOLD_LABELS,
+  mechanicalHoldRegex,
+  mechanicalHoldsOn,
   QUEUE_DEFERRAL_MARKER,
   QUEUE_DEFERRAL_SCHEMA,
   RELEASABLE_REASON_SOURCES,
@@ -203,42 +203,39 @@ describe('classifyReceipt', () => {
   });
 });
 
-describe('human-policy holds', () => {
-  it('covers taste, net-new, and outbound without treating queue-deferred as human', () => {
-    expect(HUMAN_POLICY_HOLD_LABELS).toEqual(
+describe('mechanical holds', () => {
+  it('covers machine-verifiable stops without treating queue-deferred as separate', () => {
+    expect(MECHANICAL_HOLD_LABELS).toEqual(
       expect.arrayContaining([
-        'needs:taste',
-        'needs-human-taste',
-        'taste',
-        'net-new',
-        'needs:net-new',
-        'outbound',
-        'needs:outbound',
-        'needs-human',
+        'hold',
+        'gated',
+        'needs-conflict-resolution',
+        'risk:high',
+        'incident',
       ])
     );
-    expect(HUMAN_POLICY_HOLD_LABELS).not.toContain('queue-deferred');
+    expect(MECHANICAL_HOLD_LABELS).not.toContain('queue-deferred');
   });
 
-  it('matches only the canonical human-policy labels', () => {
-    const re = new RegExp(humanPolicyHoldRegex());
-    expect(re.test('needs:taste')).toBe(true);
-    expect(re.test('net-new')).toBe(true);
-    expect(re.test('outbound')).toBe(true);
+  it('matches only machine-verifiable labels', () => {
+    const re = new RegExp(mechanicalHoldRegex());
+    expect(re.test('hold')).toBe(true);
+    expect(re.test('risk:high')).toBe(true);
     expect(re.test('queue-deferred')).toBe(false);
-    expect(re.test('taste-approved')).toBe(false);
-    expect(re.test('needs-human-taste')).toBe(true);
-    expect(re.test('needs-human')).toBe(true);
+    expect(re.test('needs-human-taste')).toBe(false);
+    expect(re.test('needs-human')).toBe(false);
+    expect(re.test('no-auto')).toBe(false);
   });
 
-  it('extracts human-policy labels from mixed PR label lists', () => {
+  it('extracts machine holds while ignoring retired labels', () => {
     expect(
-      humanPolicyHoldsOn([
+      mechanicalHoldsOn([
         'queue-deferred',
         'needs:taste',
-        { name: 'outbound' },
+        { name: 'risk:high' },
+        { name: 'hold' },
       ])
-    ).toEqual(['needs:taste', 'outbound']);
+    ).toEqual(['risk:high', 'hold']);
   });
 });
 
@@ -265,42 +262,34 @@ describe('classifyQueueDeferredHold', () => {
   });
 
   it.each([
+    'needs-human',
+    'needs-human-review',
+    'human-review-required',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
     'needs:taste',
     'needs-human-taste',
-    'taste',
-  ])('holds untyped PRs with taste label %s', label => {
-    expect(
-      classifyQueueDeferredHold({
-        receipt: null,
-        labels: ['queue-deferred', label],
-      })
-    ).toEqual({
-      releasable: false,
-      detail: `human-policy-hold:${label}`,
-    });
-  });
-
-  it.each([
     'net-new',
-    'needs:net-new',
-    'needs-net-new',
-  ])('holds untyped PRs with net-new label %s', label => {
+    'outbound',
+  ])('ignores retired human policy label %s', label => {
     expect(
       classifyQueueDeferredHold({
         receipt: null,
         labels: ['queue-deferred', label],
       })
     ).toEqual({
-      releasable: false,
-      detail: `human-policy-hold:${label}`,
+      releasable: true,
+      detail: 'untyped-ready-hold',
     });
   });
 
   it.each([
-    'outbound',
-    'needs:outbound',
-    'needs-outbound',
-  ])('holds untyped PRs with outbound label %s', label => {
+    'hold',
+    'gated',
+    'needs-conflict-resolution',
+    'risk:high',
+  ])('holds untyped PRs with machine gate %s', label => {
     expect(
       classifyQueueDeferredHold({
         receipt: null,
@@ -308,7 +297,7 @@ describe('classifyQueueDeferredHold', () => {
       })
     ).toEqual({
       releasable: false,
-      detail: `human-policy-hold:${label}`,
+      detail: `mechanical-hold:${label}`,
     });
   });
 

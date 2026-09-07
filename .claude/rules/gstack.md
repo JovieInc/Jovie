@@ -1,10 +1,14 @@
+---
+paths: [".agents/skills/**", ".claude/skills/**", "docs/agent-context/**"]
+---
+
 # gstack (Workflow Toolkit) + Skill Routing
 
 This repo vendors a Jovie-customized fork of [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (see its `VERSION` and `CHANGELOG.md`). It is **not** a git submodule. `.claude/skills/gstack` is a symlink to that fork, and each `.claude/skills/<name>/SKILL.md` symlinks to `gstack/<name>/SKILL.md`, so the fork is the single source of truth for every gstack skill. Generated `SKILL.md` files come from `SKILL.md.tmpl` templates — edit the template, then regenerate (see "Updating gstack" below). Never hand-edit a generated `SKILL.md`.
 
 `src/`, `test/`, and `bin/` inside the gstack checkout are implementation, not skills. Do not treat files there as catalog entries.
 
-**Conflict rule:** gstack commands are canonical. If a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
+**Conflict rule:** gstack supplies workflows subordinate to host instructions, the user’s authorized task, repo canon, and scoped rules. A skill does not grant permissions or override DESIGN.md. Select one relevant workflow; do not load the whole catalog.
 
 **Web browsing:** Playwright only (`pnpm exec playwright` or Playwright MCP). `/browse` and the gstack browse daemon are removed. Never invoke `$B`, never build `browse/dist/browse`, never use `mcp__claude-in-chrome__*`. `/qa` in this repo is Playwright tests, not the gstack browse loop.
 
@@ -51,7 +55,7 @@ To pull upstream garrytan/gstack changes, sync them into `.agents/skills/gstack/
 
 ## Skill Routing
 
-When the user's request matches an available skill, ALWAYS invoke it using the Skill tool as your FIRST action. Do NOT answer directly, do NOT use other tools first. The skill has specialized workflows that produce better results than ad-hoc answers.
+When a skill is explicitly requested, load its entry point. Otherwise select a skill only when its workflow materially fits the task. Use the host’s callable skill/file mechanism; do not require a tool named Skill. Complete necessary ownership and source preflights first. Read references only as needed.
 
 Key routing rules:
 

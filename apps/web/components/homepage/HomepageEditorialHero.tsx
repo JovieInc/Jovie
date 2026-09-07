@@ -1,20 +1,10 @@
 // @coverage-via apps/web/tests/unit/home/HomepageEditorialHero.test.tsx
-import { getImageProps } from 'next/image';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
 import {
   HOMEPAGE_CERTIFIED_CONTEXT,
   HOMEPAGE_CERTIFIED_EVENTS,
 } from '@/data/homepageCertifiedOptimization';
 import { HomepageCertifiedExposure } from './HomepageCertifiedExposure';
-
-export interface HomepageEditorialHeroBackdrop {
-  readonly desktopSrc: string;
-  readonly desktopWidth: number;
-  readonly desktopHeight: number;
-  readonly mobileSrc: string;
-  readonly mobileWidth: number;
-  readonly mobileHeight: number;
-}
 
 export interface HomepageEditorialHeroSearch {
   readonly placeholder: string;
@@ -25,46 +15,20 @@ export interface HomepageEditorialHeroProps {
   readonly headline: string;
   readonly support: string;
   readonly search: HomepageEditorialHeroSearch;
-  readonly backdrop: HomepageEditorialHeroBackdrop;
   readonly headingId?: string;
 }
 
-const BACKDROP_MOBILE_MEDIA = '(max-width: 767px)';
-
 /**
- * Full-viewport editorial hero: one photo behind, one headline, one support
- * line, and the existing name search as the single conversion control.
- *
- * The backdrop is art-directed with a <picture> element because next/image
- * cannot switch sources per viewport; getImageProps keeps both sources on the
- * optimizer pipeline.
+ * Full-viewport editorial hero: a quiet abstract light field, one headline,
+ * one support line, and the existing name search as the single conversion
+ * control. The backdrop is CSS-only so product meaning remains the focal point.
  */
 export function HomepageEditorialHero({
   headline,
   support,
   search,
-  backdrop,
   headingId = 'homepage-editorial-hero-heading',
 }: HomepageEditorialHeroProps) {
-  const shared = {
-    alt: '',
-    priority: true,
-    quality: 85,
-    sizes: '100vw',
-  } as const;
-  const { props: desktop } = getImageProps({
-    ...shared,
-    src: backdrop.desktopSrc,
-    width: backdrop.desktopWidth,
-    height: backdrop.desktopHeight,
-  });
-  const { props: mobile } = getImageProps({
-    ...shared,
-    src: backdrop.mobileSrc,
-    width: backdrop.mobileWidth,
-    height: backdrop.mobileHeight,
-  });
-
   return (
     <section
       className='homepage-editorial-hero'
@@ -75,19 +39,13 @@ export function HomepageEditorialHero({
       <div
         className='homepage-editorial-hero__backdrop'
         aria-hidden='true'
+        data-hero-layer='decorative'
+        data-hero-visual='abstract-light-field'
         data-testid='homepage-editorial-hero-backdrop'
       >
-        <picture>
-          <source
-            media={BACKDROP_MOBILE_MEDIA}
-            srcSet={mobile.srcSet}
-            sizes={mobile.sizes}
-          />
-          <img {...desktop} alt='' decoding='async' fetchPriority='high' />
-        </picture>
+        <div className='homepage-editorial-hero__light-well' />
       </div>
-      <div className='homepage-editorial-hero__scrim' aria-hidden='true' />
-      <div className='homepage-editorial-hero__copy'>
+      <div className='homepage-editorial-hero__copy' data-hero-layer='active'>
         <h1 id={headingId} className='homepage-editorial-hero__headline'>
           {headline}
         </h1>

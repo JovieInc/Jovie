@@ -20,15 +20,6 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   }),
 }));
 
-const BACKDROP = {
-  desktopSrc: '/images/hero/night-desk.webp',
-  desktopWidth: 1536,
-  desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile.webp',
-  mobileWidth: 737,
-  mobileHeight: 1024,
-} as const;
-
 function renderHero() {
   return render(
     <HomepageEditorialHero
@@ -36,7 +27,6 @@ function renderHero() {
       headline='Control how the world sees you.'
       support='Find what the internet knows. Turn it into relationships.'
       search={{ placeholder: 'Search your name', action: 'Find me' }}
-      backdrop={BACKDROP}
     />
   );
 }
@@ -57,6 +47,9 @@ describe('HomepageEditorialHero', () => {
         'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeInTheDocument();
+    expect(
+      document.querySelectorAll('[data-hero-layer="active"]')
+    ).toHaveLength(1);
 
     const input = screen.getByRole('combobox');
     expect(input).toHaveAttribute('placeholder', 'Search your name');
@@ -72,22 +65,20 @@ describe('HomepageEditorialHero', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  it('art-directs the backdrop as a decorative picture', () => {
+  it('keeps the centered hero abstract and free of distracting media', () => {
     renderHero();
 
     const backdrop = screen.getByTestId('homepage-editorial-hero-backdrop');
     expect(backdrop).toHaveAttribute('aria-hidden', 'true');
-
-    const source = backdrop.querySelector('source');
-    expect(source).toHaveAttribute('media', '(max-width: 767px)');
-    expect(source?.getAttribute('srcset')).toContain('night-desk-mobile');
-
-    const img = backdrop.querySelector('img');
-    expect(img).toHaveAttribute('alt', '');
-    expect(img?.getAttribute('srcset') ?? img?.getAttribute('src')).toContain(
-      'night-desk'
+    expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
+    expect(backdrop).toHaveAttribute(
+      'data-hero-visual',
+      'abstract-light-field'
     );
-    expect(img).toHaveAttribute('fetchpriority', 'high');
+    const hero = screen.getByTestId('homepage-hero-shell');
+    expect(hero.querySelectorAll('picture, img, video, canvas')).toHaveLength(
+      0
+    );
   });
 });
 

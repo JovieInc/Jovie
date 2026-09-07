@@ -22,8 +22,7 @@ const hoisted = vi.hoisted(() => ({
   proposeMerchAction: vi.fn(),
   listVideosForProfile: vi.fn(),
   getVideoMetricsForProfile: vi.fn(),
-  getVideoPkForProfile: vi.fn(),
-  insertThumbnailCandidate: vi.fn(),
+  registerThumbnailCandidateReview: vi.fn(),
   getAuthenticatedProfile: vi.fn(),
 }));
 
@@ -46,8 +45,7 @@ vi.mock('@/lib/db/queries/shared', () => ({
 vi.mock('@/lib/youtube-library', () => ({
   listVideosForProfile: hoisted.listVideosForProfile,
   getVideoMetricsForProfile: hoisted.getVideoMetricsForProfile,
-  getVideoPkForProfile: hoisted.getVideoPkForProfile,
-  insertThumbnailCandidate: hoisted.insertThumbnailCandidate,
+  registerThumbnailCandidateReview: hoisted.registerThumbnailCandidateReview,
 }));
 
 vi.mock('@/lib/chat/tools/merch-propose', () => ({
@@ -136,11 +134,11 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
     });
     hoisted.listVideosForProfile.mockResolvedValue([]);
     hoisted.getVideoMetricsForProfile.mockResolvedValue([]);
-    hoisted.getVideoPkForProfile.mockResolvedValue(
-      '00000000-0000-4000-8000-000000000003'
-    );
-    hoisted.insertThumbnailCandidate.mockResolvedValue({
-      id: '00000000-0000-4000-8000-000000000004',
+    hoisted.registerThumbnailCandidateReview.mockResolvedValue({
+      ok: true,
+      thumbnailVersionId: '00000000-0000-4000-8000-000000000004',
+      reviewActionId: '00000000-0000-4000-8000-000000000005',
+      metricsCapturedAt: '2026-09-01T12:00:00.000Z',
     });
     hoisted.getAuthenticatedProfile.mockResolvedValue({ id: 'p1' });
   });
@@ -586,6 +584,8 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
           arguments: {
             videoId: 'yt-1',
             imageUrl: 'https://cdn.example.com/t.jpg',
+            artifactSha256:
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           },
         },
       }),
@@ -593,7 +593,7 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
     );
     const body = await res.json();
     expect(body.error.message).toContain('Authentication required');
-    expect(hoisted.insertThumbnailCandidate).not.toHaveBeenCalled();
+    expect(hoisted.registerThumbnailCandidateReview).not.toHaveBeenCalled();
   });
 
   it('register_thumbnail_version registers a pending candidate for the owner', async () => {
@@ -609,6 +609,8 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
           arguments: {
             videoId: 'yt-1',
             imageUrl: 'https://cdn.example.com/t.jpg',
+            artifactSha256:
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             provenance: { generator: 'thumb-gen', model: 'sdxl' },
             experimentId: 'exp-1',
           },
@@ -617,14 +619,14 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       { params: Promise.resolve({ username: 'artist1' }) }
     );
     const body = await res.json();
-    expect(hoisted.insertThumbnailCandidate).toHaveBeenCalledWith({
-      videoId: '00000000-0000-4000-8000-000000000003',
+    expect(hoisted.registerThumbnailCandidateReview).toHaveBeenCalledWith({
+      userId: 'owner-1',
+      creatorProfileId: 'p1',
+      youtubeVideoId: 'yt-1',
       imageUrl: 'https://cdn.example.com/t.jpg',
-      provenance: {
-        source: 'generated',
-        generator: 'thumb-gen',
-        model: 'sdxl',
-      },
+      artifactSha256:
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      provenance: { generator: 'thumb-gen', model: 'sdxl' },
       experimentId: 'exp-1',
       cohortId: null,
     });
@@ -633,5 +635,37 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       '00000000-0000-4000-8000-000000000004'
     );
     expect(content.approvalStatus).toBe('pending');
+    expect(content.reviewActionId).toBe('00000000-0000-4000-8000-000000000005');
+  });
+
+  it('register_thumbnail_version fails closed without current API metrics', async () => {
+    hoisted.getCachedAuth.mockResolvedValue({ userId: 'owner-1' });
+    hoisted.registerThumbnailCandidateReview.mockResolvedValueOnce({
+      ok: false,
+      error: 'api-metrics-required',
+    });
+    const { POST } = await import('./route');
+    const res = await POST(
+      makeRequest({
+        jsonrpc: '2.0',
+        id: 29,
+        method: 'tools/call',
+        params: {
+          name: 'register_thumbnail_version',
+          arguments: {
+            videoId: 'yt-1',
+            imageUrl: 'https://cdn.example.com/t.jpg',
+            artifactSha256:
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          },
+        },
+      }),
+      { params: Promise.resolve({ username: 'artist1' }) }
+    );
+
+    const body = await res.json();
+    expect(body.error.message).toBe(
+      'Current YouTube API metrics required: yt-1'
+    );
   });
 });

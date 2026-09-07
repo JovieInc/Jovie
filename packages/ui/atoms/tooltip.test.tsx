@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -286,6 +286,23 @@ describe('Tooltip', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content).toBeInTheDocument();
+    });
+  });
+
+  describe('Pointer interaction', () => {
+    it('does not cancel pointer events outside the tooltip', () => {
+      render(
+        <>
+          <TestTooltip open={true} />
+          <button type='button'>Outside action</button>
+        </>
+      );
+
+      const outsideAction = screen.getByRole('button', {
+        name: 'Outside action',
+      });
+
+      expect(fireEvent.pointerDown(outsideAction)).toBe(true);
     });
   });
 

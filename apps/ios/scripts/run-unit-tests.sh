@@ -9,10 +9,11 @@ DERIVED_DATA="${JOVIE_IOS_DERIVED_DATA:-.build/ios-ci}"
 mkdir -p "$(dirname "$RESULT_BUNDLE")"
 rm -rf "$RESULT_BUNDLE"
 
-bash "$SCRIPT_DIR/run-xcodebuild.sh" test \
+JOVIE_IOS_RESULT_BUNDLE_PATH="$RESULT_BUNDLE" \
+  JOVIE_IOS_SCHEME="JovieUnitTests" \
+  bash "$SCRIPT_DIR/run-xcodebuild.sh" test \
   -derivedDataPath "$DERIVED_DATA" \
   -enableCodeCoverage YES \
-  -resultBundlePath "$RESULT_BUNDLE" \
   -only-testing:JovieTests
 
 echo "Unit test result bundle: $RESULT_BUNDLE"

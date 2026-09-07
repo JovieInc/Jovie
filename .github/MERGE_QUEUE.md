@@ -35,7 +35,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 | Context | Source PR | Native `merge_group` |
 | --- | --- | --- |
-| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, diff secret scan, Golden Path Lock |
+| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
 | `Migration Guard` | Path-gated migration policy | Re-emitted and evaluated on the combined head |
 | `Fork PR Gate` | Human approval policy for external forks | Revalidates every exact group member before emitting the combined-head context |
 | `PR Size Guard` | Source-diff size policy | Revalidates every exact group member before emitting the combined-head context |
@@ -46,6 +46,8 @@ never start from the source-PR event and are not required source `PR Ready`
 leaves. No PR label fans out CI. Full security and CodeQL scans remain
 post-merge/nightly;
 the fast diff secret scan gates source and combined heads.
+The full iOS simulator UI and screenshot regression runs only for an authorized
+iOS TestFlight generation and must pass before upload.
 
 ## Canonical native configuration
 
@@ -99,7 +101,7 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   request to a full 40-character head SHA.
 - Enrollment and dequeue prove their postconditions; failed mutations are
   reconciled from fresh state rather than blindly retried.
-- `needs-human`, `hold`, `gated`, `queue-deferred`, conflicts, and terminal-red
+- `hold`, `gated`, `queue-deferred`, conflicts, and terminal-red
   checks remove native queue membership and the audit label.
 - Pending, queued, and cancelled checks are not terminal red. This prevents
   cancellation churn from becoming a dequeue/re-enroll loop.
@@ -180,11 +182,10 @@ the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
   12-minute SLA. A missing receipt reports as `untyped-ready-hold` and is
   released automatically when the live PR is ready, mergeable, exact-head
   green, and a fresh GREEN fleet receipt agrees. A malformed typed receipt
-  stays held. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
-  `needs-human`, …) report as `human-policy-hold:<label>` and stay held.
+  stays held. Legacy human, taste, and no-auto labels are ignored and scrubbed.
 - **Release pass** — only under a fresh (≤10-minute) `GREEN` fleet receipt
   with `promotionAdmission.allowed`, and only when the live PR is non-draft,
-  mergeable, same-repo/main, no human-policy hold labels are present, and
+  mergeable, same-repo/main, no separate machine hold is present, and
   required checks are green: removes `queue-deferred`. Typed mechanical
   receipts (`symphony-birth-hold`, `queue-pressure`) still bind reason to
   source. Untyped ready holds are dropped rather than waiting for a human.

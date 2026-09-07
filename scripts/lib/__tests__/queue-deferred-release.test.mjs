@@ -72,11 +72,12 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
       'releasing only after fresh controller admission'
     );
     expect(releaseScript).not.toContain('never released automatically');
-    expect(releaseScript).toContain('node "$LIB" human-policy-re');
+    expect(releaseScript).toContain('node "$LIB" mechanical-hold-re');
   });
 
-  it('still fail-closes human-policy holds and non-admitted fleet receipts', () => {
-    expect(releaseScript).toContain('human-policy-re');
+  it('still fail-closes machine holds and non-admitted fleet receipts', () => {
+    expect(releaseScript).toContain('mechanical-hold-re');
+    expect(releaseScript).not.toContain('human-policy-re');
     expect(releaseScript).toContain('queue-deferred-release-admission.mjs');
     expect(admission).toContain('fleet-gate-not-releasable');
     expect(releaseScript).toContain('fleet-receipt-stale');

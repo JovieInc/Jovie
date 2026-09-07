@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -21,6 +23,7 @@ import {
   PROTECTED_REVENUE_SCREEN_SOURCES,
   RETAINED_SWEEP_WORKFLOWS,
   runScreenCertification,
+  runScreenCertificationFromArtifact,
   SCREEN_BROWSER_PROOF_SCHEMA,
   SCREEN_CERT_INVARIANT_ID,
   SCREEN_CERT_SCHEMA,
@@ -30,8 +33,10 @@ import {
   validateProtectedRevenueScreenRegistry,
   validateRetainedSweeps,
   validateScreenRegistry,
+  verifyProofArtifact,
 } from './screen-certification.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
+import { resolveTrustedScreenProof } from './screen-proof-resolver.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -41,10 +46,14 @@ const protectedSources = () => Object.keys(PROTECTED_REVENUE_SCREEN_SOURCES);
 const kindOf = path => classifyScreenPath(path).kind;
 const digestFile = path =>
   `sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`;
+const sha256 = bytes =>
+  `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 function validExternalProof(screen = gated()[0], headSha = HEAD) {
   return {
     schema: SCREEN_BROWSER_PROOF_SCHEMA,
     producer: 'external-render-runner',
+    status: 'unverified-candidate',
+    certificationStatus: 'not-certified',
     screenId: screen.id,
     headSha,
     tier: 'rendered-evidence',
@@ -184,7 +193,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
   });
 
-  it('does not certify caller-authored proof without rendered artifact bytes', () => {
+  it('fails closed until a trusted browser producer adapter is integrated', () => {
     const screen = home();
     const result = runScreenCertification({
       headSha: HEAD,
@@ -193,89 +202,41 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     });
     assert.equal(result.ok, false);
     assert.equal(result.receipt.certified, false);
-    assert.equal(result.receipt.status, 'blocked');
+    assert.equal(result.receipt.status, 'external-certification-unavailable');
     assert.match(
       result.receipt.issues.join('\n'),
-      /proof artifactPath is required; caller-authored proof cannot certify/
+      /trusted external browser producer integration is unavailable/
     );
   });
 
-  it('certifies when rendered artifact bytes reverify against the proof digest', () => {
-    const screen = home();
-    const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-cert-'));
-    try {
-      writeFileSync(
-        join(artifactRoot, 'homepage-bundle.bin'),
-        'rendered-stills'
-      );
-      const artifactDigest = digestFile(
-        join(artifactRoot, 'homepage-bundle.bin')
-      );
-      const proof = {
-        ...validExternalProof(screen),
-        artifactPath: 'homepage-bundle.bin',
-        artifactDigest,
-      };
-      const result = runScreenCertification({
-        headSha: HEAD,
-        changedFiles: ['apps/web/app/(home)/page.tsx'],
-        proofs: [proof],
-        artifactRoot,
-      });
-      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
-      assert.equal(result.receipt.certified, true);
-      assert.equal(result.receipt.status, 'certified');
-      assert.equal(result.receipt.registrationOnly, false);
-      assert.deepEqual(result.receipt.changedScreens, [
-        {
-          id: 'web.homepage',
-          verdict: 'pass',
-          findings: [],
-          artifactDigest,
-          rendererRunUrl: proof.runUrl,
-        },
-      ]);
-    } finally {
-      rmSync(artifactRoot, { force: true, recursive: true });
-    }
-  });
-
-  it('blocks when artifact bytes are missing, foreign, or digest-mismatched', () => {
-    const screen = home();
+  it('retains local artifact consistency checks without treating them as trust', () => {
     const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-cert-'));
     try {
       writeFileSync(join(artifactRoot, 'bundle.bin'), 'rendered-stills');
       const base = {
-        ...validExternalProof(screen),
+        artifactPath: 'bundle.bin',
         artifactDigest: digestFile(join(artifactRoot, 'bundle.bin')),
       };
-      const run = proof =>
-        runScreenCertification({
-          headSha: HEAD,
-          changedFiles: ['apps/web/app/(home)/page.tsx'],
-          proofs: [proof],
-          artifactRoot,
-        });
-      const missing = run({ ...base, artifactPath: 'absent.bin' });
-      assert.equal(missing.receipt.certified, false);
+      assert.equal(verifyProofArtifact(base, { artifactRoot }), null);
       assert.match(
-        missing.receipt.issues.join('\n'),
+        verifyProofArtifact(
+          { ...base, artifactPath: 'absent.bin' },
+          { artifactRoot }
+        ),
         /artifact bytes are unreadable/
       );
-      const mismatched = run({
-        ...base,
-        artifactPath: 'bundle.bin',
-        artifactDigest: `sha256:${'c'.repeat(64)}`,
-      });
-      assert.equal(mismatched.receipt.certified, false);
       assert.match(
-        mismatched.receipt.issues.join('\n'),
+        verifyProofArtifact(
+          { ...base, artifactDigest: `sha256:${'c'.repeat(64)}` },
+          { artifactRoot }
+        ),
         /artifactDigest does not match the rendered artifact bytes/
       );
-      const escaping = run({ ...base, artifactPath: '../outside.bin' });
-      assert.equal(escaping.receipt.certified, false);
       assert.match(
-        escaping.receipt.issues.join('\n'),
+        verifyProofArtifact(
+          { ...base, artifactPath: '../outside.bin' },
+          { artifactRoot }
+        ),
         /escapes the artifact root/
       );
     } finally {
@@ -283,13 +244,287 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
-  it('emits a certifying proof only from a real render bundle (screen-proof-emit)', () => {
+  it('does not certify caller-authored proof without rendered artifact bytes', () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-cert-audit-'));
+    try {
+      const artifactPath = 'not-rendered.txt';
+      writeFileSync(
+        join(artifactRoot, artifactPath),
+        'Deliberately plain text, not rendered evidence.'
+      );
+      const screen = home();
+      const proof = {
+        schema: SCREEN_BROWSER_PROOF_SCHEMA,
+        producer: 'external-render-runner',
+        screenId: screen.id,
+        headSha: HEAD,
+        tier: 'rendered-evidence',
+        runUrl: 'https://example.com/unverified',
+        artifactPath,
+        artifactDigest: digestFile(join(artifactRoot, artifactPath)),
+        capturedAt: '2099-01-01T00:00:00Z',
+        viewports: screen.viewports.map(id => ({
+          id,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+        })),
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true },
+        visibleActions: ['Certify'],
+      };
+      assert.equal(verifyProofArtifact(proof, { artifactRoot }), null);
+      const attemptedCallerVerifier = {
+        screen,
+        headSha: HEAD,
+        verifyArtifact: candidate =>
+          verifyProofArtifact(candidate, { artifactRoot }),
+      };
+      const result = evaluateScreenProof(
+        proof,
+        /** @type {any} */ (attemptedCallerVerifier)
+      );
+      assert.match(result.join('\n'), /unverified-candidate/);
+      assert.match(result.join('\n'), /not-certified/);
+      assert.match(
+        result.join('\n'),
+        /trusted external browser producer integration is unavailable/
+      );
+    } finally {
+      rmSync(artifactRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('tests owned GitHub artifact transport directly while the gate remains fail closed without source continuity', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-gh-'));
+    const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      /** @type {[string, Buffer][]} */
+      const images = [
+        ['screenshots/desktop.png', image],
+        ['screenshots/mobile.png', image],
+      ];
+      const digest = createHash('sha256');
+      for (const [name, bytes] of images) {
+        digest.update(name);
+        digest.update('\0');
+        digest.update(bytes);
+        digest.update('\0');
+      }
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const proof = {
+        ...validExternalProof(home(), head),
+        environment: 'local-production-build',
+        sourcePaths: ['apps/web/app/(home)/page.tsx'],
+        capturedAt: iso(-60_000),
+        artifactDigest: `sha256:${digest.digest('hex')}`,
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/77/attempts/3',
+        producerRunId: 77,
+        producerRunAttempt: 3,
+        producerJobId: 99,
+        viewports: ['desktop', 'mobile'].map(id => ({
+          id,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+          contrast: { passed: true },
+        })),
+      };
+      writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+      for (const [name, bytes] of images) {
+        mkdirSync(dirname(join(root, name)), { recursive: true });
+        writeFileSync(join(root, name), bytes);
+      }
+      assert.equal(
+        spawnSync(
+          'zip',
+          [
+            '-q',
+            'proof.zip',
+            'screen-proof.json',
+            ...images.map(([name]) => name),
+          ],
+          { cwd: root }
+        ).status,
+        0
+      );
+      const zip = readFileSync(join(root, 'proof.zip'));
+      let records = {
+        artifact: {
+          id: 42,
+          name: 'screen-browser-proof',
+          expired: false,
+          digest: sha256(zip),
+          created_at: iso(-30_000),
+          workflow_run: { id: 77 },
+        },
+        run: {
+          id: 77,
+          run_attempt: 3,
+          repository: { full_name: 'JovieInc/Jovie' },
+          head_branch: 'main',
+          head_sha: head,
+          path: '.github/workflows/screenshots.yml',
+          event: 'push',
+          conclusion: 'success',
+        },
+        jobs: {
+          jobs: [
+            {
+              id: 99,
+              name: 'Generate Screenshots',
+              run_id: 77,
+              run_attempt: 3,
+              head_sha: head,
+              conclusion: 'success',
+              started_at: iso(-90_000),
+              completed_at: iso(-10_000),
+            },
+          ],
+        },
+        changed: 'M\tapps/web/app/(home)/page.tsx\n',
+      };
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      const git = join(root, 'git');
+      writeFileSync(
+        git,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const a=process.argv.slice(2),r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(a[0]==='rev-parse')process.stdout.write(r.run.head_sha);else if(a[0]==='diff')process.stdout.write(r.changed);else process.exit(1);`
+      );
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      chmodSync(gh, 0o755);
+      chmodSync(git, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
+      const certify = () =>
+        runScreenCertificationFromArtifact({
+          artifactId: 42,
+          screenId: 'web.homepage',
+        });
+      const resolveProof = () =>
+        resolveTrustedScreenProof({
+          artifactId: 42,
+          context: {
+            headSha: head,
+            screenId: 'web.homepage',
+            sourcePaths: ['apps/web/app/(home)/page.tsx'],
+            viewports: home().viewports,
+          },
+        });
+      const result = certify();
+      assert.deepEqual([result.ok, result.receipt.certified], [false, false]);
+      assert.equal(result.receipt.status, 'external-certification-unavailable');
+      assert.match(
+        result.receipt.issues.join('\n'),
+        /authoritative GitHub event source continuity/
+      );
+      assert.ok(
+        resolveProof().proof,
+        'fixture must exercise resolver acceptance'
+      );
+
+      const baselineProof = structuredClone(proof);
+      const baselineRecords = structuredClone(records);
+      let screenshot = image;
+      const rebuild = () => {
+        writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+        for (const [name] of images)
+          writeFileSync(join(root, name), screenshot);
+        rmSync(join(root, 'proof.zip'));
+        assert.equal(
+          spawnSync(
+            'zip',
+            [
+              '-q',
+              'proof.zip',
+              'screen-proof.json',
+              ...images.map(([name]) => name),
+            ],
+            { cwd: root }
+          ).status,
+          0
+        );
+        records.artifact.digest = sha256(readFileSync(join(root, 'proof.zip')));
+      };
+      /** @param {{ mutate: () => void; archive?: boolean }} test */
+      const rejects = ({ mutate, archive = false }) => {
+        Object.assign(proof, structuredClone(baselineProof));
+        records = structuredClone(baselineRecords);
+        screenshot = image;
+        mutate();
+        if (archive) rebuild();
+        writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+        assert.equal(resolveProof().proof, null);
+      };
+      /** @type {[boolean, () => void][]} */
+      const negativeCases = [
+        [false, () => (records.run.head_sha = 'b'.repeat(40))],
+        [false, () => (records.run.repository.full_name = 'attacker/Jovie')],
+        [false, () => (records.run.path = '.github/workflows/other.yml')],
+        [false, () => (records.jobs.jobs[0].name = 'Invented producer')],
+        [false, () => (records.jobs.jobs[0].run_attempt = 0)],
+        [false, () => (records.artifact.created_at = iso(-9 * 60_000))],
+        [false, () => (records.artifact.digest = sha256('modified artifact'))],
+        [true, () => (proof.environment = 'preview')],
+        [true, () => (proof.capturedAt = iso(9 * 60_000))],
+        [
+          true,
+          () => {
+            proof.producerRunId = 999;
+            proof.runUrl = 'https://example.test/invented-run';
+          },
+        ],
+        [true, () => proof.sourcePaths.push('apps/web/app/(home)/layout.tsx')],
+        [true, () => delete proof.viewports[0].contrast],
+        [true, () => (screenshot = Buffer.alloc(0))],
+      ];
+      for (const [archive, mutate] of negativeCases)
+        rejects({ archive, mutate });
+      Object.assign(proof, structuredClone(baselineProof));
+      records = structuredClone(baselineRecords);
+      records.changed = [
+        'M\tapps/web/app/(home)/page.tsx',
+        'M\tapps/web/app/waitlist/page.tsx',
+      ].join('\n');
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      const widened = runScreenCertificationFromArtifact({
+        artifactId: 42,
+        screenId: 'web.homepage',
+      });
+      assert.deepEqual([widened.ok, widened.receipt.ok], [false, false]);
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('emits only a candidate; the emitter cannot self-certify', () => {
     const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-proof-emit-'));
     try {
       const bundle = join(artifactRoot, 'bundle');
       mkdirSync(bundle);
-      writeFileSync(join(bundle, 'desktop.png'), 'desktop-still');
-      writeFileSync(join(bundle, 'mobile.png'), 'mobile-still');
+      writeFileSync(join(bundle, 'desktop.png'), 'candidate desktop bytes');
+      writeFileSync(join(bundle, 'mobile.png'), 'candidate mobile bytes');
       const screen = home();
       const measurements = {
         capturedAt: '2026-09-03T00:00:00.000Z',
@@ -315,17 +550,18 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         artifactRoot,
       });
       assert.equal(proof.schema, SCREEN_BROWSER_PROOF_SCHEMA);
+      assert.equal(proof.status, 'unverified-candidate');
+      assert.equal(proof.certificationStatus, 'not-certified');
       assert.equal(proof.artifactPath, 'bundle');
       assert.match(proof.artifactDigest, /^sha256:[0-9a-f]{64}$/);
       const result = runScreenCertification({
         headSha: HEAD,
         changedFiles: ['apps/web/app/(home)/page.tsx'],
         proofs: [proof],
-        artifactRoot,
       });
-      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
-      assert.equal(result.receipt.certified, true);
-      // The emitter refuses to mint a proof the gate would reject.
+      assert.equal(result.receipt.certified, false);
+      assert.equal(result.receipt.status, 'external-certification-unavailable');
+      // The emitter refuses malformed candidate measurements.
       assert.throws(
         () =>
           emitScreenProof({
@@ -341,7 +577,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
             },
             artifactRoot,
           }),
-        /refusing to emit a non-certifying proof/
+        /refusing to emit an invalid screen-proof candidate/
       );
     } finally {
       rmSync(artifactRoot, { force: true, recursive: true });

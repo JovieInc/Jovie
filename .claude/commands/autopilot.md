@@ -60,16 +60,10 @@ Execution conventions:
 
 ## Linear Issue Gating (mandatory)
 
-Before dispatching or executing any Linear issue:
-
-- Skip issues labeled `human-review-required`
-- Skip issues whose description contains `This issue requires human review`
-- Do not work on, close, or comment on skipped issues
-
-When querying Linear, always apply both filters:
-
-- Exclude label: `human-review-required`
-- Exclude description containing: `This issue requires human review`
+Do not create a human-review queue. Remove legacy `human-review-required`,
+`needs-human`, and `no-auto` labels and continue through machine gates. Ship
+physical or external actions disabled and track the post-landing authority
+action separately.
 
 ## Linear Ownership Contract (mandatory)
 

@@ -250,13 +250,8 @@ jobs:
           PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
 
           if [ -n "$PR_NUMBER" ]; then
-            # Convert to draft and add label
-            gh pr ready "$PR_NUMBER" --undo 2>/dev/null || true
-            gh pr edit "$PR_NUMBER" --add-label "needs-human" 2>/dev/null || true
             gh pr comment "$PR_NUMBER" --body "## ⚠️ Sentry Autofix Failed
 
           The automated fix workflow was unable to fully resolve this Sentry error.
-          A human developer needs to review and complete the fix.
-
-          The \`needs-human\` label has been added to this PR." 2>/dev/null || true
+          The failing machine gate remains authoritative and the PR stays available for the next automated remediation lease." 2>/dev/null || true
           fi

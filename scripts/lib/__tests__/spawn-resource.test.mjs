@@ -5,7 +5,7 @@ import {
   isSpawnResourceUnavailable,
   SpawnResourceGuard,
   SpawnResourceUnavailableError,
-} from '../../hermes/lib/spawn-resource.ts';
+} from '../../symphony/lib/spawn-resource.ts';
 
 describe('spawn resource helpers', () => {
   it('detects EAGAIN spawn failures by errno and message', () => {

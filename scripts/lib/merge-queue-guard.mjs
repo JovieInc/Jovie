@@ -503,6 +503,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Layout Guard',
   'CI / Build + Layout (combined)',
   'Build + Layout (combined)',
+  'CI / iOS Fast Unit + Coverage (combined)',
+  'iOS Fast Unit + Coverage (combined)',
   'CI / iOS Build + Test (combined)',
   'iOS Build + Test (combined)',
   'CI / Mac Build + Test (combined)',
@@ -974,10 +976,10 @@ export function serializationKeysForFile(file) {
       reason: 'web library subsystem',
       file: normalized,
     });
-  } else if (normalized.startsWith('scripts/hermes/')) {
+  } else if (normalized.startsWith('scripts/symphony/')) {
     keys.push({
       key: `subsystem:${firstDirectory(normalized, 3)}`,
-      reason: 'Hermes automation subsystem',
+      reason: 'Symphony automation subsystem',
       file: normalized,
     });
   } else if (normalized.startsWith('scripts/')) {

@@ -221,6 +221,7 @@ describe('Checkbox', () => {
       expect(checkbox.className).toContain('h-4');
       expect(checkbox.className).toContain('w-4');
       expect(checkbox.className).toContain('before:h-11');
+      expect(checkbox.className).toContain('before:min-w-11');
       expect(checkbox.className).toContain('before:w-11');
     });
 

@@ -7,6 +7,7 @@
 # - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
 #
 name: Security Scanning
+# clock-class: upstream-advisory
 
 on:
   # PR and merge-group diff scans are required through ci.yml / PR Ready.

@@ -2,35 +2,40 @@
 
 export const PRE_ADMISSION_SCHEMA = 'symphony-pre-admission/v1';
 
-// These labels represent explicit human ownership, a hold, or an incident
-// workflow. They must be checked from the latest issue snapshot immediately
+// These labels represent an active machine hold or incident workflow. Legacy
+// human-review labels never block admission (JOV-INV-028). Check the remaining
+// labels from the latest issue snapshot immediately
 // before allocation and before any admission mutation.
 export const PROTECTED_ADMISSION_LABELS = Object.freeze([
   'blocked',
   'codex-blocked',
   'codex-in-progress',
-  'decision-required',
-  'founder-fast-track',
   'held',
   'hold',
-  'human-review-required',
   'incident',
   'launch-blocker',
   'manual-incident',
   'missed-work',
-  'needs-human',
-  'needs:human',
-  'needs-decision',
-  'needs:decision',
-  'no-auto',
   'protected',
-  'risk:high',
-  'tim-approved',
-  'tim-owned',
   'type:epic',
 ]);
 
 const PROTECTED_LABEL_SET = new Set(PROTECTED_ADMISSION_LABELS);
+
+const FOUNDER_STEERING_ASSIGNEE = /tim(?:\s|-|_)*white|itstimwhite|^tim$/i;
+
+/**
+ * Tim's Linear assignment is a prioritization/steering signal, not an
+ * implementation lease. Machine ownership still requires the normal Symphony
+ * receipts, so this exception cannot collide with an active machine claim.
+ */
+export function isFounderSteeringAssignee(issue) {
+  const assignee = issue?.assignee;
+  if (!assignee) return false;
+  return FOUNDER_STEERING_ASSIGNEE.test(
+    `${assignee.id || ''} ${assignee.name || assignee.displayName || ''} ${assignee.email || ''}`
+  );
+}
 
 function rawLabels(value) {
   if (Array.isArray(value)) return value;

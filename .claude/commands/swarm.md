@@ -26,19 +26,14 @@ If wrong: `nvm use 22 && corepack prepare pnpm@9.15.4 --activate`
 
 ### Linear Issue Gating (mandatory)
 
-When scanning Linear issues for swarm dispatch, always skip:
-
-- Issues labeled `human-review-required`
-- Issues whose description contains `This issue requires human review`
-
-Do not work on, close, or comment on skipped issues.
+Do not create a human-review queue. Remove legacy `human-review-required`,
+`needs-human`, and `no-auto` labels and keep the work behind machine gates.
 
 ### Phase 1: Intake
 
 1. **Fetch issues from Linear:**
    - Use `list_issues` MCP tool with `team: "jovie"`, states: `started`, `unstarted`, `backlog`
-   - Exclude label: `human-review-required`
-   - Exclude description containing: `This issue requires human review`
+   - Remove legacy human-hold labels before ranking.
    - Limit to N issues (from argument or default 5)
 
 2. **Deduplicate against open PRs:**

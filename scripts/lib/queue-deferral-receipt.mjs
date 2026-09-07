@@ -17,26 +17,17 @@ export const RELEASABLE_REASONS = Object.freeze(
   Object.keys(RELEASABLE_REASON_SOURCES)
 );
 
-/**
- * Holds only a human may keep in place. Mechanical `queue-deferred` is not
- * in this set: missing receipts must not become a permanent manual trap.
- * Closed-loop policy: humans block on net-new, taste, or outbound.
- */
-export const HUMAN_POLICY_HOLD_LABELS = Object.freeze([
-  'needs-human',
+/** Machine-verifiable holds that remain independent of `queue-deferred`. */
+export const MECHANICAL_HOLD_LABELS = Object.freeze([
+  'blocked',
   'hold',
   'gated',
   'fast',
   'needs-conflict-resolution',
-  'needs:taste',
-  'needs-human-taste',
-  'taste',
-  'net-new',
-  'needs:net-new',
-  'needs-net-new',
-  'outbound',
-  'needs:outbound',
-  'needs-outbound',
+  'needs-manual-rebase',
+  'risk:high',
+  'incident',
+  'manual-incident',
 ]);
 
 function labelName(label) {
@@ -47,15 +38,15 @@ function labelName(label) {
   return '';
 }
 
-export function humanPolicyHoldsOn(labels = []) {
-  const allowed = new Set(HUMAN_POLICY_HOLD_LABELS);
+export function mechanicalHoldsOn(labels = []) {
+  const allowed = new Set(MECHANICAL_HOLD_LABELS);
   return [
     ...new Set((labels ?? []).map(labelName).filter(name => allowed.has(name))),
   ];
 }
 
-export function humanPolicyHoldRegex() {
-  const escaped = HUMAN_POLICY_HOLD_LABELS.map(name =>
+export function mechanicalHoldRegex() {
+  const escaped = MECHANICAL_HOLD_LABELS.map(name =>
     name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   );
   return `^(${escaped.join('|')})$`;
@@ -217,17 +208,18 @@ export function classifyReceipt(receipt) {
  * Decide whether a queue-deferred hold may be lifted once fleet/live
  * checks agree. Typed mechanical receipts stay reason-bound. A structurally
  * invalid typed receipt stays held; only missing provenance becomes an
- * untyped ready hold when no human-policy label is present.
+ * untyped ready hold when no separate machine gate is present. Human/taste
+ * labels are retired and never affect this decision.
  */
 export function classifyQueueDeferredHold({
   receipt = null,
   labels = [],
 } = {}) {
-  const humanHolds = humanPolicyHoldsOn(labels);
-  if (humanHolds.length > 0) {
+  const mechanicalHolds = mechanicalHoldsOn(labels);
+  if (mechanicalHolds.length > 0) {
     return {
       releasable: false,
-      detail: `human-policy-hold:${humanHolds.join(',')}`,
+      detail: `mechanical-hold:${mechanicalHolds.join(',')}`,
     };
   }
   if (receipt == null) {
@@ -304,8 +296,8 @@ export async function runCli(argv = process.argv.slice(2)) {
       process.stdout.write(`${releasable ? 'releasable' : detail}\n`);
       return releasable ? 0 : 4;
     }
-    case 'human-policy-re': {
-      process.stdout.write(`${humanPolicyHoldRegex()}\n`);
+    case 'mechanical-hold-re': {
+      process.stdout.write(`${mechanicalHoldRegex()}\n`);
       return 0;
     }
     case 'classify-hold': {
@@ -331,7 +323,7 @@ export async function runCli(argv = process.argv.slice(2)) {
     }
     default:
       process.stderr.write(
-        'usage: queue-deferral-receipt.mjs <render|extract|classify|classify-hold|human-policy-re> [options]\n'
+        'usage: queue-deferral-receipt.mjs <render|extract|classify|classify-hold|mechanical-hold-re> [options]\n'
       );
       return 2;
   }

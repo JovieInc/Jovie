@@ -1,8 +1,9 @@
 # Agent Landing Sweep
+# JOV-INV-028: human-review labels never stop machine-gated landing.
 #
 # PURPOSE: Dispatch-only fallback for the event-driven agent-pipeline approve job.
 # Sweeps open, non-draft agent PRs and enables auto-merge on any that are
-# CI-green, CodeRabbit-unblocked, and free of the needs-human hold label.
+# CI-green and CodeRabbit-unblocked.
 #
 # WHY A FALLBACK IN ADDITION TO workflow_run EVENTS:
 # The event-driven path in agent-pipeline.yml fires when CI *completes*. PRs
@@ -14,10 +15,9 @@
 # GUARDRAILS (same as agent-pipeline.yml approve job):
 # 1. Only agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
 # 2. Not a draft PR
-# 3. No needs-human label
-# 4. CI PR Ready check = success
-# 5. CodeRabbit not blocking (no CHANGES_REQUESTED)
-# 6. Queue pressure guard: defers when native merge-queue depth hits the configured cap
+# 3. CI PR Ready check = success
+# 4. CodeRabbit not blocking (no CHANGES_REQUESTED)
+# 5. Queue pressure guard: defers when native merge-queue depth hits the configured cap
 # Scope Judge was deleted in #14484 and is not a landing gate.
 #
 # RELATIONSHIP TO agent-pipeline.yml:
@@ -143,13 +143,6 @@ jobs:
             echo "Branch: $PR_BRANCH"
             echo "SHA: $PR_SHA"
             echo "Labels: ${LABELS:-none}"
-
-            # Gate: needs-human label is a hard stop
-            if echo "$LABELS" | grep -q "needs-human"; then
-              echo "Has needs-human label. Skipping."
-              SKIPPED=$((SKIPPED + 1))
-              continue
-            fi
 
             # Gate: automerge or ai:ready-to-merge label required
             # (PRs not explicitly marked for auto-landing are not swept)

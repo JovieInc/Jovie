@@ -333,9 +333,17 @@ final class JovieUITests: XCTestCase {
 
     attachScreenshot(named: "settings", app: app)
     for linkTitle in ["Manage Account", "Support", "Billing", "Privacy", "Terms"] {
+      // Settings rows are native Links, which XCUITest may classify as either
+      // buttons or links depending on OS/style, and the accessibility snapshot
+      // needs settle time on cold merge-group runners. Match by label across
+      // any element type with a bounded wait instead of an instant
+      // type-specific `.exists` probe (iOS merge-group lane exit 65).
+      let settingsRow = app.descendants(matching: .any).matching(
+        NSPredicate(format: "label == %@", linkTitle)
+      ).firstMatch
       XCTAssertTrue(
-        app.buttons[linkTitle].waitForExistence(timeout: 2),
-        "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
+        settingsRow.waitForExistence(timeout: 5),
+        "Settings row \(linkTitle) did not appear in the accessibility tree.\n\(app.debugDescription)"
       )
     }
     for valueTitle in ["Version", "Build"] {
@@ -346,6 +354,17 @@ final class JovieUITests: XCTestCase {
     }
 
     let logoutButton = app.buttons["Log Out"]
+    // The native Link rows are taller than the old button rows, so on cold
+    // merge-group runners the logout row can still be virtualized out of the
+    // accessibility tree when the value-row assertions finish. Reveal it
+    // before measuring its frame (iOS merge-group lane exit 65).
+    if !logoutButton.waitForExistence(timeout: 2) {
+      app.swipeUp()
+    }
+    XCTAssertTrue(
+      logoutButton.waitForExistence(timeout: 3),
+      "Log Out row did not appear in the accessibility tree.\n\(app.debugDescription)"
+    )
     let idleFrame = logoutButton.frame
     logoutButton.tap()
 

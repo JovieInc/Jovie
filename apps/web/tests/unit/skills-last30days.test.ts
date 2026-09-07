@@ -61,7 +61,7 @@ describe('last30days skill adoption (GH-10926)', () => {
   it('Hermes Air config template includes idea-radar schedule', () => {
     const configPath = join(
       repoRoot,
-      'scripts/hermes/config.air.template.yaml'
+      'scripts/symphony/config.air.template.yaml'
     );
     expect(existsSync(configPath), `missing: ${configPath}`).toBe(true);
     const content = readFileSync(configPath, 'utf8');

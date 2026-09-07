@@ -1,5 +1,5 @@
 name: Production Controller
-# Invariant consumer: JOV-INV-010.
+# Invariant consumer: JOV-INV-010. JOV-INV-029: merge is not activation.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Symphony
 # capability-gap: Event-driven supersession must read live merge-queue depth,
@@ -515,13 +515,28 @@ jobs:
                 --sha "$deployed_sha" \
                 --repo "$REPOSITORY" \
                 --controller-workflow-id "$controller_workflow_id")"
-              jq -e '
-                .state == "verified" and
-                (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
-              ' >/dev/null <<<"$deployed_marker_json" || {
-                echo "::error::Canonical production SHA lacks one exact verified deployment marker."
-                exit 1
-              }
+              deployed_marker_state="$(jq -r '.state // empty' <<<"$deployed_marker_json")"
+              case "$deployed_marker_state" in
+                verified)
+                  jq -e '
+                    (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
+                  ' >/dev/null <<<"$deployed_marker_json" || {
+                    echo "::error::Canonical production marker lacks an exact deployment ID."
+                    exit 1
+                  }
+                  ;;
+                none)
+                  if [ "$deployed_sha" = "$EXPECTED_SHA" ]; then
+                    echo "::error::Current production cannot bootstrap its own missing verified marker."
+                    exit 1
+                  fi
+                  echo "::warning::Bootstrapping the release range from exact canonical live SHA $deployed_sha; the new target still requires the full production path and its own durable marker."
+                  ;;
+                *)
+                  echo "::error::Canonical production marker state is not admissible as a release base ($deployed_marker_state)."
+                  exit 1
+                  ;;
+              esac
             fi
 
             lane_range_json="$RUNNER_TEMP/production-lane-range.json"
@@ -530,6 +545,7 @@ jobs:
               --deployed-sha "$deployed_sha" \
               --current-sha "$EXPECTED_SHA" \
               --current-receipt "$receipt_dir/release.json" \
+              --deployed-marker-state "${deployed_marker_state:-verified}" \
               --mode "$lane_range_mode" \
               --json-out "$lane_range_json"
             selected_lanes="$(jq -r 'if (.selectedLanes | length) == 0 then "none" else (.selectedLanes | join(",")) end' "$lane_range_json")"

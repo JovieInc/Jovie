@@ -1,4 +1,5 @@
 name: Actions Cache GC
+# clock-class: temporal-resource
 
 # Ongoing eviction for stale/duplicate Actions caches. Does not smash live
 # pnpm/node/playwright caches on main or open PR refs unless they are unused

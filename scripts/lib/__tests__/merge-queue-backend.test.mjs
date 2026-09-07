@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { classifyProductionMarkerEvidence } from '../../../.github/scripts/production-marker-state.mjs';
 import {
   CANONICAL_NATIVE_MUTATION_ACTOR,
   canAcceptExactHeadQueueReceipt,
@@ -21,7 +22,6 @@ import {
   HARD_HOLD_LABELS,
   hasAuthoritativeExactHeadQueueReceipt,
   listPullRequestQueueStates,
-  NO_AUTO_HOLD_LABELS,
   preflightMergeQueue,
   proveExactHeadQueueReceipt,
   resolveMergeQueueBackend,
@@ -29,6 +29,11 @@ import {
   SELECTOR_BLOCKING_LABELS,
   validateNativePreflightEvidence,
 } from '../../merge-queue-backend.mjs';
+import {
+  attestationMatchesControllerRepair,
+  renderControllerRepairAttestation,
+  selectSeerControllerRepairReview,
+} from '../controller-repair-attestation.mjs';
 import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -38,7 +43,12 @@ const HEAD = 'a'.repeat(40);
 const OTHER_HEAD = 'b'.repeat(40);
 const PR_ID = 'PR_kwDO_native_pr';
 const ENTRY_ID = 'MQE_kwDO_native_entry';
-const QUEUE_ENTRY = { id: ENTRY_ID, state: 'QUEUED', position: 1 };
+const QUEUE_ENTRY = {
+  id: ENTRY_ID,
+  state: 'QUEUED',
+  position: 1,
+  enqueuedAt: '2026-07-15T00:00:00Z',
+};
 const AUTO_MERGE = { enabledAt: '2026-07-15T00:00:00Z' };
 const VALID_REPOSITORY = Object.freeze(
   JSON.parse(
@@ -276,6 +286,8 @@ function executeAdmissionScope({
   workflowEvent = 'pull_request',
   pullRequests = [],
   pullRequestEvent = null,
+  productionAdmissionAllowed = true,
+  fleetPromotionMode = 'normal',
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
@@ -318,6 +330,16 @@ function executeAdmissionScope({
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
           MANUAL_HEAD: '',
+          PRODUCTION_ADMISSION_ALLOWED: productionAdmissionAllowed
+            ? 'true'
+            : 'false',
+          PRODUCTION_CHECKPOINT_STATE: productionAdmissionAllowed
+            ? 'verified'
+            : 'none',
+          PRODUCTION_CHECKPOINT_REASON: productionAdmissionAllowed
+            ? 'verified_marker'
+            : 'no_marker',
+          FLEET_PROMOTION_MODE: fleetPromotionMode,
           MOCK_PULL_REQUESTS: JSON.stringify(pullRequests),
           PATH: `${binPath}:${process.env.PATH}`,
           REPO: REPOSITORY,
@@ -338,6 +360,119 @@ function executeAdmissionScope({
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+function executeReleaseCheckpoint({
+  state,
+  reason,
+  mainSha = HEAD,
+  workflowId = 12345,
+}) {
+  const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
+  const script = workflowRunScript(
+    workflow,
+    'Resolve production release checkpoint'
+  );
+  const directory = mkdtempSync(join(tmpdir(), 'production-checkpoint-'));
+  const outputPath = join(directory, 'output.txt');
+  const binPath = join(directory, 'bin');
+  mkdirSync(binPath);
+  writeFileSync(
+    join(binPath, 'gh'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' '${workflowId}'\n`
+  );
+  writeFileSync(
+    join(binPath, 'node'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' '${JSON.stringify({ state, reason })}'\n`
+  );
+  chmodSync(join(binPath, 'gh'), 0o755);
+  chmodSync(join(binPath, 'node'), 0o755);
+  writeFileSync(outputPath, '');
+  try {
+    const result = spawnSync(
+      'bash',
+      ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: outputPath,
+          MAIN_SHA: mainSha,
+          PATH: `${binPath}:${process.env.PATH}`,
+          REPO: REPOSITORY,
+        },
+      }
+    );
+    if (result.status !== 0) {
+      throw new Error(
+        `Release checkpoint failed (${result.status}): ${result.stderr || result.stdout}`
+      );
+    }
+    const lines = readFileSync(outputPath, 'utf8').trim().split('\n');
+    return {
+      lines,
+      outputs: Object.fromEntries(lines.map(line => line.split('=', 2))),
+    };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function exactProductionMarkerEvidence({
+  evidenceSha = HEAD,
+  markerSha = evidenceSha,
+  expired = false,
+  conclusion = 'success',
+  runRepository = REPOSITORY,
+} = {}) {
+  const workflowId = 9876;
+  const controllerRun = 54321;
+  return {
+    sha: evidenceSha,
+    repo: REPOSITORY,
+    controllerWorkflowId: workflowId,
+    markers: [
+      {
+        artifact: {
+          id: 777,
+          name: `production-generation-verified-${markerSha}`,
+          expired,
+          workflowRunId: controllerRun,
+        },
+        payload: {
+          sha: markerSha,
+          deploymentId: 'dpl_ExactProduction123',
+          controllerRun: String(controllerRun),
+          controllerAttempt: '1',
+        },
+        attemptRun: {
+          id: controllerRun,
+          run_attempt: 1,
+          workflow_id: workflowId,
+          path: '.github/workflows/production-controller.yml',
+          head_sha: markerSha,
+          head_branch: 'main',
+          head_repository: { full_name: runRepository },
+          event: 'workflow_run',
+          status: 'completed',
+          conclusion,
+        },
+        attemptJobs: [
+          {
+            id: 999,
+            name: 'Production Verified',
+            run_id: controllerRun,
+            run_attempt: 1,
+            head_sha: markerSha,
+            head_branch: 'main',
+            status: 'completed',
+            conclusion: 'success',
+          },
+        ],
+      },
+    ],
+    recoveryArtifacts: [],
+  };
 }
 
 function executeHoldIntakePreflight({
@@ -559,7 +694,7 @@ describe('queue workflow mutation safety', () => {
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
     expect(workflow).toContain(
-      'types: [reopened, labeled, unlabeled, enqueued]'
+      'types: [reopened, labeled, unlabeled, enqueued, dequeued]'
     );
     expect(workflow).not.toContain('ready_for_review, reopened');
 
@@ -631,6 +766,7 @@ describe('queue workflow mutation safety', () => {
     );
     expect(drain).toContain('qs: (.mergeQueueEntry.state // null)');
     expect(drain).toContain('qp: (.mergeQueueEntry.position // null)');
+    expect(drain).toContain('qa: (.mergeQueueEntry.enqueuedAt // null)');
     expect(drain).toContain('select(.qp == 1)');
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
@@ -658,12 +794,8 @@ describe('queue workflow mutation safety', () => {
       'node scripts/merge-queue-backend.mjs prove-receipt'
     );
     expect(drain).toContain('.state.isInMergeQueue == true');
-    expect(drain).toContain(
-      'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
-    );
-    expect(drain).toContain(
-      '(.state.labels.nodes // []) | map(.name) | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
-    );
+    expect(drain).not.toContain('NO_AUTO_HOLD_JQ');
+    expect(drain).not.toContain('. == "no-auto"');
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
@@ -805,6 +937,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.workflow_run.event // empty');
     expect(scope).toContain('== "merge_group"');
     expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
+    expect(enroll).toContain('DRAIN_RECONCILE_ADMISSION_RECEIPTS:');
     expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
     expect(enroll).toContain("steps.admission.outputs.deferred_release != '1'");
     expect(enroll).toContain(
@@ -812,14 +945,302 @@ describe('queue workflow mutation safety', () => {
     );
     expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
     expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'");
-    expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
+    expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-admission/v2"');
     expect(drain).toContain('bounded exact-head native admission');
     expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$');
-    expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
+    expect(drain).toContain(
+      'queue_reentry_receipt_is_recoverable "$n" "$head_oid"'
+    );
     expect(drain).toContain('check_failures_for_pr "$n"');
     expect(drain).toContain('(( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 ))');
     expect(drain).toContain('select((.n | tostring) != $admission_pr)');
     expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
+  });
+
+  it('pauses only new admission paths until exact current production is verified', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const checkpoint = workflowStep(
+      workflow,
+      'Resolve production release checkpoint'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+
+    expect(workflow).toContain('actions: read');
+    expect(checkpoint).toContain('.github/scripts/production-marker-state.mjs');
+    expect(checkpoint).toContain("echo 'admission_allowed=false'");
+    expect(checkpoint).toContain(
+      'if [[ "$checkpoint_state" == \'verified\' ]]'
+    );
+    expect(checkpoint).toContain("echo 'admission_allowed=true'");
+    expect(checkpoint).toContain('existing queue entries continue');
+    expect(scope).toContain(
+      '"${FLEET_PROMOTION_MODE:-blocked}" != \'controller-repair-only\''
+    );
+    expect(scope).toContain("admission_disposition='neutral'");
+    expect(scope).toContain('production-release-checkpoint-');
+    expect(scope).toContain('recover_holds=0');
+    expect(scope).toContain('reconcile_queue_reentry=0');
+    expect(enroll).toContain(
+      'DRAIN_PRODUCTION_CHECKPOINT_STATE: ${{ steps.release-checkpoint.outputs.state }}'
+    );
+    expect(
+      enroll.match(
+        /steps\.release-checkpoint\.outputs\.admission_allowed == 'true'/g
+      )
+    ).toHaveLength(4);
+
+    const blocked = executeAdmissionScope({
+      productionAdmissionAllowed: false,
+      pullRequestEvent: {
+        action: 'labeled',
+        label: { name: 'ready-to-merge' },
+        sender: { login: 'jovie-bot[bot]' },
+        pull_request: {
+          number: 16546,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+    });
+    expect(blocked).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'production-release-checkpoint-none-no_marker',
+        pr_number: '',
+        head_sha: '',
+        recover_holds: '0',
+        deferred_release: '0',
+        reconcile_queue_reentry: '0',
+      })
+    );
+
+    const boundedRepair = executeAdmissionScope({
+      productionAdmissionAllowed: false,
+      fleetPromotionMode: 'controller-repair-only',
+      pullRequestEvent: {
+        action: 'labeled',
+        label: { name: 'ready-to-merge' },
+        sender: { login: 'jovie-bot[bot]' },
+        pull_request: {
+          number: 16546,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+    });
+    expect(boundedRepair).toEqual(
+      expect.objectContaining({
+        disposition: 'candidate',
+        reason: 'pull-request-exact-head',
+        pr_number: '16546',
+        head_sha: HEAD,
+      })
+    );
+    expect(scope).toContain(
+      'preserving one attested controller-repair-only candidate'
+    );
+    expect(enroll).toContain('DRAIN_PROMOTION_MODE:');
+    expect(enroll).toContain('needs.fleet-policy.outputs.mode');
+
+    const unavailable = executeReleaseCheckpoint({
+      state: 'none',
+      reason: 'no_marker',
+    });
+    expect(unavailable.outputs).toEqual(
+      expect.objectContaining({
+        admission_allowed: 'false',
+        state: 'none',
+        reason: 'no_marker',
+      })
+    );
+    expect(checkpoint).not.toMatch(/--method\s+(POST|PUT|PATCH|DELETE)/);
+
+    const verified = executeReleaseCheckpoint({
+      state: 'verified',
+      reason: 'exact_attempt_verified',
+    });
+    expect(verified.outputs).toEqual(
+      expect.objectContaining({
+        admission_allowed: 'true',
+        state: 'verified',
+        reason: 'exact_attempt_verified',
+      })
+    );
+    expect(
+      verified.lines.filter(line => line === 'admission_allowed=true')
+    ).toHaveLength(1);
+  });
+
+  it('accepts only exact trusted production marker evidence at the checkpoint', () => {
+    expect(
+      classifyProductionMarkerEvidence(exactProductionMarkerEvidence())
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_attempt_verified',
+    });
+
+    const rejected = [
+      exactProductionMarkerEvidence({ expired: true }),
+      exactProductionMarkerEvidence({
+        evidenceSha: OTHER_HEAD,
+        markerSha: HEAD,
+      }),
+      exactProductionMarkerEvidence({ runRepository: 'attacker/fork' }),
+      exactProductionMarkerEvidence({ conclusion: 'failure' }),
+      exactProductionMarkerEvidence({ conclusion: 'cancelled' }),
+    ].map(evidence => classifyProductionMarkerEvidence(evidence));
+
+    expect(rejected).toHaveLength(5);
+    expect(rejected.every(result => result.state !== 'verified')).toBe(true);
+    expect(rejected.map(result => result.reason)).toEqual([
+      'malformed_or_contradictory_marker',
+      'malformed_or_contradictory_marker',
+      'contradictory_marker_attempt',
+      'unsafe_or_contradictory_rollback',
+      'unsafe_or_contradictory_rollback',
+    ]);
+  });
+
+  it('keeps the controller repair escape exact, independently owned, and expiring', () => {
+    const now = Date.parse('2026-09-06T18:00:00.000Z');
+    const changedPathsSha256 = 'c'.repeat(64);
+    const operationId = 'run-34050357620-attempt-1';
+    const body = renderControllerRepairAttestation(
+      {
+        schema: 'jovie-controller-repair-attestation/v1',
+        kind: 'controller-runtime-repair',
+        condition: 'controller-failure',
+        repository: REPOSITORY,
+        pr: 16546,
+        head: HEAD,
+        mainSha: OTHER_HEAD,
+        reviewAuthority: 'independent-llm-review',
+        reviewId: 'review-release-repair-1',
+        reviewedHead: HEAD,
+        changedPathsSha256,
+        operationId,
+        issuedAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + 15 * 60_000).toISOString(),
+        deploymentsAllowed: false,
+        runtimeActivationAllowed: false,
+      },
+      now
+    );
+    const exactScope = {
+      repository: REPOSITORY,
+      pr: 16546,
+      head: HEAD,
+      mainSha: OTHER_HEAD,
+      changedPathsSha256,
+      operationId,
+    };
+
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        minimumValidForMs: 2 * 60_000,
+        now: now + 10 * 60_000,
+      })
+    ).toBe(true);
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        minimumValidForMs: 1,
+        now: now + 15 * 60_000 + 1,
+      })
+    ).toBe(false);
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        head: OTHER_HEAD,
+        minimumValidForMs: 1,
+        now: now + 10 * 60_000,
+      })
+    ).toBe(false);
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        operationId: 'run-34050357620-attempt-2',
+        minimumValidForMs: 1,
+        now: now + 10 * 60_000,
+      })
+    ).toBe(false);
+  });
+
+  it('binds controller repair authority to one successful exact-head Seer check', () => {
+    const checkSuite = {
+      app: { id: 12637, slug: 'sentry' },
+      head_sha: HEAD,
+      id: 92271699412,
+    };
+    const checkRun = {
+      app: { id: 12637, slug: 'sentry' },
+      check_suite: { id: checkSuite.id },
+      conclusion: 'success',
+      head_sha: HEAD,
+      id: 101553168181,
+      name: 'Seer Code Review',
+      status: 'completed',
+    };
+
+    expect(
+      selectSeerControllerRepairReview(
+        { checkRuns: [checkRun], checkSuite },
+        { expectedHead: HEAD }
+      )
+    ).toEqual({
+      checkRunId: checkRun.id,
+      checkSuiteId: checkSuite.id,
+      reviewId: `seer-check-${checkRun.id}`,
+      reviewedHead: HEAD,
+    });
+
+    for (const evidence of [
+      { checkRuns: [{ ...checkRun, head_sha: OTHER_HEAD }], checkSuite },
+      { checkRuns: [{ ...checkRun, conclusion: 'failure' }], checkSuite },
+      {
+        checkRuns: [checkRun, { ...checkRun, id: checkRun.id + 1 }],
+        checkSuite,
+      },
+      {
+        checkRuns: [{ ...checkRun, app: { id: 999, slug: 'attacker-review' } }],
+        checkSuite,
+      },
+      {
+        checkRuns: [checkRun],
+        checkSuite: { ...checkSuite, head_sha: OTHER_HEAD },
+      },
+    ]) {
+      expect(() =>
+        selectSeerControllerRepairReview(evidence, { expectedHead: HEAD })
+      ).toThrow();
+    }
+  });
+
+  it('publishes controller repair leases from the same Auto-Enroll attempt only', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const producer = workflowStep(
+      workflow,
+      'Publish exact controller repair attestation'
+    );
+
+    expect(producer).toContain(
+      "needs.fleet-policy.outputs.mode == 'controller-repair-only'"
+    );
+    expect(producer).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(producer).toContain(
+      'OPERATION_ID: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}'
+    );
+    expect(producer).toContain('check_name=Seer%20Code%20Review');
+    expect(producer).toContain('--operation-id "$OPERATION_ID"');
+    expect(producer).toContain('controller-repair-attestation "$attestation"');
   });
 
   it('recovers missing-CI heads with a bounded, per-head-idempotent close+reopen', () => {
@@ -891,7 +1312,6 @@ describe('queue workflow mutation safety', () => {
     expect(approval).toContain('--json state,isDraft,headRefOid,labels');
     expect(approval).toContain('.headRefOid == $expected_head');
     for (const label of [
-      'needs-human',
       'hold',
       'gated',
       'queue-deferred',
@@ -1785,20 +2205,12 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
-  it('refuses a held exact head before invoking the enrollment mutation', async () => {
-    const runner = createNativeRunner({
-      states: [prState({ labels: { nodes: [{ name: 'queue-deferred' }] } })],
-    });
-    await expect(enroll(runner)).rejects.toMatchObject({
-      code: 'held_pull_request',
-      details: { labels: ['queue-deferred'] },
-    });
-    expect(invokedEnrollment(runner)).toBe(false);
-  });
-
   it.each([
-    ...NO_AUTO_HOLD_LABELS,
-  ])('refuses a %s tombstone before invoking the enrollment mutation', async label => {
+    'queue-deferred',
+    'hold',
+    'gated',
+    'incident',
+  ])('refuses the machine hold %s before invoking enrollment', async label => {
     const runner = createNativeRunner({
       states: [prState({ labels: { nodes: [{ name: label }] } })],
     });
@@ -1810,22 +2222,27 @@ describe('native enrollment', () => {
   });
 
   it.each([
-    ...NO_AUTO_HOLD_LABELS,
-  ])('refuses a delayed queue entry when a %s tombstone appears after SNAP', async label => {
-    const queuedAndHeld = prState({
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('ignores the legacy %s label during native enrollment', async label => {
+    const queued = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
-      autoMergeRequest: AUTO_MERGE,
       labels: { nodes: [{ name: label }] },
     });
     const runner = createNativeRunner({
-      states: [prState(), queuedAndHeld],
+      states: [prState({ labels: { nodes: [{ name: label }] } }), queued],
     });
-    await expect(
-      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
-    ).rejects.toMatchObject({
-      code: 'held_pull_request',
-      details: { labels: [label] },
+    await expect(enroll(runner)).resolves.toMatchObject({
+      changed: true,
+      state: { queued: true },
     });
     expect(invokedEnrollment(runner)).toBe(true);
   });
@@ -1911,6 +2328,8 @@ describe('native enrollment', () => {
     ['missing id', { state: 'QUEUED', position: 1 }],
     ['unknown state', { ...QUEUE_ENTRY, state: 'UNKNOWN' }],
     ['missing position', { id: ENTRY_ID, state: 'QUEUED' }],
+    ['missing enqueuedAt', { id: ENTRY_ID, state: 'QUEUED', position: 1 }],
+    ['malformed enqueuedAt', { ...QUEUE_ENTRY, enqueuedAt: 'not-a-date' }],
     ['zero position', { ...QUEUE_ENTRY, position: 0 }],
     ['negative position', { ...QUEUE_ENTRY, position: -1 }],
     ['fractional position', { ...QUEUE_ENTRY, position: 1.5 }],
@@ -1998,6 +2417,22 @@ describe('native enrollment', () => {
 });
 
 describe('native dequeue', () => {
+  it('rejects guarded CLI dequeue without the sole-writer authorization', async () => {
+    const runner = vi.fn();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({ code: 'native_mutation_unauthorized' });
+    expect(runner).not.toHaveBeenCalled();
+  });
+
   it('dequeues the queue entry and disables auto-merge using the PullRequest id', async () => {
     const runner = createNativeRunner({
       states: [
@@ -2036,6 +2471,178 @@ describe('native dequeue', () => {
     await expect(dequeue(runner)).rejects.toMatchObject({
       code: 'dequeue_postcondition_failed',
     });
+  });
+
+  it('runs the guarded CLI through live entry revalidation and external mutations', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: AUTO_MERGE,
+    });
+    const readRunner = createNativeRunner({
+      states: [
+        queued,
+        queued,
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState(),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+    const write = vi.fn();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write,
+      })
+    ).resolves.toMatchObject({
+      changed: true,
+      guardedQueueEntry: {
+        id: ENTRY_ID,
+        enqueuedAt: QUEUE_ENTRY.enqueuedAt,
+      },
+    });
+
+    expect(
+      readRunner.mock.calls.filter(([args]) =>
+        queryText(args).includes('MergeQueuePullRequestState')
+      )
+    ).toHaveLength(4);
+    expect(invokedNativeMutation(readRunner)).toBe(false);
+    expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('dequeuePullRequest')
+      )
+    ).toBe(true);
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('disablePullRequestAutoMerge')
+      )
+    ).toBe(true);
+    expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({
+      changed: true,
+      state: { headRefOid: HEAD, isInMergeQueue: false },
+    });
+  });
+
+  it('suppresses the guarded CLI when the exact head changed before mutation', async () => {
+    const readRunner = createNativeRunner({
+      states: [
+        prState({
+          headRefOid: OTHER_HEAD,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+    });
+    expect(invokedNativeMutation(mutationRunner)).toBe(false);
+  });
+
+  it.each([
+    ['id', { id: 'MQE_kwDO_replacement_entry' }],
+    ['enqueuedAt', { enqueuedAt: '2026-07-15T00:01:00Z' }],
+  ])('suppresses mutation when the live queue entry %s changed after observation', async (_field, replacement) => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const replaced = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: {
+        ...QUEUE_ENTRY,
+        ...replacement,
+      },
+    });
+    const readRunner = createNativeRunner({ states: [queued, replaced] });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'queue-entry-changed',
+      guardedQueueEntry: {
+        id: ENTRY_ID,
+        enqueuedAt: QUEUE_ENTRY.enqueuedAt,
+      },
+    });
+    expect(invokedNativeMutation(mutationRunner)).toBe(false);
+  });
+
+  it('reports a head race after dequeue without mutating replacement auto-merge', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const readRunner = createNativeRunner({
+      states: [
+        queued,
+        queued,
+        prState({ headRefOid: OTHER_HEAD, autoMergeRequest: AUTO_MERGE }),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: readRunner,
+        mutationRunner,
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({
+      code: 'dequeue_head_raced',
+      details: { expectedHeadOid: HEAD },
+    });
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('dequeuePullRequest')
+      )
+    ).toBe(true);
+    expect(
+      mutationRunner.mock.calls.some(([args]) =>
+        queryText(args).includes('disablePullRequestAutoMerge')
+      )
+    ).toBe(false);
   });
 });
 
@@ -2226,6 +2833,35 @@ describe('exact-head queue receipt proof', () => {
     });
   });
 
+  it('admits only an attested controller repair in controller-repair-only mode', () => {
+    const input = {
+      admissionPr: 16068,
+      admissionHead: HEAD,
+      promotionMode: 'controller-repair-only',
+      enrollSlots: 1,
+    };
+    expect(
+      explainExactHeadAdmissionSelector({
+        ...input,
+        snapshot: [{ ...selectorRow, controllerRepair: true }],
+      })
+    ).toEqual({
+      observed: true,
+      queued: false,
+      eligible: true,
+      reason: 'eligible',
+    });
+    expect(
+      explainExactHeadAdmissionSelector({
+        ...input,
+        snapshot: [{ ...selectorRow, controllerRepair: false }],
+      })
+    ).toMatchObject({
+      eligible: false,
+      reason: 'promotion-mode=controller-repair-only',
+    });
+  });
+
   it('does not treat snapshot auto-merge intent as queued membership', () => {
     expect(
       explainExactHeadAdmissionSelector({
@@ -2243,51 +2879,67 @@ describe('exact-head queue receipt proof', () => {
     });
   });
 
-  it('treats the no-auto tombstone family as a durable selector hard hold', () => {
-    const preRepairSelectorBlockingLabels = new Set([
-      'needs-human',
-      'hold',
-      'gated',
-      'needs-conflict-resolution',
-      'fast',
-    ]);
-    expect([...NO_AUTO_HOLD_LABELS]).toEqual([
-      'no-auto',
-      'no-auto-merge',
-      'no-automerge',
-    ]);
-    for (const label of NO_AUTO_HOLD_LABELS) {
-      expect(preRepairSelectorBlockingLabels.has(label)).toBe(false);
-      expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(true);
-      expect(HARD_HOLD_LABELS.has(label)).toBe(true);
-
-      const snapshot = [{ ...selectorRow, L: [label] }];
+  it.each([
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('ignores the legacy %s label in exact-head selection', label => {
+    expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(false);
+    expect(HARD_HOLD_LABELS.has(label)).toBe(false);
+    const snapshot = [{ ...selectorRow, L: [label] }];
+    for (const promotionMode of ['normal', 'hold-intake', 'draft-only']) {
       expect(
-        snapshot[0].L.some(name => preRepairSelectorBlockingLabels.has(name))
-      ).toBe(false);
-
-      for (const promotionMode of ['normal', 'hold-intake', 'draft-only']) {
-        expect(
-          explainExactHeadAdmissionSelector({
-            snapshot,
-            admissionPr: 16068,
-            admissionHead: HEAD,
-            promotionMode,
-            enrollSlots: 15,
-          })
-        ).toEqual({
-          observed: true,
-          queued: false,
-          eligible: false,
-          reason: `held-by=${label}`,
-        });
-      }
+        explainExactHeadAdmissionSelector({
+          snapshot,
+          admissionPr: 16068,
+          admissionHead: HEAD,
+          promotionMode,
+          enrollSlots: 15,
+        })
+      ).toEqual({
+        observed: true,
+        queued: false,
+        eligible: true,
+        reason: 'eligible',
+      });
     }
   });
 
   it.each([
-    ...NO_AUTO_HOLD_LABELS,
-  ])('does not treat a delayed native entry as a receipt when %s is live', async label => {
+    'hold',
+    'gated',
+    'incident',
+  ])('blocks exact-head selection on the machine hold %s', label => {
+    expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(true);
+    expect(HARD_HOLD_LABELS.has(label)).toBe(true);
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, L: [label] }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'normal',
+        enrollSlots: 15,
+      })
+    ).toMatchObject({ eligible: false, reason: `held-by=${label}` });
+  });
+
+  it.each([
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('accepts an exact-head native receipt carrying legacy %s', async label => {
     const queuedAndHeld = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
@@ -2296,10 +2948,10 @@ describe('exact-head queue receipt proof', () => {
     expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
       true
     );
-    expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
+    expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(true);
     expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
-      ok: false,
-      reason: `held-by=${label}`,
+      ok: true,
+      reason: 'queued',
     });
 
     const runner = createNativeRunner({ states: [queuedAndHeld] });
@@ -2308,9 +2960,9 @@ describe('exact-head queue receipt proof', () => {
         nativeOptions(runner, { expectedHeadOid: HEAD })
       )
     ).resolves.toMatchObject({
-      ok: false,
+      ok: true,
       attempts: 1,
-      explanation: { ok: false, reason: `held-by=${label}` },
+      explanation: { ok: true, reason: 'queued' },
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });
@@ -2372,6 +3024,11 @@ describe('authoritative native state listing', () => {
     const queries = runner.mock.calls.map(call => queryText(call[0]));
     expect(
       queries.some(query => query.includes('MergeQueuePullRequestState'))
+    ).toBe(true);
+    expect(
+      queries.some(query =>
+        query.includes('mergeQueueEntry { id state position enqueuedAt }')
+      )
     ).toBe(true);
     expect(
       queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))

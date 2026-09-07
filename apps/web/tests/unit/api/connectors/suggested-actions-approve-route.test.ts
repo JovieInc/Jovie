@@ -435,7 +435,39 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbSelectLimit.mockResolvedValueOnce([
       {
-        payload: { title: 'Candidate' },
+        payload: {
+          schemaVersion: 1,
+          title: 'Review thumbnail for A song',
+          creatorProfileId: '00000000-0000-4000-8000-000000000001',
+          channelId: 'UC-owned',
+          youtubeVideoId: 'video-1',
+          videoTitle: 'A song',
+          candidateThumbnailVersionId: '00000000-0000-4000-8000-000000000002',
+          candidateImageUrl: 'https://cdn.example.com/candidate.jpg',
+          currentThumbnailUrl: 'https://i.ytimg.com/current.jpg',
+          artifactSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          apiMetrics: {
+            source: 'youtube-analytics-api',
+            window: 'lifetime',
+            capturedAt: '2026-09-01T12:00:00.000Z',
+            views: 1250,
+            watchTimeMinutes: 300,
+            avgViewDurationSeconds: 42,
+            impressions: null,
+            ctr: null,
+          },
+          publicationGate: {
+            state: 'blocked',
+            reason:
+              'direct-thumbnail-mutation-disabled-native-experiment-required',
+            requiredProof: [
+              'founder-candidate-approval',
+              'youtube-studio-native-experiment',
+              'provider-readback-receipt',
+            ],
+          },
+        },
         kind: 'youtube.thumbnail_candidate',
         signalType: null,
       },

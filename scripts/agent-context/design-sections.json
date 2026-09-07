@@ -1,0 +1,82 @@
+[
+  {
+    "heading": "## Authority and precedence",
+    "sha256": "bacc403143e3587606b957307b5b66f5ef0d062ed38853a5c5da66e5709ead75"
+  },
+  {
+    "heading": "## Surface Classification",
+    "sha256": "17e022f6c74f087615089efeb71b721bf1bb836e4b2d1a84f89dd87c2055c756"
+  },
+  {
+    "heading": "## Typography",
+    "sha256": "3017a47fff5776cfebbd100636858ff9fac8d6d3149d57533a857f8d41c72b24"
+  },
+  {
+    "heading": "## Copywriting",
+    "sha256": "bc4b6db62fda887197352a68bede3f53ba89a8ff5787c87435600920778a9928"
+  },
+  {
+    "heading": "## Subtraction Principle",
+    "sha256": "b5f1771a61f7690af972d9832a98fd0fc35bb972bb2ead7d99fea653e48b6390"
+  },
+  {
+    "heading": "## Use Tokens, Not Raw Colors",
+    "sha256": "d3695f07b5100c41650d6391ef1d0c3c056dc6a1f4e9436b07c4ab50ad7b1875"
+  },
+  {
+    "heading": "## Color System",
+    "sha256": "1c5c5f888b38f9d49e76f1aa5a1e495b88dac531c82d72b2cedf7961e2d21cf8"
+  },
+  {
+    "heading": "## Spacing",
+    "sha256": "d02fc2dad28b89cc8cdb67885c341ccc68ce28ef0073ee8c1c1a59fd6ec9d690"
+  },
+  {
+    "heading": "## DS_FOUNDATION_V1 canonical decisions",
+    "sha256": "5411649ad4853a5141bf6a355e3954d9b040aa85ceefd33231dfb47c79fee0f5"
+  },
+  {
+    "heading": "## Borders & Radius",
+    "sha256": "4f814092c949a23ca9e5c4d7a99042bdd4dbe537a5bab729330cab91825fe5fc"
+  },
+  {
+    "heading": "## Shadows",
+    "sha256": "a35ee3f2824f3e74abada8ceca63cc026e158a7342656847a19c04b058770eab"
+  },
+  {
+    "heading": "## Motion",
+    "sha256": "1a00660de1e58d0c5331245c46fa3c894e60406b226296bd6b6ca94bc29aef5f"
+  },
+  {
+    "heading": "## App IA & Page Scaffold",
+    "sha256": "19d50dbe5f3e51fe1c2cf3db9b1afc48b656b9bdacedad5d18f518cf691611d9"
+  },
+  {
+    "heading": "## Component Patterns",
+    "sha256": "ca4e080e2a044a4db9f12e2ec6729806b435f91282489e77399af7456955d3d0"
+  },
+  {
+    "heading": "## Full-Screen Status Screens",
+    "sha256": "a57480cb3e67213a52dba1c26d5b079f060b5aece975ca3575b13a9d24710b96"
+  },
+  {
+    "heading": "## Layout Shift Prevention (Visual Stability)",
+    "sha256": "c872a8050ee044285f1bcc03608f3fd9c5a6ea85b16ce09b44941eed619eca4c"
+  },
+  {
+    "heading": "## Text Casing",
+    "sha256": "10db10e0e41b2b585ba45b3ed8daa43e5976274706aecc1718d3a3a4cb309aa8"
+  },
+  {
+    "heading": "## Canonical Surface Split",
+    "sha256": "ec58c1877747673868cbe63598a745c8df9785cced288bef4bfc8c1c87089b6c"
+  },
+  {
+    "heading": "## Source-of-Truth File Map",
+    "sha256": "0e6dd1dde0044b616949e5a8610863d59269e3e0c5540c4d14aa3758ea255b71"
+  },
+  {
+    "heading": "## Decisions Log",
+    "sha256": "e9f5eb968f8202d1537ab4459792a43725eb825cae8ab7ea9b91cde095d45f5b"
+  }
+]
