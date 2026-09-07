@@ -7,8 +7,22 @@
     "application-shell": {
       "owner": "apps/web/components/organisms/AppShellFrame.tsx",
       "publicImport": "@/components/canonical",
-      "exports": ["AppShellFrame", "AppShellContentPanel", "AppShellRightRail", "PageShell", "PageHeader", "PageContent"],
-      "contracts": ["rail-visibility", "content-plane", "scroll-ownership", "safe-area", "ultrawide", "narrow-fallback"]
+      "exports": [
+        "AppShellFrame",
+        "AppShellContentPanel",
+        "AppShellRightRail",
+        "PageShell",
+        "PageHeader",
+        "PageContent"
+      ],
+      "contracts": [
+        "rail-visibility",
+        "content-plane",
+        "scroll-ownership",
+        "safe-area",
+        "ultrawide",
+        "narrow-fallback"
+      ]
     },
     "headers": {
       "owner": "apps/web/components/organisms/HeaderNav.tsx",
@@ -18,7 +32,14 @@
     "cards": {
       "owner": "packages/ui/atoms/card.tsx",
       "publicImport": "@jovie/ui",
-      "exports": ["Card", "CardHeader", "CardContent", "CardFooter", "CardTitle", "CardDescription"]
+      "exports": [
+        "Card",
+        "CardHeader",
+        "CardContent",
+        "CardFooter",
+        "CardTitle",
+        "CardDescription"
+      ]
     },
     "tables-and-lists": {
       "owner": "apps/web/components/organisms/table/index.ts",
