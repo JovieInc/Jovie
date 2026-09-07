@@ -193,7 +193,7 @@ jobs:
             echo 'admission_allowed=true' >>"$GITHUB_OUTPUT"
             echo "Exact current main $MAIN_SHA has a trusted production marker; new native admissions may continue"
           else
-            echo "::notice::Production release checkpoint is $checkpoint_state ($checkpoint_reason) for current main $MAIN_SHA; existing queue entries continue, but new admissions remain paused"
+            echo "::notice::Production release checkpoint is $checkpoint_state ($checkpoint_reason) for current main $MAIN_SHA; existing queue entries continue. New admissions stay paused unless fleet is hold-intake (prod-unbound-is-deploy-hold-v1) or controller-repair-only"
           fi
       - name: Resolve exact admission scope
         id: admission
@@ -358,7 +358,8 @@ jobs:
           esac
 
           if [[ "${PRODUCTION_ADMISSION_ALLOWED:-false}" != 'true' \
-            && "${FLEET_PROMOTION_MODE:-blocked}" != 'controller-repair-only' ]]; then
+            && "${FLEET_PROMOTION_MODE:-blocked}" != 'controller-repair-only' \
+            && "${FLEET_PROMOTION_MODE:-blocked}" != 'hold-intake' ]]; then
             # This is a machine-owned release checkpoint, never a human hold.
             # Existing merge-queue entries continue under GitHub's native
             # ordering. New admissions reopen automatically after the exact
@@ -370,6 +371,13 @@ jobs:
             recover_holds=0
             deferred_release=0
             reconcile_queue_reentry=0
+          elif [[ "${PRODUCTION_ADMISSION_ALLOWED:-false}" != 'true' \
+            && "${FLEET_PROMOTION_MODE:-blocked}" == 'hold-intake' ]]; then
+            # prod-unbound-is-deploy-hold-v1: missing/unbound production is a
+            # deploy hold, not a CLEAN enroll or lease freeze. Drain already
+            # treats hold-intake as a waiting lane that continues CLEAN
+            # admission. Receipts use checkpoint=deploy-hold.
+            echo 'Production unbound is a deploy hold; CLEAN enroll and leases continue'
           elif [[ "${PRODUCTION_ADMISSION_ALLOWED:-false}" != 'true' ]]; then
             # The fleet gate already constrains controller-repair-only to one
             # exact PR/head/current-main Jovie Bot attestation, independently

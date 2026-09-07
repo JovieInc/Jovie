@@ -41,7 +41,8 @@
 #                         or blocked
 #   DRAIN_PRODUCTION_CHECKPOINT_STATE  verified when the exact current-main
 #     production checkpoint authorized admission; controller-repair-only uses
-#     its existing exact attestation instead
+#     its existing exact attestation instead; hold-intake records deploy-hold
+#     (prod-unbound-is-deploy-hold-v1) so CLEAN enroll is not frozen
 #   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
@@ -784,7 +785,7 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
     | sort_by(.updated_at)
     | last
     | . as $receipt
-    | ($receipt.description | capture("^checkpoint=(?<checkpoint>verified|controller-repair);main=(?<main>[0-9a-f]{40});pr=(?<pr>[1-9][0-9]*)$")) as $binding
+    | ($receipt.description | capture("^checkpoint=(?<checkpoint>verified|controller-repair|deploy-hold);main=(?<main>[0-9a-f]{40});pr=(?<pr>[1-9][0-9]*)$")) as $binding
     | select(
         $receipt != null
         and $receipt.state == "success"
@@ -828,6 +829,8 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
   fi
   if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
     checkpoint="controller-repair"
+  elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
+    checkpoint="deploy-hold"
   elif [[ "${DRAIN_PRODUCTION_CHECKPOINT_STATE:-}" == "verified" ]]; then
     checkpoint="verified"
   else
