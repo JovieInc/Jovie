@@ -112,7 +112,7 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
         self.assertEqual(payload["hosts"]["gem"], "Ubuntu Symphony")
         self.assertEqual(
             payload["hosts"]["pro"],
-            "Tim's MacBook Pro (mac.lan / M5 32GB — Ops/Grok Bot local tools)",
+            "Tim's MacBook Pro (mac.lan / M5 32GB — where Ops/Grok Bot local tools run)",
         )
         self.assertEqual(payload["hosts"]["air"], "MacBook Air powered off on desk")
         self.assertEqual(payload["hosts"]["pc"], "dead")

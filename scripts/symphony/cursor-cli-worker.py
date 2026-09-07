@@ -3,9 +3,10 @@
 
 Symphony and this Cursor CLI keep-alive run on gem (Ubuntu Symphony).
 Never say "the Mac." Locked inventory: gem=Ubuntu Symphony; Pro=Tim's
-MacBook Pro (mac.lan / M5 32GB — Ops/Grok Bot local tools); Air=MacBook
-Air powered off on desk; PC=dead. Cursor CLI install and auto-update
-target gem only. Pro may hold a logged-in Cursor for reference only.
+MacBook Pro (mac.lan / M5 32GB — where Ops/Grok Bot local tools run);
+Air=MacBook Air powered off on desk; PC=dead. Cursor CLI install and
+auto-update target gem only. Pro may hold a logged-in Cursor for
+reference only.
 
 This worker never selects a Symphony route, never leases an issue, and never
 claims useful-turn capacity. Official Codex app-server on :4041 stays
@@ -52,7 +53,7 @@ PRO_ROLE = "ops_grok_bot"
 PRO_CURSOR_ROLE = "reference_only"
 HOSTS = {
     "gem": "Ubuntu Symphony",
-    "pro": "Tim's MacBook Pro (mac.lan / M5 32GB — Ops/Grok Bot local tools)",
+    "pro": "Tim's MacBook Pro (mac.lan / M5 32GB — where Ops/Grok Bot local tools run)",
     "air": "MacBook Air powered off on desk",
     "pc": "dead",
 }

@@ -3,7 +3,7 @@
 # Symphony Cursor CLI worker units and known-good GEM_CURSOR_EXECUTABLE path.
 #
 # Target host is gem (Ubuntu Symphony). Never say "the Mac."
-# Pro=Tim's MacBook Pro (mac.lan / M5 32GB — Ops/Grok Bot local tools);
+# Pro=Tim's MacBook Pro (mac.lan / M5 32GB — where Ops/Grok Bot local tools run);
 # Air=MacBook Air powered off on desk; PC=dead.
 # Cursor CLI install+auto-update targets gem only.
 #
