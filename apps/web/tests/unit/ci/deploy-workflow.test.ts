@@ -4069,6 +4069,21 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 });
 
 describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
+  it('uses the root packageManager as the single pnpm version source', () => {
+    const cleanupWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
+      'utf8'
+    );
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+    ) as { packageManager?: string };
+    const setupPnpmStep = getStepBlock(cleanupWorkflow, 'Setup pnpm');
+
+    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
+    expect(setupPnpmStep).toContain('uses: pnpm/action-setup@');
+    expect(setupPnpmStep).not.toMatch(/^\s+version:/m);
+  });
+
   it('deletes prefixed CI branches when a PR closes', () => {
     const cleanupWorkflow = readFileSync(
       resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
