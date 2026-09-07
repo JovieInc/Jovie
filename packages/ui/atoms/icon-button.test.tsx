@@ -75,7 +75,11 @@ describe('IconButton', () => {
 
   it('keeps compact circular chrome overflow-visible for the hit container', () => {
     render(
-      <IconButton ariaLabel='Compact surface action' size='md' variant='surface'>
+      <IconButton
+        ariaLabel='Compact surface action'
+        size='md'
+        variant='surface'
+      >
         <svg aria-hidden='true' />
       </IconButton>
     );
