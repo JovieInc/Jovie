@@ -18,6 +18,26 @@ from decimal import Decimal, InvalidOperation
 SCHEMA = "symphony-hyperagent-lifecycle/v1"
 MAX_OBSERVATION_AGE_SECONDS = 300
 MAX_LIVE_FACT_AGE_SECONDS = 900
+NAMED_AGENTS = {
+    "architecture": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "root-cause": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "review": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "design": {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+    "code": {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
+    "tests": {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
+    "mechanical": {"agent_name": "Flash", "model_id": "Flash"},
+}
+SILENT_ALTERNATIVE_MARKERS = frozenset({
+    "opus",
+    "newest",
+    "auto",
+    "codex",
+    "composer",
+    "claude",
+    "live-cheapest-capable",
+    "cheapest",
+    "sonnet",
+})
 TERMINAL_STATES = frozenset(
     {"useful_success", "terminal_failed", "declined", "cancelled"}
 )
@@ -127,6 +147,18 @@ def _interaction_matches_dispatch(interaction, observed_job, expected_job):
     )
 
 
+def select_named_agent(task_class):
+    """Return the fail-closed named Hyperagent identity for one task class."""
+    if not isinstance(task_class, str) or task_class not in NAMED_AGENTS:
+        raise LifecycleError("unknown_task_class")
+    return dict(NAMED_AGENTS[task_class])
+
+
+def _silent_alternative(value):
+    text = str(value or "").strip().lower()
+    return any(marker in text for marker in SILENT_ALTERNATIVE_MARKERS)
+
+
 def validate_dispatch(envelope, now=None):
     """Validate live routing/account/cost evidence before an MCP create call."""
     now = now or datetime.now(timezone.utc)
@@ -140,6 +172,7 @@ def validate_dispatch(envelope, now=None):
         "agent_id",
         "agent_name",
         "model_id",
+        "task_class",
         "runtime",
         "paying_org",
         "expected_paying_org",
@@ -155,6 +188,18 @@ def validate_dispatch(envelope, now=None):
     for field in required_text:
         if not isinstance(envelope.get(field), str) or not envelope[field]:
             reasons.append(("unknown_live_fact", field))
+    task_class = envelope.get("task_class")
+    if isinstance(task_class, str) and task_class:
+        if task_class not in NAMED_AGENTS:
+            reasons.append(("unknown_task_class", "task_class"))
+        else:
+            expected = NAMED_AGENTS[task_class]
+            if envelope.get("agent_name") != expected["agent_name"]:
+                reasons.append(("named_agent_mismatch", "agent_name"))
+            if envelope.get("model_id") != expected["model_id"]:
+                reasons.append(("named_model_mismatch", "model_id"))
+    if _silent_alternative(envelope.get("model_id")) or _silent_alternative(envelope.get("agent_name")):
+        reasons.append(("silent_model_alternative", "model_id"))
     if envelope.get("provider") != "hyperagent":
         reasons.append(("route_mismatch", "provider"))
     if envelope.get("route_selected") is not True:

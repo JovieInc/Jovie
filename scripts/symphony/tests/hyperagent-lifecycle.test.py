@@ -27,9 +27,10 @@ class HyperagentLifecycleTests(unittest.TestCase):
             "expected_account_alias": "workspace-a",
             "workspace_id": "workspace-id-a",
             "agent_id": "agent-a",
-            "agent_name": "Developer",
+            "agent_name": "GLM 5.3",
             "agent_mode": "auto",
-            "model_id": "live-cheapest-capable",
+            "task_class": "code",
+            "model_id": "GLM 5.3",
             "model_price_usd": 0.5,
             "runtime": "hyperagent-sandbox",
             "runtime_compatible": True,
@@ -101,7 +102,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
         self.assertEqual(lifecycle.validate_dispatch(self.envelope, self.now), {"decision": "PROCEED", "reasons": []})
         for field in (
             "account_alias", "expected_account_alias", "workspace_id", "agent_id",
-            "agent_name", "model_id", "runtime", "paying_org", "expected_paying_org",
+            "agent_name", "model_id", "task_class", "runtime", "paying_org", "expected_paying_org",
             "credits_expire_at",
             "idempotency_key", "useful_outcome",
             "destination", "expected_destination", "balance_checked_at",
@@ -136,6 +137,57 @@ class HyperagentLifecycleTests(unittest.TestCase):
             )
             for model in hyperagent:
                 self.assertGreater(chain.index(model["id"]), last_subscription)
+
+    def test_named_agent_is_selected_by_task_class(self):
+        self.assertEqual(
+            lifecycle.select_named_agent("architecture"),
+            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+        )
+        self.assertEqual(
+            lifecycle.select_named_agent("mechanical"),
+            {"agent_name": "Flash", "model_id": "Flash"},
+        )
+        self.assertEqual(
+            lifecycle.select_named_agent("code"),
+            {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
+        )
+        self.assertEqual(
+            lifecycle.select_named_agent("tests"),
+            {"agent_name": "GLM 5.3", "model_id": "GLM 5.3"},
+        )
+        self.assertEqual(
+            lifecycle.select_named_agent("review"),
+            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+        )
+        self.assertEqual(
+            lifecycle.select_named_agent("design"),
+            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+        )
+        self.assertEqual(
+            lifecycle.select_named_agent("root-cause"),
+            {"agent_name": "Fable 5.1", "model_id": "Fable 5.1"},
+        )
+        with self.assertRaises(lifecycle.LifecycleError):
+            lifecycle.select_named_agent("newest")
+        with self.assertRaises(lifecycle.LifecycleError):
+            lifecycle.select_named_agent(None)
+
+    def test_preflight_fails_closed_on_named_model_mismatch_and_silent_alternatives(self):
+        mismatched = {**self.envelope, "agent_name": "Fable 5.1", "model_id": "Fable 5.1"}
+        decision = lifecycle.validate_dispatch(mismatched, self.now)
+        self.assertEqual(decision["decision"], "HOLD")
+        self.assertIn("named_agent_mismatch", [item["code"] for item in decision["reasons"]])
+        self.assertIn("named_model_mismatch", [item["code"] for item in decision["reasons"]])
+        for field, value, code in (
+            ("model_id", "opus", "silent_model_alternative"),
+            ("model_id", "newest", "silent_model_alternative"),
+            ("model_id", "codex", "silent_model_alternative"),
+            ("model_id", "live-cheapest-capable", "silent_model_alternative"),
+            ("task_class", "newest", "unknown_task_class"),
+        ):
+            changed = {**self.envelope, field: value}
+            result = lifecycle.validate_dispatch(changed, self.now)
+            self.assertIn(code, [item["code"] for item in result["reasons"]])
 
     def test_preflight_fails_closed_on_identity_auth_scope_mode_and_hash(self):
         mutations = (
@@ -441,7 +493,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
             terminal_state="completed",
             account_alias="workspace-a",
             destination="local-artifact",
-            model_id="live-cheapest-capable",
+            model_id="GLM 5.3",
             useful_outcome_verified=True,
             final_output_sha256="d" * 64,
             usage_receipt_sha256="e" * 64,
@@ -580,7 +632,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 "terminal_state": "completed",
                 "account_alias": "workspace-a",
                 "destination": "local-artifact",
-                "model_id": "live-cheapest-capable",
+                "model_id": "GLM 5.3",
                 "useful_outcome_verified": True,
                 "final_output_sha256": "d" * 64,
                 "usage_receipt_sha256": "e" * 64,
