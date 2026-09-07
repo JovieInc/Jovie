@@ -799,10 +799,10 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url]
   null_creator_receipt_has_provenance "$head" "$latest"
 }
 
-record_queue_reentry_receipt() {  # <pr> <expected-head>
-  local n="$1" expected_head="$2" current live_head target_url checkpoint description
-  if [[ ! "$n" =~ ^[1-9][0-9]*$ || ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "    !! cannot record queue re-entry receipt for #$n without an exact head" >&2
+record_queue_reentry_receipt() {  # <pr> <expected-head> <base-sha>
+  local n="$1" expected_head="$2" base_sha="$3" current live_head target_url checkpoint description
+  if [[ ! "$n" =~ ^[1-9][0-9]*$ || ! "$expected_head" =~ ^[0-9a-f]{40}$ || ! "$base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! cannot record queue re-entry receipt for #$n without an exact head and merge-group base" >&2
     return 1
   fi
   if [[ "$DRY_RUN" == "1" ]]; then
@@ -821,11 +821,7 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
     echo "    !! refusing admission receipt for #$n without a verified production checkpoint" >&2
     return 1
   fi
-  if [[ ! "${FLEET_POLICY_MAIN_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "    !! refusing admission receipt for #$n without an exact checkpoint main SHA" >&2
-    return 1
-  fi
-  description="checkpoint=$checkpoint;main=$FLEET_POLICY_MAIN_SHA;pr=$n"
+  description="checkpoint=$checkpoint;main=$base_sha;pr=$n"
   # One run may observe the same immutable head more than once. Reuse only its
   # own receipt; a later re-admission run must emit fresh evidence after the
   # latest AddedToMergeQueueEvent.
@@ -1482,10 +1478,20 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     # Retain a typed exact-head record before treating the native queue
     # mutation as complete. A later merge_group workflow_run has a composite
     # head, not a PR head; this receipt is the only bounded bridge that can
-    # recover a member GitHub ejects after main advances. If it cannot be
-    # written, compensate the just-proven queue membership rather than leave
-    # a PR that future event loss cannot safely recover.
-    if ! record_queue_reentry_receipt "$n" "$expected_head"; then
+    # recover a member GitHub ejects after main advances. It must be bound to
+    # the merge-group base (not the live main SHA) so the synthetic-head
+    # admission check can verify it. If it cannot be written, compensate the
+    # just-proven queue membership rather than leave a PR that future event
+    # loss cannot safely recover.
+    base_sha="$(jq -r '.state.mergeQueueEntry.baseCommit.oid // ""' <<<"$enrollment_receipt")"
+    if [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ ]]; then
+      echo "    !! native enrollment lacks a merge-group baseCommit to bind the re-entry receipt" >&2
+      if ! dequeue_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate native enrollment without a bindable base for #$n" >&2
+      fi
+      return 1
+    fi
+    if ! record_queue_reentry_receipt "$n" "$expected_head" "$base_sha"; then
       echo "    !! native enrollment lacks durable exact-head re-entry receipt; compensating" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate native enrollment without re-entry receipt for #$n" >&2

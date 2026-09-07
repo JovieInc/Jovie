@@ -41,9 +41,15 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const RULESET_ID = 10512119;
 const HEAD = 'a'.repeat(40);
 const OTHER_HEAD = 'b'.repeat(40);
+const BASE_COMMIT = 'c'.repeat(40);
 const PR_ID = 'PR_kwDO_native_pr';
 const ENTRY_ID = 'MQE_kwDO_native_entry';
-const QUEUE_ENTRY = { id: ENTRY_ID, state: 'QUEUED', position: 1 };
+const QUEUE_ENTRY = {
+  id: ENTRY_ID,
+  state: 'QUEUED',
+  position: 1,
+  baseCommit: { oid: BASE_COMMIT },
+};
 const AUTO_MERGE = { enabledAt: '2026-07-15T00:00:00Z' };
 const VALID_REPOSITORY = Object.freeze(
   JSON.parse(
@@ -2110,6 +2116,9 @@ describe('native enrollment', () => {
       backend: 'native',
       changed: true,
       mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
+      state: {
+        mergeQueueEntry: { baseCommit: { oid: BASE_COMMIT } },
+      },
     });
     const mutationCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('enablePullRequestAutoMerge')
