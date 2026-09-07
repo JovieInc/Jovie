@@ -314,6 +314,7 @@ def _write_null_creator_receipt_drain(
         "jobs": tmp_path / "jobs-scans",
         "timeline": tmp_path / "timeline-calls",
     }
+    main_sha = "a" * 40
     for path in logs.values():
         path.write_text("", encoding="utf-8")
     status_file = tmp_path / "combined-status.json"
@@ -362,10 +363,25 @@ def _write_null_creator_receipt_drain(
             f'"isInMergeQueue":false,"mergeQueueEntry":null}}}}'
         )
     if allow_enroll:
+        enroll_json = json.dumps(
+            {
+                "state": {
+                    "state": "OPEN",
+                    "isDraft": False,
+                    "headRefOid": head,
+                    "mergeQueueEntry": {
+                        "id": f"MQE_{pr}",
+                        "state": "AWAITING_CHECKS",
+                        "position": 1,
+                        "baseCommit": {"oid": main_sha},
+                    },
+                },
+            },
+            separators=(",", ":"),
+        )
         enroll_case = (
             f'enroll) printf \'%s\\n\' "${{3:-}}" >>\'{logs["enroll"]}\'; '
-            f'echo \'{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}",'
-            f'"mergeQueueEntry":{{"id":"MQE_{pr}","state":"AWAITING_CHECKS","position":1}}}}}}\' ;;'
+            f'echo \'{enroll_json}\' ;;'
         )
     else:
         enroll_case = (
@@ -1847,7 +1863,7 @@ class TestDrainPrQueueWiring:
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
                   list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
-                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1,"baseCommit":{{"oid":"{'a' * 40}"}}}}}}}}' ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -1973,7 +1989,7 @@ class TestDrainPrQueueWiring:
                       exit 1
                     fi
                     if [[ "${{FAKE_ENROLL_MODE:?}}" == "valid" ]]; then
-                      echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":3}}}}}}'
+                      echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":3,"baseCommit":{{"oid":"{'a' * 40}"}}}}}}}}'
                       exit 0
                     fi
                     echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":null}}}}'
@@ -2090,7 +2106,7 @@ class TestDrainPrQueueWiring:
                   enroll)
                     echo "${{3:?}}" >>"{enrolled}"
                     head_var="${{4:?}}"
-                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1,\\"baseCommit\\":{{\\"oid\\":\\"{'a' * 40}\\"}}}}}}}}"
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
@@ -2242,7 +2258,7 @@ JSON
                       exit 91
                     fi
                     echo "$number" >>"{enrolled}"
-                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_$number\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_$number\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1,\\"baseCommit\\":{{\\"oid\\":\\"{'a' * 40}\\"}}}}}}}}"
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
