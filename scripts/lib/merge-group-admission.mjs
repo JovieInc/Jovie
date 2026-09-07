@@ -283,14 +283,12 @@ export function classifyCanonicalAdmissionProvenance({
   if (!ADMISSION_PRODUCER_EVENTS.has(producerEvent)) {
     fail('canonical admission producer is not bound to its admission scope');
   }
-  if (producerEvent === 'pull_request') {
-    const producerHeadIsBound = runPayload.pull_requests?.some(
-      pullRequest => pullRequest?.head?.sha === runPayload.head_sha
-    );
-    if (!producerHeadIsBound) {
-      fail('canonical admission producer is not bound to its admission scope');
-    }
-  } else if (runPayload.head_sha !== mainSha) {
+  if (
+    !SHA_PATTERN.test(String(runPayload.head_sha ?? '')) ||
+    typeof runPayload.head_branch !== 'string' ||
+    runPayload.head_branch.length === 0 ||
+    (producerEvent !== 'pull_request' && runPayload.head_branch !== 'main')
+  ) {
     fail('canonical admission producer is not bound to its admission scope');
   }
   if (

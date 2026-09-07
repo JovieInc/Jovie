@@ -135,13 +135,13 @@ function admissionRun(overrides = {}) {
     conclusion: 'success',
     created_at: '2026-09-06T20:29:00Z',
     event: 'workflow_run',
+    head_branch: 'main',
     head_repository: { full_name: 'JovieInc/Jovie' },
     head_sha: BASE,
     html_url: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
     id: 123456789,
     name: 'Merge Queue Auto-Enroll',
     path: '.github/workflows/merge-queue-autoenroll.yml',
-    pull_requests: [],
     repository: { full_name: 'JovieInc/Jovie' },
     run_attempt: 1,
     status: 'completed',
@@ -441,8 +441,8 @@ describe('merge-group admission evidence', () => {
         lineagePayload: preservedLineage(checkpointMainSha),
         runPayload: admissionRun({
           event: 'pull_request',
+          head_branch: 'feature/admission-trigger',
           head_sha: SOURCE_HEAD,
-          pull_requests: [{ head: { sha: SOURCE_HEAD } }],
         }),
         sourceHeadSha: SOURCE_HEAD,
         statusPayload: {
@@ -877,17 +877,17 @@ describe('merge-group admission evidence', () => {
   it.each([
     ['unsupported producer event', { event: 'schedule' }],
     [
-      'pull-request run head absent from its triggering PR evidence',
+      'pull-request run with a malformed immutable head',
       {
         event: 'pull_request',
-        head_sha: '8'.repeat(40),
-        pull_requests: [{ head: { sha: '7'.repeat(40) } }],
+        head_sha: 'not-a-sha',
       },
     ],
     [
-      'main-scoped run at a different checkpoint',
+      'main-scoped run from a non-main branch',
       {
         event: 'workflow_dispatch',
+        head_branch: 'feature/not-main',
         head_sha: '8'.repeat(40),
       },
     ],
@@ -922,8 +922,8 @@ describe('merge-group admission evidence', () => {
         },
         runPayload: admissionRun({
           event: 'pull_request',
+          head_branch: 'feature/cohort-trigger',
           head_sha: producerHead,
-          pull_requests: [{ head: { sha: producerHead } }],
         }),
         sourceHeadSha: SOURCE_HEAD,
         statusPayload: {
@@ -934,6 +934,30 @@ describe('merge-group admission evidence', () => {
         timelinePayload: admissionTimeline(),
       })
     ).toMatchObject({ state: 'verified' });
+  });
+
+  it('preserves a main-scoped producer when main advances before policy evaluation', () => {
+    expect(
+      classifyCanonicalAdmissionProvenance({
+        evidence: {
+          baseSha: BASE,
+          prNumber: 123,
+          repository: 'JovieInc/Jovie',
+        },
+        runPayload: admissionRun({
+          event: 'workflow_run',
+          head_branch: 'main',
+          head_sha: '8'.repeat(40),
+        }),
+        sourceHeadSha: SOURCE_HEAD,
+        statusPayload: {
+          link: null,
+          sha: SOURCE_HEAD,
+          statuses: [admissionStatus()],
+        },
+        timelinePayload: admissionTimeline(),
+      })
+    ).toMatchObject({ checkpointMainSha: BASE, state: 'verified' });
   });
 
   it('requires the exact live queue ref and head SHA', () => {
