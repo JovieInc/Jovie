@@ -157,6 +157,7 @@ class DeploymentContractTests(unittest.TestCase):
     def test_versioned_service_uses_versioned_cycle_registry_and_model_router(self):
         service = (HERMES / "systemd/gem-pr-drain.service").read_text(encoding="utf-8")
         self.assertIn("%h/gem-workspace/scripts/gem-repo-drain-cycle.py", service)
+        self.assertIn("/usr/bin/flock -n /tmp/gem-pr-drain.lock", service)
         self.assertIn("%h/gem-workspace/config/gem-repo-registry.json", service)
         self.assertIn("%h/gem-workspace/scripts/model-router.py", service)
         self.assertIn(
@@ -204,10 +205,13 @@ class DeploymentContractTests(unittest.TestCase):
 
         with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
             CYCLE.subprocess, "run", side_effect=run_drain
-        ), mock.patch.object(CYCLE, "run_summer_bottleneck_producer", side_effect=summer) as producer:
+        ), mock.patch.object(CYCLE, "run_summer_bottleneck_producer", side_effect=summer) as producer, mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=78
+        ) as consumer:
             self.assertEqual(CYCLE.main(), 0)
 
         producer.assert_called_once_with()
+        consumer.assert_called_once_with()
         self.assertEqual(drains, [repo.github for repo in repos])
 
     def test_activation_requires_exact_rehabilitation_attestation(self):
@@ -249,7 +253,7 @@ class DeploymentContractTests(unittest.TestCase):
                     "HOME": directory,
                     "GEM_WORKSPACE": str(pathlib.Path(directory) / "gem"),
                     "GEM_REHABILITATION_VERIFY_ONLY": "true",
-                    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                    "PATH": f"{pathlib.Path(shutil.which('node')).parent}:/usr/bin:/bin:/usr/sbin:/sbin",
                 },
                 text=True,
                 capture_output=True,
@@ -355,7 +359,7 @@ exit 0
             env={
                 "HOME": str(home),
                 "GEM_WORKSPACE": str(gem),
-                "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
+                "PATH": f"{fake_bin}:{pathlib.Path(shutil.which('node')).parent}:/usr/bin:/bin:/usr/sbin:/sbin",
                 "FAKE_SYSTEMCTL_LOG": str(log),
                 "FAKE_TIMER_ENABLED": str(enabled),
                 "FAKE_TIMER_ACTIVE": str(active),
@@ -400,6 +404,11 @@ exit 0
                 pathlib.Path(directory) / "gem/scripts/symphony_proof_context.py"
             )
             self.assertTrue(installed_context.is_file())
+            installed_consumer = (
+                pathlib.Path(directory)
+                / "gem/scripts/summer-symphony-outbox-consumer.mjs"
+            )
+            self.assertTrue(installed_consumer.is_file())
             import_check = subprocess.run(
                 [sys.executable, str(installed_gate), "--help"],
                 cwd=installed_gate.parent,
@@ -420,6 +429,7 @@ exit 0
 
         self.assertEqual(import_check.returncode, 0, import_check.stderr)
         self.assertTrue(receipt["artifacts"]["proofContext"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerSymphonyConsumer"]["matches"])
 
     def test_failed_install_restores_every_prior_timer_state(self):
         for prior_enabled in (False, True):
