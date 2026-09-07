@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildGBrainHealthSummary,
   collectGBrainHealthSummary,
-  type GBrainExec,
 } from '../../jobs/gbrain-health-summary';
 
 const RUNBOOK_PATH = resolve(
@@ -107,7 +106,7 @@ describe('gbrain server recovery runbook', () => {
 
   it('proves a failing required check degrades the summary and authorizes recovery', () => {
     const now = new Date('2026-09-06T18:00:00.000Z');
-    const exec: GBrainExec = (_file, args) => {
+    const exec = (_file: string, args: readonly string[]) => {
       const command = args.join(' ');
       if (command.includes('/health')) return '{"status":"ok"}';
       if (command.includes('doctor')) return '{"status":"ok"}';
@@ -125,7 +124,7 @@ describe('gbrain server recovery runbook', () => {
 
   it('proves all required checks failing marks the summary down', () => {
     const now = new Date('2026-09-06T18:00:00.000Z');
-    const exec: GBrainExec = () => {
+    const exec = () => {
       throw new Error('gbrain unavailable');
     };
     const summary = collectGBrainHealthSummary({ exec, now });
