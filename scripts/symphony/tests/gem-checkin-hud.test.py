@@ -167,9 +167,29 @@ class ExecutionTruthTests(unittest.TestCase):
         text = strip("\n".join(HUD.execution_summary(state, 430, now=NOW)))
         self.assertIn("service active", text)
         self.assertIn("API STALE / UNAVAILABLE", text)
-        self.assertIn("usable capacity UNKNOWN", text)
-        self.assertIn("Linear rate limit gate until", text)
-        self.assertIn("remediation UNKNOWN (not exposed by :4041)", text)
+        self.assertIn("RUNNING: UNKNOWN · live count unavailable", text)
+        self.assertIn("configured ceiling/model are not running proof", text)
+
+    def test_execution_summary_makes_idle_running_and_failures_obvious(self):
+        idle = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [], "running": 0, "blocked": 0, "retrying": 0, "service_state": "active", "generated_at": NOW.isoformat()}, 430, now=NOW)))
+        self.assertIn("RUNNING: 0 · Nothing running", idle)
+        self.assertIn("ACTIVE RUNS: Nothing running", idle)
+        self.assertIn("BLOCKED: 0 · None", idle)
+        self.assertIn("RETRYING: 0 · None", idle)
+
+        rows = [
+            {"kind": "running", "id": "JOV-1", "session_id": "s1", "tokens_total": 12, "last_event_at": NOW.isoformat(), "executed_provider": "openai", "executed_model": "gpt-test"},
+            {"kind": "blocked", "id": "JOV-2", "error": "launch failed", "started": STARTED},
+            {"kind": "retrying", "id": "JOV-3", "last_message": "transient provider error", "started": STARTED},
+        ]
+        busy = strip("\n".join(HUD.execution_summary({"ok": True, "rows": rows, "running": 1, "blocked": 1, "retrying": 1, "service_state": "active", "generated_at": NOW.isoformat()}, 430, now=NOW)))
+        self.assertIn("RUNNING: 1 · active work reported", busy)
+        self.assertIn("ACTIVE RUNS:", busy)
+        self.assertIn("JOV-1 · SESSION / RECENT EVENT · openai/gpt-test", busy)
+        self.assertIn("BLOCKED: 1", busy)
+        self.assertIn("JOV-2 · 3 minutes ago · launch failed", busy)
+        self.assertIn("RETRYING: 1", busy)
+        self.assertIn("JOV-3 · 3 minutes ago · transient provider error", busy)
 
     def test_notification_event_does_not_replace_useful_last_message(self):
         row = {
@@ -185,9 +205,10 @@ class ExecutionTruthTests(unittest.TestCase):
     def test_next_action_tracks_actual_failure_state(self):
         active = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [{"kind": "running", "session_id": "s", "tokens_total": 1, "last_event_at": NOW.isoformat()}], "running": 1, "retrying": 0, "blocked": 0}, 430, now=NOW)))
         retry = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [], "running": 0, "retrying": 1, "blocked": 0}, 430, now=NOW)))
-        self.assertIn("NEXT  Active sessions are reporting recent progress", active)
-        self.assertNotIn("Inspect blocked/retrying", active)
-        self.assertIn("NEXT  Inspect blocked/retrying attempts", retry)
+        self.assertIn("RUNNING: 1 · active work reported", active)
+        self.assertIn("RETRYING: 0 · None", active)
+        self.assertIn("RUNNING: 0 · Nothing running", retry)
+        self.assertIn("RETRYING: 1", retry)
 
     def test_compact_shows_stable_stage_table_without_execution_cards(self):
         row = {"kind": "running", "id": "JOV-1", "title": "Visible work", "session_id": "session-1", "tokens_total": 10, "last_event_at": NOW.isoformat(), "executed_model": "gpt-5.6-sol"}
@@ -335,8 +356,9 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("OpenAI", plain)
         running_line = next(line for line in plain.splitlines() if line.startswith("●") and "JOV-5491" in line)
         self.assertIn("turn completed", running_line)
-        self.assertLess(plain.index("JOV-5488"), plain.index("JOV-5491"))
-        self.assertLess(plain.index("JOV-5491"), plain.index("#16796"))
+        current_work = plain.split("CURRENT WORK", 1)[1]
+        self.assertLess(current_work.index("JOV-5488"), current_work.index("JOV-5491"))
+        self.assertLess(current_work.index("JOV-5491"), current_work.index("#16796"))
         self.assertNotIn("GEM OPERATIONS", plain)
         self.assertNotIn("$0", plain)
 
@@ -492,7 +514,8 @@ class UltrawideHudTests(unittest.TestCase):
         state, _ = fetch_state(official_state())
         plain = strip(paint(state, width=200, height=40))
         header = next(line for line in plain.splitlines() if "TRY/TURN" in line)
-        row = next(line for line in plain.splitlines() if "JOV-5491" in line)
+        current_work = plain.split("CURRENT WORK", 1)[1]
+        row = next(line for line in current_work.splitlines() if "JOV-5491" in line)
         self.assertEqual(header.index("TOKENS") + len("TOKENS"), row.index("12.3K") + len("12.3K"))
         self.assertEqual(header.index("ELAPSED") + len("ELAPSED"), row.index("3m") + len("3m"))
         self.assertNotIn("OpenAI", plain)
@@ -625,7 +648,8 @@ class UltrawideHudTests(unittest.TestCase):
             "up": True,
         }
         plain = strip(paint(symphony=symphony, width=430, height=90))
-        row = next(line for line in plain.splitlines() if "JOV-44" in line)
+        current_work = plain.split("CURRENT WORK", 1)[1]
+        row = next(line for line in current_work.splitlines() if "JOV-44" in line)
         self.assertIn("BLOCKED", row)
         self.assertIn("gpt-5.6-sol/codex/seat-b", row)
         self.assertIn("quota exhausted", row)
@@ -1064,7 +1088,8 @@ class UltrawideHudTests(unittest.TestCase):
         order = ["OPERATOR HEALTH", "AGENTS", "PRIMARY CAPACITY / PRESSURE", "CURRENT WORK", "SHIP", "PR FLOW", "CI MATRIX", "BUSINESS SIGNALS"]
         for before, after in zip(order, order[1:]):
             self.assertLess(plain.index(before), plain.index(after))
-        self.assertLess(plain.index("JOV-1"), plain.index("JOV-2"))
+        current_work = plain.split("CURRENT WORK", 1)[1]
+        self.assertLess(current_work.index("JOV-1"), current_work.index("JOV-2"))
 
     def test_only_operator_action_metrics_receive_hero_blocks(self):
         output = strip(

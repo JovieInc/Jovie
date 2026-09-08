@@ -2712,26 +2712,53 @@ def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[s
 
 def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime) -> list[str]:
     fresh = symphony.get("ok") and not symphony.get("stale")
-    recent = sum(execution_state(row, now=now) == "SESSION / RECENT EVENT" for row in symphony.get("rows", [])) if fresh else UNKNOWN
     source = "FRESH" if fresh else "STALE / UNAVAILABLE"
-    counts = "  ".join(f"{key} {symphony.get(key) if fresh and symphony.get(key) is not None else UNKNOWN}" for key in ("running", "queued", "retrying", "blocked"))
-    blocked = _int(symphony.get("blocked"))
-    retrying = _int(symphony.get("retrying"))
-    action = "Active sessions are reporting recent progress"
-    if not fresh:
-        action = "Restore official API through runtime owner; cached attempts are not running proof"
-    elif (blocked or 0) > 0 or (retrying or 0) > 0:
-        action = "Inspect blocked/retrying attempts; worker recovery owner controls intake"
-    elif not recent:
-        action = "No recent session events evidenced; inspect launcher/capacity with runtime owner"
-    if symphony.get("linear_gate_until"):
-        action = f"Linear rate limit gate until {symphony['linear_gate_until']} · runtime owner controls recovery"
+    rows = symphony.get("rows") if isinstance(symphony.get("rows"), list) else []
+    running_rows = [row for row in rows if row.get("kind") == "running"]
+
+    def summary_rows(kind: str) -> list[str]:
+        selected = [row for row in rows if row.get("kind") == kind]
+        values = []
+        for row in selected[:4]:
+            reason = row.get("error") or row.get("last_message") or row.get("last_event") or row.get("title") or UNKNOWN
+            stamp = row.get("last_event_at") or row.get("started")
+            age = natural_time(stamp, now=now) if _iso(stamp) else elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
+            values.append(f"  {row.get('id') or UNKNOWN} · {age} · {reason}")
+        hidden = len(selected) - len(values)
+        if hidden:
+            values.append(f"  +{hidden} more")
+        return values
+
+    running = symphony.get("running") if fresh and isinstance(symphony.get("running"), int) else UNKNOWN
+    if running == 0:
+        running_state = "Nothing running"
+    elif running == UNKNOWN:
+        running_state = "live count unavailable"
+    else:
+        running_state = "active work reported"
+    active = []
+    if fresh:
+        for row in running_rows[:4]:
+            route = "/".join(value for value in (row.get("executed_provider"), row.get("executed_model")) if value) or "route UNKNOWN"
+            active.append(f"  {row.get('id') or UNKNOWN} · {execution_state(row, now=now)} · {route} · event {natural_time(row.get('last_event_at'), now=now)}")
+    active_header = (
+        "ACTIVE RUNS: UNKNOWN · live source unavailable"
+        if not fresh
+        else "ACTIVE RUNS: Nothing running" if running == 0
+        else "ACTIVE RUNS: identity/model/account/effort/initiator UNKNOWN · :4041 supplied count only" if not active
+        else "ACTIVE RUNS:"
+    )
+    blocked = symphony.get("blocked") if fresh and isinstance(symphony.get("blocked"), int) else UNKNOWN
+    retrying = symphony.get("retrying") if fresh and isinstance(symphony.get("retrying"), int) else UNKNOWN
     lines = [
-        f"EXECUTION TRUTH  |  API {source}  |  service {symphony.get('service_state', UNKNOWN)}  |  remediation UNKNOWN (not exposed by :4041)",
-        f"Sessions with recent events {recent} jobs  |  reserved {counts}  |  configured ceiling {symphony.get('cap') if symphony.get('cap') is not None else UNKNOWN} slots  |  usable capacity UNKNOWN",
-        f"NEXT  {action}",
-        f"Source: :4041/api/v1/state · jobs/tokens · snapshot {natural_time(symphony.get('generated_at'), now=now)} · activity window 120s · shipped work requires separate receipts",
-        f"Configuration only: model {symphony.get('configured_model', UNKNOWN)} · WORKFLOW.md (not execution proof) | service/gate: systemd + linear-rate-limit.json · observed {natural_time(symphony.get('runtime_observed_at'), now=now)}",
+        f"RUNNING: {running} · {running_state}  |  service {symphony.get('service_state', UNKNOWN)}  |  API {source}  |  snapshot {natural_time(symphony.get('generated_at'), now=now)}",
+        active_header,
+        *active,
+        f"BLOCKED: {blocked}" + (" · UNKNOWN · live source unavailable" if not fresh else " · None" if blocked == 0 else " · identity/reason/age UNKNOWN" if not summary_rows("blocked") else ""),
+        *summary_rows("blocked"),
+        f"RETRYING: {retrying}" + (" · UNKNOWN · live source unavailable" if not fresh else " · None" if retrying == 0 else " · identity/reason/age UNKNOWN" if not summary_rows("retrying") else ""),
+        *summary_rows("retrying"),
+        "Source: :4041 live activity · executed model UNKNOWN without a run receipt · configured ceiling/model are not running proof · useful completion/merge/deploy require separate fresh receipts",
     ]
     return [_rgb(ORANGE if not fresh else FG, clip(line, width), bold=index == 0) for index, line in enumerate(lines)]
 
@@ -2932,7 +2959,11 @@ def render(
     truth = execution_summary(symphony, cols, now=clock)
     if cols >= 300 and rows >= 60 and review is not None and review > 0:
         truth[0] = _rgb(FG, clip(ANSI_RE.sub("", truth[0]).rstrip() + f" | !  REVIEW QUEUE {review}", cols), bold=True)
-    lines[1:1] = [truth[0], truth[2]] if compact else truth
+    if compact:
+        blocked_truth = next(line for line in truth if ANSI_RE.sub("", line).startswith("BLOCKED:"))
+        lines[1:1] = [truth[0], blocked_truth]
+    else:
+        lines[1:1] = truth
     blocks = []
     for row in symphony.get("rows", []):
         blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
