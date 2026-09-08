@@ -33,6 +33,22 @@ function evidence(overrides = {}) {
       'node --test scripts/backlog-orchestrator/__tests__/plan-gate.test.mjs',
     ],
     rollback: 'Revert the plan-gate commit and remove the receipt comment',
+    value: {
+      authority: 'summer-priority',
+      decisionId: 'summer-priority:JOV-900:2026-09-08',
+      rationale: 'Remove an observed delivery-control bottleneck',
+      expectedBenefit: 'Reduce admission-to-production lead time',
+      validation: 'Verify one exact source-to-production receipt chain',
+      sanity: {
+        basis: 'assumption',
+        concurrency: 1,
+        demandPerDay: 2,
+        criticalPath: [{ stage: 'source-to-ci', durationMs: 3_600_000 }],
+        bottleneck: 'exact-head CI',
+        simplification: 'remove duplicate approval labels',
+        owner: 'Summer',
+      },
+    },
     optimization: CONTROL_PLANE_OPTIMIZATION_EXCEPTION,
     ...overrides,
   };
@@ -86,6 +102,9 @@ describe('plan-gate/v1', () => {
     assert.equal(result.status, 'approved');
     assert.equal(result.receipt, receipt);
     assert.match(receipt, /<!-- plan-gate\/v1 -->/);
+    const value = JSON.parse(receipt.split('\n')[1]).evidence.value;
+    assert.equal(value.sanity.expectedLeadTimeMs, 3_600_000);
+    assert.equal(value.sanity.achievablePerDay, 24);
     assert.equal(fake.calls.addComment.length, 1);
     assert.equal(fake.calls.setIssueLabels.length, 1);
     assert.equal(fake.calls.fetchIssue, 3);
@@ -168,6 +187,14 @@ describe('plan-gate/v1', () => {
     assert.equal(result.status, 'rejected');
     assert.match(result.reason, /rollback/);
     assert.equal(fake.calls.addComment.length, 0);
+  });
+
+  it('rejects unsupported rapid-delivery economics', () => {
+    assert.equal(
+      planGate.validatePlanCandidate(issue(),
+        evidence({ value: { ...evidence().value, sanity: undefined } })),
+      'operating-sanity-missing-or-invalid'
+    );
   });
 
   it('rejects a missing optimization contract without mutating Linear', async () => {
