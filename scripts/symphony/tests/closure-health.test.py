@@ -519,7 +519,7 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(by_pr[31]["owner"], "controller")
         self.assertIsNone(by_pr[31]["headSha"])
 
-    def test_native_merge_queue_policy_remains_20_1_5(self):
+    def test_native_merge_queue_policy_scales_builds_with_20_minute_budget(self):
         ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(
             encoding="utf-8"
         )
@@ -528,7 +528,7 @@ class ClosureClassificationTests(unittest.TestCase):
         )
         for source in (ruleset, guard):
             self.assertRegex(source, r"check_response_timeout_minutes:\s*20")
-            self.assertRegex(source, r"max_entries_to_build:\s*1")
+            self.assertRegex(source, r"max_entries_to_build:\s*2")
             self.assertRegex(source, r"max_entries_to_merge:\s*5")
 
     def test_clean_pr_with_stale_base_is_repair_not_promote(self):

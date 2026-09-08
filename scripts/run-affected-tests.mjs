@@ -2286,6 +2286,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '--coverage',
       '--coverage.include=merge-queue-backend.mjs',
       '--coverage.include=lib/merge-group-admission.mjs',
+      '--coverage.include=lib/merge-queue-guard.mjs',
       '--coverage.thresholds.perFile=true',
       '--coverage.thresholds.lines=85',
       '--coverage.thresholds.branches=75',
