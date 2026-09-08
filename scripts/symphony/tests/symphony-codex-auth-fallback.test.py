@@ -4378,9 +4378,11 @@ class FallbackLockGcTests(unittest.TestCase):
                 return_value=(True, "admitted", {"issue_revision": "2026-08-22T00:00:00Z"}),
             ),
             mock.patch.object(
-                self.module,
-                "_provider_measured_capacity",
-                side_effect=lambda provider: 1 if provider == "grok" else 0,
+                self.module, "_provider_capacity_state",
+                return_value=({"schema": "symphony-provider-capacity/v1", "observedAt": "2026-09-08T00:00:00Z",
+                               "providers": {"grok": {"limit": 1, "status": "available"},
+                                             "kimi": {"limit": 0, "status": "available"}},
+                               "events": {}, "incidents": {}}, pathlib.Path("unused")),
             ),
             mock.patch.object(
                 self.module, "_control", side_effect=lambda command: launches.append(command) or True
