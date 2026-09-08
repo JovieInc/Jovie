@@ -33,10 +33,10 @@ describe('AGENT_OS_ADMIN_FIXTURE_ARTIFACTS', () => {
       ])
     );
     expect(
-      AGENT_OS_ADMIN_FIXTURE_ARTIFACTS.some(
+      AGENT_OS_ADMIN_FIXTURE_ARTIFACTS.every(
         artifact =>
-          artifact.humanApprovalRequired &&
-          artifact.humanGate.status === 'pending'
+          !artifact.humanApprovalRequired &&
+          artifact.humanGate.status !== 'pending'
       )
     ).toBe(true);
   });

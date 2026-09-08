@@ -1,10 +1,16 @@
+// biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
-import { withFullGateReceipts, withPreLeaseReceipts } from './pre-lease.mjs';
+import { validatePlanCandidate } from '../plan-gate.mjs';
+import {
+  planEvidenceFor,
+  withFullGateReceipts,
+  withPreLeaseReceipts,
+} from './pre-lease.mjs';
 
 const NOW = new Date().toISOString();
 
@@ -18,6 +24,29 @@ Triple labels block idle hosts.
 
 ## Proposed fix
 Use one revision-scoped admission receipt.
+
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI
+
+## Optimization exception
+- Class: non-product
+- Justification: This control-plane admission receipt ships no user-facing page, link, asset, campaign, recommendation, or content variant.
+
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make actual shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
 
 ## Acceptance criteria
 * Receipts admit work without the three labels.
@@ -95,6 +124,15 @@ describe('revision-scoped admission receipt', () => {
     });
   });
 
+  it('requires a founder request or Summer priority decision with a measurable benefit', () => {
+    const candidate = withPreLeaseReceipts(issue(), { now: NOW });
+    const evidence = planEvidenceFor({ value: undefined });
+    assert.equal(
+      validatePlanCandidate(candidate, evidence),
+      'value-justification-missing-or-invalid'
+    );
+  });
+
   it('treats the three labels as derived audit, not independent blockers', () => {
     const unlabeled = admitted();
     const labeled = admitted({
@@ -141,23 +179,57 @@ describe('revision-scoped admission receipt', () => {
     });
   });
 
-  it('revokes admission when a human-review label appears', () => {
-    const protectedIssue = admitted({
-      labels: { nodes: [{ name: 'human-review-required' }] },
+  it('rejects stale unscoped admission receipts that omit repository target fields', () => {
+    const original = admitted();
+    const body = admissionGate.buildAdmissionGateReceipt(original, {
+      now: NOW,
     });
+    const payload = JSON.parse(body.split('\n')[1]);
+    for (const field of [
+      'target_system',
+      'target_repo',
+      'artifact',
+      'verification_authority',
+    ]) {
+      delete payload[field];
+    }
+    const unscoped = `${admissionGate.ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${admissionGate.ADMISSION_GATE_SUFFIX}`;
+    const candidate = {
+      ...original,
+      comments: { nodes: [{ body: unscoped }] },
+    };
     assert.equal(
-      admissionGate.validateAdmissionCandidate(protectedIssue),
-      'protected-or-human-review'
-    );
-    assert.equal(
-      admissionGate.admissionGateReceipt(protectedIssue, { now: NOW }),
+      admissionGate.admissionGateReceipt(candidate, { now: NOW }),
       null
     );
-    assert.equal(admitter.hasAdmissionEvidence(protectedIssue).eligible, false);
-    assert.deepEqual(deterministicGates.admissionIntentLoad([protectedIssue]), {
-      count: 0,
-      identifiers: [],
-    });
+    assert.equal(admitter.hasAdmissionEvidence(candidate).eligible, false);
+  });
+
+  it('keeps admission live when legacy human or taste labels appear', () => {
+    for (const label of [
+      'human-review-required',
+      'needs-human',
+      'needs:taste',
+      'needs-human-taste',
+      'no-auto',
+    ]) {
+      const labeledIssue = admitted({
+        labels: { nodes: [{ name: label }] },
+      });
+      assert.equal(
+        admissionGate.validateAdmissionCandidate(labeledIssue),
+        null
+      );
+      assert.notEqual(
+        admissionGate.admissionGateReceipt(labeledIssue, { now: NOW }),
+        null
+      );
+      assert.equal(admitter.hasAdmissionEvidence(labeledIssue).eligible, true);
+      assert.deepEqual(deterministicGates.admissionIntentLoad([labeledIssue]), {
+        count: 1,
+        identifiers: [labeledIssue.identifier],
+      });
+    }
   });
 
   it('recovers a missing derived label from an existing receipt', async () => {

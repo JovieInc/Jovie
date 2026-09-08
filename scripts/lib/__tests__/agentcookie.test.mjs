@@ -11,7 +11,7 @@ import {
   isApiKeyAllowed,
   isDomainAllowed,
   readStatus,
-} from '../../hermes/lib/agentcookie.ts';
+} from '../../symphony/lib/agentcookie.ts';
 
 describe('agentcookie security policy', () => {
   // ── blocklist ──────────────────────────────────────────────────────────────

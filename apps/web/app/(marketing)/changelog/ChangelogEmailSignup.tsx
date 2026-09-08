@@ -2,30 +2,16 @@
 
 import { Button } from '@jovie/ui/atoms/button';
 import { Input } from '@jovie/ui/atoms/input';
-import { ArrowRight, Mail } from 'lucide-react';
-import {
-  type FocusEvent,
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type FormEvent, useCallback, useRef, useState } from 'react';
 import {
   InvisibleTurnstile,
   type InvisibleTurnstileState,
   isTurnstileClientBypassed,
   isTurnstileClientConfigured,
 } from '@/components/atoms/InvisibleTurnstile';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
-type RevealVisualState =
-  | 'collapsed'
-  | 'expanded'
-  | 'submitting'
-  | 'success'
-  | 'error';
+type CompactVisualState = 'expanded' | 'submitting' | 'success' | 'error';
 
 const TURNSTILE_FAILURE_STATUSES = new Set([
   'error',
@@ -35,12 +21,8 @@ const TURNSTILE_FAILURE_STATUSES = new Set([
   'unconfigured',
 ]);
 
-function getRevealVisualState(
-  status: Status,
-  isExpanded: boolean
-): RevealVisualState {
+function getCompactVisualState(status: Status): CompactVisualState {
   if (status === 'success') return 'success';
-  if (!isExpanded) return 'collapsed';
   if (status === 'submitting') return 'submitting';
   if (status === 'error') return 'error';
   return 'expanded';
@@ -50,62 +32,24 @@ export function ChangelogEmailSignup() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
-  const [turnstileInteractive, setTurnstileInteractive] = useState(false);
   const turnstileFailureActiveRef = useRef(false);
-  const shellRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const prefersReducedMotion = useReducedMotion();
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
   const [turnstileFailed, setTurnstileFailed] = useState(false);
 
-  const visualState = getRevealVisualState(status, isExpanded);
-
-  useEffect(() => {
-    if (!isExpanded || status === 'success' || turnstileInteractive) return;
-
-    const timeoutId = globalThis.setTimeout(
-      () => {
-        inputRef.current?.focus({ preventScroll: true });
-      },
-      prefersReducedMotion ? 0 : 60
-    );
-
-    return () => globalThis.clearTimeout(timeoutId);
-  }, [isExpanded, prefersReducedMotion, status, turnstileInteractive]);
-
-  function expandComposer() {
-    setIsExpanded(true);
-  }
-
-  function collapseComposerIfEmpty() {
-    if (
-      status === 'submitting' ||
-      status === 'success' ||
-      turnstileFailureActiveRef.current
-    )
-      return;
-    if (email.trim()) return;
-
-    setIsExpanded(false);
-    setErrorMessage('');
-    setStatus('idle');
-  }
+  const visualState = getCompactVisualState(status);
 
   const handleTurnstileStateChange = useCallback(
     (state: InvisibleTurnstileState) => {
       if (state.status === 'interactive') {
-        setTurnstileInteractive(true);
-        setIsExpanded(true);
         return;
       }
 
       if (!TURNSTILE_FAILURE_STATUSES.has(state.status)) {
         if (state.status === 'verified' || state.status === 'bypassed') {
-          setTurnstileInteractive(false);
           if (turnstileFailureActiveRef.current) {
             turnstileFailureActiveRef.current = false;
             setStatus('idle');
@@ -117,34 +61,20 @@ export function ChangelogEmailSignup() {
       }
 
       turnstileFailureActiveRef.current = true;
-      setTurnstileInteractive(false);
       setTurnstileFailed(true);
       setTurnstileToken('');
       setStatus('error');
       setErrorMessage(
         state.message ?? 'Subscription is temporarily unavailable.'
       );
-      setIsExpanded(true);
     },
     []
   );
-
-  function handleShellBlurCapture(_event: FocusEvent<HTMLDivElement>) {
-    globalThis.setTimeout(() => {
-      const activeElement = document.activeElement;
-      if (shellRef.current?.contains(activeElement)) {
-        return;
-      }
-
-      collapseComposerIfEmpty();
-    }, 0);
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     if (!email.trim()) {
-      expandComposer();
       inputRef.current?.focus({ preventScroll: true });
       return;
     }
@@ -152,7 +82,6 @@ export function ChangelogEmailSignup() {
     if (turnstileRequired && !turnstileToken) {
       setStatus('error');
       setErrorMessage('Security check is still loading. Please try again.');
-      setIsExpanded(true);
       return;
     }
 
@@ -178,31 +107,26 @@ export function ChangelogEmailSignup() {
 
       setStatus('success');
       setEmail('');
-      setIsExpanded(true);
     } catch (err) {
       setStatus('error');
       setErrorMessage(
         err instanceof Error ? err.message : 'Something went wrong'
       );
       setTurnstileResetSignal(signal => signal + 1);
-      setIsExpanded(true);
     }
   }
 
   return (
     <div
       id='changelog-subscribe'
-      className='rounded-2xl border border-subtle bg-surface-1 p-8 md:p-10'
+      className='rounded-2xl border border-subtle bg-surface-1 p-6 md:p-8'
     >
-      <div className='mb-3 flex items-center gap-3'>
-        <Mail className='h-5 w-5 opacity-50' />
-        {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- sentence-case marketing heading */}
-        <h3 className='text-lg font-semibold tracking-tight'>
-          Stay in the loop
-        </h3>
-      </div>
-      <p className='mb-6 text-sm opacity-60'>
-        Get notified when we ship something new. No spam, just product updates.
+      {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- sentence-case marketing heading */}
+      <h3 className='text-lg font-semibold tracking-tight'>
+        Get the good stuff
+      </h3>
+      <p className='mb-5 mt-2 text-sm text-secondary-token'>
+        Occasional meaningful updates — not every deploy.
       </p>
 
       <div role='status' aria-live='polite' className='sr-only'>
@@ -211,30 +135,11 @@ export function ChangelogEmailSignup() {
           : ''}
       </div>
 
-      <div
-        ref={shellRef}
-        data-ui='cta-reveal'
-        data-visual-state={visualState}
-        onBlurCapture={handleShellBlurCapture}
-      >
+      <div data-ui='cta-reveal' data-visual-state={visualState}>
         <div className='cta-reveal-shell'>
-          <div className='cta-reveal-panel cta-reveal-panel--cta'>
-            <button
-              type='button'
-              data-testid='changelog-reveal-button'
-              onClick={expandComposer}
-              className='flex min-h-14 w-full items-center justify-between gap-3 px-5 text-left text-sm font-medium text-primary-token'
-            >
-              <span>Subscribe</span>
-              <span className='inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-sm dark:bg-white dark:text-black'>
-                <ArrowRight className='h-4 w-4' aria-hidden='true' />
-              </span>
-            </button>
-          </div>
-
           <form
             onSubmit={handleSubmit}
-            data-testid='changelog-reveal-form'
+            data-testid='changelog-subscribe-form'
             className='cta-reveal-panel cta-reveal-panel--form'
           >
             <div className='grid gap-2 p-1 sm:grid-cols-[minmax(0,1fr)_auto]'>
@@ -252,11 +157,6 @@ export function ChangelogEmailSignup() {
                   if (status === 'error' && !turnstileFailed) {
                     setStatus('idle');
                     setErrorMessage('');
-                  }
-                }}
-                onFocus={() => {
-                  if (!isExpanded) {
-                    setIsExpanded(true);
                   }
                 }}
                 required

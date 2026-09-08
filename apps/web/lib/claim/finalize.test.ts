@@ -252,31 +252,93 @@ describe('claimPrebuiltProfileForUser', () => {
     expect(mocks.insertMock).toHaveBeenCalledTimes(2);
   });
 
-  it.each([
-    ['missing', null],
-    ['expired', new Date('2026-02-01T00:00:00.000Z')],
-  ] as const)('refuses the claim fixture when token expiry is %s', async (_label, claimTokenExpiresAt) => {
+  it('resumes a completed fixture for the same owner and valid token without new claim writes', async () => {
     const mocks = createTxMock([
       [
         profileRow({
           usernameNormalized: 'e2eclaimartist',
+          userId: 'user-1',
+          isClaimed: true,
+          onboardingCompletedAt: FIXED_NOW,
           claimToken: 'stored-hash',
-          claimTokenExpiresAt,
+          claimTokenExpiresAt: new Date('2026-04-01T00:00:00.000Z'),
         }),
       ],
+      [],
     ]);
-
     await expect(
       claimPrebuiltProfileForUser(mocks.tx, {
         ...baseParams,
         expectedUsername: 'e2eclaimartist',
         claimTokenHash: 'stored-hash',
+        finalizeOnboarding: true,
       })
-    ).rejects.toThrow(
-      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
-    );
+    ).resolves.toEqual({
+      profileId: 'profile-1',
+      username: 'e2eclaimartist',
+      status: 'updated',
+    });
     assertNoWrites(mocks);
   });
+
+  it.each([
+    { userId: 'another-user' },
+    { onboardingCompletedAt: null },
+    { claimToken: 'different-hash' },
+    { claimTokenExpiresAt: new Date('2026-02-01T00:00:00.000Z') },
+  ])('rejects unsafe completed-fixture retry %j', async override => {
+    const mocks = createTxMock([
+      [
+        profileRow({
+          usernameNormalized: 'e2eclaimartist',
+          userId: 'user-1',
+          isClaimed: true,
+          onboardingCompletedAt: FIXED_NOW,
+          claimToken: 'stored-hash',
+          claimTokenExpiresAt: new Date('2026-04-01T00:00:00.000Z'),
+          ...override,
+        }),
+      ],
+    ]);
+    await expect(
+      claimPrebuiltProfileForUser(mocks.tx, {
+        ...baseParams,
+        expectedUsername: 'e2eclaimartist',
+        claimTokenHash: 'stored-hash',
+        finalizeOnboarding: true,
+      })
+    ).rejects.toThrow('[PROFILE_CONFLICT]');
+    assertNoWrites(mocks);
+  });
+
+  it.each([
+    ['missing', null],
+    ['expired', new Date('2026-02-01T00:00:00.000Z')],
+  ] as const)(
+    'refuses the claim fixture when token expiry is %s',
+    async (_label, claimTokenExpiresAt) => {
+      const mocks = createTxMock([
+        [
+          profileRow({
+            usernameNormalized: 'e2eclaimartist',
+            claimToken: 'stored-hash',
+            claimTokenExpiresAt,
+          }),
+        ],
+      ]);
+
+      await expect(
+        claimPrebuiltProfileForUser(mocks.tx, {
+          ...baseParams,
+          expectedUsername: 'e2eclaimartist',
+          claimTokenHash: 'stored-hash',
+        })
+      ).rejects.toThrow(
+        '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+      );
+      assertNoWrites(mocks);
+    }
+  );
 
   it('refuses the claim fixture through direct Spotify finalization', async () => {
     const mocks = createTxMock([

@@ -176,7 +176,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     }
 
     // Check for performance-critical elements
-    await expect(page.getByTestId('homepage-hero-shell')).toBeVisible({
+    await expect(page.getByTestId('marketing-section-hero')).toBeVisible({
       timeout: 5000,
     });
     await expect(page.getByTestId(HOMEPAGE_PRIMARY_CTA_TEST_ID)).toBeVisible({

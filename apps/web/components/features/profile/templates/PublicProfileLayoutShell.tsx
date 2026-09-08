@@ -15,6 +15,9 @@ interface PublicProfileLayoutShellProps {
   readonly shouldRenderHeading: boolean;
   readonly profileAccentStyle: CSSProperties;
   readonly compactSurface: ReactNode;
+  readonly desktopSurface: ReactNode;
+  readonly desktopBanner?: ReactNode;
+  readonly previewExitHref?: string;
   /** Desktop spare-space growth CTA (JOV-3544). */
   readonly claimFooterHref?: string | null;
   readonly showClaimFooter?: boolean;
@@ -33,6 +36,9 @@ export function PublicProfileLayoutShell({
   shouldRenderHeading,
   profileAccentStyle,
   compactSurface,
+  desktopSurface,
+  desktopBanner,
+  previewExitHref,
   claimFooterHref = null,
   showClaimFooter = false,
   embedded = false,
@@ -50,6 +56,8 @@ export function PublicProfileLayoutShell({
       )}
       style={profileAccentStyle}
       data-testid='public-profile-layout-shell'
+      data-layout={isDesktopLayout ? 'desktop' : 'compact'}
+      data-profile-preview={embedded ? 'true' : undefined}
     >
       <div className='absolute inset-0' aria-hidden='true'>
         <div className='absolute inset-0 sm:inset-[-10%]'>
@@ -81,7 +89,53 @@ export function PublicProfileLayoutShell({
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
           <div className='public-profile-layout-compact-slot'>
-            {compactSurface}
+            {!isDesktopLayout && embedded ? (
+              <div className='profile-preview-frame flex h-full min-h-0 w-full flex-col overflow-hidden rounded-(--profile-shell-card-radius) border border-(--profile-panel-border) bg-(--profile-content-bg) shadow-(--profile-panel-shadow)'>
+                <div className='flex min-h-11 shrink-0 items-center justify-between border-(--profile-panel-border) border-b px-4'>
+                  <span
+                    className='text-sm font-medium text-secondary-token'
+                    data-testid='profile-preview-label'
+                  >
+                    Preview
+                  </span>
+                  <a
+                    className='inline-flex min-h-11 items-center text-sm font-medium text-primary-token underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2'
+                    data-testid='profile-preview-exit'
+                    href={previewExitHref ?? '/'}
+                  >
+                    Open full profile
+                  </a>
+                </div>
+                <div className='min-h-0 flex-1'>{compactSurface}</div>
+              </div>
+            ) : !isDesktopLayout ? (
+              compactSurface
+            ) : null}
+          </div>
+          <div
+            className='public-profile-layout-desktop-shell overflow-hidden rounded-3xl'
+            data-testid='profile-desktop-shell'
+          >
+            {desktopBanner ? (
+              <div
+                className='relative z-20 w-full shrink-0 overflow-hidden rounded-t-3xl'
+                data-testid='profile-desktop-banner'
+              >
+                {desktopBanner}
+              </div>
+            ) : null}
+            {isDesktopLayout ? (
+              desktopSurface
+            ) : (
+              <div
+                className='public-profile-layout-desktop-placeholder'
+                data-testid='profile-desktop-loading'
+                role='status'
+                aria-busy='true'
+              >
+                <span className='text-secondary-token'>Loading profile…</span>
+              </div>
+            )}
           </div>
           {showClaimFooter && claimFooterHref ? (
             <ProfileClaimFooter href={claimFooterHref} enabled />

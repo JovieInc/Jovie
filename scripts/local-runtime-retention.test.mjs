@@ -60,17 +60,21 @@ function addWorktree(root, name) {
 }
 
 function runRetention(root, mode, options = {}) {
-  return spawnSync('node', [retentionScript, mode, '--repo-root', root], {
-    cwd: options.cwd ?? resolve('.'),
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      JOVIE_CLEANUP_TEST_MODE: '1',
-    },
-  });
+  return spawnSync(
+    process.execPath,
+    [retentionScript, mode, '--repo-root', root],
+    {
+      cwd: options.cwd ?? resolve('.'),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        JOVIE_CLEANUP_TEST_MODE: '1',
+      },
+    }
+  );
 }
 
-test('full Next dev output is dry-run safe and removed only when stale and oversized', () => {
+test('stale oversized Next dev output remains debt without allocation release', () => {
   const root = createRepo();
   const nextDev = join(root, 'apps/web/.next/dev');
   try {
@@ -78,11 +82,12 @@ test('full Next dev output is dry-run safe and removed only when stale and overs
     const dryRun = runRetention(root, '--dry-run');
     assert.equal(dryRun.status, 0, dryRun.stderr);
     assert.ok(existsSync(nextDev));
-    assert.match(dryRun.stdout, /Would remove apps\/web\/\.next\/dev/);
+    assert.match(dryRun.stdout, /Cleanup debt apps\/web\/\.next\/dev/);
 
     const apply = runRetention(root, '--apply');
     assert.equal(apply.status, 0, apply.stderr);
-    assert.equal(existsSync(nextDev), false);
+    assert.ok(existsSync(nextDev));
+    assert.match(apply.stdout, /no verified allocation release/);
 
     createSizedDirectory(nextDev);
     utimesSync(join(nextDev, 'payload.bin'), new Date(), new Date());
@@ -111,7 +116,8 @@ test('separately managed cache metadata cannot mask stale full Next dev output',
     writeFileSync(join(nextDev, '.DS_Store'), 'metadata');
     const result = runRetention(root, '--apply');
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(existsSync(nextDev), false);
+    assert.ok(existsSync(nextDev));
+    assert.match(result.stdout, /no verified allocation release/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -189,7 +195,7 @@ test('active Finder metadata fails closed without unlinking the candidate', () =
   }
 });
 
-test('worktree cleanup removes only registered, unlocked, clean, inactive old dependencies', () => {
+test('even clean inactive worktree dependencies require explicit allocation release', () => {
   const root = createRepo();
   try {
     const eligible = addWorktree(root, 'eligible');
@@ -212,7 +218,8 @@ test('worktree cleanup removes only registered, unlocked, clean, inactive old de
 
     const result = runRetention(root, '--apply');
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(existsSync(join(eligible, 'node_modules')), false);
+    assert.ok(existsSync(join(eligible, 'node_modules')));
+    assert.match(result.stdout, /no verified allocation release/);
     for (const preserved of [dirty, locked, active, unregistered, outside]) {
       assert.ok(existsSync(join(preserved, 'node_modules')), preserved);
     }

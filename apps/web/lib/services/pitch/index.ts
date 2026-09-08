@@ -10,6 +10,19 @@ export {
   generatePitches,
   truncateToLimit,
 } from './pitch-generator';
+export type {
+  GateReleasePitchInput,
+  ReleasePitchGateResult,
+  ReleasePitchRuleCaseId,
+  ReleasePitchRuleCaseResult,
+} from './pitch-rules';
+export {
+  evaluateAllReleasePitchRuleCases,
+  evaluateReleasePitchRuleCase,
+  gateReleasePitch,
+  RELEASE_PITCH_RULE_CASE_IDS,
+  RELEASE_PITCH_RULES,
+} from './pitch-rules';
 export {
   buildPitchDraftSystemPrompt,
   buildPitchDraftUserPrompt,

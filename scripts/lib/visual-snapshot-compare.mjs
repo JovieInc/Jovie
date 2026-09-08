@@ -4,10 +4,23 @@
  * Compare mode treats a missing baseline / ENOENT as FAIL. Refresh mode is the
  * only path allowed to pass --update-snapshots and self-heal missing files.
  * Advisory success is never a valid compare outcome.
+ *
+ * JOV-5960: the compare job runs on every merge group and on source PRs that
+ * touch the homepage surface. Source PR Ready must require it there — a
+ * skipped compare is not green on a homepage PR.
  */
 
 export const VISUAL_COMPARE_MODE = 'compare';
 export const VISUAL_REFRESH_MODE = 'refresh';
+
+/**
+ * Path Changes output that selects the compare job on source PRs. Any change
+ * to the mounted homepage surface, its stylesheet, its locked copy, the
+ * homepage visual spec, or its committed baselines selects it (JOV-5960), so a
+ * skipped compare can never read as green on a homepage PR.
+ */
+export const HOMEPAGE_VISUAL_SELECTION_OUTPUT =
+  'needs.ci-path-changes.outputs.run_homepage_visual';
 
 export const VISUAL_SNAPSHOT_SPECS = Object.freeze([
   'apps/web/tests/e2e/visual-regression.spec.ts',
@@ -243,8 +256,29 @@ export function assertVisualCompareWorkflowContract({
     if (!compareJob.includes("github.event_name == 'merge_group'")) {
       issues.push('compare job must run on merge_group');
     }
+    if (!compareJob.includes(`${HOMEPAGE_VISUAL_SELECTION_OUTPUT} == 'true'`)) {
+      issues.push(
+        'compare job must run on homepage pull_request paths (run_homepage_visual)'
+      );
+    }
     if (compareJob.includes('neon-create-branch')) {
       issues.push('compare job must not provision Neon');
+    }
+    const renderedHomepageContract = [
+      './.github/actions/setup-node-pnpm',
+      './.github/actions/setup-playwright',
+      'pnpm turbo build --filter=@jovie/web',
+      '.github/scripts/guard-playwright-artifacts.mjs',
+      'playwright test tests/e2e/visual-regression.spec.ts',
+      '--project=chromium',
+      '--grep homepage',
+    ];
+    if (
+      renderedHomepageContract.some(fragment => !compareJob.includes(fragment))
+    ) {
+      issues.push(
+        'homepage visual compare must render and compare the Playwright homepage snapshots'
+      );
     }
   }
 
@@ -253,8 +287,18 @@ export function assertVisualCompareWorkflowContract({
     issues.push('merge-group PR Ready must require visual snapshot compare');
   }
   const sourceReady = extractJobBlock(ciYaml, 'ci-pr-ready');
-  if (sourceReady.includes('ci-visual-snapshot-compare')) {
-    issues.push('source PR Ready must stay fast (no visual snapshot compare)');
+  if (!sourceReady.includes('ci-visual-snapshot-compare')) {
+    issues.push(
+      'source PR Ready must require visual snapshot compare on homepage paths'
+    );
+  }
+  if (
+    !sourceReady.includes(HOMEPAGE_VISUAL_SELECTION_OUTPUT) ||
+    !/"\$VISUAL_COMPARE_RESULT" != "success"/.test(sourceReady)
+  ) {
+    issues.push(
+      'source PR Ready must fail closed when a homepage PR skips visual snapshot compare'
+    );
   }
 
   return issues;

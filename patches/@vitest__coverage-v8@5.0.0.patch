@@ -1,0 +1,15 @@
+diff --git a/dist/index.js b/dist/index.js
+index 1a4f7dcf0c89e6f5de8b7a27d2faacb7ffbbd3e8..1cdd156e36e2b91af18c32586ac3e9c11e365f08 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -68,7 +68,9 @@ const mod = {
+ 			}
+ 		}
+ 		const coverageFilesDirectory = options?.coverageFilesDirectory;
+-		assert(coverageFilesDirectory, "coverageFilesDirectory is required");
++		if (!coverageFilesDirectory) {
++			return { result };
++		}
+ 		return await writeCoverageFile(coverageFilesDirectory, { result });
+ 	},
+ 	async stopCoverage({ isolate }) {

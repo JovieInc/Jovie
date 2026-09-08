@@ -17,7 +17,6 @@ import {
 } from '@/components/molecules/drawer';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type {
   PreviewSource,
   PreviewVerification,
@@ -491,21 +490,14 @@ export function TrackSidebar({
                     ? `, ${track.providerConfidenceSummary.unknown} unknown`
                     : ''}
                 </div>
-
-                {unresolvedProviders.length > 0 ? (
-                  <p className='text-2xs text-tertiary-token'>
-                    Unresolved:{' '}
-                    {unresolvedProviders
-                      .map(provider => PROVIDER_LABELS[provider])
-                      .join(', ')}
-                  </p>
-                ) : null}
               </div>
             </DrawerSurfaceCard>
           ) : (
             <div className='space-y-2'>
               <TrackPlatformLinksSection
                 providers={canonicalProviders}
+                missingProviders={unresolvedProviders.map(key => ({ key }))}
+                findQuery={track.title}
                 title='Canonical DSPs'
               />
               {fallbackProviders.length > 0 ? (

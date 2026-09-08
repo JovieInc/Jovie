@@ -1,87 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import {
-  formatUsageResetDate,
   formatUsageResetTime,
-  getMonthlyUsage,
-  getOverallRemainingPercent,
-  getRemainingPercent,
-  isChatUsageBelowWarningThreshold,
+  getWeeklyUsageModel,
 } from '@/lib/chat-usage/metrics';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 
 const baseUsage: ChatUsageData = {
   plan: 'free',
-  dailyLimit: 10,
+  weeklyLimit: 15,
   used: 4,
-  remaining: 6,
+  remaining: 11,
   resetAt: '2026-05-23T19:27:00.000Z',
-  monthlyLimit: 310,
-  monthlyUsed: 24,
-  monthlyRemaining: 286,
-  monthlyResetAt: '2026-06-01T00:00:00.000Z',
   isExhausted: false,
-  warningThreshold: 2,
+  warningThreshold: 3,
   isNearLimit: false,
 };
 
 describe('chat usage metrics', () => {
-  it('derives monthly usage from the same fields as the settings page', () => {
-    expect(getMonthlyUsage(baseUsage)).toEqual({
-      limit: 310,
-      used: 24,
-      remaining: 286,
-      resetAt: '2026-06-01T00:00:00.000Z',
+  it('normalizes weekly chat usage through the shared meter model', () => {
+    expect(getWeeklyUsageModel(baseUsage)).toMatchObject({
+      used: 4,
+      limit: 15,
+      remaining: 11,
+      remainingPercent: 73,
+      state: 'healthy',
     });
   });
 
-  it('computes remaining percent from quota left', () => {
-    expect(getRemainingPercent(6, 10)).toBe(60);
-    expect(getRemainingPercent(286, 310)).toBe(92);
-  });
-
-  it('uses the tighter window for the collapsed menu percent', () => {
-    expect(getOverallRemainingPercent(baseUsage)).toBe(60);
-
+  it('does not overstate remaining capacity when weekly fields disagree', () => {
     expect(
-      getOverallRemainingPercent({
+      getWeeklyUsageModel({
         ...baseUsage,
-        remaining: 9,
-        monthlyRemaining: 50,
+        used: 2,
+        remaining: 1,
       })
-    ).toBe(16);
-  });
-
-  it('only warns when the tighter usage window is below ten percent', () => {
-    expect(
-      isChatUsageBelowWarningThreshold({
-        ...baseUsage,
-        dailyLimit: 100,
-        used: 91,
-        remaining: 9,
-        monthlyLimit: 3100,
-        monthlyUsed: 2790,
-        monthlyRemaining: 310,
-      })
-    ).toBe(true);
-
-    expect(
-      isChatUsageBelowWarningThreshold({
-        ...baseUsage,
-        dailyLimit: 100,
-        used: 90,
-        remaining: 10,
-        monthlyLimit: 3100,
-        monthlyUsed: 2790,
-        monthlyRemaining: 310,
-      })
-    ).toBe(false);
+    ).toMatchObject({ used: 14, remaining: 1, remainingPercent: 7 });
   });
 
   it('formats compact reset labels for the inline menu', () => {
     expect(formatUsageResetTime('2026-05-23T19:27:00.000Z')).toMatch(/PM|AM/);
     expect(formatUsageResetTime(null)).toBe('—');
-    expect(formatUsageResetDate('2026-06-01T00:00:00.000Z')).toMatch(
-      /May 31|Jun 1/
-    );
   });
 });

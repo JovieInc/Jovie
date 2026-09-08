@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ReleaseEditDialog } from '@/features/dashboard/organisms/releases/ReleaseEditDialog';
+import { ReleaseEditDialog } from '@/components/features/dashboard/organisms/releases/ReleaseEditDialog';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/components/organisms/Dialog', () => ({
@@ -21,8 +21,8 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
 }));
 
-vi.mock('@/components/atoms/ImageWithFallback', () => ({
-  ImageWithFallback: () => <div data-testid='release-artwork' />,
+vi.mock('@/components/atoms/ReleaseArtworkThumb', () => ({
+  ReleaseArtworkThumb: () => <div data-testid='release-artwork' />,
 }));
 
 vi.mock('@/components/atoms/ProviderIcon', () => ({

@@ -62,4 +62,14 @@ describe('profile shell token contract', () => {
       /\.profile-cover-home-gradient[\s\S]{0,400}var\(--profile-stage-bg\)/
     );
   });
+
+  it('keeps the production desktop stage on the canonical public width token', () => {
+    const designSystemContents = readFileSync(DESIGN_SYSTEM, 'utf8');
+    const desktopRule = designSystemContents.match(
+      /@media \(min-width: 1180px\)[\s\S]*?\.profile-viewport:not\(\.profile-viewport--embedded\)[\s\S]*?\.public-profile-layout-frame \{([\s\S]*?)\}/
+    )?.[1];
+
+    expect(desktopRule).toContain('var(--ds-public-content-max)');
+    expect(desktopRule).not.toContain('--profile-shell-max-width');
+  });
 });

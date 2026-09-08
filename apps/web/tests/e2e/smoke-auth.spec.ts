@@ -4,7 +4,7 @@ import {
   ClerkTestError,
   ensureSignedInUser,
   signInUser,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import {
   chatComposerInputLocator,
   SMOKE_TIMEOUTS,

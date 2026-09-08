@@ -67,7 +67,7 @@ After push, monitor with `no-mistakes` (TUI) or `no-mistakes axi status`.
 | Skip all husky hooks | `HUSKY=0 git push` |
 | Push without no-mistakes pipeline | `git push origin <branch>` (direct to GitHub) |
 | Cancel an in-flight no-mistakes run | `no-mistakes axi abort` |
-| Emergency hotfix | `hotfix/*` branch → `main` with `needs-human` label (see `.claude/rules/release.md`) |
+| Emergency hotfix | `hotfix/*` branch → `main`; automated security, migration, and incident gates still apply |
 
 The husky hook defaults to **publication** (diff integrity, changed-file secrets, hook policy) so the first draft can reach GitHub. Set `JOVIE_PUSH_PHASE=qualification` to restore the affected-test gate before ready/landing. The no-mistakes pipeline adds tests, review, docs, and CI babysitting in the disposable worktree.
 

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
@@ -14,6 +15,23 @@ vi.mock('next/navigation', async importOriginal => {
 });
 
 describe('PublicPageShell', () => {
+  it('keeps YouTube acquisition content inside the sole page main', () => {
+    render(
+      <PublicPageShell>
+        <YoutubeThumbnailsLanding />
+      </PublicPageShell>
+    );
+    const mains = screen.getAllByRole('main');
+    expect(mains).toHaveLength(1);
+    expect(mains[0]).toHaveAttribute('id', 'main-content');
+    expect(mains[0]).toContainElement(
+      screen.getByTestId('marketing-section-hero')
+    );
+    expect(mains[0]).toContainElement(
+      screen.getByTestId('marketing-section-cta')
+    );
+  });
+
   it('renders children inside main#main-content with the header offset by default', () => {
     const { container } = render(
       <PublicPageShell>
@@ -96,6 +114,14 @@ describe('PublicPageShell', () => {
     expect(
       screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/start');
+  });
+
+  it('uses min-h-svh so iOS Safari chrome cannot jump the public shell', () => {
+    const { container } = render(<PublicPageShell>body</PublicPageShell>);
+    expect(container.firstElementChild?.className).toContain('min-h-svh');
+    expect(container.firstElementChild?.className).not.toContain(
+      'min-h-screen'
+    );
   });
 
   it('renders the skip-to-content link by default and can disable it', () => {

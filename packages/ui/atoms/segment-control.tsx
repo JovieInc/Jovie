@@ -34,7 +34,7 @@ const segmentControlSurfaceSizeClassNames = {
 
 const segmentTriggerVariants = cva(
   [
-    "relative rounded-full border border-transparent bg-transparent transition-[background-color,color,box-shadow,border-color] duration-subtle ease-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] motion-reduce:transition-none",
+    "relative min-w-0 rounded-full border border-transparent bg-transparent transition-[background-color,color,box-shadow,border-color] duration-subtle ease-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] motion-reduce:transition-none",
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
     'disabled:pointer-events-none disabled:opacity-45',
     // Inactive state

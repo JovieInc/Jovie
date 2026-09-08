@@ -65,7 +65,7 @@ export default async function AlternativesPage({
 
       <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Alternative</p>
-        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+        <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl line-clamp-2'>
           {data.heroHeadline}
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
@@ -76,7 +76,7 @@ export default async function AlternativesPage({
       {/* Why Switch */}
       <MarketingContainer width='prose' className='pb-16'>
         <section>
-          <h2 className='text-2xl font-semibold text-primary-token'>
+          <h2 className='text-2xl font-semibold text-primary-token line-clamp-2'>
             Why Musicians Are Switching
           </h2>
           <ul className='mt-6 space-y-4'>
@@ -96,7 +96,7 @@ export default async function AlternativesPage({
       {/* Highlights */}
       <MarketingContainer width='prose' className='pb-16'>
         <section>
-          <h2 className='text-2xl font-semibold text-primary-token'>
+          <h2 className='text-2xl font-semibold text-primary-token line-clamp-2'>
             What You Get With {APP_NAME}
           </h2>
           <div className='mt-6 grid gap-8 sm:grid-cols-2'>
@@ -118,7 +118,7 @@ export default async function AlternativesPage({
       <MarketingContainer width='prose' className='pb-16'>
         <section>
           <div className='rounded-xl border border-border-primary bg-surface-secondary p-8 text-center'>
-            <h2 className='text-xl font-semibold text-primary-token'>
+            <h2 className='text-xl font-semibold text-primary-token line-clamp-2'>
               Ready To Try {APP_NAME}?
             </h2>
             <p className='mt-2 text-sm text-secondary-token'>

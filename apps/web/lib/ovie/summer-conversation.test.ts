@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DurableOperatingStore,
+  FailoverOperatingStore,
   memoryRecordBackend,
 } from '@/lib/ovie/mcp/store';
 import { OvieProgramError } from '@/lib/ovie/program';
@@ -9,6 +10,7 @@ import {
   completeOvieSummerTurn,
   enqueueOvieSummerTurn,
   OvieSummerTurnError,
+  ovieSummerTurnId,
 } from '@/lib/ovie/summer-conversation';
 import {
   respondToOvieSummerAction,
@@ -18,7 +20,10 @@ import {
   bindCurrentSummerQueueSpeaker,
   createCurrentSummerQueueSpeaker,
 } from '@/lib/ovie/summer-queue-speaker';
-import { loadCurrentSummerSession } from '@/lib/ovie/summer-session';
+import {
+  CURRENT_SUMMER_SESSION_ID,
+  loadCurrentSummerSession,
+} from '@/lib/ovie/summer-session';
 import {
   bindCurrentSummerSpeaker,
   getBoundSummerSpeaker,
@@ -264,6 +269,68 @@ describe('Ovie Summer conversation handoff', () => {
     expect(session?.identity.memoryNamespace).toBe('summer');
   });
 
+  it('accepts a tool-only Mac completion without founder prose', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    const id = ovieSummerTurnId({
+      conversationId: CURRENT_SUMMER_SESSION_ID,
+      clientTurnId: 'tool-only',
+    });
+    await enqueueOvieSummerTurn(store, {
+      id,
+      conversationId: CURRENT_SUMMER_SESSION_ID,
+      userText: 'Org state?',
+    });
+    await claimOvieSummerTurn(store, {
+      id,
+      workerId: 'summer-mac',
+      claimToken: 'tool-only-claim',
+    });
+    for (const receiptId of ['', '   ']) {
+      const rejected = await respondToOvieSummerAction({
+        principal: founder,
+        store,
+        body: {
+          action: 'complete',
+          id,
+          claim_token: 'tool-only-claim',
+          response_text: '',
+          tool: { name: 'get_org_state', ok: true, receiptId, summary: 'org' },
+        },
+      });
+      expect(rejected.status).toBe(400);
+      expect(await store.getSummerTurn(id)).toMatchObject({ state: 'claimed' });
+    }
+    await completeOvieSummerTurn(store, {
+      id,
+      claimToken: 'tool-only-claim',
+      responseText: '',
+      tool: {
+        name: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_only',
+        summary: 'org',
+      },
+    });
+    const events: unknown[] = [];
+    for await (const event of createCurrentSummerQueueSpeaker(store).speak({
+      userText: 'Org state?',
+      conversationId: 'summer-session:current',
+      clientTurnId: 'tool-only',
+      history: [],
+    })) {
+      events.push(event);
+    }
+    expect(events).toEqual([
+      {
+        type: 'tool',
+        tool: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_only',
+        summary: 'org',
+      },
+    ]);
+  });
+
   it('fails a fenced Mac claim and refuses a stale token', async () => {
     const store = new DurableOperatingStore(memoryRecordBackend());
     await enqueueOvieSummerTurn(store, {
@@ -322,5 +389,63 @@ describe('Ovie Summer conversation handoff', () => {
       })
     ).toThrow(OvieProgramError);
     expect(getBoundSummerSpeaker()).toBe(bound);
+  });
+
+  it('marks failures after durable enqueue as unknown and retryable', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    let getCalls = 0;
+    const unstableStore = new Proxy(store, {
+      get(target, property) {
+        if (property === 'getSummerTurn') {
+          return async (id: string) => {
+            getCalls += 1;
+            if (getCalls > 1) throw new Error('poll backend unavailable');
+            return target.getSummerTurn(id);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const speaker = createCurrentSummerQueueSpeaker(unstableStore);
+    const events: Array<{ type: string; state?: string }> = [];
+
+    for await (const event of speaker.speak({
+      userText: 'Queue once',
+      clientTurnId: 'unknown-after-enqueue',
+      history: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual({ type: 'error', state: 'unknown' });
+    expect(await store.listSummerTurns()).toHaveLength(1);
+  });
+
+  it('does not report failure after the durable enqueue survives a cache write error', async () => {
+    const fallback = new DurableOperatingStore(memoryRecordBackend());
+    const primary = new DurableOperatingStore(memoryRecordBackend());
+    const originalPut = primary.putSummerTurn.bind(primary);
+    primary.putSummerTurn = async record => {
+      await originalPut(record);
+      throw new Error('cache acknowledgement failed');
+    };
+    const store = new FailoverOperatingStore({
+      primary,
+      fallback,
+      isPrimaryFailure: () => false,
+    });
+    const events: Array<{ type: string; state?: string }> = [];
+
+    for await (const event of createCurrentSummerQueueSpeaker(store).speak({
+      userText: 'Persist before cache failure',
+      clientTurnId: 'durable-before-cache-error',
+      history: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual({ type: 'error', state: 'unknown' });
+    await expect(store.listSummerTurns()).resolves.toHaveLength(1);
   });
 });

@@ -4,9 +4,8 @@ name: Stuck Draft Auto-Close
 # (>48h since last update) with failing checks. Automatic closing conflicts
 # with the active all-PR drain, so this workflow has no schedule.
 #
-# Opt out per-PR with any of: needs-human, hold, gated.
+# Mechanical `hold` and `gated` labels remain explicit operator stops.
 # Human-owned branches are never touched.
-# 48h needs-human close is owned by agent-pipeline.yml (Slack/Linear first).
 
 on:
   workflow_dispatch:

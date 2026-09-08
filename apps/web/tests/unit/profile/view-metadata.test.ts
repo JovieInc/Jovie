@@ -41,16 +41,32 @@ describe('buildViewMetadata', () => {
   });
 
   it('titles routed modes mode-first so the URL-tab scan target is the intent', () => {
-    expect(buildViewMetadata('listen', BASELINE).title).toBe(
-      'Listen · The Weeknd · Jovie'
-    );
-    expect(buildViewMetadata('pay', BASELINE).title).toBe(
-      'Pay · The Weeknd · Jovie'
-    );
+    expect(buildViewMetadata('listen', BASELINE).title).toEqual({
+      absolute: 'Listen · The Weeknd · Jovie',
+    });
+    expect(buildViewMetadata('pay', BASELINE).title).toEqual({
+      absolute: 'Pay · The Weeknd · Jovie',
+    });
     // Base profile is artist-first.
-    expect(buildViewMetadata('profile', BASELINE).title).toBe(
-      'The Weeknd · Jovie'
-    );
+    expect(buildViewMetadata('profile', BASELINE).title).toEqual({
+      absolute: 'The Weeknd · Jovie',
+    });
+  });
+
+  it('opts routed-mode titles out of the root layout template', () => {
+    // The composed title already ends in "· Jovie"; passing it through the
+    // root "%s | Jovie" template would double the brand in tabs and SERP
+    // ("Contact · The Weeknd · Jovie | Jovie" — verified live on /tim/about).
+    for (const mode of ['listen', 'contact', 'about'] as const) {
+      const meta = buildViewMetadata(mode, BASELINE);
+      expect(meta.title, `title shape for ${mode}`).toEqual({
+        absolute: expect.any(String),
+      });
+      if (typeof meta.title === 'object' && 'absolute' in meta.title) {
+        expect(meta.title.absolute.endsWith('Jovie')).toBe(true);
+        expect(meta.title.absolute.includes('| Jovie')).toBe(false);
+      }
+    }
   });
 
   it('pulls descriptions from the registry subtitle when present', () => {

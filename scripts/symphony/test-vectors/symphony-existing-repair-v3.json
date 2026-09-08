@@ -1,0 +1,52 @@
+{
+  "schema": "jovie.symphony-existing-repair-contract/v1",
+  "task": {
+    "schema": "jovie-symphony-repair-task/v3",
+    "taskKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "decisionFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "createdAt": "2026-09-07T01:00:00Z",
+    "owner": "symphony",
+    "route": "symphony",
+    "authority": "host-assigned-isolated-repair-only",
+    "action": "execute-existing-owned-repair",
+    "safety": "exact-source-ci-native-queue-production-gates-remain-required",
+    "selected": {
+      "id": "affected-only-unit-selection",
+      "sourceRevision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "owner": "ci-reliability",
+      "handle": "audit:affected-only"
+    },
+    "source": {
+      "sourceVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "snapshotDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "existingRepair": {
+      "mode": "isolated-cli",
+      "identifier": "JOV-6224",
+      "issueId": "d1d9b064-5264-4907-a3ca-f599eb75b9de",
+      "ownerId": "01a0818b-6e1b-7573-a2b1-a7ad52ea8328",
+      "issueRevision": "2026-09-07T00:59:00Z",
+      "repository": "JovieInc/Jovie",
+      "pr": 17742,
+      "head": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "workspace": "/fixture/exact-workspace",
+      "writerUnit": "fixture-repair.service",
+      "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "expiresAt": "2026-09-07T01:30:00Z"
+    }
+  },
+  "result": {
+    "status": "succeeded",
+    "detail": "fixture source execution",
+    "completedAt": "2026-09-07T01:01:00Z",
+    "execution": {
+      "runId": "fixture-run",
+      "provider": "fixture-local",
+      "model": "fixture-task-model",
+      "authPoolIdentity": "1111111111111111111111111111111111111111111111111111111111111111",
+      "leaseIdentity": "2222222222222222222222222222222222222222222222222222222222222222",
+      "evidenceDigest": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  }
+}

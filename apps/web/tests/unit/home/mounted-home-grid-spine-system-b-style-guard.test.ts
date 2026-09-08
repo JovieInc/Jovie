@@ -52,29 +52,26 @@ describe('mounted homepage grid spine System B source contract', () => {
     // The hero guard slices page.tsx between these two anchors; they must
     // survive any page-spine edit verbatim.
     expect(pageSource).toContain('function HomepageHero()');
-    expect(pageSource).toContain('function HomepageFaq()');
+    expect(pageSource).toContain('function HomepageUnlockedSections()');
     expect(pageSource.indexOf('function HomepageHero()')).toBeLessThan(
-      pageSource.indexOf('function HomepageFaq()')
+      pageSource.indexOf('function HomepageUnlockedSections()')
     );
 
     // Page-level wrappers stay neutral: sections mount through named shells,
     // never through ad-hoc sizing utilities in page markup.
     expect(pageSource).toContain('homepage-story-stack');
-    expect(pageSource).toContain('homepage-trust-section');
-    expect(pageSource).toContain('homepage-faq-section__inner');
+    // Certified homepage: proof is a statement, never a logo strip.
+    expect(pageSource).not.toContain('HomeTrustSection');
+    expect(pageSource).not.toContain('FaqSection');
   });
 
   it('mounts each homepage section exactly once', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
 
     for (const mount of [
-      '<MarketingPosterHero',
-      '<HomeTrustSection',
-      '<HomepageMeetJovie',
-      '<HomepageArtistProfiles',
-      '<HomepageClosedLoop',
-      '<HomepageV2FinalCta',
-      '<FaqSection',
+      '<HomepageEditorialHero',
+      '<HomepageCertifiedSections',
+      '<HomepageClose',
     ]) {
       expect(
         countOccurrences(pageSource, mount),
@@ -85,7 +82,6 @@ describe('mounted homepage grid spine System B source contract', () => {
     expect(
       countOccurrences(pageSource, "data-testid='homepage-story-stack'")
     ).toBe(1);
-    expect(countOccurrences(pageSource, "data-testid='homepage-faq'")).toBe(1);
 
     expect(pageSource).not.toContain('MarketingShippedSitesShowcase');
     expect(pageSource).not.toContain('MarketingPlatformSpecBento');
@@ -127,5 +123,23 @@ describe('mounted homepage grid spine System B source contract', () => {
         '--homepage-grid-gutter: var(--homepage-page-gutter);'
       );
     }
+
+    // homepage-optical-polish-v1: editorial sections reuse the shared
+    // 12-column desktop spans. 34rem is a reading-width limit, not a
+    // column position. Offset-copy / two-track-only rules belong in the
+    // certified optical-grid contract test.
+    const certifiedStart = cssSource.indexOf(
+      'HOMEPAGE CERTIFIED SECTIONS START'
+    );
+    const certified = cssSource.slice(
+      certifiedStart,
+      cssSource.indexOf('HOMEPAGE CERTIFIED SECTIONS END', certifiedStart)
+    );
+    expect(certified).toContain(
+      'grid-template-columns: repeat(12, minmax(0, 1fr))'
+    );
+    expect(certified).toContain('grid-column: 1 / span 6');
+    expect(certified).toContain('grid-column: 7 / span 6');
+    expect(certified).not.toMatch(/margin-left:\s*auto/);
   });
 });

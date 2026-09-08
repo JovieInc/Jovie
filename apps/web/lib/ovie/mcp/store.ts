@@ -12,6 +12,11 @@ const INDEX_CAP = 100;
 
 export type OperatingStore = {
   putDecision(record: OvieDecision): Promise<void>;
+  putDecisionIfUnchanged(
+    record: OvieDecision,
+    expected: OvieDecision | undefined
+  ): Promise<boolean>;
+  getDecisionForUpdate(id: string): Promise<OvieDecision | undefined>;
   getDecision(id: string): Promise<OvieDecision | undefined>;
   listDecisions(): Promise<readonly OvieDecision[]>;
   putInitiative(record: OvieInitiative): Promise<void>;
@@ -58,8 +63,8 @@ export type RecordBackend = {
   ): Promise<boolean>;
   compareAndSet(
     key: string,
-    expectedValue: string,
-    nextValue: string,
+    expectedValue: unknown,
+    nextValue: unknown,
     ttlSeconds: number
   ): Promise<boolean>;
   lpush(key: string, value: string): Promise<void>;
@@ -127,8 +132,34 @@ export class DurableOperatingStore implements OperatingStore {
     await this.backend.lpush(DECISION_INDEX, record.id);
   }
 
+  async putDecisionIfUnchanged(
+    record: OvieDecision,
+    expected: OvieDecision | undefined
+  ): Promise<boolean> {
+    const updated = expected
+      ? await this.backend.compareAndSet(
+          decisionKey(record.id),
+          expected,
+          record,
+          TTL_SECONDS
+        )
+      : await this.backend.setIfAbsent(
+          decisionKey(record.id),
+          record,
+          TTL_SECONDS
+        );
+    if (updated && !expected) {
+      await this.backend.lpush(DECISION_INDEX, record.id);
+    }
+    return updated;
+  }
+
   async getDecision(id: string): Promise<OvieDecision | undefined> {
     return asDecision(await this.backend.get(decisionKey(id)));
+  }
+
+  getDecisionForUpdate(id: string): Promise<OvieDecision | undefined> {
+    return this.getDecision(id);
   }
 
   async listDecisions(): Promise<readonly OvieDecision[]> {
@@ -330,6 +361,23 @@ export class FailoverOperatingStore implements OperatingStore {
     return this.put('putDecision', record);
   }
 
+  async putDecisionIfUnchanged(
+    record: OvieDecision,
+    expected: OvieDecision | undefined
+  ): Promise<boolean> {
+    const updated = await this.options.fallback.putDecisionIfUnchanged(
+      record,
+      expected
+    );
+    if (!updated) return false;
+    await this.syncDecisionCache(record.id);
+    return true;
+  }
+
+  getDecisionForUpdate(id: string): Promise<OvieDecision | undefined> {
+    return this.options.fallback.getDecisionForUpdate(id);
+  }
+
   getDecision(id: string): Promise<OvieDecision | undefined> {
     return this.get('getDecision', id);
   }
@@ -463,6 +511,23 @@ export class FailoverOperatingStore implements OperatingStore {
 
   private noteFailure(error: unknown): void {
     this.options.onPrimaryFailure?.(error);
+  }
+
+  private async syncDecisionCache(id: string): Promise<void> {
+    const { primary, fallback } = this.options;
+    try {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const authoritative = await fallback.getDecisionForUpdate(id);
+        if (!authoritative) return;
+        const cached = await primary.getDecisionForUpdate(id);
+        if (cached?.decided === authoritative.decided) return;
+        if (await primary.putDecisionIfUnchanged(authoritative, cached)) return;
+      }
+    } catch (error) {
+      // The Postgres mutation already committed. Redis is only a cache here;
+      // a later canonical mutation retries synchronization.
+      this.noteFailure(error);
+    }
   }
 }
 

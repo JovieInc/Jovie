@@ -148,19 +148,24 @@ describe('TourModePanel', () => {
   it('renders empty state when no tour dates', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
     expect(screen.getByTestId('tour-drawer-content')).toBeInTheDocument();
-    expect(screen.getByText('No Events')).toBeInTheDocument();
+    expect(screen.getByText('No upcoming shows')).toBeInTheDocument();
     expect(screen.getByTestId('mock-notifications-cta')).toHaveAttribute(
       'data-source',
       'events_empty_state'
     );
     const notificationsCta = screen.getByTestId('mock-notifications-cta');
-    expect(notificationsCta).toHaveClass('h-8');
-    expect(notificationsCta.className).toContain('before:h-11');
-    expect(notificationsCta.className).toContain('before:min-w-11');
-    expect(notificationsCta).not.toHaveClass('h-11!', 'h-12');
+    expect(notificationsCta).toHaveClass('h-auto', 'min-h-7');
+    expect(notificationsCta).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(notificationsCta).not.toHaveClass(fixedHeight);
+    }
   });
 
-  it('keeps the preview empty-state action at 32px inside a 44px target', () => {
+  it('keeps the preview empty-state action growable with 28px and 44px minima', () => {
     render(
       <TourDrawerContent artist={artist} tourDates={[]} renderMode='preview' />
     );
@@ -168,9 +173,15 @@ describe('TourModePanel', () => {
     const previewCta = screen.getByRole('button', {
       name: 'Turn On Event Alerts',
     });
-    expect(previewCta).toHaveClass('h-8');
-    expect(previewCta.className).toContain('before:h-11');
-    expect(previewCta.className).toContain('before:min-w-11');
+    expect(previewCta).toHaveClass('h-auto', 'min-h-7');
+    expect(previewCta).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(previewCta).not.toHaveClass(fixedHeight);
+    }
   });
 
   it('renders a cardless full-plane events empty state without music leakage', () => {
@@ -182,7 +193,7 @@ describe('TourModePanel', () => {
     expect(screen.getByTestId('profile-primary-tab-events-empty').tagName).toBe(
       'OUTPUT'
     );
-    const heading = screen.getByText('No Events');
+    const heading = screen.getByText('No upcoming shows');
     expect(heading).toHaveClass('text-secondary-token');
     expect(
       screen.getByText('Get alerted when shows are announced.')

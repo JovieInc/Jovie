@@ -196,6 +196,16 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     includeInFastHealth: false,
   },
   {
+    id: 'investor-updates',
+    name: 'Admin Investor Updates',
+    path: APP_ROUTES.ADMIN_INVESTOR_UPDATES,
+    rootTestId: 'admin-investor-updates-page',
+    snapshotSlug: 'admin-investor-updates',
+    primaryWorkspace: false,
+    utilityRoot: false,
+    includeInFastHealth: false,
+  },
+  {
     id: 'investors-settings',
     name: 'Admin Investor Settings',
     path: APP_ROUTES.ADMIN_INVESTORS_SETTINGS,

@@ -85,6 +85,7 @@ describe('ThreadView shell contract', () => {
     );
 
     expect(source).toContain('px-app-header');
+    expect(source).toContain('line-clamp-2');
     expect(source).toContain('max-w-[44rem]');
     expect(source).toContain('env(safe-area-inset-bottom)');
     expect(source).toContain('shadow-popover');

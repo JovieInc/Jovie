@@ -9,23 +9,29 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-import { APP_ROUTES } from '@/constants/routes';
 import {
   AuthRedirectHandler,
-  hasActiveClerkSession,
-} from '@/features/home/AuthRedirectHandler';
+  hasActiveAuthSession,
+} from '@/components/features/home/AuthRedirectHandler';
+import { APP_ROUTES } from '@/constants/routes';
 
-describe('hasActiveClerkSession', () => {
+describe('hasActiveAuthSession', () => {
   it('returns false when the cookie is missing', () => {
-    expect(hasActiveClerkSession('foo=bar')).toBe(false);
+    expect(hasActiveAuthSession('foo=bar')).toBe(false);
   });
 
-  it('returns false when Clerk activity cookie is zero', () => {
-    expect(hasActiveClerkSession('__client_uat=0')).toBe(false);
+  it('returns false when leftover Clerk activity cookie is zero', () => {
+    expect(hasActiveAuthSession('__client_uat=0')).toBe(false);
   });
 
-  it('returns true when Clerk activity cookie is a non-zero value', () => {
-    expect(hasActiveClerkSession('__client_uat=12345')).toBe(true);
+  it('returns true when leftover Clerk activity cookie is a non-zero value', () => {
+    expect(hasActiveAuthSession('__client_uat=12345')).toBe(true);
+  });
+
+  it('returns true when a Better Auth session cookie is present', () => {
+    expect(
+      hasActiveAuthSession('better-auth.session_token=signed-session')
+    ).toBe(true);
   });
 });
 
@@ -49,7 +55,7 @@ describe('AuthRedirectHandler', () => {
   });
 
   it('renders loader and redirects authenticated users', async () => {
-    document.cookie = '__client_uat=1700000000';
+    document.cookie = 'better-auth.session_token=signed-session';
 
     render(<AuthRedirectHandler />);
 

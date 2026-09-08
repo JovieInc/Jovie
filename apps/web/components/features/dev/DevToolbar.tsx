@@ -919,7 +919,7 @@ export function DevToolbar({
       >
         {/* Center: brand logo */}
         <div className='absolute left-1/2 -translate-x-1/2 pointer-events-none'>
-          <BrandLogo size={16} tone='auto' aria-hidden rounded={false} />
+          <BrandLogo size='compact' tone='auto' aria-hidden rounded={false} />
         </div>
         {/* Left: env + version */}
         <span

@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { authClerkLocalization } from '@/components/providers/clerkLocalization';
+import { authCopy } from '@/components/providers/auth-copy';
 import { APP_ROUTES } from '@/constants/routes';
-import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
+import {
+  getHomepageFrontDoorCtaContract,
+  PUBLIC_WAITLIST_URL,
+} from '@/data/homepageFrontDoorCta';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
-  it('locks waitlist-on homepage CTA to Get started → /start (JOV-5085 / JOV-5479)', () => {
+  it('keeps waitlist-on homepage CTAs in request-access mode', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
     expect(contract.primary).toEqual({
       label: 'Get started',
-      href: APP_ROUTES.START,
+      href: PUBLIC_WAITLIST_URL,
     });
-    expect(contract.primary.href).not.toMatch(/waitlist/i);
-    expect(contract.primary.href).not.toContain('starter_prompt');
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
       'Limited prelaunch access. We will email when you are in.'
@@ -28,7 +30,7 @@ describe('auth front-door contract', () => {
     });
     expect(contract.secondary).toEqual({
       label: 'See a live profile',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: TIM_WHITE_PROFILE.publicProfilePath,
     });
     expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
   });
@@ -38,7 +40,7 @@ describe('auth front-door contract', () => {
     expect(APP_ROUTES.SIGNIN).toBe('/signin');
   });
 
-  it('redirects legacy hyphenated auth paths to the canonical Clerk routes', async () => {
+  it('redirects legacy hyphenated auth paths to the canonical auth routes', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = await nextConfig.redirects();
@@ -63,19 +65,13 @@ describe('auth front-door contract', () => {
     });
   });
 
-  it('keeps Clerk-owned auth copy aligned with the canonical cross-links', () => {
-    expect(authClerkLocalization.signUp.start.title).toBe(
-      'Create your account'
-    );
-    expect(authClerkLocalization.signUp.start.actionText).toBe(
-      'Have an account?'
-    );
-    expect(authClerkLocalization.signUp.start.actionLink).toBe('Sign in');
+  it('keeps first-party auth copy aligned with the canonical cross-links', () => {
+    expect(authCopy.signUp.start.title).toBe('Continue to Jovie');
+    expect(authCopy.signUp.start.actionText).toBe('Have an account?');
+    expect(authCopy.signUp.start.actionLink).toBe('Sign in');
 
-    expect(authClerkLocalization.signIn.start.title).toBe('Welcome back');
-    expect(authClerkLocalization.signIn.start.actionText).toBe('No account?');
-    expect(authClerkLocalization.signIn.start.actionLink).toBe(
-      'Create your account'
-    );
+    expect(authCopy.signIn.start.title).toBe('Log in to Jovie');
+    expect(authCopy.signIn.start.actionText).toBe('Trouble signing in?');
+    expect(authCopy.signIn.start.actionLink).toBe('Get help');
   });
 });

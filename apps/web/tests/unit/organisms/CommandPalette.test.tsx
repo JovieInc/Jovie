@@ -352,7 +352,7 @@ describe('CommandPalette', () => {
       .find(el => el.textContent?.includes('Switch to OV'));
     fireEvent.mouseDown(action!);
 
-    expect(pushMock).toHaveBeenCalledWith('/app/ov');
+    expect(pushMock).toHaveBeenCalledWith('/app/ov/chat');
   });
 
   it('routes the admin workspace action from OV back to Jovie', () => {

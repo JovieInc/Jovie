@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { Link } from './link';
 
 describe('Link', () => {
+  it('deliberate-red: disables color transitions when reduced motion is requested', () => {
+    render(<Link href='/docs'>Documentation</Link>);
+
+    expect(screen.getByRole('link', { name: 'Documentation' })).toHaveClass(
+      'motion-reduce:transition-none'
+    );
+  });
+
   it('renders anchor with canonical link variant attrs', () => {
     render(
       <Link href='/docs' data-testid='link'>

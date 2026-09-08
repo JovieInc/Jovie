@@ -1,28 +1,45 @@
-import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   app,
   BrowserWindow,
+  clipboard,
   desktopCapturer,
   type IpcMainInvokeEvent,
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  type Session,
   screen,
   session,
-  type Session,
   shell,
 } from 'electron';
-import {
-  isTrayAppState,
-  MenuBarTray,
-  type TrayAction,
-  type TrayStatePayload,
-} from './tray';
 import { autoUpdater } from 'electron-updater';
+import {
+  OPERATOR_SPAWN_TIMEOUT_MS,
+  runBoundedProcess,
+} from './bounded-process';
+import {
+  DESKTOP_BUILD_IDENTITY_PRINT_FLAG,
+  DESKTOP_BUILD_IDENTITY_RESOURCE_NAME,
+  DESKTOP_BUILD_IDENTITY_SHELL_CSS,
+  DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
+  formatDesktopBuildIdentityDisplay,
+  renderDesktopBuildIdentitySection,
+  resolveDesktopBuildIdentity,
+  resolveDesktopBuildIdentityIpcRequest,
+  toDesktopBuildIdentityJson,
+} from './build-identity';
+import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
+import {
+  clearDesktopBrowserAuthRouteState,
+  type DesktopAuthIntent,
+  emptyDesktopBrowserAuthRouteState,
+  rememberDesktopBrowserAuthRoutePkce,
+  resolveDesktopBrowserAuthRoute,
+  setDesktopAuthRecoveryNavigationPending,
+} from './desktop-auth-browser-route';
 import {
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
@@ -32,13 +49,8 @@ import {
 } from './desktop-auth-security';
 import {
   buildDesktopUpdateMenuItem,
-  desktopBundlePathFromExecutable,
   hasNightlyUpdateFlag,
-  NIGHTLY_UPDATE_HOUR,
   NIGHTLY_UPDATE_TIMEOUT_MS,
-  nightlyUpdateLaunchAgentLabel,
-  nightlyUpdateMinute,
-  renderNightlyUpdateLaunchAgentPlist,
   shouldInstallDownloadedUpdateNow,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
@@ -51,23 +63,13 @@ import {
   shouldGrantTrustedHudScreenPermissionCheck,
 } from './desktop-permissions';
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
-import {
-  DESKTOP_BUILD_IDENTITY_PRINT_FLAG,
-  DESKTOP_BUILD_IDENTITY_RESOURCE_NAME,
-  DESKTOP_BUILD_IDENTITY_SHELL_CSS,
-  DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
-  formatDesktopBuildIdentityDisplay,
-  renderDesktopBuildIdentitySection,
-  resolveDesktopBuildIdentity,
-  toDesktopBuildIdentityJson,
-} from './build-identity';
-import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
 import { APP_ENV, APP_URL } from './env';
 import {
   decideHudBuildReload,
   getHudBuildFingerprint,
   isHudRoutePath,
 } from './hud-build-reload';
+import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -77,20 +79,22 @@ import {
   type UrlDisposition,
 } from './navigation';
 import {
+  decideOperatorLaunch,
+  parseOperatorLaunchRequest,
+  terminalLaunchSpec,
+} from './operator-launch';
+import {
   OVIE_OPERATOR_TALK_ROUTE,
   ovieOperatorOpsHref,
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
-import {
-  decideOperatorLaunch,
-  parseOperatorLaunchRequest,
-  terminalLaunchSpec,
-} from './operator-launch';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
   createLocalHostedLoadRetryController,
+  type DesktopLoadFailureReason,
+  type DesktopLoadFailureView,
   decideAbortedMainFrameRecovery,
   decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
@@ -107,15 +111,23 @@ import {
   shouldArmRendererWatchdogsForAppEnv,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
-  type DesktopLoadFailureReason,
-  type DesktopLoadFailureView,
 } from './renderer-recovery';
 import {
   createSummerRuntimeBridge,
   type SummerRuntimeBridge,
 } from './summer-runtime-bridge';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
-import { sanitizeWindowState, type WindowState } from './window-state';
+import {
+  isTrayAppState,
+  MenuBarTray,
+  type TrayAction,
+  type TrayStatePayload,
+} from './tray';
+import type { WindowState } from './window-state';
+import {
+  createWindowStateStore,
+  WINDOW_STATE_SHUTDOWN_FLUSH_MS,
+} from './window-state-store';
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
@@ -148,6 +160,7 @@ const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
 const APP_ICON_FILENAME =
   APP_ENV === 'production' ? 'icon.png' : 'icon-staging.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
+const APP_ICON_AVAILABLE = fs.existsSync(APP_ICON_PATH);
 const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
 const JOVIE_MARK_SVG_PATH =
   'm176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z';
@@ -156,6 +169,8 @@ const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
 function readPackagedBuildIdentityRecord(): unknown {
   if (!app.isPackaged) return null;
   try {
+    // Exact-site bootstrap read for About/identity before whenReady.
+    // Interactive window-state and launch-agent paths stay async.
     return JSON.parse(
       fs.readFileSync(
         path.join(process.resourcesPath, DESKTOP_BUILD_IDENTITY_RESOURCE_NAME),
@@ -191,6 +206,7 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
@@ -214,6 +230,7 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
+const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -254,16 +271,14 @@ const AUTH_HANDOFF_WINDOW_BOUNDS = {
   minHeight: 460,
 } as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
-const PUBLIC_PROFILE_PREVIEW_PARTITION =
-  'persist:jovie-public-profile-preview';
+const PUBLIC_PROFILE_PREVIEW_PARTITION = 'persist:jovie-public-profile-preview';
 const PUBLIC_PROFILE_PREVIEW_BOUNDS = {
   width: 390,
   height: 844,
   minWidth: 320,
   minHeight: 568,
 } as const;
-const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL =
-  'open-public-profile-in-browser';
+const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
@@ -275,7 +290,7 @@ let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
-let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
+let desktopBrowserAuthRouteState = emptyDesktopBrowserAuthRouteState();
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
@@ -397,7 +412,9 @@ async function openPublicProfileInBrowser(
   }
 }
 
-async function openExternalUrl(urlString: string): Promise<DesktopAuthOpenResult> {
+async function openExternalUrl(
+  urlString: string
+): Promise<DesktopAuthOpenResult> {
   const parsed = parseUrl(urlString);
   if (!parsed || !isAllowedExternalUrl(parsed)) {
     return { ok: false, reason: 'blocked-url' };
@@ -529,13 +546,6 @@ function sanitizeDesktopReturnRoute(
   return normalized;
 }
 
-function getDefaultDesktopReturnRoute(pathname: string): string {
-  return matchesPathPrefix(pathname, '/signup') ||
-    matchesPathPrefix(pathname, '/sign-up')
-    ? '/start'
-    : '/app';
-}
-
 function base64Url(buffer: Buffer): string {
   return buffer
     .toString('base64')
@@ -558,16 +568,22 @@ function createDesktopAuthPkce(): PendingDesktopAuthPkce {
 }
 
 function rememberDesktopAuthPkce(pkce: PendingDesktopAuthPkce): void {
-  pendingDesktopAuthPkce = pkce;
+  desktopBrowserAuthRouteState = rememberDesktopBrowserAuthRoutePkce(
+    desktopBrowserAuthRouteState,
+    pkce
+  );
   recentAuthCompletion = null;
 }
 
-function buildCentralDesktopAuthUrl(
-  intent: 'sign_in' | 'sign_up',
+function clearPendingDesktopAuthFlow(): void {
+  desktopBrowserAuthRouteState = clearDesktopBrowserAuthRouteState();
+}
+
+function createCentralDesktopAuthRoute(
+  intent: DesktopAuthIntent,
   returnTo: string
-): string {
+): { readonly authUrl: string; readonly pendingPkce: PendingDesktopAuthPkce } {
   const pkce = createDesktopAuthPkce();
-  rememberDesktopAuthPkce(pkce);
 
   const authUrl = new URL(DESKTOP_AUTH_START_PATH, APP_URL);
   authUrl.searchParams.set('client', 'electron');
@@ -576,46 +592,43 @@ function buildCentralDesktopAuthUrl(
   authUrl.searchParams.set('code_challenge', pkce.codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set(DESKTOP_AUTH_FLOW_PARAM, pkce.flowNonce);
-  return `${authUrl.pathname}${authUrl.search}`;
+  return {
+    authUrl: `${authUrl.pathname}${authUrl.search}`,
+    pendingPkce: pkce,
+  };
 }
 
-function isCentralDesktopAuthStartUrl(parsed: URL): boolean {
-  return (
-    parsed.origin === APP_ORIGIN &&
-    parsed.pathname === DESKTOP_AUTH_START_PATH &&
-    parsed.searchParams.get('client') === 'electron' &&
-    parsed.searchParams.get('code_challenge_method') === 'S256' &&
-    Boolean(parsed.searchParams.get('code_challenge')) &&
-    Boolean(sanitizeDesktopReturnRoute(parsed.searchParams.get('return_to')))
-  );
+function buildCentralDesktopAuthUrl(
+  intent: DesktopAuthIntent,
+  returnTo: string
+): string {
+  const created = createCentralDesktopAuthRoute(intent, returnTo);
+  rememberDesktopAuthPkce(created.pendingPkce);
+  return created.authUrl;
+}
+
+function resolveDesktopBrowserAuthUrl(urlString: string) {
+  const resolution = resolveDesktopBrowserAuthRoute({
+    state: desktopBrowserAuthRouteState,
+    urlString,
+    appOrigin: APP_ORIGIN,
+    authStartPath: DESKTOP_AUTH_START_PATH,
+    flowParam: DESKTOP_AUTH_FLOW_PARAM,
+    returnParam: DESKTOP_RETURN_PARAM,
+    parseUrl,
+    isDesktopAuthPath,
+    sanitizeReturnRoute: sanitizeDesktopReturnRoute,
+    matchesPathPrefix,
+    createCentralRoute: createCentralDesktopAuthRoute,
+  });
+  desktopBrowserAuthRouteState = resolution.state;
+  if (resolution.created) recentAuthCompletion = null;
+  return resolution;
 }
 
 function buildDesktopBrowserAuthUrl(urlString: string): string | null {
-  const parsed = parseUrl(urlString);
-  if (parsed && isCentralDesktopAuthStartUrl(parsed)) {
-    return `${parsed.pathname}${parsed.search}`;
-  }
-
-  if (
-    !parsed ||
-    parsed.origin !== APP_ORIGIN ||
-    !isDesktopAuthPath(parsed.pathname)
-  ) {
-    return null;
-  }
-
-  const desktopReturn =
-    sanitizeDesktopReturnRoute(parsed.searchParams.get(DESKTOP_RETURN_PARAM)) ??
-    sanitizeDesktopReturnRoute(parsed.searchParams.get('redirect_url')) ??
-    getDefaultDesktopReturnRoute(parsed.pathname);
-
-  parsed.searchParams.delete('oauth_error');
-  const intent =
-    matchesPathPrefix(parsed.pathname, '/signup') ||
-    matchesPathPrefix(parsed.pathname, '/sign-up')
-      ? 'sign_up'
-      : 'sign_in';
-  return buildCentralDesktopAuthUrl(intent, desktopReturn);
+  const resolution = resolveDesktopBrowserAuthUrl(urlString);
+  return resolution.ok ? resolution.authUrl : null;
 }
 
 function buildDesktopAuthHandoffUrl(authUrl: string): string {
@@ -664,7 +677,9 @@ function parseLegacyAuthReturnRouteDeepLink(urlString: string): string | null {
   return sanitizeDesktopReturnRoute(parsed.searchParams.get('route'));
 }
 
-function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null {
+function findLegacyAuthReturnRouteInArgv(
+  argv: readonly string[]
+): string | null {
   for (const arg of argv) {
     const route = parseLegacyAuthReturnRouteDeepLink(arg);
     if (route) return route;
@@ -672,16 +687,22 @@ function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null
   return null;
 }
 
+// Chromium's Web Speech recognition backend needs Google API keys that
+// Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
+// but every start() fails with a 'network' error (electron/electron#46143,
+// #7749). Advertising it as a fallback made the composer mic look live and
+// fail on every press. Report it unavailable so the renderer points at OS
+// dictation instead — macOS dictation types into any focused field here.
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
     nativeAvailable: false,
-    webSpeechFallbackAllowed: true,
-    mode: 'web-speech',
+    webSpeechFallbackAllowed: false,
+    mode: 'unavailable',
     reason:
       process.platform === 'darwin'
-        ? 'native-macos-dictation-is-system-owned-web-speech-fallback-enabled'
-        : 'native-dictation-unavailable-web-speech-fallback-enabled',
+        ? 'web-speech-unsupported-in-electron-use-macos-system-dictation'
+        : 'web-speech-unsupported-in-electron-use-system-dictation',
   };
 }
 
@@ -691,27 +712,24 @@ const WINDOW_STATE_FILE = path.join(
 );
 
 function getAppIconPath(): string | undefined {
-  return fs.existsSync(APP_ICON_PATH) ? APP_ICON_PATH : undefined;
+  return APP_ICON_AVAILABLE ? APP_ICON_PATH : undefined;
 }
 
-function loadWindowState(): WindowState {
+const windowStateStore = createWindowStateStore({
+  filePath: WINDOW_STATE_FILE,
+});
+let windowStateQuitFlushed = false;
+
+async function hydrateWindowState(): Promise<WindowState> {
   const displayBounds = screen.getPrimaryDisplay().workArea;
   const connectedDisplays = screen
     .getAllDisplays()
     .map(display => display.workArea);
-
-  try {
-    const raw = fs.readFileSync(WINDOW_STATE_FILE, 'utf8');
-    const parsed: unknown = JSON.parse(raw);
-    return sanitizeWindowState(
-      parsed,
-      displayBounds,
-      reportDesktopSecurityEvent,
-      connectedDisplays
-    );
-  } catch {
-    return sanitizeWindowState(undefined, displayBounds);
-  }
+  return windowStateStore.load({
+    displayBounds,
+    connectedDisplays,
+    report: reportDesktopSecurityEvent,
+  });
 }
 
 function saveWindowState(win: BrowserWindow): void {
@@ -720,17 +738,12 @@ function saveWindowState(win: BrowserWindow): void {
   // pre-fullscreen bounds so those transient states are never persisted.
   if (win.isMinimized()) return;
   const bounds = win.getNormalBounds();
-  const state: WindowState = {
+  windowStateStore.scheduleSave({
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-  };
-  try {
-    fs.writeFileSync(WINDOW_STATE_FILE, JSON.stringify(state), 'utf8');
-  } catch {
-    // Non-fatal — window state loss is acceptable
-  }
+  });
 }
 
 function showWindowNow(win: BrowserWindow): void {
@@ -786,9 +799,7 @@ function restoreMainWindowAfterAuthHandoff(): void {
   mainWindowHiddenForAuthHandoff = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (
-      shouldRecoverAuthHandoffToCanonicalShell(
-        mainWindow.webContents.getURL()
-      )
+      shouldRecoverAuthHandoffToCanonicalShell(mainWindow.webContents.getURL())
     ) {
       const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
       void mainWindow.loadURL(buildDesktopAuthHandoffUrl(authUrl));
@@ -907,34 +918,39 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
 // persisted across launches; the new flow starts over.
 function surfaceNoPendingAuthFlow(): void {
   if (!app.isReady()) return;
+  if (desktopBrowserAuthRouteState.recoveryNavigationPending) return;
   const win =
     mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
   showWindow(win);
-  showDesktopAuthHandoff(buildCentralDesktopAuthUrl('sign_in', '/app'));
+  showDesktopAuthHandoff(buildCentralDesktopAuthUrl('sign_in', '/app'), {
+    recoveryNavigation: true,
+  });
 }
 
 function handleAuthCompletion(
   completion: NonNullable<ReturnType<typeof parseDesktopAuthReturnDeepLink>>
 ): void {
   const binding = bindPendingDesktopAuthCompletion(
-    pendingDesktopAuthPkce,
+    desktopBrowserAuthRouteState.pendingPkce,
     completion
   );
 
   if (!binding.ok) {
     reportDesktopAuthBindingFailure(reportDesktopSecurityEvent, binding);
     if (binding.reason === 'pkce-expired') {
-      // The pending flow is dead either way — drop it.
-      pendingDesktopAuthPkce = null;
+      // The pending flow is dead either way. Replace it with a fresh handoff
+      // so the user is not stranded after returning from an expired browser.
+      clearPendingDesktopAuthFlow();
+      surfaceNoPendingAuthFlow();
     } else if (binding.reason === 'no-pending-flow') {
       surfaceNoPendingAuthFlow();
     }
     // 'flow-mismatch' (a forged-but-well-formed deep link) must NOT clear the
-    // legitimate in-flight login — leave pendingDesktopAuthPkce untouched.
+    // legitimate in-flight login — leave the pending PKCE state untouched.
     return;
   }
 
-  pendingDesktopAuthPkce = null;
+  clearPendingDesktopAuthFlow();
 
   const nativeCompletion: DesktopAuthCompletion = {
     code: completion.code,
@@ -998,12 +1014,31 @@ function getRecentAuthCompletionForState(
   return recentAuthCompletion.completion;
 }
 
-function showDesktopAuthHandoff(authUrl: string): void {
+function showDesktopAuthHandoff(
+  authUrl: string,
+  options: { readonly recoveryNavigation?: boolean } = {}
+): void {
   const handoffUrl = buildDesktopAuthHandoffUrl(authUrl);
   hideMainWindowForAuthHandoff();
 
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
-    void authHandoffWindow.loadURL(handoffUrl);
+    const recoveryWindow = authHandoffWindow;
+    if (options.recoveryNavigation) {
+      desktopBrowserAuthRouteState = setDesktopAuthRecoveryNavigationPending(
+        desktopBrowserAuthRouteState,
+        true
+      );
+    }
+    const finishRecoveryNavigation = () => {
+      if (authHandoffWindow !== recoveryWindow) return;
+      desktopBrowserAuthRouteState = setDesktopAuthRecoveryNavigationPending(
+        desktopBrowserAuthRouteState,
+        false
+      );
+    };
+    void recoveryWindow
+      .loadURL(handoffUrl)
+      .then(finishRecoveryNavigation, finishRecoveryNavigation);
     showWindow(authHandoffWindow);
     return;
   }
@@ -1046,6 +1081,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
 
   authHandoffWindow.on('closed', () => {
     authHandoffWindow = null;
+    clearPendingDesktopAuthFlow();
     restoreMainWindowAfterAuthHandoff();
     // The handoff installed deny-all permission handlers on the shared default
     // session; restore the main window's trusted-audio policy.
@@ -1121,11 +1157,11 @@ function buildDesktopShellHtml(input: {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${input.title}</title>
     <style>
-      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; }
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; --system-b-mark-cream: ${SYSTEM_B_DESKTOP_TOKENS.markCream}; }
       html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); color: var(--system-b-text-primary); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
       body { display: grid; place-items: center; overflow: hidden; }
-      .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; }
-      .mark { position: absolute; left: 50%; top: 50%; width: 180px; height: 180px; opacity: 0.035; pointer-events: none; transform: translate(-50%, -50%); }
+      .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; justify-items: center; }
+      .mark { width: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; height: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; color: var(--system-b-mark-cream); }
       .copy { position: relative; display: grid; gap: 8px; justify-items: center; }
       h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
       p { margin: 0; max-width: 34ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
@@ -1152,9 +1188,7 @@ function buildDesktopShellHtml(input: {
 </html>`;
 }
 
-function buildDesktopLoadFailureUrl(
-  failure: DesktopLoadFailureView
-): string {
+function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
   const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
   const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
   const html = buildDesktopShellHtml({
@@ -1170,14 +1204,34 @@ function buildDesktopLoadFailureUrl(
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
+function buildDesktopBootSplashHtml(): string {
+  const markPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
+  const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jovie</title>
+    <style>
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-mark-cream: ${markCream}; }
+      html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); }
+      body { display: grid; place-items: center; overflow: hidden; }
+      .mark { width: ${markPx}px; height: ${markPx}px; color: var(--system-b-mark-cream); }
+    </style>
+  </head>
+  <body>
+    <main role="main" aria-label="Jovie is loading" data-desktop-splash="splash-b">
+      <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
+        <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
+      </svg>
+    </main>
+  </body>
+</html>`;
+}
+
 function buildDesktopBootSplashUrl(): string {
-  const html = buildDesktopShellHtml({
-    title: 'Jovie',
-    heading: 'Loading Jovie',
-    body: 'Starting the app…',
-    identityHtml: renderDesktopBuildIdentitySection(desktopBuildIdentity),
-  });
-  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(buildDesktopBootSplashHtml())}`;
 }
 
 function buildDesktopAboutUrl(): string {
@@ -1196,9 +1250,9 @@ function buildDesktopAboutUrl(): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
-function persistDesktopBuildIdentityEvidence(): void {
+async function persistDesktopBuildIdentityEvidence(): Promise<void> {
   try {
-    fs.writeFileSync(
+    await fs.promises.writeFile(
       path.join(app.getPath('userData'), DESKTOP_BUILD_IDENTITY_RESOURCE_NAME),
       toDesktopBuildIdentityJson(desktopBuildIdentity)
     );
@@ -1298,7 +1352,9 @@ async function findReachableHostedUrl(
 ): Promise<string | null> {
   for (const candidate of hostedUrlCandidates(APP_URL, hostedUrl)) {
     const origin = new URL(candidate).origin;
-    if (await probeAppUrl(new URL('/api/health/build-info', origin).toString())) {
+    if (
+      await probeAppUrl(new URL('/api/health/build-info', origin).toString())
+    ) {
       return candidate;
     }
     if (await probeAppUrl(origin)) {
@@ -1403,8 +1459,8 @@ function showPublicProfilePreview(urlString: string): boolean {
     PUBLIC_PROFILE_PREVIEW_PARTITION,
     { cache: true }
   );
-  previewSession.setPermissionRequestHandler((_contents, _permission, callback) =>
-    callback(false)
+  previewSession.setPermissionRequestHandler(
+    (_contents, _permission, callback) => callback(false)
   );
   previewSession.setPermissionCheckHandler(() => false);
 
@@ -1444,14 +1500,17 @@ function showPublicProfilePreview(urlString: string): boolean {
     if (event.isMainFrame) return;
     event.preventDefault();
   });
-  preview.webContents.on('will-redirect', (event, url, _inPlace, isMainFrame) => {
-    const navigationUrl = resolveNavigationUrl(url);
-    if (getUrlDisposition(navigationUrl) === 'profile-preview') return;
-    event.preventDefault();
-    if (isMainFrame && getUrlDisposition(navigationUrl) === 'external') {
-      void openExternalUrl(navigationUrl);
+  preview.webContents.on(
+    'will-redirect',
+    (event, url, _inPlace, isMainFrame) => {
+      const navigationUrl = resolveNavigationUrl(url);
+      if (getUrlDisposition(navigationUrl) === 'profile-preview') return;
+      event.preventDefault();
+      if (isMainFrame && getUrlDisposition(navigationUrl) === 'external') {
+        void openExternalUrl(navigationUrl);
+      }
     }
-  });
+  );
   preview.webContents.setWindowOpenHandler(({ url }) => {
     const navigationUrl = resolveNavigationUrl(url);
     const disposition = getUrlDisposition(navigationUrl);
@@ -1781,7 +1840,10 @@ function attachRendererRecovery(
           showWindowNow(win);
           return;
         }
-        if (abortAction === 'arm-load-watchdog' && typeof validatedURL === 'string') {
+        if (
+          abortAction === 'arm-load-watchdog' &&
+          typeof validatedURL === 'string'
+        ) {
           armLoadWatchdog(resolveNavigationUrl(validatedURL));
         }
         return;
@@ -1797,14 +1859,17 @@ function attachRendererRecovery(
           retryUrl,
         });
         if (localResult.action === 'retry') {
-          console.warn('[Jovie Desktop] Local hosted load not ready, retrying', {
-            errorCode,
-            attempt: localResult.attempt,
-            validatedURL:
-              typeof validatedURL === 'string'
-                ? validatedURL.split('?')[0]
-                : validatedURL,
-          });
+          console.warn(
+            '[Jovie Desktop] Local hosted load not ready, retrying',
+            {
+              errorCode,
+              attempt: localResult.attempt,
+              validatedURL:
+                typeof validatedURL === 'string'
+                  ? validatedURL.split('?')[0]
+                  : validatedURL,
+            }
+          );
           // Chromium commits chrome-error://chromewebdata/ after a refused
           // loopback load. Keep the app-owned shell painted while the bounded
           // retry obligation remains active.
@@ -1861,7 +1926,7 @@ function attachRendererRecovery(
 }
 
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
-  const windowState = loadWindowState();
+  const windowState = windowStateStore.peek();
 
   const win = new BrowserWindow({
     show: false,
@@ -2029,6 +2094,12 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     return { action: 'deny' };
   });
 
+  win.on('resize', () => {
+    saveWindowState(win);
+  });
+  win.on('move', () => {
+    saveWindowState(win);
+  });
   win.on('close', () => {
     saveWindowState(win);
   });
@@ -2176,52 +2247,20 @@ function scheduleDesktopAutoUpdate(): void {
   interval.unref?.();
 }
 
-function installNightlyUpdateLaunchAgent(): void {
-  if (
-    nightlyUpdateLaunch ||
-    !app.isPackaged ||
-    process.platform !== 'darwin' ||
-    !desktopUpdatesSupported()
-  ) {
-    return;
-  }
-
-  const label = nightlyUpdateLaunchAgentLabel(APP_ENV);
-  const minute = nightlyUpdateMinute(APP_ENV);
-  if (!label || minute === null) {
-    return;
-  }
-
-  const bundlePath = desktopBundlePathFromExecutable(process.execPath);
-  const plistPath = path.join(
-    app.getPath('home'),
-    'Library',
-    'LaunchAgents',
-    `${label}.plist`
-  );
-  fs.mkdirSync(path.dirname(plistPath), { recursive: true });
-  fs.writeFileSync(
-    plistPath,
-    renderNightlyUpdateLaunchAgentPlist({
-      label,
-      bundlePath,
-      hour: NIGHTLY_UPDATE_HOUR,
-      minute,
-    }),
-    'utf8'
-  );
-
-  const uid = process.getuid?.();
-  if (typeof uid !== 'number') {
-    return;
-  }
-
-  const domain = `gui/${uid}`;
-  spawnSync('launchctl', ['bootout', `${domain}/${label}`], {
-    stdio: 'ignore',
-  });
-  spawnSync('launchctl', ['bootstrap', domain, plistPath], {
-    stdio: 'ignore',
+function scheduleNightlyUpdateLaunchAgent(): void {
+  void installNightlyUpdateLaunchAgent({
+    nightlyUpdateLaunch,
+    packaged: app.isPackaged,
+    platform: process.platform,
+    appEnv: APP_ENV,
+    execPath: process.execPath,
+    homeDirectory: app.getPath('home'),
+    uid: process.getuid?.(),
+  }).catch(error => {
+    console.warn(
+      '[jovie-desktop-launch-agent]',
+      error instanceof Error ? error.message : String(error)
+    );
   });
 }
 
@@ -2417,6 +2456,18 @@ autoUpdater.on('error', () => {
   }
 });
 
+// Return only the already-validated identity, and only to the trusted app origin.
+ipcMain.handle(
+  GET_BUILD_IDENTITY_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    return resolveDesktopBuildIdentityIpcRequest({
+      trustedSender: isTrustedIpcSender(event),
+      args,
+      identity: desktopBuildIdentity,
+    });
+  }
+);
+
 // Allow renderer to trigger quit-and-install without exposing node access.
 ipcMain.handle(
   QUIT_AND_INSTALL_CHANNEL,
@@ -2458,9 +2509,17 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', event => {
   summerRuntimeBridge?.stop();
   summerRuntimeBridge = null;
+  if (windowStateQuitFlushed || !windowStateStore.needsFlush()) return;
+  windowStateQuitFlushed = true;
+  event.preventDefault();
+  void windowStateStore
+    .flushOnShutdown(WINDOW_STATE_SHUTDOWN_FLUSH_MS)
+    .finally(() => {
+      app.quit();
+    });
 });
 
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
@@ -2523,12 +2582,42 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-request' };
     }
 
-    const browserAuthUrl = buildDesktopBrowserAuthUrl(authUrl);
-    if (!browserAuthUrl) {
-      return { ok: false, reason: 'invalid-auth-url' };
+    const resolution = resolveDesktopBrowserAuthUrl(authUrl);
+    if (!resolution.ok) {
+      return { ok: false, reason: resolution.reason };
     }
 
-    return openExternalUrl(new URL(browserAuthUrl, APP_URL).toString());
+    return openExternalUrl(new URL(resolution.authUrl, APP_URL).toString());
+  }
+);
+
+ipcMain.handle(
+  COPY_DESKTOP_AUTH_URL_CHANNEL,
+  (
+    event: IpcMainInvokeEvent,
+    authUrl: unknown,
+    ...args: unknown[]
+  ): DesktopAuthOpenResult => {
+    if (
+      !isTrustedDesktopAuthSender(event) ||
+      args.length !== 0 ||
+      typeof authUrl !== 'string'
+    ) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    const resolution = resolveDesktopBrowserAuthUrl(authUrl);
+    if (!resolution.ok) {
+      return { ok: false, reason: resolution.reason };
+    }
+
+    const externalAuthUrl = new URL(resolution.authUrl, APP_URL).toString();
+    try {
+      clipboard.writeText(externalAuthUrl);
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'clipboard-write-failed' };
+    }
   }
 );
 
@@ -2539,6 +2628,7 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-request' };
     }
 
+    clearPendingDesktopAuthFlow();
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win && !win.isDestroyed()) {
       win.close();
@@ -2604,7 +2694,8 @@ if (gotSingleInstanceLock) {
 
     const invalidAuthReturn = argv.some(
       arg =>
-        isAuthReturnDeepLinkCandidate(arg) && !parseDesktopAuthReturnDeepLink(arg)
+        isAuthReturnDeepLinkCandidate(arg) &&
+        !parseDesktopAuthReturnDeepLink(arg)
     );
     if (invalidAuthReturn) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
@@ -2617,7 +2708,9 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    const profileUrl = argv.find((arg: string) => canonicalPublicProfileUrl(arg));
+    const profileUrl = argv.find((arg: string) =>
+      canonicalPublicProfileUrl(arg)
+    );
     if (profileUrl) {
       showPublicProfilePreview(profileUrl);
       return;
@@ -2655,16 +2748,15 @@ if (gotSingleInstanceLock) {
   pendingLegacyAuthReturnRoute = findLegacyAuthReturnRouteInArgv(process.argv);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 
-  persistDesktopBuildIdentityEvidence();
+  void persistDesktopBuildIdentityEvidence();
   app.setAboutPanelOptions({
     applicationName: getDesktopAppDisplayName(),
     applicationVersion: desktopBuildIdentity.version,
     version:
-      desktopBuildIdentity.sourceRevision ??
-      DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
+      desktopBuildIdentity.sourceRevision ?? DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
     credits: formatDesktopBuildIdentityDisplay(desktopBuildIdentity),
   });
   console.info(
@@ -2699,7 +2791,7 @@ app.whenReady().then(() => {
     return;
   }
 
-  installNightlyUpdateLaunchAgent();
+  await hydrateWindowState();
 
   // macOS menu bar extra (NSStatusItem via Electron Tray)
   if (process.platform === 'darwin') {
@@ -2718,6 +2810,7 @@ app.whenReady().then(() => {
   );
   if (directProfileUrl) showPublicProfilePreview(directProfileUrl);
   pendingLegacyAuthReturnRoute = null;
+  scheduleNightlyUpdateLaunchAgent();
   scheduleDesktopAutoUpdate();
   scheduleHudBuildAutoReload();
 
@@ -2797,14 +2890,17 @@ ipcMain.handle(
     }
     const spec = terminalLaunchSpec(process.platform, decision.command);
     if (!spec) return { ok: false, reason: 'unsupported-platform' };
-    try {
-      spawn(spec.command, [...spec.args], {
-        detached: true,
-        stdio: 'ignore',
-      }).unref();
-      return { ok: true };
-    } catch {
-      return { ok: false, reason: 'open-terminal-failed' };
+    const launched = await runBoundedProcess({
+      command: spec.command,
+      args: spec.args,
+      timeoutMs: OPERATOR_SPAWN_TIMEOUT_MS,
+      detached: true,
+      stdio: 'ignore',
+      waitForExit: false,
+    });
+    if (!launched.ok) {
+      return { ok: false, reason: launched.reason };
     }
+    return { ok: true };
   }
 );

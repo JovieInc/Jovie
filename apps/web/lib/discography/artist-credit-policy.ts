@@ -1,6 +1,22 @@
 import type { ArtistRole } from '@/lib/db/schema/content';
 
 /**
+ * Roles that count as credited primary/main artists on a release or track.
+ * Featured, remix, and production credits must never be promoted into this set.
+ */
+export const PRIMARY_ARTIST_ROLES = [
+  'main_artist',
+] as const satisfies readonly ArtistRole[];
+
+export type PrimaryArtistRole = (typeof PRIMARY_ARTIST_ROLES)[number];
+
+export function isPrimaryArtistRole(
+  role: ArtistRole
+): role is PrimaryArtistRole {
+  return PRIMARY_ARTIST_ROLES.includes(role as PrimaryArtistRole);
+}
+
+/**
  * Credit roles that represent a public artist collaboration.
  *
  * Production and songwriting roles remain visible on release credit surfaces,

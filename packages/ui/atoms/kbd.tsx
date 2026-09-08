@@ -22,7 +22,7 @@ const Kbd = React.forwardRef<HTMLElement, KbdProps>(
         'inline-flex min-h-5 min-w-5 items-center justify-center rounded-(--app-shell-radius-item) px-1.5 py-px text-center font-mono text-2xs leading-none font-medium shadow-sm',
         variant === 'tooltip'
           ? // Tooltip variant: elevated surface visible against tooltip bg
-            'border border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
+            'border border-(--linear-border-default) bg-surface-tooltip text-(--linear-text-primary)'
           : // Default variant: for use outside tooltips
             'border border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
         className

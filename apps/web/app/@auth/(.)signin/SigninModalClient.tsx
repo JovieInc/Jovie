@@ -23,7 +23,10 @@ export function SigninModalClient() {
 
   return (
     <AuthenticatedAuthEntryGuard>
-      <AuthModalShell ariaLabel='Sign in to Jovie'>
+      <AuthModalShell
+        ariaLabel='Log in to Jovie'
+        backButtonLabel='Back to homepage'
+      >
         <AuthShell
           mode='sign-in'
           compact

@@ -1,0 +1,282 @@
+{
+  "contract": "jovie.eve.summer-product-paths/v1",
+  "base": {
+    "schema": "jovie.eve.summer-product-paths/v1",
+    "observedAt": "2026-09-04T20:00:00.000Z",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reference": "https://example.test/company/aggregate-fixture",
+    "cohort": {
+      "id": "journeys-7d",
+      "definitionRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "windowStart": "2026-08-28T20:00:00.000Z",
+      "windowEnd": "2026-09-04T20:00:00.000Z",
+      "environment": "production",
+      "deploymentRevision": "cccccccccccccccccccccccccccccccccccccccc"
+    },
+    "paths": [
+      {
+        "id": "artist-search",
+        "interface": "web",
+        "stage": "account-created",
+        "owner": "signup-owner",
+        "handle": "JOV-6000",
+        "blockedSince": null,
+        "basis": "measured",
+        "measurement": {
+          "cohortId": "journeys-7d",
+          "sampleStatus": "complete",
+          "attemptedJourneys": 100,
+          "successfulJourneys": 70,
+          "failedJourneys": 20,
+          "abandonedJourneys": 10,
+          "paidConversions": {
+            "cohortId": "journeys-7d",
+            "basis": "collected-positive-payment",
+            "count": 7
+          }
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "complete production evidence",
+      "valid": true,
+      "changes": []
+    },
+    {
+      "name": "local critical-path risk",
+      "valid": true,
+      "changes": [
+        {
+          "path": ["cohort", "environment"],
+          "value": "local"
+        },
+        {
+          "path": ["paths", "0", "basis"],
+          "value": "critical-path-risk"
+        },
+        {
+          "path": ["paths", "0", "measurement"],
+          "value": null
+        }
+      ]
+    },
+    {
+      "name": "stale product evidence remains explicit data for Summer to downgrade",
+      "valid": true,
+      "changes": [
+        {
+          "path": ["observedAt"],
+          "value": "2026-09-04T18:00:00.000Z"
+        },
+        {
+          "path": ["cohort", "windowEnd"],
+          "value": "2026-09-04T18:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "sparse counts",
+      "valid": true,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "sampleStatus"],
+          "value": "sparse"
+        }
+      ]
+    },
+    {
+      "name": "missing payment evidence",
+      "valid": true,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "paidConversions"],
+          "value": null
+        }
+      ]
+    },
+    {
+      "name": "cross-cohort counts",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "cohortId"],
+          "value": "different-cohort"
+        }
+      ]
+    },
+    {
+      "name": "cross-cohort payment",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "paidConversions", "cohortId"],
+          "value": "different-cohort"
+        }
+      ]
+    },
+    {
+      "name": "subscription proxy is not collected payment",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "paidConversions", "basis"],
+          "value": "subscription-id-exists"
+        }
+      ]
+    },
+    {
+      "name": "impossible outcomes",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "failedJourneys"],
+          "value": 101
+        }
+      ]
+    },
+    {
+      "name": "impossible payments",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "paidConversions", "count"],
+          "value": 71
+        }
+      ]
+    },
+    {
+      "name": "fabricated lift field",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "conversionLift"],
+          "value": 0.9
+        }
+      ]
+    },
+    {
+      "name": "invalid window",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["cohort", "windowEnd"],
+          "value": "2026-09-05T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "unsupported version",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["schema"],
+          "value": "jovie.eve.summer-product-paths/v2"
+        }
+      ]
+    },
+    {
+      "name": "measured counts missing",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement"],
+          "value": null
+        }
+      ]
+    },
+    {
+      "name": "future blocked time",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "blockedSince"],
+          "value": "2026-09-05T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "name": "duplicate path ids",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths"],
+          "value": [
+            {
+              "id": "artist-search",
+              "interface": "web",
+              "stage": "account-created",
+              "owner": "signup-owner",
+              "handle": "JOV-6000",
+              "blockedSince": null,
+              "basis": "measured",
+              "measurement": {
+                "cohortId": "journeys-7d",
+                "sampleStatus": "complete",
+                "attemptedJourneys": 100,
+                "successfulJourneys": 70,
+                "failedJourneys": 20,
+                "abandonedJourneys": 10,
+                "paidConversions": {
+                  "cohortId": "journeys-7d",
+                  "basis": "collected-positive-payment",
+                  "count": 7
+                }
+              }
+            },
+            {
+              "id": "artist-search",
+              "interface": "web",
+              "stage": "account-created",
+              "owner": "signup-owner",
+              "handle": "JOV-6000",
+              "blockedSince": null,
+              "basis": "measured",
+              "measurement": {
+                "cohortId": "journeys-7d",
+                "sampleStatus": "complete",
+                "attemptedJourneys": 100,
+                "successfulJourneys": 70,
+                "failedJourneys": 20,
+                "abandonedJourneys": 10,
+                "paidConversions": {
+                  "cohortId": "journeys-7d",
+                  "basis": "collected-positive-payment",
+                  "count": 7
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "empty complete sample",
+      "valid": false,
+      "changes": [
+        {
+          "path": ["paths", "0", "measurement", "attemptedJourneys"],
+          "value": 0
+        },
+        {
+          "path": ["paths", "0", "measurement", "successfulJourneys"],
+          "value": 0
+        },
+        {
+          "path": ["paths", "0", "measurement", "failedJourneys"],
+          "value": 0
+        },
+        {
+          "path": ["paths", "0", "measurement", "abandonedJourneys"],
+          "value": 0
+        },
+        {
+          "path": ["paths", "0", "measurement", "paidConversions"],
+          "value": null
+        }
+      ]
+    }
+  ]
+}

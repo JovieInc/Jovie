@@ -6,7 +6,7 @@
 #   ready-to-enroll  — non-draft, mergeable, 0 failing checks, not opted out
 #   needs-ready-flip — draft, mergeable, 0 failing checks, agent-owned
 #   needs-fix        — mergeable but has failing checks
-#   needs-human      — has needs-human/hold/gated label
+#   machine-held     — has a current hold/gated/incident label
 #   superseded       — merge conflict or unmergeable
 #
 # Also reports the count of orphaned drafts (green but still draft >24h).
@@ -106,7 +106,7 @@ while IFS= read -r pr; do
   fail="[]"
   if jq -e '
     (.m == "MERGEABLE")
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated")) | not)
+    and (([.L[]] | any(. == "hold" or . == "gated" or . == "incident")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -118,7 +118,7 @@ SNAP="$ENRICHED"
 CLASSIFIED="$(echo "$SNAP" | jq --arg re "$AGENT_RE" --arg cutoff "$orphan_cutoff_iso" '
   [.[] | . + {
     bucket: (
-      if ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated")) then "needs-human"
+      if ([.L[]] | any(. == "hold" or . == "gated" or . == "incident")) then "machine-held"
       elif .m == "CONFLICTING" then "superseded"
       elif .m != "MERGEABLE" then "superseded"
       elif .draft and ((.head | test($re)) and (.fail | length == 0) and ((.updated // "9999-01-01") < $cutoff)) then "needs-ready-flip"
@@ -141,7 +141,7 @@ else
   echo "=== CI HEALTH CHECK ==="
   echo ""
 
-  for bucket in ready-to-enroll needs-ready-flip needs-fix needs-human superseded; do
+  for bucket in ready-to-enroll needs-ready-flip needs-fix machine-held superseded; do
     bucket_prs="$(echo "$CLASSIFIED" | jq -c --arg b "$bucket" '[.[] | select(.bucket == $b)]')"
     count="$(jq length <<<"$bucket_prs")"
     echo "--- $bucket ($count) ---"

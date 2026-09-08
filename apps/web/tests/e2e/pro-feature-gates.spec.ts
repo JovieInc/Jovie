@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { signInUser } from '../helpers/auth';
 import {
   completeCardPayment,
   createCheckoutSession,

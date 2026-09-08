@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly SYMPHONY_VERSION="v0.0.2"
+readonly SYMPHONY_VERSION="v0.0.2-jovie.2"
 readonly SYMPHONY_ASSET="symphony-${SYMPHONY_VERSION}-macos_arm64"
-readonly SYMPHONY_RELEASE_URL="https://github.com/openai/symphony/releases/download/${SYMPHONY_VERSION}"
+readonly SYMPHONY_RELEASE_URL="https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_VERSION}"
 readonly SYMPHONY_INSTALL_DIR="${1:-$HOME/.local/bin}"
 
 if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then

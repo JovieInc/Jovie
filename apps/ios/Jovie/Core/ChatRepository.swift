@@ -22,9 +22,13 @@ final class ChatRepository {
   private(set) var activeConversationID: String?
   private(set) var isLoadingConversations = false
   private(set) var isSending = false
+  private(set) var isLoadingOlder = false
+  private(set) var hasMoreOlder = false
   private(set) var isOffline = false
   private(set) var sessionExpired = false
   private(set) var lastErrorMessage: String?
+  private var olderCursor: String?
+  private var sendGeneration = 0
 
   private let client: MobileChatClientProtocol
   private let cache: ChatCache
@@ -40,6 +44,7 @@ final class ChatRepository {
   /// unconditionally calls `refreshConversations()` in a `.task` on
   /// appear, so this can't be solved by the call site alone.
   private var isFixtureSeeded = false
+  private var sendTask: Task<Void, Never>?
 
   init(
     client: MobileChatClientProtocol,
@@ -59,6 +64,15 @@ final class ChatRepository {
 
   func bootstrap() async {
     await hydrateFromCache()
+    if workspace == .ovie {
+      if activeConversationID == nil { await refreshConversations() }
+      else { await openConversation(activeConversationID!) }
+    }
+  }
+
+  func cancelInFlightTurn() {
+    sendGeneration += 1
+    sendTask?.cancel()
   }
 
   func refreshConversations() async {
@@ -73,6 +87,9 @@ final class ChatRepository {
       isOffline = false
       lastErrorMessage = nil
       await persistCache()
+      if workspace == .ovie, activeConversationID == nil, let first = fetched.first {
+        await openConversation(first.id)
+      }
     } catch {
       await hydrateFromCache()
       applyFailure(error)
@@ -90,15 +107,24 @@ final class ChatRepository {
     // live timeline (it may hold an in-flight turn the cache has not seen).
     if isSwitchingThread, !(await hydrateConversationFromCache(conversationID)) {
       timeline = []
+      hasMoreOlder = false
+      olderCursor = nil
     }
 
     do {
-      let detail = try await client.fetchConversation(id: conversationID, limit: 100)
+      let detail = try await client.fetchConversation(
+        id: conversationID,
+        limit: ChatTranscriptWindow.initialMessageLimit,
+        before: nil
+      )
       await persistCache(messages: detail.messages, conversationID: conversationID)
       // The user may have moved on while this fetch was in flight; never paint
       // a stale thread over the one they are looking at now.
       guard activeConversationID == conversationID else { return }
-      timeline = detail.messages.map(timelineItem(from:))
+      let hasInFlightTurn = timeline.contains { $0.status.isInFlight }
+      if !hasInFlightTurn {
+        applyFetchedWindow(detail.messages, hasMore: detail.hasMore)
+      }
       isOffline = false
       lastErrorMessage = nil
       donateConversationActivity(
@@ -107,6 +133,9 @@ final class ChatRepository {
       )
     } catch {
       guard activeConversationID == conversationID else { return }
+      if timeline.isEmpty {
+        await hydrateConversationFromCache(conversationID)
+      }
       applyFailure(error)
       donateConversationActivity(
         conversationID: conversationID,
@@ -115,9 +144,39 @@ final class ChatRepository {
     }
   }
 
+  func loadOlderMessages() async {
+    guard
+      hasMoreOlder,
+      !isLoadingOlder,
+      let conversationID = activeConversationID,
+      let olderCursor,
+      !olderCursor.isEmpty
+    else { return }
+
+    isLoadingOlder = true
+    defer { isLoadingOlder = false }
+
+    do {
+      let detail = try await client.fetchConversation(
+        id: conversationID,
+        limit: ChatTranscriptWindow.initialMessageLimit,
+        before: olderCursor
+      )
+      guard activeConversationID == conversationID else { return }
+      prependFetchedWindow(detail.messages, hasMore: detail.hasMore)
+      isOffline = false
+      lastErrorMessage = nil
+      await persistCache()
+    } catch {
+      applyFailure(error)
+    }
+  }
+
   func startNewConversation() {
     activeConversationID = nil
     timeline = []
+    hasMoreOlder = false
+    olderCursor = nil
     lastErrorMessage = nil
   }
 
@@ -134,22 +193,39 @@ final class ChatRepository {
     isFixtureSeeded = true
     self.activeConversationID = activeConversationID
     self.timeline = timeline
+    hasMoreOlder = false
+    olderCursor = nil
     isOffline = false
     lastErrorMessage = nil
   }
 
   func send(text: String) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, !isSending else { return }
+    guard !trimmed.isEmpty else { return }
 
+    let wasSending = isSending
+    sendGeneration += 1
+    let generation = sendGeneration
+    if wasSending {
+      sendTask?.cancel()
+      interruptInFlightAssistantRows()
+    }
+
+    let task = Task { [weak self] in
+      _ = await self?.performSend(text: trimmed, generation: generation)
+    }
+    sendTask = task
+    await task.value
+  }
+
+  private func performSend(text: String, generation: Int) async {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
-
     timeline.append(
       MobileChatTimelineItem(
         id: "user:\(clientTurnId)",
         role: .user,
-        content: trimmed,
+        content: text,
         status: .completed,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
@@ -161,7 +237,7 @@ final class ChatRepository {
         id: "assistant:\(clientTurnId)",
         role: .assistant,
         content: "",
-        status: .sending,
+        status: .queued,
         clientTurnId: clientTurnId,
         requiresWebHandoff: false,
         handoffURL: nil
@@ -169,25 +245,34 @@ final class ChatRepository {
     )
 
     isSending = true
-    defer { isSending = false }
+    defer {
+      if generation == sendGeneration {
+        isSending = false
+      }
+    }
 
     // The client publishes one event per NDJSON line, so raw chunk cadence
     // would otherwise drive one timeline mutation (and one assistant-row
     // re-parse) per token. Coalesce deltas to a bounded rate (JOV-5874).
     let coalescer = MobileChatStreamCoalescer { [weak self] batch in
-      self?.apply(events: batch, clientTurnId: clientTurnId)
+      self?.applyIfCurrent(
+        generation: generation,
+        events: batch,
+        clientTurnId: clientTurnId
+      )
     }
 
     do {
-      // Apply NDJSON events as they arrive so tokens paint before the body
-      // finishes. Do not refetch list/detail here — those GETs can replace
-      // this timeline and mark a successful turn offline.
+      try Task.checkCancellation()
+      // Apply each NDJSON event as it arrives so tokens paint before the
+      // body finishes. Do not refetch list/detail here — those GETs can
+      // replace this timeline and mark a successful turn offline.
       _ = try await client.sendTurn(
         MobileChatTurnRequest(
           conversationId: activeConversationID,
           clientTurnId: clientTurnId,
           clientMessageId: clientMessageId,
-          text: trimmed,
+          text: text,
           source: "typed",
           chatMode: workspace.chatMode
         )
@@ -196,13 +281,30 @@ final class ChatRepository {
       }
       coalescer.flush()
 
+      guard generation == sendGeneration else { return }
+
+      if Task.isCancelled {
+        markAssistantCanceled(clientTurnId: clientTurnId)
+      } else if assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true {
+        markAssistantFailed(
+          clientTurnId: clientTurnId,
+          message: "Summer did not confirm a terminal state for this turn."
+        )
+      }
       isOffline = false
-      if assistantStatus(clientTurnId: clientTurnId) != .failed {
+      if assistantStatus(clientTurnId: clientTurnId) != .failed,
+         assistantStatus(clientTurnId: clientTurnId) != .canceled
+      {
         lastErrorMessage = nil
       }
       await persistCache()
+    } catch is CancellationError {
+      guard generation == sendGeneration else { return }
+      markAssistantCanceled(clientTurnId: clientTurnId)
+      await persistCache()
     } catch {
       coalescer.flush()
+      guard generation == sendGeneration else { return }
       applySendFailure(error, clientTurnId: clientTurnId)
       await persistCache()
     }
@@ -303,6 +405,15 @@ final class ChatRepository {
       return
     }
 
+    if case MobileChatClientError.requestFailed(statusCode: 409) = error {
+      updateAssistant(clientTurnId: clientTurnId) { item in
+        var updated = item
+        if ![.completed, .failed, .canceled].contains(item.status) { updated.status = .retrying }
+        return updated
+      }
+      isOffline = false
+      return
+    }
     if assistantStatus(clientTurnId: clientTurnId) != .completed {
       markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
       isOffline = true
@@ -330,14 +441,24 @@ final class ChatRepository {
     }
   }
 
+  private func applyIfCurrent(
+    generation: Int,
+    events: [MobileChatStreamEvent],
+    clientTurnId: String
+  ) {
+    guard generation == sendGeneration else { return }
+    apply(events: events, clientTurnId: clientTurnId)
+  }
+
   private func apply(events: [MobileChatStreamEvent], clientTurnId: String) {
     var pendingDeltas: [String: String] = [:]
 
     func flushDelta(for turnID: String) {
       guard let text = pendingDeltas.removeValue(forKey: turnID), !text.isEmpty else { return }
       updateAssistant(clientTurnId: turnID) { item in
+        if item.status == .failed || item.status == .canceled { return item }
         var updated = item
-        updated.status = .streaming
+        if item.status != .completed { updated.status = .streaming }
         updated.content += text
         return updated
       }
@@ -345,24 +466,40 @@ final class ChatRepository {
 
     for event in events {
       switch event {
-      case let .turnReserved(conversationId, _, _):
+      case let .turnReserved(conversationId, turnId, _):
         activeConversationID = conversationId
         updateAssistant(clientTurnId: clientTurnId) { item in
           var updated = item
-          updated.status = .streaming
+          if item.status != .failed && item.status != .canceled && item.status != .completed {
+            updated.status = .queued
+          }
+          updated.turnId = turnId
+          return updated
+        }
+
+      case let .turnState(eventClientTurnId, state, eveWorkId):
+        updateAssistant(clientTurnId: eventClientTurnId) { item in
+          if item.status == .failed || item.status == .canceled || item.status == .completed {
+            return item
+          }
+          var updated = item
+          updated.status = Self.status(fromLifecycle: state) ?? item.status
+          if let eveWorkId { updated.eveWorkId = eveWorkId }
           return updated
         }
 
       case let .assistantDelta(eventClientTurnId, text):
         pendingDeltas[eventClientTurnId, default: ""] += text
 
-      case let .assistantCompleted(eventClientTurnId, conversationId, _, text):
+      case let .assistantCompleted(eventClientTurnId, conversationId, turnId, text):
         flushDelta(for: eventClientTurnId)
         activeConversationID = conversationId
         updateAssistant(clientTurnId: eventClientTurnId) { item in
+          if item.status == .failed || item.status == .canceled { return item }
           var updated = item
           updated.status = .completed
           updated.content = text
+          updated.turnId = turnId
           return updated
         }
 
@@ -370,6 +507,7 @@ final class ChatRepository {
         flushDelta(for: eventClientTurnId)
         activeConversationID = conversationId
         updateAssistant(clientTurnId: eventClientTurnId) { item in
+          if item.status == .failed || item.status == .canceled { return item }
           var updated = item
           updated.status = .completed
           updated.content = summary
@@ -380,7 +518,11 @@ final class ChatRepository {
 
       case let .error(_, message):
         flushDelta(for: clientTurnId)
-        markAssistantFailed(clientTurnId: clientTurnId, message: message)
+        if assistantStatus(clientTurnId: clientTurnId) != .completed {
+          markAssistantFailed(clientTurnId: clientTurnId, message: message)
+        } else {
+          lastErrorMessage = message
+        }
       }
     }
 
@@ -395,12 +537,35 @@ final class ChatRepository {
 
   private func markAssistantFailed(clientTurnId: String, message: String) {
     updateAssistant(clientTurnId: clientTurnId) { item in
+      if item.status == .completed { return item }
       var updated = item
       updated.status = .failed
       updated.content = message
       return updated
     }
     lastErrorMessage = message
+  }
+
+  private func markAssistantCanceled(clientTurnId: String) {
+    updateAssistant(clientTurnId: clientTurnId) { item in
+      if item.status == .completed || item.status == .failed { return item }
+      var updated = item
+      updated.status = .canceled
+      if updated.content.isEmpty { updated.content = "Summer turn was canceled before completion." }
+      return updated
+    }
+  }
+
+  private static func status(fromLifecycle state: String) -> MobileChatTimelineStatus? {
+    switch state {
+    case "queued": return .queued
+    case "running": return .running
+    case "retrying": return .retrying
+    case "failed": return .failed
+    case "canceled": return .canceled
+    case "completed": return .completed
+    default: return nil
+    }
   }
 
   private func updateAssistant(
@@ -418,10 +583,10 @@ final class ChatRepository {
   private func hydrateFromCache() async {
     guard let snapshot = await cache.load(for: userID, workspace: workspace) else { return }
     conversations = snapshot.conversations
-    if let activeConversationID,
-       let cachedMessages = snapshot.messagesByConversationID[activeConversationID]
-    {
-      timeline = cachedMessages.map(timelineItem(from:))
+    let conversationID = activeConversationID ?? snapshot.activeConversationID ?? snapshot.conversations.first?.id
+    activeConversationID = conversationID
+    if let conversationID {
+      await paintCachedWindow(conversationID, snapshot: snapshot)
     }
   }
 
@@ -429,14 +594,66 @@ final class ChatRepository {
   /// cache miss so callers can decide what to show while the network loads.
   @discardableResult
   private func hydrateConversationFromCache(_ conversationID: String) async -> Bool {
-    guard
-      let snapshot = await cache.load(for: userID, workspace: workspace),
-      let cachedMessages = snapshot.messagesByConversationID[conversationID]
-    else {
+    await paintCachedWindow(conversationID)
+  }
+
+  @discardableResult
+  private func paintCachedWindow(
+    _ conversationID: String,
+    snapshot: CachedChatSnapshot? = nil
+  ) async -> Bool {
+    let loaded: CachedChatSnapshot?
+    if let snapshot {
+      loaded = snapshot
+    } else {
+      loaded = await cache.load(for: userID, workspace: workspace)
+    }
+    guard let cachedMessages = loaded?.messagesByConversationID[conversationID] else {
       return false
     }
-    timeline = cachedMessages.map(timelineItem(from:))
+    applyFetchedWindow(
+      ChatTranscriptWindow.visibleTail(cachedMessages),
+      hasMore: ChatTranscriptWindow.hasOlderHistory(
+        cachedCount: cachedMessages.count,
+        fetchedHasMore: false
+      )
+    )
     return true
+  }
+
+  private func applyFetchedWindow(
+    _ messages: [MobileConversationMessage],
+    hasMore: Bool
+  ) {
+    timeline = messages.map(timelineItem(from:))
+    olderCursor = messages.first?.createdAt
+    hasMoreOlder = hasMore
+  }
+
+  private func prependFetchedWindow(
+    _ messages: [MobileConversationMessage],
+    hasMore: Bool
+  ) {
+    let existingIDs = Set(timeline.map(\.id))
+    let incoming = messages.filter { !existingIDs.contains($0.id) }
+    timeline.insert(contentsOf: incoming.map(timelineItem(from:)), at: 0)
+    olderCursor = (incoming.first ?? messages.first)?.createdAt ?? olderCursor
+    hasMoreOlder = hasMore
+  }
+
+  private func interruptInFlightAssistantRows() {
+    timeline.removeAll {
+      $0.role == .assistant
+        && $0.status.isInFlight
+        && $0.content.isEmpty
+    }
+    for index in timeline.indices {
+      let item = timeline[index]
+      guard item.role == .assistant, item.status.isInFlight else { continue }
+      var updated = item
+      updated.status = .completed
+      timeline[index] = updated
+    }
   }
 
   private func persistCache(
@@ -455,7 +672,8 @@ final class ChatRepository {
     let snapshot = CachedChatSnapshot(
       conversations: conversations,
       messagesByConversationID: messagesByConversationID,
-      cachedAt: Date()
+      cachedAt: Date(),
+      activeConversationID: activeConversationID
     )
     await cache.store(snapshot, for: userID, workspace: workspace)
   }
@@ -465,14 +683,23 @@ final class ChatRepository {
       ? webBaseURL.appending(path: "/app/chat/\(activeConversationID ?? "")")
       : nil
 
+    let status: MobileChatTimelineStatus = switch message.turnStatus {
+    case "reserved": .queued
+    case "running", "streaming": .running
+    case "canceled": .canceled
+    case "failed_tool_unavailable", "failed_model_error", "failed_timeout", "failed_network", "failed":
+      .failed
+    default: .completed
+    }
     return MobileChatTimelineItem(
       id: message.id,
       role: MobileChatTimelineRole(rawValue: message.role) ?? .assistant,
       content: message.content,
-      status: .completed,
+      status: status,
       clientTurnId: message.clientMessageId,
       requiresWebHandoff: message.requiresWebHandoff,
-      handoffURL: handoffURL
+      handoffURL: handoffURL,
+      turnId: message.turnId
     )
   }
 
@@ -491,8 +718,16 @@ final class ChatRepository {
       role: item.role.rawValue,
       content: item.content,
       clientMessageId: item.clientTurnId,
-      turnId: nil,
-      turnStatus: item.status == .failed ? "failed" : "completed",
+      turnId: item.turnId,
+      turnStatus: {
+        switch item.status {
+        case .failed: return "failed"
+        case .canceled: return "canceled"
+        case .queued: return "reserved"
+        case .running, .retrying, .streaming, .sending: return "streaming"
+        default: return "completed"
+        }
+      }(),
       createdAt: ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )
@@ -537,8 +772,8 @@ final class MobileChatStreamCoalescer {
     let window = self.window
     flushTask = Task { [weak self] in
       try? await Task.sleep(for: window)
-      guard !Task.isCancelled else { return }
-      self?.flush()
+      guard !Task.isCancelled, let self else { return }
+      self.flush()
     }
   }
 

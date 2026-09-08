@@ -1,20 +1,17 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import type { PlanId } from '@/lib/entitlements/registry';
 import { FREQUENT_BACKGROUND_CACHE } from './cache-strategies';
 import { createQueryFn, FetchError } from './fetch';
 import { queryKeys } from './keys';
 
 export interface ChatUsageData {
-  plan: 'free' | 'pro' | 'max';
-  dailyLimit: number;
+  plan: PlanId;
+  weeklyLimit: number;
   used: number;
   remaining: number;
   resetAt?: string | null;
-  monthlyLimit?: number | null;
-  monthlyUsed?: number | null;
-  monthlyRemaining?: number | null;
-  monthlyResetAt?: string | null;
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;

@@ -1,4 +1,5 @@
 name: Production Synthetic Monitoring
+# clock-class: production-liveness
 
 permissions:
   contents: read

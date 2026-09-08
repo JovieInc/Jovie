@@ -193,7 +193,7 @@ const VenmoEditForm = memo(function VenmoEditForm({
         <Button
           onClick={onSave}
           disabled={isSaving || !venmoHandle.trim()}
-          variant='primary'
+          variant='secondary'
           size='sm'
         >
           {isSaving ? 'Saving…' : 'Save'}
@@ -277,7 +277,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
             <Button
               onClick={onSave}
               disabled={isSaving || !venmoHandle.trim()}
-              variant='primary'
+              variant='secondary'
               size='sm'
             >
               {isSaving ? 'Connecting…' : 'Connect'}

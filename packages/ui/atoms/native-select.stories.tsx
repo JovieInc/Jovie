@@ -31,6 +31,15 @@ export const Required: Story = {
   args: { options, label: 'Release status', required: true, name: 'status' },
 };
 
+export const Selected: Story = {
+  args: {
+    options,
+    label: 'Release status',
+    defaultValue: 'live',
+    name: 'status',
+  },
+};
+
 export const Error: Story = {
   args: {
     options,

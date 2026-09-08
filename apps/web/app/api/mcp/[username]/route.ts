@@ -45,9 +45,8 @@ import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import {
   getVideoMetricsForProfile,
-  getVideoPkForProfile,
-  insertThumbnailCandidate,
   listVideosForProfile,
+  registerThumbnailCandidateReview,
 } from '@/lib/youtube-library';
 
 export const revalidate = 0;
@@ -462,10 +461,15 @@ function buildToolDescriptors() {
               model: { type: 'string', maxLength: 120 },
             },
           },
+          artifactSha256: {
+            type: 'string',
+            pattern: '^[a-f0-9]{64}$',
+            description: 'SHA-256 of the immutable candidate image artifact',
+          },
           experimentId: { type: 'string', maxLength: 120 },
           cohortId: { type: 'string', maxLength: 120 },
         },
-        required: ['videoId', 'imageUrl'],
+        required: ['videoId', 'imageUrl', 'artifactSha256'],
       },
     },
   ];
@@ -777,6 +781,7 @@ async function callTool(
             model: z.string().max(120).optional(),
           })
           .optional(),
+        artifactSha256: z.string().regex(/^[a-f0-9]{64}$/),
         experimentId: z.string().max(120).optional(),
         cohortId: z.string().max(120).optional(),
       })
@@ -784,27 +789,32 @@ async function callTool(
     if (!parsed.success)
       return { error: 'Invalid register_thumbnail_version arguments' };
 
-    const videoPk = await getVideoPkForProfile({
+    const result = await registerThumbnailCandidateReview({
+      userId,
       creatorProfileId: profile.id,
-      videoId: parsed.data.videoId,
-    });
-    if (!videoPk) return { error: `Video not found: ${parsed.data.videoId}` };
-
-    // Registers a pending candidate only — a YouTube-side thumbnail swap is
-    // NEVER performed here (that flow is JOV-3935).
-    const inserted = await insertThumbnailCandidate({
-      videoId: videoPk,
+      youtubeVideoId: parsed.data.videoId,
       imageUrl: parsed.data.imageUrl,
-      provenance: { source: 'generated', ...parsed.data.provenance },
+      artifactSha256: parsed.data.artifactSha256,
+      provenance: parsed.data.provenance,
       experimentId: parsed.data.experimentId ?? null,
       cohortId: parsed.data.cohortId ?? null,
     });
+    if (!result.ok) {
+      return {
+        error:
+          result.error === 'video-not-found'
+            ? `Video not found: ${parsed.data.videoId}`
+            : `Current YouTube API metrics required: ${parsed.data.videoId}`,
+      };
+    }
     return {
       data: {
-        thumbnailVersionId: inserted.id,
+        thumbnailVersionId: result.thumbnailVersionId,
+        reviewActionId: result.reviewActionId,
         approvalStatus: 'pending',
+        metricsCapturedAt: result.metricsCapturedAt,
         nextStep:
-          'A human must approve this candidate before any swap is considered.',
+          'Review in the Jovie Opportunity Inbox. Approval records a receipt but does not mutate YouTube; a native Studio experiment and provider readback remain required.',
       },
     };
   }

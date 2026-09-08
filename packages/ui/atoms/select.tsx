@@ -28,7 +28,11 @@ const SelectTrigger = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
-    className={cn(SELECT_TRIGGER_BASE, className)}
+    className={cn(
+      SELECT_TRIGGER_BASE,
+      "relative before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']",
+      className
+    )}
     {...props}
   >
     {children}

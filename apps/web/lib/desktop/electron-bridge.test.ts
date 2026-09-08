@@ -254,6 +254,57 @@ describe('electron-bridge — defensive guards', () => {
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
+  it('copyDesktopAuthUrl uses only the explicit validated bridge method', async () => {
+    const copyDesktopAuthUrl = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({ copyDesktopAuthUrl });
+    const authUrl = 'https://jov.ie/signin?runtime=electron';
+
+    await expect(__testing.copyDesktopAuthUrl(authUrl)).resolves.toEqual({
+      ok: true,
+    });
+    expect(copyDesktopAuthUrl).toHaveBeenCalledWith(authUrl);
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('copyDesktopAuthUrl fails closed for a stale bridge', async () => {
+    setElectronAPI({ versions: { app: '0.1.0' } });
+
+    await expect(
+      __testing.copyDesktopAuthUrl('https://jov.ie/signin?runtime=electron')
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-auth-copy-bridge-unavailable',
+    });
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('copyDesktopAuthUrl preserves a main-process copy failure', async () => {
+    const copyDesktopAuthUrl = vi.fn(async () => ({
+      ok: false,
+      reason: 'clipboard-write-failed',
+    }));
+    setElectronAPI({ copyDesktopAuthUrl });
+
+    await expect(
+      __testing.copyDesktopAuthUrl('https://jov.ie/signin?runtime=electron')
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'clipboard-write-failed',
+    });
+  });
+
+  it('copyDesktopAuthUrl supplies a bounded default failure reason', async () => {
+    const copyDesktopAuthUrl = vi.fn(async () => ({ ok: false }));
+    setElectronAPI({ copyDesktopAuthUrl });
+
+    await expect(
+      __testing.copyDesktopAuthUrl('https://jov.ie/signin?runtime=electron')
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'desktop-auth-copy-failed',
+    });
+  });
+
   it('startDesktopAuthHandoff uses explicit IPC when available', async () => {
     const startDesktopAuthHandoff = vi.fn(async () => ({ ok: true }));
     setElectronAPI({

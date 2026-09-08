@@ -34,6 +34,12 @@ interface ChatComposerSurfaceProps {
   readonly chatInputProps: ChatInputProps;
   readonly chatMode?: 'ov';
   readonly showThreadView: boolean;
+  /**
+   * one-chrome-layer-v1: when the empty state already shows a chrome
+   * affordance (prompt suggests, starter/action cards), the usage banner
+   * stays hidden — at most one non-content chrome layer at a time.
+   */
+  readonly suppressUsageAlert?: boolean;
   readonly isRateLimited: boolean;
   readonly showManifest: boolean;
   readonly manifestCollapsed: boolean;
@@ -58,6 +64,7 @@ export function ChatComposerSurface({
   chatInputProps,
   chatMode,
   showThreadView,
+  suppressUsageAlert = false,
   isRateLimited,
   showManifest,
   manifestCollapsed,
@@ -78,7 +85,7 @@ export function ChatComposerSurface({
 
   return (
     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
-      <ChatUsageAlert />
+      {suppressUsageAlert ? null : <ChatUsageAlert />}
 
       {isRateLimited ? (
         <p className='mb-1.5 text-xs text-tertiary-token' aria-live='polite'>

@@ -10,7 +10,7 @@
  */
 
 import { expect, type Page, test } from '@playwright/test';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const USER_TEXT = 'Hello from timeline smoke.';

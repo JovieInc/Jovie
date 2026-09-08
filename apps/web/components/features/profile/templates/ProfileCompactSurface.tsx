@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
 import { BadgeCheck, ChevronLeft, MapPin, MoreHorizontal } from 'lucide-react';
@@ -28,13 +29,16 @@ import type { ProfilePrimaryActionCardRelease } from '@/features/profile/Profile
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
-  hasPublicProfileHistoryDestination,
+  getPublicProfileHistoryServerSnapshot,
+  getPublicProfileHistorySnapshot,
   resolveProfileSurfaceState,
   shouldShowPublicProfileBackChevron,
+  subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -48,7 +52,10 @@ import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-p
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import { resolvePublicHeroObjectPosition } from '@/lib/profile/public-hero-media';
-import { resolvePublicProfileActiveDestination } from '@/lib/profile/route-config';
+import {
+  getPermittedPublicProfileActions,
+  resolvePublicProfileActiveDestination,
+} from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -57,6 +64,7 @@ import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import {
   publicLinkAriaLabel,
+  publicPlatformDisplayName,
   sanitizePublicHref,
 } from '@/lib/utils/public-url';
 import type { PublicContact } from '@/types/contacts';
@@ -182,6 +190,7 @@ interface ProfileCompactSurfaceProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
@@ -207,6 +216,11 @@ interface ProfileCompactSurfaceProps {
   readonly previewReleaseActionLabel?: string;
   readonly dataTestId?: string;
   readonly hideBackButton?: boolean;
+  /**
+   * Live public-profile documents opt in. Marketing/homepage embeds must stay
+   * false even when tablet chrome uses presentation="embedded".
+   */
+  readonly allowSignedInEscape?: boolean;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
@@ -251,21 +265,6 @@ function resolveActivePrimaryTab(params: {
   }
 }
 
-function subscribeToPublicProfileHistory() {
-  return () => {};
-}
-
-function getPublicProfileHistorySnapshot() {
-  return hasPublicProfileHistoryDestination({
-    historyLength: globalThis.history.length,
-    referrer: document.referrer,
-  });
-}
-
-function getPublicProfileHistoryServerSnapshot() {
-  return false;
-}
-
 export function ProfileCompactSurface({
   renderMode = 'interactive',
   presentation = 'standalone',
@@ -291,6 +290,7 @@ export function ProfileCompactSurface({
   viewerLocation,
   resolveNearbyTour = true,
   releases = [],
+  catalogLoadFailed = false,
   merchCards = [],
   drawerOpen,
   drawerView,
@@ -317,6 +317,7 @@ export function ProfileCompactSurface({
   },
   dataTestId,
   hideBackButton = false,
+  allowSignedInEscape = false,
   hideMoreMenu = false,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
@@ -383,12 +384,14 @@ export function ProfileCompactSurface({
   const activeNotificationSourceContext =
     notificationSourceContext ?? defaultNotificationSourceContext;
   const isHomeMode = activeVisiblePrimaryTab === 'profile';
-  const activeNavTab = resolvePublicProfileActiveDestination({
+  const visibleNavTab = resolvePublicProfileActiveDestination({
     mode: activeMode,
     overlayView: isDrawerOverlayActive ? drawerView : null,
   });
-  const visibleNavTab =
-    !allowFanCapture && activeNavTab === 'subscribe' ? 'profile' : activeNavTab;
+  const canGetUpdates =
+    getPermittedPublicProfileActions({
+      fanCaptureEnabled: allowFanCapture,
+    }).length > 0;
   const showBottomNav = shouldShowColdVisitorTabBar({
     tabBarArm: profilePacAssignment.tabBar,
     isSubscribed,
@@ -415,10 +418,12 @@ export function ProfileCompactSurface({
         activeSubtitle: getProfileModeDefinition(activeVisiblePrimaryTab)
           .subtitle,
         viewerCountryCode,
+        catalogLoadFailed,
       }),
     [
       activeVisiblePrimaryTab,
       artist,
+      catalogLoadFailed,
       featuredPlaylistFallback,
       isSubscribed,
       latestRelease,
@@ -477,6 +482,7 @@ export function ProfileCompactSurface({
   const homeContentScrollClassName = 'min-h-0 flex-1';
   // Prefer current/based location for the hero pin; hometown lives in About.
   const locationLabel = artist.location?.trim() || null;
+  const isSignedIn = useIsAuthenticated() && allowSignedInEscape;
   const hasHistoryDestination = useSyncExternalStore(
     subscribeToPublicProfileHistory,
     getPublicProfileHistorySnapshot,
@@ -485,6 +491,7 @@ export function ProfileCompactSurface({
   const showBackChevron = shouldShowPublicProfileBackChevron({
     isProfileRoot: activeMode === 'profile',
     hasHistoryDestination,
+    isSignedIn,
     forceHidden: hideBackButton || isNotificationsFlowOpen,
   });
 
@@ -513,7 +520,7 @@ export function ProfileCompactSurface({
   }, [onModeSelect]);
   const openNotifications = useCallback(
     (sourceContext?: NotificationSourceContext) => {
-      if (!allowFanCapture) return;
+      if (!canGetUpdates) return;
       setNotificationSourceContext(
         sourceContext ?? defaultNotificationSourceContext
       );
@@ -535,7 +542,7 @@ export function ProfileCompactSurface({
       onRevealNotifications?.();
     },
     [
-      allowFanCapture,
+      canGetUpdates,
       defaultNotificationSourceContext,
       onModeSelect,
       onRevealNotifications,
@@ -580,9 +587,7 @@ export function ProfileCompactSurface({
   );
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
-    renderMode === 'interactive' &&
-    renderInteractiveOverlays &&
-    allowFanCapture;
+    renderMode === 'interactive' && renderInteractiveOverlays && canGetUpdates;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
   const homeProfileSettings = homeLatestRelease
@@ -785,9 +790,9 @@ export function ProfileCompactSurface({
                         if (!link.platform) return null;
                         const href = sanitizePublicHref(link.url);
                         if (!href) return null;
-                        const platformLabel =
-                          link.platform.charAt(0).toUpperCase() +
-                          link.platform.slice(1);
+                        const platformLabel = publicPlatformDisplayName(
+                          link.platform
+                        );
                         return (
                           <a
                             key={link.id}
@@ -824,7 +829,7 @@ export function ProfileCompactSurface({
             isHomeMode ? 'profile-home-content-column pt-0' : 'pt-2'
           )}
         >
-          {allowFanCapture &&
+          {canGetUpdates &&
           shouldRenderInteractiveOverlays &&
           activeVisiblePrimaryTab !== 'subscribe' ? (
             <ProfileInlineNotificationsCTA
@@ -888,7 +893,7 @@ export function ProfileCompactSurface({
                 renderMode={renderMode}
                 onPlayClick={onPlayClick}
                 onAlertsClick={openNotifications}
-                showAlertsCard={allowFanCapture}
+                showAlertsCard={canGetUpdates}
                 isSubscribed={homeAlertsSubscribed}
                 profilePacAssignment={profilePacAssignment}
                 viewerLocation={viewerLocation}
@@ -920,6 +925,7 @@ export function ProfileCompactSurface({
                 allowPhotoDownloads={allowPhotoDownloads}
                 tourDates={tourDates}
                 releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
                 alertSourceContext={defaultNotificationSourceContext}
                 previewNotificationsState={previewNotificationsState}
                 onFlowClosed={returnToProfileAfterNotifications}

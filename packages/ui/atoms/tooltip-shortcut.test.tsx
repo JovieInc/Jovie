@@ -42,7 +42,7 @@ describe('TooltipShortcut', () => {
       expect(tooltip).toHaveTextContent('Bold');
       expect(tooltip).toHaveTextContent('⌘B');
       expect(screen.getByTestId('tooltip-content')).toHaveClass(
-        'rounded-full',
+        'rounded-(--system-b-radius-overlay)',
         'whitespace-nowrap'
       );
     });
@@ -71,6 +71,7 @@ describe('TooltipShortcut', () => {
       expect(screen.getByTestId('tooltip-content')).not.toHaveClass(
         'whitespace-nowrap'
       );
+      expect(screen.getByTestId('tooltip-label')).toHaveClass('min-w-0');
     });
   });
 
@@ -83,7 +84,9 @@ describe('TooltipShortcut', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getByTestId('tooltip-content')).toHaveClass('rounded-full');
+    expect(screen.getByTestId('tooltip-content')).toHaveClass(
+      'rounded-(--system-b-radius-overlay)'
+    );
   });
 
   describe('Props', () => {

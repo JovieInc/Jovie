@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { isClerkRedirectUrl } from './utils/smoke-test-utils';
 
 /**
@@ -34,8 +35,9 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('anonymous handle claim redirects to waitlist', async ({ page }) => {
-    // Homepage Get started is locked to /start. The ClaimHandleForm is behind
-    // a feature flag and may not be rendered. Check for either form.
+    // The homepage currently uses RedesignedHero with a "Get started" CTA
+    // that links to /waitlist. The ClaimHandleForm is behind a feature flag
+    // and may not be rendered. Check for either form.
     const handleInput = page.getByLabel(
       /choose your handle|claim your handle/i
     );
@@ -44,14 +46,17 @@ test.describe('Onboarding Flow', () => {
       .catch(() => false);
 
     if (!isFormVisible) {
-      // No claim form on homepage — locked golden path is Get started → /start.
+      // No claim form on homepage — verify the "Get started" link goes to /waitlist
       const getStartedLink = page.getByRole('link', { name: /get started/i });
       const isGetStartedVisible = await getStartedLink
         .isVisible({ timeout: 5000 })
         .catch(() => false);
 
       if (isGetStartedVisible) {
-        await expect(getStartedLink).toHaveAttribute('href', '/start');
+        await expect(getStartedLink).toHaveAttribute(
+          'href',
+          PUBLIC_WAITLIST_URL
+        );
       }
 
       console.log(

@@ -91,6 +91,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     avatarUrl: 'avatarUrl',
     isClaimed: 'isClaimed',
     isPublic: 'isPublic',
+    displayName: 'displayName',
     settings: 'settings',
     id: 'id',
   },
@@ -147,7 +148,11 @@ describe('sitemap', () => {
 
     whereMock
       .mockResolvedValueOnce([
-        { username: 'tim', updatedAt: new Date('2026-01-01') },
+        {
+          username: 'tim',
+          displayName: 'Tim White',
+          updatedAt: new Date('2026-01-01'),
+        },
       ])
       .mockResolvedValueOnce([
         {
@@ -233,7 +238,11 @@ describe('sitemap', () => {
     getBlogPosts.mockResolvedValue([]);
     whereMock
       .mockResolvedValueOnce([
-        { username: 'artist', updatedAt: new Date('2026-01-01') },
+        {
+          username: 'artist',
+          displayName: 'Artist',
+          updatedAt: new Date('2026-01-01'),
+        },
       ])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
@@ -258,12 +267,14 @@ describe('sitemap', () => {
       .mockResolvedValueOnce([
         {
           username: 'claimed-artist',
+          displayName: 'Claimed Artist',
           updatedAt: new Date('2026-01-01'),
           isClaimed: true,
           settings: {},
         },
         {
           username: 'a_unclaimed',
+          displayName: null,
           updatedAt: new Date('2026-01-01'),
           isClaimed: false,
           settings: {
@@ -298,18 +309,21 @@ describe('sitemap', () => {
       .mockResolvedValueOnce([
         {
           username: 'dualipa',
+          displayName: 'Dua Lipa',
           updatedAt: new Date('2026-01-01'),
           isClaimed: true,
           settings: {},
         },
         {
           username: 'testartist',
+          displayName: 'Test Artist',
           updatedAt: new Date('2026-01-01'),
           isClaimed: true,
           settings: {},
         },
         {
           username: 'dualipa-official',
+          displayName: 'Dua Lipa Official',
           updatedAt: new Date('2026-01-01'),
           isClaimed: true,
           settings: {},
@@ -353,6 +367,120 @@ describe('sitemap', () => {
     expect(urls).toContain('https://jov.ie/dualipa-official');
     expect(urls).toContain('https://jov.ie/dualipa-official/real-release');
     expect(urls).toContain('https://jov.ie/dualipa-official/real-track');
+  });
+
+  it('excludes claimed Clerk-test machine-handle profiles and every URL under them (JOV-6126 canary)', async () => {
+    // Live production evidence 2026-09-10: five claimed Clerk-test profiles
+    // (tmoc* handles, display names like 'gp moc…+clerk test') shipped ~230
+    // junk URLs into the sitemap. Every profile/release/track URL under those
+    // identities must be excluded from the sitemap catalog.
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'tmoc0g1x9dwmk71',
+          displayName: 'gp moc+clerk test',
+          updatedAt: new Date('2026-09-10'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'tmoc209131l1r6w',
+          displayName: 'gp moc 986+clerk test',
+          updatedAt: new Date('2026-09-10'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'tmoc46fryq6bfjq',
+          displayName: 'gp moc+clerk test',
+          updatedAt: new Date('2026-09-10'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'tmoc5lql8bre49o',
+          displayName: 'gp moc+clerk test',
+          updatedAt: new Date('2026-09-10'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'tmoc9mm7xfvx02c',
+          displayName: 'gp moc+clerk test',
+          updatedAt: new Date('2026-09-10'),
+          isClaimed: true,
+          settings: {},
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'tmoc0g1x9dwmk71',
+          slug: 'qa-release-986',
+          updatedAt: new Date('2026-09-10'),
+          artworkUrl: null,
+        },
+        {
+          username: 'tmoc9mm7xfvx02c',
+          slug: 'gp-moc-test-release',
+          updatedAt: new Date('2026-09-10'),
+          artworkUrl: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'tmoc209131l1r6w',
+          slug: 'qa-track-1',
+          updatedAt: new Date('2026-09-10'),
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const urls = (await sitemap()).map(entry => entry.url);
+
+    // Zero tmoc* profile URLs in the sitemap.
+    for (const handle of [
+      'tmoc0g1x9dwmk71',
+      'tmoc209131l1r6w',
+      'tmoc46fryq6bfjq',
+      'tmoc5lql8bre49o',
+      'tmoc9mm7xfvx02c',
+    ]) {
+      expect(urls).not.toContain(`https://jov.ie/${handle}`);
+    }
+    // Zero release/track URLs under them.
+    expect(urls).not.toContain('https://jov.ie/tmoc0g1x9dwmk71/qa-release-986');
+    expect(urls).not.toContain(
+      'https://jov.ie/tmoc9mm7xfvx02c/gp-moc-test-release'
+    );
+    expect(urls).not.toContain('https://jov.ie/tmoc209131l1r6w/qa-track-1');
+    // The whole sitemap stays well-formed: no tmoc* URL of any shape.
+    for (const url of urls) {
+      expect(url).not.toMatch(/jov\.ie\/tmoc[0-9a-z]{10,}(\/|$)/);
+    }
+  });
+
+  it('keeps legitimate creators in the sitemap when only their handle shares a tmoc prefix', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'tmoc-artist',
+          displayName: 'Real Artist',
+          updatedAt: new Date('2026-09-10'),
+          isClaimed: true,
+          settings: {},
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const urls = (await sitemap()).map(entry => entry.url);
+
+    expect(urls).toContain('https://jov.ie/tmoc-artist');
   });
 
   it('is non-empty (at minimum static marketing pages are included)', async () => {

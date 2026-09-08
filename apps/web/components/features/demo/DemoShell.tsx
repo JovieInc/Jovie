@@ -116,7 +116,11 @@ export function DemoShell({
                     aria-label='Open Workspace Selector'
                   >
                     <div className='flex items-center gap-1.5 w-full'>
-                      <BrandLogo size={14} className='rounded-sm' tone='auto' />
+                      <BrandLogo
+                        size='compact'
+                        className='rounded-sm'
+                        tone='auto'
+                      />
                       <span className='truncate flex-1 text-app tracking-tight [font-weight:var(--font-weight-nav)]'>
                         {DEMO_ARTIST_NAME}
                       </span>
@@ -216,7 +220,7 @@ export function DemoShell({
                     <SidebarMenuItem>
                       <SidebarMenuButton className='h-7'>
                         <BrandLogo
-                          size={14}
+                          size='chrome'
                           className='rounded-sm'
                           tone='auto'
                         />

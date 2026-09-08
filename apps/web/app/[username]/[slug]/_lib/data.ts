@@ -23,8 +23,14 @@ import {
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
+import {
+  type CanonicalReleaseCredit,
+  materializeReleaseCreditPayload,
+  parseProviderAlbumArtists,
+} from '@/lib/discography/release-credits';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
@@ -81,6 +87,8 @@ export interface SmartLinkCreditEntry {
   handle: string | null;
   role: SmartLinkCreditRole;
   position: number;
+  spotifyId?: string | null;
+  isPrimary?: boolean;
 }
 
 export interface SmartLinkCreditGroup {
@@ -97,6 +105,8 @@ export function groupReleaseCredits(
     handle: string | null;
     role: ArtistRole;
     position: number;
+    spotifyId?: string | null;
+    isPrimary?: boolean;
   }>
 ): SmartLinkCreditGroup[] {
   const groups = new Map<SmartLinkCreditRole, SmartLinkCreditEntry[]>();
@@ -107,15 +117,21 @@ export function groupReleaseCredits(
     if (!name) continue;
 
     const role = normalizeCreditRole(row.role);
-    const dedupeKey = `${name.toLowerCase()}::${row.handle ?? ''}`;
+    const identityKey = row.artistId
+      ? `artist:${row.artistId}`
+      : row.spotifyId
+        ? `provider:spotify:${row.spotifyId}`
+        : null;
     const seen = seenByRole.get(role) ?? new Set<string>();
 
-    if (seen.has(dedupeKey)) {
+    if (identityKey && seen.has(identityKey)) {
       continue;
     }
 
-    seen.add(dedupeKey);
-    seenByRole.set(role, seen);
+    if (identityKey) {
+      seen.add(identityKey);
+      seenByRole.set(role, seen);
+    }
 
     const entries = groups.get(role) ?? [];
     entries.push({
@@ -124,6 +140,8 @@ export function groupReleaseCredits(
       handle: row.handle,
       role,
       position: row.position,
+      spotifyId: row.spotifyId ?? null,
+      isPrimary: row.isPrimary ?? role === 'main_artist',
     });
     groups.set(role, entries);
   }
@@ -139,6 +157,86 @@ export function groupReleaseCredits(
     }));
 }
 
+function flattenCreditGroups(
+  groups: SmartLinkCreditGroup[]
+): CanonicalReleaseCredit[] {
+  return groups.flatMap(group =>
+    group.entries.map(entry => ({
+      artistId: entry.artistId,
+      spotifyId: entry.spotifyId ?? null,
+      name: entry.name,
+      handle: entry.handle,
+      role: group.role,
+      position: entry.position,
+      isPrimary: entry.isPrimary ?? group.role === 'main_artist',
+    }))
+  );
+}
+
+function toSmartLinkPrimaryEntries(
+  credits: readonly CanonicalReleaseCredit[]
+): SmartLinkCreditEntry[] {
+  return credits.map(credit => ({
+    artistId: credit.artistId ?? `provider:${credit.spotifyId ?? credit.name}`,
+    name: credit.name,
+    handle: credit.handle,
+    role: 'main_artist',
+    position: credit.position,
+    spotifyId: credit.spotifyId ?? null,
+    isPrimary: true,
+  }));
+}
+
+function attachCanonicalCredits(
+  groups: SmartLinkCreditGroup[],
+  metadata: Record<string, unknown> | null | undefined,
+  context: {
+    readonly entityType: ContentType;
+    readonly entityId: string;
+  }
+): {
+  credits: SmartLinkCreditGroup[];
+  primaryArtists: SmartLinkCreditEntry[];
+} {
+  const reconciled = materializeReleaseCreditPayload({
+    storedCredits: flattenCreditGroups(groups),
+    providerArtists: parseProviderAlbumArtists(metadata),
+  });
+
+  if (reconciled.mismatch) {
+    void captureWarning(
+      'Release credit provider mismatch',
+      new Error('release_credit_provider_mismatch'),
+      {
+        source: 'release_credit_provider_mismatch',
+        entityType: context.entityType,
+        entityId: context.entityId,
+        provider: reconciled.mismatch.provider,
+        storedNames: reconciled.mismatch.storedNames,
+        providerNames: reconciled.mismatch.providerNames,
+        addedNames: reconciled.mismatch.addedNames,
+        skippedFeaturedNames: reconciled.mismatch.skippedFeaturedNames,
+      }
+    );
+  }
+
+  const primaryArtists = toSmartLinkPrimaryEntries(reconciled.primaryArtists);
+  const otherGroups = groups.filter(group => group.role !== 'main_artist');
+  const credits =
+    primaryArtists.length > 0
+      ? [
+          {
+            role: 'main_artist' as const,
+            label: CREDIT_ROLE_LABELS.main_artist,
+            entries: primaryArtists,
+          },
+          ...otherGroups,
+        ]
+      : otherGroups;
+
+  return { credits, primaryArtists };
+}
+
 async function fetchReleaseCredits(
   releaseId: string
 ): Promise<SmartLinkCreditGroup[]> {
@@ -150,6 +248,8 @@ async function fetchReleaseCredits(
       handle: creatorProfiles.usernameNormalized,
       role: releaseArtists.role,
       position: releaseArtists.position,
+      spotifyId: artists.spotifyId,
+      isPrimary: releaseArtists.isPrimary,
     })
     .from(releaseArtists)
     .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
@@ -171,6 +271,8 @@ async function fetchRecordingCredits(
       handle: creatorProfiles.usernameNormalized,
       role: recordingArtists.role,
       position: recordingArtists.position,
+      spotifyId: artists.spotifyId,
+      isPrimary: recordingArtists.isPrimary,
     })
     .from(recordingArtists)
     .innerJoin(artists, eq(recordingArtists.artistId, artists.id))
@@ -215,6 +317,8 @@ export interface ContentData {
   /** Parent release title — present for tracks, shown as "from [Release]" link */
   releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
+  /** Ordered primary/main artists derived from canonical credits, never ownership. */
+  primaryArtists?: SmartLinkCreditEntry[];
   /** Track duration in milliseconds (from discog_recordings) */
   durationMs?: number | null;
   /** ISRC code (from discog_recordings) */
@@ -258,6 +362,7 @@ export interface CachedContentData {
   releaseSlug?: string | null;
   releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
+  primaryArtists?: SmartLinkCreditEntry[];
   trackNumber?: number | null;
 }
 
@@ -464,7 +569,10 @@ const fetchContentBySlug = async (
         previewMetadata: previewRow?.previewMetadata ?? null,
         isrc: previewRow?.isrc ?? null,
         upc: release.upc,
-        credits,
+        ...attachCanonicalCredits(credits, metadata, {
+          entityType: 'release',
+          entityId: release.id,
+        }),
       };
     }
 
@@ -564,7 +672,14 @@ const fetchContentBySlug = async (
         releaseSlug: releaseData?.slug ?? null,
         releaseTitle: releaseData?.title ?? null,
         trackNumber: rt?.trackNumber ?? null,
-        credits,
+        ...attachCanonicalCredits(
+          credits,
+          recording.previewMetadata as Record<string, unknown> | null,
+          {
+            entityType: 'track',
+            entityId: recording.id,
+          }
+        ),
       };
     }
 
@@ -797,57 +912,64 @@ export const getTrackBySlugInRelease = cache(
         if (releaseTrack) {
           // Merge release_track links with legacy track links so mixed-model content
           // still renders complete DSP actions on public track pages.
-          const [[recording], [releaseData], releaseTrackLinks, [legacyTrack]] =
-            await Promise.all([
-              db
-                .select({
-                  title: discogRecordings.title,
-                  previewUrl: discogRecordings.previewUrl,
-                  previewMetadata: discogRecordings.metadata,
-                  durationMs: discogRecordings.durationMs,
-                  isrc: discogRecordings.isrc,
-                })
-                .from(discogRecordings)
-                .where(eq(discogRecordings.id, releaseTrack.recordingId))
-                .limit(1),
-              db
-                .select({
-                  artworkUrl: discogReleases.artworkUrl,
-                  releaseDate: discogReleases.releaseDate,
-                  revealDate: discogReleases.revealDate,
-                  slug: discogReleases.slug,
-                  title: discogReleases.title,
-                })
-                .from(discogReleases)
-                .where(
-                  and(
-                    eq(discogReleases.id, releaseId),
-                    publicReleaseEligibilitySqlPredicate()
-                  )
+          const [
+            [recording],
+            [releaseData],
+            releaseTrackLinks,
+            [legacyTrack],
+            recordingCredits,
+          ] = await Promise.all([
+            db
+              .select({
+                title: discogRecordings.title,
+                previewUrl: discogRecordings.previewUrl,
+                previewMetadata: discogRecordings.metadata,
+                durationMs: discogRecordings.durationMs,
+                isrc: discogRecordings.isrc,
+              })
+              .from(discogRecordings)
+              .where(eq(discogRecordings.id, releaseTrack.recordingId))
+              .limit(1),
+            db
+              .select({
+                artworkUrl: discogReleases.artworkUrl,
+                releaseDate: discogReleases.releaseDate,
+                revealDate: discogReleases.revealDate,
+                slug: discogReleases.slug,
+                title: discogReleases.title,
+                metadata: discogReleases.metadata,
+              })
+              .from(discogReleases)
+              .where(
+                and(
+                  eq(discogReleases.id, releaseId),
+                  publicReleaseEligibilitySqlPredicate()
                 )
-                .limit(1),
-              db
-                .select(PROVIDER_LINK_COLUMNS)
-                .from(providerLinks)
-                .where(
-                  and(
-                    eq(providerLinks.ownerType, 'release_track'),
-                    eq(providerLinks.releaseTrackId, releaseTrack.id)
-                  )
-                ),
-              db
-                .select({
-                  id: discogTracks.id,
-                })
-                .from(discogTracks)
-                .where(
-                  and(
-                    eq(discogTracks.releaseId, releaseId),
-                    eq(discogTracks.slug, trackSlug)
-                  )
+              )
+              .limit(1),
+            db
+              .select(PROVIDER_LINK_COLUMNS)
+              .from(providerLinks)
+              .where(
+                and(
+                  eq(providerLinks.ownerType, 'release_track'),
+                  eq(providerLinks.releaseTrackId, releaseTrack.id)
                 )
-                .limit(1),
-            ]);
+              ),
+            db
+              .select({
+                id: discogTracks.id,
+              })
+              .from(discogTracks)
+              .where(
+                and(
+                  eq(discogTracks.releaseId, releaseId),
+                  eq(discogTracks.slug, trackSlug)
+                )
+              )
+              .limit(1),
+            fetchRecordingCredits(releaseTrack.recordingId),
+          ]);
 
           const legacyTrackLinks = legacyTrack
             ? await db
@@ -891,6 +1013,15 @@ export const getTrackBySlugInRelease = cache(
             durationMs: recording?.durationMs ?? null,
             isrc: recording?.isrc ?? null,
             trackNumber: releaseTrack.trackNumber,
+            ...attachCanonicalCredits(
+              recordingCredits,
+              (recording?.previewMetadata as Record<string, unknown> | null) ??
+                (releaseData.metadata as Record<string, unknown> | null),
+              {
+                entityType: 'track',
+                entityId: releaseTrack.recordingId,
+              }
+            ),
           };
         }
 

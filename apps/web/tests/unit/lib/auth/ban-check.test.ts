@@ -82,6 +82,16 @@ describe('ban-check.ts', () => {
     });
   });
 
+  it('skips the database during secretless visual capture', async () => {
+    vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+
+    const result = await getUserBanStatus('clerk_banned');
+
+    expect(result).toEqual({ isBanned: false });
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
   it('returns banned status from DB and writes Redis cache', async () => {
     mockDbResult([
       {

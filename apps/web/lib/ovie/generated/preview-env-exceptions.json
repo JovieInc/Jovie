@@ -1,0 +1,97 @@
+{
+  "schema": "jovie-preview-env-exceptions/v1",
+  "updatedBy": "JOV-5941",
+  "source": ".github/preview-env-registry.json",
+  "note": "Projection of the canonical preview/ephemeral-environment registry for the Ovie HUD. Lane ids are kept in sync with the registry by scripts/lib/__tests__/preview-env-contract.test.mjs. activeExceptions is maintained by cleanup/reconciliation receipts; expired or unknown entries never count as valid certification evidence.",
+  "lanes": [
+    {
+      "id": "ci-neon-db",
+      "kind": "neon-branch",
+      "policy": "manual-dispatch",
+      "owner": "ci-risk-classifier / release engineering",
+      "surface": "ephemeral Neon branch ci-neon-run-<run_id>-<attempt> (isolated database only)",
+      "evidencePurpose": "Database-affecting proof that cannot be obtained from normal CI or the shared staging database.",
+      "ttlHours": 2,
+      "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); neon-scheduled-cleanup daily heartbeat reconciles missed events",
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+    },
+    {
+      "id": "ci-lighthouse-dashboard-neon",
+      "kind": "neon-branch",
+      "policy": "manual-dispatch",
+      "owner": "ci-risk-classifier / release engineering",
+      "surface": "ephemeral Neon branch dashboard-lighthouse-<run_id>-<attempt> (isolated database only)",
+      "evidencePurpose": "Authenticated dashboard performance evidence against an isolated database.",
+      "ttlHours": 2,
+      "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+    },
+    {
+      "id": "ci-golden-path-neon",
+      "kind": "neon-branch",
+      "policy": "manual-dispatch",
+      "owner": "ci-risk-classifier / release engineering",
+      "surface": "ephemeral Neon branch golden-path-<run_id>-<attempt> (isolated database only)",
+      "evidencePurpose": "Full signup-to-checkout journey proof against an isolated database with real Clerk.",
+      "ttlHours": 2,
+      "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+    },
+    {
+      "id": "ci-admin-smoke-neon",
+      "kind": "neon-branch",
+      "policy": "manual-dispatch",
+      "owner": "ci-risk-classifier / release engineering",
+      "surface": "ephemeral Neon branch admin-smoke-<run_id>-<attempt> (isolated database only)",
+      "evidencePurpose": "Authenticated admin-surface smoke proof against an isolated database.",
+      "ttlHours": 2,
+      "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+    },
+    {
+      "id": "ci-pr-vercel-preview",
+      "kind": "vercel-preview",
+      "policy": "manual-dispatch (inputs.run_preview_deploy=true)",
+      "owner": "dispatching engineer (github.actor)",
+      "surface": "Vercel preview deployment of @jovie/web pinned to the dispatched SHA",
+      "evidencePurpose": "Exact production-candidate hosted proof or debugging evidence that normal CI and current staging cannot produce.",
+      "ttlHours": 24,
+      "cleanupTrigger": "vercel-preview-cleanup on pull_request closed; cancel-stale-vercel-previews reaps stuck builds",
+      "costBudget": "One Vercel preview build plus one deployment per dispatch"
+    },
+    {
+      "id": "e2e-full-matrix-neon",
+      "kind": "neon-branch",
+      "policy": "scheduled-evidence",
+      "owner": "ci scheduled evidence lanes / release engineering",
+      "surface": "ephemeral Neon branch e2e-full-<run_id>-* (isolated database only)",
+      "evidencePurpose": "Scheduled deep E2E coverage that PR CI does not run.",
+      "ttlHours": 2,
+      "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per weekly run"
+    },
+    {
+      "id": "nightly-tests-neon",
+      "kind": "neon-branch",
+      "policy": "scheduled-evidence",
+      "owner": "ci scheduled evidence lanes / release engineering",
+      "surface": "ephemeral Neon branch nightly-e2e-<run_id> (isolated database only)",
+      "evidencePurpose": "Scheduled nightly coverage that PR CI does not run.",
+      "ttlHours": 2,
+      "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per nightly run"
+    },
+    {
+      "id": "visual-regression-neon",
+      "kind": "neon-branch",
+      "policy": "scheduled-evidence",
+      "owner": "ci scheduled evidence lanes / release engineering",
+      "surface": "ephemeral Neon branch visual-regression-<run_id> (isolated database only)",
+      "evidencePurpose": "Scheduled visual diff coverage that PR CI does not run.",
+      "ttlHours": 2,
+      "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per daily run"
+    }
+  ],
+  "activeExceptions": []
+}

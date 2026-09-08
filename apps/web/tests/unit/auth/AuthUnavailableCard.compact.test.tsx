@@ -14,7 +14,7 @@ describe('AuthUnavailableCard', () => {
   });
 
   it('uses compact design-system button sizing for unavailable auth actions', () => {
-    render(<AuthUnavailableCard />);
+    const { container } = render(<AuthUnavailableCard />);
 
     const action = screen.getByRole('link', { name: 'Go to Homepage' });
     expect(action.className).not.toContain('min-h-[3.75rem]');
@@ -26,6 +26,10 @@ describe('AuthUnavailableCard', () => {
       name: 'Sign in is temporarily unavailable',
     });
     expect(heading.className).not.toContain('clamp(2.9rem');
+    expect(container.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '32'
+    );
     expect(
       screen.getByText("This environment's sign-in setup is not ready.")
     ).toBeInTheDocument();

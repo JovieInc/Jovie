@@ -1,0 +1,1325 @@
+#!/usr/bin/env bash
+# Concurrency-safe multi-account Codex launcher for Symphony.
+set -euo pipefail
+
+REAL_CODEX="${CODEX_REAL_BIN:-$HOME/.local/bin/codex}"
+ACCOUNTS_ROOT="${CODEX_ACCOUNTS_ROOT:-$HOME/.codex-accounts}"
+STATE_FILE="${CODEX_ACCOUNTS_STATE:-$ACCOUNTS_ROOT/state.json}"
+LOG_FILE="${CODEX_ROTATE_LOG:-$ACCOUNTS_ROOT/rotate.log}"
+LOCKS_DIR="${CODEX_ACCOUNT_LOCKS_DIR:-$ACCOUNTS_ROOT/locks}"
+WAIT_SECONDS="${CODEX_ACCOUNT_WAIT_SECONDS:-900}"
+# JOV-5031: Symphony's app-server reader enforces read_timeout_ms (5s) as an
+# inactivity deadline, not a boot budget. While this launcher waits for an
+# account it is silent, so the reader used to time out and abandon the port,
+# orphaning the launcher behind a dead reader where it could later seize an
+# account and strand it. In app-server mode the launcher emits a typed
+# keepalive line on the JSON-RPC stream; the reader treats it as an ignorable
+# notification and resets its inactivity clock. If the reader is gone, the
+# write fails (SIGPIPE/EPIPE) and the launcher dies before it can seize an
+# account — the initialization wait is cancellation-safe and the account lock
+# can never strand behind a dead reader.
+HEARTBEAT_SECONDS="${CODEX_ROTATE_HEARTBEAT_SECONDS:-2}"
+DEFAULT_COOLDOWN_SECONDS="${CODEX_DEFAULT_COOLDOWN_SECONDS:-21600}"
+# App-server JSON-RPC budget per request (reset-window read, credit consume).
+RPC_TIMEOUT="${CODEX_ROTATE_RPC_TIMEOUT:-15}"
+# Banked reset-credit redemption (decisions/codex-banked-resets-authorized-on-exhaustion-2026-09-05;
+# guardrails ops/tibo-codex-reset-credit-guardrails-2026-08-21). "0" disables.
+REDEEM_RESET_CREDITS="${CODEX_REDEEM_RESET_CREDITS:-1}"
+# Guardrail inputs: fresh evidence-backed drain demand plus non-secret
+# paid-access lifecycle metadata are mandatory; anything missing or stale
+# fails closed and the account simply cools.
+CAPACITY_EVIDENCE="${CODEX_CAPACITY_EVIDENCE:-${GEM_WORKSPACE:-/home/timwhite/gem-workspace}/state/concurrency.json}"
+REDEEM_EVIDENCE_MAX_AGE="${CODEX_REDEEM_EVIDENCE_MAX_AGE_SECONDS:-900}"
+RECEIPTS_DIR="${CODEX_REDEMPTION_RECEIPTS_DIR:-$ACCOUNTS_ROOT/receipts}"
+
+app_server_mode=0
+for arg in "$@"; do
+  if [[ "$arg" == "app-server" ]]; then
+    app_server_mode=1
+    break
+  fi
+done
+
+mkdir -p "$LOCKS_DIR"
+touch "$LOG_FILE"
+chmod 600 "$LOG_FILE" 2>/dev/null || true
+
+log() {
+  printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$LOG_FILE"
+}
+
+if ! command -v flock >/dev/null 2>&1; then
+  log "ERROR flock unavailable"
+  echo "codex-rotate: flock is required for account leasing" >&2
+  exit 2
+fi
+
+if [[ ! -f "$STATE_FILE" ]]; then
+  printf '%s\n' '{"active":null,"cooldowns":{},"last_error":{}}' >"$STATE_FILE"
+  chmod 600 "$STATE_FILE"
+fi
+
+account_order() {
+  ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import json
+import os
+import re
+import time
+import fcntl
+from pathlib import Path
+
+def codex_account(path):
+    """Only ChatGPT-authenticated profiles using the OpenAI provider belong here."""
+    try:
+        import tomllib
+        auth = json.loads((path / "auth.json").read_text())
+        config = tomllib.loads((path / "config.toml").read_text())
+        if not isinstance(auth, dict) or auth.get("auth_mode") != "chatgpt":
+            return False
+        provider = config.get("model_provider", "openai")
+        profile = config.get("profile")
+        if profile is not None:
+            selected = config.get("profiles", {}).get(profile)
+            if not isinstance(selected, dict):
+                return False
+            provider = selected.get("model_provider", provider)
+        return provider == "openai"
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
+root = Path(os.environ["ACCOUNTS_ROOT"])
+state_path = Path(os.environ["STATE_FILE"])
+with open(str(state_path) + ".lock", "a+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_SH)
+    try:
+        state = json.loads(state_path.read_text())
+        if not isinstance(state, dict):
+            raise ValueError("account state must be an object")
+        cooldowns = state.get("cooldowns", {})
+        if not isinstance(cooldowns, dict):
+            raise ValueError("cooldowns must be an object")
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        print("__CODEX_ROTATE_CAPACITY__:account_state_invalid")
+        raise SystemExit
+def account_groups(root):
+    """Aliases of one ChatGPT account share cooldown and existing lease files."""
+    groups = {}
+    for path in sorted(root.iterdir()):
+        if not path.is_dir() or not codex_account(path):
+            continue
+        if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", path.name)
+                or path.is_symlink()
+                or (path / "auth.json").is_symlink()
+                or (path / "config.toml").is_symlink()):
+            raise ValueError("unsafe account path")
+        auth = json.loads((path / "auth.json").read_text())
+        tokens = auth.get("tokens")
+        identity = tokens.get("account_id") if isinstance(tokens, dict) else None
+        if not isinstance(identity, str) or not identity.strip():
+            raise ValueError("missing canonical account identity")
+        # IDs remain private: only validated local alias names leave this process.
+        groups.setdefault(identity, []).append(path.name)
+    return list(groups.values())
+
+try:
+    groups = account_groups(root)
+    cooldown_by_group = {}
+    for aliases in groups:
+        values = [cooldowns.get(name, 0) for name in aliases]
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
+            raise ValueError("invalid cooldown")
+        cooldown_by_group[aliases[0]] = max(values)
+except (OSError, ValueError, TypeError):
+    print("__CODEX_ROTATE_CAPACITY__:account_state_invalid")
+    raise SystemExit
+now = int(time.time())
+ready = [aliases for aliases in groups if cooldown_by_group[aliases[0]] <= now]
+if not ready and groups:
+    earliest_retry = min(cooldown_by_group.values())
+    print(f"__CODEX_ROTATE_CAPACITY__:account_cooldown:{earliest_retry}")
+    raise SystemExit
+active = state.get("active")
+ready.sort(key=lambda aliases: active not in aliases)
+for aliases in ready:
+    selected = active if active in aliases else aliases[0]
+    print(selected + "\t" + " ".join(aliases))
+PY
+}
+
+set_active() {
+  ACCOUNT="$1" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import json
+import os
+import fcntl
+from pathlib import Path
+
+path = Path(os.environ["STATE_FILE"])
+with open(str(path) + ".lock", "a+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    try:
+        state = json.loads(path.read_text())
+    except Exception:
+        state = {"active": None, "cooldowns": {}, "last_error": {}}
+    state["active"] = os.environ["ACCOUNT"]
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(state, indent=2) + "\n")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+PY
+}
+
+mark_cooldown() {
+  ACCOUNT="$1" UNTIL="$2" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import json
+import os
+import time
+import fcntl
+from pathlib import Path
+
+path = Path(os.environ["STATE_FILE"])
+with open(str(path) + ".lock", "a+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    try:
+        state = json.loads(path.read_text())
+    except Exception:
+        state = {"active": None, "cooldowns": {}, "last_error": {}}
+    account = os.environ["ACCOUNT"]
+    until = int(os.environ["UNTIL"])
+    state.setdefault("cooldowns", {})[account] = until
+    state.setdefault("last_error", {})[account] = {
+        "reason": "limit_or_auth",
+        "at": int(time.time()),
+        "until": until,
+    }
+    if state.get("active") == account:
+        state["active"] = None
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(state, indent=2) + "\n")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+PY
+}
+
+# Reset windows come from the official app-server RPC account/rateLimits/read,
+# never from parsing error text: the "try again at" strings proved ~7h
+# inaccurate (9/6 RCA). Transport mirrors codex_cli_artifact.initialize: one
+# `codex app-server` process, newline-delimited JSON-RPC, response matched by
+# id with a bounded budget. Every failure is fail-closed (bounded default
+# cooldown); the account is never parked on a guessed timestamp.
+reset_until_via_rpc() {
+  REAL_CODEX="$REAL_CODEX" RPC_TIMEOUT="$RPC_TIMEOUT" python3 - <<'PY' 2>>"$LOG_FILE"
+import json
+import os
+import selectors
+import subprocess
+import time
+
+EXHAUSTED_PERCENT = 99.5
+MAX_COOLDOWN_SECONDS = 45 * 86400
+
+
+def rpc_timeout():
+    try:
+        value = float(os.environ.get("RPC_TIMEOUT", "15"))
+    except (TypeError, ValueError):
+        return 15.0
+    return value if 0 < value <= 30 else 15.0
+
+
+class AppServer:
+    """Newline-delimited JSON-RPC over one `codex app-server` process."""
+
+    def __init__(self):
+        self.timeout = rpc_timeout()
+        self.buffer = b""
+        self.process = subprocess.Popen(
+            [os.environ["REAL_CODEX"], "app-server"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        self.selector = selectors.DefaultSelector()
+        self.selector.register(self.process.stdout, selectors.EVENT_READ)
+        status, payload = self.request(1, "initialize", {
+            "clientInfo": {"name": "codex-rotate", "version": "1"},
+            "capabilities": {"experimentalApi": True},
+        })
+        if status != "ok" or not isinstance(payload, dict) or not payload.get("userAgent"):
+            raise RuntimeError("initialize failed")
+        self.send({"method": "initialized", "params": {}})
+
+    def send(self, message):
+        self.process.stdin.write((json.dumps(message) + "\n").encode())
+        self.process.stdin.flush()
+
+    def request(self, request_id, method, params):
+        """Returns (status, payload): 'ok' | 'error' (clean refusal) | 'ambiguous'."""
+        self.send({"id": request_id, "method": method, "params": params})
+        deadline = time.monotonic() + self.timeout
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None and not self.selector.select(0):
+                # The server exited: drain what it sent, but never wait on a
+                # pipe a surviving child still holds open.
+                break
+            # Cap each wait so a server dying mid-read is caught promptly.
+            if not self.selector.select(min(0.1, max(0, deadline - time.monotonic()))):
+                continue
+            chunk = os.read(self.process.stdout.fileno(), 4096)
+            if not chunk:
+                break
+            self.buffer += chunk
+            if len(self.buffer) > 1048576:
+                raise RuntimeError("response exceeds the 1MiB bound")
+            while b"\n" in self.buffer:
+                line, self.buffer = self.buffer.split(b"\n", 1)
+                try:
+                    message = json.loads(line)
+                except ValueError:
+                    continue
+                # Server->client requests and notifications carry a method; a
+                # response to us never does. Match strictly on our id.
+                if not isinstance(message, dict) or "method" in message:
+                    continue
+                if message.get("id") != request_id:
+                    continue
+                if "error" in message:
+                    return "error", message.get("error")
+                return "ok", message.get("result")
+        return "ambiguous", None
+
+    def close(self):
+        try:
+            self.selector.close()
+        except Exception:
+            pass
+        try:
+            self.process.stdin.close()
+        except OSError:
+            pass
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+
+
+def parse_window(value):
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("window must be an object or null")
+    used = value.get("usedPercent")
+    resets_at = value.get("resetsAt")
+    if isinstance(used, bool) or not isinstance(used, (int, float)):
+        raise ValueError("usedPercent must be a number")
+    # resetsAt is nullable in the v2 schema: a window without a known recovery
+    # instant can never supply a cooldown target.
+    if resets_at is not None and (isinstance(resets_at, bool) or not isinstance(resets_at, int)):
+        raise ValueError("resetsAt must be epoch seconds or null")
+    return {"usedPercent": float(used), "resetsAt": resets_at}
+
+
+def parse_snapshot(result):
+    if not isinstance(result, dict):
+        raise ValueError("rateLimits result must be an object")
+    rate_limits = result.get("rateLimits")
+    if not isinstance(rate_limits, dict):
+        raise ValueError("rateLimits must be an object")
+    reached = rate_limits.get("rateLimitReachedType")
+    if reached is not None and not isinstance(reached, str):
+        raise ValueError("rateLimitReachedType must be a string or null")
+    return {
+        "primary": parse_window(rate_limits.get("primary")),
+        "secondary": parse_window(rate_limits.get("secondary")),
+        "reached": reached,
+    }
+
+
+def binding_reset(snapshot):
+    exhausted = [
+        snapshot[name]["resetsAt"]
+        for name in ("primary", "secondary")
+        if snapshot[name] is not None
+        and snapshot[name]["usedPercent"] >= EXHAUSTED_PERCENT
+        and snapshot[name]["resetsAt"] is not None
+    ]
+    if not exhausted:
+        return None
+    return max(exhausted)
+
+
+now = int(time.time())
+try:
+    server = AppServer()
+except (OSError, RuntimeError):
+    raise SystemExit(1)
+try:
+    status, payload = server.request(2, "account/rateLimits/read", {})
+finally:
+    server.close()
+if status != "ok":
+    raise SystemExit(1)
+try:
+    snapshot = parse_snapshot(payload)
+except ValueError:
+    raise SystemExit(1)
+until = binding_reset(snapshot)
+if until is None or until <= now or until > now + MAX_COOLDOWN_SECONDS:
+    # The typed limit event contradicts the snapshot, or the reset time is
+    # implausible: park on the bounded default instead of trusting it.
+    raise SystemExit(1)
+print(until)
+PY
+}
+
+# Banked reset-credit redemption, event-driven inside the account lease this
+# launcher still holds (guardrails ops/tibo-codex-reset-credit-guardrails-2026-08-21):
+# evaluate only after the typed terminal rate-limit event, pick the
+# earliest-expiry available codexRateLimits credit, redeem only with fresh
+# drain evidence and paid-access metadata, use one stable idempotency key per
+# account+weekly window, reconcile an uncertain consume by reusing that key
+# (the backend dedupes via alreadyRedeemed; sends are capped), and clear the
+# cooldown only after a readback proves both windows reset and the weekly
+# reset moved. Every attempt writes an auditable receipt.
+attempt_banked_reset() {
+  ACCOUNT="$ACCOUNT" ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" \
+  REAL_CODEX="$REAL_CODEX" RPC_TIMEOUT="$RPC_TIMEOUT" \
+  CAPACITY_EVIDENCE="$CAPACITY_EVIDENCE" EVIDENCE_MAX_AGE="$REDEEM_EVIDENCE_MAX_AGE" \
+  RECEIPTS_DIR="$RECEIPTS_DIR" \
+  python3 - <<'PY' 2>>"$LOG_FILE"
+import fcntl
+import hashlib
+import json
+import os
+import re
+import selectors
+import subprocess
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+EXHAUSTED_PERCENT = 99.5
+SAFE_ACCOUNT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+MAX_COOLDOWN_SECONDS = 45 * 86400
+
+
+def rpc_timeout():
+    try:
+        value = float(os.environ.get("RPC_TIMEOUT", "15"))
+    except (TypeError, ValueError):
+        return 15.0
+    return value if 0 < value <= 30 else 15.0
+
+
+class AppServer:
+    """Newline-delimited JSON-RPC over one `codex app-server` process."""
+
+    def __init__(self):
+        self.timeout = rpc_timeout()
+        self.buffer = b""
+        self.process = subprocess.Popen(
+            [os.environ["REAL_CODEX"], "app-server"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        self.selector = selectors.DefaultSelector()
+        self.selector.register(self.process.stdout, selectors.EVENT_READ)
+        status, payload = self.request(1, "initialize", {
+            "clientInfo": {"name": "codex-rotate", "version": "1"},
+            "capabilities": {"experimentalApi": True},
+        })
+        if status != "ok" or not isinstance(payload, dict) or not payload.get("userAgent"):
+            raise RuntimeError("initialize failed")
+        self.send({"method": "initialized", "params": {}})
+
+    def send(self, message):
+        self.process.stdin.write((json.dumps(message) + "\n").encode())
+        self.process.stdin.flush()
+
+    def request(self, request_id, method, params):
+        """Returns (status, payload): 'ok' | 'error' (clean refusal) | 'ambiguous'."""
+        self.send({"id": request_id, "method": method, "params": params})
+        deadline = time.monotonic() + self.timeout
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None and not self.selector.select(0):
+                # The server exited: drain what it sent, but never wait on a
+                # pipe a surviving child still holds open.
+                break
+            # Cap each wait so a server dying mid-read is caught promptly.
+            if not self.selector.select(min(0.1, max(0, deadline - time.monotonic()))):
+                continue
+            chunk = os.read(self.process.stdout.fileno(), 4096)
+            if not chunk:
+                break
+            self.buffer += chunk
+            if len(self.buffer) > 1048576:
+                raise RuntimeError("response exceeds the 1MiB bound")
+            while b"\n" in self.buffer:
+                line, self.buffer = self.buffer.split(b"\n", 1)
+                try:
+                    message = json.loads(line)
+                except ValueError:
+                    continue
+                # Server->client requests and notifications carry a method; a
+                # response to us never does. Match strictly on our id.
+                if not isinstance(message, dict) or "method" in message:
+                    continue
+                if message.get("id") != request_id:
+                    continue
+                if "error" in message:
+                    return "error", message.get("error")
+                return "ok", message.get("result")
+        return "ambiguous", None
+
+    def close(self):
+        try:
+            self.selector.close()
+        except Exception:
+            pass
+        try:
+            self.process.stdin.close()
+        except OSError:
+            pass
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+
+
+def parse_window(value):
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("window must be an object or null")
+    used = value.get("usedPercent")
+    resets_at = value.get("resetsAt")
+    if isinstance(used, bool) or not isinstance(used, (int, float)):
+        raise ValueError("usedPercent must be a number")
+    # resetsAt is nullable in the v2 schema: a window without a known recovery
+    # instant can never supply a cooldown target.
+    if resets_at is not None and (isinstance(resets_at, bool) or not isinstance(resets_at, int)):
+        raise ValueError("resetsAt must be epoch seconds or null")
+    return {"usedPercent": float(used), "resetsAt": resets_at}
+
+
+def parse_snapshot(result):
+    if not isinstance(result, dict):
+        raise ValueError("rateLimits result must be an object")
+    rate_limits = result.get("rateLimits")
+    if not isinstance(rate_limits, dict):
+        raise ValueError("rateLimits must be an object")
+    reached = rate_limits.get("rateLimitReachedType")
+    if reached is not None and not isinstance(reached, str):
+        raise ValueError("rateLimitReachedType must be a string or null")
+    allowed = result.get("ordinaryUsageAllowed")
+    if allowed is not None and not isinstance(allowed, bool):
+        raise ValueError("ordinaryUsageAllowed must be a boolean or null")
+    return {
+        "primary": parse_window(rate_limits.get("primary")),
+        "secondary": parse_window(rate_limits.get("secondary")),
+        "reached": reached,
+        "ordinaryUsageAllowed": allowed,
+    }
+
+
+def parse_credits(result):
+    """result.rateLimitResetCredits is a summary object, never a bare list."""
+    summary = result.get("rateLimitResetCredits")
+    if summary is None:
+        return []
+    if not isinstance(summary, dict):
+        raise ValueError("rateLimitResetCredits must be an object")
+    count = summary.get("availableCount")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise ValueError("availableCount must be a non-negative integer")
+    raw = summary.get("credits")
+    if raw is None:
+        # Detail rows are optional on the wire; without them no deliberate
+        # earliest-expiry selection is possible, so redemption fails closed.
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("reset credits must be a list or null")
+    credits = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError("reset credit must be an object")
+        credit_id = item.get("id")
+        status = item.get("status")
+        reset_type = item.get("resetType")
+        expires_at = item.get("expiresAt")
+        if not isinstance(credit_id, str) or not credit_id.strip():
+            raise ValueError("reset credit id must be a string")
+        if not isinstance(status, str):
+            raise ValueError("reset credit status must be a string")
+        if not isinstance(reset_type, str):
+            raise ValueError("reset credit resetType must be a string")
+        # expiresAt is nullable: null means the credit does not expire.
+        if expires_at is not None and (isinstance(expires_at, bool) or not isinstance(expires_at, int)):
+            raise ValueError("reset credit expiresAt must be epoch seconds or null")
+        credits.append({
+            "id": credit_id,
+            "status": status,
+            "resetType": reset_type,
+            "expiresAt": expires_at,
+        })
+    return credits
+
+
+def select_credit(credits, now):
+    """Earliest-expiry available codexRateLimits credit; never-expiring sorts last."""
+    available = [
+        credit for credit in credits
+        if credit["status"] == "available"
+        and credit["resetType"] == "codexRateLimits"
+        and (credit["expiresAt"] is None or credit["expiresAt"] > now)
+    ]
+    if not available:
+        return None
+    never = 2**62
+    return min(available, key=lambda credit: (
+        credit["expiresAt"] if credit["expiresAt"] is not None else never,
+        credit["id"],
+    ))
+
+
+def binding_reset(snapshot):
+    exhausted = [
+        snapshot[name]["resetsAt"]
+        for name in ("primary", "secondary")
+        if snapshot[name] is not None
+        and snapshot[name]["usedPercent"] >= EXHAUSTED_PERCENT
+        and snapshot[name]["resetsAt"] is not None
+    ]
+    if not exhausted:
+        return None
+    return max(exhausted)
+
+
+def load_evidence(now):
+    """Fresh gem-concurrency-evidence/v1 receipt proving real drain demand."""
+    try:
+        max_age = float(os.environ.get("EVIDENCE_MAX_AGE", "900"))
+    except (TypeError, ValueError):
+        max_age = 900.0
+    if not 0 < max_age <= 86400:
+        max_age = 900.0
+    path = Path(os.environ["CAPACITY_EVIDENCE"])
+    try:
+        if path.is_symlink():
+            return None
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    if (value.get("schema") != "gem-concurrency-evidence/v1"
+            or value.get("source") != "execution-proven-useful-turns"):
+        return None
+    observed = value.get("observedAt")
+    if not isinstance(observed, str):
+        return None
+    try:
+        observed_at = datetime.fromisoformat(observed.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+    if observed_at > now + 60 or now - observed_at > max_age:
+        return None
+    target = value.get("target")
+    if isinstance(target, bool) or not isinstance(target, int) or target < 1:
+        return None
+    return {"path": str(path), "observedAt": observed, "target": target}
+
+
+def load_lifecycle(home, now):
+    """Non-secret paid-access lifecycle metadata, separate from credentials."""
+    path = home / "lifecycle.json"
+    try:
+        if path.is_symlink() or not path.is_file():
+            return None
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    end = value.get("paidAccessEndsAt")
+    if isinstance(end, bool):
+        return None
+    if isinstance(end, int):
+        ends_at = end
+    elif isinstance(end, str):
+        text = end if "T" in end else end + "T00:00:00+00:00"
+        try:
+            ends_at = int(datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp())
+        except ValueError:
+            return None
+    else:
+        return None
+    if ends_at <= now:
+        return None
+    renewal = value.get("renewalIntent")
+    if renewal is not None and not isinstance(renewal, bool):
+        return None
+    return {"paidAccessEndsAt": ends_at, "renewalIntent": renewal}
+
+
+def readback_proves_reset(before, after, now):
+    """Both windows below exhaustion and the weekly reset moved (guardrail).
+
+    ordinaryUsageAllowed is the backend's own recovery verdict; when present
+    it must agree, since clients must not infer recovery from percentages.
+    """
+    if after["ordinaryUsageAllowed"] is False:
+        return False
+    weekly_before = before["secondary"]
+    weekly_after = after["secondary"]
+    if weekly_before is None or weekly_after is None:
+        return False
+    if weekly_after["resetsAt"] is None or weekly_after["resetsAt"] == weekly_before["resetsAt"]:
+        return False
+    if weekly_after["resetsAt"] <= now:
+        return False
+    if weekly_after["usedPercent"] >= EXHAUSTED_PERCENT:
+        return False
+    primary_after = after["primary"]
+    if primary_after is not None and primary_after["usedPercent"] >= EXHAUSTED_PERCENT:
+        return False
+    return True
+
+
+def write_receipt(path, receipt):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    temporary = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+    temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+
+
+def clear_cooldown(state_file, account, now):
+    path = Path(state_file)
+    with open(str(path) + ".lock", "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            state = json.loads(path.read_text())
+        except Exception:
+            state = {"active": None, "cooldowns": {}, "last_error": {}}
+        if not isinstance(state, dict):
+            return False
+        cooldowns = state.setdefault("cooldowns", {})
+        if not isinstance(cooldowns, dict):
+            return False
+        cooldowns[account] = now
+        errors = state.setdefault("last_error", {})
+        if isinstance(errors, dict):
+            errors.pop(account, None)
+        temporary = path.with_suffix(path.suffix + ".tmp")
+        temporary.write_text(json.dumps(state, indent=2) + "\n")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+    return True
+
+
+def iso(epoch):
+    return datetime.fromtimestamp(epoch, timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def emit(outcome, reason, until="", key=""):
+    # An emitted until steers the account cooldown, so it gets the same
+    # plausibility bound reset_until_via_rpc applies: a lapsed or implausible
+    # horizon is withheld and the launcher falls back to the bounded default.
+    if until != "":
+        now = int(time.time())
+        if not isinstance(until, int) or until <= now or until > now + MAX_COOLDOWN_SECONDS:
+            until = ""
+    print(f"outcome={outcome} reason={reason} until={until} key={key}")
+
+
+def main():
+    account = os.environ["ACCOUNT"]
+    if not SAFE_ACCOUNT.fullmatch(account):
+        emit("parked", "account_invalid")
+        return
+    root = Path(os.environ["ACCOUNTS_ROOT"])
+    home = root / account
+    now = int(time.time())
+    try:
+        auth = json.loads((home / "auth.json").read_text(encoding="utf-8"))
+        tokens = auth.get("tokens") if isinstance(auth, dict) else None
+        identity = tokens.get("account_id") if isinstance(tokens, dict) else None
+    except (OSError, ValueError):
+        identity = None
+    if not isinstance(identity, str) or not identity.strip():
+        emit("parked", "identity_unavailable")
+        return
+    try:
+        server = AppServer()
+    except (OSError, RuntimeError):
+        emit("parked", "rpc_unavailable")
+        return
+    try:
+        status, payload = server.request(2, "account/rateLimits/read", {})
+        if status != "ok":
+            emit("parked", "rpc_read_failed")
+            return
+        try:
+            snapshot = parse_snapshot(payload)
+            credits = parse_credits(payload)
+        except ValueError:
+            emit("parked", "snapshot_invalid")
+            return
+        weekly = snapshot["secondary"]
+        if (weekly is None or weekly["usedPercent"] < EXHAUSTED_PERCENT
+                or weekly["resetsAt"] is None or weekly["resetsAt"] <= now
+                or snapshot["ordinaryUsageAllowed"] is True):
+            # Only weekly-bound genuine exhaustion is redeemable: the readback
+            # proof requires the weekly reset to move, a primary-only binding
+            # recovers naturally within hours, and a backend still allowing
+            # ordinary usage contradicts the typed terminal event.
+            until = binding_reset(snapshot)
+            emit("parked", "not_weekly_bound", until if until and until > now else "")
+            return
+        natural_until = weekly["resetsAt"]
+        credit = select_credit(credits, now)
+        if credit is None:
+            emit("parked", "no_credit", natural_until)
+            return
+        evidence = load_evidence(now)
+        if evidence is None:
+            emit("parked", "no_drain_evidence", natural_until)
+            return
+        # Natural binding-window recovery (weekly.resetsAt > now) is later
+        # than the fastest evidence-backed drain horizon: fresh proven ready
+        # seats (target >= 1) drain restored capacity immediately, so the
+        # horizon is now and the guardrail comparison holds.
+        lifecycle = load_lifecycle(home, now)
+        if lifecycle is None:
+            emit("parked", "no_paid_access", natural_until)
+            return
+        key = hashlib.sha256(
+            f"codex-reset-credit|{identity}|{natural_until}".encode("utf-8")
+        ).hexdigest()[:32]
+        receipt_path = Path(os.environ["RECEIPTS_DIR"]) / f"codex-reset-credit-{key}.json"
+        receipt = {
+            "schema": "codex-reset-credit-redemption/v1",
+            "account": account,
+            "idempotencyKey": key,
+            "creditId": credit["id"],
+            "creditExpiresAt": credit["expiresAt"],
+            "naturalResetAt": natural_until,
+            "evidence": evidence,
+            "lifecycle": lifecycle,
+            "preReset": {
+                "primary": snapshot["primary"],
+                "secondary": weekly,
+                "rateLimitReachedType": snapshot["reached"],
+                "ordinaryUsageAllowed": snapshot["ordinaryUsageAllowed"],
+            },
+            "consumeAttempted": False,
+            "consumeSends": 0,
+            "consumeStatus": "not-sent",
+            "consumeOutcome": None,
+            "postReset": None,
+            "readbackProven": False,
+            "decision": "parked",
+            "reason": "pending",
+            "recordedAt": iso(now),
+        }
+        consume_status = None
+        resend = False
+        if receipt_path.exists():
+            try:
+                prior = json.loads(receipt_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                prior = None
+            if not isinstance(prior, dict):
+                emit("parked", "receipt_corrupt", natural_until, key)
+                return
+            if prior.get("consumeAttempted") is True:
+                # One stable idempotency key, reused on an uncertain result
+                # (decisions/codex-banked-resets-authorized-on-exhaustion-2026-09-05):
+                # the backend dedupes via alreadyRedeemed, so re-sending with
+                # the same key can never redeem twice. A prior definitive
+                # no-effect outcome is reconciled by readback only. Keep the
+                # original attempt on the receipt for audit.
+                receipt["priorConsume"] = {
+                    field: prior.get(field)
+                    for field in ("consumeStatus", "consumeOutcome", "recordedAt")
+                }
+                sends = prior.get("consumeSends")
+                if isinstance(sends, bool) or not isinstance(sends, int) or sends < 1:
+                    sends = 1
+                receipt["consumeSends"] = sends
+                if prior.get("consumeStatus") in ("sent", "ambiguous"):
+                    if sends >= 3:
+                        receipt["decision"] = "parked"
+                        receipt["reason"] = "resend_cap"
+                        write_receipt(receipt_path, receipt)
+                        emit("parked", "resend_cap", natural_until, key)
+                        return
+                    consume_status = "reconcile"
+                    resend = True
+                else:
+                    consume_status = "reconcile"
+        if consume_status is None or resend:
+            receipt["consumeAttempted"] = True
+            receipt["consumeSends"] = receipt.get("consumeSends", 0) + 1
+            receipt["consumeStatus"] = "sent" if receipt["consumeSends"] == 1 else "resent"
+            receipt["decision"] = "pending"
+            receipt["reason"] = "consume_sent"
+            # Crash-safe idempotency marker: written before the request so a
+            # launcher crash mid-consume reconciles by reusing the same key.
+            write_receipt(receipt_path, receipt)
+            first_send = receipt["consumeSends"] == 1
+            consume_status, consume_result = server.request(
+                3,
+                "account/rateLimitResetCredit/consume",
+                {"idempotencyKey": key, "creditId": credit["id"]},
+            )
+            outcome = None
+            if consume_status == "ok":
+                if (not isinstance(consume_result, dict)
+                        or not isinstance(consume_result.get("outcome"), str)):
+                    # An unparseable success payload leaves the effect unknown.
+                    consume_status = "ambiguous"
+                else:
+                    outcome = consume_result["outcome"]
+                    receipt["consumeOutcome"] = outcome
+            if consume_status == "error":
+                if first_send:
+                    # A clean refusal of the first send consumed nothing; the
+                    # same key may be retried by a later exhaustion event.
+                    receipt["consumeAttempted"] = False
+                    receipt["consumeStatus"] = "rejected"
+                    receipt["decision"] = "parked"
+                    receipt["reason"] = "consume_rejected"
+                else:
+                    # The resend was refused, but the original attempt's effect
+                    # is still unknown: stay reconcile-eligible with the key.
+                    receipt["consumeStatus"] = "ambiguous"
+                    receipt["decision"] = "parked"
+                    receipt["reason"] = "consume_rejected"
+                write_receipt(receipt_path, receipt)
+                emit("parked", "consume_rejected", natural_until, key)
+                return
+            if outcome == "noCredit":
+                if first_send:
+                    # The selected credit raced away; nothing was consumed, so
+                    # a later exhaustion event on this window may retry the key.
+                    receipt["consumeAttempted"] = False
+                receipt["consumeStatus"] = "no_credit" if first_send else "ambiguous"
+                receipt["decision"] = "parked"
+                receipt["reason"] = "consume_no_credit"
+                write_receipt(receipt_path, receipt)
+                emit("parked", "consume_no_credit", natural_until, key)
+                return
+            if outcome == "nothingToReset":
+                # Definitive no-effect answer: the backend sees no eligible
+                # window, contradicting the snapshot. Never retry this key.
+                receipt["consumeStatus"] = "nothing_to_reset"
+                receipt["decision"] = "parked"
+                receipt["reason"] = "consume_nothing_to_reset"
+                write_receipt(receipt_path, receipt)
+                emit("parked", "consume_nothing_to_reset", natural_until, key)
+                return
+            # "reset" and "alreadyRedeemed" both assert the eligible windows
+            # were reset under this key; the fresh readback remains the proof.
+        if consume_status == "ambiguous":
+            # Effect unknown: reconcile on a fresh connection with the same
+            # key; a second consume is never sent for this window.
+            server.close()
+            try:
+                server = AppServer()
+            except (OSError, RuntimeError):
+                receipt["consumeStatus"] = "ambiguous"
+                receipt["decision"] = "parked"
+                receipt["reason"] = "consume_ambiguous"
+                write_receipt(receipt_path, receipt)
+                emit("parked", "consume_ambiguous", natural_until, key)
+                return
+        read_status, read_payload = server.request(4, "account/rateLimits/read", {})
+        post = None
+        proven = False
+        if read_status == "ok":
+            try:
+                post = parse_snapshot(read_payload)
+                proven = readback_proves_reset(snapshot, post, now)
+            except ValueError:
+                proven = False
+        if consume_status in ("ambiguous", "reconcile"):
+            receipt["consumeStatus"] = consume_status
+        # On "ok" the pre-request label ("sent"/"resent") already records it.
+        receipt["postReset"] = (
+            {"primary": post["primary"], "secondary": post["secondary"],
+             "rateLimitReachedType": post["reached"],
+             "ordinaryUsageAllowed": post["ordinaryUsageAllowed"]}
+            if post is not None else None
+        )
+        receipt["readbackProven"] = proven
+        if proven:
+            receipt["decision"] = "redeemed"
+            receipt["reason"] = "redeemed"
+            if not clear_cooldown(os.environ["STATE_FILE"], account, now):
+                receipt["decision"] = "parked"
+                receipt["reason"] = "state_commit_failed"
+                write_receipt(receipt_path, receipt)
+                emit("parked", "state_commit_failed", natural_until, key)
+                return
+            write_receipt(receipt_path, receipt)
+            emit("redeemed", "redeemed", now, key)
+            return
+        receipt["decision"] = "parked"
+        if consume_status == "ambiguous":
+            receipt["reason"] = "consume_ambiguous"
+        elif consume_status == "reconcile":
+            receipt["reason"] = "consume_reconcile_unproven"
+        else:
+            receipt["reason"] = "readback_unproven"
+        write_receipt(receipt_path, receipt)
+        fallback = binding_reset(post) if post is not None else None
+        until = fallback if fallback and fallback > now else natural_until
+        emit("parked", receipt["reason"], until, key)
+        return
+    finally:
+        server.close()
+
+
+try:
+    main()
+except Exception as error:
+    print(f"attempt_banked_reset: {type(error).__name__}: {error}", file=os.sys.stderr)
+    emit("parked", "internal_error")
+PY
+}
+
+classify_provider_error() {
+  STDOUT_FILE="$1" STDERR_FILE="$2" APP_SERVER_MODE="$app_server_mode" PROCESS_RC="$3" python3 - <<'PY'
+import json
+import os
+import re
+
+
+def normalized(value):
+    return re.sub(r"[^a-z0-9]", "", str(value).lower())
+
+
+def http_status(value):
+    if not isinstance(value, dict):
+        return None
+    for key in ("httpStatusCode", "http_status_code", "status", "statusCode"):
+        status = value.get(key)
+        if isinstance(status, int) and not isinstance(status, bool):
+            return status
+    return None
+
+
+RATE_LIMIT_NAMES = {"usagelimitexceeded", "ratelimitexceeded"}
+AUTH_NAMES = {"unauthorized"}
+RATE_LIMIT_HTTP_VARIANTS = {
+    "httpconnectionfailed",
+    "responsestreamconnectionfailed",
+    "responsestreamdisconnected",
+    "responsetoomanyfailedattempts",
+}
+
+
+def typed_limit_or_auth(info):
+    """'rate_limit' for genuine exhaustion, 'auth' for credential failures."""
+    def classify_name(name):
+        if name in RATE_LIMIT_NAMES:
+            return "rate_limit"
+        if name in AUTH_NAMES:
+            return "auth"
+        return None
+
+    if isinstance(info, str):
+        return classify_name(normalized(info))
+    if not isinstance(info, dict):
+        return None
+    kind = info.get("type") or info.get("kind")
+    if isinstance(kind, str):
+        name = normalized(kind)
+        result = classify_name(name)
+        if result is not None:
+            return result
+        if name in RATE_LIMIT_HTTP_VARIANTS and http_status(info) == 429:
+            return "rate_limit"
+    for key, value in info.items():
+        name = normalized(key)
+        result = classify_name(name)
+        if result is not None:
+            return result
+        if name in RATE_LIMIT_HTTP_VARIANTS and http_status(value) == 429:
+            return "rate_limit"
+    return None
+
+
+RATE_LIMIT_TYPES = {"ratelimiterror", "usagelimiterror"}
+AUTH_TYPES = {
+    "authenticationerror",
+    "tokeninvalidated",
+    "tokenexpired",
+    "unauthorized",
+}
+RATE_LIMIT_PREFIXES = (
+    "you've hit your usage limit",
+    "usage limit; try again at",
+    "rate limit exceeded",
+)
+AUTH_PREFIXES = (
+    "token_invalidated",
+    "refresh token was revoked",
+    "token_expired",
+    "token is expired",
+    "session has ended",
+)
+
+
+def trusted_error(error):
+    """Returns the trusted kind ('rate_limit'|'auth') or None when untrusted."""
+    if not isinstance(error, dict):
+        return None
+    kind = typed_limit_or_auth(error.get("codexErrorInfo"))
+    if kind is not None:
+        return kind
+    error_type = normalized(error.get("type", ""))
+    if error_type in RATE_LIMIT_TYPES:
+        return "rate_limit"
+    if error_type in AUTH_TYPES:
+        return "auth"
+    message = str(error.get("message", "")).strip().lower()
+    if any(message.startswith(prefix) for prefix in RATE_LIMIT_PREFIXES):
+        return "rate_limit"
+    if any(message.startswith(prefix) for prefix in AUTH_PREFIXES):
+        return "auth"
+    return None
+
+
+def app_server_error(payload):
+    if not isinstance(payload, dict):
+        return None
+    method = payload.get("method")
+    params = payload.get("params")
+    if method == "error" and isinstance(params, dict):
+        return params.get("error")
+    if method == "turn/completed" and isinstance(params, dict):
+        turn = params.get("turn")
+        if isinstance(turn, dict) and turn.get("status") == "failed":
+            return turn.get("error")
+    # Older app-server builds emitted a typed top-level error event.
+    if payload.get("type") == "error":
+        return payload.get("error") if isinstance(payload.get("error"), dict) else payload
+    return None
+
+
+stdout = open(os.environ["STDOUT_FILE"], encoding="utf-8", errors="replace")
+stderr = open(os.environ["STDERR_FILE"], encoding="utf-8", errors="replace")
+if os.environ["APP_SERVER_MODE"] == "1":
+    for line in stdout:
+        try:
+            payload = json.loads(line)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        error = app_server_error(payload)
+        kind = trusted_error(error)
+        if kind is not None:
+            # The kind drives redemption eligibility; the message is log-only.
+            print(kind + "\t" + " ".join(str(error.get("message", "")).split()))
+            raise SystemExit(0)
+elif int(os.environ["PROCESS_RC"]) != 0:
+    rate_limit_prefixes = (
+        "you've hit your usage limit",
+        "usage limit; try again at",
+        "error: usage limit",
+        "rate limit exceeded",
+        "error: rate limit exceeded",
+        "error: exceeded retry limit, last status: 429 too many requests",
+    )
+    auth_prefixes = (
+        "token_invalidated",
+        "error: token_invalidated",
+        "refresh token was revoked",
+        "error: refresh token was revoked",
+        "token_expired",
+        "error: token_expired",
+        "token is expired",
+        "error: token is expired",
+        "session has ended",
+        "error: session has ended",
+    )
+    for line in stderr:
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if lowered.startswith(rate_limit_prefixes):
+            print("rate_limit" + "\t" + stripped)
+            raise SystemExit(0)
+        if lowered.startswith(auth_prefixes):
+            print("auth" + "\t" + stripped)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+started_at=$(date +%s)
+last_heartbeat=$started_at
+account=""
+account_lock_fds=()
+capacity_reason=""
+capacity_retry_at=""
+while [[ -z "$account" ]]; do
+  while IFS=$'\t' read -r candidate alias_group; do
+    [[ -n "$candidate" ]] || continue
+    if [[ "$candidate" == "__CODEX_ROTATE_CAPACITY__:account_cooldown:"* ]]; then
+      capacity_reason="account_cooldown"
+      capacity_retry_at="${candidate##*:}"
+      break
+    fi
+    if [[ "$candidate" == "__CODEX_ROTATE_CAPACITY__:account_state_invalid" ]]; then
+      capacity_reason="account_state_invalid"
+      break
+    fi
+    # Retain every existing alias lock, so old launchers, probes and reconnects
+    # cannot use a second name for this account during an incremental rollout.
+    candidate_fds=()
+    group_locked=1
+    read -r -a aliases <<< "$alias_group"
+    for alias in "${aliases[@]}"; do
+      exec {candidate_fd}>"$LOCKS_DIR/$alias.lock"
+      candidate_fds+=("$candidate_fd")
+      if ! flock -n "$candidate_fd"; then
+        group_locked=0
+        break
+      fi
+    done
+    if (( group_locked == 1 )); then
+      # Recheck identity/group and cooldown after acquiring the existing locks.
+      # Legitimate credential writers use those same locks.
+      while IFS=$'\t' read -r current_candidate current_group; do
+        if [[ "$current_candidate" == "$candidate" && "$current_group" == "$alias_group" ]]; then
+          account="$candidate"
+          account_lock_fds=("${candidate_fds[@]}")
+          break
+        fi
+      done < <(account_order)
+    fi
+    [[ -z "$account" ]] || break
+    for candidate_fd in "${candidate_fds[@]}"; do
+      exec {candidate_fd}>&-
+    done
+  done < <(account_order)
+
+  if [[ -n "$capacity_reason" ]]; then
+    if [[ "$capacity_reason" == "account_cooldown" ]]; then
+      now=$(date +%s)
+      wait_seconds=$(( capacity_retry_at > now ? capacity_retry_at - now : 0 ))
+      capacity="CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason=$capacity_reason retryAt=$capacity_retry_at waitSeconds=$wait_seconds"
+    else
+      capacity="CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason=$capacity_reason retryAt=unknown waitSeconds=unknown"
+    fi
+    log "$capacity"
+    echo "codex-rotate: $capacity" >&2
+    exit 75
+  fi
+
+  if [[ -n "$account" ]]; then
+    break
+  fi
+  now=$(date +%s)
+  if (( now - started_at >= WAIT_SECONDS )); then
+    # Typed capacity signal (JOV-5031): exit 75 (EX_TEMPFAIL) plus an explicit
+    # marker so account-busy startup is classifiable as capacity backoff
+    # instead of a generic agent failure. The launcher exits before acquiring
+    # any lock, so no orphan process or stranded account can outlive it.
+    log "CAPACITY_UNAVAILABLE reason=account_busy seconds=$WAIT_SECONDS"
+    echo "codex-rotate: CAPACITY_UNAVAILABLE reason=account_busy after ${WAIT_SECONDS}s wait" >&2
+    exit 75
+  fi
+  if (( app_server_mode == 1 && HEARTBEAT_SECONDS > 0 && now - last_heartbeat >= HEARTBEAT_SECONDS )); then
+    # JSON-RPC notification without an id: Symphony's reader ignores it and
+    # resets the inactivity deadline. A dead reader fails this write and kills
+    # the launcher (set -e / SIGPIPE) before it can strand an account.
+    printf '{"jsonrpc":"2.0","method":"codex-rotate/account-wait","params":{"elapsedSeconds":%d}}\n' \
+      "$(( now - started_at ))"
+    last_heartbeat=$now
+  fi
+  sleep 1
+done
+
+home="$ACCOUNTS_ROOT/$account"
+if [[ ! -f "$home/auth.json" || ! -f "$home/config.toml" ]]; then
+  log "ERROR incomplete account=$account"
+  echo "codex-rotate: account $account is missing auth.json or config.toml" >&2
+  exit 2
+fi
+
+set_active "$account"
+export CODEX_HOME="$home"
+log "START account=$account lease_fds=${account_lock_fds[*]} args=$*"
+
+tmp_out=$(mktemp)
+tmp_err=$(mktemp)
+tmp_provider_error=$(mktemp)
+trap 'rm -f "$tmp_out" "$tmp_err" "$tmp_provider_error"' EXIT
+set +e
+# Keep the streams separate: Codex CLI owns stderr errors, while app-server owns
+# structured stdout events. Mixing them lets arbitrary JSON-RPC values or tool
+# text impersonate a provider failure.
+"$REAL_CODEX" "$@" \
+  > >(tee -a "$tmp_out") \
+  2> >(tee -a "$tmp_err" >&2)
+rc=$?
+set -e
+# Bash does not guarantee that process substitutions finish before the next
+# command. Wait for both tee processes so the terminal event is present before
+# classifying the account.
+wait || true
+
+if classify_provider_error "$tmp_out" "$tmp_err" "$rc" >"$tmp_provider_error"; then
+  error_kind="$(cut -f1 <"$tmp_provider_error")"
+  redeemed=0
+  redemption_until=""
+  # Banked reset-credit redemption applies only to genuine exhaustion, never
+  # to credential failures, and runs while this launcher still holds every
+  # alias lock for the account (the existing rotate lock).
+  if [[ "$error_kind" == "rate_limit" && "$REDEEM_RESET_CREDITS" == "1" ]]; then
+    redemption="$(ACCOUNT="$account" attempt_banked_reset)" || redemption=""
+    redemption_outcome=""
+    redemption_key=""
+    # emit() writes one line of space-separated tokens; split on words.
+    for token in $redemption; do
+      case "$token" in
+        outcome=*) redemption_outcome="${token#outcome=}" ;;
+        until=*) redemption_until="${token#until=}" ;;
+        key=*) redemption_key="${token#key=}" ;;
+      esac
+    done
+    [[ "$redemption_until" =~ ^[0-9]+$ ]] || redemption_until=""
+    if [[ "$redemption_outcome" == "redeemed" ]]; then
+      redeemed=1
+      log "REDEEMED account=$account key=${redemption_key:-unknown} rc=$rc"
+    else
+      log "REDEMPTION_REFUSED account=$account ${redemption:-no_output} rc=$rc"
+    fi
+  fi
+  if [[ "$redeemed" -eq 0 ]]; then
+    until="$redemption_until"
+    if [[ -z "$until" ]]; then
+      until="$(reset_until_via_rpc)" || until=""
+    fi
+    if [[ -z "$until" ]]; then
+      until=$(( $(date +%s) + DEFAULT_COOLDOWN_SECONDS ))
+    fi
+    mark_cooldown "$account" "$until"
+    log "COOLDOWN account=$account until=$until kind=$error_kind rc=$rc"
+  fi
+  if [[ "$rc" -eq 0 ]]; then
+    rc=75
+  fi
+fi
+
+log "EXIT account=$account rc=$rc"
+exit "$rc"

@@ -11,20 +11,11 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
+import { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
+
+export { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
 
 const MiB = 1024 * 1024;
-
-export const HYGIENE_LIMITS = Object.freeze({
-  maxFileBytes: 10 * MiB,
-  maxChangedBytes: 60 * MiB,
-  maxBinaryBytes: 10 * MiB,
-  maxChangedBinaryBytes: 60 * MiB,
-  maxChangedBinaryFiles: 120,
-  maxSnapshotBytes: 12 * MiB,
-  maxSnapshotFiles: 100,
-  maxTrackedBytes: 180 * MiB,
-  maxTrackedBinaryBytes: 96 * MiB,
-});
 
 export const RETIRED_TRACKED_FILE_CEILING = 10_000;
 export const REPO_HEALTH_CANDIDATE_LIMITS = Object.freeze({

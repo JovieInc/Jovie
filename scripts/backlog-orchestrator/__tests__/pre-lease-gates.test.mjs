@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { CONTROL_PLANE_OPTIMIZATION_EXCEPTION } from '../../invariants/optimization-contract.mjs';
@@ -21,7 +22,14 @@ function issue(overrides = {}) {
     id: 'issue-id',
     identifier: 'JOV-5032',
     title: 'Bind pre-lease context receipts',
-    description: 'Deterministic control-plane work inside this repository.',
+    description: `## Target
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI
+
+## Scope
+Deterministic control-plane work inside this repository.`,
     state: { id: 'triage-id', name: 'Triage', type: 'triage' },
     project: { name: 'Infra & CI/CD', slugId: 'abc123' },
     assignee: null,
@@ -55,6 +63,28 @@ function planEvidence() {
       'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     ],
     rollback: 'Revert the gate commit and remove the receipt comments',
+    value: {
+      authority: 'founder-request',
+      decisionId: 'task-pre-lease-gates',
+      rationale: 'Bind evidence before agent work begins',
+      expectedBenefit: 'Prevent unqualified work and reduce repair churn',
+      validation: 'Verify one admission-to-draft flow',
+      sanity: {
+        basis: 'measured',
+        concurrency: 1,
+        demandPerDay: 1,
+        criticalPath: [{ stage: 'pre-lease', durationMs: 60_000 }],
+        bottleneck: 'context lookup',
+        simplification: 'use one revision-scoped receipt chain',
+        owner: 'Summer',
+      },
+    },
+    target: {
+      target_system: 'jovie-product',
+      target_repo: 'JovieInc/Jovie',
+      artifact: 'scripts/backlog-orchestrator/admission-gate.mjs',
+      verification_authority: 'JovieInc/Jovie CI',
+    },
     optimization: CONTROL_PLANE_OPTIMIZATION_EXCEPTION,
   };
 }
@@ -551,5 +581,10 @@ describe('pre-lease admission-to-draft flow', () => {
     );
     assert.equal(leasePayload.contextFingerprint, context.fingerprint);
     assert.equal(leasePayload.researchFingerprint, research.fingerprint);
+    assert.equal(leasePayload.target_repo, 'JovieInc/Jovie');
+    assert.equal(
+      leasePayload.artifact,
+      'scripts/backlog-orchestrator/admission-gate.mjs'
+    );
   });
 });

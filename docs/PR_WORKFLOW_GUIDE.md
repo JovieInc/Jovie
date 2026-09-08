@@ -48,14 +48,11 @@ The auto-merge workflow will:
 ✅ **Enable auto-merge for PRs with `auto-merge` label when:**
 - All CI checks pass
 - PR is not draft
-- No blocking labels (`blocked`, `human-review`, `no-auto-merge`, etc.)
+- No active machine gate (`blocked`, conflict, required-check failure, etc.)
 
 ⏸️ **Skip auto-merge for PRs with these labels:**
 - `blocked` - PR is blocked
-- `human-review` - Needs human review
-- `no-auto-merge` - Explicitly disable auto-merge
 - `claude:needs-fixes` - Claude detected issues
-- `needs-human` - Requires human intervention
 
 ## PR Types
 
@@ -90,7 +87,10 @@ The auto-merge workflow will:
 - Wait the cooldown time shown in the CodeRabbit comment before re-triggering review.
 - If the comment mentions usage credits are exhausted, either top up credits or skip CodeRabbit until credits are restored.
 
-### Need to disable auto-merge?
+### Need to stop unsafe admission?
 ```bash
-gh pr edit <PR_NUMBER> --add-label "no-auto-merge"
+gh pr edit <PR_NUMBER> --add-label "hold"
 ```
+
+Use `hold` only for a concrete machine-verifiable incident. Taste is steered
+before PR creation or certified after landing behind a feature flag.

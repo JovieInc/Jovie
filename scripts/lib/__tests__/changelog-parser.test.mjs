@@ -1,6 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { getLatestRelease, parseChangelog } from '../changelog-parser.mjs';
 
+describe('customer release safety', () => {
+  it.each([
+    'Local waits for localhost:3100 while Chromium compiles the server.',
+    'SwiftUI retries invalidAuthURL when no window is available.',
+    'Ovie opens /hud with the kiosk token.',
+    'The connector writes lib/connectors/enrichment and context_facts.',
+    'SMS uses OUTBOUND_SMS_ENABLED to enable the provider.',
+    'The merge queue reuses a worktree for its runner.',
+    'Merch confirmation actions use a neutral System B primary button surface.',
+    'Infra train version bump for desktop release guard.',
+    'VERSION: bumps train integration so desktop security ships with DMG handling.',
+  ])('keeps operational copy out of email: %s', internal => {
+    const result = parseChangelog(
+      `## [1.0.0] - 2026-03-20\n> ${internal}\n### Fixed\n- ${internal}\n- Your profile keeps your privacy choices.\n`
+    );
+    expect(result.releases[0].summary).toBe('');
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Your profile keeps your privacy choices.',
+    ]);
+    expect(result.releases[0].internalSections.fixed).toEqual([internal]);
+  });
+});
+
 const SAMPLE_CHANGELOG = `# Changelog
 
 All notable changes to this project will be documented in this file.

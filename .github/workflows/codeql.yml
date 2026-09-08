@@ -10,6 +10,7 @@
 # supported CodeQL languages.
 #
 name: CodeQL Security Analysis
+# clock-class: upstream-advisory
 
 on:
   # Risk-tiered CI: CodeQL runs on the merged code (post-merge on main) + nightly

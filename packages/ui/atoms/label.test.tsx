@@ -91,6 +91,7 @@ describe('Label', () => {
       expect(label.className).toContain('cursor-pointer');
       expect(label.className).toContain('font-medium');
       expect(label.className).toContain('leading-none');
+      expect(label.className).toContain('tracking-normal');
     });
 
     it('applies peer-disabled styles', () => {

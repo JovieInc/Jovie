@@ -117,7 +117,7 @@ describe('PlaylistDetailContent', () => {
     expect(storySource).toContain("registryId: 'web-010-playlists--[slug]'");
     expect(storySource).toContain("route: '/playlists/[slug]'");
     expect(storySource).toContain(
-      "sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997'"
+      "sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1'"
     );
   });
 });

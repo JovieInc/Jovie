@@ -1,5 +1,7 @@
 # AgentOS Architecture
 
+> **Retirement notice (2026-09-02):** Hermes and Trigger.dev are retired Jovie tooling. The v1 design below is historical and is not an active deployment or fallback plan. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md).
+
 > Issue: JOV-1922
 > Status: Accepted for v1 internal proof
 > Date: 2026-05-08
@@ -23,7 +25,7 @@ Workflow code must not merge, deploy, mutate Linear, bypass CI, or grant itself 
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| Linear | Issue source of truth, owner, priority, human-review labels | Hidden agent state |
+| Linear | Issue source of truth, owner, priority, and machine gate evidence | Hidden agent state |
 | Admin Ops | Private operator surface for run state, approvals, and gate evidence | Customer-facing workflow UX in v1 |
 | Vercel Workflow/WDK | Durable dry-run coordination, steps, retries, status emission | Merge/deploy authority |
 | Hermes/Ruflo | Bounded agent execution behind allowed paths and HOT ZONE claims | Source of truth, direct merge, direct deploy |
@@ -44,7 +46,7 @@ Minimum fields:
 - `modelRoute`: `deterministic | openrouter-free | ai-sdk-gateway | claude-code | codex-cli`
 - `allowedActions`
 - `forbiddenActions`
-- `humanApprovalRequired`
+- `postLandCertificationRequired`
 - `linearIssueId`
 - `pullRequestUrl`
 - `adminSurface`
@@ -114,7 +116,7 @@ Duplicates linked during this ADR:
 | JOV-1910 `VELOCITY: Agent OS Cost + Duplication Control` | JOV-1858 |
 | JOV-1913 `OPS: create daily runway cron / no_agent report` | JOV-1861 |
 
-Human-review-required canonical issues remain untouched.
+Legacy human-review labels are ignored and removed; actionable work continues.
 
 ## Verification Policy
 
@@ -126,7 +128,9 @@ Every implementation PR after this ADR must run the narrowest relevant local che
 4. `/ship`.
 5. Release conductor runs `/land-and-deploy` after CI and bot-review gates pass.
 
-Workflow, GitHub Actions, Hermes, and WDK PRs require `needs-human` if compile behavior, runner availability, or gate publication is ambiguous.
+Ambiguous compile behavior, runner availability, or gate publication fails the
+relevant automated check and stays in autonomous remediation. It never creates
+a human-review PR hold.
 
 ## Hermes-Air Node (always-on orchestration)
 
@@ -134,7 +138,7 @@ A dedicated 16 GB MacBook Air runs the Hermes gateway service 24/7 as the always
 
 - Operating contract: [`.claude/rules/hermes-air.md`](../.claude/rules/hermes-air.md)
 - Operator runbook: [`docs/HERMES_AIR.md`](./HERMES_AIR.md)
-- Bootstrap: `scripts/hermes/bootstrap-air.sh`
+- Bootstrap: `scripts/symphony/bootstrap-air.sh`
 - Cost target: $0/mo via OpenRouter free-model rotation + local Ollama Qwen 3 4B fallback. Sentinel kill switch trips on any paid spend.
 - `HermesAiOpsSource` includes the value `'hermes-air'` so the HUD attributes dispatches that originate from the Air separately from product/CI sources.
 

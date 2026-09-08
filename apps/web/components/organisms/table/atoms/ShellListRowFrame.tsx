@@ -2,12 +2,14 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { cn, rowState } from '../table.styles';
 
 export type ShellListRowInteraction = 'self' | 'task-row-group' | 'none';
+export type ShellListRowDensity = 'compact' | 'default';
 
 export interface ShellListRowFrameProps
   extends ComponentPropsWithoutRef<'div'> {
   readonly isSelected?: boolean;
   readonly interaction?: ShellListRowInteraction;
   readonly interactive?: boolean;
+  readonly density?: ShellListRowDensity;
 }
 
 export interface ShellListRowButtonProps
@@ -15,6 +17,7 @@ export interface ShellListRowButtonProps
   readonly isSelected?: boolean;
   readonly interaction?: ShellListRowInteraction;
   readonly interactive?: boolean;
+  readonly density?: ShellListRowDensity;
 }
 
 function getTaskRowGroupState(isSelected: boolean): string {
@@ -30,11 +33,13 @@ export function getShellListRowFrameClassName({
   interaction = 'self',
   interactive = false,
   isSelected = false,
+  density = 'default',
 }: Readonly<{
   className?: string;
   interaction?: ShellListRowInteraction;
   interactive?: boolean;
   isSelected?: boolean;
+  density?: ShellListRowDensity;
 }>) {
   const interactionClassName =
     interaction === 'self'
@@ -49,6 +54,7 @@ export function getShellListRowFrameClassName({
   return cn(
     'relative min-w-0 rounded-md border border-transparent outline-none',
     rowState.base,
+    density === 'compact' ? 'min-h-7' : 'min-h-8',
     interactive && 'cursor-pointer',
     interactionClassName,
     className
@@ -60,6 +66,7 @@ export function ShellListRowFrame({
   interaction = 'self',
   interactive = false,
   isSelected = false,
+  density = 'default',
   ...props
 }: Readonly<ShellListRowFrameProps>) {
   return (
@@ -71,6 +78,7 @@ export function ShellListRowFrame({
         interaction,
         interactive,
         isSelected,
+        density,
       })}
       {...props}
     />
@@ -82,6 +90,7 @@ export function ShellListRowButton({
   interaction = 'self',
   interactive = true,
   isSelected = false,
+  density = 'default',
   type = 'button',
   ...props
 }: Readonly<ShellListRowButtonProps>) {
@@ -95,6 +104,7 @@ export function ShellListRowButton({
         interaction,
         interactive,
         isSelected,
+        density,
       })}
       {...props}
     />

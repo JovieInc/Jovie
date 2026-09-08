@@ -1,4 +1,5 @@
 # Agent Tick — consolidated monitoring cron
+# JOV-INV-028: human-review labels never stop machine-gated landing.
 #
 # PURPOSE:
 # Consolidates 8 individual cron workflows that ran independently at */5-*/15
@@ -121,10 +122,6 @@ jobs:
 
             echo ""
             echo "--- PR #$PR_NUMBER: $PR_TITLE ---"
-
-            if echo "$LABELS" | grep -q "needs-human"; then
-              echo "Has needs-human label. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
-            fi
 
             if ! echo "$LABELS" | grep -qE "(^|,)(automerge|auto-approved|ai:ready-to-merge)(,|$)"; then
               echo "No auto-landing label. Skipping."; SKIPPED=$((SKIPPED + 1)); continue

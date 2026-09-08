@@ -51,6 +51,7 @@ export function TableHeaderCell({
     <th
       className={cn(
         presets.tableHeaderCell,
+        'whitespace-nowrap',
         // Sticky positioning
         sticky ? presets.stickyHeader : borders.header,
         // Alignment

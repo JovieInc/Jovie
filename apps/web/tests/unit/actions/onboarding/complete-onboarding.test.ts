@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   cookieSetMock,
-  mockAttributeLeadSignupFromClerkUserId,
+  mockAttributeLeadSignupFromAppUserId,
   mockCacheHandleAvailability,
   mockCaptureError,
   mockClaimPrebuiltProfileForUser,
@@ -40,7 +40,7 @@ const {
   mockRevalidatePath,
 } = vi.hoisted(() => ({
   cookieSetMock: vi.fn(),
-  mockAttributeLeadSignupFromClerkUserId: vi.fn(),
+  mockAttributeLeadSignupFromAppUserId: vi.fn(),
   mockCacheHandleAvailability: vi.fn(),
   mockCaptureError: vi.fn(),
   mockClaimPrebuiltProfileForUser: vi.fn(),
@@ -102,8 +102,8 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedCurrentUser: mockGetCachedCurrentUser,
 }));
 
-vi.mock('@/lib/auth/clerk-identity', () => ({
-  resolveClerkIdentity: mockResolveClerkIdentity,
+vi.mock('@/lib/auth/user-identity', () => ({
+  resolveUserIdentity: mockResolveClerkIdentity,
 }));
 
 vi.mock('@/lib/claim/context', () => ({
@@ -142,7 +142,7 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
-  attributeLeadSignupFromClerkUserId: mockAttributeLeadSignupFromClerkUserId,
+  attributeLeadSignupFromAppUserId: mockAttributeLeadSignupFromAppUserId,
 }));
 
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
@@ -254,7 +254,7 @@ describe('completeOnboarding', () => {
     mockInvalidateProfileCache.mockResolvedValue(undefined);
     mockHandleBackgroundAvatarUpload.mockResolvedValue(undefined);
     mockFinalizePostOnboarding.mockResolvedValue(undefined);
-    mockAttributeLeadSignupFromClerkUserId.mockResolvedValue({
+    mockAttributeLeadSignupFromAppUserId.mockResolvedValue({
       leadId: null,
       userId: null,
     });
@@ -487,6 +487,97 @@ describe('completeOnboarding', () => {
     expect(mockClearPendingClaimContext).toHaveBeenCalled();
   });
 
+  it('keeps signed claim context after receipt failure and clears it only on successful retry', async () => {
+    const realFinalize = await vi.importActual<
+      typeof import('@/lib/claim/finalize')
+    >('@/lib/claim/finalize');
+    const profile = {
+      id: 'profile-claim-123',
+      usernameNormalized: 'e2eclaimartist',
+      userId: null as string | null,
+      isClaimed: false,
+      claimedAt: null,
+      onboardingCompletedAt: null,
+      displayName: 'Artist',
+      settings: null,
+      claimToken: 'hash',
+      claimTokenExpiresAt: new Date(Date.now() + 60_000),
+    };
+    const tx = {
+      select: (columns: Record<string, unknown>) => {
+        const chain = {
+          from: () => chain,
+          where: () => chain,
+          for: () => chain,
+          limit: async () => ('claimToken' in columns ? [{ ...profile }] : []),
+        };
+        return chain;
+      },
+      update: vi.fn(() => ({
+        set: (values: Record<string, unknown>) => ({
+          where: async () => {
+            if ('isClaimed' in values) Object.assign(profile, values);
+          },
+        }),
+      })),
+      insert: vi.fn(() => ({
+        values: () =>
+          Object.assign(Promise.resolve(), {
+            onConflictDoNothing: async () => undefined,
+          }),
+      })),
+    };
+    mockClaimPrebuiltProfileForUser.mockImplementation((_tx, params) =>
+      realFinalize.claimPrebuiltProfileForUser(
+        tx as unknown as Parameters<
+          typeof realFinalize.claimPrebuiltProfileForUser
+        >[0],
+        params
+      )
+    );
+    mockFetchExistingProfile.mockImplementation(async () =>
+      profile.userId ? { ...profile } : null
+    );
+    mockReadPendingClaimContext.mockResolvedValue({
+      mode: 'token_backed',
+      creatorProfileId: 'profile-claim-123',
+      username: 'e2eclaimartist',
+      claimTokenHash: 'hash',
+      leadId: 'lead-123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    mockAttributeLeadSignupFromAppUserId.mockRejectedValueOnce(
+      new Error('receipt down')
+    );
+    await expect(
+      completeOnboarding({
+        username: 'e2eclaimartist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow('Your profile is saved');
+    expect(mockClaimPrebuiltProfileForUser).toHaveBeenCalledTimes(1);
+    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+    expect(cookieSetMock).not.toHaveBeenCalled();
+    expect(profile.isClaimed).toBe(true);
+    expect(profile.onboardingCompletedAt).toBeInstanceOf(Date);
+    const writesAfterClaim = tx.update.mock.calls.length;
+    const auditWritesAfterClaim = tx.insert.mock.calls.length;
+    await expect(
+      completeOnboarding({
+        username: 'e2eclaimartist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      })
+    ).resolves.toMatchObject({ profileId: 'profile-claim-123' });
+    expect(mockAttributeLeadSignupFromAppUserId).toHaveBeenCalledTimes(2);
+    expect(mockClearPendingClaimContext).toHaveBeenCalledTimes(1);
+    expect(tx.update).toHaveBeenCalledTimes(writesAfterClaim);
+    expect(tx.insert).toHaveBeenCalledTimes(auditWritesAfterClaim);
+    expect(cookieSetMock).toHaveBeenCalled();
+  });
+
   it('reserves the prebuilt profile for direct pending claims', async () => {
     mockReadPendingClaimContext.mockResolvedValueOnce({
       mode: 'direct_profile',
@@ -531,8 +622,8 @@ describe('completeOnboarding', () => {
   });
 
   it('creates a new user profile, caches completion, and keeps side effects non-blocking', async () => {
-    mockAttributeLeadSignupFromClerkUserId.mockRejectedValueOnce(
-      new Error('lead attribution down')
+    mockCacheHandleAvailability.mockRejectedValueOnce(
+      new Error('handle cache down')
     );
 
     const result = await completeOnboarding({
@@ -574,13 +665,13 @@ describe('completeOnboarding', () => {
       'artist'
     );
     expect(mockCaptureError).toHaveBeenCalledWith(
-      'attribute_lead_signup failed',
+      'cache_handle_availability failed',
       expect.objectContaining({
-        message: 'lead attribution down',
+        message: 'handle cache down',
       }),
       expect.objectContaining({
         route: 'onboarding',
-        contextData: { userId: 'clerk-user-123' },
+        contextData: { username: 'artist' },
       })
     );
     expect(cookieSetMock).toHaveBeenCalledWith(

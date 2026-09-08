@@ -1,6 +1,12 @@
 name: Merge Queue Auto-Enroll
+# JOV-INV-029: promotion is distinct from merge and requires exact-head handoff.
 
-# Fully event-driven — zero polling crons.
+# Event-driven, with ownerless recovery admitted only after exact main/head
+# validation. The existing ownerless-recovery-sweep cron remains the heartbeat.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: GitHub-hosted admission reads with the workflow token while the Jovie Bot token stays isolated to native queue mutations; ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
+# revisit-trigger: Remove REST-to-GraphQL hydration when GitHub exposes mergeability and exact refs through one bounded paginated REST contract.
 #
 # Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
 # older pending run in that mutex, so every surviving clean-admitting pass also
@@ -12,6 +18,7 @@ name: Merge Queue Auto-Enroll
 # Triggers:
 #   pull_request      — PR label/reopen maintenance plus native-enqueue continuation
 #   workflow_run      — CI completion (green PRs are now enrollable)
+#   repository_dispatch — ownerless-recovery exact-head intent from the sweeper
 #   push (main)       — main moved → queued PRs may conflict or get stale
 #   workflow_dispatch — maintenance-only unless exact PR + head are supplied
 #
@@ -26,7 +33,7 @@ name: Merge Queue Auto-Enroll
 # GH-13630 scope boundary: pr-conflict-handler debounce + lighter model are
 # follow-ups — handler lacks a durable "recently resolved" marker contract.
 #
-# No schedule. No watchdog label-cycling. No polling.
+# No schedule. No watchdog label-cycling. No unbounded polling.
 
 on:
   pull_request:
@@ -34,11 +41,14 @@ on:
     # native auto-merge intent; the first source CI flight remains authoritative.
     # A successful native enqueue emits `enqueued`, which advances the next
     # bounded recovery cohort after the event target proves idempotently
-    # already queued.
-    types: [reopened, labeled, unlabeled, enqueued]
+    # already queued. A rejected noncanonical admission emits `dequeued`; that
+    # exact head re-enters only through this controller and its checkpoint.
+    types: [reopened, labeled, unlabeled, enqueued, dequeued]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
+  repository_dispatch:
+    types: [ownerless-recovery-admission]
   push:
     branches: [main]
   workflow_dispatch:
@@ -57,6 +67,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   pull-requests: write
   contents: write
 
@@ -74,18 +85,30 @@ jobs:
     outputs:
       mode: ${{ steps.policy.outputs.promotion_mode }}
       receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
+      main_sha: ${{ steps.main-head.outputs.sha }}
     steps:
       - name: Checkout canonical main policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
+      - name: Resolve immutable main policy head
+        id: main-head
+        shell: bash
+        run: |
+          main_sha="$(git rev-parse HEAD)"
+          if [[ ! "$main_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid main policy SHA: $main_sha" >&2
+            exit 2
+          fi
+          echo "sha=$main_sha" >>"$GITHUB_OUTPUT"
       - name: Evaluate fresh fleet policy
         id: policy
         uses: ./.github/actions/evaluate-fleet-gate
         with:
           github-token: ${{ github.token }}
           dry-run: 'false'
+          expected-sha: ${{ steps.main-head.outputs.sha }}
 
   enroll:
     needs: fleet-policy
@@ -114,10 +137,68 @@ jobs:
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          # ref: main is resolved once in fleet-policy; consumers pin that SHA.
+          ref: ${{ needs.fleet-policy.outputs.main_sha }}
           persist-credentials: false
       - name: Verify GitHub CLI
         run: gh --version
+      - name: Resolve production release checkpoint
+        id: release-checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Observe release state without making a controller/API outage an
+          # admission dependency. Unknown evidence never clears scoped holds.
+          {
+            echo 'verified=false'
+            echo 'state=unavailable'
+            echo 'reason=checkpoint-unavailable'
+          } >>"$GITHUB_OUTPUT"
+
+          controller_workflow_id="$({
+            gh api "repos/$REPO/actions/workflows/production-controller.yml" \
+              --jq '.id // empty'
+          } 2>/dev/null)" || {
+            echo '::notice::Production checkpoint could not resolve the controller workflow; scoped hold recovery remains disabled'
+            exit 0
+          }
+          if [[ ! "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]]; then
+            echo '::notice::Production checkpoint received no trusted controller workflow id; scoped hold recovery remains disabled'
+            exit 0
+          fi
+
+          if ! marker_json="$(node .github/scripts/production-marker-state.mjs \
+            --repo "$REPO" \
+            --sha "$MAIN_SHA" \
+            --controller-workflow-id "$controller_workflow_id")" \
+            || ! jq -e 'type == "object"' <<<"$marker_json" >/dev/null 2>&1; then
+            echo '::notice::Production checkpoint read failed; scoped hold recovery remains disabled'
+            exit 0
+          fi
+          checkpoint_state="$(jq -r '.state // "manual"' <<<"$marker_json")"
+          checkpoint_reason="$(jq -r '.reason // "unclassified"' <<<"$marker_json")"
+          if [[ ! "$checkpoint_state" =~ ^[a-z_]+$ ]]; then
+            checkpoint_state='manual'
+          fi
+          if [[ ! "$checkpoint_reason" =~ ^[a-z0-9_-]+$ ]]; then
+            checkpoint_reason='malformed-evidence'
+          fi
+
+          {
+            echo "state=$checkpoint_state"
+            echo "reason=$checkpoint_reason"
+          } >>"$GITHUB_OUTPUT"
+          if [[ "$checkpoint_state" == 'verified' ]]; then
+            echo 'verified=true' >>"$GITHUB_OUTPUT"
+            echo "Exact current main $MAIN_SHA has a trusted production marker"
+          else
+            echo "::notice::Production release checkpoint is $checkpoint_state ($checkpoint_reason) for current main $MAIN_SHA; release verification remains separate from source and native merge-group admission"
+          fi
       - name: Resolve exact admission scope
         id: admission
         env:
@@ -126,6 +207,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_PR: ${{ inputs.pr_number || '' }}
           MANUAL_HEAD: ${{ inputs.head_sha || '' }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          FLEET_PROMOTION_MODE: ${{ needs.fleet-policy.outputs.mode }}
         run: |
           pr_number=''
           head_sha=''
@@ -175,7 +258,17 @@ jobs:
                 admission_reason='ci-not-successful'
                 head_sha=''
               else
-                prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName,isDraft)"
+                prs_pages="$(gh api --method GET --paginate --slurp \
+                  "repos/$REPO/pulls?state=open&per_page=100")"
+                prs_json="$(jq -ce '
+                  (if length == 0 then [] elif (.[0] | type) == "array" then add else . end)
+                  | map({
+                    number,
+                    headRefOid: .head.sha,
+                    baseRefName: .base.ref,
+                    isDraft: (.draft == true)
+                  })
+                ' <<<"$prs_pages")"
                 matching_prs=()
                 while IFS= read -r matching_pr; do
                   [[ -n "$matching_pr" ]] && matching_prs+=("$matching_pr")
@@ -222,6 +315,7 @@ jobs:
               if [[ -z "$MANUAL_PR" && -z "$MANUAL_HEAD" ]]; then
                 echo 'Untargeted manual dispatch; no primary target (bounded reconciliation remains enabled)'
                 admission_reason='manual-maintenance'
+                recover_holds=1
               elif [[ "$MANUAL_PR" =~ ^[1-9][0-9]*$ && "${MANUAL_HEAD,,}" =~ ^[0-9a-f]{40}$ ]]; then
                 pr_number="$MANUAL_PR"
                 head_sha="${MANUAL_HEAD,,}"
@@ -232,15 +326,41 @@ jobs:
                 exit 2
               fi
               ;;
+            repository_dispatch)
+              sender="$(jq -er '.sender.login' "$GITHUB_EVENT_PATH")"
+              pr_number="$(jq -er '.client_payload.pr_number | tostring | select(test("^[1-9][0-9]*$"))' "$GITHUB_EVENT_PATH")"
+              head_sha="$(jq -er '.client_payload.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              payload_main_sha="$(jq -r '(.client_payload.main_sha // empty) | strings | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              payload_ownerless_since="$(jq -r '(.client_payload.ownerless_since // empty) | strings | select(test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"))' "$GITHUB_EVENT_PATH")"
+              if [[ "$sender" != 'jovie-bot[bot]' ]]; then
+                echo "::error::Ownerless recovery admission requires the Jovie Bot sender" >&2
+                exit 2
+              fi
+              if [[ "$payload_main_sha" == "$FLEET_POLICY_MAIN_SHA" && -n "$payload_ownerless_since" ]]; then
+                echo "Ownerless recovery exact admission for #$pr_number at $head_sha on main $payload_main_sha"
+                admission_disposition='candidate'
+                admission_reason='ownerless-recovery-exact-head'
+                recover_holds=1
+              else
+                echo "Ownerless recovery nudge is malformed or not bound to immutable main; maintenance-only"
+                pr_number=''
+                head_sha=''
+              fi
+              ;;
             push)
               echo 'Main push; no primary target (bounded reconciliation remains enabled)'
               admission_reason='main-push-reconcile'
+              recover_holds=1
               ;;
             *)
               echo "::error::Unsupported admission event: $EVENT_NAME" >&2
               exit 2
               ;;
           esac
+
+          # Admission depends on exact source/native merge-group checks and the
+          # scoped fleet policy. A prior deployment is release evidence only;
+          # requiring its marker here seals out the repair of a broken release.
 
           if [[ "$admission_disposition" == 'neutral' ]]; then
             # Typed-neutral events can run bounded maintenance, but can never
@@ -261,6 +381,85 @@ jobs:
             echo "deferred_release=$deferred_release"
             echo "reconcile_queue_reentry=$reconcile_queue_reentry"
           } >>"$GITHUB_OUTPUT"
+      - name: Publish exact controller repair attestation
+        if: >-
+          needs.fleet-policy.outputs.mode == 'controller-repair-only' &&
+          steps.admission.outputs.disposition == 'candidate'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.admission.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.admission.outputs.head_sha }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          OPERATION_ID: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pr_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER")"
+          jq -e \
+            --arg repo "$REPO" \
+            --arg head "$PR_HEAD_SHA" '
+              .state == "open" and
+              .base.ref == "main" and
+              .base.repo.full_name == $repo and
+              ((.head.sha // "") | ascii_downcase) == $head
+            ' <<<"$pr_json" >/dev/null
+
+          current_main_sha="$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha | ascii_downcase')"
+          if [[ "$current_main_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
+            echo "::error::Main moved before controller repair attestation ($current_main_sha != $FLEET_POLICY_MAIN_SHA)" >&2
+            exit 2
+          fi
+
+          check_pages="$(gh api --paginate --slurp \
+            "repos/$REPO/commits/$PR_HEAD_SHA/check-runs?check_name=Seer%20Code%20Review&filter=all&per_page=100")"
+          check_runs="$(jq -ce '[.[] | .check_runs[]?]' <<<"$check_pages")"
+          suite_id="$(jq -er '
+            [.[] | select(.name == "Seer Code Review")]
+            | select(length == 1)
+            | .[0].check_suite.id
+            | select(type == "number" and floor == . and . > 0)
+          ' <<<"$check_runs")"
+          check_suite="$(gh api "repos/$REPO/check-suites/$suite_id")"
+          review_json="$(jq -nc \
+            --argjson checkRuns "$check_runs" \
+            --argjson checkSuite "$check_suite" \
+            '{checkRuns:$checkRuns,checkSuite:$checkSuite}' \
+            | node scripts/lib/controller-repair-attestation.mjs seer-review \
+                --head "$PR_HEAD_SHA")"
+          review_id="$(jq -er '.reviewId | select(test("^seer-check-[1-9][0-9]*$"))' <<<"$review_json")"
+
+          file_pages="$(gh api --paginate --slurp \
+            "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100")"
+          changed_paths="$(jq -ce '
+            [.[][]? | .filename]
+            | select(length > 0 and length < 3000)
+            | select(all(.[]; type == "string" and length > 0))
+          ' <<<"$file_pages")"
+          paths_hash="$(printf '%s' "$changed_paths" \
+            | node scripts/lib/controller-repair-attestation.mjs paths-hash)"
+
+          attestation="$(node scripts/lib/controller-repair-attestation.mjs render \
+            --repository "$REPO" \
+            --pr "$PR_NUMBER" \
+            --head "$PR_HEAD_SHA" \
+            --main-sha "$FLEET_POLICY_MAIN_SHA" \
+            --review-id "$review_id" \
+            --changed-paths-sha256 "$paths_hash" \
+            --operation-id "$OPERATION_ID")"
+          GITHUB_REPOSITORY="$REPO" bash scripts/lib/upsert-pr-comment.sh \
+            "$PR_NUMBER" controller-repair-attestation "$attestation"
+
+          post_pr_json="$(gh api "repos/$REPO/pulls/$PR_NUMBER")"
+          post_main_sha="$(gh api "repos/$REPO/git/ref/heads/main" --jq '.object.sha | ascii_downcase')"
+          jq -e --arg head "$PR_HEAD_SHA" \
+            '.state == "open" and ((.head.sha // "") | ascii_downcase) == $head' \
+            <<<"$post_pr_json" >/dev/null
+          if [[ "$post_main_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
+            echo "::error::Main moved while publishing controller repair attestation" >&2
+            exit 2
+          fi
       - name: Enroll clean PRs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -293,24 +492,44 @@ jobs:
           DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && needs.fleet-policy.outputs.mode != 'hold-intake' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
           # Bounded admission projection for isolated-only, hold-intake, draft-only, blocked.
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
-          DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
+          DRAIN_RECOVER_FLEET_HOLDS: ${{ steps.release-checkpoint.outputs.verified == 'true' && needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
           # Composite CI heads cannot map to source PRs. The drain consumes
           # only bot-authored exact-head native-admission receipts, with fresh
-          # checks and the shared total cap below; it is never a global sweep.
+          # checks and the shared admission bound below; it is never a global sweep.
           DRAIN_RECONCILE_QUEUE_REENTRY: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.reconcile_queue_reentry == '1' && '1' || '0' }}
+          # Native membership created outside this controller is not admission
+          # authority. The sole writer replaces stale/unbound entries with
+          # fresh source receipts; required merge-group checks prove ancestry.
+          DRAIN_RECONCILE_ADMISSION_RECEIPTS: ${{ needs.fleet-policy.outputs.mode == 'normal' && '1' || '0' }}
           # GitHub's single pending slot can replace an exact CI admission event
           # even with cancel-in-progress=false. Reconcile only in the same fleet
-          # modes that already permit clean exact-head admission, sharing the
-          # total cap below with the event-scoped candidate and native re-entry.
+          # modes that already permit clean exact-head admission. Admissions are
+          # uncapped (0): native queue depth is the sole bound; a positive
+          # integer re-caps event + recovery admissions per run.
           DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
-          DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'
+          DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'
+          # A non-draft main PR whose required source checks never registered a
+          # check-run on its exact head can never turn green and never enroll
+          # (observed 2026-09-03 across multiple open PRs for 24h+). The drain
+          # re-fires source CI with a bounded close+reopen: at most two per run,
+          # heads at least two hours old, and never twice on the same exact head
+          # (bot-comment marker). Not an admission path, so no fleet-mode gate.
+          DRAIN_RECOVER_MISSING_CI: '1'
+          DRAIN_MISSING_CI_MAX_PER_RUN: '2'
+          DRAIN_MISSING_CI_MIN_AGE_MINUTES: '120'
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
           # maintenance must preserve it until an owner explicitly releases it.
           DRAIN_RECONCILE_QUEUE_DEFERRED: '0'
           EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event || '' }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
         run: |
+          policy_checkout_sha="$(git rev-parse HEAD)"
+          if [[ "$policy_checkout_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
+            echo "::error::Main policy checkout drifted from fleet-policy evidence ($policy_checkout_sha != $FLEET_POLICY_MAIN_SHA)" >&2
+            exit 2
+          fi
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
             exit 2

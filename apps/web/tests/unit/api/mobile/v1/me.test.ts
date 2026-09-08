@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 
 const hoisted = vi.hoisted(() => ({
   captureErrorMock: vi.fn(),
@@ -77,7 +78,7 @@ const JOVIE_WORKSPACE = {
 const OVIE_WORKSPACE = {
   id: 'ov',
   label: 'OV',
-  href: '/app/ov',
+  href: APP_ROUTES.ADMIN_CHAT,
   brandVariant: 'ov',
   role: 'secondary',
   access: 'admin',

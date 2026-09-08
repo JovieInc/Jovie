@@ -22,7 +22,7 @@ import {
   ensureSignedInUser,
   hasClerkCredentials,
   setTestAuthBypassSession,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import {
   gotoAuthenticatedChatRoute,
   smokeNavigateWithRetry,

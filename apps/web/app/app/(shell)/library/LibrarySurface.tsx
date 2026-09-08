@@ -28,7 +28,6 @@ import {
   Check,
   ChevronDown,
   Disc3,
-  ExternalLink,
   FileAudio2,
   FileText,
   Filter,
@@ -63,6 +62,7 @@ import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
+import { LibraryInspectorAssetSlots } from '@/components/features/library/LibraryInspectorAssetSlots';
 import {
   formatLibraryItemType,
   formatLibraryStatus,
@@ -85,6 +85,10 @@ import {
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  DspQuietRow,
+  isDspQuietListScope,
+} from '@/components/molecules/inspector';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
@@ -125,15 +129,21 @@ import {
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryMerchProductOption } from '@/lib/library/graph-types';
 import {
   libraryAssetMatchesStage,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
+import {
+  EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+  type LibraryPostReleaseBundle,
+} from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
   releaseStatusClasses,
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
@@ -144,6 +154,7 @@ import {
 import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
+  attachLibraryProductGraph,
   formatLibraryDuration,
   formatLibraryReleaseDate,
   formatLibraryReleaseDateTitle,
@@ -178,9 +189,15 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import { PostReleasePanel } from './PostReleasePanel';
+import {
+  YouTubeMerchRelationshipEditor,
+  YouTubeOptimizationPanel,
+} from './YouTubeAssetDrawerPanels';
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
+const EMPTY_RELATIONSHIPS: readonly LibraryRelationshipView[] = [];
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)';
 const LIBRARY_CARD_FOCUS_CLASS =
@@ -1999,11 +2016,15 @@ function AssetDrawer({
   playingPreviewId,
   onTogglePreview,
   onAudioUploaded,
+  onArtworkUploaded,
   getContextMenuItems,
   profileId,
   approvalSavingIds,
   artistHandle,
   pressKitCandidates,
+  merchProducts,
+  relationships,
+  postReleaseBundle,
   onApprovalStatusChange,
   onShareChange,
 }: {
@@ -2014,11 +2035,18 @@ function AssetDrawer({
   readonly playingPreviewId: string | null;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
+  readonly onArtworkUploaded: (assetId: string, artworkUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
   readonly profileId: string | null;
   readonly approvalSavingIds: ReadonlySet<string>;
   readonly artistHandle: string | null;
   readonly pressKitCandidates: readonly LibraryReleaseAsset[];
+  readonly merchProducts: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
+  readonly relationships: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle: LibraryPostReleaseBundle;
   readonly onApprovalStatusChange: (
     asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
@@ -2038,7 +2066,12 @@ function AssetDrawer({
 
   const current = asset ?? stickyAsset;
   const isMerch = current ? getLibraryItemKind(current) === 'merch' : false;
-  const closedInteractiveProps = open ? {} : { tabIndex: -1 };
+  const isYouTubeVideo = current?.source?.provider === 'youtube';
+  const defaultOpenSectionId = isMerch
+    ? 'merch'
+    : isYouTubeVideo
+      ? 'relationships'
+      : 'details';
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
   const isPreviewPlaying =
@@ -2128,9 +2161,7 @@ function AssetDrawer({
           searchPlaceholder='Search actions'
           searchMode='recursive'
         >
-          <DrawerSectionGroup
-            defaultOpenSectionId={isMerch ? 'merch' : 'details'}
-          >
+          <DrawerSectionGroup defaultOpenSectionId={defaultOpenSectionId}>
             <div className='space-y-2.5 overflow-visible px-3'>
               {isMerch ? (
                 <DrawerSection
@@ -2155,11 +2186,57 @@ function AssetDrawer({
                 </DrawerSection>
               ) : (
                 <>
+                  {getLibraryItemKind(current) === 'release' ||
+                  current.linkedReleaseId ? (
+                    <DrawerSection
+                      sectionId='post-release'
+                      surface='card'
+                      title='Post-release'
+                      defaultOpen
+                    >
+                      <PostReleasePanel
+                        asset={current}
+                        creatorProfileId={profileId}
+                        bundle={postReleaseBundle}
+                        disabled={!open}
+                      />
+                    </DrawerSection>
+                  ) : null}
+                  {isYouTubeVideo && current.source ? (
+                    <>
+                      <DrawerSection
+                        sectionId='relationships'
+                        surface='card'
+                        title='Relationships'
+                        defaultOpen
+                      >
+                        <YouTubeMerchRelationshipEditor
+                          profileId={profileId}
+                          videoId={current.source.canonicalId}
+                          merchProducts={merchProducts}
+                          relationships={relationships}
+                          disabled={!open}
+                        />
+                      </DrawerSection>
+                      <DrawerSection
+                        sectionId='optimization'
+                        surface='card'
+                        title='Optimization'
+                        defaultOpen={false}
+                      >
+                        <YouTubeOptimizationPanel
+                          profileId={profileId}
+                          videoId={current.source.canonicalId}
+                          disabled={!open}
+                        />
+                      </DrawerSection>
+                    </>
+                  ) : null}
                   <DrawerSection
                     sectionId='share-link'
                     surface='card'
                     title='Share Link'
-                    defaultOpen
+                    defaultOpen={!isYouTubeVideo}
                   >
                     <LibraryAssetSharePanel
                       asset={current}
@@ -2197,6 +2274,13 @@ function AssetDrawer({
                       embedded
                     />
                   </DrawerSection>
+
+                  <LibraryInspectorAssetSlots
+                    asset={current}
+                    downloads={postReleaseBundle.downloads}
+                    disabled={!open}
+                    onArtworkUploaded={onArtworkUploaded}
+                  />
 
                   <DrawerSection
                     sectionId='press-kit-drop'
@@ -2298,7 +2382,7 @@ function AssetDrawer({
                 </dl>
               </DrawerSection>
 
-              {!isMerch ? (
+              {isDspQuietListScope(getLibraryItemKind(current)) ? (
                 <DrawerSection
                   sectionId='providers'
                   surface='card'
@@ -2306,35 +2390,24 @@ function AssetDrawer({
                   defaultOpen={false}
                 >
                   {current.providers.length > 0 ? (
-                    <div className='space-y-1'>
+                    <div className='space-y-0.5'>
                       {current.providers.map(provider => (
-                        <a
+                        <DspQuietRow
                           key={`${current.id}-${provider.key}`}
+                          className='system-b-library-provider-link'
+                          label={provider.label}
                           href={provider.url}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          {...closedInteractiveProps}
-                          className={cn(
-                            'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
-                            LIBRARY_CARD_FOCUS_CLASS
-                          )}
-                        >
-                          <ProviderIcon
-                            provider={provider.key as ProviderKey}
-                            className='h-3.5 w-3.5'
-                          />
-                          <span className='min-w-0 flex-1 truncate'>
-                            {provider.label}
-                          </span>
-                          <ExternalLink className='h-3 w-3 text-tertiary-token' />
-                        </a>
+                          closedTabIndex={closedTabIndex}
+                          icon={
+                            <ProviderIcon
+                              provider={provider.key as ProviderKey}
+                              className='h-3.5 w-3.5'
+                            />
+                          }
+                        />
                       ))}
                     </div>
-                  ) : (
-                    <p className='system-b-library-provider-empty leading-5 text-secondary-token'>
-                      No provider links are connected for this release yet.
-                    </p>
-                  )}
+                  ) : null}
                 </DrawerSection>
               ) : null}
             </div>
@@ -2368,16 +2441,24 @@ function LibraryStatusBar({
   );
 }
 
+const EMPTY_MERCH_PRODUCTS: readonly LibraryMerchProductOption[] = [];
+
 export function LibrarySurface({
   assets,
   profileId = null,
   artistHandle = null,
   canSyncSpotify = false,
+  merchProducts = EMPTY_MERCH_PRODUCTS,
+  relationships = EMPTY_RELATIONSHIPS,
+  postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
   readonly canSyncSpotify?: boolean;
+  readonly merchProducts?: readonly LibraryMerchProductOption[];
+  readonly relationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2481,10 +2562,15 @@ export function LibrarySurface({
   }, []);
 
   // Version-stack duplicate ingests so each release renders as one row
-  // (JOV-3089); overrides then layer on top of the surviving canonical row.
+  // (JOV-3089); product-graph enrichment then attaches to the surviving
+  // canonical row so duplicate-version merch/post-release data is not dropped.
   const effectiveAssets = useMemo<readonly LibraryReleaseAsset[]>(
     () =>
-      stackLibraryReleaseVersions(assets).map((asset): LibraryReleaseAsset => {
+      attachLibraryProductGraph(stackLibraryReleaseVersions(assets), {
+        merchProducts,
+        relationships,
+        postReleaseBundle,
+      }).map((asset): LibraryReleaseAsset => {
         const previewUrl = audioOverrides[asset.id];
         const hasPreviewOverride = Boolean(previewUrl);
         const approvalStatus =
@@ -2528,7 +2614,10 @@ export function LibrarySurface({
       assets,
       audioOverrides,
       lifecycleStatusOverrides,
+      merchProducts,
+      postReleaseBundle,
       profileVisibilityOverrides,
+      relationships,
       shareOverrides,
     ]
   );
@@ -2937,6 +3026,13 @@ export function LibrarySurface({
     [router]
   );
 
+  const handleArtworkUploaded = useCallback(
+    (_assetId: string, _artworkUrl: string) => {
+      router.refresh();
+    },
+    [router]
+  );
+
   const assetDrawerPanel = useMemo(
     () => (
       <AssetDrawer
@@ -2947,6 +3043,7 @@ export function LibrarySurface({
         playingPreviewId={playingPreviewId}
         onTogglePreview={handleTogglePreview}
         onAudioUploaded={handleAudioUploaded}
+        onArtworkUploaded={handleArtworkUploaded}
         getContextMenuItems={getContextMenuItems}
         profileId={profileId}
         approvalSavingIds={approvalSavingIds}
@@ -2954,6 +3051,14 @@ export function LibrarySurface({
         pressKitCandidates={effectiveAssets.filter(
           item => getLibraryItemKind(item) === 'release'
         )}
+        merchProducts={effectiveAssets.flatMap(asset =>
+          getLibraryItemKind(asset) === 'merch' &&
+          asset.source?.provider === 'merch'
+            ? [{ id: asset.source.canonicalId, title: asset.title }]
+            : []
+        )}
+        relationships={relationships}
+        postReleaseBundle={postReleaseBundle}
         onApprovalStatusChange={handleApprovalStatusChange}
         onShareChange={handleShareChange}
       />
@@ -2966,11 +3071,14 @@ export function LibrarySurface({
       effectiveAssets,
       getContextMenuItems,
       handleApprovalStatusChange,
+      handleArtworkUploaded,
       handleAudioUploaded,
       handleShareChange,
       handleTogglePreview,
       playingPreviewId,
+      postReleaseBundle,
       profileId,
+      relationships,
       selectedAsset,
     ]
   );

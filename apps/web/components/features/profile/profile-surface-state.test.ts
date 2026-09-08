@@ -2,9 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
+  getPublicProfileHistoryExitDelta,
+  PUBLIC_EVENTS_NO_SURFACE,
+  PUBLIC_EVENTS_NO_UPCOMING,
+  PUBLIC_MUSIC_EMPTY_HEADING,
+  PUBLIC_MUSIC_ERROR_HEADING,
+  readPublicProfileHistoryDepth,
   resolveProfileSurfaceState,
+  resolvePublicMusicSurface,
   resolvePublicProfileBackAction,
+  shouldOfferPublicEventsDestination,
   shouldShowPublicProfileBackChevron,
+  withPublicProfileHistoryDepth,
 } from './profile-surface-state';
 
 const artist = {
@@ -65,6 +74,74 @@ const upcomingShow = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 } satisfies TourDateViewModel;
+
+describe('resolvePublicMusicSurface', () => {
+  it('uses imported catalog before artist streaming', () => {
+    expect(
+      resolvePublicMusicSurface({
+        releases: [
+          {
+            id: 'release-1',
+            title: 'Listed',
+            slug: 'listed',
+            releaseType: 'single',
+            releaseDate: '2026-04-01',
+            artworkUrl: null,
+            artistNames: ['Test Artist'],
+          },
+        ],
+        hasPlayableDestinations: true,
+      }).kind
+    ).toBe('catalog');
+  });
+
+  it('falls back to artist streaming when slugs are missing', () => {
+    expect(
+      resolvePublicMusicSurface({
+        releases: [
+          {
+            id: 'release-1',
+            title: 'Unlisted',
+            slug: '',
+            releaseType: 'single',
+            releaseDate: '2026-04-01',
+            artworkUrl: null,
+            artistNames: ['Test Artist'],
+          },
+        ],
+        hasPlayableDestinations: true,
+      })
+    ).toEqual({ kind: 'artist-streaming' });
+  });
+
+  it('uses a genuine empty only when catalog and streaming are both absent', () => {
+    expect(
+      resolvePublicMusicSurface({
+        releases: [],
+        hasPlayableDestinations: false,
+      })
+    ).toEqual({ kind: 'empty' });
+  });
+
+  it('does not treat a load failure as an empty catalog', () => {
+    expect(
+      resolvePublicMusicSurface({
+        releases: [],
+        hasPlayableDestinations: true,
+        catalogLoadFailed: true,
+      })
+    ).toEqual({ kind: 'error' });
+  });
+});
+
+describe('shouldOfferPublicEventsDestination', () => {
+  it('offers Events only when upcoming dates exist', () => {
+    expect(shouldOfferPublicEventsDestination(0)).toBe(false);
+    expect(shouldOfferPublicEventsDestination(1)).toBe(true);
+    expect(PUBLIC_EVENTS_NO_SURFACE).toBe('No live shows listed.');
+    expect(PUBLIC_EVENTS_NO_UPCOMING).toBe('No upcoming shows.');
+  });
+});
 
 describe('resolveProfileSurfaceState', () => {
   it('prioritizes ticketed shows over music and alerts', () => {
@@ -146,6 +223,24 @@ describe('resolveProfileSurfaceState', () => {
     });
     expect(state.visibleSocialLinks).toHaveLength(0);
     expect(state.hasTip).toBe(false);
+    expect(state.hasReleases).toBe(false);
+    expect(state.emptyState.release).toBe(`${PUBLIC_MUSIC_EMPTY_HEADING}.`);
+    expect(state.emptyState.tour).toBe('No upcoming shows.');
+  });
+
+  it('keeps catalog load failure copy distinct from a genuine empty catalog', () => {
+    const state = resolveProfileSurfaceState({
+      artist,
+      socialLinks: [spotifyLink],
+      latestRelease: null,
+      tourDates: [],
+      releases: [],
+      hasPlayableDestinations: true,
+      catalogLoadFailed: true,
+      activeSubtitle: 'Artist profile',
+    });
+
+    expect(state.emptyState.release).toBe(`${PUBLIC_MUSIC_ERROR_HEADING}.`);
     expect(state.hasReleases).toBe(false);
   });
 
@@ -242,5 +337,97 @@ describe('resolveProfileSurfaceState', () => {
         referrer: '',
       })
     ).toBe('profile-root');
+  });
+
+  it('shows the root back chevron for a signed-in session without history', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('app-fallback');
+  });
+
+  it('uses history back for a signed-in session when history exists without a referrer', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 2,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('history-back');
+  });
+
+  it('does not walk internal mode history for a signed-in new-tab arrival', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 3,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 1,
+      })
+    ).toBe('app-fallback');
+  });
+
+  it('exits past internal mode entries to the prior app surface', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
+      })
+    ).toBe('history-exit');
+  });
+
+  it('does not overshoot when browser back left a stale history.length', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 0,
+      })
+    ).toBe('history-back');
+  });
+
+  it('reads and stamps profile history depth on history state', () => {
+    expect(readPublicProfileHistoryDepth(null)).toBe(0);
+    expect(readPublicProfileHistoryDepth({ joviePublicProfileDepth: 2 })).toBe(
+      2
+    );
+    expect(getPublicProfileHistoryExitDelta(2)).toBe(-3);
+    expect(getPublicProfileHistoryExitDelta(0)).toBe(-1);
+    expect(withPublicProfileHistoryDepth({ keep: true }, 1)).toMatchObject({
+      keep: true,
+      joviePublicProfileDepth: 1,
+    });
+  });
+
+  it('exits past internal mode entries for a logged-out referrer arrival', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: 'https://jov.ie/explore',
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
+      })
+    ).toBe('history-exit');
   });
 });

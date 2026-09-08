@@ -17,7 +17,7 @@ vi.mock('@/lib/flags/server', () => ({
 }));
 
 vi.mock('@/lib/rate-limit/limiters', () => ({
-  aiChatDailyPlanAwareLimiter: {
+  aiChatWeeklyPlanAwareLimiter: {
     getStatus: hoisted.getStatusMock,
   },
 }));
@@ -66,7 +66,7 @@ function makeEntitlements(
     analyticsRetentionDays: 180,
     contactsLimit: null,
     smartLinksLimit: null,
-    aiDailyMessageLimit: 100,
+    aiWeeklyMessageLimit: 100,
     aiPitchGenPerRelease: 5,
     aiRetouchDailyLimit: 10,
     billingVerification: 'verified',
@@ -110,7 +110,7 @@ describe('resolveChatAccountContext', () => {
     expect(context.flags.merchMvp).toBe(true);
     expect(context.merchAccess.available).toBe(true);
     expect(context.usage).toMatchObject({
-      dailyLimit: 100,
+      weeklyLimit: 100,
       used: 8,
       remaining: 92,
       resetAt: '2026-05-24T07:00:00.000Z',
@@ -145,7 +145,7 @@ describe('resolveChatAccountContext', () => {
         canAccessMerchCreation: false,
         canGenerateAlbumArt: false,
         canAccessAdvancedAnalytics: false,
-        aiDailyMessageLimit: 10,
+        aiWeeklyMessageLimit: 10,
       })
     );
 

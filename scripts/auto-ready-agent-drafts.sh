@@ -8,8 +8,8 @@
 # present for the exact head. Existing source checks may still be pending;
 # GitHub keeps the merge blocked until they pass.
 #
-# Opt out per-PR with taste/security/hold labels, controlled-proof/canary
-# markers, or any of: needs-human, hold, gated, queue-deferred, fast.
+# Opt out per-PR only for current machine/security holds or controlled-proof
+# markers. Legacy human, taste, and no-auto labels are inert.
 #
 # Env:
 #   DRY_RUN=1                 classify and print only; flip no PRs

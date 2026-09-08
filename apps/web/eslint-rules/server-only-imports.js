@@ -7,7 +7,7 @@
 
 const SERVER_ONLY_IMPORTS = new Set([
   'server-only',
-  '@clerk/nextjs/server',
+  '@/lib/auth/better-auth',
   '@neondatabase/serverless',
   'drizzle-orm',
   'drizzle-orm/neon-serverless',

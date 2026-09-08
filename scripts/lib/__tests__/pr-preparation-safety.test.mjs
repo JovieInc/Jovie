@@ -167,6 +167,23 @@ describe('reusable exact eligibility gate', () => {
   });
 
   it.each([
+    'human-review-required',
+    'needs-human',
+    'needs-human-review',
+    'needs-human-taste',
+    'needs:taste',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'taste',
+  ])('ignores the legacy %s label', label => {
+    expect(eligibility({ labels: [{ name: label }] })).toMatchObject({
+      eligible: true,
+      outcome: 'eligible',
+    });
+  });
+
+  it.each([
     ['queue', { mergeQueueEntry: { id: 'MQE' } }],
     ['auto merge', { autoMergeRequest: { enabledAt: 'now' } }],
     ['review', { reviewDecision: 'CHANGES_REQUESTED' }],

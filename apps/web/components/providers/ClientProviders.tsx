@@ -1,11 +1,12 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/providers/ClientProviders.interaction.test.tsx
 import { TooltipProvider } from '@jovie/ui';
 import React from 'react';
 import {
-  ClerkSafeDefaultsProvider,
-  ClerkSafeValuesProvider,
-} from '@/hooks/useClerkSafe';
+  JovieAuthDefaultsProvider,
+  JovieAuthValuesProvider,
+} from '@/hooks/useJovieAuth';
 import type { ClientAuthBootstrap } from '@/lib/auth/dev-test-auth-types';
 import { useDesktopAppBootSignal } from '@/lib/desktop/electron-bridge';
 import type { ThemeMode } from '@/types';
@@ -21,13 +22,11 @@ function DesktopAppBootSignal() {
 interface ClientProvidersProps {
   readonly children: React.ReactNode;
   readonly authBootstrap?: ClientAuthBootstrap | null;
-  readonly forceBypassClerk?: boolean;
+  readonly forceSignedOutDefaults?: boolean;
   readonly initialThemeMode?: ThemeMode;
-  readonly publishableKey?: string | undefined;
   readonly skipCoreProviders?: boolean;
 }
 
-// Inner component that wraps children with CoreProviders or QueryProvider
 interface WrappedProvidersOptions {
   children: React.ReactNode;
   initialThemeMode: ThemeMode;
@@ -53,32 +52,18 @@ function wrapWithCoreProviders({
 }
 
 /**
- * Client providers root (Clerk → Better Auth migration, client-flip commit ⑦).
+ * Client providers root. Better Auth needs no vendor provider —
+ * `authClient.useSession()` reads the session cookie. The context fan-out
+ * from `useJovieAuth` still mounts once so `useUserSafe` / `useAuthSafe` /
+ * `useSessionSafe` consumers keep working.
  *
- * Better Auth needs no provider — `authClient.useSession()` reads the session
- * cookie directly. The context fan-out architecture from the Clerk era is
- * preserved (plan decision 7): `JovieAuthValuesProvider` (aliased here as
- * `ClerkSafeValuesProvider`) subscribes to the session ONCE and fans the
- * user/auth/session slices out through context so the 36
- * `useUserSafe`/`useAuthSafe`/`useSessionSafe` consumers don't churn.
- *
- * The legacy `publishableKey` / `forceBypassClerk` / `authBootstrap` props are
- * kept in the interface for source compatibility with existing callers
- * (`ResolvedClientProviders`) but are functionally inert under Better Auth:
- *   - `publishableKey` — no Clerk JS to load.
- *   - `forceBypassClerk` — routes to `ClerkSafeDefaultsProvider` (signed-out
- *     safe defaults) for mock/DB-less mode.
- *   - `authBootstrap` — under Clerk this synthesized a fake user because
- *     Clerk's client SDK couldn't see the dev test cookie. Under BA the dev
- *     bypass mints a REAL `ba_sessions` row + session cookie (commit ⑤'s
- *     `mintBetterAuthSessionForDevTestActor`), so `authClient.useSession()`
- *     observes it through the standard cookie path and the bootstrap provider
- *     collapses into the live values provider.
+ * `forceSignedOutDefaults` is for mock/DB-less/public-profile rendering
+ * that must not subscribe to a live session.
  */
 export function ClientProviders({
   children,
   authBootstrap = null,
-  forceBypassClerk = false,
+  forceSignedOutDefaults = false,
   initialThemeMode = 'dark',
   skipCoreProviders = false,
 }: ClientProvidersProps) {
@@ -88,23 +73,19 @@ export function ClientProviders({
     skipCoreProviders,
   });
 
-  // `forceBypassClerk` routes to signed-out safe defaults (mock/DB-less mode,
-  // build-time rendering, tests). Under BA this is the only remaining branch
-  // — the bootstrap branch collapsed because the dev bypass now mints a real
-  // BA session cookie that `authClient.useSession()` observes directly.
-  if (forceBypassClerk && !authBootstrap?.isAuthenticated) {
+  if (forceSignedOutDefaults && !authBootstrap?.isAuthenticated) {
     return (
-      <ClerkSafeDefaultsProvider>
+      <JovieAuthDefaultsProvider>
         <DesktopAppBootSignal />
         {wrappedChildren}
-      </ClerkSafeDefaultsProvider>
+      </JovieAuthDefaultsProvider>
     );
   }
 
   return (
-    <ClerkSafeValuesProvider>
+    <JovieAuthValuesProvider>
       <DesktopAppBootSignal />
       {wrappedChildren}
-    </ClerkSafeValuesProvider>
+    </JovieAuthValuesProvider>
   );
 }

@@ -35,7 +35,7 @@ describe('canonical surface registry', () => {
 
   it('pins the audited live owners', () => {
     expect(getCanonicalSurface('homepage').sourceComponent).toContain(
-      'MarketingPosterHero'
+      'HomepageEditorialHero'
     );
     expect(getCanonicalSurface('homepage').routeOwner).toContain(
       'PublicPageShell'

@@ -23,6 +23,8 @@ export const YOUTUBE_THUMBNAILS_COPY = {
   states: {
     loading: 'Finding your latest videos…',
     previewOnly: 'Redos open soon. These are the three we would start with.',
+    redosReady:
+      'Your three free redos. Download or apply them after you create an account — applying needs YouTube Connect.',
     invalidChannel:
       'We could not find that channel. Paste the @handle or the channel link.',
     noVideos: 'That channel has no public videos yet.',
@@ -97,7 +99,9 @@ export const YOUTUBE_THUMBNAILS_EVENTS = {
 
 /** JOV-INV-012 contract on analytics, retouch, and YouTube experiments. */
 export const YOUTUBE_THUMBNAILS_OPTIMIZATION = {
+  experimentId: 'youtube-closed-loop',
   variantIdentity: 'youtube-thumbnails:paste-channel:v1',
+  parentVariantIdentity: 'youtube-closed-loop:paste-channel:v1',
   exposure: YOUTUBE_THUMBNAILS_EVENTS.EXPOSED,
   outcome: YOUTUBE_THUMBNAILS_EVENTS.APPLY_CLICKED,
   attribution: 'source=youtube-thumbnails',

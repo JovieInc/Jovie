@@ -1,3 +1,4 @@
+import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { useQueryMock } = vi.hoisted(() => ({
@@ -27,7 +28,9 @@ describe('query refetch policies', () => {
   });
 
   it('disables focus refetch for impersonation status', () => {
-    useImpersonationQuery();
+    // useImpersonationQuery syncs the JOV-6186 cache fence via useEffect, so
+    // the hook must run inside a React render (hook dispatcher present).
+    renderHook(() => useImpersonationQuery());
 
     expect(useQueryMock).toHaveBeenCalledWith(
       expect.objectContaining({

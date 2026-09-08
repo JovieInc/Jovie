@@ -1,14 +1,15 @@
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import type { BrandMarkSize } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 interface LogoIconProps {
-  readonly size?: number;
+  readonly size?: BrandMarkSize;
   readonly className?: string;
   readonly variant?: 'color' | 'white' | 'muted';
 }
 
 export function LogoIcon({
-  size = 48,
+  size = 'chrome',
   className,
   variant = 'color',
 }: LogoIconProps) {

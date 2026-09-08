@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';

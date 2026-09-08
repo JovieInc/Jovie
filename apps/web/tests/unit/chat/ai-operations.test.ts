@@ -199,16 +199,16 @@ describe('buildSystemPrompt', () => {
     it('includes free tier limits when tools are restricted', () => {
       const prompt = buildSystemPrompt(mockArtistContext, [...mockReleases], {
         aiCanUseTools: false,
-        aiDailyMessageLimit: 10,
+        aiWeeklyMessageLimit: 10,
       });
       expect(prompt).toContain('Free');
-      expect(prompt).toContain('10 messages per day');
+      expect(prompt).toContain('10 messages per week');
     });
 
     it('omits plan limitations when tools are available', () => {
       const prompt = buildSystemPrompt(mockArtistContext, [...mockReleases], {
         aiCanUseTools: true,
-        aiDailyMessageLimit: 100,
+        aiWeeklyMessageLimit: 100,
       });
       expect(prompt).not.toContain('Plan Limitations');
     });

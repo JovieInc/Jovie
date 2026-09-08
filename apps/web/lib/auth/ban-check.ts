@@ -6,6 +6,7 @@ import { cache } from 'react';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
@@ -138,6 +139,10 @@ export async function invalidateBanStatusCache(
  */
 export const getUserBanStatus = cache(
   async (clerkUserId: string): Promise<BanStatus> => {
+    if (isVisualCaptureSyntheticAuthEnabled()) {
+      return { isBanned: false };
+    }
+
     try {
       const [user] = await db
         .select({

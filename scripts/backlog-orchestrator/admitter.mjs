@@ -11,6 +11,10 @@ import { invariantPolicy } from '../invariants/registry.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+} from './ownership-inventory.mjs';
 import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
 import { scoreIssue } from './scorer.mjs';
@@ -43,6 +47,7 @@ export const FLEET_GATE_REASON = Object.freeze({
   CONTROLLER_STALE: 'controller-stale',
   QUEUE_UNKNOWN: 'queue-unknown',
   QUEUE_ABOVE_TARGET: 'queue-above-target',
+  QUEUE_LANE_CAPACITY_INVALID: 'queue-lane-capacity-invalid',
   CREDENTIAL_COMPROMISE: 'credential-compromise',
   UNSAFE_MIGRATION: 'unsafe-migration-or-data-corruption',
   BROKEN_ISOLATION: 'broken-worktree-isolation',
@@ -66,13 +71,14 @@ const SEVERE_INTEGRITY_REASONS = new Set([
 const CAPACITY_POLICY = invariantPolicy('JOV-INV-007');
 const FLEET_AUTHORITY = invariantPolicy('JOV-INV-008');
 const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
-const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = CAPACITY_POLICY.maximum;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
+const CAPACITY_MAX_TARGET = 40;
 export const FLEET_PROMOTION_MODE = Object.freeze({
   NORMAL: 'normal',
   ISOLATED_ONLY: 'isolated-only',
+  CONTROLLER_REPAIR_ONLY: 'controller-repair-only',
   DRAFT_ONLY: 'draft-only',
   HOLD_INTAKE: 'hold-intake',
   BLOCKED: 'blocked',
@@ -100,6 +106,13 @@ function alreadyAdmittedCohortSemantics(promotionMode) {
       semantics: 'isolated-only',
     };
   }
+  if (promotionMode === FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY) {
+    return {
+      preserve: true,
+      newIntakeAllowed: false,
+      semantics: 'preserve-cohort-and-admit-one-controller-repair',
+    };
+  }
   if (promotionMode === FLEET_PROMOTION_MODE.DRAFT_ONLY) {
     return {
       preserve: false,
@@ -116,6 +129,87 @@ function alreadyAdmittedCohortSemantics(promotionMode) {
 
 function typedReason(code, layer, severity, detail) {
   return { code, layer, severity, detail };
+}
+
+function repositoryName(value) {
+  const normalized = String(value || '').trim();
+  return /^[^/\s]+\/[^/\s]+$/.test(normalized) ? normalized : null;
+}
+
+function capacityRecord(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Number.isInteger(value.ready) &&
+    value.ready >= 0 &&
+    Number.isInteger(value.budget) &&
+    value.budget > 0
+  );
+}
+
+function laneCapacityFailureForQueue(queue, greenReadyPrs, queueTarget) {
+  const repository = repositoryName(queue?.repository);
+  const laneCapacity = queue?.laneCapacity;
+  const repositoryCapacity = laneCapacity?.repositories?.[repository];
+  if (!repository) {
+    return 'queue repository is missing or malformed';
+  }
+  if (
+    !laneCapacity ||
+    typeof laneCapacity !== 'object' ||
+    Array.isArray(laneCapacity)
+  ) {
+    return 'lane capacity evidence is missing or malformed';
+  }
+  if (laneCapacity.schema !== 'jovie-lane-capacity/v2') {
+    return `lane capacity schema ${String(laneCapacity.schema || 'missing')} is not jovie-lane-capacity/v2`;
+  }
+  if (
+    laneCapacity.global !== undefined ||
+    !laneCapacity.repositories ||
+    typeof laneCapacity.repositories !== 'object' ||
+    Array.isArray(laneCapacity.repositories) ||
+    !Object.values(laneCapacity.repositories).every(capacityRecord) ||
+    !laneCapacity.lanes ||
+    typeof laneCapacity.lanes !== 'object' ||
+    Array.isArray(laneCapacity.lanes) ||
+    !Object.values(laneCapacity.lanes).every(capacityRecord) ||
+    !laneCapacity.sharedResources ||
+    typeof laneCapacity.sharedResources !== 'object' ||
+    Array.isArray(laneCapacity.sharedResources) ||
+    !capacityRecord(repositoryCapacity) ||
+    repositoryCapacity.ready !== greenReadyPrs ||
+    repositoryCapacity.budget !== queueTarget
+  ) {
+    return 'lane capacity evidence is not scoped to the queue repository/count/target';
+  }
+  return null;
+}
+
+function scopedLaneCapacityForQueue(queue, greenReadyPrs, queueTarget) {
+  const failure = laneCapacityFailureForQueue(
+    queue,
+    greenReadyPrs,
+    queueTarget
+  );
+  if (failure) return null;
+  return queue.laneCapacity;
+}
+
+function laneCapacityReasonForQueue(queue, greenReadyPrs, queueTarget) {
+  const failure = laneCapacityFailureForQueue(
+    queue,
+    greenReadyPrs,
+    queueTarget
+  );
+  if (!failure) return null;
+  return typedReason(
+    FLEET_GATE_REASON.QUEUE_LANE_CAPACITY_INVALID,
+    'admission',
+    'warning',
+    `Scoped lane capacity evidence is invalid: ${failure}. New issue admission fails closed.`
+  );
 }
 
 function evaluateClosureAdmission(candidate) {
@@ -152,7 +246,7 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
   const observedMs = Date.parse(value || '');
   return (
     Number.isFinite(observedMs) &&
-    observedMs <= nowMs + 60_000 &&
+    observedMs <= nowMs &&
     nowMs - observedMs <= maxAgeMs
   );
 }
@@ -324,11 +418,43 @@ function deploymentBound(mainSha, deployedSha) {
   );
 }
 
-/**
- * Runtime may preserve already-queued work at its safe floor, but a new Linear
- * mutation requires a fresh approved capacity receipt. Missing, malformed, or
- * stale evidence therefore grants zero new leases rather than inventing four.
- */
+function usefulTurnProofs(evidence, nowMs, maxAgeMs) {
+  if (
+    evidence?.schema !== GEM_CONCURRENCY_EVIDENCE_SCHEMA ||
+    evidence?.source !== 'execution-proven-useful-turns' ||
+    !Array.isArray(evidence?.acceptedEvidence) ||
+    !isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs)
+  ) {
+    return null;
+  }
+  const seats = new Set();
+  for (const proof of evidence.acceptedEvidence) {
+    const strings = [proof?.provider, proof?.profile, proof?.model];
+    const completionProven =
+      (Number.isInteger(proof?.outputBytes) && proof.outputBytes > 0) ||
+      (Number.isInteger(proof?.outputTokens) && proof.outputTokens > 0);
+    if (
+      proof?.schema !== 'symphony-useful-turn-proof/v1' ||
+      strings.some(value => typeof value !== 'string' || !value.trim()) ||
+      proof?.rc !== 0 ||
+      proof?.useful !== true ||
+      !/^[0-9a-f]{64}$/.test(proof?.outputDigest || '') ||
+      !completionProven ||
+      !isFreshTimestamp(proof?.completedAt, nowMs, maxAgeMs)
+    ) {
+      return null;
+    }
+    const seat = strings
+      .slice(0, 2)
+      .map(value => value.trim())
+      .join('\u0000');
+    if (seats.has(seat)) return null;
+    seats.add(seat);
+  }
+  return evidence.target === seats.size ? [...seats] : null;
+}
+
+/** Use only fresh, digest-bound useful turns as dispatch capacity. */
 export function resolveGemConcurrency(
   evidence,
   {
@@ -338,18 +464,13 @@ export function resolveGemConcurrency(
 ) {
   const nowMs = Date.parse(now);
   const measuredTarget = evidence?.target;
-  const requiredCleanRuns =
-    measuredTarget > DEFAULT_GEM_CONCURRENCY
-      ? CAPACITY_POLICY.cleanRunsForMaximum
-      : 1;
+  const acceptedEvidence = usefulTurnProofs(evidence, nowMs, maxAgeMs);
   const evidenceAccepted =
-    evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
+    acceptedEvidence !== null &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
-    measuredTarget <= MAX_EVIDENCE_BACKED_GEM_CONCURRENCY &&
+    measuredTarget <= CAPACITY_MAX_TARGET &&
     evidence?.approved === true &&
-    Number.isInteger(evidence?.cleanRuns) &&
-    evidence.cleanRuns >= requiredCleanRuns &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
 
@@ -360,9 +481,10 @@ export function resolveGemConcurrency(
     evidenceAccepted,
     newMutationAllowed: evidenceAccepted,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
+    acceptedEvidence: evidenceAccepted ? evidence.acceptedEvidence : [],
     reason: evidenceAccepted
-      ? 'recent-approved-measured-capacity'
-      : 'capacity-evidence-missing-malformed-or-stale',
+      ? 'execution-proven-useful-turns'
+      : 'capacity-evidence-unproven-dispatch-closed',
   };
 }
 
@@ -519,7 +641,7 @@ export function evaluateFleetGate(
     // and unbound production stays hold-intake. Drain classifies PRs itself.
   }
 
-  const state = redReasons.length
+  let state = redReasons.length
     ? FLEET_GATE_STATE.RED
     : reasons.length
       ? FLEET_GATE_STATE.AMBER
@@ -538,6 +660,28 @@ export function evaluateFleetGate(
     Number.isInteger(queueTarget) &&
     queueTarget > 0;
   const queueBelowBackpressure = queueShapeValid && greenReadyPrs < queueTarget;
+  const scopedLaneCapacity = queueShapeValid
+    ? scopedLaneCapacityForQueue(evidence?.queue, greenReadyPrs, queueTarget)
+    : null;
+  const laneCapacityReason = queueShapeValid
+    ? laneCapacityReasonForQueue(evidence?.queue, greenReadyPrs, queueTarget)
+    : null;
+  if (!redReasons.length && laneCapacityReason) {
+    reasons.push(laneCapacityReason);
+    state = FLEET_GATE_STATE.AMBER;
+  }
+  const queueRepository = repositoryName(evidence?.queue?.repository);
+  const queueRepositoryCapacity = queueRepository
+    ? scopedLaneCapacity?.repositories?.[queueRepository]
+    : null;
+  const queueRepositoryCapacityAvailable = Boolean(
+    queueRepositoryCapacity &&
+      queueRepositoryCapacity.ready < queueRepositoryCapacity.budget
+  );
+  const newMutationAllowed =
+    concurrency.newMutationAllowed &&
+    queueShapeValid &&
+    queueRepositoryCapacityAvailable;
   const isolatedPromotionAllowed =
     state === FLEET_GATE_STATE.AMBER &&
     reviewAdmission.allowed &&
@@ -556,8 +700,11 @@ export function evaluateFleetGate(
       : !closureAdmission.newIssueIntakeAllowed
         ? ['tests', 'review']
         : [
-            ...(concurrency.newMutationAllowed ? ['approved-issue-lease'] : []),
-            ...FLEET_AUTHORITY.AMBER,
+            ...(newMutationAllowed ? ['approved-issue-lease'] : []),
+            ...FLEET_AUTHORITY.AMBER.filter(
+              activity =>
+                newMutationAllowed || activity !== 'isolated-implementation'
+            ),
           ];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&
@@ -569,6 +716,35 @@ export function evaluateFleetGate(
     ['clear', 'resolved'].includes(integrityStatus) &&
     reasons.length === 1 &&
     reasons[0]?.code === FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND;
+  const controllerRepairReasonCodes = new Set(
+    reasons.map(reason => reason.code)
+  );
+  const closureRepairReasons = new Set(closureAdmission.reasons);
+  const closureAllowsControllerRepair =
+    closureAdmission.status === 'healthy' ||
+    (['grace', 'red'].includes(closureAdmission.status) &&
+      [...closureRepairReasons].every(
+        reason => reason === 'queue-controller-red-over-10m'
+      ) &&
+      closureAdmission.newIssueIntakeAllowed === false);
+  const controllerRepairAllowed =
+    state === FLEET_GATE_STATE.AMBER &&
+    reviewAdmission.allowed &&
+    closureAllowsControllerRepair &&
+    controllerFresh &&
+    controllerStatus === 'failed' &&
+    mainStatus === 'green' &&
+    validCommitSha(evidence?.main?.sha, { exact: true }) &&
+    productionStatus === 'green' &&
+    validCommitSha(evidence?.production?.deployedSha) &&
+    ['clear', 'resolved'].includes(integrityStatus) &&
+    controllerRepairReasonCodes.has(FLEET_GATE_REASON.CONTROLLER_FAILURE) &&
+    [...controllerRepairReasonCodes].every(reason =>
+      [
+        FLEET_GATE_REASON.CONTROLLER_FAILURE,
+        FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
+      ].includes(reason)
+    );
   const promotionMode = isolatedPromotionAllowed
     ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
     : state === FLEET_GATE_STATE.GREEN
@@ -579,7 +755,9 @@ export function evaluateFleetGate(
         ? FLEET_PROMOTION_MODE.DRAFT_ONLY
         : holdIntakeAllowed
           ? FLEET_PROMOTION_MODE.HOLD_INTAKE
-          : FLEET_PROMOTION_MODE.BLOCKED;
+          : controllerRepairAllowed
+            ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
+            : FLEET_PROMOTION_MODE.BLOCKED;
   const cohort = alreadyAdmittedCohortSemantics(promotionMode);
   const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
     ? cohort
@@ -619,6 +797,19 @@ export function evaluateFleetGate(
       maxConcurrent: 1,
       authority: 'canonical-merge-queue-controller',
     },
+    controllerRepairAdmission: {
+      allowed: controllerRepairAllowed,
+      condition: controllerRepairAllowed ? 'controller-failure' : null,
+      mainSha: controllerRepairAllowed ? evidence?.main?.sha : null,
+      deployedSha: controllerRepairAllowed
+        ? evidence?.production?.deployedSha
+        : null,
+      scope: 'trusted-comment-exact-repository-pr-head-main-path-set',
+      maxConcurrent: controllerRepairAllowed ? 1 : 0,
+      deploymentsAllowed: false,
+      runtimeActivationAllowed: false,
+      authority: 'canonical-merge-queue-controller',
+    },
     ownership: {
       controller: 'Gem',
       implementation: 'Symphony',
@@ -629,11 +820,7 @@ export function evaluateFleetGate(
       gem: concurrency,
       symphonyImplementation: 'event-driven-backpressure',
     },
-    laneCapacity:
-      evidence?.queue?.laneCapacity?.global?.ready === greenReadyPrs &&
-      evidence?.queue?.laneCapacity?.global?.budget === queueTarget
-        ? evidence.queue.laneCapacity
-        : null,
+    laneCapacity: scopedLaneCapacity,
   };
 }
 
@@ -655,14 +842,6 @@ function commentsOf(issue) {
 
 export function isConcreteJovieIssue(issue) {
   return Boolean(issue?.id && /^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''));
-}
-
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  if (!assignee) return false;
-  const text =
-    `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''} ${assignee.displayName || ''}`.toLowerCase();
-  return /tim(?:\s|-|_)*white|itstimwhite|^tim$/.test(text);
 }
 
 export function hasAdmissionEvidence(issue, classification = issue) {
@@ -690,6 +869,11 @@ export function buildAdmissionReceipt(
   issue,
   { now = new Date().toISOString(), fingerprint = '' } = {}
 ) {
+  const targeting = resolveAdmissionTarget(issue);
+  const target =
+    targeting.decision === 'admit'
+      ? admissionTargetPacket(targeting.target)
+      : null;
   return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({
     issue: issue.identifier,
     fingerprint,
@@ -699,7 +883,35 @@ export function buildAdmissionReceipt(
       researchGateReceipt(issue, { now })?.payload?.fingerprint || '',
     action: 'lease',
     at: now,
+    ...(target || {}),
   })} -->`;
+}
+
+function admissionLeaseReceipt(issue, body) {
+  const raw = String(body || '');
+  if (!raw.startsWith(ADMISSION_RECEIPT_PREFIX) || !raw.endsWith(' -->')) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(
+      raw.slice(ADMISSION_RECEIPT_PREFIX.length, -' -->'.length)
+    );
+    if (payload?.issue !== issue?.identifier || payload?.action !== 'lease') {
+      return null;
+    }
+    const target = admissionTargetPacket(payload);
+    const expected = resolveAdmissionTarget(issue);
+    if (expected.decision !== 'admit' || !target) return null;
+    return expected.target &&
+      target.target_system === expected.target.target_system &&
+      target.target_repo === expected.target.target_repo &&
+      target.artifact === expected.target.artifact &&
+      target.verification_authority === expected.target.verification_authority
+      ? payload
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function hasReceipt(issue, receipt) {
@@ -724,7 +936,6 @@ function candidateAdmissionDecision(classification, bundledIds) {
       !bundledIds.has(classification.identifier) &&
       classification.category === 'triageable' &&
       ['Triage', 'Backlog', 'Todo'].includes(state) &&
-      !isTimOwned(issue) &&
       !issue.pullRequestUrl &&
       evidence.eligible,
     preAdmission,
@@ -866,7 +1077,7 @@ export async function admitIssue({
     (issue.state?.name === 'Todo' &&
       namesOf(issue).includes(SYMPHONY_LABEL) &&
       commentsOf(issue).some(comment =>
-        (comment.body || comment).startsWith(ADMISSION_RECEIPT_PREFIX)
+        admissionLeaseReceipt(issue, comment.body || comment)
       ))
   ) {
     return { status: 'already-admitted', identifier: issue.identifier };

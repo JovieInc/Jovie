@@ -31,6 +31,7 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { uuidSchema } from '@/lib/validation/schemas/base';
+import { collectOrderedPrimaryNames } from './release-credits';
 import { resolveTrackProviderLinks } from './track-provider-links';
 import type { PreviewVerification } from './types';
 
@@ -240,25 +241,40 @@ async function getArtistNamesForReleases(
   const rows = await db
     .select({
       releaseId: releaseArtists.releaseId,
+      artistId: artists.id,
       artistName: artists.name,
       creditName: releaseArtists.creditName,
+      role: releaseArtists.role,
     })
     .from(releaseArtists)
     .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
     .where(inArray(releaseArtists.releaseId, releaseIds))
     .orderBy(releaseArtists.releaseId, releaseArtists.position);
 
-  const namesByRelease = new Map<string, string[]>();
+  const rowsByRelease = new Map<
+    string,
+    Array<{
+      artistId: string;
+      name: string;
+      role: (typeof rows)[number]['role'];
+    }>
+  >();
 
   for (const row of rows) {
-    const displayName = (row.creditName ?? row.artistName ?? '').trim();
-    if (!displayName) continue;
+    const name = (row.creditName ?? row.artistName ?? '').trim();
+    if (!name) continue;
+    const existing = rowsByRelease.get(row.releaseId) ?? [];
+    existing.push({
+      artistId: row.artistId,
+      name,
+      role: row.role,
+    });
+    rowsByRelease.set(row.releaseId, existing);
+  }
 
-    const existing = namesByRelease.get(row.releaseId) ?? [];
-    if (!existing.includes(displayName)) {
-      existing.push(displayName);
-      namesByRelease.set(row.releaseId, existing);
-    }
+  const namesByRelease = new Map<string, string[]>();
+  for (const [releaseId, creditRows] of rowsByRelease) {
+    namesByRelease.set(releaseId, collectOrderedPrimaryNames(creditRows));
   }
 
   return namesByRelease;

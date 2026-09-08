@@ -7,6 +7,7 @@ enum VoiceCaptureError: LocalizedError, Equatable {
   case microphoneDenied
   case speechDenied
   case recognizerUnavailable
+  case audioUnavailable
   case emptyTranscript
   case notRecording
 
@@ -18,6 +19,8 @@ enum VoiceCaptureError: LocalizedError, Equatable {
       "Speech recognition is off. Enable it in Settings → Jovie."
     case .recognizerUnavailable:
       "Voice is unavailable on this device."
+    case .audioUnavailable:
+      "The microphone isn't available right now. Try again."
     case .emptyTranscript:
       "Nothing heard."
     case .notRecording:
@@ -143,6 +146,59 @@ enum VoiceCaptureRecognitionConfig {
     request.requiresOnDeviceRecognition = onDevice
     return onDevice
   }
+
+  /// An inactive or contended audio session can hand back a 0 Hz / 0-channel
+  /// input format; `installTap(onBus:)` traps on it instead of throwing.
+  static func isUsableCaptureFormat(sampleRate: Double, channelCount: UInt32) -> Bool {
+    sampleRate > 0 && channelCount > 0
+  }
+}
+
+/// Plain-language copy for Speech/AVFoundation failures. `nil` means the
+/// failure was caused by our own cancellation and must not be surfaced.
+enum VoiceCaptureFailureMessage {
+  static let assistantDomain = "kAFAssistantErrorDomain"
+  static let genericMessage = "Voice recognition failed. Try again."
+  static let nothingHeardMessage = "Didn't catch that. Try again."
+  static let networkMessage = "Voice needs a network connection right now."
+  static let onDeviceNotReadyMessage = "On-device recognition isn't ready. Try again."
+  static let interruptedMessage = "Recording was interrupted."
+  static let routeLostMessage = "Your microphone disconnected."
+  static let recognizerFinishedMessage = "Recognition paused."
+  static let sendPreservedSuffix = "Tap Send to use what was heard."
+
+  static func message(for error: Error) -> String? {
+    let nsError = error as NSError
+    return message(domain: nsError.domain, code: nsError.code)
+  }
+
+  static func message(domain: String, code: Int) -> String? {
+    switch (domain, code) {
+    // 209/216/301: request or session cancelled — always ours.
+    case (assistantDomain, 209), (assistantDomain, 216), (assistantDomain, 301):
+      nil
+    case (assistantDomain, 1110):
+      nothingHeardMessage
+    case (assistantDomain, 1101), (assistantDomain, 1107):
+      onDeviceNotReadyMessage
+    case (NSURLErrorDomain, _):
+      networkMessage
+    default:
+      genericMessage
+    }
+  }
+}
+
+/// What to do when the recognizer or audio session stops before the user
+/// finishes: keep usable text so Send still works, or offer a retry.
+enum VoiceCaptureSessionInterruption: Equatable {
+  case preserveTranscript(String)
+  case retry
+
+  static func resolve(transcript: String) -> Self {
+    let draft = VoiceMemoActionDraft.make(fromTranscript: transcript)
+    return VoiceMemoActionDraft.isReady(draft) ? .preserveTranscript(draft) : .retry
+  }
 }
 
 @MainActor
@@ -160,6 +216,10 @@ final class VoiceCaptureService {
   private var sessionID: UInt64 = 0
   /// True while `finish()` is suspended/tearing down — blocks concurrent `start()`.
   private var isFinishing = false
+  /// Text kept when the session was paused early (interruption, route loss,
+  /// recognizer finished/failed). `finish()` returns it without a live engine.
+  private var interruptedTranscript: String?
+  private var audioSessionObservers: [NSObjectProtocol] = []
 
   private(set) var isRecording = false
   private(set) var audioLevel: Double = 0
@@ -170,6 +230,10 @@ final class VoiceCaptureService {
   /// Whether this device reports on-device Speech support.
   var supportsOnDeviceRecognition: Bool {
     VoiceCaptureRecognitionConfig.preferOnDevice(for: recognizer)
+  }
+  /// True while `finish()` can produce a transcript: live, or paused with text.
+  var canFinish: Bool {
+    isRecording || interruptedTranscript != nil
   }
 
   init(locale: Locale = .current) {
@@ -188,6 +252,28 @@ final class VoiceCaptureService {
     sessionID &+= 1
     let captureSessionID = sessionID
 
+    // Activate the session BEFORE touching the input node. An inactive
+    // session can report a 0 Hz format and installTap(onBus:) traps on it.
+    let session = AVAudioSession.sharedInstance()
+    do {
+      try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+      try session.setActive(true, options: .notifyOthersOnDeactivation)
+    } catch {
+      throw VoiceCaptureError.audioUnavailable
+    }
+
+    let inputNode = audioEngine.inputNode
+    let format = inputNode.outputFormat(forBus: 0)
+    guard
+      VoiceCaptureRecognitionConfig.isUsableCaptureFormat(
+        sampleRate: format.sampleRate,
+        channelCount: format.channelCount
+      )
+    else {
+      deactivateAudioSession()
+      throw VoiceCaptureError.audioUnavailable
+    }
+
     let request = SFSpeechAudioBufferRecognitionRequest()
     activeOnDevicePreference = VoiceCaptureRecognitionConfig.configure(
       request,
@@ -195,9 +281,6 @@ final class VoiceCaptureService {
     )
     isUsingOnDeviceRecognition = activeOnDevicePreference
     recognitionRequest = request
-
-    let inputNode = audioEngine.inputNode
-    let format = inputNode.outputFormat(forBus: 0)
 
     inputNode.removeTap(onBus: 0)
     inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
@@ -208,10 +291,6 @@ final class VoiceCaptureService {
         self.audioLevel = level
       }
     }
-
-    let session = AVAudioSession.sharedInstance()
-    try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-    try session.setActive(true, options: .notifyOthersOnDeactivation)
 
     recognitionTask = recognizer?.recognitionTask(with: request) { [weak self] result, error in
       Task { @MainActor in
@@ -224,28 +303,66 @@ final class VoiceCaptureService {
           let text = result.bestTranscription.formattedString
           self.latestTranscript = text
           self.transcriptPreview = text
+          // Server recognition caps a request (~1 min) and finishes on its
+          // own; the engine would keep running into a dead request.
+          if result.isFinal, error == nil, self.isRecording {
+            self.pauseSession(
+              message: VoiceCaptureFailureMessage.recognizerFinishedMessage,
+              status: "recognizer_finished"
+            )
+          }
         }
 
         if let error {
-          self.lastErrorMessage = error.localizedDescription
+          self.handleRecognitionError(error)
         }
       }
     }
 
+    audioEngine.prepare()
+    do {
+      try audioEngine.start()
+    } catch {
+      // Leave nothing half-armed: no tap, no task, session released.
+      inputNode.removeTap(onBus: 0)
+      recognitionTask?.cancel()
+      recognitionTask = nil
+      recognitionRequest = nil
+      deactivateAudioSession()
+      throw VoiceCaptureError.audioUnavailable
+    }
+
     recordingStartedAt = .now
     isRecording = true
+    observeAudioSession(sessionID: captureSessionID)
     Observability.addBreadcrumb(
       .voiceCaptureStarted,
       context: [
         "on_device": activeOnDevicePreference,
       ]
     )
-
-    audioEngine.prepare()
-    try audioEngine.start()
   }
 
   func finish() async throws -> VoiceCaptureResult {
+    if !isRecording, !isFinishing, let preserved = interruptedTranscript {
+      // Paused early with usable text — hand it over without a live engine.
+      interruptedTranscript = nil
+      clearTranscriptBuffers()
+      lastErrorMessage = nil
+      let latency = latencyMilliseconds(since: recordingStartedAt)
+      recordingStartedAt = nil
+      recordCompletion(
+        status: "draft_after_pause",
+        latencyMilliseconds: latency,
+        onDevice: activeOnDevicePreference
+      )
+      return VoiceCaptureResult(
+        transcript: preserved,
+        latencyMilliseconds: latency,
+        usedOnDeviceRecognition: activeOnDevicePreference
+      )
+    }
+
     guard isRecording, !isFinishing else { throw VoiceCaptureError.notRecording }
     isFinishing = true
     defer { isFinishing = false }
@@ -254,6 +371,7 @@ final class VoiceCaptureService {
     let usedOnDevice = activeOnDevicePreference
     let captureSessionID = sessionID
 
+    stopObservingAudioSession()
     audioEngine.stop()
     audioEngine.inputNode.removeTap(onBus: 0)
     recognitionRequest?.endAudio()
@@ -268,7 +386,7 @@ final class VoiceCaptureService {
     recognitionTask?.cancel()
     recognitionTask = nil
     recognitionRequest = nil
-    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    deactivateAudioSession()
 
     let transcript = VoiceMemoActionDraft.make(fromTranscript: latestTranscript)
     // Drop residual transcript from the long-lived service after handoff.
@@ -284,6 +402,9 @@ final class VoiceCaptureService {
     }
 
     let latency = latencyMilliseconds(since: startedAt)
+    // endAudio() routinely yields a trailing "no speech" (1110) on a silent
+    // tail during the settle window; a successful handoff must not carry it.
+    lastErrorMessage = nil
     recordCompletion(status: "draft", latencyMilliseconds: latency, onDevice: usedOnDevice)
     return VoiceCaptureResult(
       transcript: transcript,
@@ -293,12 +414,15 @@ final class VoiceCaptureService {
   }
 
   func cancel() {
-    guard isRecording || recognitionRequest != nil || isFinishing else {
+    guard
+      isRecording || recognitionRequest != nil || isFinishing || interruptedTranscript != nil
+    else {
       clearTranscriptBuffers()
       return
     }
     sessionID &+= 1
     isFinishing = false
+    stopObservingAudioSession()
     audioEngine.stop()
     audioEngine.inputNode.removeTap(onBus: 0)
     recognitionRequest?.endAudio()
@@ -307,6 +431,7 @@ final class VoiceCaptureService {
     recognitionRequest = nil
     isRecording = false
     audioLevel = 0
+    interruptedTranscript = nil
     clearTranscriptBuffers()
     recordCompletion(
       status: "cancelled",
@@ -314,6 +439,103 @@ final class VoiceCaptureService {
       onDevice: activeOnDevicePreference
     )
     recordingStartedAt = nil
+    deactivateAudioSession()
+  }
+
+  /// Stop capturing early while keeping state coherent: the engine and
+  /// recognizer are released, usable text is preserved for `finish()`, and
+  /// `isRecording` flips so the overlay can show Send/Retry instead of a
+  /// dead "Listening" state.
+  private func pauseSession(message: String, status: String) {
+    guard isRecording else { return }
+    stopObservingAudioSession()
+    audioEngine.stop()
+    audioEngine.inputNode.removeTap(onBus: 0)
+    recognitionRequest?.endAudio()
+    recognitionTask?.cancel()
+    recognitionTask = nil
+    recognitionRequest = nil
+    isRecording = false
+    audioLevel = 0
+    deactivateAudioSession()
+
+    switch VoiceCaptureSessionInterruption.resolve(transcript: latestTranscript) {
+    case .preserveTranscript(let draft):
+      interruptedTranscript = draft
+      transcriptPreview = draft
+      lastErrorMessage = "\(message) \(VoiceCaptureFailureMessage.sendPreservedSuffix)"
+    case .retry:
+      interruptedTranscript = nil
+      clearTranscriptBuffers()
+      lastErrorMessage = message
+    }
+    recordCompletion(
+      status: status,
+      latencyMilliseconds: latencyMilliseconds(since: recordingStartedAt),
+      onDevice: activeOnDevicePreference
+    )
+  }
+
+  private func handleRecognitionError(_ error: Error) {
+    guard let message = VoiceCaptureFailureMessage.message(for: error) else { return }
+    if isRecording {
+      pauseSession(message: message, status: "recognizer_failed")
+    } else {
+      lastErrorMessage = message
+    }
+  }
+
+  private func observeAudioSession(sessionID captureSessionID: UInt64) {
+    stopObservingAudioSession()
+    // `object: nil` on purpose — these notifications are not reliably posted
+    // with the shared session as sender; filtering on it can silence them.
+    // The captureSessionID check inside scopes them to this session.
+    let center = NotificationCenter.default
+    let interruption = center.addObserver(
+      forName: AVAudioSession.interruptionNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] note in
+      guard
+        let rawType = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+        AVAudioSession.InterruptionType(rawValue: rawType) == .began
+      else { return }
+      Task { @MainActor in
+        guard let self, self.sessionID == captureSessionID else { return }
+        self.pauseSession(
+          message: VoiceCaptureFailureMessage.interruptedMessage,
+          status: "interrupted"
+        )
+      }
+    }
+    let routeChange = center.addObserver(
+      forName: AVAudioSession.routeChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] note in
+      guard
+        let rawReason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+        AVAudioSession.RouteChangeReason(rawValue: rawReason) == .oldDeviceUnavailable
+      else { return }
+      Task { @MainActor in
+        guard let self, self.sessionID == captureSessionID else { return }
+        self.pauseSession(
+          message: VoiceCaptureFailureMessage.routeLostMessage,
+          status: "route_lost"
+        )
+      }
+    }
+    audioSessionObservers = [interruption, routeChange]
+  }
+
+  private func stopObservingAudioSession() {
+    for observer in audioSessionObservers {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    audioSessionObservers = []
+  }
+
+  private func deactivateAudioSession() {
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
   }
 
@@ -323,10 +545,12 @@ final class VoiceCaptureService {
   }
 
   private func reset() {
+    stopObservingAudioSession()
     recognitionTask?.cancel()
     recognitionTask = nil
     recognitionRequest = nil
     recordingStartedAt = nil
+    interruptedTranscript = nil
     clearTranscriptBuffers()
     lastErrorMessage = nil
     audioLevel = 0

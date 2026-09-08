@@ -32,7 +32,7 @@ import { AuthPageSkeleton } from '@/components/features/auth/AuthPageSkeleton';
 
 describe('AuthPageSkeleton', () => {
   it('renders the auth form skeleton inside the shared auth layout contract', () => {
-    render(
+    const { container } = render(
       <AuthPageSkeleton
         formTitle='Sign in'
         showFormTitle={false}
@@ -56,5 +56,8 @@ describe('AuthPageSkeleton', () => {
       'data-auth-chrome',
       'splash-b'
     );
+    expect(
+      container.querySelector('[data-auth-splash-b-skeleton]')
+    ).not.toBeNull();
   });
 });

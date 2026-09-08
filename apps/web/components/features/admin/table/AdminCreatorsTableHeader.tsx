@@ -56,14 +56,20 @@ export function AdminCreatorsTableHeader({
   return (
     <thead className='text-left text-secondary-token'>
       <tr className='text-app font-medium tracking-normal text-secondary-token'>
-        <th className={cn(headerCellClass, 'w-14')} style={stickyStyle}>
+        <th
+          className={cn(headerCellClass, 'w-14 whitespace-nowrap')}
+          style={stickyStyle}
+        >
           <Checkbox
             aria-label='Select all creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
           />
         </th>
-        <th className={headerCellClass} style={stickyStyle}>
+        <th
+          className={cn(headerCellClass, 'whitespace-nowrap')}
+          style={stickyStyle}
+        >
           <div className='inline-flex h-8 items-center'>
             {selectedCount > 0 ? (
               <DropdownMenu>
@@ -92,7 +98,10 @@ export function AdminCreatorsTableHeader({
           </div>
         </th>
         <th
-          className={cn(headerCellClass, 'max-lg:hidden lg:table-cell')}
+          className={cn(
+            headerCellClass,
+            'max-lg:hidden lg:table-cell whitespace-nowrap'
+          )}
           style={stickyStyle}
         >
           <span className='text-app font-medium tracking-normal text-secondary-token'>
@@ -102,7 +111,7 @@ export function AdminCreatorsTableHeader({
         <th
           className={cn(
             headerCellClass,
-            'cursor-pointer select-none max-md:hidden md:table-cell'
+            'cursor-pointer select-none max-md:hidden md:table-cell whitespace-nowrap'
           )}
           style={stickyStyle}
         >
@@ -112,7 +121,10 @@ export function AdminCreatorsTableHeader({
             onClick={() => onSortChange('created')}
           />
         </th>
-        <th className={cn(headerCellClass, 'text-right')} style={stickyStyle}>
+        <th
+          className={cn(headerCellClass, 'text-right whitespace-nowrap')}
+          style={stickyStyle}
+        >
           {headerActions ? (
             <div className='flex items-center justify-end'>{headerActions}</div>
           ) : (

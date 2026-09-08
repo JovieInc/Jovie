@@ -4,6 +4,7 @@ const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockParseJsonBody = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockApproveLead = vi.hoisted(() => vi.fn());
+const mockRecordLeadRejectionEvent = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
 
 const {
@@ -84,6 +85,10 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
   pipelineLog: vi.fn(),
 }));
 
+vi.mock('@/lib/leads/rejection-event', () => ({
+  recordLeadRejectionEvent: mockRecordLeadRejectionEvent,
+}));
+
 import { PATCH } from '@/app/api/admin/leads/[id]/route';
 
 describe('PATCH /api/admin/leads/[id]', () => {
@@ -124,6 +129,11 @@ describe('PATCH /api/admin/leads/[id]', () => {
         instantlyLeadId: 'instantly-123',
         outreachStatus: 'queued',
       },
+    });
+
+    mockRecordLeadRejectionEvent.mockResolvedValue({
+      action: 'insert',
+      dedupKey: 'rejected:quality_below_bar:none',
     });
   });
 
@@ -166,6 +176,44 @@ describe('PATCH /api/admin/leads/[id]', () => {
       expect.objectContaining({
         success: true,
         profileId: 'profile-1',
+      })
+    );
+  });
+
+  it('records rejection through decision-key dedup, not leadId + eventType', async () => {
+    mockParseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        status: 'rejected',
+        reason: 'missing_product_capability',
+        capability: 'claim page',
+      },
+    });
+
+    const response = await PATCH(
+      new Request('http://localhost', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'rejected',
+          reason: 'missing_product_capability',
+          capability: 'claim page',
+        }),
+      }) as never,
+      {
+        params: Promise.resolve({ id: 'lead-1' }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockApproveLead).not.toHaveBeenCalled();
+    expect(mockRecordLeadRejectionEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: 'lead-1',
+        rejection: expect.objectContaining({
+          reason: 'missing_product_capability',
+          productGap: true,
+          rebuildEligible: true,
+        }),
       })
     );
   });

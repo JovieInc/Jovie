@@ -135,6 +135,28 @@ if (typeof window !== 'undefined') {
       urlObj.origin === window.location.origin &&
       urlObj.pathname.startsWith('/api/')
     ) {
+      // Auth-backed account stories need a signed-in fixture after the
+      // Better Auth migration; the old Clerk mock no longer supplies it.
+      if (
+        urlObj.pathname === '/api/auth/get-session' &&
+        new URLSearchParams(window.location.search)
+          .get('id')
+          ?.startsWith('organisms-sidebaridentitygroup--')
+      ) {
+        return Response.json({
+          user: {
+            id: 'story-user',
+            name: 'Tim White',
+            email: 'tim@example.com',
+            image: null,
+          },
+          session: {
+            id: 'story-session',
+            userId: 'story-user',
+            expiresAt: '2099-01-01T00:00:00Z',
+          },
+        });
+      }
       return new Response(JSON.stringify({}), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

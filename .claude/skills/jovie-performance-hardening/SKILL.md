@@ -26,6 +26,7 @@ mode: closed-loop
 [8] Subagent roles
 [9] Deliverables
 [10] Stop conditions
+[11] Vercel platform specialization (scanner-only)
 
 ## [0] Mission
 
@@ -491,3 +492,46 @@ When stopping, state clearly:
 - what did not
 - what should be watched in CI
 - what future work is worth a deeper refactor
+
+## [11] Vercel platform specialization (scanner-only)
+
+Folded from the JOV-6188 `vercel-optimize` review. Do not install or run the
+upstream skill, its collectors, or its gate scripts. Coverage map:
+`docs/agent-context/vercel-agent-skills-coverage.md`.
+
+**HARD GATE:** never enable Observability Plus, Speed Insights Plus, Web
+Analytics Plus, Fluid Compute as a paid add-on, BotID, or any other paid
+Vercel product. Those paths are Tim-gated exclusions. If a recommendation
+requires Observability Plus, document the exclusion and stop. Do not wire it
+on. Do not present "Enable Observability Plus and re-run" as an agent action.
+
+### Targeting and credentials
+
+- Require an explicit project and team (`VERCEL_PROJECT_ID` + `VERCEL_ORG_ID`
+  or a reviewed `.vercel/project.json`).
+- Do not infer scope from `vercel whoami`.
+- Never put tokens in shell commands. Never `printenv VERCEL_TOKEN`. Never
+  grep `.env` for tokens.
+- Secret-bound commands stay on Doppler wrappers.
+
+### Investigation scope
+
+- Measure first with Jovie's existing scripts. Do not repo-wide grep for
+  Vercel anti-patterns without a measured bottleneck.
+- Read only files implicated by that bottleneck (candidate-bound).
+- Cost claims use magnitude. Never invent `$N/mo` savings.
+- Always verify a deployment URL when claiming a deploy. Do not skip curl/fetch.
+
+### Traffic-independent hunt extras
+
+Use these only after a baseline exists and only when they can affect every
+request or the build. Re-measure with the same method.
+
+- Production source maps enabled
+- Unoptimized `next/image` on the implicated route
+- Large static assets in `public/`
+- Over-broad middleware matchers
+- `force-dynamic` on routes that can stay static
+
+Route-level Vercel metric gates (slow/uncached/cold-start/error/ISR/CWV)
+remain Tim-gated because they require Observability Plus.

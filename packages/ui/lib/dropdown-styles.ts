@@ -62,10 +62,10 @@ export const OVERLAY_SURFACE_BASE =
 
 /**
  * Tooltip surface — floating elevation (shell remaps --color-bg-tooltip).
- * Radius rules stay on the component (compact pill vs rich rectangle).
+ * Pair the dedicated background and foreground in both themes.
  */
 export const TOOLTIP_SURFACE_BASE =
-  'border border-default bg-surface-tooltip text-primary-token shadow-popover';
+  'border border-default bg-surface-tooltip text-tooltip-foreground shadow-sm';
 
 /**
  * The shared rounded rectangle used by wrapped overlay content.

@@ -17,6 +17,9 @@ export const SUMMER_SAFE_TOOLS = [
   'get_invariant_stewardship',
   'inspect_kanban',
   'search_gbrain',
+  'get_gbrain_page',
+  'record_operational_memory',
+  'coordinate_linear_work',
 ] as const;
 
 export type SummerSafeTool = (typeof SUMMER_SAFE_TOOLS)[number];

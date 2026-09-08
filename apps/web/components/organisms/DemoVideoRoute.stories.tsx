@@ -19,7 +19,7 @@ const meta = {
       routes: ['/demo/video', '/demovideo'],
       source: 'apps/web/components/features/demo/DemoVideoPage.tsx',
       sourceExport: 'DemoVideoPage',
-      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
+      sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1',
       implementation: 'exact-production-component',
     },
     docs: {

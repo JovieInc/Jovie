@@ -202,43 +202,22 @@ cleanup_next_cache() {
   done
 
   if [[ "$force_reset" != "1" ]] && (( total_kib <= max_kib )); then
-    info "Preserved Next cache (${total_kib} KiB <= ${max_kib} KiB limit; set JOVIE_DEV_RESET_NEXT_CACHE=1 to force reset)"
+    info "Preserved Next cache (${total_kib} KiB <= ${max_kib} KiB limit)"
     return 0
   fi
 
-  if [[ "$force_reset" != "1" && "${JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK:-0}" != "1" ]]; then
-    local writers=""
-    if [[ "${JOVIE_SETUP_CACHE_TEST_NO_LSOF:-0}" == "1" ]] || ! command -v lsof >/dev/null 2>&1; then
-      warn "Next cache exceeds ${max_kib} KiB but lsof is unavailable; preserving it because active ownership cannot be proven"
-      return 0
-    fi
-    for path in "${cache_paths[@]}"; do
-      [[ -d "$path" ]] || continue
-      writers+="$(lsof +D "$path" 2>/dev/null | awk 'NR > 1 && $1 ~ /^(node|next|pnpm|turbo|bun|npm|yarn|tsc)/ { print $1 " pid=" $2 }' | sort -u || true)"
-    done
-    if [[ -n "$writers" ]]; then
-      warn "Next cache exceeds ${max_kib} KiB but is owned by an active process; skipping reset"
-      return 0
-    fi
-    if ps -axo command= 2>/dev/null | grep -F "$root" | grep -E 'next dev|next-server|turbo dev|pnpm( run)? dev:web' >/dev/null 2>&1; then
-      warn "Next cache exceeds ${max_kib} KiB but a repo dev process is active; skipping reset"
-      return 0
-    fi
-  fi
-
-  for path in "${cache_paths[@]}"; do
-    [[ -d "$path" ]] || continue
-    is_safe_cache_directory "$root" "$path" || {
-      warn "Preserved Next caches because a path became unsafe: $path"
-      return 0
-    }
-    rm -rf -- "$path"
-  done
+  warn "Cleanup debt: Next cache ${total_kib} KiB (limit ${max_kib} KiB); no verified allocation release, preserved"
   if [[ "$force_reset" == "1" ]]; then
-    success "Cleared current and legacy Next caches (forced reset)"
-  else
-    success "Cleared current and legacy Next caches (${total_kib} KiB exceeded ${max_kib} KiB limit)"
+    warn "JOVIE_DEV_RESET_NEXT_CACHE does not establish allocation release; reset deferred"
   fi
+}
+
+# Setup/start/resume does not establish completion of a previous task. Both
+# normal setup and the isolated cache-only fixture path use this same boundary.
+report_setup_retention() {
+  local root="$1"
+  node "$REPO_ROOT/scripts/local-runtime-retention.mjs" --dry-run --repo-root "$root"
+  node "$REPO_ROOT/scripts/generated-artifact-retention.mjs" --dry-run --repo-root "$root"
 }
 
 if [[ "${JOVIE_SETUP_CACHE_ONLY:-0}" == "1" ]]; then
@@ -272,8 +251,7 @@ if [[ "${JOVIE_SETUP_CACHE_ONLY:-0}" == "1" ]]; then
       exit 2
     fi
   fi
-  node "$REPO_ROOT/scripts/local-runtime-retention.mjs" --apply \
-    --repo-root "$setup_cache_root"
+  report_setup_retention "$setup_cache_root"
   cleanup_next_cache "$setup_cache_root"
   exit 0
 fi
@@ -498,13 +476,10 @@ fi
 # ─── 5.5. Turbopack cache ──────────────────────────────────────────────────
 echo ""
 echo "── Turbopack cache ─────────────────────────────────────────────────"
-node "$REPO_ROOT/scripts/local-runtime-retention.mjs" --apply --repo-root "$REPO_ROOT"
+report_setup_retention "$REPO_ROOT"
 cleanup_next_cache "$REPO_ROOT"
 
-echo ""
-echo "── Generated artifact retention ───────────────────────────────────────"
-node "$REPO_ROOT/scripts/generated-artifact-retention.mjs" --apply --repo-root "$REPO_ROOT"
-success "Applied bounded generated-artifact retention"
+success "Reported retention candidates; no task release inferred from setup"
 
 # ─── 6. Doppler auth / config check ─────────────────────────────────────────
 echo ""

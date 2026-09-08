@@ -8,7 +8,9 @@ const WORKFLOW_EXTENSIONS = new Set(['.yml', '.yaml']);
 const LOCAL_PATH_PREFIXES = ['./', '.github/', 'apps/', 'scripts/'];
 const COMMANDS_WITH_PATH =
   /(?<![-\w])(?:bash|sh|node|python3?|ruby)(?:\s+--[^\s]+)*\s+(['"]?)([^\s'"`;&|)]+)\1/g;
-const FILTER_PATTERN = /--filter(?:=|\s+)([^\s]+)/g;
+const PNPM_COMMAND_PATTERN = /(?:^|[;&|])\s*pnpm\b[^;&|]*/g;
+const YAML_PNPM_COMMAND_PATTERN = /\brun:\s*pnpm\b[^;&|]*/g;
+const FILTER_PATTERN = /--filter(?:=|\s+)([^\s;&|]+)/g;
 const IOS_SCRIPT_PATH_PATTERN =
   /(?:apps\/ios\/scripts|\.github\/scripts)\/[A-Za-z0-9._/-]+\.(?:mjs|js|ts|sh|cjs|rb)\b/g;
 
@@ -118,18 +120,24 @@ export function validateWorkflowReferences(root = process.cwd()) {
         }
       }
 
-      for (const match of line.matchAll(FILTER_PATTERN)) {
-        const filter = match[1].replace(/[),`]+$/, '');
-        if (
-          filter.startsWith('!') ||
-          filter.includes('*') ||
-          filter.includes('${')
-        )
-          continue;
-        if (!workspaceNames.has(filter)) {
-          errors.push(
-            `${relativeWorkflow}:${index + 1}: pnpm workspace filter does not resolve: ${filter}`
-          );
+      const pnpmCommands = [
+        ...line.matchAll(PNPM_COMMAND_PATTERN),
+        ...line.matchAll(YAML_PNPM_COMMAND_PATTERN),
+      ];
+      for (const command of pnpmCommands) {
+        for (const match of command[0].matchAll(FILTER_PATTERN)) {
+          const filter = match[1].replace(/[),`]+$/, '');
+          if (
+            filter.startsWith('!') ||
+            filter.includes('*') ||
+            filter.includes('${')
+          )
+            continue;
+          if (!workspaceNames.has(filter)) {
+            errors.push(
+              `${relativeWorkflow}:${index + 1}: pnpm workspace filter does not resolve: ${filter}`
+            );
+          }
         }
       }
     }

@@ -92,4 +92,9 @@ describe('TableHeaderCell (molecule)', () => {
     expect(header).toHaveClass('text-primary-token');
     expect(header).not.toHaveClass('text-secondary-token');
   });
+
+  it('keeps column heading cells bounded to one line', () => {
+    const { container } = renderCell();
+    expect(container.querySelector('th')).toHaveClass('whitespace-nowrap');
+  });
 });

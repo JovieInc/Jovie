@@ -24,6 +24,7 @@ export type IMessageAdmissionAuthor = {
   readonly id?: string;
   readonly isBot?: boolean;
   readonly phone?: string;
+  readonly userId?: string;
 };
 
 function digits(value: string | undefined): string | undefined {
@@ -34,12 +35,15 @@ function digits(value: string | undefined): string | undefined {
 
 export function admitOvieIMessage(
   author: IMessageAdmissionAuthor | undefined,
-  allowed = parseOvieIMessageAllowedSenders()
+  allowed?: ReadonlySet<string>,
+  rawAllowedSenders?: string
 ): boolean {
-  if (allowed.size === 0) return false;
+  const resolvedAllowed =
+    allowed ?? parseOvieIMessageAllowedSenders(rawAllowedSenders);
+  if (resolvedAllowed.size === 0) return false;
   if (!author || author.isBot) return false;
-  const candidates = [author.phone, author.handle, author.id]
+  const candidates = [author.phone, author.handle, author.id, author.userId]
     .map(digits)
     .filter((value): value is string => Boolean(value));
-  return candidates.some(value => allowed.has(value));
+  return candidates.some(value => resolvedAllowed.has(value));
 }

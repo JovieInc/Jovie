@@ -28,7 +28,7 @@ function renderLogoMark(
   if (mark === 'icon') {
     return (
       <BrandLogo
-        size={size === 'sm' ? 20 : 28}
+        size={size === 'sm' ? 'chrome' : 'control'}
         tone={isLinear ? 'white' : 'auto'}
         className={logoClass}
       />

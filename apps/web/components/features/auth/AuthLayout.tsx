@@ -16,6 +16,7 @@ import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
+import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 import { AuthBrandPanel } from './AuthBrandPanel';
 
@@ -79,20 +80,33 @@ function AuthFormColumn({
 
   return (
     <div
+      data-auth-form-column
       className={cn(
-        'relative flex min-h-0 flex-1 flex-col items-center justify-center px-4 sm:px-8',
+        'relative flex min-h-0 flex-col items-center',
+        isKeyboardVisible &&
+          '[&_[data-auth-shell-identity]]:hidden [&_[data-auth-provider-slots]]:hidden [&_[data-auth-method-divider]]:hidden [&_[data-auth-mode-switch]]:hidden [&_[data-auth-legal-copy]]:hidden',
         className
       )}
     >
-      {showLogo && isSplashB && !isKeyboardVisible ? (
-        <Link
-          href={APP_ROUTES.HOME}
-          className='mb-8 inline-flex size-11 shrink-0 items-center justify-center text-white dark:text-white transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
-          // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
-          aria-label='Go to homepage'
+      {showLogo && isSplashB ? (
+        <div
+          className='mb-4 flex h-8 shrink-0 items-center justify-center'
+          data-auth-splash-logo-slot
         >
-          <BrandLogo size={32} tone='white' aria-hidden />
-        </Link>
+          <Link
+            href={APP_ROUTES.HOME}
+            className={cn(
+              'inline-flex items-center justify-center text-white dark:text-white transition-[color,opacity] duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+              isKeyboardVisible && 'pointer-events-none opacity-0'
+            )}
+            // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
+            aria-label='Go to homepage'
+            aria-hidden={isKeyboardVisible}
+            tabIndex={isKeyboardVisible ? -1 : undefined}
+          >
+            <BrandLogo size={BRAND_MARK_SIZE.splash} tone='white' aria-hidden />
+          </Link>
+        </div>
       ) : null}
 
       {showFormTitle && formTitle ? (
@@ -114,7 +128,9 @@ function AuthFormColumn({
         tabIndex={-1}
         className='w-full scroll-mt-4'
       >
-        <div className='mx-auto w-full max-w-105'>{children}</div>
+        <div className={cn('mx-auto w-full', AUTH_FORM_MAX_WIDTH_CLASS)}>
+          {children}
+        </div>
       </main>
 
       {showFooterPrompt && !isKeyboardVisible ? (
@@ -136,7 +152,10 @@ function SplitLayoutContent(props: AuthLayoutInnerProps) {
   return (
     <div className='relative z-10 flex w-full flex-1 items-stretch justify-center'>
       <div className='grid w-full max-w-360 gap-2 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:items-stretch'>
-        <AuthFormColumn {...props} className='lg:max-w-120 lg:px-10' />
+        <AuthFormColumn
+          {...props}
+          className='flex-1 justify-center lg:max-w-120 lg:px-10'
+        />
 
         {props.showLogo ? (
           <div
@@ -157,7 +176,9 @@ function StackLayoutContent(props: AuthLayoutInnerProps) {
       {...props}
       className={cn(
         AUTH_FORM_MAX_WIDTH_CLASS,
-        props.contentPlacement === 'center' && 'flex-1'
+        props.contentPlacement === 'center'
+          ? 'flex-1 justify-center'
+          : 'justify-start auth-form-stack-offset'
       )}
     />
   );
@@ -215,33 +236,13 @@ export function AuthLayout({
       }
       data-auth-layout-variant={isSplitVariant ? 'split' : 'stack'}
       data-auth-chrome={chrome}
+      data-auth-keyboard-visible={isKeyboardVisible ? '' : undefined}
       className={cn(
         'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white dark:text-white [color-scheme:dark]',
         'bg-(--color-bg-base)',
-        'p-2 sm:p-2',
-        isKeyboardVisible && 'pt-1 pb-1',
-        'pb-[max(0.5rem,env(safe-area-inset-bottom))]',
-        'pl-[max(0.5rem,env(safe-area-inset-left))]',
-        'pr-[max(0.5rem,env(safe-area-inset-right))]',
         'transition-[padding] duration-subtle ease-subtle'
       )}
     >
-      {isSplashB ? null : (
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0 overflow-hidden'
-        >
-          <div className='auth-shell-grain absolute inset-0 opacity-[0.12]' />
-          <div
-            className='absolute inset-0'
-            style={{
-              background:
-                'linear-gradient(180deg, rgba(255,255,255,0.02), transparent 20%, transparent 72%, rgba(0,0,0,0.22))',
-            }}
-          />
-        </div>
-      )}
-
       {showSkipLink ? (
         <Link
           href='#auth-form'
@@ -251,7 +252,7 @@ export function AuthLayout({
         </Link>
       ) : null}
 
-      {showLogo && !isSplashB ? (
+      {showLogo && isSplitVariant ? (
         <div
           className={cn(
             'absolute top-5 left-5 z-50 transition-opacity duration-subtle ease-subtle sm:top-6 sm:left-7 lg:top-7 lg:left-14',
@@ -261,12 +262,12 @@ export function AuthLayout({
         >
           <Link
             href={APP_ROUTES.HOME}
-            className='inline-flex size-11 shrink-0 items-center justify-center text-white/45 dark:text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+            className='inline-flex size-5 shrink-0 items-center justify-center text-white/45 dark:text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
             // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible ? -1 : undefined}
           >
-            <BrandLogo size={18} tone='auto' aria-hidden />
+            <BrandLogo size={BRAND_MARK_SIZE.chrome} tone='auto' aria-hidden />
           </Link>
         </div>
       ) : null}

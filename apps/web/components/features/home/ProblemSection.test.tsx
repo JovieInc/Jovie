@@ -7,12 +7,13 @@ import { ProblemSection } from './ProblemSection';
 describe('ProblemSection', () => {
   it('renders the growth headline', () => {
     render(<ProblemSection />);
-    expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: /Built for growth with discipline/i,
-      })
-    ).toBeInTheDocument();
+    const heading = screen.getByRole('heading', {
+      level: 2,
+      name: /Built for growth with discipline/i,
+    });
+
+    expect(heading).toHaveClass('line-clamp-2');
+    expect(screen.getByText('Clear value. No fluff.')).toBeInTheDocument();
   });
 
   it('uses canonical spacing tokens for the benefit list', () => {

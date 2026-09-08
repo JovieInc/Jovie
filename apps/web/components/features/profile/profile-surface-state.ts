@@ -62,6 +62,57 @@ export interface ProfileSurfaceState {
   };
 }
 
+export const PUBLIC_MUSIC_EMPTY_HEADING = 'No releases listed yet';
+export const PUBLIC_MUSIC_EMPTY_DESCRIPTION =
+  'Get a note when the first release lands.';
+export const PUBLIC_MUSIC_ERROR_HEADING = "Couldn't load releases";
+export const PUBLIC_MUSIC_ERROR_DESCRIPTION = 'Try again in a moment.';
+export const PUBLIC_EVENTS_NO_UPCOMING_HEADING = 'No upcoming shows';
+export const PUBLIC_EVENTS_NO_UPCOMING = `${PUBLIC_EVENTS_NO_UPCOMING_HEADING}.`;
+export const PUBLIC_EVENTS_NO_SURFACE = 'No live shows listed.';
+
+export type PublicMusicSurface =
+  | {
+      readonly kind: 'catalog';
+      readonly visibleReleases: readonly PublicRelease[];
+    }
+  | { readonly kind: 'artist-streaming' }
+  | { readonly kind: 'empty' }
+  | { readonly kind: 'error' };
+
+export function getVisiblePublicReleases(
+  releases: readonly PublicRelease[] | undefined
+): PublicRelease[] {
+  return (releases ?? []).filter(release => Boolean(release.slug));
+}
+
+export function resolvePublicMusicSurface(params: {
+  readonly releases?: readonly PublicRelease[];
+  readonly hasPlayableDestinations: boolean;
+  readonly catalogLoadFailed?: boolean;
+}): PublicMusicSurface {
+  if (params.catalogLoadFailed) {
+    return { kind: 'error' };
+  }
+
+  const visibleReleases = getVisiblePublicReleases(params.releases);
+  if (visibleReleases.length > 0) {
+    return { kind: 'catalog', visibleReleases };
+  }
+
+  if (params.hasPlayableDestinations) {
+    return { kind: 'artist-streaming' };
+  }
+
+  return { kind: 'empty' };
+}
+
+export function shouldOfferPublicEventsDestination(
+  upcomingTourDateCount: number
+): boolean {
+  return upcomingTourDateCount > 0;
+}
+
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
 
@@ -230,17 +281,20 @@ function resolveStatusPill(params: {
 function resolveEmptyState(params: {
   readonly isSubscribed: boolean;
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+  readonly catalogLoadFailed?: boolean;
 }): ProfileSurfaceState['emptyState'] {
-  const { isSubscribed, featuredPlaylistFallback } = params;
+  const { isSubscribed, featuredPlaylistFallback, catalogLoadFailed } = params;
 
   return {
-    release: isSubscribed
-      ? 'New music alerts are on.'
-      : 'Follow for the next release.',
-    tour: 'No upcoming shows.',
+    release: catalogLoadFailed
+      ? `${PUBLIC_MUSIC_ERROR_HEADING}.`
+      : `${PUBLIC_MUSIC_EMPTY_HEADING}.`,
+    tour: PUBLIC_EVENTS_NO_UPCOMING,
     homeProof: featuredPlaylistFallback
       ? 'Featured playlist ready.'
-      : 'Follow for new music and show updates.',
+      : isSubscribed
+        ? 'Updates are on.'
+        : 'Follow for new music and show updates.',
   };
 }
 
@@ -260,6 +314,7 @@ export function resolveProfileSurfaceState(params: {
   readonly viewerCountryCode?: string | null;
   readonly socialLinkLimit?: number;
   readonly now?: Date;
+  readonly catalogLoadFailed?: boolean;
 }): ProfileSurfaceState {
   const {
     artist,
@@ -277,6 +332,7 @@ export function resolveProfileSurfaceState(params: {
     viewerCountryCode,
     socialLinkLimit = 2,
     now,
+    catalogLoadFailed = false,
   } = params;
 
   const rawHeroImageUrl = unwrapNextImageUrl(
@@ -297,7 +353,7 @@ export function resolveProfileSurfaceState(params: {
     releaseVisibility?.show && latestRelease ? latestRelease : null;
   const upcomingTourDates = getUpcomingTourDates(tourDates, now);
   const nextShow = upcomingTourDates[0] ?? null;
-  const visibleReleases = releases.filter(release => Boolean(release.slug));
+  const visibleReleases = getVisiblePublicReleases(releases);
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
   const heroSubtitle = resolveHeroSubtitle(artist, activeSubtitle);
@@ -334,6 +390,7 @@ export function resolveProfileSurfaceState(params: {
     emptyState: resolveEmptyState({
       isSubscribed,
       featuredPlaylistFallback,
+      catalogLoadFailed,
     }),
   };
 }
@@ -345,9 +402,36 @@ export function hasPublicProfileHistoryDestination(params: {
   return params.historyLength > 1 && params.referrer.trim().length > 0;
 }
 
+export function subscribeToPublicProfileHistory() {
+  return () => {};
+}
+
+export function getPublicProfileHistorySnapshot() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+
+  return hasPublicProfileHistoryDestination({
+    historyLength: globalThis.history.length,
+    referrer: document.referrer,
+  });
+}
+
+export function getPublicProfileHistoryServerSnapshot() {
+  return false;
+}
+
+export type PublicProfileBackAction =
+  | 'profile-root'
+  | 'history-back'
+  | 'history-exit'
+  | 'app-fallback'
+  | 'none';
+
 export function shouldShowPublicProfileBackChevron(params: {
   readonly isProfileRoot: boolean;
   readonly hasHistoryDestination: boolean;
+  readonly isSignedIn?: boolean;
   readonly forceHidden?: boolean;
 }): boolean {
   if (params.forceHidden) {
@@ -356,19 +440,81 @@ export function shouldShowPublicProfileBackChevron(params: {
   if (!params.isProfileRoot) {
     return true;
   }
+  if (params.isSignedIn) {
+    return true;
+  }
   return params.hasHistoryDestination;
+}
+
+export const PUBLIC_PROFILE_HISTORY_DEPTH_KEY = 'joviePublicProfileDepth';
+
+export function readPublicProfileHistoryDepth(state: unknown): number {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    return 0;
+  }
+  const depth = Reflect.get(state, PUBLIC_PROFILE_HISTORY_DEPTH_KEY);
+  return typeof depth === 'number' && Number.isFinite(depth) && depth >= 0
+    ? Math.floor(depth)
+    : 0;
+}
+
+export function withPublicProfileHistoryDepth(
+  state: unknown,
+  depth: number
+): Record<string, unknown> {
+  const base =
+    state && typeof state === 'object' && !Array.isArray(state)
+      ? { ...(state as Record<string, unknown>) }
+      : {};
+  return {
+    ...base,
+    [PUBLIC_PROFILE_HISTORY_DEPTH_KEY]: depth,
+  };
+}
+
+export function getPublicProfileHistoryExitDelta(
+  internalHistoryDepth: number
+): number {
+  return -(Math.max(0, internalHistoryDepth) + 1);
+}
+
+function hasInternalPublicProfileHistory(params: {
+  readonly historyLength: number;
+  readonly arrivalHistoryLength?: number;
+  readonly internalHistoryDepth?: number;
+}): boolean {
+  if (params.internalHistoryDepth !== undefined) {
+    return params.internalHistoryDepth > 0;
+  }
+  const arrival = params.arrivalHistoryLength ?? params.historyLength;
+  return params.historyLength > arrival;
 }
 
 export function resolvePublicProfileBackAction(params: {
   readonly isProfileRoot: boolean;
   readonly historyLength: number;
   readonly referrer: string;
-}): 'profile-root' | 'history-back' | 'none' {
+  readonly isSignedIn?: boolean;
+  readonly arrivalHistoryLength?: number;
+  readonly internalHistoryDepth?: number;
+}): PublicProfileBackAction {
   if (!params.isProfileRoot) {
     return 'profile-root';
   }
-  if (hasPublicProfileHistoryDestination(params)) {
-    return 'history-back';
+
+  const arrival = params.arrivalHistoryLength ?? params.historyLength;
+  const hasInternalEntries = hasInternalPublicProfileHistory(params);
+
+  if (params.isSignedIn) {
+    // New-tab / no prior surface: never walk internal mode pushStates.
+    if (arrival <= 1) {
+      return 'app-fallback';
+    }
+    return hasInternalEntries ? 'history-exit' : 'history-back';
   }
-  return 'none';
+
+  if (!hasPublicProfileHistoryDestination(params)) {
+    return 'none';
+  }
+  return hasInternalEntries ? 'history-exit' : 'history-back';
 }

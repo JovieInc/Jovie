@@ -38,7 +38,8 @@ describe('TableIconButton', () => {
     expect(button.className).toContain('overflow-visible');
     expect(button.className).toContain('before:h-11');
     expect(button.className).toContain('before:w-11');
-    expect(button.className).toContain('focus-visible:ring-focus/55');
+    expect(button).toHaveClass('focus-visible:ring-focus');
+    expect(button).not.toHaveClass('focus-visible:ring-focus/55');
     expect(button.className).toContain('hover:bg-interactive-hover');
     expect(button.className).not.toContain('rounded-md');
     expect(button.className).not.toContain('rounded-sm');

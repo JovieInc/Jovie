@@ -32,13 +32,12 @@ export function isAgentBranch(headRef) {
  * @param {{ headRef: string, labels?: string[] }} input
  */
 export function isExemptFromIntegrationTarget({ headRef, labels = [] }) {
-  const normalizedLabels = labels.map(label => label.toLowerCase());
+  void labels; // JOV-INV-028: labels never grant a human-review escape hatch.
   if (headRef.startsWith('hotfix/')) return true;
   if (headRef.startsWith('train/')) return true;
   if (headRef.startsWith(INTEGRATION_BRANCH_PREFIX)) return true;
   if (headRef.startsWith('dependabot/')) return true;
   if (headRef.startsWith('screenshots/')) return true;
-  if (normalizedLabels.includes('needs-human')) return true;
   return false;
 }
 
@@ -113,7 +112,7 @@ export function evaluateCiBranching({
   const message = [
     `Agent branch "${headRef}" targets main.`,
     `Retarget to ${recommended} via scripts/loop-integration-ship.sh,`,
-    'or add needs-human / use hotfix/* for production incidents.',
+    'or use hotfix/* for production incidents.',
     'See .claude/rules/ci-branching.md.',
   ].join(' ');
 

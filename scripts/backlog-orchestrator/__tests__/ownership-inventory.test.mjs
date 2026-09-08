@@ -7,8 +7,11 @@ import {
   ADMISSION_TARGET_FIELDS,
   admissionTargetsCollide,
   authoritativeBehaviorOwners,
+  collisionDomainsForPaths,
+  laneForArtifact,
   loadOwnershipInventory,
   resolveAdmissionTarget,
+  resourceForArtifact,
 } from '../ownership-inventory.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { planEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
@@ -26,6 +29,20 @@ Keep repository-aware admission in scripts/backlog-orchestrator/admission-gate.m
 ## Optimization exception
 - Class: non-product
 - Justification: This control-plane ownership adapter ships no user-facing page, link, asset, campaign, recommendation, or content variant.
+
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
 
 ## Acceptance criteria
 * New packets name target fields.`,
@@ -47,6 +64,20 @@ function summerOnlyIssue() {
     title: 'Update Summer bottleneck policy',
     description: `## Proposed fix
 Change the Summer runtime manifest in JovieInc/summer-config. No Jovie product files change.
+
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
 
 ## Acceptance criteria
 * Summer policy updates without a Jovie PR.`,
@@ -221,6 +252,23 @@ Change JovieInc/LogYourBody.
     assert.equal(admissionTargetsCollide(jovieWeb, jovieWebPeer), true);
     assert.equal(admissionTargetsCollide(jovieWeb, logYourBody), false);
     assert.ok(jovieWeb.collision_domains.length > 0);
+  });
+
+  it('adds lane and exact-resource domains without treating every workflow as control-plane risk', () => {
+    assert.equal(laneForArtifact('apps/ios/App/AppDelegate.swift'), 'ios');
+    assert.equal(laneForArtifact('apps/web/app/page.tsx'), 'web');
+    assert.equal(
+      resourceForArtifact('.github/workflows/ios-testflight.yml'),
+      'github-actions:ios-testflight'
+    );
+    assert.deepEqual(
+      collisionDomainsForPaths(['.github/workflows/ios-testflight.yml']),
+      [
+        'artifact:JovieInc/Jovie:.github/workflows',
+        'lane:JovieInc/Jovie:ios',
+        'resource:JovieInc/Jovie:github-actions:ios-testflight',
+      ]
+    );
   });
 
   it('keeps LYB packets on LogYourBody', () => {

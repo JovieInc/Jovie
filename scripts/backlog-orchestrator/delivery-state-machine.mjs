@@ -10,9 +10,21 @@
  * existing guarded controllers.
  */
 
-import { createHash } from 'node:crypto';
-import { mkdir, open, readFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  link,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  rename,
+  unlink,
+} from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import {
+  policyDigest,
+  readPrLifecycleContract,
+} from '../invariants/pr-lifecycle-contract.mjs';
 import {
   FX_BACKSTOP_FAILURES,
   fxBackstopRoute,
@@ -31,11 +43,18 @@ import {
 export const DELIVERY_RECEIPT_SCHEMA = 'jovie-delivery-receipt/v1';
 export const REPAIR_TASK_SCHEMA = 'jovie-symphony-repair-task/v1';
 export const STACK_HEALTH_ACTION_SCHEMA = 'jovie-stack-health-action/v1';
+export const PR_LIFECYCLE_ACTION_SCHEMA = 'jovie-pr-lifecycle-action/v1';
 export const STACK_REPAIR_ACTION = 'split-or-retarget-draft-stack'; // JOV-INV-020
+export const PR_LIFECYCLE_CONTRACT_ID = 'JOV-INV-029';
+export const PR_LIFECYCLE_POLICY_DIGEST = policyDigest(
+  readPrLifecycleContract()
+);
 export const DEFAULT_DELIVERY_STATE_DIR = resolve(
   process.env.GEM_WORKSPACE || '/home/timwhite/gem-workspace',
   'state/jovie-delivery-controller'
 );
+export const DEFAULT_DELIVERY_REPOSITORY =
+  process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 
 const AUTOMATED_FAILURES = Object.freeze({
   'workflow-cancelled': {
@@ -95,12 +114,40 @@ const NON_AUTHORITATIVE_CLOSURE_REASONS = new Set([
   'gate-evaluation-failed',
 ]);
 
+const LIFECYCLE_DISPOSITIONS = new Set(['active-remediation', 'terminal']);
+const LIFECYCLE_OWNERS = new Set([
+  'controller',
+  'gem',
+  'github-native-merge-queue',
+  'symphony',
+]);
+
 function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
+function canonicalDigest(value) {
+  const canonicalize = candidate => {
+    if (Array.isArray(candidate)) return candidate.map(canonicalize);
+    if (!candidate || typeof candidate !== 'object') return candidate;
+    return Object.fromEntries(
+      Object.keys(candidate)
+        .sort()
+        .map(key => [key, canonicalize(candidate[key])])
+    );
+  };
+  return digest(canonicalize(value));
+}
+
 function nonEmpty(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function repositoryName(value) {
+  const normalized = nonEmpty(value);
+  return normalized && /^[^/\s]+\/[^/\s]+$/.test(normalized)
+    ? normalized
+    : null;
 }
 
 function exactSha(value) {
@@ -110,6 +157,261 @@ function exactSha(value) {
 
 function exactPositiveInteger(value) {
   return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function lifecycleActionIdentity(action) {
+  const identity = {
+    repository: action.repository,
+    inventoryIndex: action.inventoryIndex,
+    pr: action.pr,
+    headSha: action.headSha,
+    issue: action.issue,
+    disposition: action.disposition,
+    sourceState: action.sourceState,
+    owner: action.owner,
+    writer: action.writer,
+    action: action.action,
+    reason: action.reason,
+    terminal: action.terminal,
+  };
+  if (action.pr) delete identity.inventoryIndex;
+  return identity;
+}
+
+function boundedLifecycleAction(action, repository) {
+  if (!action || typeof action !== 'object' || Array.isArray(action)) {
+    throw new Error('PR lifecycle action must be an object');
+  }
+  if (action.schema !== PR_LIFECYCLE_ACTION_SCHEMA) {
+    throw new Error('PR lifecycle action schema is invalid');
+  }
+  const actionRepository = repositoryName(action.repository);
+  if (!actionRepository || actionRepository !== repository) {
+    throw new Error('PR lifecycle action repository is invalid');
+  }
+  const inventoryIndex = action.inventoryIndex;
+  if (
+    !Number.isInteger(inventoryIndex) ||
+    inventoryIndex < 0 ||
+    inventoryIndex > 10_000
+  ) {
+    throw new Error('PR lifecycle action inventory index is invalid');
+  }
+  const pr = exactPositiveInteger(action.pr);
+  const sourceState = nonEmpty(action.sourceState);
+  if (!pr && sourceState !== 'unclassified') {
+    throw new Error('PR lifecycle action requires a PR number');
+  }
+  const headSha = exactSha(action.headSha);
+  if (!headSha && sourceState !== 'unclassified') {
+    throw new Error('PR lifecycle action requires an exact head SHA');
+  }
+  const lifecycleKey = nonEmpty(action.lifecycleKey);
+  const expectedLifecycleKey = pr
+    ? `${repository}:pr:${pr}`
+    : `${repository}:inventory-row:${inventoryIndex}`;
+  if (lifecycleKey !== expectedLifecycleKey || lifecycleKey.length > 180) {
+    throw new Error('PR lifecycle action key is invalid');
+  }
+  const actionKey = nonEmpty(action.actionKey)?.toLowerCase();
+  if (!actionKey || !/^[0-9a-f]{64}$/i.test(actionKey)) {
+    throw new Error('PR lifecycle action requires a SHA-256 action key');
+  }
+  const disposition = nonEmpty(action.disposition);
+  const owner = nonEmpty(action.owner);
+  const writer = nonEmpty(action.writer);
+  const nextAction = nonEmpty(action.action);
+  const reason = nonEmpty(action.reason);
+  if (!LIFECYCLE_DISPOSITIONS.has(disposition)) {
+    throw new Error('PR lifecycle disposition is invalid');
+  }
+  if (!LIFECYCLE_OWNERS.has(owner) || writer !== owner) {
+    throw new Error('PR lifecycle action requires one machine owner/writer');
+  }
+  if (
+    !nextAction ||
+    nextAction.length > 160 ||
+    !reason ||
+    reason.length > 240
+  ) {
+    throw new Error('PR lifecycle action route is invalid');
+  }
+  if (action.terminal !== (disposition === 'terminal')) {
+    throw new Error('PR lifecycle terminal state is inconsistent');
+  }
+  if (action.externalMutations !== 0) {
+    throw new Error('PR lifecycle ingress cannot mutate external state');
+  }
+  if (
+    sourceState === 'queued' &&
+    (owner !== 'github-native-merge-queue' ||
+      nextAction !== 'preserve-native-queue-ownership')
+  ) {
+    throw new Error(
+      'queued PR lifecycle action must preserve native queue ownership'
+    );
+  }
+  if (
+    sourceState === 'promote' &&
+    (owner !== 'gem' || nextAction !== 'reconcile-exact-head-queue-admission')
+  ) {
+    throw new Error('promotable PR lifecycle action must remain Gem-owned');
+  }
+  if (
+    pr === 17156 &&
+    (disposition !== 'terminal' ||
+      owner !== 'gem' ||
+      nextAction !== 'preserve-protected-pr-exclusion')
+  ) {
+    throw new Error('protected PR 17156 lifecycle exclusion is invalid');
+  }
+  const observedAt = nonEmpty(action.observedAt);
+  if (!observedAt || !Number.isFinite(Date.parse(observedAt))) {
+    throw new Error('PR lifecycle action observedAt is invalid');
+  }
+  const bounded = {
+    ...action,
+    repository,
+    inventoryIndex,
+    pr,
+    headSha,
+    issue: nonEmpty(action.issue),
+    sourceState,
+    lifecycleKey,
+    actionKey,
+    disposition,
+    owner,
+    writer,
+    action: nextAction,
+    reason,
+    observedAt: new Date(observedAt).toISOString(),
+  };
+  if (actionKey !== canonicalDigest(lifecycleActionIdentity(bounded))) {
+    throw new Error('PR lifecycle action key does not match its content');
+  }
+  return bounded;
+}
+
+async function quarantineLifecycleReceipt(directory, name) {
+  const source = join(directory, name);
+  const quarantineDirectory = join(directory, 'quarantine');
+  await mkdir(quarantineDirectory, { recursive: true, mode: 0o700 });
+  const destination = join(
+    quarantineDirectory,
+    `${name}.${Date.now()}-${randomUUID()}.malformed`
+  );
+  try {
+    await rename(source, destination);
+    return destination;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+async function loadLifecycleActions(stateDir) {
+  const directory = join(stateDir, 'pr-lifecycle-actions');
+  let names;
+  try {
+    names = await readdir(directory);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+  const records = [];
+  for (const name of names.filter(name => name.endsWith('.json')).sort()) {
+    try {
+      const record = JSON.parse(await readFile(join(directory, name), 'utf8'));
+      if (record?.schema !== 'jovie-pr-lifecycle-action-receipt/v1') {
+        throw new Error('persisted PR lifecycle action schema is malformed');
+      }
+      boundedLifecycleAction(
+        { ...record, schema: PR_LIFECYCLE_ACTION_SCHEMA },
+        repositoryName(record.repository)
+      );
+      if (
+        !Number.isInteger(record.generation) ||
+        record.generation < 0 ||
+        (record.supersedesActionKey !== null &&
+          !/^[0-9a-f]{64}$/.test(record.supersedesActionKey)) ||
+        record.outcome !== (record.terminal ? 'terminal' : 'open') ||
+        (record.terminal
+          ? record.nextProofAt !== null
+          : !Number.isFinite(Date.parse(record.nextProofAt)))
+      ) {
+        throw new Error('persisted PR lifecycle action metadata is malformed');
+      }
+      records.push(record);
+    } catch {
+      await quarantineLifecycleReceipt(directory, name);
+    }
+  }
+  return records;
+}
+
+async function persistLifecycleAction(action, { stateDir, dryRun }) {
+  const records = dryRun ? [] : await loadLifecycleActions(stateDir);
+  const previous = records
+    .filter(record => record.lifecycleKey === action.lifecycleKey)
+    .sort((left, right) => {
+      const observed = `${right.observedAt}`.localeCompare(
+        `${left.observedAt}`
+      );
+      return (
+        observed || Number(right.generation || 0) - Number(left.generation || 0)
+      );
+    })[0];
+  if (
+    previous &&
+    Date.parse(previous.observedAt) > Date.parse(action.observedAt)
+  ) {
+    throw new Error('PR lifecycle action is older than persisted authority');
+  }
+  if (
+    previous &&
+    previous.observedAt === action.observedAt &&
+    previous.actionKey !== action.actionKey
+  ) {
+    throw new Error(
+      'PR lifecycle action conflicts at the same observation time'
+    );
+  }
+  const receipt = {
+    ...action,
+    schema: 'jovie-pr-lifecycle-action-receipt/v1',
+    generation:
+      previous?.actionKey === action.actionKey
+        ? Number(previous.generation || 0)
+        : Number(previous?.generation ?? -1) + 1,
+    supersedesActionKey:
+      previous && previous.actionKey !== action.actionKey
+        ? previous.actionKey
+        : null,
+    outcome: action.terminal ? 'terminal' : 'open',
+    nextProofAt: action.terminal
+      ? null
+      : new Date(Date.parse(action.observedAt) + 10 * 60 * 1000).toISOString(),
+  };
+  const destination = join(
+    stateDir,
+    'pr-lifecycle-actions',
+    `${action.actionKey}.json`
+  );
+  if (dryRun) {
+    return { status: 'dry-run', receipt, path: destination };
+  }
+  const persisted = await atomicPersist(destination, receipt);
+  if (
+    persisted.value.actionKey !== action.actionKey ||
+    persisted.value.lifecycleKey !== action.lifecycleKey
+  ) {
+    throw new Error('PR lifecycle action key collision');
+  }
+  return {
+    status: persisted.status,
+    receipt: persisted.value,
+    path: destination,
+  };
 }
 
 function boundedStackHealthAction(action) {
@@ -138,6 +440,12 @@ function boundedStackHealthAction(action) {
   }
   if (action.owner !== 'symphony' || action.writer !== 'symphony') {
     throw new Error('stack health repair action must remain Symphony-owned');
+  }
+  const repository = repositoryName(action.repository);
+  if (!repository) {
+    throw new Error(
+      'stack health repair action requires repository owner/name'
+    );
   }
   const rootPr = exactPositiveInteger(action.rootPr);
   const rootHeadSha = exactSha(action.rootHeadSha);
@@ -253,6 +561,7 @@ function boundedStackHealthAction(action) {
   }
   return {
     schema: STACK_HEALTH_ACTION_SCHEMA,
+    repository,
     taskKey,
     deliveryKey,
     action: STACK_REPAIR_ACTION,
@@ -309,12 +618,21 @@ export function normalizeDeliveryEvent(raw = {}) {
   const headSha = exactSha(
     payload.head_sha ?? payload.head ?? workflow.head_sha
   );
+  const repository =
+    repositoryName(payload.repository) ||
+    repositoryName(raw.repository?.full_name) ||
+    repositoryName(raw.repository) ||
+    repositoryName(DEFAULT_DELIVERY_REPOSITORY);
+  if (!repository) {
+    throw new Error('delivery event requires repository owner/name');
+  }
   const deliveryKey =
     nonEmpty(payload.delivery_key) ||
     nonEmpty(payload.event_id) ||
     nonEmpty(raw.delivery_id) ||
     nonEmpty(workflow.id && String(workflow.id)) ||
     digest({
+      repository,
       workflow: nonEmpty(workflow.name),
       status: nonEmpty(workflow.status),
       conclusion: nonEmpty(workflow.conclusion),
@@ -329,6 +647,7 @@ export function normalizeDeliveryEvent(raw = {}) {
     );
   }
   return {
+    repository,
     deliveryKey,
     source: nonEmpty(payload.source) || (workflow.id ? 'github' : 'linear'),
     event: nonEmpty(payload.event) || nonEmpty(raw.action) || 'changed',
@@ -361,7 +680,17 @@ export function buildDeliveryReceipt(
     : 'received';
   return {
     schema: DELIVERY_RECEIPT_SCHEMA,
-    receiptKey: digest({ deliveryKey: event.deliveryKey, failure, stage }),
+    policy: {
+      id: PR_LIFECYCLE_CONTRACT_ID,
+      schema: 'jovie-pr-lifecycle/v1',
+      digest: PR_LIFECYCLE_POLICY_DIGEST,
+    },
+    receiptKey: digest({
+      repository: event.repository,
+      deliveryKey: event.deliveryKey,
+      failure,
+      stage,
+    }),
     observedAt: now,
     stage,
     terminal: stage === 'external-blocked',
@@ -427,11 +756,17 @@ export function transitionDeliveryReceipt(
   }
   return {
     ...receipt,
+    policy: receipt.policy || {
+      id: PR_LIFECYCLE_CONTRACT_ID,
+      schema: 'jovie-pr-lifecycle/v1',
+      digest: PR_LIFECYCLE_POLICY_DIGEST,
+    },
     observedAt: now,
     stage,
     terminal: stage === 'external-blocked' || stage === 'production-proven',
     previousReceiptKey: receipt.receiptKey,
     receiptKey: digest({
+      repository: receipt.event.repository,
       receiptKey: receipt.receiptKey,
       stage,
       failure: transition.failure || null,
@@ -458,7 +793,12 @@ export function repairTaskForReceipt(receipt) {
       : null;
   return {
     schema: REPAIR_TASK_SCHEMA,
-    taskKey: digest({ receiptKey: receipt.receiptKey, route: receipt.next }),
+    repository: receipt.event.repository,
+    taskKey: digest({
+      repository: receipt.event.repository,
+      receiptKey: receipt.receiptKey,
+      route: receipt.next,
+    }),
     createdAt: receipt.observedAt,
     receiptKey: receipt.receiptKey,
     owner: receipt.next.owner,
@@ -481,6 +821,7 @@ export function buildStackHealthReceipt(
   return buildDeliveryReceipt(
     {
       delivery_key: evidence.deliveryKey,
+      repository: evidence.repository,
       source: 'summer-closure-health',
       event: 'draft-stack-policy',
       failure: 'draft-stack-policy',
@@ -494,14 +835,18 @@ export function buildStackHealthReceipt(
 }
 
 async function atomicPersist(destination, value) {
-  await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+  const directory = dirname(destination);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const temporary = join(directory, `.${randomUUID()}.tmp`);
   try {
-    const handle = await open(destination, 'wx', 0o600);
+    const handle = await open(temporary, 'wx', 0o600);
     try {
       await handle.writeFile(`${JSON.stringify(value)}\n`, 'utf8');
+      await handle.sync();
     } finally {
       await handle.close();
     }
+    await link(temporary, destination);
     return { status: 'created', path: destination, value };
   } catch (error) {
     if (error?.code !== 'EEXIST') throw error;
@@ -510,6 +855,10 @@ async function atomicPersist(destination, value) {
       path: destination,
       value: JSON.parse(await readFile(destination, 'utf8')),
     };
+  } finally {
+    await unlink(temporary).catch(error => {
+      if (error?.code !== 'ENOENT') throw error;
+    });
   }
 }
 
@@ -578,6 +927,35 @@ export async function persistClosureHealthActions(
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
     throw new Error('closure health action source is missing or malformed');
   }
+  const repository =
+    repositoryName(candidate.repository) || DEFAULT_DELIVERY_REPOSITORY;
+  const rawLifecycleActions = candidate.lifecycleActions;
+  if (
+    rawLifecycleActions != null &&
+    (!Array.isArray(rawLifecycleActions) || rawLifecycleActions.length > 500)
+  ) {
+    throw new Error('PR lifecycle actions are missing or unbounded');
+  }
+  const lifecycleRows = Array.isArray(rawLifecycleActions)
+    ? rawLifecycleActions
+    : [];
+  const seenLifecycleKeys = new Set();
+  const boundedLifecycleRows = lifecycleRows.map((action, index) => {
+    try {
+      const bounded = boundedLifecycleAction(action, repository);
+      if (seenLifecycleKeys.has(bounded.lifecycleKey)) {
+        throw new Error('duplicate PR lifecycle action');
+      }
+      seenLifecycleKeys.add(bounded.lifecycleKey);
+      return { index, action: bounded, error: null };
+    } catch (error) {
+      return {
+        index,
+        action: null,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
   const rawActions = candidate.repairActions;
   if (
     rawActions != null &&
@@ -645,11 +1023,47 @@ export async function persistClosureHealthActions(
         })
       );
     }
+    const lifecycle = [];
+    for (const row of boundedLifecycleRows) {
+      if (row.error) {
+        lifecycle.push({
+          status: 'rejected',
+          inventoryIndex: row.index,
+          reason: row.error,
+        });
+        continue;
+      }
+      try {
+        const persisted = await persistLifecycleAction(row.action, {
+          stateDir,
+          dryRun,
+        });
+        lifecycle.push({
+          status: persisted.status,
+          inventoryIndex: row.action.inventoryIndex,
+          pr: row.action.pr,
+          headSha: row.action.headSha,
+          owner: row.action.owner,
+          disposition: row.action.disposition,
+          action: row.action.action,
+          receipt: persisted.receipt,
+          path: persisted.path,
+        });
+      } catch (error) {
+        lifecycle.push({
+          status: 'rejected',
+          inventoryIndex: row.index,
+          pr: row.action.pr,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
     const evidence = [];
     for (const rootPr of activeViolationRoots || []) {
       if (roots.has(rootPr)) continue;
       const record = classifyAndOpenFromDelivery(
         {
+          repository,
           delivery_key: `closure-stack-evidence:${rootPr}`,
           failure: 'not-proven',
           proven: false,
@@ -683,22 +1097,35 @@ export async function persistClosureHealthActions(
         now: observedAt,
         queueLockHeld,
         draftStackAuthority,
+        repository,
       }
     );
-    const statuses = [...results, ...evidence].map(result => result.status);
+    const rejectedLifecycle = lifecycle.filter(
+      result => result.status === 'rejected'
+    );
+    const statuses = [
+      ...results,
+      ...evidence,
+      ...lifecycle.filter(result => result.status !== 'rejected'),
+    ].map(result => result.status);
     return {
       schema: 'jovie-stack-health-action-ingress/v1',
       observedAt,
       actionCount: results.length,
       evidenceCount: evidence.length,
+      lifecycleActionCount: lifecycle.length - rejectedLifecycle.length,
+      lifecycleRejectedCount: rejectedLifecycle.length,
+      failClosed: rejectedLifecycle.length > 0,
       status:
-        statuses.length === 0
-          ? resolution.status === 'resolved'
-            ? 'resolved'
-            : 'none'
-          : statuses.every(status => status === 'duplicate')
-            ? 'duplicate'
-            : 'created',
+        rejectedLifecycle.length > 0
+          ? 'partial'
+          : statuses.length === 0
+            ? resolution.status === 'resolved'
+              ? 'resolved'
+              : 'none'
+            : statuses.every(status => status === 'duplicate')
+              ? 'duplicate'
+              : 'created',
       resolution,
       actions: results.map(result => ({
         status: result.status,
@@ -715,20 +1142,22 @@ export async function persistClosureHealthActions(
         taskPath: result.evidencePath,
         loop: result.record,
       })),
+      lifecycleActions: lifecycle,
     };
   };
-  if (activeViolationRoots == null || dryRun) return persistSnapshot(false);
-  const watermark = {
-    schema: 'jovie-draft-stack-authority/v1',
-    observedAt,
-    snapshotKey: digest({
-      observedAt,
-      reasons: [...candidate.reasons].sort(),
-      roots: [...activeViolationRoots].sort((a, b) => a - b),
-      actions: boundedActions.map(action => action.taskKey).sort(),
-    }),
-  };
+  if (dryRun) return persistSnapshot(false);
   return withSummerQueueLock(stateDir, async () => {
+    if (activeViolationRoots == null) return persistSnapshot(true);
+    const watermark = {
+      schema: 'jovie-draft-stack-authority/v1',
+      observedAt,
+      snapshotKey: digest({
+        observedAt,
+        reasons: [...candidate.reasons].sort(),
+        roots: [...activeViolationRoots].sort((a, b) => a - b),
+        actions: boundedActions.map(action => action.taskKey).sort(),
+      }),
+    };
     const current = (await readSummerQueue(stateDir))?.draftStackAuthority;
     if (
       current &&
@@ -745,8 +1174,12 @@ export async function persistClosureHealthActions(
         status: 'stale',
         actionCount: 0,
         evidenceCount: 0,
+        lifecycleActionCount: 0,
+        lifecycleRejectedCount: 0,
+        failClosed: false,
         actions: [],
         evidence: [],
+        lifecycleActions: [],
       };
     }
     if (
@@ -766,6 +1199,8 @@ export function attestGemService(
   { sourceSha, installedSha, configSha, loadedConfigSha, active, healthy },
   options = {}
 ) {
+  const repository =
+    repositoryName(options.repository) || DEFAULT_DELIVERY_REPOSITORY;
   const mismatch =
     !exactSha(sourceSha) ||
     sourceSha !== installedSha ||
@@ -777,6 +1212,7 @@ export function attestGemService(
     mismatch
       ? {
           delivery_key: `gem-service:${sourceSha || 'unknown'}:${installedSha || 'unknown'}:${loadedConfigSha || 'unknown'}`,
+          repository,
           source: 'gem',
           event: 'service-attestation',
           failure: 'stale-config',
@@ -791,6 +1227,7 @@ export function attestGemService(
         }
       : {
           delivery_key: `gem-service:${sourceSha}:${configSha}`,
+          repository,
           source: 'gem',
           event: 'service-attestation',
           evidence: {
@@ -815,6 +1252,8 @@ export function reconcileDeliveryHeartbeat(
   heartbeat,
   { now = new Date().toISOString(), maxAgeMs = 15 * 60 * 1000 } = {}
 ) {
+  const repository =
+    repositoryName(heartbeat?.repository) || DEFAULT_DELIVERY_REPOSITORY;
   const observedAt = nonEmpty(heartbeat?.observedAt);
   const ageMs = observedAt
     ? Date.parse(now) - Date.parse(observedAt)
@@ -825,6 +1264,7 @@ export function reconcileDeliveryHeartbeat(
     stale
       ? {
           delivery_key: `heartbeat-reconcile:${window}`,
+          repository,
           source: 'gem',
           event: 'reconciliation',
           failure: 'missing-trigger',
@@ -836,6 +1276,7 @@ export function reconcileDeliveryHeartbeat(
         }
       : {
           delivery_key: `heartbeat-reconcile:${window}`,
+          repository,
           source: 'gem',
           event: 'reconciliation',
           evidence: { observedAt, ageMs, maxAgeMs },
@@ -871,9 +1312,12 @@ async function main() {
   }
   if (closureHealthFile) {
     const closureHealth = JSON.parse(await readFile(closureHealthFile, 'utf8'));
-    process.stdout.write(
-      `${JSON.stringify(await persistClosureHealthActions(closureHealth, { stateDir, dryRun: process.argv.includes('--dry-run') }))}\n`
-    );
+    const result = await persistClosureHealthActions(closureHealth, {
+      stateDir,
+      dryRun: process.argv.includes('--dry-run'),
+    });
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (result.failClosed) process.exitCode = 1;
     return;
   }
   let heartbeat = null;

@@ -349,6 +349,33 @@ describe('buildPublicProfileMetadata', () => {
     expect(robots).toMatchObject({ index: false, follow: false });
   });
 
+  it('sets noindex for a claimed profile with a Clerk-test machine handle (JOV-6126)', () => {
+    const meta = buildPublicProfileMetadata({
+      profile: {
+        ...minimalProfile,
+        username: 'tmoc0g1x9dwmk71',
+        username_normalized: 'tmoc0g1x9dwmk71',
+      },
+      genres: null,
+      isClaimed: true,
+    });
+    const robots = meta.robots as Record<string, unknown>;
+    expect(robots).toMatchObject({ index: false, follow: false });
+  });
+
+  it('sets noindex for a claimed profile with a Clerk-test display name even on a clean handle (JOV-6126)', () => {
+    const meta = buildPublicProfileMetadata({
+      profile: {
+        ...minimalProfile,
+        display_name: 'gp moc+clerk test',
+      },
+      genres: null,
+      isClaimed: true,
+    });
+    const robots = meta.robots as Record<string, unknown>;
+    expect(robots).toMatchObject({ index: false, follow: false });
+  });
+
   it('includes genre keywords in keywords array', () => {
     const meta = buildPublicProfileMetadata({
       profile: minimalProfile,

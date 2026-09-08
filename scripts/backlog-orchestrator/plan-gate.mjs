@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy formatting while adding bounded evidence.
 /**
  * Canonical plan approval boundary for the Jovie backlog control plane.
  *
@@ -10,7 +11,10 @@
 
 import { createHash } from 'node:crypto';
 import { validateOptimizationContract } from '../invariants/optimization-contract.mjs';
-import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import {
+  hasProtectedAdmissionLabel,
+  isFounderSteeringAssignee,
+} from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
 import {
   admissionTargetPacket,
@@ -28,7 +32,6 @@ const ALLOWED_STATES = new Set(['Triage', 'Backlog', 'Todo']);
 const CREDENTIAL_PATTERN =
   /credential|secret|password|api[ -]?key|access token|private key/i;
 const SYNTHETIC_PATTERN = /synthetic|bundle|workstream|batch|epic-only/i;
-const TIM_PATTERN = /tim(?:\s|-|_)*white|itstimwhite|^tim$/i;
 const REPO_BY_TEAM = Object.freeze({
   JOV: 'JovieInc/Jovie',
   LYB: 'JovieInc/LogYourBody',
@@ -77,12 +80,80 @@ function nonEmptyList(value) {
   );
 }
 
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  if (!assignee) return false;
-  return TIM_PATTERN.test(
-    `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''} ${assignee.displayName || ''}`
+const VALUE_AUTHORITIES = new Set(['founder-request', 'summer-priority']);
+
+function operatingSanity(value) {
+  const input = value?.sanity;
+  if (
+    !input ||
+    !Number.isInteger(input.concurrency) ||
+    input.concurrency < 1 ||
+    !Number.isFinite(input.demandPerDay) ||
+    input.demandPerDay < 0 ||
+    !['measured', 'assumption'].includes(input.basis) ||
+    !Array.isArray(input.criticalPath) ||
+    input.criticalPath.length === 0 ||
+    input.criticalPath.some(
+      stage =>
+        !nonEmptyString(stage?.stage) ||
+        !Number.isFinite(stage?.durationMs) ||
+        stage.durationMs < 0
+    ) ||
+    !nonEmptyString(input.bottleneck) ||
+    !nonEmptyString(input.simplification) ||
+    !nonEmptyString(input.owner)
+  )
+    return null;
+  const criticalPath = input.criticalPath.map(stage => ({
+    stage: stage.stage.trim(),
+    durationMs: stage.durationMs,
+  }));
+  const expectedLeadTimeMs = criticalPath.reduce(
+    (total, stage) => total + stage.durationMs,
+    0
   );
+  return {
+    basis: input.basis,
+    concurrency: input.concurrency,
+    demandPerDay: input.demandPerDay,
+    criticalPath,
+    expectedLeadTimeMs,
+    achievablePerDay:
+      expectedLeadTimeMs === 0
+        ? null
+        : (86_400_000 * input.concurrency) / expectedLeadTimeMs,
+    bottleneck: input.bottleneck.trim(),
+    simplification: input.simplification.trim(),
+    owner: input.owner.trim(),
+  };
+}
+
+function normalizedValue(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const required = [
+    'authority',
+    'decisionId',
+    'rationale',
+    'expectedBenefit',
+    'validation',
+  ];
+  if (
+    !VALUE_AUTHORITIES.has(value.authority) ||
+    required.slice(1).some(field => !nonEmptyString(value[field]))
+  )
+    return null;
+  return {
+    authority: value.authority,
+    decisionId: value.decisionId.trim(),
+    rationale: value.rationale.trim(),
+    expectedBenefit: value.expectedBenefit.trim(),
+    validation: value.validation.trim(),
+    ...Object.fromEntries(
+      ['customerSignal', 'dependencies', 'cost', 'timebox']
+        .filter(field => nonEmptyString(value[field]))
+        .map(field => [field, value[field].trim()])
+    ),
+  };
 }
 
 function hasActivePullRequest(issue) {
@@ -120,6 +191,10 @@ export function validatePlanCandidate(issue, evidence) {
       : !nonEmptyString(value)
   );
   if (missing) return `missing-${missing[0]}-evidence`;
+  if (!normalizedValue(evidence.value))
+    return 'value-justification-missing-or-invalid';
+  if (!operatingSanity(evidence.value))
+    return 'operating-sanity-missing-or-invalid';
 
   if (
     evidence.owners?.implementation !== 'Symphony' ||
@@ -131,12 +206,13 @@ export function validatePlanCandidate(issue, evidence) {
   if (!ALLOWED_STATES.has(state)) return 'ambiguous-or-inactive-state';
   if (['Done', 'Canceled', 'Cancelled', 'Closed'].includes(state))
     return 'closed-issue';
-  if (isTimOwned(issue)) return 'tim-owned';
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
+    return 'already-assigned';
   if (
     hasProtectedAdmissionLabel(issue) ||
     labelsOf(issue).includes('synthetic')
   )
-    return 'protected-or-human-review';
+    return 'protected-policy';
   if (
     SYNTHETIC_PATTERN.test(`${labelsOf(issue).join(' ')} ${issueText(issue)}`)
   )
@@ -181,6 +257,10 @@ function normalizedEvidence(evidence) {
       ? evidence.test.map(item => item.trim())
       : [evidence.test.trim()],
     rollback: evidence.rollback.trim(),
+    value: {
+      ...normalizedValue(evidence.value),
+      sanity: operatingSanity(evidence.value),
+    },
     ...(evidence.optimization ? { optimization: evidence.optimization } : {}),
     ...(target ? { target } : {}),
   });

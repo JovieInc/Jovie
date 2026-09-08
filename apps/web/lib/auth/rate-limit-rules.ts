@@ -11,7 +11,7 @@ import { env } from '@/lib/env-server';
 /**
  * Canonical deterministic E2E test-email shapes (`…+e2e…@` / `…+clerk_test…@`,
  * optionally with a trailing `+suffix` segment as used by
- * tests/helpers/clerk-auth.ts).
+ * tests/helpers/auth.ts).
  */
 const TEST_OTP_EMAIL_PATTERN = /\+(e2e|clerk_test)(\+[^@]*)?@/i;
 

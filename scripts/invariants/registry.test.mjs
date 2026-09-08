@@ -69,6 +69,17 @@ describe('canonical invariant registry', () => {
     );
   });
 
+  it('deliberate red: rejects duplicate invariant identity', () => {
+    const candidate = clone();
+    candidate.invariants.push(
+      structuredClone(getInvariant(candidate, 'JOV-INV-025'))
+    );
+    assert.match(
+      validateInvariantRegistry(candidate).errors.join('\n'),
+      /JOV-INV-025: duplicate stable identity/
+    );
+  });
+
   it('rejects an invariant with incomplete required fields', () => {
     const candidate = clone();
     delete candidate.invariants[0].scope;

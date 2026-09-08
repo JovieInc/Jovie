@@ -9,7 +9,7 @@
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(

@@ -289,7 +289,7 @@ function SidebarHeaderNav({
               )}
             >
               <BrandLogo
-                size={14}
+                size='chrome'
                 tone='auto'
                 rounded={false}
                 className='rounded-sm shrink-0'
@@ -322,7 +322,7 @@ function SidebarHeaderNav({
             )}
           >
             <BrandLogo
-              size={14}
+              size='chrome'
               tone='auto'
               variant={variant}
               rounded={false}

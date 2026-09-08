@@ -1,9 +1,13 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Protected pull_request_target captures exact PR UI evidence without exposing write credentials to candidate code; trusted base review may use the configured advisory backend while capture runs with read-only permissions.
+# removal-trigger: Remove this hop when repository-owned visual evidence can be captured and reviewed at the exact PR head without a protected base workflow boundary.
+
 name: PR Visual Review
 
 # Bounded UI evidence lane. Capture runs on PR code without secrets;
-# the review step uses only the trusted base script and a configured backend.
-# JOV-5459: missing capture evidence (ENOENT) fails the capture job. LLM review
-# comments stay advisory.
+# JOV-6232: automatic paid model review is retired. Keep capture and uploads.
+# JOV-5459: missing capture evidence (ENOENT) fails the capture job.
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
@@ -12,6 +16,7 @@ on:
       - 'apps/web/components/**'
       - 'apps/web/features/**'
       - 'apps/web/lib/**'
+      - 'apps/web/data/homepage*.ts'
       - 'apps/web/public/**'
       - 'apps/web/styles/**'
       - 'apps/console/**'
@@ -33,8 +38,7 @@ env:
 
 jobs:
   capture:
-    # Capture evidence is fail-closed (JOV-5459). LLM screenshot review below
-    # stays advisory and is not a merge-queue gate.
+    # Capture evidence remains fail-closed (JOV-5459).
     name: Capture changed UI (desktop + mobile)
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -163,113 +167,3 @@ jobs:
             echo "::error::Visual evidence upload failed. Visual ENOENT is FAIL, not advisory (JOV-5459)."
             exit 1
           fi
-
-  review:
-    name: Review screenshots and post advisory review
-    # Product findings are advisory and never a production gate.
-    continue-on-error: true
-    needs: capture
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    concurrency:
-      group: pr-visual-review-trusted-review-${{ github.event.pull_request.number }}
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      pull-requests: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      GROK_VISUAL_REVIEW_API_KEY: ${{ secrets.GROK_VISUAL_REVIEW_API_KEY }}
-      GROK_VISUAL_REVIEW_BASE_URL: ${{ vars.GROK_VISUAL_REVIEW_BASE_URL || 'https://api.x.ai/v1' }}
-      GROK_VISUAL_REVIEW_MODEL: ${{ vars.GROK_VISUAL_REVIEW_MODEL || 'grok-4.5' }}
-      CODEX_VISUAL_REVIEW_API_KEY: ${{ secrets.CODEX_VISUAL_REVIEW_API_KEY }}
-      CODEX_VISUAL_REVIEW_BASE_URL: ${{ vars.CODEX_VISUAL_REVIEW_BASE_URL || 'https://api.openai.com/v1' }}
-      CODEX_VISUAL_REVIEW_MODEL: ${{ vars.CODEX_VISUAL_REVIEW_MODEL || 'gpt-5.2-codex' }}
-      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-    steps:
-      - name: Checkout trusted base helpers
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          sparse-checkout: .github/scripts/pr-visual-review.mjs
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        id: evidence
-        continue-on-error: true
-        with:
-          name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: pr-visual-artifacts
-
-      - name: Derive trusted routing and bounded diff
-        id: routed
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          set -euo pipefail
-          verify_head() {
-            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
-              | jq -e --arg head "$PR_HEAD_SHA" --arg base "$BASE_REF" '
-                  .state == "open" and .head.sha == $head and .base.ref == $base
-                ' >/dev/null
-          }
-          skip_stale_review() {
-            echo "::notice::PR head moved or PR is closed; skipping stale advisory review."
-            printf 'review=false\nreview_status=unavailable\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          }
-          verify_head || skip_stale_review
-          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
-            | jq -r '(add // []) | .[].filename' > "$RUNNER_TEMP/changed-files.txt"
-          if ! gh api \
-            -H 'Accept: application/vnd.github.v3.diff' \
-            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "$RUNNER_TEMP/pr.diff"; then
-            printf 'review=false\nreview_status=unavailable\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          verify_head || skip_stale_review
-          node --input-type=module - <<'NODE'
-          import { readFile, writeFile } from 'node:fs/promises';
-          import { routeChangedFiles } from './.github/scripts/pr-visual-review.mjs';
-          const files = (await readFile(process.env.RUNNER_TEMP + '/changed-files.txt', 'utf8')).split('\n').filter(Boolean);
-          const routing = { ...routeChangedFiles(files), files };
-          const diff = await readFile(process.env.RUNNER_TEMP + '/pr.diff', 'utf8');
-          await writeFile('trusted-routing.json', JSON.stringify(routing, null, 2));
-          await writeFile('review-input.json', JSON.stringify({ artifactDir: 'pr-visual-artifacts', changedFiles: files, routes: routing.routes, diff, reviewStatus: routing.review_status, output: 'review-result.json' }));
-          await writeFile(process.env.GITHUB_OUTPUT, `review=${routing.shouldReview}\nreview_status=${routing.review_status}\n`, { flag: 'a' });
-          NODE
-
-      - name: Call Grok 4.5 with Codex fallback
-        if: steps.routed.outputs.review == 'true'
-        run: node .github/scripts/pr-visual-review.mjs review review-input.json
-
-      - name: Post structured PR review (idempotent)
-        if: steps.routed.outputs.review == 'true'
-        run: |
-          set -euo pipefail
-          BODY=$(node --input-type=module - <<'NODE'
-          import { readFile } from 'node:fs/promises';
-          import { formatReviewBody, visualReviewIdentity } from './.github/scripts/pr-visual-review.mjs';
-          const result = JSON.parse(await readFile('review-result.json', 'utf8'));
-          const run = process.env.GITHUB_RUN_ID;
-          const body = result.status === 'completed'
-            ? formatReviewBody({ review: result.review, runId: run, artifactUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${run}`, prNumber: process.env.PR_NUMBER, headSha: process.env.PR_HEAD_SHA })
-            : `${visualReviewIdentity({ prNumber: process.env.PR_NUMBER, headSha: process.env.PR_HEAD_SHA, runId: run })}\n## Visual review (${run})\n\n**review_status: ${result.review_status}**\n\n${result.error}\n\nNo findings were generated and this advisory lane does not block merging.`;
-          process.stdout.write(body);
-          NODE
-          )
-          MARKER=$(node --input-type=module - <<'NODE'
-          import { visualReviewIdentity } from './.github/scripts/pr-visual-review.mjs';
-          process.stdout.write(visualReviewIdentity({ prNumber: process.env.PR_NUMBER, headSha: process.env.PR_HEAD_SHA, runId: process.env.GITHUB_RUN_ID }));
-          NODE
-          )
-          # `gh api` cannot combine --slurp with --jq, and --jq does not accept
-          # jq's --arg flags. Fetch the paginated JSON with gh, then evaluate
-          # the exact marker with the standalone jq binary.
-          EXISTING=$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" | jq -r --arg marker "$MARKER" '((add // []) | any(.[]; .user.login == "github-actions[bot]" and (.body | contains($marker))))')
-          if [ "$EXISTING" = "true" ]; then echo "Exact visual review already exists; idempotent no-op."; exit 0; fi
-          jq -n --arg body "$BODY" '{body:$body,event:"COMMENT"}' > review-payload.json
-          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --method POST --input review-payload.json >/dev/null

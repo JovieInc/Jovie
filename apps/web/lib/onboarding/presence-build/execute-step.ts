@@ -5,8 +5,13 @@ import { getProfileUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { discogReleases, discogReleaseTracks } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import {
+  libraryPresenceFindings,
+  libraryRightsholderEvidence,
+} from '@/lib/db/schema/library-presence';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import type { PresenceBuildStepId } from './constants';
 import type { PresenceBuildArtifact, PresenceBuildFact } from './types';
 
@@ -18,6 +23,8 @@ export async function executePresenceBuildStep(
   switch (stepId) {
     case 'research_artist':
       return researchArtist(profileId);
+    case 'surface_library_opportunities':
+      return surfaceLibraryOpportunities(profileId);
     case 'assemble_profile':
       return assembleProfile(profileId);
     case 'generate_smart_link':
@@ -29,6 +36,82 @@ export async function executePresenceBuildStep(
       throw new Error(`Unknown presence-build step: ${_exhaustive}`);
     }
   }
+}
+
+/**
+ * Read-only onboarding exposure of Library presence primitives (JOV-5694).
+ * Reuses the Library optimization contract in
+ * `docs/product/library-content-graph-and-artist-rules.md`. Does not send,
+ * invent stats, or create a parallel experiment.
+ */
+async function surfaceLibraryOpportunities(
+  profileId: string
+): Promise<PresenceBuildArtifact> {
+  const [findings, rightsholders, downloads] = await Promise.all([
+    db
+      .select({
+        kind: libraryPresenceFindings.kind,
+        status: libraryPresenceFindings.status,
+      })
+      .from(libraryPresenceFindings)
+      .where(eq(libraryPresenceFindings.creatorProfileId, profileId))
+      .limit(100),
+    db
+      .select({ evidenceClass: libraryRightsholderEvidence.evidenceClass })
+      .from(libraryRightsholderEvidence)
+      .where(eq(libraryRightsholderEvidence.creatorProfileId, profileId))
+      .limit(100),
+    db
+      .select({ id: promoDownloads.id })
+      .from(promoDownloads)
+      .where(
+        and(
+          eq(promoDownloads.creatorProfileId, profileId),
+          eq(promoDownloads.isActive, true),
+          eq(promoDownloads.rightsControlAttested, true)
+        )
+      )
+      .limit(100),
+  ]);
+
+  const open = findings.filter(
+    finding => finding.status === 'open' || finding.status === 'drafted'
+  );
+  const countKind = (kind: (typeof findings)[number]['kind']) =>
+    open.filter(finding => finding.kind === kind).length;
+  const observedRightsholders = rightsholders.filter(
+    evidence => evidence.evidenceClass === 'observed'
+  ).length;
+  const downloadCount = downloads.length;
+  const downloadNoun = downloadCount === 1 ? 'file' : 'files';
+  const downloadsValue =
+    downloadCount === 0
+      ? 'No attested files live'
+      : `${downloadCount} attested ${downloadNoun} live`;
+  const facts: PresenceBuildFact[] = [
+    { label: 'Repair queue', value: `${countKind('repair')} open` },
+    { label: 'Collisions', value: `${countKind('collision')} to review` },
+    {
+      label: 'Placement opportunities',
+      value: `${countKind('placement_opportunity')} found`,
+    },
+    {
+      label: 'Rightsholders',
+      value: `${observedRightsholders} observed`,
+    },
+    {
+      label: 'Downloads',
+      value: downloadsValue,
+    },
+    { label: 'Stats', value: 'Not connected' },
+  ];
+
+  return {
+    title: 'Library opportunities',
+    summary:
+      'Your Library presence queue is ready. Findings stay local and nothing was sent.',
+    facts,
+  };
 }
 
 type ProfileCore = {

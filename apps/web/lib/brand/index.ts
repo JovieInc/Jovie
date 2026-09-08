@@ -5,13 +5,19 @@ export {
   Wordmark,
 } from '@/lib/brand/primitives';
 export type {
+  BrandMarkSize,
+  BrandMarkSizeName,
+  BrandMarkSizePx,
   FeatureSwatch,
   PaletteSwatch,
 } from '@/lib/brand/tokens';
 export {
+  BRAND_MARK_CREAM,
+  BRAND_MARK_SIZE,
   JOVIE_PATH,
   JOVIE_VIEWBOX,
   PALETTE,
+  resolveBrandMarkSize,
   TYPOGRAPHY,
   WORDMARK_TRACK,
 } from '@/lib/brand/tokens';

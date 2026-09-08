@@ -16,6 +16,7 @@ import {
   inventoryBacklog,
   OFFICIAL_SYMPHONY_REFRESH_URL,
   REMEDIATION_SCHEMA,
+  readHostPressure,
   upsertRemediationWorkpad,
   WORKPAD_HEADING,
   WORKPAD_PREFIX,
@@ -55,7 +56,7 @@ function issue(identifier, overrides = {}) {
     createdAt: overrides.createdAt || '2026-08-20T00:00:00.000Z',
     updatedAt: '2026-08-30T00:00:00.000Z',
     priority: 3,
-    state: { name: overrides.state || 'Backlog' },
+    state: { name: overrides.state || 'Todo' },
     assignee: overrides.assignee ?? null,
     labels: {
       nodes: (overrides.labels || []).map(name => ({ name })),
@@ -77,6 +78,8 @@ function healthySignals(overrides = {}) {
       cpuSomeAvg10: 1,
       memoryFullAvg10: 0.1,
       ioFullAvg10: 0.2,
+      loadAvg1: 1,
+      cpuCount: 4,
       availableMemoryBytes: 16 * 1024 ** 3,
     },
     provider: { accounts: 3, ready: 2 },
@@ -152,13 +155,23 @@ describe('official Symphony backlog remediation', () => {
     );
   });
 
-  it('excludes taste, external messages, credentials, money, compliance, epics, and stale work', () => {
+  it('keeps taste work eligible while excluding machine safety boundaries', () => {
+    for (const candidate of [
+      issue('JOV-19', { title: 'Founder steering on brand voice' }),
+      issue('JOV-20', { labels: ['needs-decision', 'needs:taste'] }),
+      issue('JOV-18', {
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+      }),
+    ]) {
+      const result = classifyRemediationCandidate(candidate, { now: NOW });
+      assert.equal(result.selected, true, result.reason);
+      assert.notEqual(result.reason, 'human-taste-or-steering');
+    }
+    assert.doesNotMatch(MODULE, /human-taste-or-steering/);
+
     /** @type {Array<[object, string]>} */
     const cases = [
-      [
-        issue('JOV-20', { title: 'Founder steering on brand voice' }),
-        'human-taste-or-steering',
-      ],
       [
         issue('JOV-21', { title: 'Send a Telegram outreach blast' }),
         'external-messages',
@@ -184,6 +197,30 @@ describe('official Symphony backlog remediation', () => {
       assert.equal(result.reason, reason);
       assert.ok(['blocked', 'split'].includes(result.outcome), reason);
     }
+  });
+
+  it('honors an explicit engineering implementation admission while unresolved founder decisions remain blocked', () => {
+    const description = `Admission class: engineering-implementation\n\n${SAFE_DESCRIPTION}`;
+    const approved = classifyRemediationCandidate(
+      issue('JOV-5995', { description }),
+      { now: NOW }
+    );
+    assert.equal(approved.selected, true);
+    assert.equal(approved.reason, 'bounded-isolated-code-shippable');
+
+    const unresolved = classifyRemediationCandidate(
+      issue('JOV-5996', { description, labels: ['needs-decision'] }),
+      { now: NOW }
+    );
+    assert.equal(unresolved.selected, true);
+    assert.equal(unresolved.reason, 'bounded-isolated-code-shippable');
+
+    const deadLetter = classifyRemediationCandidate(
+      issue('JOV-5997', { description, labels: ['no-symphony'] }),
+      { now: NOW }
+    );
+    assert.equal(deadLetter.selected, false);
+    assert.equal(deadLetter.reason, 'machine-hold');
   });
 
   it('selects only bounded isolated issues and refuses overlapping ownership in a wave', () => {
@@ -330,9 +367,33 @@ describe('official Symphony backlog remediation', () => {
     assert.equal(scaled.reason, 'capacity-available');
   });
 
+  it('includes normalized host load in capacity evidence and backoff', () => {
+    const host = readHostPressure('/proc');
+    assert.ok(Number.isFinite(host.loadAvg1));
+    assert.ok(Number.isInteger(host.cpuCount));
+    assert.ok(host.cpuCount > 0);
+
+    const overloaded = evaluateRuntimeCapacity(
+      healthySignals({
+        host: {
+          cpuSomeAvg10: 1,
+          memoryFullAvg10: 0.1,
+          ioFullAvg10: 0.2,
+          loadAvg1: 8,
+          cpuCount: 4,
+          availableMemoryBytes: 16 * 1024 ** 3,
+        },
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(overloaded.reason, 'host-pressure-severe');
+    assert.equal(overloaded.allowed, false);
+  });
+
   it('writes a single workpad matrix and feeds only the official Elixir Symphony refresh', async () => {
     const built = receiptFor([issue('JOV-50')]);
-    assert.match(built.workpad, new RegExp(`^${WORKPAD_PREFIX}`));
+    assert.match(built.workpad, new RegExp(`^${WORKPAD_HEADING}`));
+    assert.match(built.workpad, new RegExp(WORKPAD_PREFIX));
     assert.match(built.workpad, new RegExp(WORKPAD_HEADING));
     assert.match(built.workpad, /JOV-50/);
     assert.match(built.workpad, /official Elixir Symphony/);
@@ -373,7 +434,8 @@ describe('official Symphony backlog remediation', () => {
         async addComment(id, body) {
           comments.push({ id: 'comment-1', body });
           assert.equal(id, 'workpad-id');
-          assert.ok(body.startsWith(WORKPAD_PREFIX));
+          assert.ok(body.startsWith(WORKPAD_HEADING));
+          assert.match(body, new RegExp(WORKPAD_PREFIX));
           return { commentCreate: { success: true } };
         },
         async updateComment(id, body) {
@@ -408,6 +470,38 @@ describe('official Symphony backlog remediation', () => {
       },
     });
     assert.equal(updated.status, 'updated');
+  });
+
+  it('updates the legacy remediation comment instead of creating a second workpad', async () => {
+    const comments = [
+      {
+        id: 'legacy-comment',
+        body: '## Symphony backlog remediation\nold receipt',
+      },
+    ];
+    const result = await upsertRemediationWorkpad({
+      workpadIssue: 'JOV-5492',
+      receipt: receiptFor([issue('JOV-51')]),
+      client: {
+        async fetchIssue() {
+          return {
+            id: 'workpad-id',
+            identifier: 'JOV-5492',
+            comments: { nodes: comments },
+          };
+        },
+        async addComment() {
+          throw new Error('should-update-existing-workpad');
+        },
+        async updateComment(id, body) {
+          assert.equal(id, 'legacy-comment');
+          comments[0] = { id, body };
+          return { commentUpdate: { success: true } };
+        },
+      },
+    });
+    assert.equal(result.status, 'updated');
+    assert.match(comments[0].body, new RegExp(`^${WORKPAD_HEADING}`));
   });
 
   it('does not revive homemade Symphony admission or JOV-5466 wrappers', () => {

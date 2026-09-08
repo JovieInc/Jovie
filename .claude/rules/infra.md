@@ -1,3 +1,7 @@
+---
+paths: [".github/**", "scripts/hermes/**", "apps/web/app/api/cron/**", "vercel.json"]
+---
+
 # Infrastructure & Scheduling Guardrails
 
 Cron, API budgets, forbidden infra patterns, cost disclosure.

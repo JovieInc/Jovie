@@ -8,14 +8,14 @@ describe('LogoIcon', () => {
     expect(screen.getByLabelText('Jovie')).toBeInTheDocument();
   });
 
-  it('uses the default size of 48', () => {
+  it('uses the chrome token as the default size', () => {
     const { container } = render(<LogoIcon />);
-    expect(container.querySelector('svg')).toHaveAttribute('width', '48');
+    expect(container.querySelector('svg')).toHaveAttribute('width', '20');
   });
 
   it('passes a custom size to the brand mark', () => {
-    const { container } = render(<LogoIcon size={64} />);
-    expect(container.querySelector('svg')).toHaveAttribute('width', '64');
+    const { container } = render(<LogoIcon size='splash' />);
+    expect(container.querySelector('svg')).toHaveAttribute('width', '32');
   });
 
   it('uses the color tone by default', () => {

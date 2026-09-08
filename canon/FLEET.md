@@ -2,8 +2,9 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-08-17
-Source: founder interview, 2026-08-17
+Owner: Tim White
+Last updated: 2026-09-04
+Source: founder interviews, 2026-08-17 and 2026-09-04
 
 The fleet exists to make Jovie default alive. It does not exist to file issues, keep agents busy, or maximize merges.
 
@@ -80,6 +81,33 @@ Work admission and production promotion stay separate typed authorities (GREEN /
 
 ---
 
+## Commitment closure
+
+Every accepted commitment remains open until it has one durable, destination-bound receipt:
+
+1. **Verified progress** — evidence that the work product moved materially closer to its destination.
+2. **Verified outcome** — evidence that the promised result exists at the intended destination.
+3. **Current blocker** — the exact blocking condition, one accountable owner, and the next action or objective revisit trigger.
+
+Activity, assignment, dispatch, handoff, local completion, and an agent saying “done” are not progress or outcome receipts by themselves. A source change is not a merge; a merge is not a deployment; a deployment is not an exact-runtime or customer outcome.
+
+Before creating work, reconcile existing Linear issues, leases, branches, pull requests, delivery receipts, deployments, and runtime evidence by stable identity. Resume, adopt, close, or explicitly supersede the existing commitment before creating a duplicate.
+
+The primary event path records every material transition. Independent missed-event reconciliation may recover a lost transition, but it may not manufacture progress, ownership, or success. Recovery must remain able to observe and report failure when the component it monitors is unavailable.
+
+Existing enforcement remains authoritative:
+
+| Commitment surface | Existing contract / consumer |
+|---|---|
+| Linear ownership and terminal issue state | [`.claude/rules/linear.md`](../.claude/rules/linear.md), `.github/workflows/linear-sync-on-merge.yml` |
+| PR writer proof and exact-head promotion | `JOV-INV-022`, `scripts/lib/writer-owned-pr-promotion.mjs`, `.github/workflows/merge-queue-autoenroll.yml` |
+| PR, CI, queue, deploy, provider, lease, and controller stalls | `JOV-INV-017`, `scripts/backlog-orchestrator/no-unattended-red.mjs`, `.github/workflows/delivery-control-receipts.yml` |
+| Canonical fleet state and missed-event repair | `.github/workflows/fleet-gate-refresh.yml`, `.github/workflows/ownerless-recovery-sweep.yml` |
+
+No enforcement path may count its own activity as progress or use a handoff receipt as destination proof.
+
+---
+
 ## Founder day
 
 **Morning — one briefing on Ovie.** Cash / burn / runway / MRR. Did overnight ships land. Web path pass/fail and the death step. The one admitted packet. At most three decision cards, each with a default-if-silent.
@@ -104,4 +132,5 @@ Tim does not open Linear in the morning. Tim does not enroll PRs.
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-09-04 | Made commitment closure explicit: destination-bound proof, accountable blockers, reconcile-before-duplicate, and independent missed-event recovery. | Tim White |
 | 2026-08-17 | Created. Constraint-packet fleet. Web-first sellability. Admission ≠ filing. Scoreboard: both accounts $0, $0 MRR; $935/mo known tool floor; gifted credits; $25k SAFE spent. | Tim White |

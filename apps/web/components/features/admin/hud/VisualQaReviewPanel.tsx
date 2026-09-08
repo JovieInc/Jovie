@@ -285,7 +285,19 @@ export function VisualQaReviewPanel() {
     );
   }
 
-  let surfaceIndex = 0;
+  // Precompute sequential HUD-VQA reference ids once per render instead of
+  // mutating a counter inside the nested map callbacks.
+  const surfaceReferenceIds = new Map<string, string>();
+  let surfaceCounter = 0;
+  for (const run of runs) {
+    for (const surface of run.surfaces) {
+      surfaceCounter += 1;
+      surfaceReferenceIds.set(
+        `${run.runId}:${surface.surfaceId}`,
+        `HUD-VQA-${String(surfaceCounter).padStart(3, '0')}`
+      );
+    }
+  }
 
   return (
     <ContentSurfaceCard
@@ -316,8 +328,10 @@ export function VisualQaReviewPanel() {
               </p>
               <div className='grid gap-3'>
                 {run.surfaces.map(surface => {
-                  surfaceIndex += 1;
-                  const referenceId = `HUD-VQA-${String(surfaceIndex).padStart(3, '0')}`;
+                  const referenceId =
+                    surfaceReferenceIds.get(
+                      `${run.runId}:${surface.surfaceId}`
+                    ) ?? '';
                   return (
                     <VisualQaSurfaceCard
                       key={`${run.runId}:${surface.surfaceId}`}

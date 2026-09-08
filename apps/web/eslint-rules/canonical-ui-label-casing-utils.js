@@ -126,7 +126,7 @@ const ALLOWED_PATH_FRAGMENTS = [
   '/tests/',
   '/types/',
   'app/api/',
-  'clerkLocalization',
+  'authCopy',
 ];
 
 /**

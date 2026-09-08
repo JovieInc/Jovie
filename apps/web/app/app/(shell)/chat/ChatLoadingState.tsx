@@ -46,7 +46,7 @@ export default function ChatLoading() {
               data-testid='chat-empty-state-welcome'
             >
               <h2
-                className='relative z-10 shrink-0 text-2xl font-semibold text-primary-token'
+                className='relative z-10 shrink-0 text-2xl font-semibold text-primary-token line-clamp-2'
                 aria-hidden='true'
                 data-testid='chat-empty-state-greeting'
               >

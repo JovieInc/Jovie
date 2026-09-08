@@ -7,11 +7,22 @@ import {
   verifyVercelOidc,
   withAuthChallenges,
 } from 'eve/channels/auth';
+import { createSummerCommercialReadback } from '../lib/summer-commercial-readback';
 import {
   createSummerShadowIngressHandler,
   summerShadowKey,
 } from '../lib/summer-shadow-ingress';
-import { persistImmutableShadowRecord } from '../lib/vercel-blob-shadow-store';
+import {
+  conversationPath,
+  createConversationIngress,
+  readConversationResult,
+  summerDeploymentIdSchema,
+  verifyFounderPrincipal,
+} from '../lib/summer-web-conversation';
+import {
+  persistImmutableShadowRecord,
+  readImmutableShadowRecord,
+} from '../lib/vercel-blob-shadow-store';
 
 export const JOVIE_PRODUCTION_OIDC_SUBJECT = vercelSubject({
   teamSlug: 'jovie',
@@ -72,6 +83,116 @@ export default defineChannel<SummerShadowChannelState>({
   },
   turnPolicy: 'queue',
   routes: [
+    POST(
+      '/ovie/v1/summer-shadow/conversation/events',
+      async (request, { from, attachSession, resolveSession }) => {
+        const verifiedAuth = await routeAuth(request, ovieSummerShadowOidcAuth);
+        if (verifiedAuth instanceof Response) return verifiedAuth;
+        // OIDC authenticates the application. The application verifies the exact
+        // founder before intake; Eve checks its fixed principal assertion below.
+        const auth = {
+          ...verifiedAuth,
+          attributes: {
+            ...verifiedAuth.attributes,
+            summerConversation: 'true',
+          },
+        };
+        return createConversationIngress({
+          authenticate: async () => auth,
+          read: readImmutableShadowRecord,
+          persist: persistImmutableShadowRecord,
+          async dispatch(input, message, previousSessionId) {
+            const address = `conversation:${input.conversationId}`;
+            const current = await resolveSession(address);
+            if (previousSessionId) {
+              if (!current || current.id !== previousSessionId)
+                throw new Error('canonical_session_unavailable');
+              await attachSession(previousSessionId).send(message, {
+                auth,
+                turnPolicy: 'queue',
+              });
+              return previousSessionId;
+            }
+            if (current) throw new Error('unbound_existing_session');
+            const session = await from(address).send(message, {
+              auth,
+              state: {
+                dispatchAuthority: 'none',
+                eventId: input.eventId,
+                identity: 'summer',
+                receiptPath: conversationPath('intents', input.eventId),
+                source: 'ovie-summer-shadow',
+              },
+              title: 'Summer Jovi — AI Agent',
+            });
+            return session.id;
+          },
+        })(request);
+      }
+    ),
+    GET(
+      '/ovie/v1/summer-shadow/conversation/events/:eventId/result',
+      async (request, { params, attachSession, resolveSession }) => {
+        const auth = await routeAuth(request, ovieSummerShadowOidcAuth);
+        if (auth instanceof Response) return auth;
+        const principalHash = request.headers.get(
+          'x-jovie-summer-principal-hash'
+        );
+        const deploymentId = request.headers.get(
+          'x-jovie-summer-deployment-id'
+        );
+        if (
+          !principalHash ||
+          !deploymentId ||
+          !verifyFounderPrincipal(principalHash) ||
+          !summerDeploymentIdSchema.safeParse(deploymentId).success
+        )
+          return Response.json(
+            { ok: false, code: 'invalid_conversation_binding' },
+            { status: 403, headers: { 'cache-control': 'no-store' } }
+          );
+        try {
+          return await readConversationResult({
+            eventId: params.eventId,
+            principalHash,
+            deploymentId,
+            store: {
+              read: readImmutableShadowRecord,
+              persist: persistImmutableShadowRecord,
+            },
+            stream: async (sessionId, startIndex) =>
+              (
+                await attachSession(sessionId).getEventStream({ startIndex })
+              ).pipeThrough(
+                new TransformStream({
+                  transform(event, controller) {
+                    controller.enqueue(
+                      new TextEncoder().encode(JSON.stringify(event) + '\n')
+                    );
+                  },
+                })
+              ),
+            recoverSession: async conversationId =>
+              (await resolveSession(`conversation:${conversationId}`))?.id ??
+              null,
+          });
+        } catch {
+          return Response.json(
+            { ok: false, code: 'terminal_unavailable' },
+            { status: 503, headers: { 'cache-control': 'no-store' } }
+          );
+        }
+      }
+    ),
+    GET(
+      '/ovie/v1/summer-shadow/commercial/:eventId',
+      async (request, { params }) =>
+        createSummerCommercialReadback({
+          authenticate: incoming =>
+            routeAuth(incoming, ovieSummerShadowOidcAuth),
+          read: readImmutableShadowRecord,
+        })(request, params.eventId)
+    ),
     POST('/ovie/v1/summer-shadow/events', async (request, { from }) => {
       const handler = createSummerShadowIngressHandler({
         authenticate: incoming => routeAuth(incoming, ovieSummerShadowOidcAuth),

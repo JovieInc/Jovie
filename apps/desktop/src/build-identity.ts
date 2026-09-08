@@ -29,6 +29,15 @@ export interface ResolvedDesktopBuildIdentity
   readonly provenance: DesktopBuildProvenance;
 }
 
+export function resolveDesktopBuildIdentityIpcRequest(input: {
+  readonly trustedSender: boolean;
+  readonly args: readonly unknown[];
+  readonly identity: ResolvedDesktopBuildIdentity;
+}): ResolvedDesktopBuildIdentity | null {
+  if (!input.trustedSender || input.args.length !== 0) return null;
+  return input.identity;
+}
+
 function isChannel(value: unknown): value is DesktopReleaseChannel {
   return typeof value === 'string' && CHANNELS.has(value);
 }

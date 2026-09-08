@@ -18,7 +18,7 @@ describe('shared press-motion contract', () => {
     );
 
     expect(designSystem).toMatch(/--scale-press:\s*0\.98;/);
-    expect(button).toContain('active:scale-[var(--scale-press)]');
+    expect(button).toContain('active:scale-press');
     expect(button).toContain('motion-reduce:active:scale-100');
     expect(button).not.toContain('active:scale-[0.96]');
     expect(button).toContain('pressFeedback = false');
@@ -36,7 +36,7 @@ describe('shared press-motion contract', () => {
       '[role="button"]:not([aria-disabled="true"]):not([data-static="true"])'
     );
     expect(globals).toContain(
-      'active:scale-[var(--scale-press)] motion-reduce:active:scale-100'
+      'active:scale-press motion-reduce:active:scale-100'
     );
   });
 

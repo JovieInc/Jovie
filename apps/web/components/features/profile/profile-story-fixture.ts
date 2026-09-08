@@ -7,7 +7,7 @@ export const PROFILE_STORY_ARTIST = {
   name: 'Tim White',
   handle: 'timwhite',
   spotify_id: '4u',
-  image_url: '/images/avatars/tim-white-founder.jpg',
+  image_url: '/images/avatars/tim-white.jpg',
   tagline: 'Producer, songwriter, and after-hours romantic.',
   location: 'Los Angeles',
   hometown: null,

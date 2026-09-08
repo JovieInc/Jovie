@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes with continue-on-failure semantics.
+ * Run the cheap CI cluster as labeled lanes.
  *
  * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
  * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
  * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
  * artifact; the aggregate `ci-fast` job also requires the dedicated profile
- * browser admission job. Never aborts mid-group — always reports every
- * selected lane, writes
- * $GITHUB_STEP_SUMMARY, emits lane records for the harness, and exits non-zero
- * only after all selected lanes finish if any failed. Local callers may omit
- * the selector to retain the historical all-lanes behavior.
+ * browser admission job.
+ *
+ * Fail-fast: the first failed lane skips later lanes in the same group so
+ * biome/typecheck red does not pay for structural Playwright. Skipped-later
+ * lanes still emit a receipt. Set CI_FAST_FAIL_FAST=false to restore the
+ * historical run-every-lane report. Local callers may omit the selector to
+ * retain the all-lanes default.
  *
  * Usage:
  *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
@@ -21,6 +23,8 @@
  *   CI_FAST_LANES_OUT  — optional path for JSON lane results
  *   TURBO_SCM_BASE     — for typecheck --affected
  *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
+ *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
+ *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  */
 
 import { spawnSync } from 'node:child_process';
@@ -32,6 +36,15 @@ import {
   affectsJovieTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+
+export const MARKETING_CERTIFICATION_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
+export const CERTIFICATION_KERNEL_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
+export const ACQUISITION_CERTIFICATION_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
+export const DESKTOP_RELEASE_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -76,7 +89,7 @@ const LANES = [
   },
   {
     id: 'design-system-source-ratchet',
-    name: 'Design-system source count ratchet',
+    name: 'Design-system source identity ratchet',
     nextLocalCommand: 'pnpm design:source-count-ratchet',
     run: runDesignSystemSourceRatchet,
   },
@@ -109,7 +122,15 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+      ' && ' +
+      MARKETING_CERTIFICATION_COMMAND +
+      ' && ' +
+      CERTIFICATION_KERNEL_COMMAND +
+      ' && ' +
+      ACQUISITION_CERTIFICATION_COMMAND +
+      ' && ' +
+      DESKTOP_RELEASE_COVERAGE_COMMAND,
     run: runStructural,
   },
 ];
@@ -416,6 +437,8 @@ function runGuardrails() {
     ...(selected.has('operations')
       ? [
           'node scripts/design-authority-guard.mjs',
+          // Exercise retention executables and subprocess coverage before other guards.
+          'node --test --test-timeout=45000 --experimental-test-coverage --test-coverage-include="scripts/*retention.mjs" --test-coverage-lines=75 --test-coverage-functions=70 --test-coverage-branches=75 scripts/local-runtime-retention.test.mjs scripts/generated-artifact-retention.test.mjs scripts/cleanup-safety.test.mjs scripts/setup-cache-cleanup.test.mjs',
           'pnpm design:logo-assets:check',
           'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs',
         ]
@@ -611,33 +634,62 @@ function runStructural() {
     'pnpm ci:incident-contract:validate',
     'node --test scripts/ci-release-trigger-contract.test.mjs',
     'pnpm ci:control:test',
+    'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/production-release-supersession.test.mjs',
+    "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
+    "node --experimental-test-coverage --test --test-coverage-include='scripts/native-merge-intent.mjs' --test-coverage-include='scripts/lib/source-admission-policy.mjs' --test-coverage-include='scripts/source-admission-check.mjs' --test-coverage-lines=98 scripts/lib/__tests__/native-merge-intent.test.mjs scripts/lib/__tests__/source-admission-policy.test.mjs scripts/lib/__tests__/source-admission-check.test.mjs scripts/lib/__tests__/writer-owned-pr-promote.test.mjs",
     'pnpm ci:typecheck-gate-guard',
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',
     'python3 .github/scripts/test-security-suppression-audit.py',
     // The Gem contract is embedded in the broader Symphony controller suite.
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
-    'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/gbrain-runtime-assets.test.mjs && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage combine "${RUNNER_TEMP:-/tmp}" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage report --include="*/scripts/hermes/gbrain-runtime/gbrain-mcp-http-proxy.py" --show-missing --precision=2 --fail-under=78; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local GBrain proxy coverage"; fi',
-    'python3 scripts/hermes/tests/gem-pr-drain.test.py',
-    'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
-    'python3 scripts/hermes/tests/gem-priority-gate.test.py',
-    'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
-    'python3 scripts/hermes/tests/test-model-router.py',
+    'python3 scripts/symphony/tests/run-hud-proof-gate.py',
+    'python3 scripts/symphony/tests/run-runtime-proof-gate.py',
+    'python3 scripts/symphony/tests/run-safe-restart-gate.py',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
+    'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts',
+    'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
+    'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
+    'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
+    'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/gbrain-runtime-assets.test.mjs && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage combine "${RUNNER_TEMP:-/tmp}" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage report --include="*/scripts/symphony/gbrain-runtime/gbrain-mcp-http-proxy.py" --show-missing --precision=2 --fail-under=78; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local GBrain proxy coverage"; fi',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage run --branch scripts/symphony/tests/closure-health.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage report --include="*/scripts/symphony/closure_health.py" --show-missing --precision=2 --fail-under=85',
+    'python3 scripts/symphony/tests/gem-pr-drain.test.py',
+    'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
+    'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
+    'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage run --branch scripts/symphony/tests/summer-bottleneck-producer.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage report --include="*/scripts/symphony/summer_bottleneck_producer.py" --show-missing --precision=2 --fail-under=80; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local Summer bottleneck producer coverage"; fi',
+    'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi',
+    'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
+    'python3 scripts/symphony/tests/test-model-router.py',
+    'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage report --include="*/scripts/symphony/astra/astra_readiness.py" --show-missing --precision=2 --fail-under=90',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-hyperagent-lifecycle.coverage" python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-hyperagent-lifecycle.coverage" python3 -m coverage report --include="*/scripts/symphony/hyperagent/lifecycle.py" --show-missing --precision=2 --fail-under=95',
+    'python3 scripts/symphony/tests/symphony-github-poke.test.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; else echo "pytest/coverage not installed — skip structural regressions"; fi',
+    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage" python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; elif [ "${CI:-}" = "true" ]; then echo "::error::pytest/coverage missing from hosted structural lane" >&2; exit 1; else echo "pytest/coverage not installed — skip local structural regressions"; fi',
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [
+    // JOV-6104: measured marketing contracts must run for registry-only edits.
+    MARKETING_CERTIFICATION_COMMAND,
     'pnpm next:proxy-guard',
     'pnpm tailwind:check',
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',
     'pnpm --filter=@jovie/web run lint:seo',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     'pnpm design:shared-ui-visual-arbitrary:check',
+    // JOV-6103: execute the certification kernel and its negative-path tests.
+    // A missing selector or dependency must fail, never count as proof.
+    CERTIFICATION_KERNEL_COMMAND,
+    // Revision-bound acquisition decisions and unchanged marketing CAS behavior.
+    ACQUISITION_CERTIFICATION_COMMAND,
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
     // JOV-5454: live Storybook certification evaluator + lifecycle.
@@ -648,12 +700,28 @@ function runStructural() {
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails
     // closed when the file cannot be resolved or contains no tests.
-    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/spacing-scale-ratchet.test.ts tests/unit/design-system/concentric-radius-contract.test.ts tests/unit/design-system/native-spacing-scale-ratchet.test.ts tests/unit/app/workspace-page-seam-contract.test.ts --coverage --coverage.include=scripts/optical-grid-scanners.ts --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90',
+    // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
+    // JOV-5951, gbrain ops/reviewed-invariants/blocking-ui-invariants-v1),
+    // governed by certify-only-working-v1: unproven is hidden, not green.
+    // Target Vitest directly so the screen contracts always execute and fail
+    // closed when a file is missing or resolves to zero tests (visual ENOENT
+    // is FAIL, not advisory).
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts tests/unit/design-system/single-column-one-width-v1.test.ts tests/unit/design-system/one-chrome-layer-v1.test.ts tests/unit/design-system/one-notification-v1.test.ts tests/unit/design-system/one-modal-layer-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
+  const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
   const parts = [
+    ...(selected.has('operations') || selected.has('web')
+      ? [
+          'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test.mjs --coverage --coverage.allowExternal --coverage.include="$PWD/packages/agent-transport-contracts/symphony-outage.ts" --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=90 --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-symphony-health-contract-coverage"',
+        ]
+      : []),
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
+    ...(selected.has('mac') ? macParts : []),
   ];
   if (parts.length === 0) {
     return {
@@ -744,19 +812,44 @@ function writeLaneResults(results, laneGroup, setupError) {
   return outPath;
 }
 
+function failFastEnabled() {
+  return process.env.CI_FAST_FAIL_FAST !== 'false';
+}
+
 function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
   const results = [];
   /** @type {string | undefined} */
   let setupError;
+  const failFast = failFastEnabled();
 
   try {
-    const selectedLanes = selectLanes(laneGroup);
+    let selectedLanes = selectLanes(laneGroup);
+    if (process.env.CI_FAST_ONLY_STRUCTURAL === 'true') {
+      selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
+    }
 
+    let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
       const laneStartedAt = Date.now();
+
+      if (failedFast) {
+        const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
+        console.log(`[ci-fast] ${lane.id}: skipped`);
+        console.log(logExcerpt);
+        results.push({
+          id: lane.id,
+          name: lane.name,
+          nextLocalCommand: lane.nextLocalCommand,
+          status: 'skipped',
+          logExcerpt,
+          durationMs: Math.max(0, Date.now() - laneStartedAt),
+        });
+        continue;
+      }
+
       let outcome;
       try {
         outcome = lane.run();
@@ -776,10 +869,14 @@ function main() {
 
       if (status === 'failure') {
         annotateFailure(lane, logExcerpt);
+        if (failFast) failedFast = true;
       }
 
       console.log(`[ci-fast] ${lane.id}: ${status}`);
-      if (logExcerpt && status !== 'success') {
+      if (lane.id === 'structural' && status === 'success') {
+        // Keep exact suite/coverage receipts available in GitHub's job log.
+        console.log(outcome.output);
+      } else if (logExcerpt && status !== 'success') {
         console.log(logExcerpt);
       }
 
@@ -813,7 +910,7 @@ function main() {
     process.exit(1);
   }
   console.log('[ci-fast] all lanes passed');
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 if (

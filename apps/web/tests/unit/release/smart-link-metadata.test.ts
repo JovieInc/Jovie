@@ -163,6 +163,82 @@ describe('smart-link metadata', () => {
     expect(metadata.robots).toMatchObject({ index: false, follow: false });
   });
 
+  it('includes every canonical primary artist in the Wheels Up SmartLink byline metadata', async () => {
+    getCreatorByUsernameMock.mockResolvedValue({
+      id: 'creator-tim',
+      username: 'timwhite',
+      usernameNormalized: 'timwhite',
+      displayName: 'Tim White',
+    });
+    getContentBySlugMock.mockResolvedValue({
+      id: 'release-wheels-up',
+      type: 'release',
+      slug: 'wheels-up',
+      releaseSlug: null,
+      title: 'Wheels Up',
+      artworkUrl: 'https://example.com/wheels-up.jpg',
+      artworkSizes: null,
+      releaseDate: new Date('2026-01-01T00:00:00Z'),
+      providerLinks: [{ providerId: 'spotify', url: 'https://spotify.test' }],
+      previewUrl: null,
+      releaseType: 'single',
+      totalTracks: 1,
+      credits: [
+        {
+          role: 'main_artist',
+          label: 'Primary artist',
+          entries: [
+            {
+              artistId: 'artist-tim',
+              name: 'Tim White',
+              handle: 'timwhite',
+              role: 'main_artist',
+              position: 0,
+            },
+            {
+              artistId: 'artist-lynx',
+              name: 'LYNX',
+              handle: null,
+              role: 'main_artist',
+              position: 1,
+            },
+          ],
+        },
+      ],
+      primaryArtists: [
+        {
+          artistId: 'artist-tim',
+          name: 'Tim White',
+          handle: 'timwhite',
+          role: 'main_artist',
+          position: 0,
+        },
+        {
+          artistId: 'artist-lynx',
+          name: 'LYNX',
+          handle: null,
+          role: 'main_artist',
+          position: 1,
+        },
+      ],
+      durationMs: null,
+      isrc: null,
+      trackNumber: null,
+    });
+
+    const { generateMetadata } = await import('@/app/[username]/[slug]/page');
+    const metadata = await generateMetadata({
+      params: Promise.resolve({
+        username: 'timwhite',
+        slug: 'wheels-up',
+      }),
+    });
+
+    expect(metadata.title).toBe('Wheels Up by Tim White and LYNX - Stream Now');
+    expect(metadata.openGraph?.title).toBe('Wheels Up by Tim White and LYNX');
+    expect(String(metadata.description)).toContain('Tim White and LYNX');
+  });
+
   it('renders published content before considering a matching mode alias', async () => {
     hasProfileModeAliasContentCandidateMock.mockResolvedValue(true);
     findRedirectByOldSlugMock.mockResolvedValue({
@@ -293,28 +369,26 @@ describe('smart-link metadata', () => {
     expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen&source=qr');
   });
 
-  it.each([
-    'email blast',
-    'a/b',
-    'x#y',
-    'q'.repeat(65),
-  ])('drops unsupported cache-key source %s without breaking the alias', async source => {
-    getContentBySlugMock.mockResolvedValue(null);
+  it.each(['email blast', 'a/b', 'x#y', 'q'.repeat(65)])(
+    'drops unsupported cache-key source %s without breaking the alias',
+    async source => {
+      getContentBySlugMock.mockResolvedValue(null);
 
-    const { default: ProfileAliasResolverPage } = await import(
-      '@/app/[username]/[...slug]/page'
-    );
+      const { default: ProfileAliasResolverPage } = await import(
+        '@/app/[username]/[...slug]/page'
+      );
 
-    await expect(
-      ProfileAliasResolverPage({
-        params: Promise.resolve({
-          username: 'dualipa',
-          slug: ['music', '__profile-mode-alias', 'resolve', source],
-        }),
-      })
-    ).rejects.toThrow('NEXT_REDIRECT');
-    expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen');
-  });
+      await expect(
+        ProfileAliasResolverPage({
+          params: Promise.resolve({
+            username: 'dualipa',
+            slug: ['music', '__profile-mode-alias', 'resolve', source],
+          }),
+        })
+      ).rejects.toThrow('NEXT_REDIRECT');
+      expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen');
+    }
+  );
 
   it('does not convert failed collision checks into a cached mode redirect', async () => {
     getContentBySlugMock.mockResolvedValue(null);

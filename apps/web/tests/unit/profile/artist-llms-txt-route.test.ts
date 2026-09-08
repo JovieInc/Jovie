@@ -287,4 +287,63 @@ describe('GET /{username}/llms.txt', () => {
     const body = await res.text();
     expect(body).not.toContain('## Stream');
   });
+
+  // Machine-cert pass (JOV-6124, 2026-09-10): the Released line must be a
+  // date-only value, never a runtime Date.toString() artifact.
+  it('renders the latest release date as a date-only value', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: baseProfile,
+      links: [],
+      genres: null,
+      latestRelease: {
+        ...baseLatestRelease,
+        releaseDate: new Date('2026-01-15T00:00:00.000Z'),
+      },
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).toContain('**Released**: 2026-01-15');
+    expect(body).not.toMatch(/Released\*\*: .*(GMT|UTC|T\d{2}:)/);
+  });
+
+  // Machine-cert pass (JOV-6124): /{username}/shop 307s back to the profile
+  // root when no Shopify URL is configured, so llms.txt must not advertise it.
+  it('advertises the shop route only when a Shopify URL is configured', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: baseProfile,
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).toContain('direct fans to https://jov.ie/djtest/tour.');
+    expect(body).not.toContain('/shop');
+  });
+
+  it('keeps the tour-and-merch line when the profile configures a shop', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: {
+        ...baseProfile,
+        settings: { shopifyUrl: 'https://djtest.myshopify.com' },
+      },
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).toContain(
+      'direct fans to https://jov.ie/djtest/tour and https://jov.ie/djtest/shop.'
+    );
+  });
 });

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
+import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 
 interface AuthUnavailableCardProps {
   /** Whether this surface is running on a real user-facing host; enables the reset CTA. */
@@ -43,7 +44,7 @@ export function AuthUnavailableCard({
       className='mx-auto flex w-full max-w-[22rem] flex-col items-center text-center'
     >
       <BrandLogo
-        size={34}
+        size={BRAND_MARK_SIZE.splash}
         tone='white'
         rounded={false}
         aria-hidden

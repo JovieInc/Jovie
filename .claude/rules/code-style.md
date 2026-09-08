@@ -1,3 +1,7 @@
+---
+paths: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"]
+---
+
 # Code Style
 
 TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint rules, hook patterns.
@@ -10,7 +14,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
-| Auth | Clerk (three instances, proxy via `/__clerk`) |
+| Auth | Better Auth (self-hosted, `/api/auth/[...all]`) |
 | Payments | Stripe |
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
@@ -218,7 +222,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-20 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+19 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -238,7 +242,6 @@ useQuery({
 | `no-raw-motion-values` | Raw `duration-300`, `ease-in`, `cubic-bezier(...)`, or `transition: all` that bypass System B motion tokens | Use `duration-subtle` / `duration-cinematic` and `--ease-*` tokens; see `.claude/rules/motion.md` |
 | `no-banned-marketing-copy` | Placeholder or off-brand copy (`lorem ipsum`, `John Doe`) on marketing pages | Use verified product copy; allowlist a term only with `copy-lint-allow` |
 | `no-raw-focus-ring` | `focus:ring-*` / `focus:outline-*` on interactive elements (mouse-and-keyboard focus) | Use `focus-ring-themed` or `focus-visible:*` |
-| `clerk-oauth-options-must-include-prompt` | `<SignIn>` / `<SignUp>` without `CLERK_COMPONENT_OPTIONS` or `oidcPrompt='select_account'` | Spread `CLERK_COMPONENT_OPTIONS` from `@/lib/auth/clerk-options` |
 | `chat-tool-schema-strict` | Bare `z.object()` chat tool input schemas | Wrap with `chatToolSchema()` |
 | `canonical-ui-label-casing` | Title Case / sentence-case violations on UI labels | Follow `DESIGN.md` casing; allowlist with `ui-casing-allow` |
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |

@@ -9,6 +9,7 @@
 # - Manual workflow_dispatch
 
 name: Real-Model Eval Lane
+# clock-class: upstream-advisory
 
 on:
   schedule:

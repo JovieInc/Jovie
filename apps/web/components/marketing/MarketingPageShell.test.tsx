@@ -25,10 +25,11 @@ describe('MarketingPageShell', () => {
 
     const wrapper = container.firstElementChild;
     expect(wrapper?.className).toContain('grow');
-    // The layout-owned PublicPageShell already owns min-h-screen; nesting it
+    // The layout-owned PublicPageShell already owns min-h-svh; nesting it
     // here double-applied the fixed-header offset and pushed the footer
     // below the fold on short marketing pages.
     expect(wrapper?.className).not.toContain('min-h-screen');
+    expect(wrapper?.className).not.toContain('min-h-svh');
   });
 
   it('merges page-scoped class hooks onto the wrapper', () => {

@@ -166,7 +166,7 @@ describe('Public Profile Page Logic', () => {
 
     it('resolves missing profiles before the streamed page boundary', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        "import { notFound } from 'next/navigation'"
+        "import { notFound, permanentRedirect } from 'next/navigation'"
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'const profileResult = await getProfileAndLinks(username)'
@@ -183,6 +183,15 @@ describe('Public Profile Page Logic', () => {
         )
       );
       expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+    });
+
+    it('redirects or 404s opaque internal-ID profile URLs before rendering junk', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'resolveOpaqueInternalProfileUsername'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'not_found'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'redirect'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('permanentRedirect');
     });
 
     it('keeps the transient profile error state out of the client graph', () => {
@@ -262,6 +271,16 @@ describe('Public Profile Page Logic', () => {
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'tourDatesPromise.catch(() => [] as TourDateViewModel[])'
+      );
+    });
+
+    it('marks a failed catalog load instead of treating it as an empty catalog', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'Error fetching public profile releases'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('failed: true');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'catalogLoadFailed={catalogLoadFailed}'
       );
     });
 
@@ -865,6 +884,19 @@ describe('Public Profile Page Logic', () => {
 });
 
 describe('profile mode route redirects', () => {
+  it('keeps the canonical profile admission URL source-backed and database-independent', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as RedirectRule[];
+
+    expect(redirects).not.toContainEqual(
+      expect.objectContaining({ source: '/unfazed/:path*' })
+    );
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      "username.toLowerCase() === 'unfazed'"
+    );
+  });
+
   it('does not shadow smart-link slugs with config-level redirects', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;

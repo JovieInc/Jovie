@@ -3,6 +3,7 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
@@ -136,7 +137,7 @@ export function MarketingTerminalCta({
   const content = (
     <div className={variantStyles.content}>
       <h2
-        className={variantStyles.title}
+        className={`${variantStyles.title} line-clamp-2`}
         data-testid={headingTestId}
         data-homepage-section-heading={
           variant === 'homepage-v2' ? true : undefined
@@ -189,7 +190,7 @@ export function MarketingTerminalCta({
   );
 
   return (
-    <section
+    <MarketingCtaSection
       data-pen-contract={penContractId}
       data-testid={testId}
       className={cn(variantStyles.section, className)}
@@ -209,6 +210,6 @@ export function MarketingTerminalCta({
       ) : (
         content
       )}
-    </section>
+    </MarketingCtaSection>
   );
 }

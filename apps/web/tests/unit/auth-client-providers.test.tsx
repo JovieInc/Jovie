@@ -5,8 +5,8 @@ const { valuesProviderRenderCount } = vi.hoisted(() => ({
   valuesProviderRenderCount: { n: 0 },
 }));
 
-vi.mock('@/hooks/useClerkSafe', () => ({
-  ClerkSafeValuesProvider: ({ children }: { children: React.ReactNode }) => {
+vi.mock('@/hooks/useJovieAuth', () => ({
+  JovieAuthValuesProvider: ({ children }: { children: React.ReactNode }) => {
     valuesProviderRenderCount.n += 1;
     return <div data-testid='jovie-auth-values-provider'>{children}</div>;
   },
@@ -25,7 +25,7 @@ describe('AuthClientProviders (Better Auth)', () => {
     valuesProviderRenderCount.n = 0;
   });
 
-  it('mounts Jovie auth values provider + QueryProvider (no ClerkProvider)', () => {
+  it('mounts Jovie auth values provider + QueryProvider', () => {
     render(
       <AuthClientProviders>
         <span>child</span>
@@ -35,19 +35,6 @@ describe('AuthClientProviders (Better Auth)', () => {
     expect(screen.getByTestId('jovie-auth-values-provider')).toBeTruthy();
     expect(screen.getByTestId('query-provider')).toBeTruthy();
     expect(screen.getByText('child')).toBeTruthy();
-    expect(screen.queryByTestId('clerk-provider')).toBeNull();
     expect(valuesProviderRenderCount.n).toBe(1);
-  });
-
-  it('ignores legacy forceEnableClerk / publishableKey props', () => {
-    render(
-      <AuthClientProviders forceEnableClerk publishableKey='pk_test_legacy'>
-        <span>auth-page</span>
-      </AuthClientProviders>
-    );
-
-    // Still only the BA values provider — props are inert post-cutover.
-    expect(screen.getByTestId('jovie-auth-values-provider')).toBeTruthy();
-    expect(screen.queryByTestId('clerk-provider')).toBeNull();
   });
 });

@@ -226,10 +226,7 @@ describe('performance route manifest', () => {
     for (const route of warmProfileRoutes) {
       expect(route.viewport).toEqual({ width: 390, height: 844 });
       expect(route.warmNavigationStartPath).toContain('[username]');
-      expect(route.readySelectors.navTrigger).toHaveLength(1);
-      expect(route.readySelectors.navTrigger?.[0]).toContain(
-        '[data-testid="profile-bottom-nav"] button[aria-label='
-      );
+      expect(route.readySelectors.navTrigger?.length).toBeGreaterThan(0);
       expect(route.readySelectors.content).not.toContain(
         '[data-testid="profile-header"]'
       );
@@ -243,6 +240,29 @@ describe('performance route manifest', () => {
           timing => timing.metric === 'warm-shell-response'
         )?.budget
       ).toBe(100);
+    }
+
+    // JOV-6198: destinations keep bottom-nav triggers; the Get updates action
+    // triggers through the home alerts row / inline CTA instead of a tab.
+    const navTriggerByRouteId: Record<string, string[]> = {
+      'public-profile-main': [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Home"]',
+      ],
+      'public-profile-mode-listen': [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Music"]',
+      ],
+      'public-profile-mode-subscribe': [
+        '[data-testid="profile-home-alerts-row"] button',
+        'button:has-text("Get updates")',
+      ],
+      'public-profile-mode-tour': [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Shows"]',
+      ],
+    };
+    for (const route of warmProfileRoutes) {
+      expect(route.readySelectors.navTrigger).toEqual(
+        navTriggerByRouteId[route.id]
+      );
     }
 
     const root = warmProfileRoutes.find(

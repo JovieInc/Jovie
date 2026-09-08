@@ -63,7 +63,7 @@ export const AUTH_SURFACE = {
 export const AUTH_CLASSES = {
   /** Error message styling with fade-in animation */
   fieldError:
-    'text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
+    'text-[13px] font-[450] text-destructive text-left animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
   /** Step transition animation for multi-step forms */
   stepTransition:
     'animate-in fade-in-0 slide-in-from-bottom-2 duration-cinematic ease-out',
@@ -71,13 +71,18 @@ export const AUTH_CLASSES = {
   oauthButtonMobile:
     'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] transition-[opacity] duration-subtle active:opacity-[0.92]',
   /**
-   * Full-width auth CTA overlay for the canonical `@jovie/ui` Button.
-   * Visible 32px pill (ActionButton lock) inside the Button marketing
-   * 44px tap layer. Pair with the Button `static` prop so press feedback
-   * stays opacity-based, never transform.
+   * Shared full-width CTA overlay for canonical `@jovie/ui` Button callers.
+   * Leave Button size ownership with the caller so dashboard onboarding does
+   * not inherit splash-B auth entrypoint geometry.
    */
   authCta:
-    'w-full h-8 min-h-8 px-4 text-sm font-[510] select-none touch-manipulation [-webkit-tap-highlight-color:transparent] active:opacity-90 disabled:opacity-70',
+    'w-full px-4 text-sm font-[510] select-none touch-manipulation [-webkit-tap-highlight-color:transparent] active:opacity-90 disabled:opacity-70',
+  /**
+   * Auth entrypoint CTA geometry: 28px visible pill inside Button's 44px
+   * invisible tap layer.
+   */
+  authEntryCta:
+    'w-full h-7 min-h-7 px-4 text-sm font-[510] select-none touch-manipulation [-webkit-tap-highlight-color:transparent] active:opacity-90 disabled:opacity-70',
 } as const;
 
 /**

@@ -67,14 +67,13 @@ test('preserves current and legacy caches while their combined size is within th
   }
 });
 
-test('automatically clears current and legacy caches above the combined bound', () => {
+test('reports oversized current and legacy caches as unreleased debt', () => {
   const root = createFixture();
   try {
     const result = runCacheCleanup(root, { JOVIE_NEXT_CACHE_MAX_KIB: '1' });
     assert.equal(result.status, 0, result.stderr);
-    for (const path of cachePaths)
-      assert.equal(existsSync(join(root, path)), false);
-    assert.match(result.stdout, /exceeded 1 KiB limit/);
+    for (const path of cachePaths) assert.ok(existsSync(join(root, path)));
+    assert.match(result.stdout, /no verified allocation release, preserved/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -90,13 +89,13 @@ test('preserves oversized caches when lsof is unavailable', () => {
     });
     assert.equal(result.status, 0, result.stderr);
     for (const path of cachePaths) assert.ok(existsSync(join(root, path)));
-    assert.match(result.stdout, /lsof is unavailable; preserving/);
+    assert.match(result.stdout, /no verified allocation release, preserved/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('explicit reset clears caches even when they are below the bound', () => {
+test('explicit reset cannot release caches even when they are below the bound', () => {
   const root = createFixture();
   try {
     const result = runCacheCleanup(root, {
@@ -104,15 +103,14 @@ test('explicit reset clears caches even when they are below the bound', () => {
       JOVIE_NEXT_CACHE_MAX_KIB: '100',
     });
     assert.equal(result.status, 0, result.stderr);
-    for (const path of cachePaths)
-      assert.equal(existsSync(join(root, path)), false);
-    assert.match(result.stdout, /forced reset/);
+    for (const path of cachePaths) assert.ok(existsSync(join(root, path)));
+    assert.match(result.stdout, /reset deferred/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('setup removes stale oversized full Next dev output before nested cache cleanup', () => {
+test('setup reports stale full Next dev output without treating setup as allocation release', () => {
   const root = createFixture();
   try {
     const payload = join(root, 'apps/web/.next/dev/server/payload.bin');
@@ -127,8 +125,34 @@ test('setup removes stale oversized full Next dev output before nested cache cle
       JOVIE_NEXT_CACHE_MAX_KIB: '999999',
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(existsSync(join(root, 'apps/web/.next/dev')), false);
-    assert.match(result.stdout, /Removed apps\/web\/\.next\/dev/);
+    assert.ok(existsSync(join(root, 'apps/web/.next/dev')));
+    assert.match(result.stdout, /Cleanup debt apps\/web\/\.next\/dev/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('setup shared retention entrypoint only reports completed artifacts and metadata', () => {
+  const root = createFixture();
+  try {
+    mkdirSync(join(root, '.tech-debt'));
+    for (let day = 1; day <= 15; day++) {
+      writeFileSync(
+        join(
+          root,
+          `.tech-debt/paydown-report-202607${String(day).padStart(2, '0')}-010000.md`
+        ),
+        'completed report'
+      );
+    }
+    const metadata = join(root, '.DS_Store');
+    writeFileSync(metadata, 'metadata');
+    const result = runCacheCleanup(root);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Generated artifact retention \(dry-run\)/);
+    assert.match(result.stdout, /wouldRemove=1/);
+    assert.equal(readdirSync(join(root, '.tech-debt')).length, 15);
+    assert.ok(existsSync(metadata));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -2,8 +2,14 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { OnboardingShell } from '@/components/features/onboarding/OnboardingShell';
 import { getStartRouteRedirect } from '@/lib/auth/access-route-redirect';
-import { resolveUserState } from '@/lib/auth/gate';
+import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
+import {
+  type AuthGateResult,
+  getWaitlistAccess,
+  resolveUserState,
+} from '@/lib/auth/gate';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
 /**
  * Canonical onboarding chat entry point.
@@ -29,6 +35,24 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+async function resolveStartPageRedirect(
+  authResult: AuthGateResult
+): Promise<string | null> {
+  if (authResult.state !== CanonicalUserState.WAITLIST_PENDING) {
+    return getStartRouteRedirect(authResult.state);
+  }
+
+  const email = authResult.context.email;
+  if (!email) return null;
+
+  const access = await getWaitlistAccess(email);
+  if (!access.entryId || !isWaitlistPendingStatus(access.status)) {
+    return null;
+  }
+
+  return getStartRouteRedirect(authResult.state);
+}
+
 export default async function StartPage(
   {
     searchParams,
@@ -42,7 +66,7 @@ export default async function StartPage(
   const starterHandoff = resolveStartEntryHandoff(params);
 
   const authResult = await resolveUserState({ createDbUserIfMissing: false });
-  const startRedirect = getStartRouteRedirect(authResult.state);
+  const startRedirect = await resolveStartPageRedirect(authResult);
   if (startRedirect) {
     redirect(startRedirect);
   }

@@ -5,7 +5,7 @@
 # with failing checks. This prevents stale drafts from accumulating and
 # confusing the merge-queue prioritization.
 #
-# Opt out per-PR with any of: needs-human, hold, gated.
+# Opt out per-PR with a current machine hold: hold, gated, or incident.
 # Human-owned branches are never touched.
 #
 # Env:
@@ -114,7 +114,7 @@ while IFS= read -r pr; do
   if jq -e '
     .draft
     and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated")) | not)
+    and (([.L[]] | any(. == "hold" or . == "gated" or . == "incident")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -128,7 +128,7 @@ STUCK="$(echo "$SNAP" | jq -c --arg cutoff "$cutoff_iso" '[.[] |
   and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
   and ((.updated // "9999-01-01") < $cutoff)
   and (.fail | length > 0)
-  and ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated") | not)
+  and ([.L[]] | any(. == "hold" or . == "gated" or . == "incident") | not)
 ]')"
 
 count="$(jq length <<<"$STUCK")"

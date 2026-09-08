@@ -162,7 +162,7 @@ export default function DownloadPage() {
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 text-balance text-5xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl'
+                    className='mt-5 text-balance text-5xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
                   >
                     Jovie, Installed Where You Work.
                   </h1>
@@ -265,7 +265,7 @@ export default function DownloadPage() {
                         {platform.label}
                       </span>
                     </div>
-                    <h2 className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'>
+                    <h2 className='mt-5 max-w-xs text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
                       {platform.title}
                     </h2>
                     <p
@@ -306,7 +306,7 @@ export default function DownloadPage() {
           <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
             <div>
               <p className='homepage-section-eyebrow'>Release workflow</p>
-              <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'>
+              <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
                 Everything In Jovie, Closer.
               </h2>
             </div>
@@ -333,7 +333,7 @@ export default function DownloadPage() {
             <div className='grid gap-12 lg:grid-cols-2 lg:items-start'>
               <div>
                 <p className='homepage-section-eyebrow'>Install details</p>
-                <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'>
+                <h2 className='mt-4 max-w-xs text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl line-clamp-2'>
                   Built To Stay Out Of The Way.
                 </h2>
               </div>

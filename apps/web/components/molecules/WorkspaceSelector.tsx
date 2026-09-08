@@ -42,7 +42,7 @@ export function WorkspaceSelector<Id extends string>({
           )}
         >
           <BrandLogo
-            size={14}
+            size='chrome'
             tone='auto'
             variant={currentWorkspace.brandVariant}
             rounded={false}
@@ -65,7 +65,7 @@ export function WorkspaceSelector<Id extends string>({
                 className='flex items-center gap-2'
               >
                 <BrandLogo
-                  size={14}
+                  size='chrome'
                   tone='auto'
                   variant={workspace.brandVariant}
                   rounded={false}

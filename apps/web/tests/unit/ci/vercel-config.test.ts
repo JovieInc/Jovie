@@ -53,7 +53,7 @@ describe('Vercel function config', () => {
     }
   });
 
-  it('always builds production branches and delegates preview relevance to turbo-ignore', () => {
+  it('always builds production branches and skips every other ref', () => {
     const configs = ['vercel.json', 'apps/web/vercel.json'];
     const ignoreCommands = configs.map(configPath => {
       const command = readVercelConfig(configPath).ignoreCommand;
@@ -101,10 +101,11 @@ describe('Vercel function config', () => {
       'linear/docs-only',
     ]) {
       const { callLog, result } = runIgnoreCommand(ref);
+      // JOV-5941: PR refs never build or deploy — the ignore command must
+      // exit 0 on its own without delegating to `npx turbo-ignore`, so the
+      // fake-npx call log staying unwritten is the assertion.
       expect(result.status, ref).toBe(0);
-      expect(readFileSync(callLog, 'utf8'), ref).toBe(
-        'turbo-ignore @jovie/web\n'
-      );
+      expect(existsSync(callLog), ref).toBe(false);
     }
   });
 });

@@ -44,4 +44,33 @@ describe('AuthBrandPanel', () => {
     expect(backdrop).toHaveAttribute('alt', '');
     expect(backdrop).toHaveClass('forced-colors:hidden');
   });
+
+  it('renders optional auth shell copy without changing the panel owner', () => {
+    render(
+      <AuthBrandPanel
+        headline='Welcome to Jovie'
+        description='Create your artist profile today.'
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Welcome to Jovie' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Create your artist profile today.')
+    ).toBeInTheDocument();
+  });
+
+  it('can hide compatibility copy while preserving the product frame', () => {
+    render(<AuthBrandPanel headline='Hidden copy' showText={false} />);
+
+    expect(
+      screen.getByTestId(
+        'product-screenshot-frame-dashboard-releases-sidebar-desktop'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Hidden copy' })
+    ).not.toBeInTheDocument();
+  });
 });

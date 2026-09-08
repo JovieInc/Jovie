@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
 import { AUTHED_AXE_SURFACES } from './utils/authed-axe-surface-manifest';
 import {

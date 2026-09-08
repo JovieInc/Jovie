@@ -193,7 +193,7 @@ export function designLearningContentHash(input: {
       JSON.stringify({
         ruleKey: input.ruleKey,
         statement: input.statement.trim(),
-        scope: [...input.scope].sort(),
+        scope: [...input.scope].sort((a, b) => a.localeCompare(b)),
       })
     )
     .digest('hex');

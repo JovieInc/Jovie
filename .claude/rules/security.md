@@ -1,3 +1,7 @@
+---
+paths: ["apps/web/app/api/**", "apps/web/lib/**", "packages/**", ".github/**", "scripts/**"]
+---
+
 # Security & Trust Boundaries
 
 CSP, webhooks, secrets, email, fail-closed persistence, biome-ignore, environment variables.

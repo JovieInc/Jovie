@@ -120,6 +120,29 @@ function CookieCategories({
   );
 }
 
+function CookiePreferencesSaveButton({
+  isSaving,
+  onSave,
+  className,
+}: Readonly<{
+  isSaving: boolean;
+  onSave: () => void;
+  className: string;
+}>) {
+  return (
+    <Button
+      type='button'
+      variant='primary'
+      size='marketing'
+      onClick={onSave}
+      disabled={isSaving}
+      className={className}
+    >
+      Save Preferences
+    </Button>
+  );
+}
+
 export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
   const [settings, setSettings] = useState<Consent>(() => {
     if (globalThis.window === undefined) {
@@ -188,27 +211,22 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
             />
           </div>
 
-          <SheetFooter className='mt-4 flex-row gap-3'>
+          <SheetFooter className='mt-4 flex-row flex-wrap gap-3'>
             <Button
               type='button'
               variant='secondary'
-              size='sm'
+              size='marketing'
               onClick={onClose}
               disabled={isSaving}
-              className='min-h-12 flex-1'
+              className='my-2 min-w-max flex-1'
             >
               Cancel
             </Button>
-            <Button
-              type='button'
-              variant='primary'
-              size='sm'
-              onClick={save}
-              disabled={isSaving}
-              className='min-h-12 flex-1'
-            >
-              Save Preferences
-            </Button>
+            <CookiePreferencesSaveButton
+              isSaving={isSaving}
+              onSave={save}
+              className='my-2 min-w-max flex-1'
+            />
           </SheetFooter>
           {saveError ? (
             <p
@@ -252,27 +270,22 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         ) : null}
       </DialogBody>
 
-      <DialogActions className='mt-3'>
+      <DialogActions className='mt-3 flex-wrap'>
         <Button
           type='button'
           variant='secondary'
-          size='sm'
+          size='marketing'
           onClick={onClose}
           disabled={isSaving}
-          className='min-h-12'
+          className='my-2 min-w-max'
         >
           Cancel
         </Button>
-        <Button
-          type='button'
-          variant='primary'
-          size='sm'
-          onClick={save}
-          disabled={isSaving}
-          className='min-h-12'
-        >
-          Save Preferences
-        </Button>
+        <CookiePreferencesSaveButton
+          isSaving={isSaving}
+          onSave={save}
+          className='my-2 min-w-max'
+        />
       </DialogActions>
     </Dialog>
   );

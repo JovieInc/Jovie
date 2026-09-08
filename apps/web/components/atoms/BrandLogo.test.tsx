@@ -4,11 +4,13 @@ import { BrandLogo } from './BrandLogo';
 
 describe('BrandLogo', () => {
   it('renders the selected brand with its accessible name and size', () => {
-    render(<BrandLogo variant='ov' size={64} tone='color' rounded={false} />);
+    render(
+      <BrandLogo variant='ov' size='splash' tone='color' rounded={false} />
+    );
 
     const mark = screen.getByRole('img', { name: 'OV' });
-    expect(mark).toHaveAttribute('width', '64');
-    expect(mark).toHaveAttribute('height', '64');
+    expect(mark).toHaveAttribute('width', '32');
+    expect(mark).toHaveAttribute('height', '32');
     expect(mark.parentElement).toHaveAttribute('data-brand-variant', 'ov');
     expect(mark.parentElement).toHaveClass('text-accent');
     expect(mark.parentElement).not.toHaveClass('rounded-full');

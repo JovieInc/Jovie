@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/artist-profile/artist-profile-system-b-style-guard.test.ts
 import Image from 'next/image';
 import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
 import { HomepagePosterHero } from '@/components/homepage/HomepagePosterHero';
@@ -42,7 +43,7 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
         headline={hero.headline}
         subtitle={hero.subhead}
         primaryCta={{
-          label: hero.ctaLabel,
+          label: claimIntent.label,
           href: claimIntent.href,
           eventName: claimIntent.eventName,
           signUp: true,

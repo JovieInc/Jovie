@@ -8,6 +8,7 @@
 #
 # Exit 1 from brand-scrub.py fails the audit and pages the owning workflow.
 name: Brand Scrub
+# clock-class: skip-if-unchanged
 
 on:
   schedule:

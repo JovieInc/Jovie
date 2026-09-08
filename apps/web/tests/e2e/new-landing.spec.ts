@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -35,14 +36,17 @@ test.describe('/new landing page', () => {
 
     await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
     await expect(
+      headerNav.getByRole('link', { name: 'Customers', exact: true })
+    ).toHaveAttribute('href', APP_ROUTES.ARTISTS);
+    await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
     await expect(
       headerNav.getByRole('button', { name: 'For', exact: true })
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       headerNav.getByRole('button', { name: 'Tools', exact: true })
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       headerNav.getByRole('link', { name: 'Pricing', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.PRICING);
@@ -94,12 +98,12 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('navigates hero CTA to start', async ({ page }) => {
+  test('navigates hero CTA to waitlist', async ({ page }) => {
     await gotoLanding(page);
 
     await expect(
       page.getByTestId('homepage-v2-hero-primary-cta')
-    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+    ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
   });
 
   test('routes deep links to artist profiles anchors', async ({ page }) => {

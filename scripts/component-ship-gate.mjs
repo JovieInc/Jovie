@@ -2097,9 +2097,11 @@ export function runComponentShipGate(options = {}) {
         headSha: flags.headSha ?? undefined,
         observations: flags.liveObservations,
         nodeVersion: flags.liveNodeVersion,
+        changedComponents,
       });
       report.sections.liveStorybookCertification = {
         ok: live.ok,
+        skipped: live.skipped === true,
         schema: live.schema,
         receipt: live.receipt,
       };

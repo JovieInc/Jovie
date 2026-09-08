@@ -13,7 +13,7 @@
       "$type": "color"
     },
     "surface.panel": {
-      "$value": "#0a0d16",
+      "$value": "#0f1420",
       "$type": "color"
     },
     "surface.card": {
@@ -101,39 +101,39 @@
       "$type": "color"
     },
     "accent.ultra": {
-      "$value": "#a982ff",
+      "$value": "#8e56f5",
       "$type": "color"
     },
     "accent.pulse": {
-      "$value": "#ff48d2",
+      "$value": "#f52bb5",
       "$type": "color"
     },
     "accent.aqua": {
-      "$value": "#24f6d2",
+      "$value": "#3ffa8b",
       "$type": "color"
     },
     "accent.mint": {
-      "$value": "#39e58c",
+      "$value": "#3ffa8b",
       "$type": "color"
     },
     "accent.gold": {
-      "$value": "#ffc857",
+      "$value": "#ff7800",
       "$type": "color"
     },
     "accent.flare": {
-      "$value": "#ff677d",
+      "$value": "#f72a36",
       "$type": "color"
     },
     "status.success": {
-      "$value": "#39e58c",
+      "$value": "#3ffa8b",
       "$type": "color"
     },
     "status.warning": {
-      "$value": "#ffc857",
+      "$value": "#ff7800",
       "$type": "color"
     },
     "status.error": {
-      "$value": "#ff677d",
+      "$value": "#f72a36",
       "$type": "color"
     },
     "feature.analytics": {
@@ -141,23 +141,23 @@
       "$type": "color"
     },
     "feature.conversion": {
-      "$value": "#a982ff",
+      "$value": "#8e56f5",
       "$type": "color"
     },
     "feature.beauty": {
-      "$value": "#ff48d2",
+      "$value": "#f52bb5",
       "$type": "color"
     },
     "feature.links": {
-      "$value": "#24f6d2",
+      "$value": "#3ffa8b",
       "$type": "color"
     },
     "feature.speed": {
-      "$value": "#39e58c",
+      "$value": "#3ffa8b",
       "$type": "color"
     },
     "feature.pro": {
-      "$value": "#ffc857",
+      "$value": "#ff7800",
       "$type": "color"
     }
   }

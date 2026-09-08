@@ -12,7 +12,7 @@ const hoisted = vi.hoisted(() => {
   const fetchExistingProfileMock = vi.fn();
   const cacheHandleAvailabilityMock = vi.fn();
   const invalidateProxyUserStateCacheMock = vi.fn();
-  const attributeLeadSignupFromClerkUserIdMock = vi.fn();
+  const attributeLeadSignupFromAppUserIdMock = vi.fn();
   const invalidateProfileCacheMock = vi.fn();
   const markWaitlistSignedUpInTxMock = vi.fn();
   const enforceOnboardingRateLimitMock = vi.fn();
@@ -20,7 +20,7 @@ const hoisted = vi.hoisted(() => {
   const captureErrorMock = vi.fn();
 
   return {
-    attributeLeadSignupFromClerkUserIdMock,
+    attributeLeadSignupFromAppUserIdMock,
     cacheHandleAvailabilityMock,
     captureErrorMock,
     cookiesMock,
@@ -61,8 +61,8 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedCurrentUser: hoisted.currentUserMock,
 }));
 
-vi.mock('@/lib/auth/clerk-identity', () => ({
-  resolveClerkIdentity: vi.fn().mockReturnValue({
+vi.mock('@/lib/auth/user-identity', () => ({
+  resolveUserIdentity: vi.fn().mockReturnValue({
     avatarUrl: null,
     displayName: 'Gold Path User',
     email: 'fresh@test.jovie.com',
@@ -95,8 +95,8 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
-  attributeLeadSignupFromClerkUserId:
-    hoisted.attributeLeadSignupFromClerkUserIdMock,
+  attributeLeadSignupFromAppUserId:
+    hoisted.attributeLeadSignupFromAppUserIdMock,
 }));
 
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
@@ -172,11 +172,51 @@ describe('completeOnboarding', () => {
     hoisted.enforceOnboardingRateLimitMock.mockResolvedValue(undefined);
     hoisted.cacheHandleAvailabilityMock.mockResolvedValue(undefined);
     hoisted.invalidateProxyUserStateCacheMock.mockResolvedValue(undefined);
-    hoisted.attributeLeadSignupFromClerkUserIdMock.mockResolvedValue(undefined);
+    hoisted.attributeLeadSignupFromAppUserIdMock.mockResolvedValue(undefined);
     hoisted.invalidateProfileCacheMock.mockResolvedValue(undefined);
     hoisted.withDbSessionTxMock.mockImplementation(async operation => {
       return operation({} as never, 'clerk_123');
     });
+  });
+
+  it('rejects completion when required lead receipts fail instead of swallowing them', async () => {
+    hoisted.withRetryMock.mockResolvedValueOnce({
+      username: 'freshhandle',
+      profileId: 'profile_123',
+      status: 'complete',
+    });
+    hoisted.attributeLeadSignupFromAppUserIdMock.mockRejectedValueOnce(
+      new Error('receipt unavailable')
+    );
+    await expect(
+      completeOnboarding({
+        username: 'freshhandle',
+        displayName: 'Fresh Handle',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow('Your profile is saved');
+    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
+      'completeOnboarding failed',
+      expect.objectContaining({
+        message: expect.stringContaining('Your profile is saved'),
+      }),
+      expect.anything()
+    );
+    hoisted.withRetryMock.mockResolvedValueOnce({
+      username: 'freshhandle',
+      profileId: 'profile_123',
+      status: 'complete',
+    });
+    await expect(
+      completeOnboarding({
+        username: 'freshhandle',
+        displayName: 'Fresh Handle',
+        redirectToDashboard: false,
+      })
+    ).resolves.toMatchObject({ profileId: 'profile_123', status: 'complete' });
+    expect(hoisted.attributeLeadSignupFromAppUserIdMock).toHaveBeenCalledTimes(
+      2
+    );
   });
 
   it('recovers as success when a concurrent duplicate handle belongs to the same user', async () => {

@@ -4,7 +4,7 @@ import {
   buildGBrainHealthSummary,
   collectGBrainHealthSummary,
   runGBrainHealthSummary,
-} from '../../hermes/jobs/gbrain-health-summary.ts';
+} from '../../symphony/jobs/gbrain-health-summary.ts';
 
 const generatedAt = '2026-07-04T10:00:00.000Z';
 const check = (name, ok, detail = 'ok') => ({

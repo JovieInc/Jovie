@@ -45,25 +45,75 @@ struct QRCodeRendererTests {
 }
 
 struct PublicProfileURLPolicyTests {
-  private let policy = PublicProfileURLPolicy(webBaseURL: URL(string: "https://jov.ie")!)!
+  private let policy = PublicProfileURLPolicy(publicProfileURL: "https://jov.ie/tim")!
 
-  @Test func acceptsConfiguredHTTPSHost() {
+  @Test func acceptsConfiguredHTTPSProfileAndItsPublicSubroutes() {
     #expect(policy.validatedURL(from: "https://jov.ie/tim") == URL(string: "https://jov.ie/tim"))
+    #expect(
+      policy.validatedURL(from: "https://jov.ie/tim/summer-tour/sounds?source=app#latest")
+        == URL(string: "https://jov.ie/tim/summer-tour/sounds?source=app#latest")
+    )
   }
 
-  @Test func rejectsHTTPAndUnrelatedHosts() {
+  @Test func rejectsHTTPUnrelatedHostsAndCrossTenantProfiles() {
     #expect(policy.validatedURL(from: "http://jov.ie/tim") == nil)
     #expect(policy.validatedURL(from: "https://example.com/tim") == nil)
+    #expect(policy.validatedURL(from: "https://jov.ie/another-artist") == nil)
+    #expect(policy.validatedURL(from: "about:blank") == nil)
     #expect(policy.validatedURL(from: nil) == nil)
   }
 
   @Test func rejectsInvalidConfiguredBaseURL() {
-    #expect(PublicProfileURLPolicy(webBaseURL: URL(string: "http://jov.ie")!) == nil)
+    #expect(PublicProfileURLPolicy(webBaseURL: URL(string: "http://jov.ie/tim")!) == nil)
+    #expect(PublicProfileURLPolicy(webBaseURL: URL(string: "https://jov.ie")!) == nil)
+    #expect(PublicProfileURLPolicy(publicProfileURL: "https://example.com/tim") == nil)
   }
 
   @Test func acceptsPublicProfileURLHostEvenWhenAppBaseIsLAN() {
     let policy = PublicProfileURLPolicy(publicProfileURL: "https://jov.ie/tim")
     #expect(policy?.validatedURL(from: "https://jov.ie/tim") == URL(string: "https://jov.ie/tim"))
+  }
+
+  @Test func acceptsStagingHostPublicProfiles() {
+    let policy = PublicProfileURLPolicy(publicProfileURL: "https://staging.jov.ie/tim")
+    #expect(
+      policy?.validatedURL(from: "https://staging.jov.ie/tim")
+        == URL(string: "https://staging.jov.ie/tim")
+    )
+  }
+
+  @Test func rejectsOperatorAdminAndAppDestinationsEvenOnTheAllowedHost() {
+    for path in [
+      "/app",
+      "/app/ov/chat",
+      "/admin",
+      "/hud",
+      "/hud-tv",
+      "/api/mobile/v1/me",
+      "/auth/start",
+      "/changelog",
+      "/about",
+      "/waitlist",
+      "/__clerk",
+      "/onboarding",
+    ] {
+      #expect(PublicProfileURLPolicy(publicProfileURL: "https://jov.ie\(path)") == nil)
+      #expect(policy.validatedURL(from: "https://jov.ie\(path)") == nil)
+    }
+  }
+
+  @Test func rejectsUnsafeOrOverdeepPublicProfilePaths() {
+    #expect(policy.validatedURL(from: "https://jov.ie/tim/a/b/c/d") == nil)
+    #expect(policy.validatedURL(from: "https://jov.ie/tim/%5Cadmin") == nil)
+    #expect(policy.validatedURL(from: "https://jov.ie/tim/%2F%2Fadmin") == nil)
+  }
+
+  @Test @MainActor func publicBrowserUsesAnIsolatedNonPersistentDataStore() {
+    let url = URL(string: "https://jov.ie/tim")!
+    let model = PublicProfileBrowserModel(initialURL: url, policy: policy)
+    #expect(model.webView.configuration.websiteDataStore.isPersistent == false)
+    #expect(model.webView.configuration.allowsInlineMediaPlayback)
+    #expect(model.webView.configuration.mediaTypesRequiringUserActionForPlayback.isEmpty)
   }
 }
 

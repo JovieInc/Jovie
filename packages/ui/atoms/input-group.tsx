@@ -12,9 +12,9 @@ export interface InputGroupProps extends React.ComponentPropsWithoutRef<'div'> {
 }
 
 const sizeClasses = {
-  sm: '[&>[data-slot=icon]]:size-4 [&>[data-slot=icon]:first-child]:left-2 [&>input~[data-slot=icon]]:right-2 [&>[data-slot=icon]:first-child~input]:pl-8 [&:has(>input~[data-slot=icon])>input]:pr-8',
-  md: '[&>[data-slot=icon]]:size-3.5 [&>[data-slot=icon]:first-child]:left-3 [&>input~[data-slot=icon]]:right-3 [&>[data-slot=icon]:first-child~input]:pl-9 [&:has(>input~[data-slot=icon])>input]:pr-9',
-  lg: '[&>[data-slot=icon]]:size-5 [&>[data-slot=icon]:first-child]:left-3.5 [&>input~[data-slot=icon]]:right-3.5 [&>[data-slot=icon]:first-child~input]:pl-12 [&:has(>input~[data-slot=icon])>input]:pr-12',
+  sm: '[&>[data-slot=icon]]:size-4 [&>[data-slot=icon]:first-child]:left-2 [&>*+[data-slot=icon]]:right-2 [&:has(>[data-slot=icon]:first-child)_input]:pl-8 [&:has(>*+[data-slot=icon])_input]:pr-8',
+  md: '[&>[data-slot=icon]]:size-3.5 [&>[data-slot=icon]:first-child]:left-3 [&>*+[data-slot=icon]]:right-3 [&:has(>[data-slot=icon]:first-child)_input]:pl-9 [&:has(>*+[data-slot=icon])_input]:pr-9',
+  lg: '[&>[data-slot=icon]]:size-5 [&>[data-slot=icon]:first-child]:left-3.5 [&>*+[data-slot=icon]]:right-3.5 [&:has(>[data-slot=icon]:first-child)_input]:pl-12 [&:has(>*+[data-slot=icon])_input]:pr-12',
 } satisfies Record<NonNullable<InputGroupProps['size']>, string>;
 
 /**

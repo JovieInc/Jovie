@@ -1,3 +1,7 @@
+---
+paths: ["apps/ios/**", "**/*.swift"]
+---
+
 # iOS (Native SwiftUI App)
 
 Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-auth, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. Mac product work is Electron, not an iOS Swift rewrite — [`.claude/rules/macos.md`](macos.md).

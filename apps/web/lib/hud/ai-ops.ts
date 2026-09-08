@@ -62,13 +62,7 @@ function isAgentBranch(value: unknown): boolean {
 
 function hasBlockingLabel(labels: unknown): boolean {
   if (!Array.isArray(labels)) return false;
-  const blocking = new Set([
-    'needs-human-taste',
-    'hold',
-    'gated',
-    'needs-human',
-    'human-review-required',
-  ]);
+  const blocking = new Set(['hold', 'gated']);
   return labels.some(label => {
     if (!isRecord(label)) return false;
     const name = typeof label.name === 'string' ? label.name : '';

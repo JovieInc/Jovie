@@ -46,7 +46,9 @@ describe('Kbd', () => {
         </Kbd>
       );
       const kbd = screen.getByTestId('kbd');
-      expect(kbd.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(kbd.className).toContain('bg-surface-tooltip');
+      // Deliberate-red guard: the tooltip keycap must not inherit the card surface.
+      expect(kbd.className).not.toContain('bg-(--linear-bg-surface-1)');
       expect(kbd.className).toContain('border-(--linear-border-default)');
       expect(kbd.className).toContain('text-(--linear-text-primary)');
     });
@@ -58,7 +60,7 @@ describe('Kbd', () => {
         </Kbd>
       );
       const kbd = screen.getByTestId('kbd');
-      expect(kbd.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(kbd.className).toContain('bg-surface-tooltip');
       expect(kbd.className).toContain('border-(--linear-border-default)');
     });
   });
@@ -147,6 +149,7 @@ describe('Kbd', () => {
         </div>
       );
       const kbd = screen.getByText('⌘K');
+      expect(kbd.className).toContain('bg-surface-tooltip');
       expect(kbd.className).toContain('text-(--linear-text-primary)');
     });
   });

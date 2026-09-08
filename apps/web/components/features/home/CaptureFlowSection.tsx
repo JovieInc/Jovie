@@ -5,7 +5,7 @@ export function CaptureFlowSection() {
     <section className='section-spacing-linear bg-base border-t border-subtle'>
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto'>
-          <h2 className='marketing-h2-linear text-center mb-4'>
+          <h2 className='marketing-h2-linear text-center mb-4 line-clamp-2'>
             {/* ui-casing-allow: marketing display headline */}
             New fans subscribe. Returning fans listen.
           </h2>

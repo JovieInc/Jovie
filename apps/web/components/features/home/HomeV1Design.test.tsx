@@ -25,7 +25,7 @@ describe('HomeV1Design', () => {
         level: 1,
         name: 'Release Work, Finally Organized.',
       })
-    ).toBeInTheDocument();
+    ).toHaveClass('line-clamp-2');
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
 
     const requestHeading = screen.getByRole('heading', {
@@ -65,6 +65,20 @@ describe('HomeV1Design', () => {
     expect(rawDocument.body.textContent).toContain('Plan my next release');
     expect(rawDocument.body.textContent).toContain(
       'Built for artists and teams replacing scattered release work'
+    );
+    expect(
+      rawDocument
+        .querySelector('[data-brand-mark-size]')
+        ?.getAttribute('data-brand-mark-size')
+    ).toBe('20');
+  });
+
+  it('uses min-h-svh so iOS Safari chrome cannot jump the homepage shell', () => {
+    const { container } = render(<HomeV1Design />);
+
+    expect(container.firstElementChild?.className).toContain('min-h-svh');
+    expect(container.firstElementChild?.className).not.toContain(
+      'min-h-screen'
     );
   });
 });

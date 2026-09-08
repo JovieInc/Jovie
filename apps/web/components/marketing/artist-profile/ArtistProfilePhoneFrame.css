@@ -1,51 +1,111 @@
 /* ArtistProfilePhoneFrame — System B tokenized device chrome. Gradient stops
    map to the dark surface tokens (surface-2 #161a20 / surface-0 #0a0b0e),
-   matching the original rgba(20,21,28) → rgba(10,11,15) stops. */
+   matching the original rgba(20,21,28) → rgba(10,11,15) stops.
 
-.ap-phone-frame {
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 12%, transparent);
-  border-radius: 2.4rem;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--color-bg-surface-2) 98%, transparent),
-    color-mix(in oklab, var(--color-bg-surface-0) 98%, transparent)
-  );
-  box-shadow:
-    0 34px 100px
-    color-mix(in oklab, var(--system-b-cinematic-black) 48%, transparent),
-    0 14px 36px
-    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
-}
+   Size variants set --ap-phone-scale from the lg reference (21.25rem). Bezel
+   padding, radii, and shadow follow that scale. Notch + screen radius also
+   use cqi so chrome stays proportionate when a parent shrinks the frame
+   below the variant max (homepage 7.5rem trio, 900px two-column).
 
-.ap-phone-frame__screen {
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
-  border-radius: 1.85rem;
-}
+   Keep these rules in @layer components so Tailwind utilities such as
+   max-w-none (ModeSwitcher / Homepage V2 compact rail) can still win. */
 
-.ap-phone-frame__notch {
-  background: color-mix(
-    in oklab,
-    var(--system-b-cinematic-black) 70%,
-    transparent
-  );
-  box-shadow: 0 0 0 1px
-    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
-}
+@layer components {
+  .ap-phone-frame {
+    --ap-phone-scale: 1;
+    --ap-phone-max-width: 21.25rem;
+    --ap-phone-pad: calc(0.75rem * var(--ap-phone-scale));
+    --ap-phone-radius: calc(2.4rem * var(--ap-phone-scale));
+    --ap-phone-screen-radius: calc(1.85rem * var(--ap-phone-scale));
+    --ap-phone-notch-width: calc(7rem * var(--ap-phone-scale));
+    --ap-phone-notch-height: calc(1.5rem * var(--ap-phone-scale));
+    --ap-phone-notch-inset: calc(0.75rem * var(--ap-phone-scale));
+    --ap-phone-shadow-y-far: calc(34px * var(--ap-phone-scale));
+    --ap-phone-shadow-blur-far: calc(100px * var(--ap-phone-scale));
+    --ap-phone-shadow-y-near: calc(14px * var(--ap-phone-scale));
+    --ap-phone-shadow-blur-near: calc(36px * var(--ap-phone-scale));
 
-.ap-phone-frame__overlay {
-  background:
-    radial-gradient(
-      circle at top,
-      color-mix(in oklab, var(--color-text-tertiary-token) 14%, transparent),
-      transparent 35%
-    ),
-    linear-gradient(
+    container-type: inline-size;
+    container-name: ap-phone;
+    width: 100%;
+    max-width: var(--ap-phone-max-width);
+    margin-inline: auto;
+    padding: var(--ap-phone-pad);
+    border: 1px solid
+      color-mix(in oklab, var(--color-text-primary-token) 12%, transparent);
+    border-radius: var(--ap-phone-radius);
+    background: linear-gradient(
       180deg,
-      color-mix(in oklab, var(--color-text-primary-token) 4%, transparent),
-      transparent 22%,
-      transparent 78%,
-      color-mix(in oklab, var(--system-b-cinematic-black) 22%, transparent)
+      color-mix(in oklab, var(--color-bg-surface-2) 98%, transparent),
+      color-mix(in oklab, var(--color-bg-surface-0) 98%, transparent)
     );
+    box-shadow:
+      0 var(--ap-phone-shadow-y-far) var(--ap-phone-shadow-blur-far)
+        color-mix(in oklab, var(--system-b-cinematic-black) 48%, transparent),
+      0 var(--ap-phone-shadow-y-near) var(--ap-phone-shadow-blur-near)
+        color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+  }
+
+  .ap-phone-frame[data-size="md"] {
+    --ap-phone-scale: 0.7059;
+    --ap-phone-max-width: 15rem;
+  }
+
+  .ap-phone-frame[data-size="sm"] {
+    --ap-phone-scale: 0.5647;
+    --ap-phone-max-width: 12rem;
+  }
+
+  .ap-phone-frame__screen {
+    position: relative;
+    aspect-ratio: 9 / 19.5;
+    overflow: hidden;
+    background: var(--color-bg-surface-0);
+    border: 1px solid
+      color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+    border-radius: min(var(--ap-phone-screen-radius), 8.71cqi);
+  }
+
+  .ap-phone-frame__notch {
+    position: absolute;
+    left: 50%;
+    top: min(var(--ap-phone-notch-inset), 3.53cqi);
+    z-index: 20;
+    width: min(var(--ap-phone-notch-width), 32.94cqi);
+    height: min(var(--ap-phone-notch-height), 7.06cqi);
+    translate: -50% 0;
+    border-radius: 999px;
+    background: color-mix(
+      in oklab,
+      var(--system-b-cinematic-black) 70%,
+      transparent
+    );
+    box-shadow: 0 0 0 1px
+      color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+  }
+
+  .ap-phone-frame__overlay {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        circle at top,
+        color-mix(in oklab, var(--color-text-tertiary-token) 14%, transparent),
+        transparent 35%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--color-text-primary-token) 4%, transparent),
+        transparent 22%,
+        transparent 78%,
+        color-mix(in oklab, var(--system-b-cinematic-black) 22%, transparent)
+      );
+  }
+
+  .ap-phone-frame__viewport {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+  }
 }

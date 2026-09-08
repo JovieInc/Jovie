@@ -470,7 +470,6 @@ function splitMainConjunctionName(name: string): string[] | null {
 // Process "vs" split artists into credits
 function processVsParts(
   vsParts: string[],
-  artistIndex: number,
   artist: SpotifyArtistInput,
   imageUrl: string | undefined,
   credits: ParsedArtistCredit[],
@@ -486,7 +485,7 @@ function processVsParts(
       role: j === 0 ? 'main_artist' : 'vs',
       joinPhrase: j === 0 ? null : ' vs ',
       position: position++,
-      isPrimary: j === 0 && artistIndex === 0,
+      isPrimary: j === 0,
       spotifyId: j === 0 ? artist.id : undefined,
       imageUrl: j === 0 ? imageUrl : undefined,
     });
@@ -497,7 +496,6 @@ function processVsParts(
 // Process conjunction split artists into credits
 function processConjunctionParts(
   conjunctionParts: string[],
-  artistIndex: number,
   artist: SpotifyArtistInput,
   imageUrl: string | undefined,
   credits: ParsedArtistCredit[],
@@ -513,7 +511,7 @@ function processConjunctionParts(
       role: 'main_artist',
       joinPhrase: j === 0 ? null : ' & ',
       position: position++,
-      isPrimary: j === 0 && artistIndex === 0,
+      isPrimary: true,
       spotifyId: j === 0 ? artist.id : undefined,
       imageUrl: j === 0 ? imageUrl : undefined,
     });
@@ -534,8 +532,7 @@ export function parseMainArtists(
   const credits: ParsedArtistCredit[] = [];
   let position = 0;
 
-  for (let i = 0; i < spotifyArtists.length; i++) {
-    const artist = spotifyArtists[i];
+  for (const artist of spotifyArtists) {
     if (!artist) continue;
 
     const artistName = artist.name;
@@ -543,14 +540,7 @@ export function parseMainArtists(
 
     const vsParts = splitVsName(artistName);
     if (vsParts) {
-      position = processVsParts(
-        vsParts,
-        i,
-        artist,
-        imageUrl,
-        credits,
-        position
-      );
+      position = processVsParts(vsParts, artist, imageUrl, credits, position);
       continue;
     }
 
@@ -558,7 +548,6 @@ export function parseMainArtists(
     if (conjunctionParts) {
       position = processConjunctionParts(
         conjunctionParts,
-        i,
         artist,
         imageUrl,
         credits,
@@ -573,7 +562,7 @@ export function parseMainArtists(
       role: 'main_artist',
       joinPhrase: credits.length === 0 ? null : ', ',
       position: position++,
-      isPrimary: i === 0,
+      isPrimary: true,
       spotifyId: artist.id,
       imageUrl,
     });

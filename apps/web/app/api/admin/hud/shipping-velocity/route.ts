@@ -48,7 +48,7 @@ export interface DailyBucket {
 
 export type ShippingVelocityObservation = Extract<
   HudObservationState,
-  'fresh' | 'stale' | 'empty' | 'not_configured'
+  'fresh' | 'stale' | 'empty' | 'unavailable' | 'not_configured'
 >;
 
 export interface ShippingVelocityResponse {
@@ -80,7 +80,38 @@ interface GraphQLResponse {
       };
     };
   };
-  errors?: Array<{ message: string }>;
+  errors?: Array<{ message: string; type?: string }>;
+}
+
+const RATE_LIMIT_MESSAGE_PATTERN = /rate limit/i;
+
+/**
+ * GitHub rate-limit exhaustion is an expected infrastructure condition with a
+ * known reset — not an unknown failure. It must degrade to stale/unavailable
+ * observations without filing per-request error reports (JOV-5765).
+ */
+class GitHubRateLimitError extends Error {
+  readonly resetAtIso: string | null;
+
+  constructor(message: string, resetAtIso: string | null) {
+    super(message);
+    this.name = 'GitHubRateLimitError';
+    this.resetAtIso = resetAtIso;
+  }
+}
+
+function rateLimitResetAtIso(response: Response): string | null {
+  const resetHeader = response.headers.get('x-ratelimit-reset');
+  if (!resetHeader) return null;
+  const resetEpoch = Number.parseInt(resetHeader, 10);
+  if (!Number.isFinite(resetEpoch)) return null;
+  return new Date(resetEpoch * 1000).toISOString();
+}
+
+function rateLimitRetryMessage(error: GitHubRateLimitError): string {
+  return error.resetAtIso
+    ? `GitHub rate limit exceeded; shipping velocity refreshes after ${error.resetAtIso}.`
+    : 'GitHub rate limit exceeded; try again shortly.';
 }
 
 const SHIPPING_VELOCITY_QUERY = `query ShippingVelocity($owner: String!, $name: String!, $cursor: String) {
@@ -146,14 +177,33 @@ async function fetchGraphQLPage(
   });
 
   if (!response.ok) {
+    if (
+      (response.status === 403 || response.status === 429) &&
+      response.headers.get('x-ratelimit-remaining') === '0'
+    ) {
+      throw new GitHubRateLimitError(
+        `GitHub GraphQL API error: ${response.status}`,
+        rateLimitResetAtIso(response)
+      );
+    }
     throw new Error(`GitHub GraphQL API error: ${response.status}`);
   }
 
   const payload = (await response.json()) as GraphQLResponse;
   if (payload.errors?.length) {
-    throw new Error(
-      `GitHub GraphQL errors: ${payload.errors[0]?.message ?? 'unknown'}`
+    const message = payload.errors[0]?.message ?? 'unknown';
+    const isRateLimited = payload.errors.some(
+      error =>
+        error.type === 'RATE_LIMITED' ||
+        RATE_LIMIT_MESSAGE_PATTERN.test(error.message)
     );
+    if (isRateLimited) {
+      throw new GitHubRateLimitError(
+        `GitHub GraphQL errors: ${message}`,
+        rateLimitResetAtIso(response)
+      );
+    }
+    throw new Error(`GitHub GraphQL errors: ${message}`);
   }
 
   return payload;
@@ -499,23 +549,49 @@ export async function GET(request: Request): Promise<Response> {
     try {
       result = await computation;
     } catch (error) {
+      const isRateLimited = error instanceof GitHubRateLimitError;
       if (cached?.response.observation !== undefined) {
         const stale = normalizeVelocityResponse({
           ...cached.response,
           observation: 'stale',
-          errorMessage:
-            'Refresh unavailable; showing last verified shipping velocity.',
+          errorMessage: isRateLimited
+            ? rateLimitRetryMessage(error)
+            : 'Refresh unavailable; showing last verified shipping velocity.',
         });
-        logger.error(
-          '[hud/shipping-velocity] Refresh failed; serving stale cache',
+        if (isRateLimited) {
+          logger.warn(
+            '[hud/shipping-velocity] GitHub rate limit exceeded; serving stale cache',
+            error
+          );
+        } else {
+          logger.error(
+            '[hud/shipping-velocity] Refresh failed; serving stale cache',
+            error
+          );
+          await captureError('HUD shipping velocity refresh failed', error, {
+            route: '/api/admin/hud/shipping-velocity',
+            method: 'GET',
+            fallback: 'stale-cache',
+          });
+        }
+        return NextResponse.json(stale, {
+          status: 200,
+          headers: NO_STORE_HEADERS,
+        });
+      }
+      if (isRateLimited) {
+        logger.warn(
+          '[hud/shipping-velocity] GitHub rate limit exceeded; no cache available',
           error
         );
-        await captureError('HUD shipping velocity refresh failed', error, {
-          route: '/api/admin/hud/shipping-velocity',
-          method: 'GET',
-          fallback: 'stale-cache',
-        });
-        return NextResponse.json(stale, {
+        const unavailable: ShippingVelocityResponse = {
+          data: [],
+          range,
+          cachedAt: new Date().toISOString(),
+          observation: 'unavailable',
+          errorMessage: rateLimitRetryMessage(error),
+        };
+        return NextResponse.json(unavailable, {
           status: 200,
           headers: NO_STORE_HEADERS,
         });

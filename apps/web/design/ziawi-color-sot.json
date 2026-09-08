@@ -1,0 +1,44 @@
+{
+  "schema": "ziawi-color-sot-v1",
+  "penNode": "ZiaWI",
+  "authority": "pen-node",
+  "locked": "2026-09-10",
+  "keep": ["2026-09-10T13:26-07:00", "2026-09-10T13:34-07:00"],
+  "note": "Pen node ZiaWI is the canonical color source of truth. React tokens, OKLCH, and CSS emitters project these hexes. Do not invent a parallel React-only color root. Live Pen native semantic manifest remains unavailable in this workspace; hexes are the founder KEEP from ZiaWI.",
+  "elevations": {
+    "count": 5,
+    "roles": ["canvas", "shell", "card", "elevated", "floating"],
+    "retired": ["panel", "glass"],
+    "dark": {
+      "canvas": "#030407",
+      "shell": "#06080D",
+      "card": "#0F1420",
+      "elevated": "#151B2A",
+      "floating": "#1B2436"
+    },
+    "light": {
+      "canvas": "#F8FAFD",
+      "shell": "#F3F5F8",
+      "card": "#EAEDF1",
+      "elevated": "#DFE3E8",
+      "floating": "#D4D9E0"
+    }
+  },
+  "accents": {
+    "count": 6,
+    "roles": ["ion", "ultra", "pulse", "mint", "orange", "red"],
+    "hex": {
+      "ion": "#11AFFF",
+      "ultra": "#8E56F5",
+      "pulse": "#F52BB5",
+      "mint": "#3FFA8B",
+      "orange": "#FF7800",
+      "red": "#F72A36"
+    },
+    "aliases": {
+      "aqua": "mint",
+      "gold": "orange",
+      "flare": "red"
+    }
+  }
+}

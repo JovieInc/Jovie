@@ -66,17 +66,19 @@ describe('BrandLogo', () => {
   });
 
   it('applies size to width and height attributes on svg', () => {
-    const { container } = render(<BrandLogo size={64} />);
+    const { container } = render(<BrandLogo size='splash' />);
     const svg = container.querySelector('svg');
-    expect(svg).toHaveAttribute('width', '64');
-    expect(svg).toHaveAttribute('height', '64');
+    expect(svg).toHaveAttribute('width', '32');
+    expect(svg).toHaveAttribute('height', '32');
   });
 
-  it('uses default size of 48', () => {
+  it('uses the chrome token as the default size', () => {
     const { container } = render(<BrandLogo />);
     const svg = container.querySelector('svg');
-    expect(svg).toHaveAttribute('width', '48');
-    expect(svg).toHaveAttribute('height', '48');
+    const wrapper = container.querySelector('span');
+    expect(svg).toHaveAttribute('width', '20');
+    expect(svg).toHaveAttribute('height', '20');
+    expect(wrapper).toHaveAttribute('data-brand-mark-size', '20');
   });
 
   it('applies rounded-full class on wrapper when rounded=true (default)', () => {

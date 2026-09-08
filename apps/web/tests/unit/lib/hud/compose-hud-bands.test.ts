@@ -139,6 +139,19 @@ describe('composeHudForPresentation', () => {
     expect(source).not.toContain('founder-hud-shipping-velocity');
   });
 
+  it('registers env-exceptions as the trailing noise section with panel wiring', () => {
+    const sections = composeHudForPresentation('shell');
+    const last = sections[sections.length - 1];
+    expect(last?.id).toBe('env-exceptions');
+    expect(last?.band).toBe('noise');
+    expect(last?.testId).toBe('hud-section-env-exceptions');
+    expect(last?.label).toBe('Env exceptions');
+
+    const source = readFileSync(HUD_DASHBOARD_CLIENT, 'utf8');
+    expect(source).toContain("case 'env-exceptions':");
+    expect(source).toContain('HudEnvExceptionsPanel');
+  });
+
   it('routes the legacy cash band through the three-answer CEO overview', () => {
     const source = readFileSync(
       join(

@@ -64,6 +64,13 @@ describe('public-profile consumer attachment', () => {
       join(WEB_ROOT, 'components/features/profile/nav/BottomTabBar.tsx'),
       'utf8'
     );
+    const desktop = readFileSync(
+      join(
+        WEB_ROOT,
+        'components/features/profile/templates/ProfileDesktopSurface.tsx'
+      ),
+      'utf8'
+    );
 
     expect(route).toContain('<StaticArtistPage');
     expect(entry).toContain('<ProfileCompactTemplate');
@@ -72,6 +79,10 @@ describe('public-profile consumer attachment', () => {
     expect(template).toContain('getPermittedPublicProfileNavigation');
     expect(surface).toContain('resolvePublicProfileActiveDestination');
     expect(tabBar).toContain('getPermittedPublicProfileNavigation');
+    expect(desktop).toContain("from '@/lib/profile/route-config'");
+    expect(desktop).toContain('getPermittedPublicProfileNavigation');
+    expect(desktop).toContain('resolvePublicProfileActiveDestination');
+    expect(desktop).not.toContain('PRIMARY_TABS');
   });
 
   it('fails when a new route-local or preview consumer detaches from the canonical template owner', () => {

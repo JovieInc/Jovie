@@ -158,7 +158,6 @@ function ReleasePopoverContent({
               iconPath={config.iconPath}
               iconColor={config.color}
               href={`${releaseHref}?dsp=${provider}`}
-              className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
             />
           );
         })}
@@ -317,7 +316,7 @@ export function SeeItInActionCarousel({
       <Container size='homepage'>
         <div className='relative mx-auto max-w-linear-content'>
           <div className='flex flex-col items-center gap-5 text-center reveal-on-scroll'>
-            <h2 className='marketing-h2-linear text-primary-token'>
+            <h2 className='marketing-h2-linear text-primary-token line-clamp-2'>
               See It In Action
             </h2>
             <p className='max-w-2xl marketing-lead-linear text-secondary-token'>

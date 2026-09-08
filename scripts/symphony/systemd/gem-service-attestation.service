@@ -1,0 +1,10 @@
+[Unit]
+Description=Observe source identity of the running official Symphony service
+After=symphony-elixir.service
+Requires=symphony-elixir.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/symphony/runner-source.env
+ExecStart=/usr/bin/python3 %h/gem-workspace/scripts/emit-gem-service-attestation.py --provenance ${SYMPHONY_RELEASE_PROVENANCE} --source-root ${JOVIE_CONFIGURATION_SOURCE_ROOT} --source-revision ${JOVIE_CONFIGURATION_SOURCE_REVISION}
+Nice=10

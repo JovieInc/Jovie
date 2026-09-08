@@ -18,7 +18,7 @@ import demoVideoMeta, {
 const DEMO_VIDEO_STORY_PATH =
   'apps/web/components/organisms/DemoVideoRoute.stories.tsx';
 const DEMO_VIDEO_STORY_FIRST_CONTAINING_SHA =
-  '8b0353fcbeb0cffef614fa47afbbbd8eeae48997';
+  '00895196e53b823bb0311193b4af29f67b8849c1';
 
 vi.mock('@/components/features/demo/DemoVideoPlayer', () => ({
   DemoVideoPlayer: ({

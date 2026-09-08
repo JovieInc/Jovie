@@ -10,7 +10,7 @@ struct MobileChatMessageRow: View {
   var onRecordVideo: (MobileChatVideoProposalPayload) -> Void = { _ in }
 
   private var isStreamingAssistant: Bool {
-    item.role == .assistant && item.status == .streaming
+    item.role == .assistant && item.status.isInFlight
   }
 
   private var assistantSegments: [MobileChatRenderableSegment] {
@@ -35,7 +35,7 @@ struct MobileChatMessageRow: View {
           .foregroundStyle(JovieColor.textPrimary)
       }
 
-      if item.status == .failed {
+      if item.status == .failed || item.status == .canceled {
         Button("Retry", action: onRetry)
           .font(JovieFont.body(size: 14, weight: .semibold))
           .foregroundStyle(JovieColor.textPrimary)

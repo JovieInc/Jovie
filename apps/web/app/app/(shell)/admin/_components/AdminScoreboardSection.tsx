@@ -223,11 +223,11 @@ export async function AdminScoreboardSection() {
             <caption>Weekly funnel trend data</caption>
             <thead>
               <tr>
-                <th>Week</th>
-                <th>Scraped</th>
-                <th>Contacted</th>
-                <th>Signups</th>
-                <th>Paid</th>
+                <th className='whitespace-nowrap'>Week</th>
+                <th className='whitespace-nowrap'>Scraped</th>
+                <th className='whitespace-nowrap'>Contacted</th>
+                <th className='whitespace-nowrap'>Signups</th>
+                <th className='whitespace-nowrap'>Paid</th>
               </tr>
             </thead>
             <tbody>

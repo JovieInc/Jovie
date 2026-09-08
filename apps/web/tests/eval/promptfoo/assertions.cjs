@@ -2618,7 +2618,9 @@ function assertPromptContextAccountSummary(output) {
     return fail('prompt did not include verified billing state');
   }
   if (
-    !/- \*\*AI Usage Today:\*\* 7 used, 93 remaining of 100/i.test(systemPrompt)
+    !/- \*\*AI Usage This Week:\*\* 7 used, 63 remaining of 70/i.test(
+      systemPrompt
+    )
   ) {
     return fail('prompt did not include deterministic usage summary');
   }
@@ -2664,7 +2666,7 @@ function assertPromptContextMissingAccountOmitted(output) {
     return fail('missing-account prompt included account access section');
   }
   if (
-    /Account Email|Billing Portal|Billing Verification|AI Usage Today/i.test(
+    /Account Email|Billing Portal|Billing Verification|AI Usage This Week/i.test(
       systemPrompt
     )
   ) {
@@ -2688,8 +2690,8 @@ function assertPromptContextFreePlanLimitations(output) {
   if (!payload.hasPlanLimitationsSection) {
     return fail('free prompt did not include plan limitations');
   }
-  if (!/Free plan with 10 messages per day/i.test(systemPrompt)) {
-    return fail('free prompt did not include the free daily limit');
+  if (!/Free plan with 15 messages per week/i.test(systemPrompt)) {
+    return fail('free prompt did not include the free weekly limit');
   }
   for (const toolName of [
     'proposeAvatarUpload',
@@ -3619,6 +3621,14 @@ function assertSkillPromptContractCovered(output) {
       `retouch generation prompt missing facts: ${missingGenerationFacts.join(', ')}`
     );
   }
+  const missingRetouchFacts = Array.isArray(retouch.missingFacts)
+    ? retouch.missingFacts
+    : [];
+  if (missingRetouchFacts.length > 0) {
+    return fail(
+      `retouch identity gate missing facts: ${missingRetouchFacts.join(', ')}`
+    );
+  }
 
   const packaging = payload.packaging ?? {};
   if (!packaging || typeof packaging !== 'object') {
@@ -3750,6 +3760,34 @@ function assertSmartLinkSwitchRuleCase(output) {
   if (smartLinkSwitch.ruleCasePassed !== true) {
     return fail(
       `smart link switch rule case failed: ${String(smartLinkSwitch.ruleCase)} ${String(smartLinkSwitch.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertReleasePitchRuleCase(output) {
+  const payload = parseOutput(output);
+  const releasePitch = payload.releasePitch ?? {};
+  if (releasePitch.skillId !== 'generateReleasePitch') {
+    return fail('release pitch rule case is not tied to generateReleasePitch');
+  }
+  if (releasePitch.ruleCasePassed !== true) {
+    return fail(
+      `release pitch rule case failed: ${String(releasePitch.ruleCase)} ${String(releasePitch.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertRetouchRuleCase(output) {
+  const payload = parseOutput(output);
+  const retouch = payload.retouch ?? {};
+  if (retouch.skillId !== 'retouch') {
+    return fail('retouch rule case is not tied to retouch');
+  }
+  if (retouch.ruleCasePassed !== true) {
+    return fail(
+      `retouch rule case failed: ${String(retouch.ruleCase)} ${String(retouch.ruleCaseReason)}`
     );
   }
   return pass();
@@ -5248,6 +5286,8 @@ module.exports = {
   assertChannelPlaylistRuleCase,
   assertFanEmailRuleCase,
   assertSmartLinkSwitchRuleCase,
+  assertReleasePitchRuleCase,
+  assertRetouchRuleCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

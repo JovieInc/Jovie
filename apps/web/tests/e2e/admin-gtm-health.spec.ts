@@ -1,4 +1,4 @@
-import { ClerkTestError } from '../helpers/clerk-auth';
+import { ClerkTestError } from '../helpers/auth';
 import { expect, test } from './setup';
 import { getAdminSurfaceById } from './utils/admin-surface-manifest';
 import { hasAdminCredentials, signInAsAdmin } from './utils/admin-test-utils';

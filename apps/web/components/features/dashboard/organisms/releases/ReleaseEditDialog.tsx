@@ -1,9 +1,10 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/releases/ReleaseEditDialog.test.tsx
 import { Badge, Input } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import {
   DrawerButton,
   DrawerFormField,
@@ -85,16 +86,12 @@ export function ReleaseEditDialog({
             >
               <EntityHeaderCard
                 image={
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-subtle bg-surface-0'>
-                    <ImageWithFallback
-                      src={release.artworkUrl}
-                      alt={`${release.title} artwork`}
-                      fill
-                      className='object-cover'
-                      sizes='64px'
-                      fallbackVariant='release'
-                    />
-                  </div>
+                  <ReleaseArtworkThumb
+                    src={release.artworkUrl}
+                    alt={`${release.title} artwork`}
+                    size={64}
+                    className='border border-subtle bg-surface-0'
+                  />
                 }
                 title={release.title}
                 subtitle={`Smart link: ${release.smartLinkPath}`}

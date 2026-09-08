@@ -109,7 +109,7 @@ export function ImpersonationBanner({
     return (
       <div className={`fixed bottom-4 right-4 z-9999 ${className}`}>
         <Button
-          variant='primary'
+          variant='secondary'
           size='sm'
           onClick={() => setMinimized(false)}
           className='flex items-center gap-2 bg-amber-500 text-black dark:text-white hover:bg-amber-400'

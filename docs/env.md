@@ -41,21 +41,28 @@ The URL of your Supabase project.
 
 The public/anon key for your Supabase project. This is used for client-side access.
 
-## Clerk Authentication
+## Better Auth
 
-### `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+### `BETTER_AUTH_SECRET`
 
-The publishable key for Clerk authentication.
+Server secret for Better Auth sessions. Required on preview/production. Must be
+at least 32 characters.
 
-### `CLERK_SECRET_KEY`
+### `BETTER_AUTH_URL` / `NEXT_PUBLIC_BETTER_AUTH_URL`
 
-The secret key for Clerk authentication.
+Public origin of the auth server (`https://jov.ie` in production).
 
-### OAuth provider buttons — no `NEXT_PUBLIC_CLERK_OAUTH_*` flags
+### `NEXT_PUBLIC_AUTH_MOCK`
 
-Do **not** add `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED` (or similar) to
-control which OAuth buttons render on sign-in. Provider enablement is a
-hardcoded allowlist in `apps/web/lib/auth/oauth-providers.ts`. See
+Local/E2E only. Set to `1` to render signed-out defaults without a live session
+subscribe. Playwright still accepts the retired `NEXT_PUBLIC_CLERK_MOCK=1`
+alias for one release.
+
+### OAuth provider buttons — no env enablement flags
+
+Do **not** add `NEXT_PUBLIC_*_OAUTH_*_ENABLED` (or similar) to control which
+OAuth buttons render on sign-in. Provider enablement is a hardcoded allowlist
+in `apps/web/lib/auth/oauth-providers.ts`. See
 `docs/auth/next-public-oauth-flags.md` (JOV-2131).
 
 ## Application Configuration

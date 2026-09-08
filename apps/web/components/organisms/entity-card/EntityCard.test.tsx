@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -106,6 +108,12 @@ describe('EntityCard', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('$45.00')).toBeInTheDocument();
     expect(screen.getByText('Buy')).toBeInTheDocument();
+  });
+
+  it('keeps editorial helper lines outside paragraph anatomy', () => {
+    render(<EntityCard model={merchModel} treatment='detailed' />);
+    expect(screen.getByText('Premium tee').tagName).toBe('SPAN');
+    expect(screen.getByText('Profit $11.87').tagName).toBe('SPAN');
   });
 
   it('hides the status pill in the compact treatment (progressive disclosure)', () => {
@@ -264,6 +272,7 @@ describe('EntityCard', () => {
       expect(cta.className).toContain('w-full');
       // Price joins the single meta line; there is no separate price block.
       expect(screen.getByText('Premium tee · $45.00')).toBeInTheDocument();
+      expect(screen.getByText('Premium tee · $45.00').tagName).toBe('SPAN');
       expect(screen.queryByText('Profit $11.87')).not.toBeInTheDocument();
     });
 
@@ -306,6 +315,22 @@ describe('EntityCard', () => {
       expect(text.className).not.toContain('rounded-full');
       expect(text.className).not.toContain('bg-btn-primary');
     });
+  });
+});
+
+describe('EntityCard source contract', () => {
+  it('uses inline helper anatomy for meta and profit details', () => {
+    const source = readFileSync(resolve(__dirname, './EntityCard.tsx'), 'utf8');
+
+    expect(source).toContain(
+      "'block min-w-0 truncate text-[11.5px] text-tertiary-token'"
+    );
+    expect(source).toContain(
+      "<span className='block text-2xs text-tertiary-token'>"
+    );
+    expect(source).not.toContain(
+      "<p className='text-2xs text-tertiary-token'>"
+    );
   });
 });
 

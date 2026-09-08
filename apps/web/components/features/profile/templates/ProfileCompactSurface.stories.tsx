@@ -27,6 +27,7 @@ const meta: Meta<typeof ProfileCompactSurface> = {
     onOpenMenu: profileStoryNoop,
     onPlayClick: profileStoryNoop,
     onShare: profileStoryNoop,
+    allowSignedInEscape: false,
     profileHref: '/timwhite',
     contentPrefs: PROFILE_STORY_CONTENT_PREFS,
     renderInteractiveOverlays: false,

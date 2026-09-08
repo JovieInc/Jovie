@@ -13,6 +13,10 @@ import {
   invalidateCacheMatching,
   prefetch,
 } from '@/lib/fetch/deduped-fetch';
+import {
+  applyCacheScope,
+  resetCacheIsolationForTests,
+} from '@/lib/queries/cache-isolation';
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -21,6 +25,7 @@ global.fetch = mockFetch;
 describe('dedupedFetch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetCacheIsolationForTests();
     clearCache();
   });
 
@@ -312,8 +317,8 @@ describe('dedupedFetch', () => {
       const stats = getCacheStats();
 
       expect(stats.cacheSize).toBe(2);
-      expect(stats.keys).toContain('/api/stats/1');
-      expect(stats.keys).toContain('/api/stats/2');
+      expect(stats.keys.some(key => key.endsWith('/api/stats/1'))).toBe(true);
+      expect(stats.keys.some(key => key.endsWith('/api/stats/2'))).toBe(true);
     });
   });
 
@@ -380,6 +385,135 @@ describe('dedupedFetch', () => {
 
       expect(getResult).toEqual({ method: 'GET' });
       expect(postResult).toEqual({ method: 'POST' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('JOV-6186 cache isolation', () => {
+    it('does not cache or dedupe side-effecting requests', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: 1 }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: 2 }),
+        });
+
+      const first = await dedupedFetch('/api/resource', {
+        method: 'POST',
+        body: JSON.stringify({ data: 'test' }),
+      });
+      const second = await dedupedFetch('/api/resource', {
+        method: 'POST',
+        body: JSON.stringify({ data: 'test' }),
+      });
+
+      expect(first).toEqual({ id: 1 });
+      expect(second).toEqual({ id: 2 });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(getCacheStats().cacheSize).toBe(0);
+    });
+
+    it('does not rehydrate the cache from a late in-flight response after clear', async () => {
+      let resolveJson: ((value: unknown) => void) | undefined;
+      mockFetch
+        .mockImplementationOnce(
+          () =>
+            Promise.resolve({
+              ok: true,
+              json: () =>
+                new Promise(resolve => {
+                  resolveJson = resolve;
+                }),
+            }) as Promise<Response>
+        )
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ secret: 'B' }),
+        });
+
+      const pendingA = dedupedFetch('/api/private');
+      await vi.waitFor(() => {
+        expect(typeof resolveJson).toBe('function');
+      });
+      clearCache();
+      resolveJson?.({ secret: 'A' });
+      await expect(pendingA).resolves.toEqual({ secret: 'A' });
+
+      const after = await dedupedFetchWithMeta('/api/private');
+      expect(after.fromCache).toBe(false);
+      expect(after.data).toEqual({ secret: 'B' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not let one subscriber abort a still-needed shared GET', async () => {
+      const firstController = new AbortController();
+      const secondController = new AbortController();
+      let resolveJson: ((value: unknown) => void) | undefined;
+      mockFetch.mockImplementationOnce(
+        (_url: string, init?: RequestInit) =>
+          Promise.resolve({
+            ok: true,
+            json: () =>
+              new Promise(resolve => {
+                resolveJson = resolve;
+              }),
+            signal: init?.signal,
+          }) as Promise<Response>
+      );
+
+      const first = dedupedFetch('/api/shared', {
+        signal: firstController.signal,
+      });
+      const second = dedupedFetch('/api/shared', {
+        signal: secondController.signal,
+      });
+
+      await vi.waitFor(() => {
+        expect(typeof resolveJson).toBe('function');
+      });
+
+      firstController.abort();
+      const sharedInit = mockFetch.mock.calls[0]?.[1] as
+        | RequestInit
+        | undefined;
+      expect(sharedInit?.signal?.aborted).not.toBe(true);
+      resolveJson?.({ ok: true });
+      await expect(second).resolves.toEqual({ ok: true });
+      await expect(first).resolves.toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not collide the same URL across profile scopes and still dedupes one scope', async () => {
+      applyCacheScope({
+        userId: 'user-a',
+        sessionId: 'sess-a',
+        profileId: 'profile-a',
+        ready: true,
+      });
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ owner: 'A' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ owner: 'B' }),
+        });
+
+      const firstA = dedupedFetch('/api/private');
+      const secondA = dedupedFetch('/api/private');
+      await expect(Promise.all([firstA, secondA])).resolves.toEqual([
+        { owner: 'A' },
+        { owner: 'A' },
+      ]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      applyCacheScope({ profileId: 'profile-b' });
+      const fromB = await dedupedFetch('/api/private');
+      expect(fromB).toEqual({ owner: 'B' });
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });

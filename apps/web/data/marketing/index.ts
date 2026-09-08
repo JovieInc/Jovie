@@ -284,6 +284,7 @@ export type {
 export {
   getDefaultVariant,
   getMarketingSection,
+  getRequiredVariantInputs,
   getVariant,
   getVariants,
   hasRequiredPrior,

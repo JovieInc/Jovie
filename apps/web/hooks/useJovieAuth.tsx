@@ -4,6 +4,7 @@ import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { clearLegacyClerkSessionMarker } from '@/lib/auth/auth-session-cookies';
 import { authClient } from '@/lib/auth/client';
 import { type JovieUser, toJovieUser } from '@/lib/auth/jovie-user';
+import { applyCacheScope } from '@/lib/queries/cache-isolation';
 
 // ============================================================================
 // Jovie auth context fan-out (Better Auth port of hooks/useClerkSafe.tsx)
@@ -78,6 +79,13 @@ export interface UseSessionSafeReturn {
  * back, so the failure is visible rather than silent.
  */
 export async function signOut(options?: JovieSignOutOptions): Promise<void> {
+  applyCacheScope({
+    userId: null,
+    sessionId: null,
+    profileId: null,
+    impersonationSubject: null,
+    ready: true,
+  });
   await authClient.signOut().catch(() => undefined);
   clearLegacyClerkSessionMarker();
 
@@ -184,10 +192,9 @@ export function JovieAuthValuesProvider({
 
 /**
  * Safe-defaults provider for mock/DB-less mode: build-time rendering, tests,
- * and bypassed-auth origins per the `shouldBypassClerk()` contract in
- * components/providers/clerkAvailability.ts (keyed off NEXT_PUBLIC_CLERK_MOCK
- * today; the NEXT_PUBLIC_AUTH_MOCK rename lands with the migration's env
- * commit). Everything renders signed-out and auth UI stays hidden.
+ * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK, with a
+ * one-release NEXT_PUBLIC_CLERK_MOCK fallback). Everything renders
+ * signed-out and auth UI stays hidden.
  */
 export function JovieAuthDefaultsProvider({
   children,

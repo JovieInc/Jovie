@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/artist-profile/artist-profile-system-b-style-guard.test.ts
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { HomepageV2FinalCta } from '../homepage-v2/HomepageV2Ctas';
@@ -16,7 +17,7 @@ export function ArtistProfileFinalCta({
   return (
     <HomepageV2FinalCta
       headline={finalCta.headline}
-      ctaLabel={finalCta.ctaLabel || claimIntent.label}
+      ctaLabel={claimIntent.label}
       ctaHref={ctaHref ?? claimIntent.href}
       sectionTestId='artist-profile-final-cta'
       headingTestId='final-cta-headline'

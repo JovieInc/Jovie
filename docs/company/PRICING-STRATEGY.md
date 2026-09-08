@@ -1,115 +1,139 @@
 # Jovie AI Pricing Strategy
 
-> This document is the **current snapshot**: prices, quotas, costs. The principles that govern how this snapshot changes live in [`PRICING-PHILOSOPHY.md`](./PRICING-PHILOSOPHY.md). The Stripe data behind those principles lives in [`pricing-trends-summary.md`](./pricing-trends-summary.md). Read those before proposing a price or packaging change.
+> Status: weekly packaging approved for launch on 2026-08-17. Paid overage is
+> still a proposal and must not launch until the telemetry, billing, and consent
+> gates below pass. Governing principles live in
+> [`PRICING-PHILOSOPHY.md`](./PRICING-PHILOSOPHY.md).
 
-## Pricing Model: AI as the Upgrade Lever
+## Decision
 
-Jovie uses a **tiered subscription model** where AI capabilities are the primary driver
-for upgrades. Free users get a taste of Jovie AI to experience value, while paid plans
-unlock the full toolset that makes AI actionable.
+Jovie sells the subscription, includes enough AI messaging for the normal job,
+and uses additional completed responses as the variable-cost upsell.
 
-## Tier Summary
+The customer sees one meter: **Weekly messages**. Internal model calls, tool
+steps, retries, and tokens are implementation details, not customer units.
 
-| Feature | Free | Pro ($39/mo) | Growth ($99/mo) |
-|---|---|---|---|
-| **AI Chat Messages** | 5/day | 100/day | 500/day |
-| **AI Tools** (Canvas, Promo, Releases) | No | Yes | Yes |
-| **Profile Verification Badge** | No | Yes | Yes |
-| **Analytics Retention** | 7 days | 90 days | 365 days |
-| **Contacts** | 100 | Unlimited | Unlimited |
-| **Export Contacts** | No | Yes | Yes |
-| **Remove Branding** | No | Yes | Yes |
-| **Advanced Analytics** | No | Yes | Yes |
+## Weekly allowances
 
-## AI Feature Gating Details
+| Plan | Price | Included AI messages | Limit behavior |
+|---|---:|---:|---|
+| Free | $0 | 15/week | Hard stop, upgrade to Pro |
+| Pro Trial | $0 for 14 days | 50/week | Hard stop, upgrade to Pro |
+| Pro | $39/month or $375/year | 70/week | Hard stop until paid overage is explicitly enabled |
+| Max | $149/month or $1,430/year | 250/week | Hard stop until paid overage is explicitly enabled |
 
-### Free Tier (5 messages/day, chat-only)
+The plan quota is a rolling seven-day window. A separate 30-message hourly burst
+limit remains in place to contain abuse and sudden provider spend.
 
-Free users can ask Jovie AI general questions about their career, get advice based on
-their profile data, and see the value of having an AI music career assistant. They
-**cannot** use any tools:
+These launch allowances are the smallest current envelope that is useful to
+artists and remains plausible under today's unverified inference cost range.
+They must be re-evaluated against observed Jovie cost-per-turn and retention
+data using the thresholds below.
 
-- No profile editing via AI
-- No Spotify Canvas planning
-- No promotion strategy generation
-- No release creation
-- No related artist suggestions
+## Meter and upsell contract
 
-When a free user asks for something that requires a tool, Jovie AI explains the feature
-is available on Pro and describes the value.
+- Show remaining capacity, not spend or internal credits.
+- Show one warning line at 20% remaining.
+- Use the normal accent above the line, warning color at or below the line, and
+  error color only at zero.
+- Free users see the Pro upgrade at warning and exhaustion.
+- Pro users see Max as the next included-capacity option.
+- Do not silently auto-upgrade, auto-charge, or imply that paid overage exists
+  before its billing path is implemented and explicitly enabled by the user.
 
-**Why 5/day:** This is enough for 1-2 short conversations to experience the product.
-At ~$0.01-0.05 per Claude API call, worst-case cost per free user is $0.25/day or
-~$7.50/month -- acceptable for conversion-driving usage. Most free users will use 0-2
-messages/day.
+## Recommended paid overage
 
-### Pro Tier (100 messages/day, full tools)
+After the launch gate passes, offer **$0.12 per successfully delivered Jovie
+response** above the included paid-plan allowance.
 
-Pro users get the full Jovie AI experience:
-- All AI tools unlocked (canvas planning, promo strategy, profile editing, etc.)
-- 100 messages/day covers even power users (median expected usage: 10-20 messages/day)
-- Profile verification badge
+- Opt-in only.
+- User-selected monthly spend caps, initially $10, $25, or $50.
+- Aggregate charges onto the monthly invoice.
+- Do not charge failed, canceled, validation-blocked, or idempotently retried
+  turns.
+- Keep image, audio, and other high-variance tools on their existing separate
+  quotas.
 
-### Growth Tier (500 messages/day, full tools)
+This adopts the clearest proven parts of the market:
 
-Growth users get higher limits for heavier workflows:
-- 500 messages/day for batch operations and extensive planning
-- All Pro features
-- Future: priority model access, bulk canvas generation
+- Laylo separates its platform subscription from variable messaging capacity.
+  That boundary is useful; its weighted credit arithmetic is not.
+- Klaviyo moved mobile messaging from opaque credits to explicit dollar rates,
+  estimated send cost, limit warnings, and opt-in flexible overage or plan
+  upgrades. Jovie should copy the transparency and consent model.
+- Klaviyo Customer Agent charges for resolved AI conversations rather than
+  internal model work. Jovie should similarly count delivered responses.
 
-## Rate Limiting Architecture
+Primary references:
 
-Two layers of rate limiting protect against cost overruns:
+- [Laylo pricing](https://help.laylo.com/Laylo-Pricing-11b23cdfc6158248961381ffb994fb7c)
+- [Laylo messaging credits](https://docs.laylo.com/en/articles/6520299-messaging-credits)
+- [Klaviyo mobile per-message pricing](https://help.klaviyo.com/hc/en-us/articles/52952739755931)
+- [Klaviyo billing](https://help.klaviyo.com/hc/en-us/articles/115000976672)
 
-1. **Daily plan quota** (plan-specific): 5/100/500 messages per day per user
-2. **Hourly burst limiter** (all plans): 30 messages per hour per user
+## Cost model
 
-The burst limiter prevents a Pro user from burning through all 100 messages in minutes
-of rapid-fire usage, which would spike API costs. The daily quota is the user-facing
-limit tied to plan value.
+Jovie routes general chat to Claude Sonnet 4 and simpler turns to Claude Haiku
+4.5. A single customer message can trigger multiple model and tool steps. Vercel
+AI Gateway charges provider list price without a token markup.
 
-Both use the existing Redis-backed rate limiter with in-memory fallback.
+`turn cost = sum(model calls × token cost) + retries + external-tool cost`
 
-## Verification as a Paid Feature
+Until Jovie records the full per-turn cost, use these inference-only planning
+scenarios:
 
-The `isVerified` badge on artist profiles is gated to Pro and Growth plans via
-`PLAN_LIMITS.canBeVerified`. This follows the model proven by X (Twitter Blue),
-Meta Verified, and YouTube:
+| Scenario | Calls and token assumption | Cost/message | Cost/100 | Cost/1,000 |
+|---|---|---:|---:|---:|
+| Low | 1 call, 2k input, 400 output, 80% Haiku | $0.0056 | $0.56 | $5.60 |
+| Base | 1.5 calls, 5k input, 800 output, 40% Haiku | $0.0297 | $2.97 | $29.70 |
+| High | 3 calls, 12k input, 2k output, 90% Sonnet | $0.1848 | $18.48 | $184.80 |
 
-- Verification is **visible** to every profile visitor (fans, bookers, curators)
-- It signals legitimacy and professionalism
-- It's a low-cost, high-perceived-value feature that drives upgrades
+At the base scenario, the proposed allowances cost about $9/month for a fully
+used Pro allowance and $32/month for a fully used Max allowance. A $0.12
+additional response yields about 75% marginal gross margin before shared
+infrastructure at that same base scenario.
 
-The `creatorProfiles.isVerified` column already exists in the database schema.
-Plan gating should be enforced at the API layer when setting verification status.
+Model-rate references:
 
-## Cost Model
+- [Vercel AI Gateway pricing](https://vercel.com/docs/ai-gateway/pricing)
+- [Claude Sonnet 4 pricing](https://vercel.com/ai-gateway/models/claude-sonnet-4/providers)
+- [Claude Haiku 4.5 pricing](https://www.anthropic.com/news/claude-haiku-4-5)
 
-| Plan | Max Daily AI Cost/User | Monthly Worst Case | Expected Monthly |
-|---|---|---|---|
-| Free | $0.25 | $7.50 | $1-3 |
-| Pro | $5.00 | $150 | $10-30 |
-| Growth | $25.00 | $750 | $30-80 |
+## Overage and pricing iteration gate
 
-Pro at $39/mo with expected $10-30/mo AI cost = ~25-75% gross margin on AI.
-This is in line with the 50-65% gross margin benchmarks for AI-first SaaS (a16z).
+1. Record model, provider, input/output/cache tokens, tool steps, retries,
+   external-tool cost, and final turn outcome for every customer message.
+2. Review weekly messages and cost per customer at p50, p75, p90, p95, and p99
+   by plan.
+3. Confirm expected plan gross margin remains at least 50% and marginal overage
+   gross margin remains at least 70%.
+4. Enable paid overage only after explicit consent and spend-cap selection.
 
-## When to Revisit
+## Success, re-evaluation, and kill switches
 
-After 6 months of usage data:
+Measure:
 
-1. **Check free-tier conversion rate.** If <2%, consider reducing to 3 messages/day.
-   If >10%, the free tier may be too generous -- test tightening.
-2. **Check Pro margin.** If top-10% Pro users regularly hit 100 messages with high
-   tool usage, consider a credits-based overage or moving heavy tools to Growth.
-3. **Consider outcome-based pricing.** Once canvas video generation is automated
-   end-to-end, price per canvas created ($2-5 each) rather than per message.
-4. **Evaluate credits model.** If usage patterns vary widely within a tier, credits
-   may better align cost to value. But avoid this complexity until data proves it's needed.
+- Actual cost per completed response.
+- Model mix, tokens, retries, and steps per turn.
+- Weekly usage distribution by plan.
+- Warning-to-upgrade conversion.
+- Limit-hit abandonment and seven-day return rate.
+- Overage revenue, COGS, refunds, and total plan gross margin.
 
-## Implementation Files
+Re-evaluate after 28 days of shadow data or 30 paid users with at least two
+active weeks, whichever is later.
 
-- `apps/web/lib/stripe/config.ts` -- PLAN_LIMITS with AI quotas and verification
-- `apps/web/lib/rate-limit/config.ts` -- Plan-specific daily rate limiters
-- `apps/web/lib/rate-limit/limiters.ts` -- `checkAiChatRateLimitForPlan()`
-- `apps/web/app/api/chat/route.ts` -- Plan-aware rate limiting and tool gating
+Stop or roll back the pricing test if:
+
+- Cost attribution becomes unavailable.
+- Rolling p90 cost exceeds $0.03 per completed response.
+- Expected plan gross margin falls below 50%.
+- Marginal overage gross margin falls below 70%.
+- Limit-hit abandonment rises without a compensating paid-conversion gain.
+
+Operational kill switches:
+
+- Disable overage charging while preserving included access.
+- Use the existing `ai_chat_force_light` control during a model-cost incident.
+- Restore the prior quota configuration if the weekly-window rollout causes a
+  material retention or support regression.

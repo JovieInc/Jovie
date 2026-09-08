@@ -40,7 +40,7 @@ export const JOVIE_APP_SHELL_WORKSPACE = {
 export const OVIE_APP_SHELL_WORKSPACE = {
   id: 'ov',
   label: 'OV',
-  href: APP_ROUTES.OV,
+  href: APP_ROUTES.ADMIN_CHAT,
   brandVariant: 'ov',
   role: 'secondary',
   access: 'admin',

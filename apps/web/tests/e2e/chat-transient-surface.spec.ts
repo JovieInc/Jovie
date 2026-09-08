@@ -1,5 +1,5 @@
 import { expect, type Locator, test } from '@playwright/test';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import {
   chatComposerInputLocator,
   gotoAuthenticatedChatRoute,

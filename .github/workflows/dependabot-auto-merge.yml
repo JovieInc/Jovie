@@ -9,6 +9,12 @@ name: Dependabot Auto-Merge
 # event actor is not the authority: maintainer and controller synchronizations
 # must preserve policy derived from the PR author and Dependabot metadata.
 #
+# fetch-metadata refuses heads that no longer contain only Dependabot commits
+# (maintainer rebase). That refusal must skip/succeed, never fail: a FAILURE
+# check makes mergeStateStatus UNSTABLE and blocks native autoenroll even when
+# every required gate is green. Do not disable commit certification — uncertified
+# heads must not receive patch/minor queue-intent from this job.
+#
 # Ship now: patch/minor updates queue automatically; confirmed conflicts are
 # recreated; unmerged closes without a durable hold are reopened. Majors are
 # visible but held for migration/release review.
@@ -37,11 +43,22 @@ jobs:
     steps:
       - name: Fetch Dependabot metadata
         id: meta
+        continue-on-error: true
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ github.token }}
 
+      - name: Skip uncertified Dependabot head
+        if: steps.meta.outcome != 'success'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          echo "fetch-metadata could not certify Dependabot commits on $PR_URL."
+          echo "Expected after a maintainer rebase. Native autoenroll remains the queue writer."
+          echo "This job succeeds so mergeStateStatus is not UNSTABLE."
+
       - name: Checkout trusted reconciliation policy
+        if: steps.meta.outcome == 'success'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -51,6 +68,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Classify exact Dependabot event
+        if: steps.meta.outcome == 'success'
         id: policy
         env:
           DEPENDABOT_UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}

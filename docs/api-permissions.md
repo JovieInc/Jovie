@@ -18,6 +18,7 @@ This document tracks required privilege levels by API namespace so new routes ar
 | `/api/cron/**` | Cron secret | Must validate `CRON_SECRET` before execution. |
 | `/api/webhooks/**` | Signed provider webhook | Must validate provider signature/token. |
 | `/api/mobile/**` | Authenticated mobile session | Native iOS session via `getMobileSessionUserId`. Summer/OV destinations additionally require admin (`canUseOvChatMode`) on the server. |
+| `/api/ovie/summer/reconcile` | Authenticated configured founder only | GET-only, source-bound recovery of one immutable Summer event. Must validate the app UUID with `authorizeFounderSummerUser`, obtain Vercel OIDC server-side, reject result-binding drift, and persist nothing before exact terminal validation. |
 | `/api/**` public endpoints (trackers, opt-ins, status probes, etc.) | Public | Must avoid exposing private user/admin data. |
 
 ## Audit Findings (JOV-1692)

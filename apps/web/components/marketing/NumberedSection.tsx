@@ -48,7 +48,7 @@ export function NumberedSection({
 
           <div className='homepage-section-intro reveal-on-scroll'>
             <div>
-              <h2 className='marketing-h2-linear max-w-[12ch] text-primary-token'>
+              <h2 className='marketing-h2-linear max-w-[12ch] text-primary-token line-clamp-2'>
                 {heading}
               </h2>
             </div>

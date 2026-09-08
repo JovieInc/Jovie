@@ -21,6 +21,13 @@ return 1
 `;
 let skipRedisUntil = 0;
 
+function serializeRedisCasValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new Error('invalid_redis_cas_value');
+  return serialized;
+}
+
 function redisRecordBackend(
   redis: NonNullable<ReturnType<typeof getRedis>>
 ): RecordBackend {
@@ -39,7 +46,14 @@ function redisRecordBackend(
     compareAndSet: async (key, expectedValue, nextValue, ttlSeconds) => {
       const result = await redis
         .createScript<number>(COMPARE_AND_SET_SCRIPT)
-        .eval([key], [expectedValue, nextValue, String(ttlSeconds)]);
+        .eval(
+          [key],
+          [
+            serializeRedisCasValue(expectedValue),
+            serializeRedisCasValue(nextValue),
+            String(ttlSeconds),
+          ]
+        );
       return result === 1;
     },
     lpush: async (key, value) => {

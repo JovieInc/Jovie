@@ -224,18 +224,18 @@ function ReleaseRow({ label, type, year, artBg, isActive }: ReleaseRowProps) {
         aria-hidden='true'
       />
       <div className='min-w-0 flex-1'>
-        <p
-          className='truncate text-app text-primary-token/90 leading-tight'
+        <span
+          className='block truncate text-app text-primary-token/90 leading-tight'
           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
         >
           {label}
-        </p>
-        <p
-          className='text-2xs text-primary-token/38 leading-tight mt-0.5'
+        </span>
+        <span
+          className='mt-0.5 block text-2xs text-primary-token/38 leading-tight'
           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
         >
           {type} · {year}
-        </p>
+        </span>
       </div>
     </div>
   );
@@ -247,7 +247,7 @@ interface StatStripProps {
 
 function StatStrip({ stats }: StatStripProps) {
   return (
-    <p
+    <div
       className='text-2xs leading-relaxed text-primary-token/40'
       style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
@@ -268,7 +268,7 @@ function StatStrip({ stats }: StatStripProps) {
           )}
         </span>
       ))}
-    </p>
+    </div>
   );
 }
 
@@ -289,8 +289,8 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
           aria-hidden='true'
         />
         <div className='flex min-w-0 flex-col justify-center gap-1 pt-1'>
-          <p
-            className='text-3xs uppercase tracking-[0.08em] text-primary-token/40'
+          <span
+            className='block text-3xs uppercase tracking-[0.08em] text-primary-token/40'
             style={{
               fontFamily:
                 'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
@@ -298,13 +298,13 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
             }}
           >
             {eyebrow}
-          </p>
-          <p
-            className='text-mid font-[500] text-primary-token/90 leading-snug'
+          </span>
+          <span
+            className='block text-mid font-[500] text-primary-token/90 leading-snug'
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
           >
             {title}
-          </p>
+          </span>
           <StatStrip stats={stats} />
         </div>
       </div>
@@ -318,7 +318,7 @@ function ActionList() {
       {DEMO_RELEASE_ACTIONS.map(action => (
         <div className='home-composer-action' key={action.key}>
           <div>
-            <p>{action.label}</p>
+            <span className='home-composer-action-label'>{action.label}</span>
             <span>{action.body}</span>
           </div>
           <strong>{action.status}</strong>

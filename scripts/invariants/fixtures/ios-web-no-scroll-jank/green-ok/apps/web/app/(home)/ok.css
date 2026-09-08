@@ -1,0 +1,14 @@
+.hero {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+@supports (height: 100svh) {
+  .legacy-hero {
+    min-height: 100svh;
+  }
+}
+
+.legacy-hero {
+  min-height: 100vh;
+}

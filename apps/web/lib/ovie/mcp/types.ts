@@ -2,7 +2,7 @@ import type { OvieLane, OvieReceipt } from '@/lib/ovie/ingest';
 
 export const OVIE_MCP_PROTOCOL_VERSION = '2025-03-26';
 export const OVIE_MCP_SERVER_NAME = 'ovie';
-export const OVIE_MCP_IDENTITY = 'ovie' as const;
+export const OVIE_MCP_IDENTITY = 'summer' as const;
 
 export const OVIE_MCP_TOOLS = [
   'get_org_state',
@@ -16,6 +16,8 @@ export const OVIE_MCP_TOOLS = [
   'get_workflow_capture',
   'search_gbrain',
   'get_gbrain_page',
+  'record_operational_memory',
+  'coordinate_linear_work',
 ] as const;
 
 export type OvieMcpToolName = (typeof OVIE_MCP_TOOLS)[number];
@@ -25,6 +27,8 @@ export const OVIE_WRITE_TOOLS = [
   'create_initiative',
   'certify_feature',
   'request_workflow_capture',
+  'record_operational_memory',
+  'coordinate_linear_work',
 ] as const;
 
 /** Read-only operating detail that is still founder-private. */
@@ -96,6 +100,14 @@ export type OvieDecision = {
   readonly createdAt: string;
 };
 
+export type OvieBlocker = {
+  readonly summary?: string;
+  readonly owner?: string;
+  readonly nextAction?: string;
+  /** ISO timestamp by which the next proof must be observed. */
+  readonly nextProofDeadline?: string;
+};
+
 export type OvieInitiative = {
   readonly id: string;
   readonly kind: 'initiative';
@@ -112,6 +124,8 @@ export type OvieInitiative = {
   readonly idempotencyKey?: string;
   readonly routingState?: OvieRoutingState;
   readonly routingReason?: string;
+  /** Persisted blocker facts. Present only while routingState is blocked. */
+  readonly blocker?: OvieBlocker;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly evidence: readonly OvieEvidence[];
@@ -165,6 +179,8 @@ export type OvieEvidence = {
   readonly ref?: string;
   /** Kanban task id or Linear identifier after the Mac lander writes. */
   readonly landed_ref?: string;
+  /** ISO timestamp when the evidence was observed by its writer. */
+  readonly observedAt?: string;
 };
 
 export type OvieMcpPrincipal = {

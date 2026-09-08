@@ -23,6 +23,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getCacheGeneration } from '@/lib/queries/cache-isolation';
 import {
   type DedupedFetchOptions,
   dedupedFetchWithMeta,
@@ -172,14 +173,20 @@ export function useDedupedFetch<T = unknown>(
       }));
 
       try {
+        const startedGeneration = getCacheGeneration();
         const result = await dedupedFetchWithMeta<T>(url, {
           ...fetchOptionsRef.current,
           forceRefresh,
           signal: controller.signal,
         });
 
-        // Only update state if still mounted
-        if (mountedRef.current && !controller.signal.aborted) {
+        // Only update state if still mounted and the auth/profile generation
+        // has not advanced (JOV-6186 late-result fence).
+        if (
+          mountedRef.current &&
+          !controller.signal.aborted &&
+          getCacheGeneration() === startedGeneration
+        ) {
           setState({
             data: result.data,
             loading: false,

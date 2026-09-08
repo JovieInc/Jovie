@@ -1,11 +1,13 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { CopyLinkInput } from '@/components/features/dashboard/atoms/CopyLinkInput';
 import { toast } from '@/components/feedback';
-import { DrawerAsyncToggle } from '@/components/molecules/drawer';
+import {
+  OverflowMenu,
+  type OverflowMenuItem,
+} from '@/components/molecules/inspector';
 import {
   DEFAULT_LIBRARY_ASSET_VISIBILITY,
   formatLibraryAssetShareDisplayUrl,
@@ -137,45 +139,76 @@ export function LibraryAssetSharePanel({
   const displayUrl = shareUrl
     ? formatLibraryAssetShareDisplayUrl(shareUrl)
     : 'Generating link...';
+  const overflowBusy = disabled || isEnsuring || isRevoking || !profileId;
+
+  const overflowItems = useMemo<OverflowMenuItem[]>(() => {
+    const items: OverflowMenuItem[] = [
+      {
+        id: 'visibility',
+        label: visibility === 'public' ? 'Make private' : 'Make public',
+        disabled: overflowBusy,
+        onSelect: () => {
+          handleVisibilityToggle(visibility !== 'public').catch(() => {
+            toast.error('Unable to change share visibility right now');
+          });
+        },
+      },
+      {
+        id: 'open',
+        label: 'Open',
+        disabled: !shareUrl,
+        onSelect: () => {
+          globalThis.open(shareUrl, '_blank', 'noopener,noreferrer');
+        },
+      },
+    ];
+
+    if (visibility === 'private') {
+      items.push({
+        id: 'revoke',
+        label: isRevoking ? 'Revoking...' : 'Revoke private link',
+        variant: 'destructive',
+        separatorBefore: true,
+        disabled: overflowBusy || !profileId,
+        onSelect: () => {
+          handleRevoke().catch(() => {});
+        },
+      });
+    }
+
+    return items;
+  }, [
+    handleRevoke,
+    handleVisibilityToggle,
+    isRevoking,
+    overflowBusy,
+    profileId,
+    shareUrl,
+    visibility,
+  ]);
 
   return (
-    <div className='space-y-3' data-testid={`library-asset-share-${asset.id}`}>
-      <DrawerAsyncToggle
-        label='Public Link'
-        ariaLabel={`Set ${asset.title} share link visibility`}
-        checked={visibility === 'public'}
-        onToggle={handleVisibilityToggle}
-        successMessage={enabled =>
-          enabled ? 'Asset link is now public' : 'Asset link is now private'
-        }
-        density='compact'
-        testId={`library-asset-share-visibility-${asset.id}`}
-      />
-
+    <div
+      className='flex items-center gap-1.5'
+      data-testid={`library-asset-share-${asset.id}`}
+    >
       <CopyLinkInput
         url={shareUrl || ' '}
         displayValue={displayUrl}
         size='sm'
         stopPropagation
         testId={`library-asset-share-url-${asset.id}`}
-        className={cn((disabled || isEnsuring) && 'opacity-60')}
+        className={cn(
+          'min-w-0 flex-1',
+          (disabled || isEnsuring) && 'opacity-60'
+        )}
       />
-
-      {visibility === 'private' ? (
-        <Button
-          type='button'
-          variant='secondary'
-          size='sm'
-          onClick={() => {
-            handleRevoke().catch(() => {});
-          }}
-          disabled={disabled || isEnsuring || isRevoking || !profileId}
-          data-testid={`library-asset-share-revoke-${asset.id}`}
-          className='system-b-library-action system-b-library-action--standard h-8 px-2.5 text-2xs text-secondary-token'
-        >
-          {isRevoking ? 'Revoking...' : 'Revoke private link'}
-        </Button>
-      ) : null}
+      <OverflowMenu
+        label={`Share link actions for ${asset.title}`}
+        items={overflowItems}
+        disabled={disabled}
+        testId={`library-asset-share-overflow-${asset.id}`}
+      />
     </div>
   );
 }

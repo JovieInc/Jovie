@@ -1,4 +1,5 @@
 name: Sentry Autofix Recurrence
+# clock-class: production-liveness
 
 # Closes the sentry-autofix loop after a fix has landed on current main.
 # Scheduled / manual only — never a source-PR or merge-queue gate, and never

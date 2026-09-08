@@ -1,6 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { applyCacheScope } from './cache-isolation';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
@@ -31,13 +33,30 @@ const fetchImpersonationStatus = createQueryFn<ImpersonationState>(
  * }
  */
 export function useImpersonationQuery() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.admin.impersonation(),
     queryFn: fetchImpersonationStatus,
     staleTime: 30_000, // 30 seconds
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes after unmount
     refetchOnWindowFocus: false,
   });
+
+  const impersonation = query.data;
+  useEffect(() => {
+    applyCacheScope({
+      impersonationSubject: impersonation?.isImpersonating
+        ? (impersonation.effectiveDbId ??
+          impersonation.effectiveClerkId ??
+          'impersonating')
+        : null,
+    });
+  }, [
+    impersonation?.effectiveClerkId,
+    impersonation?.effectiveDbId,
+    impersonation?.isImpersonating,
+  ]);
+
+  return query;
 }
 
 /**

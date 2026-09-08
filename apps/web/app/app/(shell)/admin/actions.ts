@@ -7,7 +7,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -512,7 +511,6 @@ export async function banUserAction(formData: FormData): Promise<void> {
     const [current] = await tx
       .select({
         userStatus: users.userStatus,
-        clerkId: users.clerkId,
         betterAuthUserId: users.betterAuthUserId,
       })
       .from(users)
@@ -549,22 +547,9 @@ export async function banUserAction(formData: FormData): Promise<void> {
     });
 
     return {
-      clerkId: current.clerkId,
       betterAuthUserId: current.betterAuthUserId,
     };
   });
-
-  // Clerk metadata is a legacy side effect and may be absent post-cutover.
-  if (result.clerkId) {
-    try {
-      await syncAllClerkMetadata(result.clerkId);
-    } catch (error) {
-      captureError('Failed to sync Clerk metadata after ban', error, {
-        userId,
-        clerkId: result.clerkId,
-      });
-    }
-  }
 
   try {
     await invalidateProxyUserStateCache(userId);
@@ -597,10 +582,9 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
   // status was before banning. Default to 'active' if no record found.
   // ACID requirement: status update + audit log must be atomic to prevent
   // inconsistent state (e.g. status restored but no audit trail).
-  const result = await runLegacyDbTransaction(async tx => {
+  await runLegacyDbTransaction(async tx => {
     const [user] = await tx
       .select({
-        clerkId: users.clerkId,
         deletedAt: users.deletedAt,
         userStatus: users.userStatus,
       })
@@ -671,21 +655,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
       action: 'unban_user',
       metadata: { restoredTo: restoreStatus },
     });
-
-    return { clerkId: user.clerkId };
   });
-
-  // Clerk metadata is a legacy side effect and may be absent post-cutover.
-  if (result.clerkId) {
-    try {
-      await syncAllClerkMetadata(result.clerkId);
-    } catch (error) {
-      captureError('Failed to sync Clerk metadata after unban', error, {
-        userId,
-        clerkId: result.clerkId,
-      });
-    }
-  }
 
   try {
     await invalidateProxyUserStateCache(userId);

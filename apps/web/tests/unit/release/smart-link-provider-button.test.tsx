@@ -57,4 +57,22 @@ describe('SmartLinkProviderButton', () => {
     const icon = document.querySelector('svg');
     expect(icon).toHaveClass('text-muted-foreground');
   });
+
+  it('renders Deezer and Apple Music rows without a resting fill', () => {
+    render(
+      <>
+        <SmartLinkProviderButton
+          label='Apple Music'
+          href='https://music.apple.com'
+        />
+        <SmartLinkProviderButton label='Deezer' href='https://www.deezer.com' />
+      </>
+    );
+
+    for (const name of [/apple music/i, /deezer/i]) {
+      const row = screen.getByRole('link', { name });
+      expect(row).toHaveClass('bg-transparent');
+      expect(row).not.toHaveClass('bg-white/10');
+    }
+  });
 });

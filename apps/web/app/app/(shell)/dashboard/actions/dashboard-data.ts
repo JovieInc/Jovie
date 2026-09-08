@@ -50,7 +50,10 @@ import {
   isMissingCreatorDistributionEventsTableError,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
-import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
+import {
+  isE2EFastOnboardingEnabled,
+  isVisualCaptureSyntheticAuthEnabled,
+} from '@/lib/e2e/runtime';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   type InboxNavigationAvailability,
@@ -545,6 +548,18 @@ async function loadInboxNavigationAvailability(
       );
       return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
     }
+    // Expected transient timeouts on a fail-soft badge count are log-only too
+    // (JOV-5754): Neon cold-start PG statement timeouts, idle-in-transaction
+    // timeouts, and JS-level query timeouts are infrastructure conditions, not
+    // data bugs, and the read is designed to fail open. Drizzle names the
+    // failing statement in the wrapper message, so reporting them pages
+    // Sentry with the tour_dates count query title.
+    if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
+      logger.warn(
+        '[inbox-navigation] inbox count read timed out; degrading to unknown availability'
+      );
+      return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+    }
     Sentry.captureException(error, {
       level: 'warning',
       tags: { context: 'inbox_navigation_availability' },
@@ -577,6 +592,15 @@ function canUseE2EDashboardFallback(clerkUserId: string): boolean {
     process.env.VERCEL_ENV !== 'preview' &&
     isE2EFastOnboardingEnabled() &&
     clerkUserId.trim().length > 0
+  );
+}
+
+function shouldUseVisualCaptureSyntheticDashboard(
+  clerkUserId: string
+): boolean {
+  return (
+    isVisualCaptureSyntheticAuthEnabled() &&
+    canUseE2EDashboardFallback(clerkUserId)
   );
 }
 
@@ -884,6 +908,10 @@ async function fetchDashboardCoreWithSession(
     readonly allowMissingUserProvisioning?: boolean;
   }
 ): Promise<CoreData> {
+  if (shouldUseVisualCaptureSyntheticDashboard(clerkUserId)) {
+    return createE2EDashboardCoreData(clerkUserId);
+  }
+
   try {
     const base = await withDbSessionTx(
       async (tx, sessionUserId) =>
@@ -1129,6 +1157,10 @@ async function fetchDashboardEssentialWithSession(
     readonly allowMissingUserProvisioning?: boolean;
   }
 ): Promise<CoreData> {
+  if (shouldUseVisualCaptureSyntheticDashboard(clerkUserId)) {
+    return createE2EDashboardCoreData(clerkUserId);
+  }
+
   try {
     return await withDbSessionTx(
       async (tx, sessionUserId) =>
@@ -1185,6 +1217,10 @@ async function fetchDashboardShellWithSession(
     readonly allowMissingUserProvisioning?: boolean;
   }
 ): Promise<CoreData> {
+  if (shouldUseVisualCaptureSyntheticDashboard(clerkUserId)) {
+    return createE2EDashboardCoreData(clerkUserId);
+  }
+
   try {
     // Keep shell reads inside the transaction-scoped session. RLS depends on
     // app.clerk_user_id being set on the same pooled connection as the profile

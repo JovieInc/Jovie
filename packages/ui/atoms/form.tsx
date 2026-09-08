@@ -125,15 +125,27 @@ const FormControl = React.forwardRef<
   const { error, formItemId, formDescriptionId, formMessageId } =
     useFormField();
 
+  const {
+    id: _id,
+    'aria-describedby': ariaDescribedBy,
+    'aria-invalid': ariaInvalid,
+    ...controlProps
+  } = props;
+  const describedBy = [
+    ariaDescribedBy,
+    formDescriptionId,
+    error ? formMessageId : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <Slot
+      {...controlProps}
       ref={ref}
       id={formItemId}
-      aria-describedby={
-        error ? `${formDescriptionId} ${formMessageId}` : `${formDescriptionId}`
-      }
-      aria-invalid={error ? true : undefined}
-      {...props}
+      aria-describedby={describedBy || undefined}
+      aria-invalid={error ? true : ariaInvalid}
     />
   );
 });
@@ -164,23 +176,21 @@ const FormMessage = React.forwardRef<
   const { error, formMessageId } = useFormField();
   const body = error ? String(error?.message) : children;
 
-  if (!body) {
-    return null;
-  }
-
   return (
-    <p
-      ref={ref}
-      id={formMessageId}
-      className={cn('text-app font-medium text-destructive', className)}
-      data-slot='form-message'
-      role={error ? 'alert' : undefined}
-      aria-live={error ? 'polite' : undefined}
-      aria-atomic={error ? 'true' : undefined}
-      {...props}
-    >
-      {body}
-    </p>
+    <div className='min-h-5' data-slot='form-message-feedback'>
+      {body ? (
+        <p
+          ref={ref}
+          id={formMessageId}
+          className={cn('text-app font-medium text-destructive', className)}
+          data-slot='form-message'
+          role={error ? 'alert' : undefined}
+          {...props}
+        >
+          {body}
+        </p>
+      ) : null}
+    </div>
   );
 });
 FormMessage.displayName = 'FormMessage';

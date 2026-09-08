@@ -1349,16 +1349,24 @@ async function runRemediate(isDryRun) {
 }
 
 main().catch(err => {
-  console.error(
-    'Failure receipt:',
-    JSON.stringify({
-      schema: 'backlog-orchestrator/failure/v1',
-      status: 'blocked',
-      code: err.code || 'UNKNOWN',
-      attempts: err.attempts,
-      message: err.message,
-    })
-  );
+  const cooldown = linear.activeLinearCooldown(err);
+  const deferred = process.argv[2] === 'remediate' && cooldown !== null;
+  const receipt = {
+    schema: 'backlog-orchestrator/failure/v1',
+    status: deferred ? 'deferred' : 'blocked',
+    code: deferred ? 'RATE_LIMITED' : err.code || 'UNKNOWN',
+    attempts: err.attempts,
+    message: err.message,
+    ...(deferred ? cooldown : {}),
+  };
+  console.error('Failure receipt:', JSON.stringify(receipt));
+  if (deferred) {
+    console.error(
+      `Linear credential cooldown is active; the scheduled remediation clock will retry at or after ${receipt.retryAt}.`
+    );
+    process.exitCode = 0;
+    return;
+  }
   console.error('Fatal error:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });

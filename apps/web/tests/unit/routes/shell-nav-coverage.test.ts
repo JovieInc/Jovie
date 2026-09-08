@@ -37,6 +37,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/ov/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/ov/investors/settings':
     'Sub-tool reached from Investors workspace actions',
+  '/app/ov/investors/updates':
+    'Sub-tool reached from Investors workspace actions',
   '/app/ov/interviews': 'Internal admin review workspace (manual entry)',
   '/app/ov/playlists': 'Internal admin workflow (manual entry)',
   '/app/ov/agent-runs/[id]':

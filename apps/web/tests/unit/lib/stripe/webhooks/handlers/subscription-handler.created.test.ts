@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
+  mockAttributeLeadPaidConversionByAppUserId,
+  mockCaptureCriticalError,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockLogFallback,
@@ -98,6 +100,45 @@ describe('@critical SubscriptionHandler - Created', () => {
       expect.objectContaining({
         clerkUserId: 'user_from_db',
         eventType: 'subscription_created',
+      })
+    );
+  });
+
+  it('fails closed when paid_converted write throws so Stripe retries', async () => {
+    mockAttributeLeadPaidConversionByAppUserId.mockRejectedValue(
+      new Error('injected event-write failure')
+    );
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_receipt_fail',
+        type: 'customer.subscription.created',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'sub_receipt_fail',
+            status: 'active',
+            customer: 'cus_receipt',
+            metadata: { clerk_user_id: 'user_receipt' },
+            items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+          } as unknown as Stripe.Subscription,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_receipt_fail',
+      stripeEventTimestamp: new Date(),
+    };
+
+    await expect(handler.handle(context)).rejects.toThrow(
+      'injected event-write failure'
+    );
+    expect(mockInvalidateBillingCache).toHaveBeenCalled();
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Lead paid conversion outcome receipt failed',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/stripe/webhooks',
+        event: 'customer.subscription.created',
+        subscriptionId: 'sub_receipt_fail',
       })
     );
   });

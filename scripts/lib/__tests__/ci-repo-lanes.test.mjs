@@ -25,14 +25,31 @@ const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 describe('JOV-5288 CI repo lanes', () => {
   it('keeps Symphony control-plane files off the Jovie product suite', () => {
     const plan = classifyCiRepoLanes([
-      'scripts/hermes/gem-priority-gate.py',
-      'scripts/hermes/tests/gem-priority-gate.test.py',
+      'scripts/symphony/gem-priority-gate.py',
+      'scripts/symphony/tests/gem-priority-gate.test.py',
       'scripts/backlog-orchestrator/admitter.mjs',
     ]);
     expect(plan.runJovieProduct).toBe(false);
     expect(plan.runSymphonyControl).toBe(true);
     expect(plan.runSummerOps).toBe(false);
     expect(plan.lanes).toEqual([CI_LANES.SYMPHONY_CONTROL]);
+  });
+
+  it('maps symphony commission signals onto Symphony control-plane only', () => {
+    expect(
+      classifyChangedFile(
+        'scripts/symphony/signals/gem-publisher-commission.request'
+      )
+    ).toEqual([CI_LANES.SYMPHONY_CONTROL]);
+    expect(classifyChangedFile('ops/signals/example.request')).toEqual([
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
+    const plan = classifyCiRepoLanes([
+      'scripts/symphony/signals/gem-publisher-commission.request',
+    ]);
+    expect(plan.runJovieProduct).toBe(false);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runSummerOps).toBe(false);
   });
 
   it('classifies ci-fast lane wiring as Symphony control-plane, not Jovie product', () => {
@@ -98,13 +115,13 @@ describe('JOV-5288 CI repo lanes', () => {
       'README.md',
       'apps/web/app/icon.png',
       'apps/web/app/globals.css',
-      'scripts/hermes/gem-ops-hud.py',
+      'scripts/symphony/gem-ops-hud.py',
     ]) {
       expect(affectsJovieTypecheck(path), path).toBe(false);
     }
 
     expect(
-      classifyCiRepoLanes(['scripts/hermes/job.ts']).runJovieTypecheck
+      classifyCiRepoLanes(['scripts/symphony/job.ts']).runJovieTypecheck
     ).toBe(false);
     expect(
       classifyCiRepoLanes(['apps/web/app/page.tsx']).runJovieTypecheck
@@ -155,7 +172,7 @@ describe('JOV-5288 CI repo lanes', () => {
   });
 
   it('emits GitHub outputs that skip product suites for Symphony-only diffs', () => {
-    const plan = classifyCiRepoLanes(['scripts/hermes/codex-rotate']);
+    const plan = classifyCiRepoLanes(['scripts/symphony/codex-rotate']);
     expect(githubLaneOutputs(plan)).toEqual([
       'run_jovie_product=false',
       'run_jovie_typecheck=false',

@@ -73,6 +73,25 @@ describe('IconButton', () => {
     }
   });
 
+  it('keeps compact circular chrome overflow-visible for the hit container', () => {
+    render(
+      <IconButton
+        ariaLabel='Compact surface action'
+        size='md'
+        variant='surface'
+      >
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Compact surface action',
+    });
+    expect(button.className).toContain('overflow-visible');
+    expect(button.className).toContain('before:h-11');
+    expect(button.className).toContain('before:w-11');
+  });
+
   it('keeps secondary controls unfilled at rest with circular interaction states', () => {
     render(
       <IconButton ariaLabel='Secondary action' size='md' variant='secondary'>
@@ -161,7 +180,8 @@ describe('IconButton', () => {
       const button = screen.getByRole('button', {
         name: `${variant} action`,
       });
-      expect(button.className).toContain('focus-visible:ring-focus/55');
+      expect(button).toHaveClass('focus-visible:ring-focus');
+      expect(button).not.toHaveClass('focus-visible:ring-focus/55');
       expect(button.className).toContain('motion-reduce:transition-none');
       expect(button.className).not.toContain('focus-visible:ring-ring');
       expect(button.className).not.toContain('focus-visible:ring-focus/16');
@@ -225,5 +245,41 @@ describe('IconButton', () => {
     expect(button.className).toContain('duration-subtle');
     expect(button.className).toContain('ease-subtle');
     expect(button.className).not.toContain('ease-out');
+  });
+
+  it('uses named frosted background utilities', () => {
+    render(
+      <IconButton ariaLabel='Frosted action' variant='frosted'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Frosted action' });
+    expect(button.className).toContain('bg-icon-button-frosted');
+    expect(button.className).toContain('hover:bg-icon-button-frosted-hover');
+    expect(button.className).not.toMatch(/bg-\[/);
+  });
+
+  it('uses shared quiet-control elevation for pearl interaction depth', () => {
+    render(
+      <IconButton ariaLabel='Quiet pearl action' variant='pearlQuiet'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Quiet pearl action',
+    });
+    expect(button.className).toContain(
+      'hover:bg-icon-button-pearl-quiet-hover'
+    );
+    expect(button.className).toContain(
+      'focus-visible:bg-icon-button-pearl-quiet-focus'
+    );
+    expect(button.className).toContain('hover:shadow-sm');
+    expect(button.className).toContain('focus-visible:shadow-sm');
+    expect(button.className).not.toContain('profile-pearl-shadow');
+    expect(button.className).not.toMatch(/bg-\[/);
+    expect(button.className).not.toMatch(/(?:hover|focus-visible):shadow-\[/);
   });
 });

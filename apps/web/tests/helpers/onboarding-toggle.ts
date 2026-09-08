@@ -47,7 +47,7 @@ async function callToggleEndpoint(
 
 /**
  * Mark onboarding as completed for the currently authenticated user.
- * Requires the test to be signed in (see tests/helpers/clerk-auth.ts).
+ * Requires the test to be signed in (see tests/helpers/auth.ts).
  */
 export async function setOnboardingComplete(
   page: Page
@@ -57,7 +57,7 @@ export async function setOnboardingComplete(
 
 /**
  * Reset onboarding (set onboardingCompletedAt to null) for the currently authenticated user.
- * Requires the test to be signed in (see tests/helpers/clerk-auth.ts).
+ * Requires the test to be signed in (see tests/helpers/auth.ts).
  */
 export async function resetOnboarding(page: Page): Promise<ToggleResponse> {
   return await callToggleEndpoint(page, 'reset');

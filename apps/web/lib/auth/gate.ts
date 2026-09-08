@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { cache } from 'react';
 import { auth } from '@/lib/auth/better-auth';
@@ -13,12 +13,10 @@ import {
 } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
-  type WaitlistStatus as CanonicalWaitlistStatus,
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
 } from '@/lib/waitlist/state-machine';
@@ -30,6 +28,7 @@ import {
 import { getCachedDevTestAuthSession } from './dev-test-auth.server';
 import { checkUserStatus } from './status-checker';
 import { determineUserStatus, type UserLifecycleStatus } from './user-status';
+import { getWaitlistAccess } from './waitlist-access';
 
 export type { UserStateInput } from './canonical-user-state';
 // Re-export canonical state enum and utilities so consumers can import from gate.ts
@@ -63,6 +62,11 @@ export interface AuthGateResult {
     email: string | null;
     errorCode?: string;
   };
+}
+
+export interface AuthGateIdentity {
+  readonly clerkUserId: string | null;
+  readonly email: string | null;
 }
 
 function canUseE2ETestAuthFallback(): boolean {
@@ -435,7 +439,7 @@ async function handleMissingDbUser(
   let waitlistEntryId: string | undefined;
 
   if (waitlistGateEnabled) {
-    const waitlistResult = await checkWaitlistAccessInternal(email);
+    const waitlistResult = await getWaitlistAccess(email);
 
     if (isWaitlistPendingStatus(waitlistResult.status)) {
       return {
@@ -508,10 +512,9 @@ async function handleMissingDbUser(
  * short-circuit the session read. The app user's `betterAuthUserId` is
  * resolved from the DB.
  */
-async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
-  clerkUserId: string | null;
-  email: string | null;
-}> {
+async function resolveAuthIdentity(
+  knownAppUserId?: string
+): Promise<AuthGateIdentity> {
   // The secretless visual-capture runtime carries a Better Auth identity in
   // test cookies, but has no persisted app `users.id`. In that deliberately
   // synthetic mode it must win over a caller's cached app-id hint. Normal
@@ -568,6 +571,10 @@ async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
     // must pass `knownAppUserId`.
     return { clerkUserId: null, email: null };
   }
+}
+
+export async function resolveRequestAuthIdentity(): Promise<AuthGateIdentity> {
+  return resolveAuthIdentity();
 }
 
 async function loadAuthGateRecord(
@@ -653,6 +660,12 @@ function toAuthGateProfile(
 export interface ResolveUserStateOptions {
   createDbUserIfMissing?: boolean;
   /**
+   * Pre-resolved Better Auth identity for callers that already performed the
+   * request session lookup. This preserves the canonical gate while avoiding a
+   * second auth-store read on the same route.
+   */
+  knownAuthIdentity?: AuthGateIdentity;
+  /**
    * Pre-resolved app `users.id` UUID. When provided, skips the Better Auth
    * session read (which calls `headers()` and must NOT be invoked inside
    * `unstable_cache` / `"use cache"` boundaries).
@@ -672,6 +685,7 @@ function serializeResolveUserStateOptions(
 ): string {
   return JSON.stringify({
     createDbUserIfMissing: options.createDbUserIfMissing ?? true,
+    knownAuthIdentity: options.knownAuthIdentity ?? null,
     knownClerkUserId: options.knownClerkUserId ?? null,
   });
 }
@@ -697,10 +711,16 @@ function serializeResolveUserStateOptions(
 async function resolveUserStateInternal(
   options: ResolveUserStateOptions = {}
 ): Promise<AuthGateResult> {
-  const { createDbUserIfMissing = true, knownClerkUserId } = options;
+  const {
+    createDbUserIfMissing = true,
+    knownAuthIdentity,
+    knownClerkUserId,
+  } = options;
 
   // 1. Resolve Better Auth identity and prefetch waitlist gate in parallel.
-  const identityPromise = resolveAuthIdentity(knownClerkUserId);
+  const identityPromise = knownAuthIdentity
+    ? Promise.resolve(knownAuthIdentity)
+    : resolveAuthIdentity(knownClerkUserId);
   const waitlistGatePromise = readWaitlistGateEnabledForAuthGate();
   const { clerkUserId, email } = await identityPromise;
 
@@ -816,11 +836,13 @@ const resolveUserStateCached = cache(
   async (optionsKey: string): Promise<AuthGateResult> => {
     const parsed = JSON.parse(optionsKey) as {
       createDbUserIfMissing: boolean;
+      knownAuthIdentity: AuthGateIdentity | null;
       knownClerkUserId: string | null;
     };
 
     return resolveUserStateInternal({
       createDbUserIfMissing: parsed.createDbUserIfMissing,
+      knownAuthIdentity: parsed.knownAuthIdentity ?? undefined,
       knownClerkUserId: parsed.knownClerkUserId ?? undefined,
     });
   }
@@ -833,65 +855,11 @@ export async function resolveUserState(
 }
 
 // =============================================================================
-// Waitlist Access Helpers (exported for reuse)
+// Waitlist Access Helpers (re-exported for existing import paths)
 // =============================================================================
 
-export type WaitlistStatus = CanonicalWaitlistStatus;
-
-export interface WaitlistAccessResult {
-  entryId: string | null;
-  status: WaitlistStatus | null;
-}
-
-/**
- * Check waitlist access by email.
- * Returns the waitlist entry status.
- *
- * This is the single source of truth for waitlist status checks.
- * Use this instead of querying waitlist tables directly.
- */
-export async function getWaitlistAccess(
-  email: string
-): Promise<WaitlistAccessResult> {
-  return checkWaitlistAccessInternal(email);
-}
-
-/**
- * Internal helper to check waitlist access by email.
- */
-async function checkWaitlistAccessInternal(email: string): Promise<{
-  entryId: string | null;
-  status: WaitlistStatus | null;
-}> {
-  const normalizedEmail = normalizeEmail(email);
-
-  // JOV-1963: order by createdAt DESC so the LATEST waitlist entry wins when
-  // a single email has multiple entries. Previously the query relied on
-  // arbitrary ordering, which could surface a stale `'new'` row even after
-  // the user had been invited or claimed access.
-  const [entry] = await db
-    .select({
-      id: waitlistEntries.id,
-      status: waitlistEntries.status,
-    })
-    .from(waitlistEntries)
-    .where(
-      drizzleSql`${waitlistEntries.emailNormalized} = ${normalizedEmail} OR lower(${waitlistEntries.email}) = ${normalizedEmail}`
-    )
-    .orderBy(
-      drizzleSql`${waitlistEntries.canonical} DESC, ${waitlistEntries.createdAt} DESC`
-    )
-    .limit(1);
-
-  if (!entry) {
-    return { entryId: null, status: null };
-  }
-
-  return {
-    entryId: entry.id,
-    status: entry.status,
-  };
-}
+export type { WaitlistAccessResult, WaitlistStatus } from './waitlist-access';
+export { getWaitlistAccess } from './waitlist-access';
 
 // State utilities (getRedirectForState, canAccessApp, canAccessOnboarding,
 // requiresRedirect) are re-exported from canonical-user-state.ts at the top

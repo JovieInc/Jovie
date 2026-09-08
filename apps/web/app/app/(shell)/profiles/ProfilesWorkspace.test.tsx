@@ -396,6 +396,15 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       within(outcomes).getByRole('link', { name: /Engagement Scored/i })
     ).toHaveAttribute('href', '/app/contacts');
     expect(screen.queryByText('7')).not.toBeInTheDocument();
+
+    // JOV-6170: presence outcomes group by artist goal, not raw type.
+    expect(
+      screen.getByRole('button', { name: 'Identity' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Profiles' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Catalog' })).toBeInTheDocument();
     const typeGlyph = screen.getByRole('img', {
       name: 'DSP profile type',
     });
@@ -418,13 +427,107 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         .some(element => element.classList.contains('sr-only'))
     ).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: 'DSPs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Profiles' }));
     expect(screen.getByText('Spotify')).toBeInTheDocument();
+    expect(screen.getByText('Instagram')).toBeInTheDocument();
     expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Identity' }));
+    expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
+    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
+
+    // Catalog outcome: authority/directory sources. Base fixture has none,
+    // so the outcome tab renders the category empty state.
+    fireEvent.click(screen.getByRole('button', { name: 'Catalog' }));
+    expect(
+      screen.getByText('No Presence in This Category')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
 
     expect(
       screen.getByRole('button', { name: 'Connectors' })
     ).toBeInTheDocument();
+  });
+
+  it('renders one recommendation primitive per suggested-qualification surface', async () => {
+    renderWorkspace({
+      ...data,
+      rows: [
+        ...data.rows,
+        {
+          id: 'fan-wiki',
+          rowType: 'surface',
+          kind: 'authority',
+          platform: 'wikipedia',
+          label: 'Fan Wiki',
+          handle: null,
+          url: 'https://example.com/wiki/tim',
+          trackedUrl: null,
+          qualificationStatus: 'suggested',
+          isOfficial: false,
+          monitoringState: 'unavailable',
+          rank: null,
+          previousRank: null,
+          lastObservedAt: null,
+        },
+      ],
+    });
+
+    await userEvent.setup().click(screen.getByText('Fan Wiki'));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(panel).not.toBeNull();
+
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    const signalList = screen.getByTestId('presence-signal-list');
+    // Suggested qualification: recommendation primitive at its own weight.
+    expect(
+      within(signalList).getByTestId('presence-signal-recommendation')
+    ).toHaveTextContent('Qualify This Page');
+    expect(
+      within(signalList).getByTestId('presence-signal-finding')
+    ).toHaveTextContent('Needs Qualification');
+  });
+
+  it('groups presence signals into separated blocker, finding, and state primitives', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(dataWithConnector);
+
+    await user.click(screen.getByText('Gmail'));
+    const connectorPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    expect(connectorPanel).not.toBeNull();
+    const connectorRender = render(
+      <TooltipProvider>{connectorPanel as ReactElement}</TooltipProvider>
+    );
+
+    const signalList = screen.getByTestId('presence-signal-list');
+    // Connected connector: quiet state primitive only, no fabricated recs.
+    expect(
+      within(signalList).getByTestId('presence-signal-state')
+    ).toHaveTextContent('Active');
+    expect(
+      within(signalList).queryByTestId('presence-signal-blocker')
+    ).not.toBeInTheDocument();
+    expect(
+      within(signalList).queryByTestId('presence-signal-recommendation')
+    ).not.toBeInTheDocument();
+
+    connectorRender.unmount();
+    await user.click(screen.getByRole('button', { name: 'All Pages' }));
+    await user.click(screen.getByText('Spotify'));
+    const dspPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    render(<TooltipProvider>{dspPanel as ReactElement}</TooltipProvider>);
+
+    const dspSignals = screen.getByTestId('presence-signal-list');
+    expect(
+      within(dspSignals).getByTestId('presence-signal-finding')
+    ).toHaveTextContent('Limit Reached');
+    expect(
+      within(dspSignals).queryByTestId('presence-signal-blocker')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Next Best Action')).not.toBeInTheDocument();
   });
 
   it('renders persisted suggestions without fabricating profile surface suggestions', async () => {
@@ -468,6 +571,18 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       await screen.findAllByTestId('suggested-connection-row')
     ).toHaveLength(2);
     expect(screen.getAllByTestId('suggested-connection-group')).toHaveLength(1);
+    // JOV-6170: one identity = one opportunity with a Review count and
+    // canonical directory drills (Genius / Last.fm / MusicBrainz).
+    expect(
+      screen.getByText('Add canonical @timwhite profile')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Review 2')).toBeInTheDocument();
+    expect(screen.getAllByTestId('canonical-source-drill')).toHaveLength(3);
+    expect(
+      screen
+        .getAllByTestId('canonical-source-drill')
+        .map(drill => drill.textContent)
+    ).toEqual(['Genius', 'Last.fm', 'MusicBrainz']);
     expect(screen.getByTestId('suggested-connections-review')).toHaveClass(
       'min-w-0'
     );
@@ -492,6 +607,33 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.getByText('2 suggested profiles to review.')
     ).toBeInTheDocument();
+  });
+
+  it('renders one opportunity per identity with drills scoped to that identity', async () => {
+    mockPersistedSuggestions([
+      socialSuggestion('social-tiktok', 'tiktok', '@timwhite', 0.96),
+      dspSuggestion('spotify-alpha', 'Alpha Artist', 0.89),
+    ]);
+    renderWorkspace(data);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Suggested' }));
+
+    expect(
+      await screen.findByText('Add canonical Alpha Artist profile')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Add canonical @timwhite profile')
+    ).toBeInTheDocument();
+    expect(screen.getAllByTestId('suggested-connection-group')).toHaveLength(2);
+    expect(screen.getAllByText('Review 1')).toHaveLength(2);
+    const drills = screen.getAllByTestId('canonical-source-drill');
+    expect(drills).toHaveLength(6);
+    expect(drills[0]).toHaveAttribute(
+      'href',
+      'https://genius.com/search?q=Alpha%20Artist'
+    );
   });
 
   it('accepts a persisted suggestion, removes review actions, and shows a normal connection row', async () => {
@@ -529,7 +671,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: 'Social' }));
+    await user.click(screen.getByRole('button', { name: 'Profiles' }));
     expect(screen.getByText('TikTok')).toBeInTheDocument();
     const acceptedRow = screen.getByText('TikTok').closest('tr');
     expect(acceptedRow).not.toBeNull();
@@ -664,10 +806,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'href',
       'https://open.spotify.com/artist/tim'
     );
-    expect(screen.getByText('Next Best Action')).toBeInTheDocument();
-    expect(
-      screen.getByText('Upgrade the monitoring limit to track this page.')
-    ).toBeInTheDocument();
+    // JOV-6170: separated signal primitives replace the merged next-best-action.
+    expect(screen.getByTestId('presence-signal-finding')).toHaveTextContent(
+      'Limit Reached'
+    );
+    expect(screen.getByText('Signals')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute(
       'href',
       '/app/settings/billing'
@@ -677,7 +820,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
   it('uses the canonical Jovie URL only for supported social connections', async () => {
     const user = userEvent.setup();
     renderWorkspace(data);
-    await user.click(screen.getByRole('button', { name: 'Social' }));
+    await user.click(screen.getByRole('button', { name: 'Profiles' }));
 
     expect(
       screen.getByTitle('https://jov.ie/tim/s/instagram')
@@ -757,7 +900,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
     ).not.toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Social' }));
+    await user.click(screen.getByRole('button', { name: 'Profiles' }));
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
   });
 

@@ -22,7 +22,26 @@ body:has(.home-viewport) {
 }
 
 html:has(.home-viewport) {
+  /* Matches marketing-glass sticky chrome so hash / scrollIntoView /
+     find-in-page never park a heading under the pill. */
+  --homepage-sticky-nav-offset: clamp(0.42rem, 0.8vw, 0.62rem);
+  --homepage-sticky-nav-height: 2.72rem;
+  --homepage-sticky-nav-clearance: calc(
+    var(--homepage-sticky-nav-offset) +
+    var(--homepage-sticky-nav-height) +
+    env(safe-area-inset-top, 0px) +
+    var(--space-6)
+  );
+
   position: relative;
+  scroll-padding-top: var(--homepage-sticky-nav-clearance);
+}
+
+@media (max-width: 767px) {
+  html:has(.home-viewport) {
+    --homepage-sticky-nav-offset: 0.6rem;
+    --homepage-sticky-nav-height: 3.15rem;
+  }
 }
 
 html:has(.home-viewport)::-webkit-scrollbar,
@@ -1972,6 +1991,574 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 /* HOMEPAGE POSTER HERO SYSTEM B END */
 
+/* HOMEPAGE EDITORIAL HERO START */
+/* Centered, image-free hero. Soft illumination across a dark plane —
+   no horizon line, no wireframe ellipse, no wallpaper. */
+.homepage-editorial-hero {
+  --homepage-hero-reveal-delay: 100ms;
+  --homepage-editorial-light: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 5%,
+    transparent
+  );
+  --homepage-editorial-light-soft: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 2%,
+    transparent
+  );
+  --homepage-editorial-hairline: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 12%,
+    transparent
+  );
+
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  align-content: center;
+  justify-items: center;
+  overflow: clip;
+  isolation: isolate;
+  padding: calc(var(--homepage-header-height) + var(--space-8))
+    var(--homepage-grid-gutter) var(--space-16);
+  background: var(--system-b-bg-page);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-editorial-hero__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--system-b-bg-page);
+}
+
+.homepage-editorial-hero__light-well {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  width: min(80rem, 120vw);
+  height: min(42rem, 62vw);
+  border: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    var(--homepage-editorial-light) 0%,
+    var(--homepage-editorial-light-soft) 42%,
+    transparent 74%
+  );
+  opacity: 0.5;
+  filter: blur(var(--space-8));
+}
+
+.homepage-editorial-hero__light-well::after {
+  position: absolute;
+  inset: 42% 14% auto;
+  height: 48%;
+  content: "";
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--system-b-text-primary) 1.5%, transparent),
+    transparent 88%
+  );
+  filter: blur(var(--space-12));
+  transform: none;
+}
+
+.homepage-editorial-hero__copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(var(--homepage-grid-max), 100%);
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transform: translateY(calc(var(--homepage-header-height) * -0.12));
+}
+
+.homepage-editorial-hero__headline {
+  margin: 0;
+  max-width: 100%;
+  color: var(--color-text-primary-token);
+  font-family:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  font-size: clamp(2.5rem, 5.3vw, 4.75rem);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--ds-marketing-display-tracking);
+  line-height: 1.02;
+  text-wrap: balance;
+  white-space: nowrap;
+}
+
+.homepage-editorial-hero__support {
+  margin: var(--space-5) 0 0;
+  max-width: 44rem;
+  color: var(--color-text-secondary-token);
+  font-size: clamp(1.0625rem, 1.5vw, 1.375rem);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--ds-marketing-lede-leading);
+  letter-spacing: var(--ds-marketing-lede-tracking);
+  text-wrap: balance;
+  white-space: nowrap;
+}
+
+.homepage-editorial-hero__search {
+  width: min(40rem, 100%);
+  margin-top: var(--space-8);
+}
+
+/* Field geometry only. Illumination lives on InputAuraFrame.
+   The opaque interior token lives here so hero and close match. */
+.homepage-name-search__field {
+  --homepage-editorial-field: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 4%,
+    var(--system-b-bg-page)
+  );
+  --homepage-name-search-inset: var(--space-2);
+  /* 28px visible action + matching top/bottom/right inset = 44px pill. */
+  min-height: calc(
+    var(--space-6) +
+    var(--space-1) +
+    var(--homepage-name-search-inset) *
+    2
+  );
+  overflow: hidden;
+  gap: var(--space-2);
+  padding: var(--homepage-name-search-inset) var(--homepage-name-search-inset)
+    var(--homepage-name-search-inset) var(--space-5);
+  border: var(--space-px) solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--homepage-editorial-field);
+}
+
+.homepage-name-search__input {
+  font-size: var(--text-lg);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.005em;
+}
+
+.homepage-name-search__input::placeholder {
+  color: var(--color-text-tertiary-token);
+}
+
+.homepage-name-search__submit {
+  font-family:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  font-size: 14px;
+  font-weight: 510;
+  padding-inline: var(--space-4);
+}
+
+.homepage-name-search__results {
+  border-radius: var(--radius-xl);
+}
+
+@media (max-width: 767px) {
+  .homepage-editorial-hero {
+    padding-bottom: var(--space-12);
+  }
+
+  .homepage-editorial-hero__copy {
+    transform: none;
+  }
+
+  /* Keep the tablet composition generous while retaining a two-line measure. */
+  .homepage-editorial-hero__headline {
+    max-width: min(16ch, 100%);
+    font-size: clamp(2.35rem, 10.6vw, 2.75rem);
+    line-height: 1.06;
+    white-space: normal;
+  }
+
+  .homepage-editorial-hero__support {
+    max-width: 30rem;
+    margin-top: var(--space-4);
+    font-size: var(--text-lg);
+    white-space: normal;
+  }
+
+  .homepage-editorial-hero__search {
+    margin-top: var(--space-6);
+  }
+
+  .homepage-editorial-hero__light-well {
+    width: 150vw;
+    height: 60vw;
+  }
+
+  .homepage-name-search__field {
+    padding-left: var(--space-4);
+  }
+
+  .homepage-name-search__input {
+    font-size: var(--text-base);
+  }
+}
+
+@media (max-width: 1023px) {
+  .homepage-editorial-hero__search {
+    width: 100%;
+  }
+}
+
+@media (max-width: 479px) {
+  .homepage-editorial-hero__headline {
+    max-width: 11ch;
+  }
+
+  .homepage-editorial-hero__support {
+    max-width: 22rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-editorial-hero__copy {
+    animation: homepage-hero-content-reveal var(--ds-motion-subtle-duration)
+      var(--ds-motion-subtle-easing) var(--homepage-hero-reveal-delay) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-editorial-hero__copy {
+    animation: none;
+    opacity: 1;
+  }
+
+  .homepage-name-search__field {
+    transition: none;
+  }
+}
+/* HOMEPAGE EDITORIAL HERO END */
+
+/* HOMEPAGE CERTIFIED SECTIONS START */
+/* Sections 2-9. Named rhythm: proof strip, text chapter, product chapter,
+   close. Product chapters take the strongest beat; supporting chapters
+   stay economical. One content column, one gutter, top rules, no cards. */
+.homepage-certified-proof,
+.homepage-certified-section,
+.homepage-close {
+  --homepage-rhythm-proof: clamp(var(--space-8), 4vw, var(--space-12));
+  --homepage-rhythm-text: clamp(var(--space-10), 5.5vw, var(--space-16));
+  --homepage-rhythm-product: clamp(var(--space-16), 8vw, var(--space-24));
+  --homepage-rhythm-close-start: clamp(var(--space-24), 10vw, var(--space-32));
+  --homepage-rhythm-close-end: clamp(var(--space-16), 8vw, var(--space-24));
+
+  background: var(--system-b-bg-page);
+  color: var(--color-text-primary-token);
+}
+
+.homepage-certified-proof {
+  padding-block: var(--homepage-rhythm-proof);
+}
+
+.homepage-certified-proof
+  .system-b-mounted-home-trust-strip-shell
+  > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+  padding-block: 0;
+}
+
+.homepage-certified-proof__statement {
+  width: min(
+    var(--homepage-grid-max),
+    calc(100% - var(--homepage-grid-gutter) * 2)
+  );
+  margin: 0 auto;
+  color: var(--color-text-secondary-token);
+  font-size: var(--ds-marketing-lede-size);
+  line-height: var(--ds-marketing-lede-leading);
+  letter-spacing: var(--ds-marketing-lede-tracking);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.homepage-certified-proof__logos {
+  margin-top: 0;
+}
+
+/* homepage-proof-no-card-v1: four logos sit on the page background (no
+   frosted card). Desktop spacing matches /pricing compact card:
+   flex + gap-x-8 + lg nowrap / space-between. The shared trust-strip
+   primitive stays a 5-track grid for other mounts. */
+.homepage-certified-proof
+  .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+  overflow: visible;
+}
+
+@media (min-width: 768px) {
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-5) var(--space-8);
+    grid-template-columns: none;
+  }
+
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo-slot {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: max-content;
+    height: auto;
+    overflow: visible;
+  }
+
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo {
+    max-width: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo-grid {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: var(--space-8);
+  }
+}
+
+.homepage-certified-section__inner,
+.homepage-close__inner {
+  width: min(
+    var(--homepage-grid-max),
+    calc(100% - var(--homepage-grid-gutter) * 2)
+  );
+  margin-inline: auto;
+}
+
+.homepage-certified-section__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-16));
+  align-items: center;
+  padding-block: var(--homepage-rhythm-text);
+  border-top: 1px solid var(--homepage-chapter-rule);
+}
+
+.homepage-certified-section[data-rhythm="product"]
+  .homepage-certified-section__inner {
+  padding-block: var(--homepage-rhythm-product);
+}
+
+.homepage-certified-section__copy {
+  /* Reading-width LIMIT inside the assigned column. Does not position the
+     column — desktop spans in the 900px grid do that. */
+  max-width: 34rem;
+}
+
+.homepage-certified-section__headline,
+.homepage-close__headline {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-family:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--ds-marketing-title-tracking);
+  line-height: var(--ds-marketing-title-leading);
+  text-wrap: balance;
+}
+
+.homepage-certified-section__headline {
+  font-size: var(--ds-marketing-title-size);
+}
+
+.home-viewport .homepage-certified-section,
+.home-viewport .homepage-close,
+.home-viewport .homepage-certified-section__headline,
+.home-viewport .homepage-close__headline,
+.home-viewport [data-homepage-section-heading] {
+  scroll-margin-top: var(--homepage-sticky-nav-clearance);
+}
+
+.homepage-certified-section__body {
+  margin: var(--space-5) 0 0;
+  color: var(--color-text-secondary-token);
+  font-size: var(--ds-marketing-lede-size);
+  line-height: var(--ds-marketing-lede-leading);
+  letter-spacing: var(--ds-marketing-lede-tracking);
+  text-wrap: pretty;
+}
+
+.homepage-certified-section__media {
+  min-width: 0;
+}
+
+.homepage-certified-section__phones {
+  display: flex;
+  justify-content: center;
+  gap: clamp(var(--space-4), 2.5vw, var(--space-8));
+}
+
+.homepage-certified-section__device {
+  width: min(100%, 15rem);
+  max-width: none;
+}
+
+.homepage-certified-section__phones[data-count="3"]
+  .homepage-certified-section__device {
+  width: min(100%, 12rem);
+}
+
+.homepage-certified-section__phones[data-count="3"]
+  .homepage-certified-section__device:nth-child(2) {
+  transform: translateY(calc(var(--space-6) * -1));
+}
+
+.homepage-certified-section__screen {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.homepage-close {
+  /* Locked close pass: 28/32 Satoshi at 620, quiet wordmark, one low
+     night wash. Tokens only; the 620 sits between semibold and bold on
+     purpose — it is the approved still, not a new scale step. */
+  --homepage-close-headline-weight: 620;
+  --homepage-close-wash: color-mix(
+    in oklab,
+    var(--color-accent-blue) 16%,
+    transparent
+  );
+  --homepage-close-wash-soft: color-mix(
+    in oklab,
+    var(--color-accent-purple) 7%,
+    transparent
+  );
+
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  border-top: 1px solid var(--homepage-chapter-rule);
+  padding-block: var(--homepage-rhythm-close-start)
+    var(--homepage-rhythm-close-end);
+}
+
+.homepage-close::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      44% 56% at 50% 78%,
+      var(--homepage-close-wash) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      62% 72% at 50% 110%,
+      var(--homepage-close-wash-soft) 0%,
+      transparent 70%
+    );
+}
+
+.homepage-close__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.homepage-close__headline {
+  font-size: 1.75rem;
+  font-weight: var(--homepage-close-headline-weight);
+  letter-spacing: -0.01em;
+  line-height: 2rem;
+}
+
+.homepage-close__support {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary-token);
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
+  letter-spacing: 0;
+}
+
+.homepage-close__search {
+  width: min(30rem, 100%);
+  margin-top: var(--space-8);
+}
+
+/* Quiet wordmark: the section signs off, it does not link anywhere. */
+.homepage-close__mark {
+  --linear-text-primary: var(--color-text-tertiary-token);
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-20);
+  color: var(--color-text-tertiary-token);
+}
+
+@media (min-width: 900px) {
+  /* Shared 12-column contract for all six editorial sections. Left-copy,
+     right-copy, and media occupy the same spans whether or not media exists.
+     34rem stays a reading-width limit inside the assigned column. */
+  .homepage-certified-section__inner {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: clamp(var(--space-4), 2vw, var(--space-6));
+    row-gap: clamp(var(--space-8), 5vw, var(--space-16));
+  }
+
+  .homepage-certified-section[data-align="start"]
+    .homepage-certified-section__copy {
+    grid-column: 1 / span 6;
+  }
+
+  .homepage-certified-section[data-align="end"]
+    .homepage-certified-section__copy {
+    grid-column: 7 / span 6;
+  }
+
+  .homepage-certified-section[data-align="start"]
+    .homepage-certified-section__media {
+    grid-column: 7 / span 6;
+  }
+
+  .homepage-certified-section[data-align="end"]
+    .homepage-certified-section__media {
+    grid-column: 1 / span 6;
+  }
+
+  /* Trio phones share a ~half-rail column here, so bezel tokens follow
+     the squeezed width. Notch already uses cqi. */
+  .homepage-certified-section__phones[data-count="3"]
+  .homepage-certified-section__device {
+    --ap-phone-scale: 0.367;
+  }
+}
+
+@media (max-width: 767px) {
+  .homepage-certified-section__phones[data-count="3"]
+    .homepage-certified-section__device {
+    width: min(100%, 7.5rem);
+    --ap-phone-scale: 0.3529;
+    --ap-phone-max-width: 7.5rem;
+  }
+
+  .homepage-certified-section__phones[data-count="3"]
+    .homepage-certified-section__device:nth-child(2) {
+    transform: translateY(calc(var(--space-4) * -1));
+  }
+
+  .homepage-close {
+    padding-block: var(--space-24) var(--space-16);
+  }
+
+  .homepage-close__mark {
+    margin-top: var(--space-16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-certified-section__device {
+    transition: none;
+  }
+}
+/* HOMEPAGE CERTIFIED SECTIONS END */
+
 .homepage-hero-command-center {
   position: relative;
   width: 100%;
@@ -2127,7 +2714,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   );
 }
 
-.home-composer-action p {
+.home-composer-action-label {
+  display: block;
   margin: 0;
   color: var(--color-text-secondary-token);
   font-family: Inter, system-ui, sans-serif;
@@ -4711,7 +5299,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-story-stack--proof-transition {
-  margin-top: calc(var(--space-8) * -1);
   overflow: visible;
   background: transparent;
 }
@@ -4832,7 +5419,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Center the composer in its column: the dock's utility padding comes off so
    the surface and its caption share the same edges. */
-.homepage-opportunity-section__demo [aria-label="Jovie AI Composer Demo"]
+.homepage-opportunity-section__demo
+  [aria-label="Jovie AI Composer Demo"]
   > div:last-child {
   padding: 0;
 }
@@ -5230,10 +5818,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     min-height: calc(var(--space-24) * 3.25);
     margin-top: var(--space-8);
   }
-
-  .homepage-story-stack--proof-transition {
-    margin-top: calc(var(--space-6) * -1);
-  }
 }
 
 /* HOMEPAGE CINEMATIC MONOLITH END */
@@ -5350,7 +5934,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Deliberate hierarchy, no glow: the recommended tier gets a flat surface
    shift and a filled badge; everything else stays on surface-0. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card[data-recommended="true"] {
   background: var(--system-b-bg-surface-1);
 }
@@ -5401,7 +5986,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* Price scale: large quiet figure, hushed cadence suffix. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card__price {
   margin: var(--space-5) 0 0;
   color: var(--color-text-primary-token);
@@ -5423,7 +6009,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Feature rhythm: a flat seam separates the list from the CTA, checks sit
    one tone quieter than the line copy. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card__features {
   gap: var(--space-3);
   margin: var(--space-6) 0 0;

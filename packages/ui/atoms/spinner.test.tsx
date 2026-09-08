@@ -44,6 +44,7 @@ describe('Spinner', () => {
     const animated = spinner.querySelector('.border-t-transparent');
     expect(animated).toHaveClass('motion-reduce:animate-none');
     expect(animated).toHaveClass('motion-reduce:transform-none');
+    expect(animated).toHaveClass('motion-reduce:will-change-auto');
     expect(animated).not.toHaveClass(
       'motion-reduce:animate-[spin_1.2s_linear_infinite]'
     );

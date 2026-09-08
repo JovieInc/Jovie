@@ -46,6 +46,60 @@ function verifiedBrandDealPayload(
 }
 
 describe('mapSuggestedActionToInboxCard', () => {
+  it('maps an evidence-backed YouTube candidate into the swipe review surface', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'candidate-1',
+      kind: 'youtube.thumbnail_candidate',
+      payload: {
+        schemaVersion: 1,
+        title: 'Review thumbnail for A song',
+        creatorProfileId: '00000000-0000-4000-8000-000000000001',
+        channelId: 'UC-owned',
+        youtubeVideoId: 'video-1',
+        videoTitle: 'A song',
+        candidateThumbnailVersionId: '00000000-0000-4000-8000-000000000002',
+        candidateImageUrl: 'https://cdn.example.com/candidate.jpg',
+        currentThumbnailUrl: 'https://i.ytimg.com/current.jpg',
+        artifactSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        apiMetrics: {
+          source: 'youtube-analytics-api',
+          window: 'lifetime',
+          capturedAt: '2026-09-01T12:00:00.000Z',
+          views: 1250,
+          watchTimeMinutes: 300,
+          avgViewDurationSeconds: 42,
+          impressions: null,
+          ctr: null,
+        },
+        publicationGate: {
+          state: 'blocked',
+          reason:
+            'direct-thumbnail-mutation-disabled-native-experiment-required',
+          requiredProof: [
+            'founder-candidate-approval',
+            'youtube-studio-native-experiment',
+            'provider-readback-receipt',
+          ],
+        },
+      },
+      rationale: 'Compare candidate with control.',
+      createdAt: new Date('2026-09-01T12:01:00.000Z'),
+    });
+
+    expect(card).toMatchObject({
+      category: 'youtube_thumbnail',
+      typeLabel: 'YouTube Thumbnail',
+      primaryActionLabel: 'Approve Candidate',
+      youtubeThumbnail: {
+        channelId: 'UC-owned',
+        youtubeVideoId: 'video-1',
+        apiMetrics: { views: 1250 },
+        publicationBlockedReason:
+          'direct-thumbnail-mutation-disabled-native-experiment-required',
+      },
+    });
+  });
   it('maps typed workflow requests into a direct Record decision', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'capture-1',
@@ -138,6 +192,29 @@ describe('mapSuggestedActionToInboxCard', () => {
     });
   });
 
+  it('carries source-owned thumbnail evidence into the editorial review card', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'thumbnail-1',
+      kind: 'youtube.thumbnail_candidate',
+      payload: {
+        title: 'Refresh a weak YouTube thumbnail',
+        thumbnailUrl: 'https://i.ytimg.com/vi/example/hqdefault.jpg',
+        thumbnailAlt: 'Current thumbnail for the release video',
+      },
+      rationale: 'The default frame reads weakly at mobile size.',
+      createdAt: new Date('2026-09-01T10:00:00.000Z'),
+    });
+
+    expect(card).toMatchObject({
+      sourceKind: 'youtube.thumbnail_candidate',
+      visual: {
+        url: 'https://i.ytimg.com/vi/example/hqdefault.jpg',
+        alt: 'Current thumbnail for the release video',
+        fit: 'contain',
+      },
+    });
+  });
+
   it('uses the persisted signal_type when present', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'action-3',
@@ -170,6 +247,19 @@ describe('mapSuggestedActionToInboxCard', () => {
 });
 
 describe('buildOpportunityInboxData', () => {
+  it('keeps malformed YouTube candidates out of the founder decision surface', () => {
+    const data = buildOpportunityInboxData([
+      {
+        id: 'candidate-malformed',
+        kind: 'youtube.thumbnail_candidate',
+        payload: { title: 'Missing artifact and ownership evidence' },
+        rationale: 'Malformed candidate.',
+        createdAt: new Date('2026-09-01T12:00:00.000Z'),
+      },
+    ]);
+
+    expect(data.cards).toEqual([]);
+  });
   it('keeps malformed workflow requests out of the Inbox', () => {
     const data = buildOpportunityInboxData([
       {

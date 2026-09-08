@@ -32,19 +32,22 @@ describe('chat route error capture contract (GH #13300)', () => {
   });
 
   it('captures the real exception on both terminal error paths', () => {
-    const captures = routeSource.match(
-      /captureError\('Chat stream failed', error/g
-    );
+    const captures = routeSource.match(/captureError\(/g);
     // 1: route-level catch (buildChatErrorResponse)
     // 2: mid-stream telemetry captureException hook
     expect(captures?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(routeSource).toContain("'Chat stream failed'");
   });
 
   it('keys the capture context by the on-screen reference id (requestId)', () => {
-    const routeCatch = routeSource.slice(
-      routeSource.indexOf("captureError('Chat stream failed'")
-    );
+    const routeCatch = routeSource.slice(routeSource.indexOf('captureError('));
     expect(routeCatch).toContain('requestId');
+  });
+
+  it('classifies gateway budget walls as a distinct alertable event (JOV-5856)', () => {
+    expect(routeSource).toContain('isGatewayBudgetExceededError');
+    expect(routeSource).toContain('AI Gateway API key budget exceeded');
+    expect(routeSource).toContain('gateway_budget_exceeded');
   });
 
   it('flushes Sentry before the lambda can suspend on both paths', () => {

@@ -7,7 +7,23 @@ export type OpportunityInboxCardCategory =
   | 'tour_date'
   | 'report'
   | 'brand_deal'
-  | 'workflow_capture';
+  | 'workflow_capture'
+  | 'youtube_thumbnail';
+
+export interface OpportunityInboxYoutubeThumbnailData {
+  readonly channelId: string;
+  readonly youtubeVideoId: string;
+  readonly currentThumbnailUrl: string | null;
+  readonly candidateImageUrl: string;
+  readonly artifactSha256: string;
+  readonly apiMetrics: {
+    readonly capturedAt: string;
+    readonly views: number | null;
+    readonly watchTimeMinutes: number | null;
+    readonly avgViewDurationSeconds: number | null;
+  };
+  readonly publicationBlockedReason: string;
+}
 
 export interface OpportunityInboxWorkflowCaptureData {
   readonly instructions: string;
@@ -43,6 +59,8 @@ export interface OpportunityInboxReportData {
 
 export interface OpportunityInboxCardViewModel {
   readonly id: string;
+  /** Persisted suggested_action kind, used for durable founder-review binding. */
+  readonly sourceKind?: string;
   readonly signalType: OpportunitySignalType;
   readonly typeLabel: string;
   readonly createdAt: string;
@@ -51,12 +69,20 @@ export interface OpportunityInboxCardViewModel {
   readonly primaryActionLabel: string;
   readonly status: OpportunityInboxCardStatus;
   readonly category: OpportunityInboxCardCategory;
+  /** Source-owned editorial visual. Never inferred from private source refs. */
+  readonly visual?: {
+    readonly url: string;
+    readonly alt: string;
+    readonly fit: 'contain';
+  };
   /** Server-computed score used to rank verified brand-deal decisions. */
   readonly brandDealRankingScore?: number;
   /** Present only when category === 'report'. */
   readonly report?: OpportunityInboxReportData;
   /** Present only when category === 'workflow_capture'. */
   readonly workflowCapture?: OpportunityInboxWorkflowCaptureData;
+  /** Present only when category === 'youtube_thumbnail'. */
+  readonly youtubeThumbnail?: OpportunityInboxYoutubeThumbnailData;
 }
 
 export interface OpportunityInboxTourDateItem {

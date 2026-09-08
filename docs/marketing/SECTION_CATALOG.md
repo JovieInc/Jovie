@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.2.0
+spec-version: 1.3.0
 doc-freshness: docs/marketing/SECTION_CATALOG.md
 -->
 # Marketing Section Catalog
@@ -29,7 +29,9 @@ proof makes the claim non-arguable before the visitor invests scroll effort.
 **Variant notes:** `centered-phone` is the artist-recipe default (phone-framed
 profile = hero-weight proof). `centered-handle-claim` is the Linktree-style
 claim bar (creator R2 — unproven; first use requires humanOptIn). `split-screenshot-right`
-is the homepage default. `centered-none` is the SEO/blog-landing interior hero.
+is the recipe homepage default. `centered-none` is the SEO/blog-landing interior
+hero. `left-none` is the active source contract for a left-aligned acquisition
+hero with no media; it does not imply a new component or visual treatment.
 
 ### #section-logo-cloud
 
@@ -62,6 +64,10 @@ remain registered as `unproven`.
 **Exemplar:** `/artist-profiles` (`outcomes` section — "Built around fan
 outcomes.", `4-ledger` variant).
 
+**Variant notes:** `two-column-text` is the active source contract for a
+title/body acquisition grid that already renders as two textual columns. It
+does not authorize cards, icons, or media.
+
 ### #section-feature-split
 
 **Purpose:** One capability per section, depth after breadth. Media + text,
@@ -72,6 +78,10 @@ the shipped `adaptive` instance (E6 derivation).
 
 **Exemplar:** `/artist-profiles` (`adaptive` → `phone-right`; phone-framed
 profile mode switcher).
+
+**Variant notes:** `editorial` is the active homepage chapter contract. Media
+is optional and must remain source-declared; the variant cannot invent imagery
+to satisfy certification.
 
 ### #section-how-it-works
 

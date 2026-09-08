@@ -16,15 +16,10 @@ const HARD_HOLD_LABELS = new Set([
   'fast',
   'gated',
   'hold',
-  'human-review-required',
+  'incident',
   'needs-conflict-resolution',
-  'needs-human',
-  'needs-human-review',
-  'needs-human-taste',
   'needs-manual-rebase',
-  'no-auto',
   'queue-deferred',
-  'taste',
 ]);
 const TEST_COMMANDS = Object.freeze([
   'pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts',

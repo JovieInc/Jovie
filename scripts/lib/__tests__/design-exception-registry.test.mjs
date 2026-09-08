@@ -160,6 +160,39 @@ describe('design exception-registry contract (JOV-5447)', () => {
     }
   });
 
+  it.each([
+    ['arbitrary-radius', ['count']],
+    ['spacing-scale', ['conservative', 'count']],
+    ['spacing-scale-families', ['conservative', 'perFamily', 'marketing']],
+    ['native-spacing-ios', ['surfaces', 'ios', 'conservative']],
+    ['native-spacing-desktop', ['surfaces', 'desktop', 'conservative']],
+  ])(
+    'locks %s ceilings against the trusted base and rejects deletion or self-seeding',
+    (id, keys) => {
+      const spec = DESIGN_EXCEPTION_REGISTRIES.find(entry => entry.id === id);
+      expect(spec).toBeDefined();
+      const raised = readJson(spec.path);
+      let current = raised;
+      for (const key of keys.slice(0, -1)) current = current[key];
+      current[keys.at(-1)] += 1;
+      const growth = evaluatePair({ [spec.path]: raised });
+      expect(growth.issues).toContainEqual(
+        expect.objectContaining({
+          registry: id,
+          code: ISSUE_CODES.COUNT_GROWTH,
+        })
+      );
+      expect(
+        evaluatePair({}, { candidate: [spec.path] }).issues.map(
+          item => item.code
+        )
+      ).toContain(ISSUE_CODES.MISSING_REGISTRY);
+      expect(
+        evaluatePair({}, { base: [spec.path] }).issues.map(item => item.code)
+      ).toContain(ISSUE_CODES.SELF_SEEDED_REGISTRY);
+    }
+  );
+
   it('passes shrink, unchanged, and complete documented exceptions', () => {
     expect(evaluatePair().ok).toBe(true);
     const arbitrary = readJson(ARBITRARY);

@@ -8,6 +8,7 @@ describe('profile admission fixture guard', () => {
   it('only enables the route in the explicit test E2E runtime', () => {
     expect(
       isProfileAdmissionFixtureEnabled({
+        CI: 'true',
         NODE_ENV: 'test',
         NEXT_PUBLIC_E2E_MODE: '1',
       })
@@ -15,10 +16,19 @@ describe('profile admission fixture guard', () => {
     expect(
       isProfileAdmissionFixtureEnabled({
         NODE_ENV: 'production',
+        VERCEL_ENV: 'production',
         NEXT_PUBLIC_E2E_MODE: '1',
         PUBLIC_NOAUTH_SMOKE: '1',
       })
     ).toBe(false);
+    expect(
+      isProfileAdmissionFixtureEnabled({
+        CI: 'true',
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_E2E_MODE: '1',
+        PUBLIC_NOAUTH_SMOKE: '1',
+      })
+    ).toBe(true);
     expect(
       isProfileAdmissionFixtureEnabled({
         NODE_ENV: 'test',

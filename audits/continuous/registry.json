@@ -41,7 +41,7 @@
     {
       "id": "codex",
       "qualificationState": "conditional",
-      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "modelRegistry": "scripts/symphony/config/model-registry.json",
       "requiredCapabilities": ["review", "architecture", "root-cause"],
       "readBoundary": "sanitized-selected-scope",
       "egress": "provider-only-after-run-qualification",
@@ -51,7 +51,7 @@
     {
       "id": "cursor",
       "qualificationState": "conditional",
-      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "modelRegistry": "scripts/symphony/config/model-registry.json",
       "requiredCapabilities": ["review", "architecture"],
       "readBoundary": "sanitized-selected-scope",
       "egress": "provider-only-after-run-qualification",
@@ -61,7 +61,7 @@
     {
       "id": "grok",
       "qualificationState": "conditional",
-      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "modelRegistry": "scripts/symphony/config/model-registry.json",
       "requiredCapabilities": ["review", "architecture", "root-cause"],
       "readBoundary": "sanitized-selected-scope",
       "egress": "provider-only-after-run-qualification",
@@ -71,7 +71,7 @@
     {
       "id": "kimi",
       "qualificationState": "conditional",
-      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "modelRegistry": "scripts/symphony/config/model-registry.json",
       "requiredCapabilities": ["review", "code"],
       "readBoundary": "sanitized-selected-scope",
       "egress": "provider-only-after-run-qualification",

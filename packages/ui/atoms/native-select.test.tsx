@@ -54,6 +54,32 @@ describe('NativeSelect', () => {
     expect(select).toHaveAttribute('data-state', 'invalid');
   });
 
+  it('reserves error-message geometry before validation fails', () => {
+    const { container, rerender } = render(
+      <NativeSelect options={OPTIONS} label='Release status' />
+    );
+
+    const errorSlot = container.querySelector(
+      '[data-slot="native-select-error-slot"]'
+    );
+    expect(errorSlot).not.toBeNull();
+    expect(errorSlot).toHaveClass('min-h-5');
+    expect(errorSlot).toBeEmptyDOMElement();
+
+    rerender(
+      <NativeSelect
+        options={OPTIONS}
+        label='Release status'
+        error='Choose a status'
+      />
+    );
+
+    expect(
+      container.querySelector('[data-slot="native-select-error-slot"]')
+    ).toBe(errorSlot);
+    expect(errorSlot).toHaveTextContent('Choose a status');
+  });
+
   it('keeps native form submission semantics', () => {
     const { container } = render(
       <form>

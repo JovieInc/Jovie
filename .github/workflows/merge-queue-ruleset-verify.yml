@@ -5,6 +5,7 @@
 # only check that would catch a GitHub-UI edit weakening the merge gate.
 # It is a scheduled/main-push observer, not a source PR Ready context.
 name: Merge Queue Ruleset Verify
+# clock-class: upstream-advisory
 
 on:
   schedule:

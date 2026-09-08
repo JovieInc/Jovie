@@ -77,6 +77,10 @@ describe('closeButtonStyles', () => {
     expect(closeButtonStyles.base).toContain('absolute');
     expect(closeButtonStyles.base).toContain('right-4');
     expect(closeButtonStyles.base).toContain('top-4');
+    expect(closeButtonStyles.base).toContain('size-9');
+    expect(closeButtonStyles.base).toContain('before:h-11');
+    expect(closeButtonStyles.base).toContain('before:w-11');
+    expect(closeButtonStyles.base).not.toContain('size-12');
   });
 
   it('has hover styles', () => {
@@ -119,7 +123,9 @@ describe('closeButtonClassName', () => {
 
   it('uses the shared pill close button shape', () => {
     expect(closeButtonClassName).toContain('rounded-full');
-    expect(closeButtonClassName).toContain('size-12');
+    expect(closeButtonClassName).toContain('size-9');
+    expect(closeButtonClassName).toContain('before:h-11');
+    expect(closeButtonClassName).toContain('before:w-11');
     expect(closeButtonClassName).not.toContain(
       'rounded-(--app-shell-radius-item)'
     );

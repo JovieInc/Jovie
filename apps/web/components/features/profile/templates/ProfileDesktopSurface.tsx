@@ -3,11 +3,11 @@
 import { Button, Switch } from '@jovie/ui';
 import {
   BadgeCheck,
-  Bell,
   CalendarDays,
+  ChevronLeft,
   ChevronRight,
-  Disc3,
   House,
+  type LucideIcon,
   Mail,
   MapPin,
   MoreHorizontal,
@@ -16,10 +16,12 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
+import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type {
@@ -29,12 +31,28 @@ import type {
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
-import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
+import {
+  getPublicProfileHistoryServerSnapshot,
+  getPublicProfileHistorySnapshot,
+  PUBLIC_EVENTS_NO_SURFACE,
+  resolveProfileSurfaceState,
+  resolvePublicMusicSurface,
+  shouldOfferPublicEventsDestination,
+  shouldShowPublicProfileBackChevron,
+  subscribeToPublicProfileHistory,
+} from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
+import {
+  type BottomTabKey,
+  getPermittedPublicProfileActions,
+  getPermittedPublicProfileNavigation,
+  resolvePublicProfileActiveDestination,
+} from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -42,6 +60,7 @@ import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import {
   publicLinkAriaLabel,
+  publicPlatformDisplayName,
   sanitizePublicHref,
 } from '@/lib/utils/public-url';
 import type { PublicContact } from '@/types/contacts';
@@ -50,17 +69,26 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
 
-const PRIMARY_TABS: ReadonlyArray<{
-  mode: ProfilePrimaryTab;
-  label: string;
-  icon: typeof House;
-}> = [
-  { mode: 'profile', label: 'Profile', icon: House },
-  { mode: 'listen', label: 'Music', icon: Music2 },
-  { mode: 'tour', label: 'Events', icon: CalendarDays },
-  { mode: 'subscribe', label: 'Alerts', icon: Bell },
-  { mode: 'about', label: 'About', icon: UserRound },
-];
+/**
+ * JOV-6201 listen-mode desktop split. Apply on every desktop listen branch
+ * (JOV-6197 `listenTabContent` copies). Reuses the grandfathered 360px track;
+ * only the 1180px hand-off and min-w-0 are new. Do not invent a new grid-cols
+ * identity or revert the listen split to `xl:` only.
+ */
+export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
+  'grid min-h-0 min-w-0 flex-1 items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1.3fr)_360px]';
+
+export const PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME =
+  'min-h-0 min-w-0 overflow-hidden isolate';
+
+export const PROFILE_LISTEN_DSP_COLUMN_CLASSNAME = 'grid min-w-0 gap-3.5';
+
+const DESTINATION_ICONS: Readonly<Record<BottomTabKey, LucideIcon>> = {
+  profile: House,
+  listen: Music2,
+  tour: CalendarDays,
+  about: UserRound,
+};
 
 interface ProfileDesktopSurfaceProps {
   readonly presentation?: ProfileSurfacePresentation;
@@ -80,6 +108,7 @@ interface ProfileDesktopSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  readonly allowFanCapture?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -87,6 +116,7 @@ interface ProfileDesktopSurfaceProps {
   readonly tourDates?: TourDateViewModel[];
   readonly viewerCountryCode?: string | null;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly activeMode?: ProfileMode;
@@ -96,6 +126,7 @@ interface ProfileDesktopSurfaceProps {
   readonly onDrawerViewChange: (view: DrawerView) => void;
   readonly onOpenMenu: () => void;
   readonly onPlayClick: () => void;
+  readonly onBack?: () => void;
   readonly profileHref: string;
   readonly isSubscribed?: boolean;
   readonly contentPrefs?: Record<NotificationContentType, boolean>;
@@ -155,22 +186,6 @@ function formatReleaseMeta(
   return [normalizedType, year].filter(Boolean).join(' • ');
 }
 
-function getDesktopBaseMode(mode: ProfileMode): ProfilePrimaryTab {
-  switch (mode) {
-    case 'listen':
-    case 'releases':
-      return 'listen';
-    case 'tour':
-      return 'tour';
-    case 'subscribe':
-      return 'subscribe';
-    case 'about':
-      return 'about';
-    default:
-      return 'profile';
-  }
-}
-
 function DesktopSurfaceCard({
   title,
   actionLabel,
@@ -202,7 +217,7 @@ function DesktopSurfaceCard({
           <button
             type='button'
             onClick={onAction}
-            className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
+            className='inline-flex min-h-11 items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
           >
             <span>{actionLabel}</span>
             <ChevronRight className='h-4 w-4' />
@@ -233,6 +248,7 @@ export function ProfileDesktopSurface({
   latestRelease,
   profileSettings,
   alertOptInVariant = 'button',
+  allowFanCapture = true,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -240,6 +256,7 @@ export function ProfileDesktopSurface({
   tourDates = [],
   viewerCountryCode,
   releases = [],
+  catalogLoadFailed = false,
   drawerOpen,
   drawerView,
   activeMode = 'profile',
@@ -249,6 +266,7 @@ export function ProfileDesktopSurface({
   onDrawerViewChange,
   onOpenMenu,
   onPlayClick,
+  onBack,
   profileHref,
   isSubscribed = false,
   contentPrefs = {
@@ -261,6 +279,19 @@ export function ProfileDesktopSurface({
   onUnsubscribe = () => {},
   isUnsubscribing = false,
 }: ProfileDesktopSurfaceProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => setIsHydrated(true), []);
+  const isSignedIn = useIsAuthenticated();
+  const hasHistoryDestination = useSyncExternalStore(
+    subscribeToPublicProfileHistory,
+    getPublicProfileHistorySnapshot,
+    getPublicProfileHistoryServerSnapshot
+  );
+  const showBackChevron = shouldShowPublicProfileBackChevron({
+    isProfileRoot: activeMode === 'profile',
+    hasHistoryDestination,
+    isSignedIn,
+  });
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
@@ -271,16 +302,18 @@ export function ProfileDesktopSurface({
       ),
     [artist, socialLinks, viewerCountryCode]
   );
-  const baseActivePrimaryTab = getDesktopBaseMode(activeMode);
   const hasTourDates = tourDates.length > 0;
-  const activePrimaryTab =
-    baseActivePrimaryTab === 'tour' && !hasTourDates
-      ? 'profile'
-      : baseActivePrimaryTab;
-  const visiblePrimaryTabs = useMemo(
-    () => PRIMARY_TABS.filter(tab => tab.mode !== 'tour' || hasTourDates),
-    [hasTourDates]
+  const hasEventsDestination = shouldOfferPublicEventsDestination(
+    tourDates.length
   );
+  const activePrimaryTab = resolvePublicProfileActiveDestination({
+    mode: activeMode,
+  });
+  const visiblePrimaryTabs = getPermittedPublicProfileNavigation();
+  const canGetUpdates =
+    getPermittedPublicProfileActions({
+      fanCaptureEnabled: allowFanCapture,
+    }).length > 0;
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -296,9 +329,11 @@ export function ProfileDesktopSurface({
         isSubscribed,
         activeSubtitle: latestRelease?.title ?? 'Artist profile',
         viewerCountryCode,
+        catalogLoadFailed,
       }),
     [
       artist,
+      catalogLoadFailed,
       isSubscribed,
       latestRelease,
       mergedDSPs.length,
@@ -324,6 +359,11 @@ export function ProfileDesktopSurface({
     hasReleases,
     emptyState,
   } = surfaceState;
+  const musicSurface = resolvePublicMusicSurface({
+    releases: visibleReleases,
+    hasPlayableDestinations: mergedDSPs.length > 0,
+    catalogLoadFailed,
+  });
   const shareContext = useMemo(
     () =>
       buildProfileShareContext({
@@ -345,7 +385,7 @@ export function ProfileDesktopSurface({
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
-    primaryActionElement = (
+    primaryActionElement = canGetUpdates ? (
       <ProfileInlineNotificationsCTA
         artist={artist}
         portalContainer={notificationsPortalContainer}
@@ -354,25 +394,10 @@ export function ProfileDesktopSurface({
         experimentVariant={alertOptInVariant}
         onManageNotifications={() => onModeSelect('subscribe')}
       />
-    );
-  } else if (primaryAction.href) {
-    primaryActionElement = (
-      <Button asChild variant='primary' size='marketing' className='gap-2 px-4'>
-        <a href={primaryAction.href}>
-          <PrimaryActionIcon className='h-4 w-4' />
-          {primaryAction.label}
-        </a>
-      </Button>
-    );
+    ) : null;
   } else {
-    primaryActionElement = (
-      <Button
-        type='button'
-        variant='primary'
-        size='marketing'
-        onClick={() => onModeSelect(primaryAction.mode)}
-        className='gap-2 px-4'
-      >
+    const primaryActionContent = (
+      <>
         <PrimaryActionIcon
           className={cn(
             'h-4 w-4',
@@ -380,19 +405,47 @@ export function ProfileDesktopSurface({
           )}
         />
         {primaryAction.label}
+      </>
+    );
+    primaryActionElement = (
+      <Button
+        {...(primaryAction.href
+          ? { asChild: true }
+          : {
+              type: 'button' as const,
+              onClick: () => onModeSelect(primaryAction.mode),
+            })}
+        variant='primary'
+        size='marketing'
+        className='gap-2 px-4'
+      >
+        {primaryAction.href ? (
+          <a href={primaryAction.href}>{primaryActionContent}</a>
+        ) : (
+          primaryActionContent
+        )}
       </Button>
     );
   }
 
   const homeOverview = (
-    <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
-      <div className='grid min-h-0 min-w-0 gap-3.5'>
+    <div
+      className={cn(
+        'grid min-h-0 min-w-0 flex-1 gap-4 [@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]'
+      )}
+      data-testid='profile-desktop-home-overview'
+      data-side-rail-enabled={canGetUpdates ? 'true' : 'false'}
+    >
+      <div
+        className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
+        data-testid='profile-desktop-main-content'
+      >
         {/* Composition rule (#11899): the desktop cover is a fixed standard
             4:5 shape — height is the single driver (viewport-bounded with a
             min floor), width follows the aspect ratio, and the fill image
             crops (object-cover), never squashes. */}
         <section
-          className='relative aspect-card-standard h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)]'
+          className='relative aspect-card-standard h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)] [@media(min-width:1180px)]:col-start-1 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-cover'
         >
           <div className='absolute inset-0'>
@@ -424,9 +477,9 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex max-w-205 items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
-                  <span className='line-clamp-2'>{artist.name}</span>
+                  <span className='min-w-0 line-clamp-2'>{artist.name}</span>
                   {artist.is_verified ? (
                     <BadgeCheck
                       className='h-7 w-7 shrink-0'
@@ -455,9 +508,9 @@ export function ProfileDesktopSurface({
                     if (!link.platform) return null;
                     const href = sanitizePublicHref(link.url);
                     if (!href) return null;
-                    const platformLabel =
-                      link.platform.charAt(0).toUpperCase() +
-                      link.platform.slice(1);
+                    const platformLabel = publicPlatformDisplayName(
+                      link.platform
+                    );
                     return (
                       <a
                         key={link.id}
@@ -490,13 +543,15 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'
+          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)] [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1 [@media(min-width:1180px)]:self-start'
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
-            title='Events'
-            actionLabel='View Events'
-            onAction={() => onModeSelect('tour')}
+            title='Shows'
+            actionLabel={hasEventsDestination ? 'View Shows' : undefined}
+            onAction={
+              hasEventsDestination ? () => onModeSelect('tour') : undefined
+            }
           >
             <div className='space-y-2'>
               {upcomingTourDates.length > 0 ? (
@@ -526,7 +581,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
-                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
+                        className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
                       </a>
@@ -534,15 +589,23 @@ export function ProfileDesktopSurface({
                   </div>
                 ))
               ) : (
-                <EmptySurfaceBlock>{emptyState.tour}</EmptySurfaceBlock>
+                <EmptySurfaceBlock>
+                  {PUBLIC_EVENTS_NO_SURFACE}
+                </EmptySurfaceBlock>
               )}
             </div>
           </DesktopSurfaceCard>
 
           <DesktopSurfaceCard
             title='All Releases'
-            actionLabel='View all releases'
-            onAction={() => onModeSelect('listen')}
+            actionLabel={
+              musicSurface.kind === 'catalog' ? 'View all releases' : undefined
+            }
+            onAction={
+              musicSurface.kind === 'catalog'
+                ? () => onModeSelect('listen')
+                : undefined
+            }
           >
             <div className='space-y-2'>
               {visibleReleases.length > 0 ? (
@@ -554,7 +617,7 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
                       <ImageWithFallback
@@ -577,14 +640,6 @@ export function ProfileDesktopSurface({
                         )}
                       </p>
                     </div>
-                    <span className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-black/28 text-white dark:text-white'>
-                      <Play className='ml-0.5 h-4 w-4 fill-current' />
-                    </span>
-                    <span className='flex items-center gap-1 text-white/30'>
-                      <span className='h-1 w-1 rounded-full bg-current' />
-                      <span className='h-1 w-1 rounded-full bg-current' />
-                      <span className='h-1 w-1 rounded-full bg-current' />
-                    </span>
                   </a>
                 ))
               ) : (
@@ -595,68 +650,45 @@ export function ProfileDesktopSurface({
         </div>
       </div>
 
-      <div className='grid min-h-0 min-w-0 gap-3.5'>
-        <DesktopSurfaceCard title='Alerts' testId='profile-desktop-alerts-card'>
+      <div
+        className={cn(
+          'min-h-0 min-w-0 gap-3.5',
+          canGetUpdates
+            ? 'grid [@media(min-width:1180px)]:col-span-2 [@media(min-width:1180px)]:row-start-2'
+            : 'hidden'
+        )}
+        data-testid='profile-desktop-side-rail'
+      >
+        <DesktopSurfaceCard
+          title='Get updates'
+          testId='profile-desktop-alerts-card'
+          className={canGetUpdates ? undefined : 'hidden'}
+        >
           <div className='space-y-4'>
-            {!isSubscribed ? (
-              <button
-                type='button'
-                onClick={() => onModeSelect('subscribe')}
-                className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
-              >
-                <span className='min-w-0'>
-                  <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
-                    Release Alerts
-                  </span>
-                  <span className='block truncate text-xs leading-5 text-white/48'>
-                    New music, shows, and merch.
-                  </span>
+            <button
+              type='button'
+              onClick={() => onModeSelect('subscribe')}
+              data-testid={
+                isSubscribed
+                  ? 'profile-desktop-manage-updates'
+                  : 'profile-desktop-get-updates'
+              }
+              className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
+            >
+              <span className='min-w-0'>
+                <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
+                  {isSubscribed ? 'Updates on' : 'Get updates'}
                 </span>
-                {alertOptInVariant === 'toggle' ? (
-                  <span
-                    className='relative h-7 w-11 shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
-                    aria-hidden='true'
-                  >
-                    <span className='block h-6 w-6 rounded-full bg-white dark:bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
-                  </span>
-                ) : (
-                  <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
-                    Get alerts
-                  </span>
-                )}
-              </button>
-            ) : null}
-            <div className='space-y-3'>
-              {[
-                { key: 'newMusic', label: 'New Music', icon: Music2 },
-                { key: 'tourDates', label: 'Shows', icon: CalendarDays },
-                { key: 'merch', label: 'Merch', icon: Disc3 },
-              ].map(item => {
-                const Icon = item.icon;
-                const checked = Boolean(
-                  contentPrefs[item.key as NotificationContentType]
-                );
-                return (
-                  <div
-                    key={item.key}
-                    className='flex items-center justify-between gap-4'
-                  >
-                    <div className='flex items-center gap-3'>
-                      <Icon className='size-4 text-white/62' />
-                      <span className='text-sm font-medium tracking-[-0.015em] text-white/84'>
-                        {item.label}
-                      </span>
-                    </div>
-                    <Switch
-                      checked={checked}
-                      onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label={item.label}
-                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                <span className='block truncate text-xs leading-5 text-white/48'>
+                  {isSubscribed
+                    ? 'Manage what you hear about.'
+                    : 'New music, shows, and merch.'}
+                </span>
+              </span>
+              <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
+                {isSubscribed ? 'Manage' : 'Get updates'}
+              </span>
+            </button>
             {showArtistEmailRow ? (
               <>
                 <div className='h-px bg-white/8' />
@@ -693,83 +725,143 @@ export function ProfileDesktopSurface({
     </div>
   );
 
-  const nonHomeContent =
-    activePrimaryTab === 'listen' ? (
-      <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.3fr)_360px]'>
+  const catalogListenSidebar = (
+    <div
+      className={PROFILE_LISTEN_DSP_COLUMN_CLASSNAME}
+      data-testid='profile-listen-dsp-column'
+    >
+      <DesktopSurfaceCard title='Latest Release'>
+        <div className='space-y-4'>
+          <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
+            <ImageWithFallback
+              src={latestVisibleRelease?.artworkUrl}
+              alt={latestVisibleRelease?.title ?? artist.name}
+              fill
+              sizes='320px'
+              priority
+              className='object-cover'
+              fallbackVariant='release'
+            />
+          </div>
+          <div>
+            <p className='text-xl font-semibold tracking-[-0.03em] text-white dark:text-white'>
+              {latestVisibleRelease?.title ?? 'Latest release'}
+            </p>
+            <p className='mt-1 text-sm text-white/48'>
+              {formatReleaseMeta(
+                latestVisibleRelease?.releaseType,
+                latestVisibleRelease?.releaseDate
+              )}
+            </p>
+          </div>
+        </div>
+      </DesktopSurfaceCard>
+      {hasTip ? (
+        <DesktopSurfaceCard
+          title='Pay'
+          actionLabel='Open Pay'
+          onAction={() => onDrawerViewChange('pay')}
+        >
+          <button
+            type='button'
+            onClick={() => onDrawerViewChange('pay')}
+            className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
+          >
+            Pay {artist.name}
+          </button>
+        </DesktopSurfaceCard>
+      ) : null}
+    </div>
+  );
+
+  let listenTabContent: React.ReactNode;
+  if (musicSurface.kind === 'catalog') {
+    listenTabContent = (
+      <div
+        className={PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME}
+        data-testid='profile-listen-desktop-grid'
+      >
         <DesktopSurfaceCard
           title='Releases'
-          className='min-h-0'
+          className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
           testId='profile-primary-tab-releases'
         >
-          {visibleReleases.length > 0 ? (
-            <ReleasesView
-              releases={visibleReleases}
-              artistId={artist.id}
-              artistHandle={artist.handle}
-              artistName={artist.name}
-            />
-          ) : (
-            <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
-          )}
+          <ReleasesView
+            releases={musicSurface.visibleReleases}
+            artistId={artist.id}
+            artistHandle={artist.handle}
+            artistName={artist.name}
+          />
         </DesktopSurfaceCard>
-        <div className='grid gap-3.5'>
-          <DesktopSurfaceCard title='Listen'>
-            <StaticListenInterface
-              artist={artist}
-              handle={artist.handle}
-              dspsOverride={mergedDSPs}
-              containerClassName='max-w-none'
-              providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white dark:text-white hover:bg-white/[0.08]'
-              emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
-              hideHelpText
-            />
-          </DesktopSurfaceCard>
-          <DesktopSurfaceCard title='Latest Release'>
-            <div className='space-y-4'>
-              <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
-                <ImageWithFallback
-                  src={latestVisibleRelease?.artworkUrl}
-                  alt={latestVisibleRelease?.title ?? artist.name}
-                  fill
-                  sizes='320px'
-                  priority
-                  className='object-cover'
-                  fallbackVariant='release'
-                />
-              </div>
-              <div>
-                <p className='text-xl font-semibold tracking-[-0.03em] text-white dark:text-white'>
-                  {latestVisibleRelease?.title ?? 'Latest release'}
-                </p>
-                <p className='mt-1 text-sm text-white/48'>
-                  {formatReleaseMeta(
-                    latestVisibleRelease?.releaseType,
-                    latestVisibleRelease?.releaseDate
-                  )}
-                </p>
-              </div>
-            </div>
-          </DesktopSurfaceCard>
-          {hasTip ? (
-            <DesktopSurfaceCard
-              title='Pay'
-              actionLabel='Open Pay'
-              onAction={() => onDrawerViewChange('pay')}
-            >
-              <button
-                type='button'
-                onClick={() => onDrawerViewChange('pay')}
-                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
-              >
-                Pay {artist.name}
-              </button>
-            </DesktopSurfaceCard>
-          ) : null}
-        </div>
+        {catalogListenSidebar}
       </div>
+    );
+  } else if (musicSurface.kind === 'artist-streaming') {
+    const artistStreamingListen = (
+      <DesktopSurfaceCard
+        title='Listen'
+        className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
+        testId='profile-primary-tab-artist-streaming'
+      >
+        <StaticListenInterface
+          artist={artist}
+          handle={artist.handle}
+          dspsOverride={mergedDSPs}
+          containerClassName='max-w-none'
+          providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white dark:text-white hover:bg-white/[0.08]'
+          emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
+          hideHelpText
+        />
+      </DesktopSurfaceCard>
+    );
+    listenTabContent = latestVisibleRelease ? (
+      <div
+        className={PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME}
+        data-testid='profile-listen-desktop-grid'
+      >
+        {artistStreamingListen}
+        {catalogListenSidebar}
+      </div>
+    ) : (
+      artistStreamingListen
+    );
+  } else {
+    listenTabContent = (
+      <DesktopSurfaceCard
+        title='Releases'
+        className='flex-1'
+        testId={
+          musicSurface.kind === 'error'
+            ? 'profile-primary-tab-music-error'
+            : 'profile-primary-tab-listen'
+        }
+      >
+        <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
+      </DesktopSurfaceCard>
+    );
+  }
+
+  const nonHomeContent =
+    activePrimaryTab === 'listen' ? (
+      listenTabContent
+    ) : activeMode === 'subscribe' && isSubscribed && canGetUpdates ? (
+      <DesktopSurfaceCard
+        title='Manage updates'
+        className='flex-1'
+        testId='profile-desktop-manage-settings'
+      >
+        <AlertsSettingsView
+          presentation='embedded'
+          isSubscribed={isSubscribed}
+          contentPrefs={contentPrefs}
+          onTogglePref={onTogglePref}
+          onUnsubscribe={onUnsubscribe}
+          isUnsubscribing={isUnsubscribing}
+        />
+      </DesktopSurfaceCard>
     ) : activePrimaryTab === 'tour' ? (
       <DesktopSurfaceCard
-        title='Events'
+        title='Shows'
         className='flex-1'
         testId='profile-primary-tab-tour'
       >
@@ -818,7 +910,7 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'about' ? (
       <DesktopSurfaceCard
-        title='Profile'
+        title='About'
         className='flex-1'
         testId='profile-primary-tab-about'
       >
@@ -834,50 +926,70 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div className='relative flex h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
+    <div className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
+        data-interactive-ready={isHydrated ? 'true' : undefined}
         data-testid='profile-desktop-surface'
       >
-        <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>
-          <nav
-            className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
-            aria-label='Profile Navigation'
-          >
-            {visiblePrimaryTabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activePrimaryTab === tab.mode;
-              return (
-                <button
-                  key={tab.mode}
-                  type='button'
-                  onClick={() => onModeSelect(tab.mode)}
-                  data-testid={`profile-primary-tab-${tab.mode}`}
-                  className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
-                    isActive
-                      ? 'text-white dark:text-white'
-                      : 'text-white/50 hover:text-white/78'
-                  )}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon
+        <div
+          className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'
+          data-testid='profile-desktop-top-chrome'
+        >
+          <div className='flex min-w-0 items-center gap-2'>
+            {showBackChevron && onBack ? (
+              <CircleIconButton
+                onClick={onBack}
+                size='lg'
+                variant='pearlQuiet'
+                className='profile-top-chrome-icon text-white dark:text-white'
+                ariaLabel='Back'
+              >
+                <ChevronLeft className='h-5 w-5' />
+              </CircleIconButton>
+            ) : null}
+            <nav
+              className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
+              aria-label='Profile Navigation'
+              data-public-profile-nav={visiblePrimaryTabs
+                .map(destination => destination.id)
+                .join(',')}
+            >
+              {visiblePrimaryTabs.map(tab => {
+                const Icon = DESTINATION_ICONS[tab.id];
+                const isActive = activePrimaryTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type='button'
+                    onClick={() => onModeSelect(tab.id)}
+                    data-testid={`profile-primary-tab-${tab.id}`}
                     className={cn(
-                      'h-4 w-4 shrink-0 transition-colors duration-subtle',
-                      isActive && 'text-white dark:text-white'
+                      'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
+                      isActive
+                        ? 'text-white dark:text-white'
+                        : 'text-white/50 hover:text-white/78'
                     )}
-                  />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 shrink-0 transition-colors duration-subtle',
+                        isActive && 'text-white dark:text-white'
+                      )}
+                    />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
           <button
             type='button'
             onClick={onOpenMenu}
-            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
+            className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
             aria-label='Menu'
           >
             <MoreHorizontal className='h-5 w-5' />
@@ -891,7 +1003,7 @@ export function ProfileDesktopSurface({
           </div>
         </div>
 
-        {activePrimaryTab === 'subscribe' ? (
+        {canGetUpdates && activeMode === 'subscribe' && !isSubscribed ? (
           <ProfileInlineNotificationsCTA
             artist={artist}
             presentation='modal'

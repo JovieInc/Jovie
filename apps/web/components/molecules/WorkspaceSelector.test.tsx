@@ -48,6 +48,10 @@ describe('WorkspaceSelector', () => {
     const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger.querySelector('svg.lucide-chevron-down')).toBeNull();
+    expect(trigger.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
   });
 
   it('renders every supplied workspace with the active destination marked', () => {

@@ -30,11 +30,9 @@ import type { SettingsConnectorState } from '../settings/connectors/connectors-d
 
 export type ProfilesWorkspaceFilter =
   | 'all'
-  | 'dsp'
-  | 'social'
-  | 'source'
-  | 'website'
-  | 'jovie'
+  | 'identity'
+  | 'profiles'
+  | 'catalog'
   | 'connector';
 
 export interface ProfileWorkspaceSurfaceRow {

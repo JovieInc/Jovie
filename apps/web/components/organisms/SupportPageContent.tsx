@@ -37,7 +37,7 @@ export function SupportPageContent() {
         <p className='text-sm font-medium text-tertiary-token'>Support</p>
         <h1
           id='support-hero-heading'
-          className='mt-6 text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'
+          className='system-b-marketing-route-title mt-6 text-primary-token'
         >
           We&apos;re Here To Help.
         </h1>

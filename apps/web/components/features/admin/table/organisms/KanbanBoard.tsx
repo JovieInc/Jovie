@@ -200,6 +200,7 @@ function KanbanColumn<TData>({
         </span>
       </div>
 
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: HTML5 drop target for column moves; fieldset+legend names the column for AT. */}
       <fieldset
         ref={containerRef}
         className='m-0 min-w-0 flex-1 overflow-y-auto border-0 p-2.5'
@@ -231,6 +232,7 @@ function KanbanColumn<TData>({
                   const itemId = getItemId(item);
 
                   return (
+                    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: HTML5 drag source for the card; item stays a list item.
                     <li
                       key={itemId}
                       data-index={virtualRow.index}
@@ -261,6 +263,7 @@ function KanbanColumn<TData>({
           return (
             <ul className='m-0 list-none space-y-2.5 p-0'>
               {column.items.map((item, index) => (
+                // biome-ignore lint/a11y/noNoninteractiveElementInteractions: HTML5 drag source for the card; item stays a list item.
                 <li
                   key={getItemId(item)}
                   draggable={Boolean(onItemMove)}

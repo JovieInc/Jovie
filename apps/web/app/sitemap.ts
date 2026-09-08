@@ -32,6 +32,7 @@ type SitemapCatalog = {
     updatedAt: Date | null;
     avatarUrl: string | null;
     isClaimed: boolean | null;
+    displayName: string | null;
     settings: unknown;
   }>;
   releases: Array<{
@@ -66,6 +67,7 @@ const getSitemapCatalog = unstable_cache(
             updatedAt: creatorProfiles.updatedAt,
             avatarUrl: creatorProfiles.avatarUrl,
             isClaimed: creatorProfiles.isClaimed,
+            displayName: creatorProfiles.displayName,
             settings: creatorProfiles.settings,
           })
           .from(creatorProfiles)
@@ -137,7 +139,7 @@ const getSitemapCatalog = unstable_cache(
       return {
         profiles: profiles.filter(
           profile =>
-            isPublicProfileIndexable(profile.username) &&
+            isPublicProfileIndexable(profile.username, profile.displayName) &&
             (profile.isClaimed === true ||
               !isUnclaimedStructuredCreditProfile(profile.settings))
         ),
@@ -154,7 +156,7 @@ const getSitemapCatalog = unstable_cache(
       return { profiles: [], releases: [], tracks: [], playlists: [] };
     }
   },
-  ['sitemap-catalog-v3'],
+  ['sitemap-catalog-v4'],
   { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
 );
 

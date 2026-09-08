@@ -201,6 +201,10 @@ export function buildPublicProfileMetadata(
   const isStructuredCreditUnclaimed =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
   const profileHandle = profile.username_normalized ?? profile.username;
+  // Display name participates in the indexing policy (QA machine-handle rule):
+  // a claimed profile whose artist-provided name matches the Clerk-test shape
+  // stays noindex even when the unclaimed-marker path above does not apply.
+  const policyDisplayName = sanitizeMetadataText(profile.display_name);
 
   const baseKeywords = [
     artistName,
@@ -228,7 +232,7 @@ export function buildPublicProfileMetadata(
     },
     robots: isStructuredCreditUnclaimed
       ? NOINDEX_ROBOTS
-      : getPublicProfileRobots(profileHandle),
+      : getPublicProfileRobots(profileHandle, policyDisplayName),
     openGraph: {
       type: 'profile',
       title: socialTitle,

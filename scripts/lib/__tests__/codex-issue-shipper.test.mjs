@@ -35,7 +35,6 @@ import {
   isUiUxDesignIssue,
   loadShipperConfig,
   MAX_RETRY_RELEASES,
-  NO_AUTO_LABEL,
   parseAgentChain,
   parseCreatedPrNumber,
   parseDirtyPaths,
@@ -48,7 +47,7 @@ import {
   shellQuote,
   shouldEscalateRetry,
   worktreeHasWork,
-} from '../../hermes/lib/codex-issue-shipper.ts';
+} from '../../symphony/lib/codex-issue-shipper.ts';
 
 const config = {
   maxIssuesPerRun: 2,
@@ -136,11 +135,11 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters no-auto, claimed, blocked, epic, and invalid issues before dispatch', () => {
+  it('ignores legacy human holds while filtering machine blockers, epics, and invalid issues', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
     const noAuto = issue({
       number: 2,
-      labels: [{ name: 'codex' }, { name: NO_AUTO_LABEL }],
+      labels: [{ name: 'codex' }, { name: 'no-auto' }],
     });
     const claimed = issue({
       number: 3,
@@ -178,13 +177,20 @@ describe('codex issue shipper planner', () => {
         epic,
         invalidMisroute,
       ])
-    ).toEqual([ready]);
+    ).toEqual([ready, noAuto]);
     expect(
       buildDispatchPlans(
         [ready, noAuto, claimed, blocked, epic, invalidMisroute],
         config
       )
-    ).toHaveLength(1);
+    ).toHaveLength(2);
+
+    const humanReview = issue({
+      number: 7,
+      body: 'This issue requires human review',
+      labels: [{ name: 'codex' }, { name: 'human-review-required' }],
+    });
+    expect(eligibleCodexIssues([humanReview])).toEqual([humanReview]);
   });
 
   it('does not require codex-approved before dispatching codex-labeled issues', () => {
@@ -1001,7 +1007,7 @@ describe('agent fallback chain', () => {
 describe('agent failure disposition', () => {
   /**
    * @type {Array<[string, number | null, NodeJS.Signals | null, string,
-   *   import('../../hermes/lib/codex-issue-shipper.ts').AgentFailureDisposition]>}
+   *   import('../../symphony/lib/codex-issue-shipper.ts').AgentFailureDisposition]>}
    */
   const cases = [
     [
@@ -1133,7 +1139,7 @@ describe('agent failure disposition', () => {
     expect(consumesTaskRetryBudget('system_retryable')).toBe(false);
   });
 
-  /** @type {import('../../hermes/lib/codex-issue-shipper.ts').AgentFailureDisposition[]} */
+  /** @type {import('../../symphony/lib/codex-issue-shipper.ts').AgentFailureDisposition[]} */
   const incidentDispositions = ['provider_cooldown', 'system_retryable'];
 
   it.each(
@@ -1290,12 +1296,12 @@ describe('checkout freshness gate', () => {
 
   it('flags shipper-critical dirty paths as non-recoverable detritus', () => {
     expect(
-      isShipperCriticalPath('scripts/hermes/jobs/codex-issue-shipper.ts')
+      isShipperCriticalPath('scripts/symphony/jobs/codex-issue-shipper.ts')
     ).toBe(true);
     expect(dirtyPathsAreRecoverableDetritus(['DESIGN.md'])).toBe(true);
     expect(
       dirtyPathsAreRecoverableDetritus([
-        'scripts/hermes/jobs/codex-issue-shipper.ts',
+        'scripts/symphony/jobs/codex-issue-shipper.ts',
       ])
     ).toBe(false);
   });
@@ -1340,7 +1346,7 @@ describe('checkout freshness gate', () => {
         originMainSha: 'abc',
         dirty: true,
       },
-      ['scripts/hermes/jobs/codex-issue-shipper.ts']
+      ['scripts/symphony/jobs/codex-issue-shipper.ts']
     );
     expect(plan.proceed).toBe(false);
     expect(plan.attemptRecovery).toBe(false);

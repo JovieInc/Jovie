@@ -109,7 +109,7 @@ function SignUpClaimDataPersistence() {
 
   return (
     <output
-      className='mb-4 block rounded-sm border border-subtle bg-surface-1 px-4 py-3 text-center lg:text-left'
+      className='mb-4 block text-center text-app text-secondary-token'
       aria-live='polite'
     >
       {availability === 'checking' && (
@@ -275,11 +275,10 @@ export function SignUpPageClient() {
 
   return (
     <AuthLayout
-      formTitle='Create your account'
+      formTitle='Continue to Jovie'
       showFormTitle={false}
       showFooterPrompt={false}
       layoutVariant='stack'
-      chrome='splash-b'
     >
       <AuthRoutePrefetch href={signInUrl} />
       <SignUpOauthErrorBanner signInUrl={signInUrl} />

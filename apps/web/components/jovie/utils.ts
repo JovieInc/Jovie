@@ -1,6 +1,10 @@
 import type { UIMessage } from 'ai';
 
 import {
+  GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+  isGatewayBudgetExceededError,
+} from '@/lib/ai/gateway-errors';
+import {
   isRecoverableToolErrorCode,
   isRecoverableToolStreamError,
   resolveToolFailurePresentation,
@@ -103,6 +107,10 @@ export function getErrorType(error: Error): ChatErrorType {
   }
 
   if (typeof status === 'number' && status >= 500) {
+    return 'server';
+  }
+
+  if (isGatewayBudgetExceededError(error)) {
     return 'server';
   }
 
@@ -327,6 +335,10 @@ export function getPreferredErrorMessage(
   type: ChatErrorType,
   metadata: ErrorMetadata
 ): string {
+  if (isGatewayBudgetExceededError(error)) {
+    return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;
+  }
+
   if (metadata.message) {
     return metadata.message;
   }

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/demo/DemoTimWhiteProfileSurface.test.tsx
 'use client';
 
 import Image from 'next/image';
@@ -42,10 +43,10 @@ import { DemoClientProviders } from './DemoClientProviders';
 const DEMO_PRESS_PHOTOS = [
   {
     id: 'press-photo-1',
-    blobUrl: '/images/avatars/tim-white-founder.jpg',
-    smallUrl: '/images/avatars/tim-white-founder.jpg',
-    mediumUrl: '/images/avatars/tim-white-founder.jpg',
-    largeUrl: '/images/avatars/tim-white-founder.jpg',
+    blobUrl: '/images/avatars/tim-white.jpg',
+    smallUrl: '/images/avatars/tim-white.jpg',
+    mediumUrl: '/images/avatars/tim-white.jpg',
+    largeUrl: '/images/avatars/tim-white.jpg',
     originalFilename: 'tim-white-portrait.avif',
     width: 1200,
     height: 1500,

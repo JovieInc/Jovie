@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/friday-rhythm-section.test.tsx
 'use client';
 
 import {
@@ -256,7 +257,7 @@ function FridayRhythmContent({
   return (
     <div className='homepage-friday-rhythm-content mx-auto w-full max-w-(--homepage-section-max) px-(--homepage-page-gutter) py-20 sm:py-24 md:py-0'>
       <div className='homepage-friday-rhythm-copy max-w-[45rem] text-left'>
-        <h2 className='homepage-friday-rhythm-title text-white dark:text-white'>
+        <h2 className='homepage-friday-rhythm-title text-white dark:text-white line-clamp-2'>
           <span className='block'>Make Every Friday</span>
           <span className='block'>Count</span>
         </h2>

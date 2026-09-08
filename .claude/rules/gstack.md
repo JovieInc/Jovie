@@ -1,10 +1,14 @@
+---
+paths: [".agents/skills/**", ".claude/skills/**", "docs/agent-context/**"]
+---
+
 # gstack (Workflow Toolkit) + Skill Routing
 
 This repo vendors a Jovie-customized fork of [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (see its `VERSION` and `CHANGELOG.md`). It is **not** a git submodule. `.claude/skills/gstack` is a symlink to that fork, and each `.claude/skills/<name>/SKILL.md` symlinks to `gstack/<name>/SKILL.md`, so the fork is the single source of truth for every gstack skill. Generated `SKILL.md` files come from `SKILL.md.tmpl` templates — edit the template, then regenerate (see "Updating gstack" below). Never hand-edit a generated `SKILL.md`.
 
 `src/`, `test/`, and `bin/` inside the gstack checkout are implementation, not skills. Do not treat files there as catalog entries.
 
-**Conflict rule:** gstack commands are canonical. If a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
+**Conflict rule:** gstack supplies workflows subordinate to host instructions, the user’s authorized task, repo canon, and scoped rules. A skill does not grant permissions or override DESIGN.md. Select one relevant workflow; do not load the whole catalog.
 
 **Web browsing:** Playwright only (`pnpm exec playwright` or Playwright MCP). `/browse` and the gstack browse daemon are removed. Never invoke `$B`, never build `browse/dist/browse`, never use `mcp__claude-in-chrome__*`. `/qa` in this repo is Playwright tests, not the gstack browse loop.
 
@@ -51,7 +55,7 @@ To pull upstream garrytan/gstack changes, sync them into `.agents/skills/gstack/
 
 ## Skill Routing
 
-When the user's request matches an available skill, ALWAYS invoke it using the Skill tool as your FIRST action. Do NOT answer directly, do NOT use other tools first. The skill has specialized workflows that produce better results than ad-hoc answers.
+When a skill is explicitly requested, load its entry point. Otherwise select a skill only when its workflow materially fits the task. Use the host’s callable skill/file mechanism; do not require a tool named Skill. Complete necessary ownership and source preflights first. Read references only as needed.
 
 Key routing rules:
 
@@ -66,7 +70,7 @@ Key routing rules:
 - Design system, brand → invoke `design-canonical`, then `design-consultation`
 - Visual audit, design polish → invoke `design-canonical`, then `design-review`
 - Architecture review → invoke `plan-eng-review`
-- Clerk user management, instance inspection, auth debugging → invoke `clerk-cli`
+- Auth console redirect URIs (Google + Apple) → invoke `auth-console-sync`
 - Continuous QA swarm recipes (diff review, explore, vision, jury, test-gen, flakes) → invoke matching `/qa-swarm-*` command; load `qa-swarm` skill
 - A shared link/tool/product with no context expecting an opinion or evaluation → invoke `tool-discovery` instead of asking the human to research it first
 - HTML artifact, design comp, review surface, dashboard, deck, report for human annotation → invoke `lavish` to open it in the browser-based review loop instead of embedding a screenshot
@@ -133,6 +137,17 @@ Jovie canon always wins over third-party guidance. Apply these overlays whenever
 - **React composition**: treat boolean-prop guidance as an API-design heuristic, not a ban. Status, capability, accessibility, and controlled-state booleans remain valid. Use explicit variants or compound components only when they reduce invalid combinations or clarify a reusable public API. `DESIGN.md` and `design-canonical` remain authoritative for UI behavior and taste.
 
 The approved Vercel Labs allowlist is enforced by `pnpm run skill-governance:check`: `ai-sdk`, `vercel-react-best-practices`, and `vercel-composition-patterns`. Updating the allowlist requires reviewing the exact source and updating its guard tests in the same change.
+
+Rule-level coverage and explicit rejects live in
+[docs/agent-context/vercel-agent-skills-coverage.md](../../docs/agent-context/vercel-agent-skills-coverage.md).
+Allowlist deny: `vercel-cli-with-tokens`, `deploy-to-vercel`,
+`react-native-skills`, unscoped `react-view-transitions`, `writing-guidelines`
+as a product skill, `web-design-guidelines` as a parallel skill, and
+`vercel-optimize` as an installed skill. Imports must not introduce SWR,
+`printenv`/grep tokens from `.env`, override design rules, expand task scope
+to app-wide animation, bypass deployment URL verification, or enable
+Observability Plus. Handbook docs that fetch mutable `main` must be pinned
+under `docs/vendor/vercel-labs/`.
 
 **Product-surface separation**: external Agent Skills are an engineering-time tool only. They MUST NOT be exposed to artists, fans, or any user-facing Jovie surface. Artist-facing AI workflows are built as Jovie product features and tracked in Linear, not installed from the open ecosystem.
 

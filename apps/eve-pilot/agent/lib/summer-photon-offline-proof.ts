@@ -1,13 +1,14 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import {
   assertEvePilotFactoryLock,
   bindEvePilotIdentity,
-  type EvePilotBoundTurn,
 } from '../select-identity';
 
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_SIGNATURE_AGE_SECONDS = 5 * 60;
+const MAX_EVENT_AGE_MS = MAX_SIGNATURE_AGE_SECONDS * 1000;
+const MAX_EVENT_CLOCK_SKEW_MS = 60 * 1000;
 
 const spectrumEventSchema = z
   .object({
@@ -43,17 +44,19 @@ export type SummerPhotonProofDependencies = {
   readonly allowedLineIds: ReadonlySet<string>;
   readonly allowedSenderIds: ReadonlySet<string>;
   readonly allowedThreadIds: ReadonlySet<string>;
+  readonly idempotencyKey: string;
+  readonly idempotencyKeyId: string;
   readonly now: () => Date;
   readonly persistImmutable: (
     pathname: string,
     record: SummerPhotonProofRecord
   ) => Promise<'created' | 'exists'>;
+  readonly readRecord: (
+    pathname: string
+  ) => Promise<SummerPhotonProofRecord | null>;
+  readonly privacyKey: string;
+  readonly privacyKeyId: string;
   readonly signingSecret: string;
-  readonly writeTestSink: (input: {
-    readonly correlationId: string;
-    readonly identity: EvePilotBoundTurn;
-    readonly message: string;
-  }) => Promise<{ readonly sinkReceiptId: string }>;
 };
 
 function response(status: number, code: string, extra = {}) {
@@ -63,8 +66,21 @@ function response(status: number, code: string, extra = {}) {
   );
 }
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
+function privateDigest(
+  domain: 'event' | 'line' | 'sender' | 'sink' | 'thread',
+  value: string,
+  key: string
+): string {
+  return createHmac('sha256', key)
+    .update(`summer-photon-proof:${domain}\0${value}`)
+    .digest('hex');
+}
+
+function sameRecord(
+  left: SummerPhotonProofRecord | null,
+  right: SummerPhotonProofRecord
+): boolean {
+  return left !== null && JSON.stringify(left) === JSON.stringify(right);
 }
 
 async function readBoundedBody(request: Request): Promise<string> {
@@ -72,9 +88,22 @@ async function readBoundedBody(request: Request): Promise<string> {
   if (Number.isFinite(length) && length > MAX_BODY_BYTES) {
     throw new Error('body_too_large');
   }
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.byteLength > MAX_BODY_BYTES) throw new Error('body_too_large');
-  return new TextDecoder().decode(bytes);
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let byteLength = 0;
+  let body = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteLength += value.byteLength;
+    if (byteLength > MAX_BODY_BYTES) {
+      await reader.cancel();
+      throw new Error('body_too_large');
+    }
+    body += decoder.decode(value, { stream: true });
+  }
+  return body + decoder.decode();
 }
 
 export function spectrumSignature(
@@ -94,7 +123,13 @@ export function verifySpectrumSignature(input: {
   readonly signature: string | null;
   readonly timestamp: string | null;
 }): boolean {
-  if (!input.signature || !input.timestamp || !input.secret) return false;
+  if (
+    !Number.isFinite(input.nowSeconds) ||
+    !input.signature ||
+    !input.timestamp ||
+    !input.secret
+  )
+    return false;
   const timestamp = Number(input.timestamp);
   if (
     !Number.isFinite(timestamp) ||
@@ -136,6 +171,20 @@ export function createSummerPhotonOfflineProofHandler(
 
     const now = dependencies.now();
     if (
+      !Number.isFinite(now.getTime()) ||
+      dependencies.idempotencyKey.length < 32 ||
+      dependencies.privacyKey.length < 32 ||
+      dependencies.idempotencyKey === dependencies.privacyKey ||
+      dependencies.idempotencyKey === dependencies.signingSecret ||
+      dependencies.privacyKey === dependencies.signingSecret ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u.test(
+        dependencies.idempotencyKeyId
+      ) ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u.test(dependencies.privacyKeyId)
+    ) {
+      return response(503, 'proof_configuration_invalid');
+    }
+    if (
       !verifySpectrumSignature({
         nowSeconds: Math.floor(now.getTime() / 1000),
         rawBody,
@@ -155,23 +204,50 @@ export function createSummerPhotonOfflineProofHandler(
     }
     const parsed = spectrumEventSchema.safeParse(input);
     if (!parsed.success) return response(422, 'invalid_event');
+    const eventAgeMs =
+      now.getTime() - Date.parse(parsed.data.message.timestamp);
+    if (
+      eventAgeMs > MAX_EVENT_AGE_MS ||
+      eventAgeMs < -MAX_EVENT_CLOCK_SKEW_MS
+    ) {
+      return response(422, 'event_outside_freshness_window');
+    }
     if (!admitted(parsed.data, dependencies)) {
       return response(403, 'identity_or_thread_refused');
     }
 
     const event = parsed.data.message;
-    const correlationKey = sha256(
-      [event.id, event.sender.id, event.space.id, event.space.phone].join('\0')
+    const correlationKey = privateDigest(
+      'event',
+      [event.id, event.sender.id, event.space.id, event.space.phone].join('\0'),
+      dependencies.idempotencyKey
     );
     const correlationId = `summer-photon:${correlationKey}`;
     const receiptPath = `summer-photon-proof/receipts/${correlationKey}.json`;
     const terminalPath = `summer-photon-proof/terminal/${correlationKey}.json`;
     const privacySafeSource = {
-      eventDigest: sha256(event.id),
-      lineDigest: sha256(event.space.phone),
-      messageDigest: sha256(event.content.text),
-      senderDigest: sha256(event.sender.id),
-      threadDigest: sha256(event.space.id),
+      eventDigest: privateDigest(
+        'event',
+        `${event.id}\0${event.timestamp}`,
+        dependencies.privacyKey
+      ),
+      idempotencyKeyId: dependencies.idempotencyKeyId,
+      lineDigest: privateDigest(
+        'line',
+        event.space.phone,
+        dependencies.privacyKey
+      ),
+      senderDigest: privateDigest(
+        'sender',
+        event.sender.id,
+        dependencies.privacyKey
+      ),
+      threadDigest: privateDigest(
+        'thread',
+        event.space.id,
+        dependencies.privacyKey
+      ),
+      privacyKeyId: dependencies.privacyKeyId,
       verifiedBy: 'spectrum-hmac-v0',
     };
     const authority = {
@@ -190,36 +266,20 @@ export function createSummerPhotonOfflineProofHandler(
 
     const initial = {
       schema: 'jovie.eve.summer-photon-proof.receipt/v1',
-      acceptedAt: now.toISOString(),
+      acceptedAt: event.timestamp,
       authority,
       correlationId,
       outbound,
       source: privacySafeSource,
       verdict: 'accepted_for_isolated_summer_sink',
     } satisfies SummerPhotonProofRecord;
-    try {
-      if (
-        (await dependencies.persistImmutable(receiptPath, initial)) === 'exists'
-      ) {
-        return response(409, 'replay_refused', { correlationId });
-      }
-    } catch {
-      return response(503, 'receipt_persistence_failed');
-    }
-
     const identity = bindEvePilotIdentity('summer');
     assertEvePilotFactoryLock(identity);
-    let sinkReceiptId: string;
-    try {
-      ({ sinkReceiptId } = await dependencies.writeTestSink({
-        correlationId,
-        identity,
-        message: event.content.text,
-      }));
-    } catch {
-      return response(503, 'isolated_sink_failed', { correlationId });
-    }
-
+    const sinkReceiptId = `sink_${privateDigest(
+      'sink',
+      correlationId,
+      dependencies.privacyKey
+    ).slice(0, 32)}`;
     const terminal = {
       schema: 'jovie.eve.summer-photon-proof.terminal/v1',
       authority,
@@ -228,27 +288,66 @@ export function createSummerPhotonOfflineProofHandler(
       outbound,
       sinkReceiptId,
       source: privacySafeSource,
-      terminalAt: dependencies.now().toISOString(),
+      terminalAt: event.timestamp,
       verdict: 'isolated_summer_sink_completed',
     } satisfies SummerPhotonProofRecord;
+
+    let initialWrite: 'created' | 'exists';
     try {
-      if (
-        (await dependencies.persistImmutable(terminalPath, terminal)) ===
-        'exists'
-      ) {
-        return response(503, 'terminal_receipt_conflict', { correlationId });
+      initialWrite = await dependencies.persistImmutable(receiptPath, initial);
+    } catch {
+      return response(503, 'receipt_persistence_failed');
+    }
+    if (initialWrite === 'exists') {
+      try {
+        if (!sameRecord(await dependencies.readRecord(receiptPath), initial)) {
+          return response(409, 'replay_refused', { correlationId });
+        }
+      } catch {
+        return response(503, 'receipt_read_failed', { correlationId });
+      }
+    }
+    try {
+      const terminalWrite = await dependencies.persistImmutable(
+        terminalPath,
+        terminal
+      );
+      if (terminalWrite === 'exists') {
+        let existingTerminal: SummerPhotonProofRecord | null;
+        try {
+          existingTerminal = await dependencies.readRecord(terminalPath);
+        } catch {
+          return response(503, 'terminal_read_failed', { correlationId });
+        }
+        if (!sameRecord(existingTerminal, terminal)) {
+          return response(409, 'terminal_receipt_conflict', { correlationId });
+        }
+        return response(202, 'offline_proof_reconciled', {
+          correlationId,
+          identity: 'summer',
+          outbound,
+          receiptPath,
+          sinkReceiptId,
+          terminalPath,
+        });
       }
     } catch {
       return response(503, 'terminal_persistence_failed', { correlationId });
     }
 
-    return response(202, 'offline_proof_completed', {
-      correlationId,
-      identity: 'summer',
-      outbound,
-      receiptPath,
-      sinkReceiptId,
-      terminalPath,
-    });
+    return response(
+      202,
+      initialWrite === 'created'
+        ? 'offline_proof_completed'
+        : 'offline_proof_reconciled',
+      {
+        correlationId,
+        identity: 'summer',
+        outbound,
+        receiptPath,
+        sinkReceiptId,
+        terminalPath,
+      }
+    );
   };
 }

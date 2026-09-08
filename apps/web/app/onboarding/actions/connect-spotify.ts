@@ -33,6 +33,8 @@ import {
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { createOnboardingReceiptPendingError } from '@/lib/errors/onboarding';
+import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { lockSpotifyProfileIdentity } from '@/lib/profile/spotify-profile-identity';
 import {
@@ -253,10 +255,11 @@ export async function connectOnboardingSpotifyArtist(
   const pendingClaim = await readPendingClaimContext({
     username: profile.handle,
   });
-  const isDirectClaimAwaitingMatch =
+  const isDirectClaim =
     pendingClaim?.mode === 'direct_profile' &&
-    pendingClaim.creatorProfileId === profile.id &&
-    profile.isClaimed !== true;
+    pendingClaim.creatorProfileId === profile.id;
+  const isDirectClaimAwaitingMatch =
+    isDirectClaim && profile.isClaimed !== true;
   const directClaimValidationMessage = getDirectClaimValidationMessage({
     expectedSpotifyArtistId: pendingClaim?.expectedSpotifyArtistId,
     isAwaitingMatch: isDirectClaimAwaitingMatch,
@@ -340,22 +343,6 @@ export async function connectOnboardingSpotifyArtist(
         },
         { clerkUserId: userId }
       );
-
-      const cookieStore = await cookies();
-      cookieStore.set('jovie_onboarding_complete', '1', {
-        httpOnly: true,
-        secure: isSecureEnv(),
-        sameSite: 'lax',
-        maxAge: 120,
-        path: '/',
-      });
-
-      await Promise.allSettled([
-        clearPendingClaimContext(),
-        invalidateProfileCache(profile.handle),
-        invalidateProxyUserStateCache(userId),
-      ]);
-      await finalizePostOnboarding(userId, profile.handle);
     } else {
       await withDbSessionTx(
         async tx => {
@@ -397,6 +384,32 @@ export async function connectOnboardingSpotifyArtist(
     }
 
     throw error;
+  }
+
+  // The direct claim is now persisted. Also reconcile on retry when the
+  // profile is already claimed but the attribution cookie survived a failure.
+  try {
+    await attributeLeadSignupFromAppUserId(userId);
+  } catch (error) {
+    throw createOnboardingReceiptPendingError(error);
+  }
+
+  if (isDirectClaim) {
+    const cookieStore = await cookies();
+    cookieStore.set('jovie_onboarding_complete', '1', {
+      httpOnly: true,
+      secure: isSecureEnv(),
+      sameSite: 'lax',
+      maxAge: 120,
+      path: '/',
+    });
+
+    await Promise.allSettled([
+      clearPendingClaimContext(),
+      invalidateProfileCache(profile.handle),
+      invalidateProxyUserStateCache(userId),
+    ]);
+    await finalizePostOnboarding(userId, profile.handle);
   }
 
   const finalizeSpotifyImport = async (

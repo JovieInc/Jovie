@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/DataPrivacySection.test.tsx
+
 import { Button, ConfirmDialog, Input } from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -59,6 +61,7 @@ export function DataPrivacySection() {
           <SettingsActionRow
             icon={<Trash2 className='h-4 w-4' aria-hidden />}
             title='Delete your account'
+            tone='destructive'
             description='Permanently remove your account, profile, contacts, and all associated data. This action cannot be undone.'
             action={
               <Button

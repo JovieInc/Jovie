@@ -8,7 +8,7 @@ import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
-interface AppShellFrameProps {
+export interface AppShellFrameProps {
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
   readonly main: ReactNode;
@@ -71,6 +71,7 @@ export const AppShellFrame = memo(function AppShellFrame({
       <DesktopTitlebar />
       <div
         data-app-shell-body='true'
+        data-electron-top-gap-owner='titlebar'
         data-shell-rail-motion='coordinated'
         className={cn(
           // Allocation belongs to the shell, not individual routes. Keeping the

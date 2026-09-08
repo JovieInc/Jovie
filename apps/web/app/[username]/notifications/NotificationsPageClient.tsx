@@ -79,7 +79,7 @@ export function NotificationsPageClient({ artist }: Props) {
               className='rounded-full opacity-60 transition-opacity duration-subtle hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
             >
               <BrandLogo
-                size={20}
+                size='chrome'
                 tone='auto'
                 rounded={false}
                 className='block'

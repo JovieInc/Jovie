@@ -237,9 +237,18 @@ vi.mock('@/lib/db/query-timeout', () => ({
   ),
   isQueryTimeoutError: (error: unknown) =>
     error instanceof Error && error.name === 'QueryTimeoutError',
-  isPostgresTimeoutError: (error: unknown) =>
-    error instanceof Error &&
-    error.message.includes('canceling statement due to statement timeout'),
+  // Mirrors the real helper, which recurses into error.cause — Drizzle wraps
+  // PG errors so the timeout text lives on the cause, not the outer message.
+  isPostgresTimeoutError: function isPostgresTimeoutErrorMock(
+    error: unknown
+  ): boolean {
+    if (!(error instanceof Error)) return false;
+    return (
+      error.message.includes('canceling statement due to statement timeout') ||
+      error.message.includes('idle-in-transaction timeout') ||
+      (error.cause instanceof Error && isPostgresTimeoutErrorMock(error.cause))
+    );
+  },
 }));
 
 vi.mock('@/lib/db/schema/analytics', () => ({
@@ -446,6 +455,96 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       width: 1024,
       height: 1024,
     });
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('degrades the Inbox tour-dates count log-only on statement timeout (JOV-5754)', async () => {
+    // Prod fingerprint of Sentry issue 7702916052: the tour_dates pending-count
+    // read fails with a PG statement timeout (57014) during Neon cold starts.
+    // Drizzle wraps the PG error — the outer message names the count query,
+    // the timeout text lives on the cause.
+    const timeoutError = new Error(
+      'Failed query: select count(*) from "tour_dates" where ("tour_dates"."profile_id" = $1 and "tour_dates"."confirmation_status" = $2)',
+      {
+        cause: Object.assign(
+          new Error('canceling statement due to statement timeout'),
+          { code: '57014' }
+        ),
+      }
+    );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // Inbox suggested-actions count succeeds
+      fail(timeoutError), // Inbox tour-dates count read times out
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+
+    // The shell still renders and the Inbox fails open — never hidden by a
+    // transient data failure.
+    expect(result.inboxNavigation).toEqual({
+      state: 'unknown',
+      pendingCount: null,
+    });
+
+    // Expected transient failure is log-only: no Sentry error event may be
+    // emitted for a read that is designed to fail open.
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('timed out')
+    );
+
+    // Sibling reads are unaffected.
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('still reports genuine Inbox count failures to Sentry', async () => {
+    // Guardrail for the JOV-5754 downgrade: only known transient timeouts and
+    // schema drift go log-only — any other failure must still be reported.
+    const realError = new Error('boom: tour_dates read failed');
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // Inbox suggested-actions count succeeds
+      fail(realError), // Inbox tour-dates count read fails unexpectedly
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+
+    expect(result.inboxNavigation).toEqual({
+      state: 'unknown',
+      pendingCount: null,
+    });
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      realError,
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          context: 'inbox_navigation_availability',
+        }),
+      })
+    );
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 

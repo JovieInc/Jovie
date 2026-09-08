@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { tryWithHeavyJobLock } from '../../hermes/lib/heavy-job-lock.ts';
+import { tryWithHeavyJobLock } from '../../symphony/lib/heavy-job-lock.ts';
 import {
   journalEnd,
   journalStart,
   planRecovery,
   readJournal,
-} from '../../hermes/lib/ship-ledger.ts';
+} from '../../symphony/lib/ship-ledger.ts';
 
 const cleanups = [];
 afterEach(() => {

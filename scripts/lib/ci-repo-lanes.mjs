@@ -47,7 +47,7 @@ const DOC_FILE = /\.(md|mdx|txt)$/i;
  */
 const LANE_PREFIXES = Object.freeze([
   {
-    prefix: 'scripts/hermes/',
+    prefix: 'scripts/symphony/',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
   {
@@ -125,6 +125,10 @@ const LANE_PREFIXES = Object.freeze([
   {
     prefix: 'STRATEGY.md',
     lanes: [CI_LANES.SUMMER_OPS],
+  },
+  {
+    prefix: 'ops/',
+    lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
   {
     prefix: '.github/',

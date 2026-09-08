@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { render, screen } from '@testing-library/react';
+import postcss from 'postcss';
+import { createElement } from 'react';
+import { compile } from 'tailwindcss';
 import { describe, expect, it } from 'vitest';
+import { ClientFaqAccordion } from '@/components/marketing/ClientFaqAccordion';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const faqSectionPath = 'components/marketing/FaqSection.tsx';
@@ -61,6 +66,54 @@ function extractFaqReducedMotionCss(source: string): string {
 }
 
 describe('mounted homepage FAQ System B source contract', () => {
+  it('emits a focus-only shadow and border transition on the actual FAQ trigger', async () => {
+    render(
+      createElement(ClientFaqAccordion, {
+        items: [{ question: 'What is Jovie?', answer: 'An artist platform.' }],
+      })
+    );
+    const trigger = screen.getByRole('button', { name: 'What is Jovie?' });
+    const themes: string[] = [];
+    postcss
+      .parse(readFileSync(path.join(webRoot, 'app/globals.css'), 'utf8'))
+      .walkAtRules('theme', rule => {
+        themes.push(rule.toString());
+      });
+    const compiler = await compile(
+      `${themes.join('\n')}\n@tailwind utilities;`
+    );
+    const output = postcss.parse(compiler.build([...trigger.classList]));
+    const focusProperties: string[] = [];
+    const idleProperties: string[] = [];
+    const durations: string[] = [];
+    output.walkRules(rule => {
+      rule.walkDecls('transition-property', declaration => {
+        if (rule.selector.endsWith(':focus-visible')) {
+          focusProperties.push(declaration.value);
+        } else if (rule.selector === '.transition-opacity') {
+          idleProperties.push(declaration.value);
+        }
+      });
+      if (rule.selector === '.duration-subtle') {
+        rule.walkDecls('transition-duration', declaration => {
+          durations.push(declaration.value);
+        });
+      }
+    });
+
+    // The base-layer focus rule loses to transition-opacity. Require the
+    // actual mounted trigger to emit its own focus override, not merely name
+    // a valid-looking utility or rely on the global rule still being present.
+    expect(focusProperties, output.toString()).toEqual([
+      'box-shadow,border-color',
+    ]);
+    expect(idleProperties).toEqual(['opacity']);
+    expect(durations).toEqual(['var(--transition-duration-subtle)']);
+    expect(themes.join('\n')).toContain(
+      '--transition-duration-subtle: var(--duration-subtle)'
+    );
+  });
+
   it('keeps the shared FaqSection on named System B primitives', () => {
     const source = readFileSync(path.join(webRoot, faqSectionPath), 'utf8');
 

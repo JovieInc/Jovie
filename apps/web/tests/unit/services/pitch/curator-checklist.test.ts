@@ -18,7 +18,11 @@ describe('getPitchChecklistStatus', () => {
     });
 
     expect(status.allResolved).toBe(false);
+    expect(status.draftable).toBe(false);
     expect(status.firstMissing?.id).toBe('whyTwoSentences');
+    expect(formatPitchChecklistForPrompt(status)).toContain(
+      'Do not draft until the curator checklist is resolved'
+    );
     expect(status.items.find(item => item.id === 'listenLink')?.status).toBe(
       'unknown'
     );
@@ -40,6 +44,7 @@ describe('getPitchChecklistStatus', () => {
     });
 
     expect(status.allResolved).toBe(true);
+    expect(status.draftable).toBe(true);
     expect(status.items.find(item => item.id === 'listenLink')?.value).toBe(
       'https://open.spotify.com/track/demo'
     );
@@ -59,8 +64,12 @@ describe('getPitchChecklistStatus', () => {
     expect(status.items.find(item => item.id === 'listenLink')?.status).toBe(
       'unknown'
     );
+    expect(status.draftable).toBe(true);
     expect(formatPitchChecklistForPrompt(status)).toContain(
       'Spotify or private listen link: UNKNOWN'
+    );
+    expect(formatPitchChecklistForPrompt(status)).not.toContain(
+      'Do not draft until the curator checklist is resolved'
     );
   });
 });

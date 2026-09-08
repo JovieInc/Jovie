@@ -19,9 +19,9 @@ These cookies are required for basic site functionality and cannot be disabled.
 | `jv_cc` | Stores your cookie consent preferences | 1 year |
 | `jv_cc_required` | Stores whether your region requires Jovie to show cookie consent controls | 30 days |
 | `jv_country` | Stores country code for region-appropriate consent and profile localization | 30 days |
-| `__clerk_*` | Authentication, session management, and account security | Session or as configured by Clerk |
-| `__session` | Authentication session management | Session |
-| `__client_uat` | Authentication session freshness check | Session |
+| `better-auth.` | Authentication, session management, and account security | Session |
+| `__Secure-better-auth.` | Secure authentication session cookies on HTTPS origins | Session |
+| `__Host-better-auth.` | Host-scoped authentication session cookies on HTTPS origins | Session |
 | `__investor_token` | Investor portal access token for shared private links | 30 days |
 | `jovie_redirect_count` | Temporary redirect-loop protection for authentication flows | 30 seconds |
 | `jovie_onboarding_session` | Anonymous onboarding session continuity before account creation | 7 days |

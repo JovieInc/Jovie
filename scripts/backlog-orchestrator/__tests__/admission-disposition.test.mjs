@@ -19,6 +19,13 @@ Repair the deterministic path.
 
 ## Acceptance criteria
 - Focused coverage passes.`;
+const TARGETED_DESCRIPTION = `${DESCRIPTION}
+
+## Target
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI`;
 
 function issue(identifier, overrides = {}) {
   return {
@@ -29,7 +36,7 @@ function issue(identifier, overrides = {}) {
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-08T00:00:00.000Z',
     priority: 3,
-    state: { name: 'Backlog' },
+    state: { name: 'Todo' },
     assignee: null,
     labels: { nodes: [] },
     children: { nodes: [] },
@@ -132,11 +139,7 @@ describe('exhaustive Symphony admission dispositions', () => {
       'deferred',
       'ownership-ambiguous'
     );
-    expect(
-      machineIssue('JOV-23', 'Backlog'),
-      'deferred',
-      'ownership-ambiguous'
-    );
+    expect(machineIssue('JOV-23', 'Backlog'), 'rejected', 'inactive-state');
     expect(
       issue('JOV-24', {
         comments: { nodes: [], pageInfo: { hasNextPage: true } },
@@ -146,17 +149,35 @@ describe('exhaustive Symphony admission dispositions', () => {
     );
   });
 
+  it('does not treat a mismatched repository admission receipt as ownership evidence', () => {
+    const result = expect(
+      issue('JOV-25', {
+        description: TARGETED_DESCRIPTION,
+        comments: {
+          nodes: [
+            {
+              body: '<!-- symphony-admission:v1 {"target_system":"jovie-product","target_repo":"JovieInc/LogYourBody","artifact":"scripts/backlog-orchestrator/admission-gate.mjs","verification_authority":"JovieInc/LogYourBody CI"} -->',
+            },
+          ],
+        },
+      }),
+      'eligible',
+      'deterministic-safe'
+    );
+    assert.equal(result.evidence.admissionReceipt, false);
+  });
+
   it('gives protected, sensitive, active, parent, incomplete, and stale work typed outcomes', () => {
     const cases = [
       [
-        issue('JOV-30', { assignee: { id: 'tim', name: 'Tim White' } }),
+        issue('JOV-30', { assignee: { id: 'other', name: 'Other Owner' } }),
         'deferred',
-        'tim-owned',
+        'already-assigned',
       ],
       [
         issue('JOV-31', { labels: { nodes: [{ name: 'needs-human' }] } }),
-        'deferred',
-        'protected-policy',
+        'eligible',
+        'deterministic-safe',
       ],
       [
         issue('JOV-32', { title: 'Rotate production credential' }),
@@ -190,13 +211,22 @@ describe('exhaustive Symphony admission dispositions', () => {
       expect(candidate, outcome, reason);
   });
 
-  it('hard-stops every human hold label but preserves exact-label boundaries', () => {
-    for (const label of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ]) {
+  it('treats founder assignment as steering rather than a human hold', () => {
+    const result = classify(
+      issue('JOV-29', {
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+        labels: { nodes: [{ name: 'needs:taste' }] },
+      })
+    );
+
+    assert.equal(result.outcome, 'eligible');
+    assert.equal(result.reason.code, 'deterministic-safe');
+    assert.equal(result.reason.layer, 'admission');
+  });
+
+  it('ignores legacy human holds while preserving machine incident holds', () => {
+    for (const label of ['held', 'manual-incident', 'no-symphony']) {
       const result = expect(
         issue(`JOV-${label.length}`, { labels: { nodes: [{ name: label }] } }),
         'deferred',
@@ -204,6 +234,16 @@ describe('exhaustive Symphony admission dispositions', () => {
       );
       assert.equal(result.reason.retryable, false);
       assert.deepEqual(result.preAdmission.matchedLabels, [label]);
+    }
+
+    for (const label of ['needs-human', 'decision-required', 'no-auto']) {
+      const result = classify(
+        issue(`JOV-${label.length + 100}`, {
+          labels: { nodes: [{ name: label }] },
+        })
+      );
+      assert.equal(result.outcome, 'eligible');
+      assert.equal(result.preAdmission.allowed, true);
     }
 
     const nearMiss = classify(

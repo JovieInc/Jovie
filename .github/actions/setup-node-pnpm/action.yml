@@ -1,6 +1,12 @@
 name: 'Setup Node.js and pnpm'
 description: 'Sets up Node.js, pnpm, and installs dependencies with optimal caching'
 
+inputs:
+  package_cache:
+    description: 'Enable setup-node package cache restore and post-job save'
+    required: false
+    default: 'true'
+
 runs:
   using: 'composite'
   steps:
@@ -59,7 +65,7 @@ runs:
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version-file: '.nvmrc'
-        cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
+        cache: ${{ runner.environment == 'github-hosted' && inputs.package_cache == 'true' && 'pnpm' || '' }}
         cache-dependency-path: '**/pnpm-lock.yaml'
 
     - name: Warm pnpm store

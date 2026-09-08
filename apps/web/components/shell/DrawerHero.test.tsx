@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DrawerHero } from './DrawerHero';
@@ -142,5 +144,12 @@ describe('DrawerHero', () => {
     expect(
       screen.getByRole('heading', { name: 'Lost in the Light' })
     ).toHaveClass('text-sm', 'line-clamp-1', 'min-h-6');
+  });
+
+  it('keeps the drawer heading bounded by default', () => {
+    const source = readFileSync(resolve(__dirname, './DrawerHero.tsx'), 'utf8');
+    expect(source).toContain(
+      'min-w-0 flex-1 font-semibold text-primary-token line-clamp-2'
+    );
   });
 });

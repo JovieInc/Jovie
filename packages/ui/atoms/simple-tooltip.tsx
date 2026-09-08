@@ -38,7 +38,7 @@ export interface SimpleTooltipProps {
   /**
    * The trigger element (button, link, etc.)
    */
-  readonly children: React.ReactNode;
+  readonly children: React.ReactElement<{ readonly tabIndex?: number }>;
 }
 
 /**
@@ -68,9 +68,13 @@ export function SimpleTooltip({
   className,
   children,
 }: SimpleTooltipProps) {
+  const trigger = React.cloneElement(children, {
+    tabIndex: children.props.tabIndex ?? 0,
+  });
+
   return (
     <Tooltip defaultOpen={defaultOpen}>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
       <TooltipContent
         side={side}
         sideOffset={sideOffset}

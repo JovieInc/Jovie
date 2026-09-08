@@ -12,13 +12,7 @@ export const DURABLE_HOLD_LABELS = new Set([
   'fast',
   'gated',
   'hold',
-  'human-review-required',
-  'needs-human',
-  'needs-human-review',
   'needs-manual-rebase',
-  'no-auto',
-  'no-auto-merge',
-  'no-automerge',
   'queue-deferred',
 ]);
 

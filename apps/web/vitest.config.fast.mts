@@ -25,22 +25,49 @@ dotenv.config({ path: path.resolve(realRoot, '.env.test') });
 const isCI = process.env.CI === 'true';
 const isChangedRun = process.argv.includes('--changed');
 const isCoverageRun = process.argv.includes('--coverage');
+const isExactHeadCoverageRun = isChangedRun && isCoverageRun;
+const coverageInclude = (process.env.JOVIE_COVERAGE_INCLUDE ?? '')
+  .split('\n')
+  .map(entry => entry.trim())
+  .filter(Boolean);
+
+// Vitest 4: the junit reporter's per-reporter outputFile OVERRIDES the CLI
+// --outputFile flag, so sharded CI runs (the workflow passes a shard-specific
+// --outputFile) all wrote the same default name that the artifact-upload glob
+// never matched — failing shards uploaded no junit at all (repo #17071).
+// Derive the shard path from argv the same way --changed is detected;
+// VITEST_JUNIT_OUTPUT_FILE remains an explicit override for other lanes.
+const shardArgv = (() => {
+  const eq = process.argv.find(a => a.startsWith('--shard='));
+  if (eq) return eq.slice('--shard='.length);
+  const i = process.argv.indexOf('--shard');
+  const next = i !== -1 ? process.argv[i + 1] : undefined;
+  return next && !next.startsWith('--') ? next : null;
+})();
+const junitOutputFile =
+  process.env.VITEST_JUNIT_OUTPUT_FILE ??
+  (isCI && shardArgv
+    ? `test-report.${shardArgv.replace(/\//g, '-')}.junit.xml`
+    : 'test-report.junit.xml');
 
 // Changed-suite runs can fan out many short-lived workers on parity branches,
 // which increases startup churn and causes timeout cascades under aggregate load.
 // Keep this mode deterministic by running in a single long-lived fork with
 // slightly higher global timeouts so only genuinely slow tests fail.
-const changedSuiteStabilityConfig = isChangedRun
-  ? {
-      fileParallelism: false,
-      maxWorkers: 1,
-      minWorkers: 1,
-      maxConcurrency: 1,
-      testTimeout: 12_000,
-      hookTimeout: 12_000,
-      teardownTimeout: 12_000,
-    }
-  : {};
+// Exact-head V8 coverage must stay parallel: the serial fork cannot finish
+// inside GitHub merge-queue check_response_timeout_minutes=20.
+const changedSuiteStabilityConfig =
+  isChangedRun && !isCoverageRun
+    ? {
+        fileParallelism: false,
+        maxWorkers: 1,
+        minWorkers: 1,
+        maxConcurrency: 1,
+        testTimeout: 12_000,
+        hookTimeout: 12_000,
+        teardownTimeout: 12_000,
+      }
+    : {};
 
 /**
  * Optimized Vitest Configuration for Fast Test Execution
@@ -104,12 +131,27 @@ export default defineConfig({
     // Use forks for better memory isolation (Vitest 4 style)
     pool: 'forks',
     isolate: true,
-    singleFork: isChangedRun,
-    // CI stability: reduce memory pressure
-    maxWorkers: isCI ? 2 : undefined,
+    singleFork: isChangedRun && !isCoverageRun,
+    // CI stability: reduce memory pressure. Exact-head coverage is a single
+    // merge-queue job and must use the runner instead of the serial changed
+    // suite, or V8 collection overruns the 20-minute check budget.
+    maxWorkers: isExactHeadCoverageRun
+      ? isCI
+        ? 4
+        : undefined
+      : isCI
+        ? 2
+        : undefined,
     minWorkers: 1,
-    fileParallelism: !isCI,
-    maxConcurrency: isCI ? 1 : undefined,
+    fileParallelism: isExactHeadCoverageRun ? true : !isCI,
+    maxConcurrency: isExactHeadCoverageRun
+      ? isCI
+        ? 4
+        : undefined
+      : isCI
+        ? 1
+        : undefined,
+    bail: isExactHeadCoverageRun ? 1 : 0,
 
     // Timeouts
     // Serial CI runs trade fan-out for determinism, so allow the same bounded
@@ -121,15 +163,21 @@ export default defineConfig({
     ...changedSuiteStabilityConfig,
 
     // Coverage disabled by default for speed (enable with --coverage flag).
-    // Merge-queue unit shards stay coverage-off; the nightly heatmap is the
-    // collection lane. Per-glob floors are last measured snapshot (2026-05-10)
+    // Standard unit shards stay coverage-off; the separate Exact-head Coverage
+    // gate and nightly heatmap own collection. Per-glob floors are the last
+    // measured snapshot (2026-05-10)
     // minus 3pp so `vitest --coverage` can fail closed on critical-surface
     // decay. Register targets (90/95/85) remain the ratchet destination.
     coverage: {
       enabled: false,
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
+      reporter: isExactHeadCoverageRun
+        ? ['text', 'json']
+        : ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
+      ...(coverageInclude.length > 0
+        ? { include: coverageInclude, all: true }
+        : {}),
       exclude: [
         'node_modules/**',
         'tests/**',
@@ -146,27 +194,45 @@ export default defineConfig({
       ],
       // Global floors stay 0: the fast config is the merge-queue unit path
       // and must not collect coverage. Per-glob floors apply when `--coverage`
-      // is passed (nightly `test:coverage`).
-      thresholds: {
-        lines: 0,
-        branches: 0,
-        functions: 0,
-        statements: 0,
-        perFile: false,
-        'lib/entitlements/**/*.ts': { branches: 68, lines: 71 },
-        'app/api/stripe/webhooks/**/*.ts': { branches: 79, lines: 79 },
-        'app/api/webhooks/**/*.ts': { branches: 42, lines: 48 },
-        'app/api/dev/test-auth/**/*.ts': { branches: 74, lines: 85 },
-        'lib/auth/test-mode.ts': { branches: 74, lines: 85 },
-      },
+      // is passed (nightly `test:coverage`). Exact-head changed-line coverage
+      // uses the 60% patch ratchet instead of those full-suite glob floors.
+      thresholds: isExactHeadCoverageRun
+        ? {
+            lines: 0,
+            branches: 0,
+            functions: 0,
+            statements: 0,
+            perFile: false,
+          }
+        : {
+            lines: 0,
+            branches: 0,
+            functions: 0,
+            statements: 0,
+            perFile: false,
+            'lib/entitlements/**/*.ts': { branches: 68, lines: 71 },
+            'app/api/stripe/webhooks/**/*.ts': { branches: 79, lines: 79 },
+            'app/api/webhooks/**/*.ts': { branches: 42, lines: 48 },
+            'app/api/dev/test-auth/**/*.ts': { branches: 74, lines: 85 },
+            'lib/auth/test-mode.ts': { branches: 74, lines: 85 },
+            'app/api/internal/ovie/summer-bottleneck/route.ts': {
+              branches: 95,
+              lines: 100,
+            },
+            'lib/ovie/summer-admissions.ts': { branches: 95, lines: 100 },
+            'lib/ovie/summer-product-paths.ts': { branches: 100, lines: 100 },
+            'lib/ovie/summer-shadow-client.ts': { branches: 100, lines: 100 },
+          },
     },
 
     // Reduce reporter overhead - basic was removed in vitest 4, use default with summary:false
-    // JUnit reporter in CI for Codecov Test Analytics ingestion
+    // JUnit reporter in CI for Codecov Test Analytics ingestion.
+    // Per-reporter outputFile wins over CLI --outputFile in Vitest 4, so the
+    // shard path is derived above (--shard argv / VITEST_JUNIT_OUTPUT_FILE).
     reporters: isCI
       ? [
           ['default', { summary: false }],
-          ['junit', { outputFile: 'test-report.junit.xml' }],
+          ['junit', { outputFile: junitOutputFile }],
         ]
       : ['default'],
 

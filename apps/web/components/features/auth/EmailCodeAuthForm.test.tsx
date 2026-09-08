@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AUTH_CLASSES } from '@/lib/auth/constants';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
 // Better Auth client calls resolve with `{ data, error }` instead of
@@ -69,12 +70,55 @@ async function submitCode(code: string) {
   });
 }
 
+function expectAuthEntryCta(button: HTMLElement) {
+  const classNames = button.getAttribute('class')?.split(/\s+/) ?? [];
+  expect(classNames).toEqual(
+    expect.arrayContaining(AUTH_CLASSES.authEntryCta.split(' '))
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('location', { assign: locationAssign } as unknown as Location);
 });
 
 describe('EmailCodeAuthForm', () => {
+  it('uses auth-entry CTA geometry across email, code, and lockout states', async () => {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+
+    renderForm();
+
+    const emailButton = screen.getByRole('button', {
+      name: /send sign-in code/i,
+    });
+    expectAuthEntryCta(emailButton);
+
+    await submitEmail();
+
+    const verifyButton = await screen.findByRole('button', {
+      name: /verify code/i,
+    });
+    expectAuthEntryCta(verifyButton);
+
+    signInEmailOtp.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: 'TOO_MANY_ATTEMPTS',
+        message: 'Too many attempts',
+        status: 403,
+      },
+    });
+    await submitCode('111111');
+
+    const lockedButton = await screen.findByRole('button', {
+      name: /request a new code/i,
+    });
+    expectAuthEntryCta(lockedButton);
+  });
+
   it('stays on the email step and shows an error when send returns an error result', async () => {
     sendVerificationOtp.mockResolvedValueOnce({
       data: null,
@@ -128,6 +172,46 @@ describe('EmailCodeAuthForm', () => {
         document.querySelector('[data-auth-email-code-step="locked"]')
       ).toBeTruthy()
     );
+    expect(locationAssign).not.toHaveBeenCalled();
+  });
+
+  it('validates email on submit without disabling the send button', async () => {
+    renderForm();
+    const form = screen
+      .getByLabelText(/email/i)
+      .closest('form') as HTMLFormElement;
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeEnabled();
+    fireEvent.submit(form);
+    expect(await screen.findByText(/enter your email address/i)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'x' },
+    });
+    fireEvent.submit(form);
+    expect(await screen.findByText(/doesn.t look right/i)).toBeTruthy();
+    expect(sendVerificationOtp).not.toHaveBeenCalled();
+  });
+
+  it('shows the recipient, Change email, and controlled resend after send', async () => {
+    renderForm();
+    await reachCodeStep();
+    expect(screen.getByText(/artist@example.com/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /change email/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/resend in 30s/i)).toBeInTheDocument();
+  });
+
+  it('recovers from an expired code by sending a new one', async () => {
+    renderForm();
+    await reachCodeStep();
+    signInEmailOtp.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'OTP_EXPIRED', message: 'Expired', status: 400 },
+    });
+    await submitCode('111111');
+    expect(await screen.findByText(/that code has expired/i)).toBeTruthy();
     expect(locationAssign).not.toHaveBeenCalled();
   });
 

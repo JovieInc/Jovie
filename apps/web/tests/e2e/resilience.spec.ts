@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
+import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 

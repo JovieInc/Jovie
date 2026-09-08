@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/HomePageNarrative.test.tsx
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Container } from '@/components/site/Container';
@@ -40,7 +41,7 @@ export function FinalCallToAction({
           <h2
             id='final-cta-headline'
             data-testid='final-cta-headline'
-            className='marketing-h1-linear mx-auto text-primary-token'
+            className='marketing-h1-linear mx-auto text-primary-token line-clamp-2'
           >
             {content.title}
           </h2>

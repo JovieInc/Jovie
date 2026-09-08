@@ -449,26 +449,26 @@ export function EntityCard({
           </h3>
 
           {size.showMeta && metaText ? (
-            <p
+            <span
               className={cn(
-                'min-w-0 truncate text-[11.5px] text-tertiary-token',
+                'block min-w-0 truncate text-[11.5px] text-tertiary-token',
                 isUnified && 'entity-card-meta',
                 isProfileLandscape && 'text-secondary-token'
               )}
             >
               {metaText}
-            </p>
+            </span>
           ) : null}
 
           {size.showMeta && model.secondaryMeta ? (
-            <p
+            <span
               className={cn(
-                'min-w-0 truncate text-[11.5px] text-tertiary-token',
+                'block min-w-0 truncate text-[11.5px] text-tertiary-token',
                 isUnified && 'entity-card-meta'
               )}
             >
               {model.secondaryMeta}
-            </p>
+            </span>
           ) : null}
         </div>
 
@@ -555,9 +555,9 @@ export function EntityCard({
                     )}
                   </span>
                   {model.price.profit ? (
-                    <p className='text-2xs text-tertiary-token'>
+                    <span className='block text-2xs text-tertiary-token'>
                       Profit {model.price.profit}
-                    </p>
+                    </span>
                   ) : null}
                 </div>
               ) : (

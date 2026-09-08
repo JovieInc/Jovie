@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
@@ -19,6 +21,10 @@ describe('AppShellFrame', () => {
     expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
     const shellBody = mainContent.closest('[data-app-shell-body]');
     expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
+    expect(shellBody).toHaveAttribute(
+      'data-electron-top-gap-owner',
+      'titlebar'
+    );
     expect(shellBody).toHaveClass(
       'transition-[gap,padding]',
       'duration-cinematic',
@@ -93,6 +99,25 @@ describe('AppShellFrame', () => {
     expect(screen.getByTestId('app-shell-scroll')).toHaveClass(
       'pb-[var(--dev-toolbar-height,0px)]'
     );
+  });
+
+  it('keeps the shell family in the canonical ownership map and boundary', () => {
+    // JOV-5596: the shell family is owned through the public canonical
+    // boundary; the frame's props type is exported from the component source.
+    const frameSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/AppShellFrame.tsx'),
+      'utf8'
+    );
+    expect(frameSource).toContain('export interface AppShellFrameProps');
+
+    const boundarySource = readFileSync(
+      resolve(process.cwd(), 'components/canonical/index.ts'),
+      'utf8'
+    );
+    expect(boundarySource).toContain(
+      "from '@/components/organisms/AppShellFrame'"
+    );
+    expect(boundarySource).toContain('AppShellFrameProps');
   });
 
   it('marks composer focus on the shell frame without changing rail geometry', () => {

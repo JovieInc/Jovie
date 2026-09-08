@@ -1,17 +1,8 @@
 name: Taste Label Guard
 
-# Backstop for the taste gate. Tim's directive (#product, 2026-06-26):
-# `needs:taste` / `needs-human-taste` is ONLY for a material, subjective UX
-# judgment a human must make. Chores, dep bumps, CI/bug fixes, refactors, and
-# guardrail-alignment auto-flow. When a taste label is APPLIED to a PR whose
-# conventional-commit type is non-taste and it has no `ux:material` marker, this
-# workflow clears the label so the PR keeps flowing (self-healing — taste gates
-# should shrink, not grow).
-#
-# Triggers on `labeled` ONLY (not `edited`): the title is evaluated at the moment
-# the label lands, so an author cannot retitle `feat:` -> `chore:` after the fact
-# to strip a gate someone applied. To keep a taste label on a non-taste-typed PR,
-# add the `ux:material` marker.
+# Compatibility backstop for retired pre-landing taste holds. Taste is steered
+# before a PR opens or certified after landing behind a feature flag, so every
+# `needs:taste` / `needs-human-taste` label is removed at the PR boundary.
 #
 # Logic + tests: scripts/lib/taste-label-guard.mjs (+ __tests__).
 # See .claude/rules/release.md and docs/company/autonomous-shipping-doctrine.md.
@@ -33,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     # Same-repo PRs only (fork PRs get a read-only token), and only when the
-    # label just applied is actually a taste gate.
+    # label just applied is a retired taste hold.
     if: >-
       github.event.pull_request.head.repo.fork == false &&
       (
@@ -51,7 +42,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Clear mis-applied taste label
+      - name: Clear retired taste hold
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}

@@ -45,6 +45,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
+import {
+  classifyChatStreamFailure,
+  isGatewayBudgetExceededError,
+  resolveChatStreamErrorMessage,
+} from '@/lib/ai/gateway-errors';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
@@ -156,7 +161,11 @@ import {
   assertOvieDoorDoesNotUseArtistJovieGeneration,
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
-import { bindCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
+import { bindEveSummerSpeaker } from '@/lib/ovie/summer-eve-speaker';
+import {
+  authorizeFounderSummerUser,
+  founderPrincipalHash,
+} from '@/lib/ovie/summer-founder-auth';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -686,7 +695,7 @@ function buildChatTurnMetadata(input: {
   readonly model?: string;
   /** OV operator chat mode tag (JOV-4810); omitted for customer turns. */
   readonly chatMode?: 'ov' | null;
-  readonly eveIdentity?: 'jovie' | 'ovie';
+  readonly eveIdentity?: 'jovie' | 'summer';
   readonly ovieIngest?: ReadonlyArray<{
     readonly lane: string;
     readonly destination: string;
@@ -2228,30 +2237,49 @@ async function buildChatErrorResponse(
   conversationId: string | null,
   corsHeaders: Record<string, string>
 ) {
-  await captureError('Chat stream failed', error, {
-    feature: 'ai-chat',
-    mode: 'route-catch',
-    userId,
-    messageCount,
-    requestId,
-    profileId,
-    conversationId,
-  });
+  const failure = classifyChatStreamFailure(error);
+  const budgetExceeded = isGatewayBudgetExceededError(error);
+  await captureError(
+    budgetExceeded
+      ? 'AI Gateway API key budget exceeded'
+      : 'Chat stream failed',
+    budgetExceeded
+      ? Object.assign(new Error('AI Gateway API key budget exceeded'), {
+          name: 'GatewayBudgetExceededError',
+          code: failure.errorCode,
+          cause: error,
+        })
+      : error,
+    {
+      feature: 'ai-chat',
+      mode: 'route-catch',
+      userId,
+      messageCount,
+      requestId,
+      profileId,
+      conversationId,
+      ...(budgetExceeded
+        ? { errorType: 'gateway_budget_exceeded', alert: 'ai_gateway_budget' }
+        : {}),
+    }
+  );
   await Sentry.flush(SENTRY_FLUSH_TIMEOUT_MS).catch(() => null);
-
-  const message =
-    error instanceof Error ? error.message : 'An unexpected error occurred';
 
   return NextResponse.json(
     {
       error: 'Failed to process chat request',
-      message:
-        'Jovie hit a temporary issue while processing your message. Please try again.',
+      message: failure.userMessage,
       errorCode:
+        sanitizeErrorCode(failure.errorCode) ??
         sanitizeErrorCode(
           error instanceof Error ? (error as { code?: string }).code : undefined
-        ) ?? 'CHAT_STREAM_FAILED',
-      debugMessage: message,
+        ) ??
+        'CHAT_STREAM_FAILED',
+      debugMessage: budgetExceeded
+        ? failure.userMessage
+        : error instanceof Error
+          ? error.message
+          : 'An unexpected error occurred',
       requestId,
     },
     { status: 500, headers: { ...corsHeaders, 'x-request-id': requestId } }
@@ -2451,6 +2479,26 @@ export async function POST(req: Request) {
       { status: 403, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
+  const summerTransportRequested =
+    chatMode === 'ov' && isSummerTransportEnabled();
+  if (summerTransportRequested) {
+    const founderAuthorization = authorizeFounderSummerUser(userId);
+    if (founderAuthorization !== 'authorized') {
+      return NextResponse.json(
+        {
+          error:
+            founderAuthorization === 'unconfigured'
+              ? 'Founder Summer identity is not configured'
+              : 'Founder Summer access required',
+          requestId,
+        },
+        {
+          status: founderAuthorization === 'unconfigured' ? 503 : 403,
+          headers: { ...corsHeaders, 'x-request-id': requestId },
+        }
+      );
+    }
+  }
 
   // Validate that either profileId or artistContext is provided
   if (
@@ -2463,11 +2511,12 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
+  const clientTurnId = normalizeClientId(body.clientTurnId);
   // JOV-5215/5216/5214: bind Eve pack + persist/ack dump to Summer Kanban
   // before any model. OV door must not fall through to artist Jovie chat.
   const ovieStore = getOvieOperatingStore();
-  if (chatMode === 'ov' && isSummerTransportEnabled()) {
-    bindCurrentSummerQueueSpeaker(ovieStore);
+  if (summerTransportRequested) {
+    bindEveSummerSpeaker();
   }
   const {
     eveTurn,
@@ -2477,7 +2526,6 @@ export async function POST(req: Request) {
     store: ovieStore,
   });
   assertOvieDoorDoesNotUseArtistJovieGeneration(chatMode, generation.kind);
-  const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
   const toolIntent = normalizeToolIntent(body.toolIntent);
@@ -2744,8 +2792,14 @@ export async function POST(req: Request) {
     const summerLive =
       summerSession !== null &&
       generation.state === 'fresh' &&
-      isSummerTransportEnabled() &&
+      summerTransportRequested &&
       speaker !== null;
+    if (summerLive && !clientTurnId) {
+      return NextResponse.json(
+        { error: 'clientTurnId is required for live OV chat', requestId },
+        { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
+      );
+    }
     if (summerLive && speaker && summerSession) {
       const firstReceipt = ovieIngestReceipts[0];
       return createSummerAssistantStreamResponse({
@@ -2756,6 +2810,7 @@ export async function POST(req: Request) {
           store: ovieStore,
           signal: req.signal,
           clientTurnId,
+          principalHash: founderPrincipalHash(userId),
         }),
         requestId,
         corsHeaders,
@@ -2799,7 +2854,7 @@ export async function POST(req: Request) {
     });
   }
 
-  // Rate limiting - plan-aware daily quota + burst protection. For clients
+  // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
   if (!rateLimitResult.success) {
@@ -2988,14 +3043,21 @@ export async function POST(req: Request) {
       // on-screen requestId + SDK-guarded Sentry send) and flush before
       // yielding (GH #13300).
       captureException: async (error, context) => {
-        await captureError('Chat stream failed', error, {
-          feature: 'ai-chat',
-          mode: 'stream',
-          requestId,
-          userId,
-          ...(context?.tags ?? {}),
-          ...(context?.extra ?? {}),
-        });
+        const budgetExceeded = isGatewayBudgetExceededError(error);
+        await captureError(
+          budgetExceeded
+            ? 'AI Gateway API key budget exceeded'
+            : 'Chat stream failed',
+          error,
+          {
+            feature: 'ai-chat',
+            mode: 'stream',
+            requestId,
+            userId,
+            ...(context?.tags ?? {}),
+            ...(context?.extra ?? {}),
+          }
+        );
         await Sentry.flush(SENTRY_FLUSH_TIMEOUT_MS).catch(() => null);
       },
     };
@@ -3008,16 +3070,14 @@ export async function POST(req: Request) {
       }
 
       streamFailurePersisted = true;
-      const message =
-        error instanceof Error ? error.message : 'The assistant stream failed.';
+      const failure = classifyChatStreamFailure(error);
       await persistTerminalAssistantMessage({
         conversationId: reservedTurn.conversationId,
         turnId: reservedTurn.turnId,
         status: 'failed_model_error',
-        content:
-          'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.',
-        errorCode: 'CHAT_STREAM_FAILED',
-        errorMessage: message,
+        content: failure.userMessage,
+        errorCode: failure.errorCode,
+        errorMessage: failure.errorMessage,
       });
     };
 
@@ -3140,9 +3200,7 @@ export async function POST(req: Request) {
           });
         }
       },
-      onError: () => {
-        return 'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.';
-      },
+      onError: error => resolveChatStreamErrorMessage(error),
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
@@ -3167,16 +3225,14 @@ export async function POST(req: Request) {
     }
 
     if (reservedTurn) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to process chat turn';
+      const failure = classifyChatStreamFailure(error);
       await persistTerminalAssistantMessage({
         conversationId: reservedTurn.conversationId,
         turnId: reservedTurn.turnId,
         status: 'failed_model_error',
-        content:
-          'Jovie hit a temporary issue while processing your message. Please retry or send a simpler next step.',
-        errorCode: 'CHAT_STREAM_FAILED',
-        errorMessage: message,
+        content: failure.userMessage,
+        errorCode: failure.errorCode,
+        errorMessage: failure.errorMessage,
       }).catch(() => null);
     }
 

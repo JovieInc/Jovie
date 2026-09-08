@@ -12,4 +12,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {
+    headline: 'Built For Artists.',
+    description:
+      'Manage releases, links, and audience signals from one focused workspace.',
+  },
+};
+
+export const TextHidden: Story = {
+  args: {
+    headline: 'Built For Artists.',
+    description:
+      'Manage releases, links, and audience signals from one focused workspace.',
+    showText: false,
+  },
+};

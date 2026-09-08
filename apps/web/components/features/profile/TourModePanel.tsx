@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import { PUBLIC_EVENTS_NO_UPCOMING_HEADING } from '@/features/profile/profile-surface-state';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -211,7 +212,7 @@ function TourDatesContent({
 
     return (
       <EmptyState
-        heading='No Events'
+        heading={PUBLIC_EVENTS_NO_UPCOMING_HEADING}
         description='Get alerted when shows are announced.'
         actionSlot={<div className='w-full max-w-xs'>{action}</div>}
         testId='profile-primary-tab-events-empty'
@@ -275,7 +276,10 @@ export function TourDrawerContent({
   readonly renderMode?: ProfileRenderMode;
   readonly className?: string;
 }>) {
-  const { location } = useUserLocation();
+  // one-modal-layer-v1: passive tour surfaces never open the browser
+  // geolocation prompt — granted-only reads cached/granted location and
+  // otherwise falls back to chronological order.
+  const { location } = useUserLocation({ permissionMode: 'granted-only' });
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
   const resolvedEmptyStateSourceContext: NotificationSourceContext =
     emptyStateSourceContext ?? {

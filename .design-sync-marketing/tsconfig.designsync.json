@@ -29,8 +29,6 @@
       "next/font/local": [
         "../../.design-sync-marketing/stubs/next-font-local.js"
       ],
-      "@clerk/nextjs": [".storybook/clerk-mock.jsx"],
-      "@clerk/nextjs/server": [".storybook/clerk-server-mock.js"],
       "@sentry/react": [
         "../../.design-sync-marketing/stubs/sentry-passthrough.tsx"
       ],

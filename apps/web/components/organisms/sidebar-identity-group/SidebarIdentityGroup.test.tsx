@@ -141,6 +141,26 @@ describe('SidebarIdentityGroup', () => {
     );
   });
 
+  it('omits public-profile access when no profile is available', () => {
+    render(<SidebarIdentityGroup profileHref={undefined} />);
+    expect(screen.getByRole('button', { name: /Tim White/i })).toBeEnabled();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('reveals the public-profile URL on keyboard focus without opening the account menu', async () => {
+    const user = userEvent.setup();
+    render(<SidebarIdentityGroup profileHref={PROFILE_HREF} />);
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole('link', { name: PROFILE_LINK_NAME })).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      PROFILE_DISPLAY_HREF
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: PROFILE_LINK_NAME })).toHaveFocus();
+  });
+
   it('keeps one enclosing boundary for hover, focus-visible, selected, spacing, and border', () => {
     pathnameMock.mockReturnValue(PROFILE_HREF);
     const { container } = render(
@@ -156,7 +176,7 @@ describe('SidebarIdentityGroup', () => {
 
     expect(getIdentityGroups(container)).toHaveLength(1);
     expect(group).toHaveAttribute('data-active', 'true');
-    expect(group).toHaveClass('border-t');
+    expect(group).not.toHaveClass('border-t');
     expect(composition).toHaveClass(
       'hover:bg-sidebar-accent',
       'bg-sidebar-accent-active'
@@ -197,34 +217,32 @@ describe('SidebarIdentityGroup', () => {
     expect(actions[1]).toHaveFocus();
   });
 
-  it.each(
-    IDENTITY_GROUP_STATES
-  )('keeps one identity group in the $id sidebar state', ({
-    width,
-    collapsible,
-  }) => {
-    const { container } = render(
-      <RailFrame width={width} collapsible={collapsible}>
-        <SidebarIdentityGroup profileHref={PROFILE_HREF} />
-      </RailFrame>
-    );
+  it.each(IDENTITY_GROUP_STATES)(
+    'keeps one identity group in the $id sidebar state',
+    ({ width, collapsible }) => {
+      const { container } = render(
+        <RailFrame width={width} collapsible={collapsible}>
+          <SidebarIdentityGroup profileHref={PROFILE_HREF} />
+        </RailFrame>
+      );
 
-    expect(
-      screen.getAllByRole('group', { name: SIDEBAR_IDENTITY_GROUP_LABEL })
-    ).toHaveLength(1);
-    expect(getIdentityGroups(container)).toHaveLength(1);
-    const group = screen.getByRole('group', {
-      name: SIDEBAR_IDENTITY_GROUP_LABEL,
-    });
-    expect(getTabbableActions(group)).toHaveLength(2);
-    expect(getNestedInteractive(group)).toBeNull();
-    expect(
-      within(group).getByRole('link', { name: PROFILE_LINK_NAME })
-    ).toHaveAttribute('href', PROFILE_HREF);
-    expect(
-      screen.queryByTestId(SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID)
-    ).toBeNull();
-  });
+      expect(
+        screen.getAllByRole('group', { name: SIDEBAR_IDENTITY_GROUP_LABEL })
+      ).toHaveLength(1);
+      expect(getIdentityGroups(container)).toHaveLength(1);
+      const group = screen.getByRole('group', {
+        name: SIDEBAR_IDENTITY_GROUP_LABEL,
+      });
+      expect(getTabbableActions(group)).toHaveLength(2);
+      expect(getNestedInteractive(group)).toBeNull();
+      expect(
+        within(group).getByRole('link', { name: PROFILE_LINK_NAME })
+      ).toHaveAttribute('href', PROFILE_HREF);
+      expect(
+        screen.queryByTestId(SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID)
+      ).toBeNull();
+    }
+  );
 
   it('sweeps the sidebar identity group against the equivalent public-profile surface', () => {
     render(

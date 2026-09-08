@@ -713,34 +713,45 @@ export const RATE_LIMITERS = {
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Free): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyFree: {
-    name: 'AI Chat Daily (Free)',
-    limit: ENTITLEMENT_REGISTRY.free.limits.aiDailyMessageLimit,
-    window: '1 d',
-    prefix: 'ai:chat:daily:free',
+  /** AI Chat weekly quota (Free): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyFree: {
+    name: 'AI Chat Weekly (Free)',
+    limit: ENTITLEMENT_REGISTRY.free.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:free',
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Pro): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyPro: {
-    name: 'AI Chat Daily (Pro)',
-    limit: ENTITLEMENT_REGISTRY.pro.limits.aiDailyMessageLimit,
-    window: '1 d',
-    prefix: 'ai:chat:daily:pro',
+  /** AI Chat weekly quota (Trial): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyTrial: {
+    name: 'AI Chat Weekly (Trial)',
+    limit: ENTITLEMENT_REGISTRY.trial.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:trial',
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Max): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyMax: {
-    name: 'AI Chat Daily (Max)',
-    limit: ENTITLEMENT_REGISTRY.max.limits.aiDailyMessageLimit,
-    window: '1 d',
-    prefix: 'ai:chat:daily:max',
+  /** AI Chat weekly quota (Pro): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyPro: {
+    name: 'AI Chat Weekly (Pro)',
+    limit: ENTITLEMENT_REGISTRY.pro.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:pro',
+    analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
+  /** AI Chat weekly quota (Max): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyMax: {
+    name: 'AI Chat Weekly (Max)',
+    limit: ENTITLEMENT_REGISTRY.max.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:max',
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',

@@ -86,17 +86,22 @@ describe('ChangelogEmailSignup', () => {
     vi.restoreAllMocks();
   });
 
-  it('expands the composer when the CTA button is clicked', async () => {
+  it('renders one compact subscribe form without a duplicate reveal CTA', () => {
     const { container } = render(<ChangelogEmailSignup />);
     const revealRoot = container.querySelector("[data-ui='cta-reveal']");
-    expect(revealRoot).toHaveAttribute('data-visual-state', 'collapsed');
-
-    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
-
     expect(revealRoot).toHaveAttribute('data-visual-state', 'expanded');
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('you@example.com')).toHaveFocus();
-    });
+
+    expect(screen.getByText('Get the good stuff')).toBeVisible();
+    expect(
+      screen.getByText('Occasional meaningful updates — not every deploy.')
+    ).toBeVisible();
+    expect(
+      screen.queryByTestId('changelog-reveal-button')
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Subscribe' })).toHaveLength(
+      1
+    );
+    expect(screen.getByPlaceholderText('you@example.com')).toBeVisible();
   });
 
   it('keeps the Turnstile lifecycle stable while the parent rerenders', async () => {
@@ -110,7 +115,7 @@ describe('ChangelogEmailSignup', () => {
     expect(turnstileMock.effectCount).toBe(1);
   });
 
-  it('expands without stealing focus when Turnstile requires interaction', async () => {
+  it('does not steal focus when Turnstile requires interaction', async () => {
     const { container } = render(<ChangelogEmailSignup />);
     const revealRoot = container.querySelector("[data-ui='cta-reveal']");
     const input = screen.getByPlaceholderText('you@example.com');
@@ -124,16 +129,9 @@ describe('ChangelogEmailSignup', () => {
     expect(input).not.toHaveFocus();
   });
 
-  it('preserves a Turnstile failure that arrives during blur collapse', async () => {
+  it('preserves a Turnstile failure while the compact form stays open', async () => {
     render(<ChangelogEmailSignup />);
-    const outsideButton = document.createElement('button');
-    document.body.appendChild(outsideButton);
 
-    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
-    const input = screen.getByPlaceholderText('you@example.com');
-    await waitFor(() => expect(input).toHaveFocus());
-
-    outsideButton.focus();
     act(() => {
       turnstileMock.onToken?.('');
       turnstileMock.onStateChange?.({
@@ -145,30 +143,7 @@ describe('ChangelogEmailSignup', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Security check could not load.'
     );
-    expect(screen.getByTestId('changelog-reveal-form')).toBeVisible();
-
-    outsideButton.remove();
-  });
-
-  it('collapses back to the CTA when the expanded shell blurs with an empty email', async () => {
-    const { container } = render(<ChangelogEmailSignup />);
-    const revealRoot = container.querySelector("[data-ui='cta-reveal']");
-    const outsideButton = document.createElement('button');
-    document.body.appendChild(outsideButton);
-
-    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
-
-    const input = screen.getByPlaceholderText('you@example.com');
-    await waitFor(() => {
-      expect(input).toHaveFocus();
-    });
-    outsideButton.focus();
-
-    await waitFor(() => {
-      expect(revealRoot).toHaveAttribute('data-visual-state', 'collapsed');
-    });
-
-    outsideButton.remove();
+    expect(screen.getByTestId('changelog-subscribe-form')).toBeVisible();
   });
 
   it('keeps the shell open and shows the success state after submit', async () => {
@@ -179,12 +154,10 @@ describe('ChangelogEmailSignup', () => {
 
     render(<ChangelogEmailSignup />);
 
-    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
-
     const input = screen.getByPlaceholderText('you@example.com');
     fireEvent.change(input, { target: { value: 'test@example.com' } });
 
-    const form = screen.getByTestId('changelog-reveal-form');
+    const form = screen.getByTestId('changelog-subscribe-form');
     await waitFor(() => {
       expect(
         within(form).getByRole('button', { name: 'Subscribe' })
@@ -215,11 +188,9 @@ describe('ChangelogEmailSignup', () => {
 
     render(<ChangelogEmailSignup />);
 
-    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
-
     const input = screen.getByPlaceholderText('you@example.com');
     fireEvent.change(input, { target: { value: 'test@example.com' } });
-    fireEvent.submit(screen.getByTestId('changelog-reveal-form'));
+    fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
 
     await waitFor(() => {
       expect(
@@ -236,14 +207,15 @@ describe('ChangelogEmailSignup', () => {
 
     render(<ChangelogEmailSignup />);
 
-    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
-
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(turnstileMock.failureMessage);
     expect(
-      within(screen.getByTestId('changelog-reveal-form')).getByRole('button', {
-        name: 'Subscribe',
-      })
+      within(screen.getByTestId('changelog-subscribe-form')).getByRole(
+        'button',
+        {
+          name: 'Subscribe',
+        }
+      )
     ).toBeDisabled();
     expect(screen.getByPlaceholderText('you@example.com')).toHaveAttribute(
       'aria-describedby',
@@ -260,9 +232,12 @@ describe('ChangelogEmailSignup', () => {
       turnstileMock.failureMessage
     );
     expect(
-      within(screen.getByTestId('changelog-reveal-form')).getByRole('button', {
-        name: 'Subscribe',
-      })
+      within(screen.getByTestId('changelog-subscribe-form')).getByRole(
+        'button',
+        {
+          name: 'Subscribe',
+        }
+      )
     ).toBeDisabled();
 
     act(() => {
@@ -271,9 +246,12 @@ describe('ChangelogEmailSignup', () => {
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId('changelog-reveal-form')).getByRole('button', {
-        name: 'Subscribe',
-      })
+      within(screen.getByTestId('changelog-subscribe-form')).getByRole(
+        'button',
+        {
+          name: 'Subscribe',
+        }
+      )
     ).toBeEnabled();
     expect(global.fetch).not.toHaveBeenCalled();
   });

@@ -1,11 +1,27 @@
 function getRuntimeHtmlDatasetValue(
-  key: 'clerkMock' | 'clerkProxyDisabled' | 'e2eMode'
+  key: 'authMock' | 'authProxyDisabled' | 'e2eMode'
 ): string | undefined {
   if (typeof document === 'undefined') {
     return undefined;
   }
 
   return document.documentElement.dataset[key] || undefined;
+}
+
+function readAuthMockFlag(): string | undefined {
+  return (
+    process.env.NEXT_PUBLIC_AUTH_MOCK ||
+    process.env.NEXT_PUBLIC_CLERK_MOCK ||
+    getRuntimeHtmlDatasetValue('authMock')
+  );
+}
+
+function readAuthProxyDisabledFlag(): string | undefined {
+  return (
+    process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED ||
+    process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED ||
+    getRuntimeHtmlDatasetValue('authProxyDisabled')
+  );
 }
 
 /**
@@ -39,9 +55,8 @@ export function absolutePublicUrl(
  * Public environment variables with lazy access.
  *
  * Uses getters to read environment variables at access time rather than
- * module load time. This fixes intermittent "Missing publishableKey" errors
- * on Vercel serverless cold starts where modules may be cached before
- * environment variables are fully initialized.
+ * module load time. Public auth mock flags accept the retired Clerk names
+ * for one-release compatibility with existing Playwright/CI setters.
  */
 export const publicEnv = {
   // Better Auth: Google One Tap client id (also gates One Tap rendering)
@@ -52,23 +67,11 @@ export const publicEnv = {
   get NEXT_PUBLIC_BETTER_AUTH_URL() {
     return process.env.NEXT_PUBLIC_BETTER_AUTH_URL || undefined;
   },
-  get NEXT_PUBLIC_CLERK_FRONTEND_API() {
-    return process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || undefined;
+  get NEXT_PUBLIC_AUTH_MOCK() {
+    return readAuthMockFlag();
   },
-  get NEXT_PUBLIC_CLERK_MOCK() {
-    return (
-      process.env.NEXT_PUBLIC_CLERK_MOCK ||
-      getRuntimeHtmlDatasetValue('clerkMock')
-    );
-  },
-  get NEXT_PUBLIC_CLERK_PROXY_URL() {
-    return process.env.NEXT_PUBLIC_CLERK_PROXY_URL || undefined;
-  },
-  get NEXT_PUBLIC_CLERK_PROXY_DISABLED() {
-    return (
-      process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED ||
-      getRuntimeHtmlDatasetValue('clerkProxyDisabled')
-    );
+  get NEXT_PUBLIC_AUTH_PROXY_DISABLED() {
+    return readAuthProxyDisabledFlag();
   },
   get NEXT_PUBLIC_APP_URL() {
     // Single domain architecture: app routes are at jov.ie/app/*

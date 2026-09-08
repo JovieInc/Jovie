@@ -269,8 +269,20 @@ describe('RadioGroup', () => {
       );
       const radio = screen.getByTestId('radio');
       expect(radio.className).not.toMatch(
-        /\b(?:transition-all|transition-transform|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
+        /\b(?:transition-all|hover:scale|hover:translate|hover:-translate|group-hover:scale|group-hover:translate|group-hover:-translate)\b/
       );
+    });
+
+    it('provides active press feedback', () => {
+      render(
+        <RadioGroup>
+          <RadioGroupItem value='test' data-testid='radio' />
+        </RadioGroup>
+      );
+      const radio = screen.getByTestId('radio');
+
+      expect(radio.className).toContain('active:scale-95');
+      expect(radio.className).toContain('active:transition-transform');
     });
 
     it('merges custom className on group', () => {

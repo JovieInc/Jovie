@@ -16,16 +16,6 @@ vi.mock('@/lib/admin', () => ({
   invalidateAdminCache: vi.fn(),
 }));
 
-vi.mock('next/headers', () => ({
-  headers: vi.fn().mockResolvedValue({
-    get: vi.fn().mockReturnValue(null),
-  }),
-}));
-
-vi.mock('@/lib/auth/clerk-sync', () => ({
-  syncAdminRoleChange: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('@/lib/db', () => ({
   db: {
     update: mockDbUpdate,

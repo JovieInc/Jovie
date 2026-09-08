@@ -81,8 +81,11 @@ function shouldReportToSentry(issues: string[]): boolean {
 
   // Filter out issues that are warnings in disguise or expected in certain contexts
   const trulyBlockingIssues = issues.filter(issue => {
-    // Clerk key missing during SSR might be handled by bypass mode
-    if (issue.includes('CLERK') && process.env.NEXT_PUBLIC_CLERK_MOCK === '1') {
+    if (
+      issue.includes('CLERK') &&
+      (process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+        process.env.NEXT_PUBLIC_CLERK_MOCK === '1')
+    ) {
       return false;
     }
     return true;

@@ -1,0 +1,109 @@
+/* Locked Pen header GTcgO → master eoUUU (Floating Bar capsule).
+   Overrides live on MarketingHeader only so HeaderNav.css (#17511) stays put.
+   Optical grid: outer 64 / pill 44 / CTA 28 / chrome mark 20. Noir-ion atoms.
+   Selector stays more specific than HeaderNav.css so tokens win the cascade. */
+
+.marketing-glass-header[data-presentation="marketing-glass"] {
+  --marketing-glass-top: var(--space-2-5);
+  --marketing-glass-height: 2.75rem;
+  --marketing-glass-gutter: var(--space-6);
+  --marketing-glass-shell: color-mix(
+    in oklab,
+    var(--noir-ion-shell) 82%,
+    transparent
+  );
+  --marketing-glass-shell-scrolled: color-mix(
+    in oklab,
+    var(--noir-ion-shell) 90%,
+    transparent
+  );
+  --marketing-glass-border: var(--noir-ion-border-subtle);
+  --marketing-glass-border-strong: var(--noir-ion-border-default);
+  --marketing-glass-text: var(--noir-ion-text-primary);
+  --marketing-glass-muted: var(--noir-ion-text-muted);
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__shell {
+  min-height: var(--marketing-glass-height);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3) !important;
+  border-color: var(--marketing-glass-border);
+  background: var(--marketing-glass-shell);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"][data-scrolled="true"]
+  .marketing-glass-header__shell,
+.marketing-glass-header[data-presentation="marketing-glass"]:has(
+    .marketing-glass-header__flyout--open
+  )
+  .marketing-glass-header__shell {
+  border-color: var(--marketing-glass-border-strong);
+  background: var(--marketing-glass-shell-scrolled);
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__cta {
+  position: relative;
+  min-height: 1.75rem;
+  padding-inline: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__cta::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__text-link {
+  color: var(--marketing-glass-muted);
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link:hover,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link:focus-visible,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link--active,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__text-link:hover,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__text-link:focus-visible {
+  color: var(--marketing-glass-text);
+  background: color-mix(
+    in oklab,
+    var(--noir-ion-text-primary) 10%,
+    transparent
+  );
+}
+
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__cta:focus-visible,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__text-link:focus-visible,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link:focus-visible {
+  outline: 2px solid var(--noir-ion-ion);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .marketing-glass-header[data-presentation="marketing-glass"] {
+    --marketing-glass-top: var(--space-2-5);
+    --marketing-glass-height: 2.75rem;
+    --marketing-glass-gutter: var(--space-6);
+  }
+}

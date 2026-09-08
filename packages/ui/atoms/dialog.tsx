@@ -77,6 +77,7 @@ const DialogContent = React.forwardRef<
       centeredContentStyles.layout,
       centeredContentStyles.surface,
       centeredContentStyles.animation,
+      'duration-cinematic ease-cinematic',
       centeredContentStyles.rounded,
       centeredContentStyles.reducedMotion,
       className

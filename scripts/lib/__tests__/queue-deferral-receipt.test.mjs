@@ -3,9 +3,9 @@ import {
   classifyQueueDeferredHold,
   classifyReceipt,
   extractReceiptFromComment,
-  HUMAN_POLICY_HOLD_LABELS,
-  humanPolicyHoldRegex,
-  humanPolicyHoldsOn,
+  MECHANICAL_HOLD_LABELS,
+  mechanicalHoldRegex,
+  mechanicalHoldsOn,
   QUEUE_DEFERRAL_MARKER,
   QUEUE_DEFERRAL_SCHEMA,
   RELEASABLE_REASON_SOURCES,
@@ -16,9 +16,11 @@ import {
 
 const HEAD = 'a'.repeat(40);
 const OTHER_HEAD = 'b'.repeat(40);
+const REPO = 'JovieInc/Jovie';
 
 const VALID = Object.freeze({
   schema: QUEUE_DEFERRAL_SCHEMA,
+  repository: REPO,
   pr: 15808,
   head: HEAD,
   reason: 'symphony-birth-hold',
@@ -50,6 +52,8 @@ describe('validateReceipt', () => {
     ['non-object', 42],
     ['array', [VALID]],
     ['wrong schema', { ...VALID, schema: 'jovie-fleet-gate/v1' }],
+    ['missing repository', { ...VALID, repository: undefined }],
+    ['malformed repository', { ...VALID, repository: 'Jovie' }],
     ['non-integer pr', { ...VALID, pr: '15808' }],
     ['non-hex head', { ...VALID, head: 'xyz' }],
     ['short head', { ...VALID, head: 'a'.repeat(39) }],
@@ -68,6 +72,7 @@ describe('validateReceipt', () => {
 describe('renderReceiptComment + extractReceiptFromComment', () => {
   it('round-trips a receipt through the comment body', () => {
     const body = renderReceiptComment({
+      repository: REPO,
       pr: 15808,
       head: HEAD,
       reason: 'symphony-birth-hold',
@@ -85,6 +90,7 @@ describe('renderReceiptComment + extractReceiptFromComment', () => {
 
   it('renders the note into the receipt JSON', () => {
     const body = renderReceiptComment({
+      repository: REPO,
       pr: 900,
       head: OTHER_HEAD,
       reason: 'queue-pressure',
@@ -94,6 +100,7 @@ describe('renderReceiptComment + extractReceiptFromComment', () => {
     });
     expect(extractReceiptFromComment(body)).toEqual({
       schema: QUEUE_DEFERRAL_SCHEMA,
+      repository: REPO,
       pr: 900,
       head: OTHER_HEAD,
       reason: 'queue-pressure',
@@ -103,9 +110,30 @@ describe('renderReceiptComment + extractReceiptFromComment', () => {
     });
   });
 
+  it('returns an invalid typed sentinel for stale unscoped deferral receipts', () => {
+    const body = `${QUEUE_DEFERRAL_MARKER}\n\`\`\`json\n${JSON.stringify({
+      ...VALID,
+      repository: undefined,
+    })}\n\`\`\``;
+    const receipt = extractReceiptFromComment(body);
+    expect(receipt).toMatchObject({
+      schema: QUEUE_DEFERRAL_SCHEMA,
+      invalid: true,
+      pr: VALID.pr,
+      head: VALID.head,
+    });
+    expect(receipt.errors).toContain('repository must be owner/name');
+  });
+
   it('rejects invalid render inputs instead of emitting a bad receipt', () => {
     expect(() =>
-      renderReceiptComment({ pr: 1, head: 'nope', reason: 'x', source: 'y' })
+      renderReceiptComment({
+        repository: REPO,
+        pr: 1,
+        head: 'nope',
+        reason: 'x',
+        source: 'y',
+      })
     ).toThrow(/invalid deferral receipt/);
   });
 
@@ -175,42 +203,39 @@ describe('classifyReceipt', () => {
   });
 });
 
-describe('human-policy holds', () => {
-  it('covers taste, net-new, and outbound without treating queue-deferred as human', () => {
-    expect(HUMAN_POLICY_HOLD_LABELS).toEqual(
+describe('mechanical holds', () => {
+  it('covers machine-verifiable stops without treating queue-deferred as separate', () => {
+    expect(MECHANICAL_HOLD_LABELS).toEqual(
       expect.arrayContaining([
-        'needs:taste',
-        'needs-human-taste',
-        'taste',
-        'net-new',
-        'needs:net-new',
-        'outbound',
-        'needs:outbound',
-        'needs-human',
+        'hold',
+        'gated',
+        'needs-conflict-resolution',
+        'risk:high',
+        'incident',
       ])
     );
-    expect(HUMAN_POLICY_HOLD_LABELS).not.toContain('queue-deferred');
+    expect(MECHANICAL_HOLD_LABELS).not.toContain('queue-deferred');
   });
 
-  it('matches only the canonical human-policy labels', () => {
-    const re = new RegExp(humanPolicyHoldRegex());
-    expect(re.test('needs:taste')).toBe(true);
-    expect(re.test('net-new')).toBe(true);
-    expect(re.test('outbound')).toBe(true);
+  it('matches only machine-verifiable labels', () => {
+    const re = new RegExp(mechanicalHoldRegex());
+    expect(re.test('hold')).toBe(true);
+    expect(re.test('risk:high')).toBe(true);
     expect(re.test('queue-deferred')).toBe(false);
-    expect(re.test('taste-approved')).toBe(false);
-    expect(re.test('needs-human-taste')).toBe(true);
-    expect(re.test('needs-human')).toBe(true);
+    expect(re.test('needs-human-taste')).toBe(false);
+    expect(re.test('needs-human')).toBe(false);
+    expect(re.test('no-auto')).toBe(false);
   });
 
-  it('extracts human-policy labels from mixed PR label lists', () => {
+  it('extracts machine holds while ignoring retired labels', () => {
     expect(
-      humanPolicyHoldsOn([
+      mechanicalHoldsOn([
         'queue-deferred',
         'needs:taste',
-        { name: 'outbound' },
+        { name: 'risk:high' },
+        { name: 'hold' },
       ])
-    ).toEqual(['needs:taste', 'outbound']);
+    ).toEqual(['risk:high', 'hold']);
   });
 });
 
@@ -224,11 +249,34 @@ describe('classifyQueueDeferredHold', () => {
     });
   });
 
-  it('releases a structurally invalid receipt as untyped rather than a manual trap', () => {
+  it('holds a structurally invalid typed receipt instead of treating it as untyped', () => {
     expect(
       classifyQueueDeferredHold({
-        receipt: { reason: 'symphony-birth-hold' },
+        receipt: { ...VALID, repository: undefined },
         labels: ['queue-deferred'],
+      })
+    ).toEqual({
+      releasable: false,
+      detail: 'untyped-hold-manual-release-required',
+    });
+  });
+
+  it.each([
+    'needs-human',
+    'needs-human-review',
+    'human-review-required',
+    'no-auto',
+    'no-auto-merge',
+    'no-automerge',
+    'needs:taste',
+    'needs-human-taste',
+    'net-new',
+    'outbound',
+  ])('ignores retired human policy label %s', label => {
+    expect(
+      classifyQueueDeferredHold({
+        receipt: null,
+        labels: ['queue-deferred', label],
       })
     ).toEqual({
       releasable: true,
@@ -237,10 +285,11 @@ describe('classifyQueueDeferredHold', () => {
   });
 
   it.each([
-    'needs:taste',
-    'needs-human-taste',
-    'taste',
-  ])('holds untyped PRs with taste label %s', label => {
+    'hold',
+    'gated',
+    'needs-conflict-resolution',
+    'risk:high',
+  ])('holds untyped PRs with machine gate %s', label => {
     expect(
       classifyQueueDeferredHold({
         receipt: null,
@@ -248,39 +297,7 @@ describe('classifyQueueDeferredHold', () => {
       })
     ).toEqual({
       releasable: false,
-      detail: `human-policy-hold:${label}`,
-    });
-  });
-
-  it.each([
-    'net-new',
-    'needs:net-new',
-    'needs-net-new',
-  ])('holds untyped PRs with net-new label %s', label => {
-    expect(
-      classifyQueueDeferredHold({
-        receipt: null,
-        labels: ['queue-deferred', label],
-      })
-    ).toEqual({
-      releasable: false,
-      detail: `human-policy-hold:${label}`,
-    });
-  });
-
-  it.each([
-    'outbound',
-    'needs:outbound',
-    'needs-outbound',
-  ])('holds untyped PRs with outbound label %s', label => {
-    expect(
-      classifyQueueDeferredHold({
-        receipt: null,
-        labels: ['queue-deferred', label],
-      })
-    ).toEqual({
-      releasable: false,
-      detail: `human-policy-hold:${label}`,
+      detail: `mechanical-hold:${label}`,
     });
   });
 

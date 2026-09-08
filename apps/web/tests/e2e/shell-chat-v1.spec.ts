@@ -9,7 +9,7 @@
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import type { PersistedToolEvent } from '@/lib/chat/tool-events';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import {
   chatComposerInputLocator,
   gotoAuthenticatedChatRoute,

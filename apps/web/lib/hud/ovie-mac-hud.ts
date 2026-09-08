@@ -112,9 +112,6 @@ const BLOCKING_PR_LABELS = new Set([
   'do not merge',
   'gated',
   'hold',
-  'human-review-required',
-  'needs-human',
-  'needs-human-taste',
 ]);
 
 const PR_STATUS_LABELS: Record<OvieMacHudInFlightPrStatus, string> = {

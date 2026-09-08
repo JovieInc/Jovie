@@ -184,7 +184,7 @@ export function MarketingBentoSection({
           <p className='homepage-section-eyebrow'>{eyebrow}</p>
           <h2
             id={titleId}
-            className='marketing-h2-linear mt-5 text-balance text-primary-token'
+            className='marketing-h2-linear mt-5 text-balance text-primary-token line-clamp-2'
           >
             {title}
           </h2>

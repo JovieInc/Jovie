@@ -7,6 +7,10 @@ describe('AssigneeChip', () => {
     const { container } = render(<AssigneeChip kind='jovie' />);
     // BrandLogo renders an svg under a span
     expect(container.querySelector('svg')).not.toBeNull();
+    expect(container.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '16'
+    );
   });
 
   it('shows the Jovie name when expanded', () => {

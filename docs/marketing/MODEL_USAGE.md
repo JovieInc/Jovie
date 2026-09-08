@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.2.0
+spec-version: 1.3.0
 doc-freshness: docs/marketing/MODEL_USAGE.md
 -->
 # Model usage ledger

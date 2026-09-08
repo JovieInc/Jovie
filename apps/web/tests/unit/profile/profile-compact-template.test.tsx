@@ -8,22 +8,18 @@ import {
   within,
 } from '@testing-library/react';
 import React from 'react';
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { renderToString } from 'react-dom/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
+import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
+import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
 
 const {
   mockCanonicalProfileDSPs,
   mockUseProfileShell,
+  mockUseIsAuthenticated,
   mockProfileInlineNotificationsCTA,
   mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
@@ -31,6 +27,7 @@ const {
 } = vi.hoisted(() => ({
   mockCanonicalProfileDSPs: vi.fn(() => []),
   mockUseProfileShell: vi.fn(),
+  mockUseIsAuthenticated: vi.fn(() => false),
   mockProfileInlineNotificationsCTA: vi.fn(),
   mockProfileDesktopSurface: vi.fn(),
   mockProfileUnifiedDrawer: vi.fn(),
@@ -127,6 +124,10 @@ vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
     primaryChannel: null,
     isEnabled: false,
   }),
+}));
+
+vi.mock('@/hooks/useIsAuthenticated', () => ({
+  useIsAuthenticated: () => mockUseIsAuthenticated(),
 }));
 
 vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
@@ -239,18 +240,14 @@ function mockViewport(width: 'mobile' | 'desktop') {
   };
 }
 
-let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
-
 describe('ProfileCompactTemplate', () => {
-  beforeAll(async () => {
-    ({ ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    ));
-  }, 120_000);
+  let originalMatchMedia: typeof window.matchMedia;
 
   beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
     cleanup();
     mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseIsAuthenticated.mockReturnValue(false);
     mockUseProfileShell.mockReset();
     mockProfileInlineNotificationsCTA.mockClear();
     mockProfileDesktopSurface.mockClear();
@@ -305,8 +302,15 @@ describe('ProfileCompactTemplate', () => {
       )
     );
     mockProfilePrimaryTabPanel.mockImplementation(
-      (props: { readonly mode: string }) => (
-        <div data-testid='mock-primary-tab-panel' data-mode={props.mode}>
+      (props: {
+        readonly mode: string;
+        readonly catalogLoadFailed?: boolean;
+      }) => (
+        <div
+          data-testid='mock-primary-tab-panel'
+          data-mode={props.mode}
+          data-catalog-load-failed={props.catalogLoadFailed ? 'true' : 'false'}
+        >
           {props.mode}
         </div>
       )
@@ -327,7 +331,78 @@ describe('ProfileCompactTemplate', () => {
   });
 
   afterEach(() => {
+    window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
+  });
+
+  it('keeps the signed-in escape hatch on a live tablet profile that uses embedded presentation', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+
+    render(
+      <ProfileCompactSurface
+        renderMode='interactive'
+        presentation='embedded'
+        allowSignedInEscape
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onBack={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onShare={vi.fn()}
+        profileHref='/test-artist'
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
+  it('does not treat marketing embeds as a signed-in live public profile', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+
+    render(
+      <ProfileCompactSurface
+        renderMode='interactive'
+        presentation='embedded'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onBack={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onShare={vi.fn()}
+        profileHref='/test-artist'
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the floating back control on the public profile root for a signed-in session', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
   it('hides the floating back control on the public profile root first landing', async () => {
@@ -401,6 +476,39 @@ describe('ProfileCompactTemplate', () => {
       'https://instagram.com/test-artist'
     );
     expect(twitter).toHaveAttribute('href', 'https://x.com/test-artist');
+  });
+
+  it('uses registry brand casing for hero social aria labels', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[
+          {
+            id: 'tiktok',
+            artist_id: mockArtist.id,
+            platform: 'tiktok',
+            url: 'https://www.tiktok.com/@test-artist',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+        contacts={[]}
+      />
+    );
+
+    const socialRow = await screen.findByTestId('profile-hero-social-row');
+    // Registry casing ('TikTok'), not naive title case ('Tiktok').
+    expect(
+      within(socialRow).getByRole('link', {
+        name: `Follow ${mockArtist.name} on TikTok`,
+      })
+    ).toHaveAttribute('href', 'https://www.tiktok.com/@test-artist');
+    expect(
+      within(socialRow).queryByRole('link', {
+        name: `Follow ${mockArtist.name} on Tiktok`,
+      })
+    ).toBeNull();
   });
 
   it('links the artist name back to the canonical profile route', async () => {
@@ -634,11 +742,17 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Events', 'Alerts']) {
+    for (const label of ['Home', 'Music', 'Shows', 'About']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Alerts' })
+    ).toBeNull();
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Get updates' })
+    ).toBeNull();
     expect(
       within(bottomNav).queryByRole('button', { name: 'More options' })
     ).not.toBeInTheDocument();
@@ -688,7 +802,7 @@ describe('ProfileCompactTemplate', () => {
     expect(surfaceSlot).toHaveClass('min-h-0', 'flex-1');
   });
 
-  it('keeps the home tab active for about mode deep links', async () => {
+  it('marks About as the active destination for about mode deep links', async () => {
     render(
       <ProfileCompactTemplate
         mode='about'
@@ -700,8 +814,11 @@ describe('ProfileCompactTemplate', () => {
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
     expect(
-      within(bottomNav).getByRole('button', { name: 'Home' })
+      within(bottomNav).getByRole('button', { name: 'About' })
     ).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(bottomNav).getByRole('button', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
       'data-mode',
       'about'
@@ -739,6 +856,211 @@ describe('ProfileCompactTemplate', () => {
       value: originalReferrer,
     });
     backSpy.mockRestore();
+  });
+
+  it('uses browser back for a signed-in arrival when history exists without a referrer', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 3,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    backSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns a signed-in arrival without history to the app dashboard', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 1,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(assignSpy).toHaveBeenCalledWith('/app');
+
+    backSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('does not trap a signed-in new-tab arrival in internal mode history', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 1,
+    });
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const goSpy = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-mode',
+      'profile'
+    );
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 3,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(goSpy).not.toHaveBeenCalled();
+    expect(assignSpy).toHaveBeenCalledWith('/app');
+
+    backSpy.mockRestore();
+    goSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('exits past internal mode history to the prior app surface for a signed-in arrival', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 2,
+    });
+    window.history.replaceState(
+      { joviePublicProfileDepth: 2 },
+      '',
+      '/test-artist'
+    );
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const goSpy = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(goSpy).toHaveBeenCalledWith(-3);
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    backSpy.mockRestore();
+    goSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('does not overshoot the prior app surface after browser back', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 2,
+    });
+    window.history.replaceState(
+      { joviePublicProfileDepth: 0 },
+      '',
+      '/test-artist'
+    );
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const goSpy = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 4,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(goSpy).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    backSpy.mockRestore();
+    goSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
@@ -1450,7 +1772,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('renders the compact profile shell at desktop widths', async () => {
+  it('switches the public profile to the desktop surface at 1180px+', async () => {
     const restoreViewport = mockViewport('desktop');
 
     render(
@@ -1463,14 +1785,82 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
-      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+      expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+        'data-layout',
+        'desktop'
+      );
+      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artist: mockArtist,
+          activeMode: 'profile',
+          presentation: 'modal',
+        })
+      );
+    });
+
+    restoreViewport();
+  });
+
+  it('forwards catalog load failure to the desktop surface', async () => {
+    const restoreViewport = mockViewport('desktop');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        catalogLoadFailed
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          catalogLoadFailed: true,
+          activeMode: 'listen',
+        })
+      );
+    });
+
+    restoreViewport();
+  });
+
+  it('forwards catalog load failure to the compact Music panel', async () => {
+    const restoreViewport = mockViewport('mobile');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        catalogLoadFailed
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-catalog-load-failed',
+        'true'
+      );
     });
 
     restoreViewport();
   });
 
   it('publishes and removes the hydrated interaction-ready contract', () => {
+    const html = renderToString(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    expect(html).not.toContain('data-interactive-ready="true"');
+    expect(html).toContain('data-testid="profile-desktop-loading"');
+    expect(html).toContain('aria-busy="true"');
     const view = render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1484,10 +1874,10 @@ describe('ProfileCompactTemplate', () => {
     expect(shell).toHaveAttribute('data-interactive-ready', 'true');
 
     view.unmount();
-    expect(shell).not.toHaveAttribute('data-interactive-ready');
+    expect(screen.queryByTestId('profile-compact-shell')).toBeNull();
   });
 
-  it('keeps desktop widths on the compact surface across profile variants', async () => {
+  it('keeps desktop variants on the desktop surface', async () => {
     const restoreViewport = mockViewport('desktop');
 
     const variantProps = {
@@ -1541,8 +1931,9 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
-      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+      expect(mockProfileDesktopSurface).toHaveBeenLastCalledWith(
+        expect.objectContaining({ activeMode: 'pay' })
+      );
     });
 
     view.rerender(
@@ -1550,10 +1941,35 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfilePrimaryTabPanel).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mode: 'subscribe',
-        })
+      expect(mockProfileDesktopSurface).toHaveBeenLastCalledWith(
+        expect.objectContaining({ activeMode: 'subscribe' })
+      );
+    });
+
+    restoreViewport();
+  });
+
+  it('keeps an explicit embedded preview compact at desktop widths', async () => {
+    const restoreViewport = mockViewport('desktop');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        embeddedPreview
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+        'data-layout',
+        'compact'
+      );
+      expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+        'data-profile-preview',
+        'true'
       );
       expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
@@ -1718,7 +2134,7 @@ describe('ProfileCompactTemplate', () => {
       });
     });
 
-    it('starts drawerPresentation from the server layout, then syncs desktop viewport after hydration', async () => {
+    it('starts on the server compact surface, then transfers desktop ownership after hydration', async () => {
       const restoreViewport = mockViewport('desktop');
 
       render(
@@ -1736,9 +2152,11 @@ describe('ProfileCompactTemplate', () => {
       expect(firstDrawerCall?.presentation).toBe('standalone');
 
       await waitFor(() => {
-        expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
-          expect.objectContaining({ presentation: 'modal' })
-        );
+        expect(
+          screen.getByTestId('public-profile-layout-shell')
+        ).toHaveAttribute('data-layout', 'desktop');
+        expect(screen.queryByTestId('profile-compact-shell')).toBeNull();
+        expect(mockProfileDesktopSurface).toHaveBeenCalled();
       });
 
       restoreViewport();

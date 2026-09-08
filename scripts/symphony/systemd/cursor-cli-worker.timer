@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep the gem (Ubuntu) Symphony Cursor CLI worker current
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

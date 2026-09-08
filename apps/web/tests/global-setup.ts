@@ -7,6 +7,10 @@ import {
   ensureDevTestAuthPersona,
   resolveDevTestAuthPersona,
 } from './helpers/dev-test-auth-personas';
+import {
+  PROFILE_CTA_SPEC,
+  runProfileCtaPreflight,
+} from './helpers/profile-cta-fixture-preflight';
 import { seedTestData } from './seed-test-data';
 
 // Load environment variables in priority order (first-loaded wins with override: false)
@@ -14,7 +18,7 @@ const webRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(webRoot, '../..');
 
 config({ path: path.join(webRoot, '.env.development.local') }); // E2E creds
-config({ path: path.join(repoRoot, '.env.local') }); // Real Clerk keys
+config({ path: path.join(repoRoot, '.env.local') }); // Local secrets
 config({ path: path.join(repoRoot, '.env.test') }); // Fallback defaults
 
 const isCI = !!process.env.CI;
@@ -23,32 +27,34 @@ const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 
 async function globalSetup() {
   const startTime = Date.now();
+  const profileCtaPreflight =
+    process.env.PROFILE_CTA_TEST_FILTER === PROFILE_CTA_SPEC;
+  if (profileCtaPreflight) {
+    await runProfileCtaPreflight(process.env, webRoot, seedTestData);
+  }
   console.log('🚀 Starting E2E global setup...');
 
   // Diagnostic: show which env files loaded
   console.log('  Env files loaded:');
   console.log(
-    `    .env.development.local: ${process.env.E2E_CLERK_USER_USERNAME ? 'yes (has E2E creds)' : 'no creds found'}`
+    `    .env.development.local: ${process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ? 'bypass ready' : 'bypass unset'}`
   );
   console.log(
-    `    .env.local: ${process.env.CLERK_SECRET_KEY ? 'yes (has Clerk keys)' : 'no Clerk keys found'}`
+    `    .env.local: ${process.env.BETTER_AUTH_SECRET ? 'yes (has Better Auth secret)' : 'no Better Auth secret found'}`
   );
 
-  // Set up Clerk testing token if we have real Clerk keys
-  // Clerk → Better Auth migration: Clerk key checks removed.
-  // The test user check is retained for the bypass persona seeding path.
   const testUsername = process.env.E2E_CLERK_USER_USERNAME ?? '';
   const hasTestUser =
-    testUsername.length > 0 &&
-    (testUsername.includes('+clerk_test') ||
-      !!process.env.E2E_CLERK_USER_PASSWORD);
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
+    (testUsername.length > 0 &&
+      (testUsername.includes('+clerk_test') ||
+        !!process.env.E2E_CLERK_USER_PASSWORD));
 
-  // Clerk → Better Auth migration, commit ⑩: `clerkSetup` is removed.
-  // Under BA the dev bypass route mints a real session cookie — no Clerk
-  // testing token is needed. Signal success so specs that check
-  // `CLERK_TESTING_SETUP_SUCCESS` still pass.
+  // Better Auth bypass mints a real session cookie. Keep the legacy
+  // CLERK_TESTING_SETUP_SUCCESS signal so existing specs still pass.
+  process.env.TEST_AUTH_SETUP_SUCCESS = 'true';
   process.env.CLERK_TESTING_SETUP_SUCCESS = 'true';
-  console.log('✓ Better Auth dev bypass ready (no Clerk setup needed)');
+  console.log('✓ Better Auth test-auth bypass ready');
 
   if (hasTestUser) {
     console.log('✓ E2E test user is configured');
@@ -79,7 +85,11 @@ async function globalSetup() {
   });
 
   // Seed test database with required profiles for smoke tests
-  if (process.env.E2E_SKIP_SEED === '1') {
+  if (profileCtaPreflight) {
+    console.log(
+      '✓ Profile CTA fixtures verified against the owned local database'
+    );
+  } else if (process.env.E2E_SKIP_SEED === '1') {
     console.log('ℹ E2E_SKIP_SEED=1, skipping test data seeding');
   } else if (process.env.DATABASE_URL) {
     try {

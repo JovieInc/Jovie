@@ -57,7 +57,7 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(designSystem).toMatch(
-      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--linear-bg-surface-1\);/
+      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--noir-ion-card\);/
     );
     expect(designSystem).toMatch(
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--app-shell-sidebar-background-rgb\);/
@@ -80,13 +80,13 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    // Noir Ion focus ring (electric blue) — not a white halo
+    // Noir Ion focus ring (ion) — not a white halo or retired aqua
     expect(linearTokens).toContain(
       '--linear-border-focus: rgba(17, 175, 255, 0.72);'
     );
     expect(designSystem).toContain('--focus-ring-width: 1px;');
     expect(designSystem).toMatch(
-      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--linear-bg-page\)[\s\S]*0 0 0 4px color-mix\(in oklab, var\(--linear-border-focus\) 55%/
+      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--linear-bg-page\)[\s\S]*0 0 0 4px var\(--color-border-focus\);/
     );
     expect(designSystem).toMatch(
       /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus\s*{[\s\S]*outline:\s*none;/

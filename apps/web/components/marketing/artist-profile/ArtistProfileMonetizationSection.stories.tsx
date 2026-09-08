@@ -15,7 +15,7 @@ const meta = {
     pen: {
       registryId: 'section.monetization',
       penRoot: 'F3grtS',
-      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
+      sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1',
       fixture: 'ARTIST_PROFILE_COPY.monetization',
       body: 'four-card-earning-loop-carousel',
       routeMount: 'omitted-on-current-production-route',

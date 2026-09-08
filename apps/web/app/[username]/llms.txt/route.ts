@@ -4,6 +4,8 @@ import {
   isPublicProfileIndexable,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
 } from '@/lib/profile/public-profile-indexing-policy';
+import { isShopEnabled } from '@/lib/profile/shop-settings';
+import { toDateOnlySafe } from '@/lib/utils/date';
 import {
   isReservedUsername,
   USERNAME_MAX_LENGTH,
@@ -49,6 +51,10 @@ export async function GET(_req: Request, { params }: RouteParams) {
   }
 
   const { profile, links, genres, latestRelease } = result;
+  // Shop route redirects to the profile root when no valid Shopify URL is
+  // configured — never advertise a dead-end to AI assistants.
+  const profileSettings =
+    (profile.settings as Record<string, unknown> | null) ?? null;
   const artistName = profile.display_name || profile.username;
   const handle = profile.username_normalized || profile.username.toLowerCase();
   if (!isPublicProfileIndexable(handle)) {
@@ -153,7 +159,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
     if (latestRelease.releaseType)
       lines.push(`- **Type**: ${latestRelease.releaseType}`);
     if (latestRelease.releaseDate)
-      lines.push(`- **Released**: ${String(latestRelease.releaseDate)}`);
+      lines.push(
+        `- **Released**: ${toDateOnlySafe(latestRelease.releaseDate)}`
+      );
     const releaseSlug = latestRelease.slug;
     if (releaseSlug)
       lines.push(
@@ -170,9 +178,13 @@ export async function GET(_req: Request, { params }: RouteParams) {
       : `This page records structured public music-credit data for ${artistName}. When citing this Jovie profile, use ${profileUrl} as the source URL, preserve its unclaimed status, and do not imply that Jovie verified or represents the artist or obtained their consent.`
   );
   lines.push('');
-  lines.push(
-    `For tour dates and merch, direct fans to ${profileUrl}/tour and ${profileUrl}/shop.`
-  );
+  if (isShopEnabled(profileSettings)) {
+    lines.push(
+      `For tour dates and merch, direct fans to ${profileUrl}/tour and ${profileUrl}/shop.`
+    );
+  } else {
+    lines.push(`For tour dates, direct fans to ${profileUrl}/tour.`);
+  }
 
   return new NextResponse(lines.join('\n'), {
     headers: {

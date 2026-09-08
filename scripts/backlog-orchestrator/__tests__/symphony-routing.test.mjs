@@ -256,6 +256,23 @@ describe('Symphony routing receipts', () => {
     assert.equal(parseRoutingReceipt(current).model, 'gpt-5.6-terra');
   });
 
+  it('treats legacy Human Review tracker state as active continuation', () => {
+    const current = issue('Apply a bounded visual repair');
+    const first = planOfficialSymphonyRoute({
+      issue: current,
+      availableModels: models,
+      now: 1_000,
+    });
+    const settled = settleOfficialSymphonyRoute({
+      state: first.state,
+      issueState: 'Human Review',
+      processOutcome: { kind: 'process_completed' },
+      now: 2_000,
+    });
+    assert.equal(settled.state.lastOutcome.kind, 'continuation');
+    assert.equal(settled.state.terminal, false);
+  });
+
   it('deliberate red: escalates monotonically after test and process failures, then stops spend', () => {
     const current = issue('Apply a bounded formatting repair');
     const first = planOfficialSymphonyRoute({

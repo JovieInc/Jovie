@@ -39,7 +39,7 @@ const meta = {
     pen: {
       registryId: 'web-026-changelog',
       contractId: 'V1OpUm',
-      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
+      sourceSha: '7641ffa76d03326542541c62080735c28190a1f0',
       receipts: {
         desktop: { id: 'uX3V7', width: 1024, height: 1200 },
         narrow: { id: 'mEYIa', width: 390, height: 844 },

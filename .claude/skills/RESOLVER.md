@@ -11,7 +11,6 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **brand-deals**: .claude/skills/brand-deals/SKILL.md | .agents/skills/brand-deals/SKILL.md
 - **canary**: .agents/skills/gstack/canary/SKILL.md
 - **careful**: .agents/skills/gstack/careful/SKILL.md
-- **clerk-cli**: .claude/skills/clerk-cli/SKILL.md
 - **codex**: .agents/skills/gstack/codex/SKILL.md
 - **connect-chrome**: .agents/skills/gstack/connect-chrome/SKILL.md
 - **cso**: .agents/skills/gstack/cso/SKILL.md

@@ -9,6 +9,9 @@ const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockCheckAccountDeleteRateLimit = vi.hoisted(() => vi.fn());
 const mockInvalidateHandleCache = vi.hoisted(() => vi.fn());
 const mockInvalidateProfileCache = vi.hoisted(() => vi.fn());
+const mockDeleteBlobs = vi.hoisted(() => vi.fn());
+
+vi.mock('@vercel/blob', () => ({ del: mockDeleteBlobs }));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
@@ -91,6 +94,7 @@ vi.mock('@/lib/db', () => ({
         selectResults.queue.length > 0 ? selectResults.queue.shift() : [];
       return makeChain(result);
     }),
+    delete: mockDbDelete.mockImplementation(() => makeChain()),
   },
 }));
 
@@ -110,7 +114,11 @@ vi.mock('@/lib/db/schema/pre-save', () => ({
 }));
 
 vi.mock('@/lib/db/schema/feedback', () => ({
-  feedbackItems: { userId: 'feedbackItems.userId' },
+  feedbackItems: {
+    userId: 'feedbackItems.userId',
+    source: 'feedbackItems.source',
+    context: 'feedbackItems.context',
+  },
 }));
 
 vi.mock('@/lib/db/schema/suppression', () => ({
@@ -118,7 +126,9 @@ vi.mock('@/lib/db/schema/suppression', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
+  and: vi.fn((...values) => values),
   eq: vi.fn((a, b) => ({ field: a, value: b })),
+  inArray: vi.fn((field, values) => ({ field, values })),
 }));
 
 // ---- helpers ----
@@ -138,6 +148,7 @@ describe('POST /api/account/delete', () => {
 
     mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_1' });
     mockCheckAccountDeleteRateLimit.mockResolvedValue({ success: true });
+    mockDeleteBlobs.mockResolvedValue(undefined);
     mockWithDbSession.mockImplementation(async (operation, options) =>
       operation(options?.clerkUserId ?? 'clerk_user_1')
     );
@@ -194,13 +205,14 @@ describe('POST /api/account/delete', () => {
 
   it('scopes RLS to existence check then delete transaction (JOV-3048)', async () => {
     selectResults.queue.push([{ id: 'user_1', deletedAt: null }]);
+    selectResults.queue.push([]);
     selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');
     await POST(makeRequest({ confirmation: 'DELETE' }));
 
     expect(mockWithDbSession).toHaveBeenCalledTimes(1);
-    expect(mockWithDbSessionTx).toHaveBeenCalledTimes(1);
+    expect(mockWithDbSessionTx).toHaveBeenCalledTimes(2);
     expect(mockWithDbSession.mock.invocationCallOrder[0]).toBeLessThan(
       mockWithDbSessionTx.mock.invocationCallOrder[0]
     );
@@ -214,6 +226,7 @@ describe('POST /api/account/delete', () => {
 
   it('retries idempotently when account was partially deleted', async () => {
     selectResults.queue.push([{ id: 'user_1', deletedAt: new Date() }]);
+    selectResults.queue.push([]);
     selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');
@@ -229,7 +242,9 @@ describe('POST /api/account/delete', () => {
   it('successfully deletes user and all associated data', async () => {
     // First select: find user by clerkId
     selectResults.queue.push([{ id: 'user_1', deletedAt: null }]);
-    // Second select: find creator profiles for handle cache invalidation
+    // Second select: retained founder-review media lookup.
+    selectResults.queue.push([]);
+    // Third select: find creator profiles for handle cache invalidation
     selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
 
     const { POST } = await import('@/app/api/account/delete/route');
@@ -239,11 +254,11 @@ describe('POST /api/account/delete', () => {
     const json = await response.json();
     expect(json.success).toBe(true);
 
-    // Verify dependent rows are removed before the user success-fence
+    // Verify the erasure fence is committed before dependent-row cleanup.
     expect(mockDbDelete).toHaveBeenCalledTimes(4);
     expect(mockDbUpdate).toHaveBeenCalled();
-    expect(mockDbDelete.mock.invocationCallOrder[0]).toBeLessThan(
-      mockDbUpdate.mock.invocationCallOrder[0]
+    expect(mockDbUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDbDelete.mock.invocationCallOrder[0]
     );
 
     // Verify handle cache was invalidated
@@ -251,6 +266,74 @@ describe('POST /api/account/delete', () => {
 
     // Verify profile ISR cache was invalidated
     expect(mockInvalidateProfileCache).toHaveBeenCalledWith('testartist');
+  });
+
+  it('deletes retained founder audio before removing its database lookup', async () => {
+    const { buildStoredFounderReviewContext, CreateFounderReviewSchema } =
+      await import('@/lib/founder-review/contract');
+    const blobUrl =
+      'https://store.private.blob.vercel-storage.com/founder-review.webm';
+    const review = CreateFounderReviewSchema.parse({
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      segmentId: '22222222-2222-4222-8222-222222222222',
+      target: {
+        type: 'inbox-card',
+        id: '33333333-3333-4333-8333-333333333333',
+        title: 'Review thumbnail',
+        sourceKind: 'youtube.thumbnail_candidate',
+        category: 'suggestion',
+      },
+      decision: 'approved',
+      transcript: 'Increase subject scale.',
+      typedText: '',
+      transcription: {
+        provider: 'web-speech',
+        status: 'complete',
+        errorCode: null,
+      },
+      recording: {
+        startedAt: '2026-09-01T18:00:00.000Z',
+        endedAt: '2026-09-01T18:00:08.000Z',
+        initiatedBy: 'button',
+        status: 'captured-retained',
+        retention: 'audio-and-transcript',
+        durationMs: 8_000,
+        media: {
+          blobUrl,
+          pathname: 'founder-inbox-reviews/user/session/segment/review.webm',
+          contentType: 'audio/webm',
+          sha256: 'a'.repeat(64),
+          byteSize: 1_024,
+          durationMs: 8_000,
+        },
+      },
+      consent: {
+        disclosureVersion: 1,
+        contentUse: 'not-allowed',
+        capturedAt: '2026-09-01T18:00:08.000Z',
+      },
+    });
+    selectResults.queue.push([{ id: 'user_1', deletedAt: null }]);
+    selectResults.queue.push([
+      {
+        context: buildStoredFounderReviewContext({
+          review,
+          pathname: '/app',
+          userAgent: 'Ovie Desktop',
+          capturedAt: '2026-09-01T18:00:08.000Z',
+        }),
+      },
+    ]);
+    selectResults.queue.push([{ usernameNormalized: 'testartist' }]);
+
+    const { POST } = await import('@/app/api/account/delete/route');
+    const response = await POST(makeRequest({ confirmation: 'DELETE' }));
+
+    expect(response.status).toBe(200);
+    expect(mockDeleteBlobs).toHaveBeenCalledWith([blobUrl]);
+    expect(mockDeleteBlobs.mock.invocationCallOrder[0]).toBeLessThan(
+      mockWithDbSessionTx.mock.invocationCallOrder[1]
+    );
   });
 
   it.skip('handles Clerk deletion failure gracefully (retired: no Clerk delete path)', async () => {

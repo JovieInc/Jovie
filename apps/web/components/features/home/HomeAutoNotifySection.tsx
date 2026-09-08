@@ -13,7 +13,10 @@ export function HomeAutoNotifySection() {
         <div className='mx-auto max-w-300'>
           <div className='homepage-auto-notify-layout'>
             <div className='homepage-chapter-copy'>
-              <h2 id='auto-notify-heading' className='homepage-chapter-title'>
+              <h2
+                id='auto-notify-heading'
+                className='homepage-chapter-title line-clamp-2'
+              >
                 {HOME_AUTO_NOTIFY_CONTENT.title}
               </h2>
               <p className='homepage-chapter-body'>

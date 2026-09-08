@@ -13,6 +13,7 @@ import {
   MENU_ICON_TRIGGER_BASE,
   MENU_ITEM_BASE,
   MENU_ITEM_COMPACT,
+  OVERLAY_COLLISION_PADDING,
   SELECT_TRIGGER_BASE,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
@@ -226,6 +227,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         align={align}
         side={side}
         sideOffset={sideOffset}
+        collisionPadding={OVERLAY_COLLISION_PADDING}
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
@@ -274,6 +276,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
   function renderContextMenuContent() {
     const content = (
       <ContextMenuPrimitive.Content
+        collisionPadding={OVERLAY_COLLISION_PADDING}
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}

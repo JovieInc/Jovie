@@ -84,6 +84,7 @@ function approve(packet: CertificationReviewPacket) {
     decision: {
       decision: 'approved',
       id: 'decision-1',
+      evidenceDigest: buildCertificationDecisionDigest(packet),
       notes: null,
       reviewer: 'founder',
     },
@@ -94,6 +95,155 @@ function approve(packet: CertificationReviewPacket) {
   return recorded.decision;
 }
 describe('certification admission kernel', () => {
+  it.each([
+    undefined,
+    '',
+    'sha256:stale-review',
+  ])('rejects founder approval without the exact reviewed digest (%s)', evidenceDigest => {
+    const packet = reviewPacket();
+    const result = recordFounderCertificationDecision({
+      packet,
+      decision: {
+        decision: 'approved',
+        id: 'unbound-decision',
+        notes: null,
+        reviewer: 'founder',
+        evidenceDigest: evidenceDigest as string,
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unbound approval must fail');
+    expect(result.reason).toBe('decision_digest_mismatch');
+    expect(result.admission.state).toBe('review_ready');
+  });
+  it('rejects a previously displayed digest when the evidence packet changes', () => {
+    const displayed = reviewPacket();
+    const evidenceDigest = buildCertificationDecisionDigest(displayed);
+    const packet = reviewPacket({
+      testsCoverage: [
+        {
+          ...receipt('tests_coverage', 'changed-coverage'),
+          summary: 'Updated test outcome',
+        },
+      ],
+    });
+    const result = recordFounderCertificationDecision({
+      packet,
+      decision: {
+        decision: 'approved',
+        id: 'stale-review',
+        notes: null,
+        reviewer: 'founder',
+        evidenceDigest,
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('stale review must fail');
+    expect(result.reason).toBe('decision_digest_mismatch');
+  });
+
+  it.each([
+    '',
+    'not-a-commit',
+    'a'.repeat(39),
+    'g'.repeat(40),
+  ])('rejects malformed source identity %s', sha => {
+    const packet = reviewPacket();
+    if (!packet.source) throw new Error('missing fixture source');
+    const admission = evaluateCertificationAdmission({
+      packet: {
+        ...packet,
+        source: { ...packet.source, sha, expectedSha: sha },
+      },
+    });
+    expect(admission.state).toBe('working');
+    expect(admission.blockers.map(item => item.code)).toContain(
+      'source_missing'
+    );
+  });
+
+  it.each([
+    'canonicalReferences',
+    'invariantEvaluation',
+    'testsCoverage',
+    'visualProof',
+  ] as const)('rejects unbound or unusable %s receipts', group => {
+    for (const invalid of [
+      { sourceSha: null },
+      { sourceSha: '' },
+      { ref: ' ' },
+      { digest: null },
+      { digest: ' ' },
+    ]) {
+      const packet = reviewPacket();
+      const admission = evaluateCertificationAdmission({
+        packet: { ...packet, [group]: [{ ...packet[group][0], ...invalid }] },
+      });
+      expect(admission.state).toBe('working');
+      expect(admission.tasteInboxCard).toBeNull();
+      expect(admission.blockers.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('rejects unbound required variant and media evidence', () => {
+    const packet = reviewPacket();
+    const variant = packet.requiredVariants[0];
+    if (!variant.proof) throw new Error('missing fixture proof');
+    for (const invalid of [
+      { sourceSha: null },
+      { ref: '' },
+      { digest: null },
+    ]) {
+      const proofResult = evaluateCertificationAdmission({
+        packet: {
+          ...packet,
+          requiredVariants: [
+            { ...variant, proof: { ...variant.proof, ...invalid } },
+          ],
+        },
+      });
+      const mediaResult = evaluateCertificationAdmission({
+        packet: {
+          ...packet,
+          itemMedia: [{ ...packet.itemMedia[0], ...invalid }],
+        },
+      });
+      expect(proofResult.state).toBe('working');
+      expect(mediaResult.state).toBe('working');
+    }
+  });
+
+  it.each([
+    'ci',
+    'queueMerge',
+    'deploy',
+    'runtimeDogfood',
+  ] as const)('rejects unbound %s operational proof', group => {
+    const packet = reviewPacket();
+    const decision = approve(packet);
+    const operational = {
+      ci: [receipt('ci')],
+      queueMerge: [receipt('queue_merge')],
+      deploy: [receipt('deploy')],
+      runtimeDogfood: [receipt('runtime_dogfood')],
+    };
+    const admission = evaluateCertificationAdmission({
+      packet: {
+        ...packet,
+        operational: {
+          ...operational,
+          [group]: [{ ...operational[group][0], sourceSha: null }],
+        },
+      },
+      decisions: [decision],
+      requestedState: 'monitored',
+    });
+    expect(admission.transition.allowed).toBe(false);
+    expect(admission.transition.blockers.map(item => item.code)).toContain(
+      `${operational[group][0].tier}_failed`
+    );
+  });
+
   it('emits one Taste Inbox card only when a review packet is complete', () => {
     const packet = reviewPacket();
     const admission = evaluateCertificationAdmission({ packet });
@@ -215,6 +365,7 @@ describe('certification admission kernel', () => {
       decision: {
         decision: 'approved',
         id: 'decision-2',
+        evidenceDigest: buildCertificationDecisionDigest(packet),
         notes: null,
         reviewer: 'founder',
       },
@@ -327,6 +478,7 @@ describe('certification admission kernel', () => {
       decision: {
         decision: 'changes_requested',
         id: 'decision-feedback',
+        evidenceDigest: buildCertificationDecisionDigest(reviewPacket()),
         notes: 'Tighten item-specific media.',
         reviewer: 'founder',
       },
@@ -339,20 +491,22 @@ describe('certification admission kernel', () => {
     expect(feedback.admission.auditHistory.map(event => event.type)).toContain(
       'founder_feedback_returned'
     );
+    const rejectionPacket = reviewPacket({
+      subject: {
+        id: 'another-feature',
+        kind: 'ovie-registry-projection',
+        title: 'Another feature',
+      },
+    });
     const rejection = recordFounderCertificationDecision({
       decision: {
         decision: 'rejected',
         id: 'decision-reject',
+        evidenceDigest: buildCertificationDecisionDigest(rejectionPacket),
         notes: 'Wrong source behavior.',
         reviewer: 'founder',
       },
-      packet: reviewPacket({
-        subject: {
-          id: 'another-feature',
-          kind: 'ovie-registry-projection',
-          title: 'Another feature',
-        },
-      }),
+      packet: rejectionPacket,
     });
     expect(rejection.ok).toBe(true);
     if (!rejection.ok) throw new Error('expected rejection to record');

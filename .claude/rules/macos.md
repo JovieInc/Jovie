@@ -1,3 +1,7 @@
+---
+paths: ["apps/desktop/**", "apps/macos/**", "docs/macos/**"]
+---
+
 # Mac (Electron product + Swift MenuMonitor)
 
 Read this before touching `apps/desktop`, `apps/macos`, or any proposed Mac

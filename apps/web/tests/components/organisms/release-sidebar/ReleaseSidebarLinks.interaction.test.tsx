@@ -526,7 +526,10 @@ describe('ReleaseSidebar DSP card interactions', () => {
     expect(
       screen.queryByTestId('release-sidebar-add-dsp-link')
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for Spotify' })
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Remove Spotify' }));
 
     expect(onRemoveDspLink).toHaveBeenCalledWith(release.id, 'spotify');
   });

@@ -94,6 +94,8 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Pro-only; chat surfaces it conversationally rather than via slash.',
   researchArtistPresence:
     'Onboarding presence-build system event; not a model-invoked or slash tool.',
+  surfaceLibraryOpportunities:
+    'Onboarding presence-build system event; not a model-invoked or slash tool.',
   assembleArtistProfile:
     'Onboarding presence-build system event; not a model-invoked or slash tool.',
   generateSmartLink:

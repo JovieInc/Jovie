@@ -26,6 +26,11 @@
       "purpose": "Mechanical architecture, workflow, docs, and repo-rule checks."
     },
     {
+      "id": "exact-head-coverage",
+      "name": "Exact-Head Coverage",
+      "purpose": "Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check."
+    },
+    {
       "id": "risk-triggered-smoke",
       "name": "Explicit Deep Evidence",
       "purpose": "Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready."
@@ -109,7 +114,7 @@
       "mergeGate": true,
       "gateStage": "merge-group",
       "nextLocalCommand": "node scripts/visual-snapshot-compare.mjs compare",
-      "remediation": "A missing visual baseline is a hard failure. Restore or commit the snapshot file. Do not pass --update-snapshots on the compare path; scheduled visual-regression.yml remains the refresh lane."
+      "remediation": "A missing visual baseline is a hard failure. Restore or commit the snapshot file. Do not pass --update-snapshots on the compare path; scheduled visual-regression.yml remains the refresh lane. Homepage PRs (run_homepage_visual) also run this compare on the source lane and PR Ready fails closed if it is skipped (JOV-5960)."
     },
     {
       "id": "drizzle-migration-guard",
@@ -130,6 +135,15 @@
       "remediation": "Run the failing Vitest file locally, add or update regression coverage, and keep quarantined tests in the quarantine lane."
     },
     {
+      "id": "ci-exact-head-coverage",
+      "name": "Exact-head Coverage",
+      "tier": "exact-head-coverage",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>",
+      "remediation": "Reproduce the exact-head changed-line loss and add meaningful tests until the existing 60% patch floor passes. Unrelated nightly global risk debt remains visible and never lowers this gate."
+    },
+    {
       "id": "ci-build-layout",
       "name": "Build + Layout (combined)",
       "tier": "combined-integration",
@@ -140,12 +154,12 @@
     },
     {
       "id": "ci-ios",
-      "name": "iOS Build + Test (combined)",
+      "name": "iOS Fast Unit + Coverage (combined)",
       "tier": "combined-integration",
       "mergeGate": true,
       "gateStage": "merge-group",
-      "nextLocalCommand": "pnpm run ios:lint && pnpm run ios:test",
-      "remediation": "Repair the path-selected Xcode build or test regression on the exact combined head; source PRs run only the portable iOS fast contract."
+      "nextLocalCommand": "pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh",
+      "remediation": "Repair the path-selected iOS unit or coverage regression on the exact combined head; the full simulator UI/screenshot regression remains required before TestFlight upload."
     },
     {
       "id": "ci-macos",

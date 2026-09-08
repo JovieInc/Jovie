@@ -142,11 +142,11 @@ describe('JOV-INV-012 optimization contract', () => {
 
   it('instructs spawned agents to satisfy or explicitly exempt the optimization contract', () => {
     const grokShip = readFileSync(
-      resolve(ROOT, 'scripts/hermes/grok-ship-one'),
+      resolve(ROOT, 'scripts/symphony/grok-ship-one'),
       'utf8'
     );
     const shipper = readFileSync(
-      resolve(ROOT, 'scripts/hermes/lib/codex-issue-shipper.ts'),
+      resolve(ROOT, 'scripts/symphony/lib/codex-issue-shipper.ts'),
       'utf8'
     );
     const compact = text => text.replace(/\s+/g, ' ');

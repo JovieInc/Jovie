@@ -40,15 +40,17 @@ describe('Eve identity packs (JOV-5216)', () => {
       EveCapabilityDeniedError
     );
     expect(() =>
-      assertEveChatFactoryLock(armFactoryWrite(bindEveIdentityForTurn('ovie')))
+      assertEveChatFactoryLock(
+        armFactoryWrite(bindEveIdentityForTurn('summer'))
+      )
     ).toThrow(EveCapabilityDeniedError);
   });
 
-  it('lets Ovie ingest/ack and read gbrain on the chat entry', async () => {
+  it('binds the Ovie presentation entry to Summer', async () => {
     const { eveTurn } = await prepareOvieChatTurn('ov', 'post this tweet', {
       store: new MemoryOperatingStore(),
     });
-    expect(eveTurn.pack.id).toBe('ovie');
+    expect(eveTurn.pack.id).toBe('summer');
     expect(eveTurn.pack.surface).toBe('door');
     expect(eveTurn.pack.isPersona).toBe(false);
     expect(eveTurn.pack.conversationalAuthority).toBe('summer');
@@ -63,7 +65,7 @@ describe('Eve identity packs (JOV-5216)', () => {
   });
 
   it('binds ov chat mode through the same entry as the chat route', async () => {
-    expect(bindEveIdentityForChatMode('ov').pack.id).toBe('ovie');
+    expect(bindEveIdentityForChatMode('ov').pack.id).toBe('summer');
     expect(bindEveIdentityForChatMode(null).pack.id).toBe('jovie');
     expect(
       (
@@ -71,7 +73,7 @@ describe('Eve identity packs (JOV-5216)', () => {
           store: new MemoryOperatingStore(),
         })
       ).eveTurn.pack.id
-    ).toBe('ovie');
+    ).toBe('summer');
     expect(
       (
         await prepareOvieChatTurn(null, null, {
@@ -85,7 +87,7 @@ describe('Eve identity packs (JOV-5216)', () => {
     const prompt = applyEveIdentityToSystemPrompt(
       'You are Jovie, an AI music career assistant.',
       {
-        id: 'ovie',
+        id: 'summer',
         instructions:
           'Eve on the Ovie door. Ingest and ack. Do not self-identify as Ovie.',
       }
@@ -100,10 +102,10 @@ describe('Eve identity packs (JOV-5216)', () => {
       })
     ).toBe('You are Jovie.');
     const fallback = applyEveIdentityToSystemPrompt('You are Jovie.', {
-      id: 'ovie',
+      id: 'summer',
       instructions: '',
     });
     expect(fallback.toLowerCase()).not.toMatch(/you are ovie/);
-    expect(fallback).toMatch(/ingest and ack/i);
+    expect(fallback).toMatch(/you are summer/i);
   });
 });

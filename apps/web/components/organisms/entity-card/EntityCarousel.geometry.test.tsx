@@ -622,3 +622,49 @@ describe('EntityCarousel profile geometry', () => {
     );
   });
 });
+
+describe('EntityCarousel carousel a11y semantics', () => {
+  it('exposes the snap track as a list so cards stay discoverable in voice cursors that drop list semantics', () => {
+    render(
+      <EntityCarousel
+        items={items}
+        layout='profile-landscape'
+        leading={<button type='button'>Featured</button>}
+        trailing={<button type='button'>Updates</button>}
+      />
+    );
+
+    const track = screen.getByTestId('entity-carousel');
+    expect(track).toHaveAttribute('role', 'list');
+    expect(track.children).toHaveLength(4);
+    for (const card of track.children) {
+      expect(card).toHaveAttribute('aria-roledescription', 'slide');
+    }
+  });
+
+  it('labels every slide with its one-based position and total (APG carousel pattern)', () => {
+    render(
+      <EntityCarousel
+        items={items}
+        layout='profile-landscape'
+        leading={<button type='button'>Featured</button>}
+        trailing={<button type='button'>Updates</button>}
+      />
+    );
+
+    const track = screen.getByTestId('entity-carousel');
+    expect(
+      [...track.children].map(card => card.getAttribute('aria-label'))
+    ).toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
+  });
+
+  it('labels slides by slot position even when only entity items render', () => {
+    render(<EntityCarousel items={items} />);
+
+    const track = screen.getByTestId('entity-carousel');
+    expect(
+      [...track.children].map(card => card.getAttribute('aria-label'))
+    ).toEqual(['1 of 2', '2 of 2']);
+    expect(track.children[0]).toHaveAttribute('aria-roledescription', 'slide');
+  });
+});

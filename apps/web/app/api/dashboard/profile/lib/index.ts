@@ -4,12 +4,7 @@
  * Re-exports for the profile API route modules.
  */
 
-export type {
-  SyncClerkProfileParams,
-  SyncClerkProfileResult,
-} from './clerk-sync';
-
-export { guardUsernameUpdate, syncClerkProfile } from './clerk-sync';
+export { guardUsernameUpdate } from './clerk-sync';
 export { ALLOWED_PROFILE_FIELDS, NO_STORE_HEADERS } from './constants';
 export type { ProfileUpdateContext } from './context';
 export { buildClerkUpdates, buildProfileUpdateContext } from './context';

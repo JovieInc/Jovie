@@ -1,5 +1,9 @@
 'use client';
 
+// The chat transcript window policy (CHAT_TRANSCRIPT_WINDOW) is certified by the
+// JovieChat.styling.test.tsx component render suite.
+// @coverage-via apps/web/tests/unit/chat/JovieChat.styling.test.tsx
+
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -14,6 +18,7 @@ import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPan
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { track } from '@/lib/analytics';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
+import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
@@ -57,8 +62,8 @@ import type {
   JovieChatProps,
 } from './types';
 
-/** Window long threads early so short-but-growing chats stay at 60fps. */
-const VIRTUALIZATION_THRESHOLD = 8;
+const VIRTUALIZATION_THRESHOLD =
+  CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
 
 function findLastAssistantIndex(
@@ -391,7 +396,7 @@ export function JovieChat({
     count: messages.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 80,
-    overscan: 5,
+    overscan: CHAT_TRANSCRIPT_WINDOW.overscanRowCount,
     measureElement: el => el.getBoundingClientRect().height,
   });
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
@@ -665,6 +670,10 @@ export function JovieChat({
       chatInputProps={chatInputProps}
       chatMode={chatMode}
       showThreadView={showThreadView}
+      // one-chrome-layer-v1: prompt suggests / starter cards XOR status
+      // banners — the usage banner yields whenever the empty state is already
+      // showing a chrome affordance layer.
+      suppressUsageAlert={!showThreadView && emptyStateAffordance !== 'none'}
       isRateLimited={isRateLimited}
       showManifest={showManifest}
       manifestCollapsed={manifestCollapsed}
@@ -788,7 +797,9 @@ export function JovieChat({
                       />
                     ) : showEmptyActionCards ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start gap-5 py-2 sm:py-3'
+                        // single-column-one-width-v1: the empty-state column
+                        // inherits the 45rem content shell — no stepped max-w.
+                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
                         data-testid='chat-empty-state-action-card-slot'
                       >
                         {showEmptyWelcome ? (
@@ -806,7 +817,8 @@ export function JovieChat({
                       </div>
                     ) : showEmptyPromptRail ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start pb-3'
+                        // single-column-one-width-v1: same shared column width.
+                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start pb-3'
                         data-testid='chat-empty-state-soft-suggestions-slot'
                       >
                         {showEmptyWelcome ? (

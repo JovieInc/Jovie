@@ -1,5 +1,5 @@
 import { type Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
@@ -8,6 +8,7 @@ import { Suspense } from 'react';
 
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
+import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
@@ -47,6 +48,8 @@ import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,
 } from '@/lib/profile/metadata';
+import { opaqueInternalProfileRedirectPath } from '@/lib/profile/opaque-internal-profile-handle';
+import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
@@ -111,6 +114,16 @@ function assertValidProfileUsername(username: string) {
   }
 }
 
+async function enforceCanonicalPublicProfileUsername(username: string) {
+  const decision = await resolveOpaqueInternalProfileUsername(username);
+  if (decision.action === 'not_found') {
+    notFound();
+  }
+  if (decision.action === 'redirect') {
+    permanentRedirect(opaqueInternalProfileRedirectPath(decision));
+  }
+}
+
 async function getPublicTourDates(
   profileId: string
 ): Promise<TourDateViewModel[]> {
@@ -130,11 +143,15 @@ async function getPublicTourDates(
   }
 }
 
-async function getPublicReleases(
-  profileId: string
-): Promise<Awaited<ReturnType<typeof getReleasesForProfileLite>>> {
+async function getPublicReleases(profileId: string): Promise<{
+  readonly releases: Awaited<ReturnType<typeof getReleasesForProfileLite>>;
+  readonly failed: boolean;
+}> {
   try {
-    return await getReleasesForProfileLite(profileId);
+    return {
+      releases: await getReleasesForProfileLite(profileId),
+      failed: false,
+    };
   } catch (error) {
     logger.error(
       'Error fetching public profile releases',
@@ -145,7 +162,7 @@ async function getPublicReleases(
       },
       'public-profile'
     );
-    return [];
+    return { releases: [], failed: true };
   }
 }
 
@@ -332,11 +349,13 @@ async function ArtistPageContent({
     profile.avatar_url
   );
 
-  // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
+  // Await tour dates + releases (started above, non-blocking). Tour failures
+  // still degrade to an empty list; catalog failures stay marked so Music
+  // can show a recoverable error instead of a false empty catalog.
   // Sort server-side so the client doesn't need a useMemo sort
   const [
     tourDatesRaw,
-    allReleases,
+    catalogResult,
     merchCards,
     alertOptInVariant,
     profilePacAssignment,
@@ -359,6 +378,8 @@ async function ArtistPageContent({
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
+  const allReleases = catalogResult.releases;
+  const catalogLoadFailed = catalogResult.failed;
 
   schedulePublicCollaboratorProfileReconciliation({
     creatorProfileId: profile.id,
@@ -382,6 +403,7 @@ async function ArtistPageContent({
   // credited artists with public Jovie profiles (→ /{handle}).
   const entityMentionContext: EntityMentionContext = {
     ownHandle: artist.handle,
+    ownName: artist.name,
     releases: releases.map(release => ({
       title: release.title,
       slug: release.slug,
@@ -495,6 +517,7 @@ async function ArtistPageContent({
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
         releases={releases}
+        catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
       />
       <ProfileAeoContent
@@ -515,6 +538,11 @@ async function ArtistPageContent({
 export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
+  await enforceCanonicalPublicProfileUsername(username);
+
+  if (username.toLowerCase() === 'unfazed') {
+    return <UnfazedProfileClient />;
+  }
 
   // Resolve a missing/private profile before the page-level Suspense boundary
   // can stream its loading shell. This preserves the segment's profile-specific
@@ -545,6 +573,14 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   assertValidProfileUsername(username);
+  await enforceCanonicalPublicProfileUsername(username);
+
+  if (username.toLowerCase() === 'unfazed') {
+    return {
+      title: 'Unfazed | Jovie',
+      robots: { index: false, follow: false },
+    };
+  }
 
   const profileResult = await getProfileAndLinks(username);
   const { profile, genres, status, creatorClerkId } = profileResult;

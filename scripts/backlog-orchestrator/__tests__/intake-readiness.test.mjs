@@ -24,6 +24,18 @@ function issue(overrides = {}) {
   };
 }
 
+const TARGETED_DESCRIPTION = `## Target
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI
+
+## Scope
+Tighten one isolated behaviour.
+
+## Acceptance criteria
+- Focused test passes.`;
+
 describe('intake readiness classifier', () => {
   it('recognizes a bounded contract alias without granting admission', () => {
     const result = classifyIntakeReadiness(issue());
@@ -51,13 +63,30 @@ describe('intake readiness classifier', () => {
     );
   });
 
-  it('routes explicit human holds as decision-required', () => {
-    for (const label of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ]) {
+  it('ignores legacy human labels and preserves machine incident holds', () => {
+    for (const label of ['needs-human', 'decision-required', 'no-auto']) {
+      const result = classifyIntakeReadiness(
+        issue({ labels: { nodes: [{ name: label }] } })
+      );
+      assert.equal(result.disposition, 'mechanical-ready');
+      assert.equal(result.requiresHumanDecision, false);
+    }
+
+    const founderSteered = classifyIntakeReadiness(
+      issue({
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+        labels: { nodes: [{ name: 'needs:taste' }] },
+      })
+    );
+    assert.equal(founderSteered.disposition, 'mechanical-ready');
+    assert.equal(
+      founderSteered.permittedNextAction,
+      'propose-readiness-receipt'
+    );
+    assert.equal(founderSteered.requiresHumanDecision, false);
+
+    for (const label of ['held', 'manual-incident']) {
       const result = classifyIntakeReadiness(
         issue({ labels: { nodes: [{ name: label }] } })
       );
@@ -65,6 +94,24 @@ describe('intake readiness classifier', () => {
       assert.equal(result.reason, 'protected-policy');
       assert.equal(result.requiresHumanDecision, true);
     }
+  });
+
+  it('does not treat a mismatched repository admission receipt as active ownership', () => {
+    const result = classifyIntakeReadiness(
+      issue({
+        description: TARGETED_DESCRIPTION,
+        comments: {
+          nodes: [
+            {
+              body: '<!-- symphony-admission:v1 {"target_system":"jovie-product","target_repo":"JovieInc/LogYourBody","artifact":"scripts/backlog-orchestrator/admission-gate.mjs","verification_authority":"JovieInc/LogYourBody CI"} -->',
+            },
+          ],
+        },
+      })
+    );
+
+    assert.equal(result.disposition, 'mechanical-ready');
+    assert.equal(result.evidence.ownership, 'unowned');
   });
 
   it('chooses at most four independent normal candidates in a control-loop receipt', () => {

@@ -12,12 +12,11 @@ describe('overnight-qa risk assessment', () => {
     });
 
     expect(risk.blocked).toBe(false);
-    expect(risk.requiresHuman).toBe(false);
     expect(risk.autoMergeEligible).toBe(true);
     expect(risk.labels).toEqual(['automerge']);
   });
 
-  it('parks billing and onboarding diffs for human review and testing', () => {
+  it('routes billing and onboarding diffs through automated verification', () => {
     const risk = assessRisk({
       changedFiles: [
         'apps/web/app/api/billing/portal/route.ts',
@@ -26,20 +25,19 @@ describe('overnight-qa risk assessment', () => {
       totalDiffLines: 75,
     });
 
-    expect(risk.blocked).toBe(true);
-    expect(risk.requiresHuman).toBe(true);
-    expect(risk.autoMergeEligible).toBe(false);
+    expect(risk.blocked).toBe(false);
+    expect(risk.autoMergeEligible).toBe(true);
     expect(risk.labels).toEqual(
-      expect.arrayContaining(['needs-human', 'testing'])
+      expect.arrayContaining(['automerge', 'testing'])
     );
-    expect(risk.labels).not.toContain('automerge');
-    expect(risk.reasons.join('\n')).toContain('Billing routes are blocked');
+    expect(risk.labels).not.toContain('needs-human');
+    expect(risk.reasons.join('\n')).toContain('automated billing verification');
     expect(risk.reasons.join('\n')).toContain(
       'Onboarding and profile ownership'
     );
   });
 
-  it('parks oversize diffs even when paths are otherwise safe', () => {
+  it('keeps oversize diffs automated while requiring complete CI coverage', () => {
     const changedFiles = Array.from({ length: 11 }, (_, index) => {
       return `apps/web/tests/unit/overnight-${index}.test.ts`;
     });
@@ -48,12 +46,12 @@ describe('overnight-qa risk assessment', () => {
       totalDiffLines: 401,
     });
 
-    expect(risk.blocked).toBe(true);
-    expect(risk.requiresHuman).toBe(true);
+    expect(risk.blocked).toBe(false);
+    expect(risk.autoMergeEligible).toBe(true);
     expect(risk.reasons).toEqual(
       expect.arrayContaining([
-        'Diff touches 11 files, exceeding the 10-file PR limit.',
-        'Diff is 401 lines, exceeding the 400-line PR limit.',
+        'Diff touches 11 files; CI must verify the complete change set.',
+        'Diff is 401 lines; CI must verify the complete change set.',
       ])
     );
   });

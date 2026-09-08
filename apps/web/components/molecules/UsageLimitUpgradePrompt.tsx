@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/components/UsageLimitUpgradePrompt.test.tsx
 'use client';
 
 import { Button } from '@jovie/ui';
@@ -14,7 +15,7 @@ interface UsageLimitUpgradePromptProps {
   readonly limit: number;
   /** Feature name for display and tracking (e.g., "contacts", "AI messages") */
   readonly featureName: string;
-  /** What the user unlocks by upgrading (e.g., "unlimited contacts", "100 messages/day") */
+  /** What the user unlocks by upgrading (e.g., "unlimited contacts", "70 messages/week") */
   readonly upgradeCopy: string;
   /** Optional custom CTA label. Defaults to "Upgrade to Pro" */
   readonly ctaLabel?: string;

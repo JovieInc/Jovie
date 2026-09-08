@@ -1,5 +1,6 @@
-import { RevivalQueuePanel } from '@/components/features/dashboard/youtube/RevivalQueuePanel';
+import { YouTubeChannelPilotPanel } from '@/components/features/dashboard/youtube/YouTubeChannelPilotPanel';
 import { APP_ROUTES } from '@/constants/routes';
+import { loadAuthorizedYouTubeChannelWorkspace } from '@/lib/youtube-library';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 
 export const runtime = 'nodejs';
@@ -16,17 +17,17 @@ export default async function YouTubeRevivalQueuePage() {
     return routeContext.error;
   }
 
-  // ponytail: connector and experiment engine are not yet wired (GH-10921 BlockedBy).
-  // Show the unconnected empty state until the YouTube OAuth connector lands.
-  // Channel intelligence (GH-10917 / JOV-3193) shares this page and hydrates
-  // from Reporting API rows once the connector syncs.
-  return (
-    <RevivalQueuePanel
-      candidates={[]}
-      experiments={[]}
-      quota={null}
-      isConnected={false}
-      intelligenceReport={null}
-    />
-  );
+  const workspace = routeContext.profileId
+    ? await loadAuthorizedYouTubeChannelWorkspace({
+        userId: routeContext.userId,
+        creatorProfileId: routeContext.profileId,
+      })
+    : ({
+        state: 'auth-required',
+        videos: [],
+        errorMessage:
+          'Select an owned creator profile before connecting YouTube.',
+      } as const);
+
+  return <YouTubeChannelPilotPanel workspace={workspace} />;
 }

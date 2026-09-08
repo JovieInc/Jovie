@@ -6,7 +6,7 @@ export function DifferentiationSection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto text-center mb-12'>
           {/* ui-casing-allow: marketing display headline */}
-          <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
+          <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token line-clamp-2'>
             Not another link list
           </h2>
         </div>

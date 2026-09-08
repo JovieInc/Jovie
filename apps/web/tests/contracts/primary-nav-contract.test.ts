@@ -52,9 +52,8 @@ function routeFileExistsFor(href: string) {
 describe('primary marketing navigation contract', () => {
   it('keeps the top-level marketing nav labels exact and ordered', () => {
     expect(MARKETING_NAV_LINKS.map(link => link.label)).toEqual([
+      'Customers',
       'Product',
-      'For',
-      'Tools',
       'Pricing',
     ]);
   });
@@ -93,15 +92,12 @@ describe('primary marketing navigation contract', () => {
   });
 
   it('makes MarketingHeader consume the primary nav contract data', () => {
-    for (const exportName of [
-      'MARKETING_NAV_LINKS',
-      'MARKETING_NAV_UTILITIES',
-      'MARKETING_FOR_FLYOUT_LINKS',
-      'MARKETING_TOOLS_FLYOUT_LINKS',
-    ]) {
-      expect(headerSource).toContain(exportName);
-    }
-
+    expect(headerSource).toContain('MARKETING_NAV_LINKS');
+    expect(headerSource).toContain('getHomepageFrontDoorCtaContract');
+    expect(headerSource).toContain('CANONICAL_PUBLIC_SHELL_EVENTS');
+    expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
+    expect(headerSource).not.toContain('MARKETING_FOR_FLYOUT_LINKS');
+    expect(headerSource).not.toContain('MARKETING_TOOLS_FLYOUT_LINKS');
     expect(headerSource).not.toContain("label: 'Features'");
     expect(headerSource).not.toContain("label: 'Resources'");
     expect(headerSource).not.toContain('showContactLink={centerNavEnabled');

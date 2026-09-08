@@ -8,6 +8,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const openDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
+const copyDesktopAuthUrlMock = vi.fn().mockResolvedValue({ ok: true });
 const closeDesktopAuthWindowMock = vi.fn().mockResolvedValue({ ok: true });
 const isElectronRuntimeMock = vi.fn(() => true);
 const searchParamsState = { value: '' };
@@ -18,6 +19,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   closeDesktopAuthWindow: () => closeDesktopAuthWindowMock(),
+  copyDesktopAuthUrl: (authUrl: string) => copyDesktopAuthUrlMock(authUrl),
   isElectronRuntime: () => isElectronRuntimeMock(),
   openDesktopAuthUrl: (authUrl: string) => openDesktopAuthUrlMock(authUrl),
   // JOV-3595: DesktopAuthClient clears the shell boot watchdog on mount
@@ -50,8 +52,18 @@ describe('DesktopAuthPage', () => {
     );
 
     expect(screen.getByTestId('desktop-auth-handoff')).toBeInTheDocument();
+    expect(screen.getByTestId('desktop-auth-handoff')).toHaveAttribute(
+      'data-desktop-auth-state',
+      'idle'
+    );
     expect(
       screen.getByRole('button', { name: 'Continue in Browser' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Copy Sign-In Link' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Cancel Sign-In' })
     ).toBeInTheDocument();
   });
 
@@ -79,9 +91,18 @@ describe('DesktopAuthPage', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(expectedAuthUrl);
     });
     expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
-    expect(
-      screen.queryByText('Continue signing in with your browser')
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('desktop-auth-handoff')).toHaveAttribute(
+      'data-desktop-auth-state',
+      'opened'
+    );
+    const reopenButton = screen.getByRole('button', {
+      name: 'Open Browser Again',
+    });
+    fireEvent.click(reopenButton);
+
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel Sign-In' }));
 
@@ -102,6 +123,13 @@ describe('DesktopAuthPage', () => {
     const continueButton = screen.getByRole('button', {
       name: 'Continue in Browser',
     });
+    const actions = screen.getByTestId('desktop-auth-actions');
+    const status = screen.getByRole('status');
+    continueButton.focus();
+    expect(continueButton).toHaveFocus();
+    expect(actions).toHaveClass('gap-2');
+    expect(actions.querySelectorAll('button')).toHaveLength(3);
+    expect(status).toHaveClass('min-h-10');
 
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
     fireEvent.click(continueButton);
@@ -109,13 +137,21 @@ describe('DesktopAuthPage', () => {
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
     });
-    expect(continueButton).toBeEnabled();
+    const retryButton = screen.getByRole('button', { name: 'Try Again' });
+    expect(retryButton).toBeEnabled();
+    expect(retryButton).toHaveFocus();
+    expect(actions.querySelectorAll('button')).toHaveLength(3);
     expect(
       await screen.findByText(/The browser did not open/i)
     ).toBeInTheDocument();
+    expect(screen.getByTestId('desktop-auth-handoff')).toHaveAttribute(
+      'data-desktop-auth-state',
+      'error'
+    );
+    expect(status).toHaveClass('min-h-10');
 
     openDesktopAuthUrlMock.mockResolvedValueOnce({ ok: true });
-    fireEvent.click(continueButton);
+    fireEvent.click(retryButton);
 
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
@@ -144,14 +180,14 @@ describe('DesktopAuthPage', () => {
 
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
-      expect(continueButton).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Try Again' })).toBeEnabled();
     });
     expect(screen.getByRole('status')).toHaveTextContent(
       /The browser did not open/i
     );
 
     openDesktopAuthUrlMock.mockResolvedValueOnce({ ok: true });
-    fireEvent.click(continueButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
 
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
@@ -198,6 +234,65 @@ describe('DesktopAuthPage', () => {
       /The browser did not open/i
     );
   });
+
+  it('copies the validated sign-in link and reports copy failures', async () => {
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+
+    const copyButton = screen.getByRole('button', {
+      name: 'Copy Sign-In Link',
+    });
+    fireEvent.click(copyButton);
+
+    await waitFor(() => {
+      expect(copyDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Sign-in link copied.'
+    );
+
+    copyDesktopAuthUrlMock.mockResolvedValueOnce({
+      ok: false,
+      reason: 'clipboard-write-failed',
+    });
+    fireEvent.click(copyButton);
+
+    await waitFor(() => {
+      expect(copyDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /could not be copied/i
+    );
+  });
+
+  it('keeps cancel available before opening and after an open failure', async () => {
+    openDesktopAuthUrlMock.mockResolvedValueOnce({
+      ok: false,
+      reason: 'open-external-failed',
+    });
+    const { DesktopAuthClient } = await import(
+      '../../../app/desktop-auth/DesktopAuthClient'
+    );
+
+    render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
+
+    const cancelButton = screen.getByRole('button', {
+      name: 'Cancel Sign-In',
+    });
+    fireEvent.click(cancelButton);
+    expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue in Browser' })
+    );
+    await screen.findByRole('button', { name: 'Try Again' });
+
+    fireEvent.click(cancelButton);
+    expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('DesktopAuthRouteHandoff', () => {
@@ -210,7 +305,7 @@ describe('DesktopAuthRouteHandoff', () => {
     );
   });
 
-  it('renders a single continue button for Electron auth routes', async () => {
+  it('keeps browser reopen and copy actions available for Electron auth routes', async () => {
     const { DesktopAuthRouteHandoff } = await import(
       '../../../app/(auth)/DesktopAuthRouteHandoff'
     );
@@ -224,9 +319,16 @@ describe('DesktopAuthRouteHandoff', () => {
       'data-auth-shell-kind',
       'desktop-return-handoff'
     );
+    expect(screen.getByTestId('desktop-auth-route-handoff')).toHaveAttribute(
+      'data-desktop-auth-state',
+      'idle'
+    );
     expect(screen.queryByTestId('auth-brand-panel')).not.toBeInTheDocument();
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
     expect(screen.getAllByText('Continue in Browser')).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'Copy Sign-In Link' })
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Continue in Browser' })
@@ -237,9 +339,22 @@ describe('DesktopAuthRouteHandoff', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledWith(window.location.href);
     });
     expect(await screen.findByText('Check your browser.')).toBeInTheDocument();
-    expect(
-      screen.queryByText('Continue signing in with your browser')
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('desktop-auth-route-handoff')).toHaveAttribute(
+      'data-desktop-auth-state',
+      'opened'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open Browser Again' }));
+    await waitFor(() => {
+      expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
+      expect(
+        screen.getByRole('button', { name: 'Copy Sign-In Link' })
+      ).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Sign-In Link' }));
+    await waitFor(() => {
+      expect(copyDesktopAuthUrlMock).toHaveBeenCalledWith(window.location.href);
+    });
   });
 
   it('recovers when route handoff browser launch rejects', async () => {
@@ -264,6 +379,10 @@ describe('DesktopAuthRouteHandoff', () => {
     });
     expect(screen.getByRole('status')).toHaveTextContent(
       /The browser did not open/i
+    );
+    expect(screen.getByTestId('desktop-auth-route-handoff')).toHaveAttribute(
+      'data-desktop-auth-state',
+      'error'
     );
   });
 

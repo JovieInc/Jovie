@@ -7,7 +7,7 @@ export function NewSocialProofSection() {
         <div className='mx-auto max-w-5xl'>
           <div className='grid gap-6 md:grid-cols-12 md:items-center'>
             <div className='md:col-span-7'>
-              <h2 className='mt-3 text-2xl sm:text-3xl font-medium tracking-tight text-primary-token heading-linear'>
+              <h2 className='mt-3 text-2xl sm:text-3xl font-medium tracking-tight text-primary-token heading-linear line-clamp-2'>
                 <span className='block'>Beautiful artist profiles</span>
                 <span className='block'>Built to convert.</span>
               </h2>

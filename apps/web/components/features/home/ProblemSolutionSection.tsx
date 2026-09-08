@@ -27,7 +27,7 @@ export function ProblemSolutionSection() {
         {/* Unified heading */}
         <h2
           id='problem-solution-heading'
-          className='mt-6 text-4xl md:text-6xl font-medium tracking-tight text-balance text-primary-token'
+          className='mt-6 text-4xl md:text-6xl font-medium tracking-tight text-balance text-primary-token line-clamp-2'
         >
           {/* ui-casing-allow: marketing display headline */}
           Your bio link is a speed bump.

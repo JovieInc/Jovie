@@ -48,7 +48,7 @@ export function ReleaseNotificationsSection() {
                 Automatic
               </span>
 
-              <h2 className='mt-5 marketing-h2-linear text-primary-token'>
+              <h2 className='mt-5 marketing-h2-linear text-primary-token line-clamp-2'>
                 New Release?
                 <br />
                 Your Fans Already Know.

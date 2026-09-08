@@ -118,4 +118,4 @@ After the agent makes fixes, the workflow runs:
 
 If validation fails:
 - First attempt: Retry with error context
-- Second attempt: Escalate to human (add `needs-human` label)
+- Second attempt: Record the exact failure and release the lease for bounded autonomous remediation

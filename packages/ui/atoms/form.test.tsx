@@ -227,6 +227,46 @@ describe('Form', () => {
       // Should include both description and message ids
       expect(describedBy.split(' ').length).toBeGreaterThanOrEqual(2);
     });
+
+    it('preserves generated field semantics over conflicting control props', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(
+        <TestForm>
+          <FormField
+            name='username'
+            rules={{ required: 'Username is required' }}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Username</FormLabel>
+                <FormControl
+                  id='custom-id'
+                  aria-describedby='external-help'
+                  aria-invalid={false}
+                >
+                  <input {...field} />
+                </FormControl>
+                <FormDescription>Public display name.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </TestForm>
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+      const input = await screen.findByRole('textbox', { name: 'Username' });
+      expect(input).not.toHaveAttribute('id', 'custom-id');
+      expect(input).toHaveAttribute(
+        'id',
+        screen.getByText('Username').getAttribute('for')
+      );
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(input.getAttribute('aria-describedby')).toContain('external-help');
+      expect(input.getAttribute('aria-describedby')).toContain(
+        `${input.id}-message`
+      );
+    });
   });
 
   describe('FormDescription', () => {
@@ -290,10 +330,14 @@ describe('Form', () => {
   });
 
   describe('FormMessage', () => {
-    it('does not render when no error and no children', () => {
-      render(<TestForm />);
-      // FormMessage should not appear when there are no errors
+    it('reserves feedback space when no error and no children', () => {
+      const { container } = render(<TestForm />);
       expect(screen.queryByText('Email is required')).not.toBeInTheDocument();
+      const feedbackSlot = container.querySelector(
+        '[data-slot="form-message-feedback"]'
+      );
+      expect(feedbackSlot).toHaveClass('min-h-5');
+      expect(feedbackSlot).toBeEmptyDOMElement();
     });
 
     it('renders error message on validation failure', async () => {
@@ -316,8 +360,8 @@ describe('Form', () => {
       expect(message.className).toContain('text-app');
       expect(message.className).toContain('font-medium');
       expect(message).toHaveAttribute('role', 'alert');
-      expect(message).toHaveAttribute('aria-live', 'polite');
-      expect(message).toHaveAttribute('aria-atomic', 'true');
+      expect(message).not.toHaveAttribute('aria-live');
+      expect(message).not.toHaveAttribute('aria-atomic');
       expect(message).toHaveAttribute('data-slot', 'form-message');
     });
 

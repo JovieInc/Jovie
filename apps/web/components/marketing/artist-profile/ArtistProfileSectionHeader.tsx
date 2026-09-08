@@ -48,7 +48,9 @@ export function ArtistProfileSectionHeader({
         </p>
       ) : null}
       {/* ui-casing-allow: marketing display headline */}
-      <h2 className={cn(SHELL_H2_CLASS, headlineClassName)}>{headline}</h2>
+      <h2 className={cn(SHELL_H2_CLASS, headlineClassName, 'line-clamp-2')}>
+        {headline}
+      </h2>
       {body ? (
         <p
           className={cn(

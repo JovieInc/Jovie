@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/forms-validation-submit-state.test.tsx
+
 import {
   Button,
   Input,
@@ -17,6 +19,7 @@ import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { FormStatus } from '@/components/molecules/FormStatus';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
@@ -497,28 +500,18 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
       <div className='border-t border-subtle pt-2'>
         <Button
           type='submit'
-          disabled={loading}
+          loading={loading}
           variant='primary'
           className='w-full sm:w-auto'
         >
-          {loading ? 'Saving...' : 'Save Music Links'}
+          Save Music Links
         </Button>
       </div>
 
-      {/* Feedback */}
-      {error && (
-        <ContentSurfaceCard className='border-red-500/20 bg-red-500/5 p-3'>
-          <p className='text-sm text-red-600 dark:text-red-400'>{error}</p>
-        </ContentSurfaceCard>
-      )}
-
-      {success && (
-        <ContentSurfaceCard className='border-emerald-500/20 bg-emerald-500/5 p-3'>
-          <p className='text-sm text-emerald-600 dark:text-emerald-400'>
-            Music links saved!
-          </p>
-        </ContentSurfaceCard>
-      )}
+      <FormStatus
+        error={error}
+        success={success ? 'Music links saved!' : undefined}
+      />
     </form>
   );
 }

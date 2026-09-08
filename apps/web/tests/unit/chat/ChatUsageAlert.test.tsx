@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatUsageAlert } from '@/components/jovie/components/ChatUsageAlert';
 import { fastRender } from '@/tests/utils/fast-render';
+
+const appRoot = resolve(__dirname, '../../..');
 
 const mockUseChatUsageQuery = vi.fn();
 
@@ -20,6 +24,17 @@ describe('ChatUsageAlert', () => {
     mockUseChatUsageQuery.mockReset();
   });
 
+  it('keeps ChatUsageAlert as the canonical weekly usage alert owner', () => {
+    const chatUsageAlertSource = readFileSync(
+      resolve(appRoot, 'components/jovie/components/ChatUsageAlert.tsx'),
+      'utf8'
+    );
+
+    expect(chatUsageAlertSource).toContain('getChatUsageCopy');
+    expect(chatUsageAlertSource).toContain('aiWeeklyMessageLimit');
+    expect(chatUsageAlertSource).toContain('useChatUsageQuery');
+  });
+
   it('shows warning state when near limit', () => {
     mockUseChatUsageQuery.mockReturnValue({
       isLoading: false,
@@ -27,7 +42,8 @@ describe('ChatUsageAlert', () => {
         plan: 'free',
         used: 9,
         remaining: 1,
-        dailyLimit: 10,
+        weeklyLimit: 15,
+        warningThreshold: 3,
         isNearLimit: true,
         isExhausted: false,
       },
@@ -36,7 +52,7 @@ describe('ChatUsageAlert', () => {
     const { getByText } = fastRender(<ChatUsageAlert />);
 
     expect(getByText("You're almost out of messages")).toBeInTheDocument();
-    expect(getByText(/9 of 10 daily messages/)).toBeInTheDocument();
+    expect(getByText(/9 of 15 weekly messages/)).toBeInTheDocument();
   });
 
   it('shows exhausted state with upgrade CTA', () => {
@@ -44,28 +60,10 @@ describe('ChatUsageAlert', () => {
       isLoading: false,
       data: {
         plan: 'free',
-        used: 100,
+        used: 15,
         remaining: 0,
-        dailyLimit: 100,
-        isNearLimit: false,
-        isExhausted: true,
-      },
-    });
-
-    const { getByText, getByRole } = fastRender(<ChatUsageAlert />);
-
-    expect(getByText("You're out of messages for today")).toBeInTheDocument();
-    expect(getByRole('button', { name: /Upgrade to Pro/ })).toBeInTheDocument();
-  });
-
-  it('shows view plans button for pro users at limit', () => {
-    mockUseChatUsageQuery.mockReturnValue({
-      isLoading: false,
-      data: {
-        plan: 'pro',
-        used: 100,
-        remaining: 0,
-        dailyLimit: 100,
+        weeklyLimit: 15,
+        warningThreshold: 3,
         isNearLimit: false,
         isExhausted: true,
       },
@@ -74,7 +72,51 @@ describe('ChatUsageAlert', () => {
     const { getByText, getByRole } = fastRender(<ChatUsageAlert />);
 
     expect(
-      getByText(/Come back tomorrow when your quota refreshes/)
+      getByText("You're out of messages for this week")
+    ).toBeInTheDocument();
+    expect(getByRole('button', { name: /Upgrade to Pro/ })).toBeInTheDocument();
+  });
+
+  it('does not offer Upgrade to Pro when a trial user is exhausted', () => {
+    mockUseChatUsageQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        plan: 'trial',
+        used: 50,
+        remaining: 0,
+        weeklyLimit: 50,
+        warningThreshold: 10,
+        isNearLimit: false,
+        isExhausted: true,
+      },
+    });
+
+    const { getByRole, queryByRole } = fastRender(<ChatUsageAlert />);
+
+    expect(getByRole('link', { name: 'View plans' })).toBeInTheDocument();
+    expect(
+      queryByRole('button', { name: /Upgrade to Pro/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows view plans button for pro users at limit', () => {
+    mockUseChatUsageQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        plan: 'pro',
+        used: 70,
+        remaining: 0,
+        weeklyLimit: 70,
+        warningThreshold: 14,
+        isNearLimit: false,
+        isExhausted: true,
+      },
+    });
+
+    const { getByText, getByRole } = fastRender(<ChatUsageAlert />);
+
+    expect(
+      getByText(/messages refresh when the current window ends/)
     ).toBeInTheDocument();
     expect(getByRole('link', { name: 'View plans' })).toBeInTheDocument();
   });

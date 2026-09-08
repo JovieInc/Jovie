@@ -67,6 +67,7 @@ function buildNavLinks(
   }
 
   if (!showAuthenticatedAction && includePublicLogin) {
+    // ui-casing-allow: canonical sentence-case auth label; MobileNav.test asserts 'Log In' must not appear
     baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log in' });
   }
 

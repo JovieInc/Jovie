@@ -33,8 +33,11 @@ function extractShellWorkspaceBlock(css: string): string {
   const markerIndex = css.indexOf(marker);
   expect(markerIndex, 'Noir Ion D marker must exist').toBeGreaterThan(-1);
   const fromMarker = css.slice(markerIndex);
-  const blockStart = fromMarker.search(/\[data-app-shell-frame=(['"])true\1\]/);
-  expect(blockStart).toBeGreaterThan(-1);
+  const selectorStart = fromMarker.search(
+    /\[data-app-shell-frame=(['"])true\1\]/
+  );
+  expect(selectorStart).toBeGreaterThan(-1);
+  const blockStart = fromMarker.lastIndexOf('\n', selectorStart) + 1;
   const openBrace = fromMarker.indexOf('{', blockStart);
   let depth = 0;
   for (let i = openBrace; i < fromMarker.length; i++) {
@@ -52,6 +55,28 @@ function extractShellWorkspaceBlock(css: string): string {
 
 describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
   const shellBlock = extractShellWorkspaceBlock(DESIGN_SYSTEM_CSS);
+
+  it('applies graphite only to dark workspaces, preserving explicit light surfaces', () => {
+    const selector = shellBlock.slice(0, shellBlock.indexOf('{')).trim();
+    const theme = document.createElement('div');
+    const frame = document.createElement('div');
+    frame.dataset.appShellFrame = 'true';
+    theme.append(frame);
+
+    for (const mode of ['light', 'dark', 'light']) {
+      theme.className = mode;
+      expect(frame.matches(selector), `workspace in ${mode}`).toBe(
+        mode === 'dark'
+      );
+    }
+
+    theme.className = '';
+    frame.className = 'dark';
+    expect(frame.matches(selector)).toBe(true);
+    frame.className = 'light';
+    expect(frame.matches(selector)).toBe(false);
+    expect(document.createElement('div').matches(selector)).toBe(false);
+  });
 
   it('keeps routine workspace state and depth graphite, reserving Ion for focus', () => {
     expect(shellBlock).toContain(

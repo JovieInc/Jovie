@@ -12,6 +12,44 @@ const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
 const CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 const MAX_FIRST_PARENT_COMMITS = 5000;
 
+export const WEB_BIND_REASONS = Object.freeze({
+  none: 'none',
+  selectedLane: 'selected_lane',
+  liveUnbound: 'live_unbound',
+});
+
+export const PRODUCTION_BASE_EVIDENCE = Object.freeze({
+  verifiedMarker: 'verified-marker',
+  canonicalBootstrap: 'canonical-live-bootstrap',
+});
+
+/**
+ * Classify the already-serving production checkpoint used as the lower bound
+ * of a new release range. A historical generation normally needs its durable
+ * verified marker. The sole bootstrap exception is an exact canonical live
+ * SHA that predates marker enforcement and differs from the new target. The
+ * caller must have read that SHA from canonical build-info; the new target
+ * still traverses the complete staging, canary, promotion, and verification
+ * path and receives its own marker.
+ */
+export function classifyProductionBaseEvidence({
+  markerState,
+  deployedSha,
+  currentSha,
+}) {
+  exactSha(deployedSha, 'deployedSha');
+  exactSha(currentSha, 'currentSha');
+  if (markerState === 'verified') {
+    return PRODUCTION_BASE_EVIDENCE.verifiedMarker;
+  }
+  if (markerState === 'none' && deployedSha !== currentSha) {
+    return PRODUCTION_BASE_EVIDENCE.canonicalBootstrap;
+  }
+  throw new Error(
+    `production base evidence is not admissible (${markerState || 'missing'})`
+  );
+}
+
 function exactSha(value, label) {
   if (!SHA_PATTERN.test(value ?? '')) {
     throw new Error(`${label} must be a full lowercase commit SHA`);
@@ -43,6 +81,11 @@ function uniqueStrings(values, label) {
  * admission evidence: its combined-head gate included every earlier commit,
  * and every later first-parent commit is proven by classification not to touch
  * the Web product lane.
+ *
+ * Live bind is occupancy of current main on jov.ie, not "web files changed."
+ * An iOS/Mac/operations-only range with deployedSha !== currentSha still
+ * selects Web/Promote so skip-promote cannot fail-closed forever (JOV-5821).
+ * Skip-promote remains fail-closed while unbound (JOV-5458 / JOV-5807).
  */
 export function planProductionLaneRange({
   deployedSha,
@@ -97,9 +140,12 @@ export function planProductionLaneRange({
   }
 
   const cumulative = classifyProductLanes(cumulativePaths);
-  const runWeb = cumulative.selectedLanes.includes('web');
+  const selectedWeb = cumulative.selectedLanes.includes('web');
+  let runWeb = selectedWeb;
   let webEvidenceSha = null;
-  if (runWeb) {
+  /** @type {'none' | 'selected_lane' | 'live_unbound'} */
+  let webBindReason = WEB_BIND_REASONS.none;
+  if (selectedWeb) {
     const evidenceCommit = commitsNewestFirst.find(commit =>
       classifyProductLanes(commit.changedPaths).selectedLanes.includes('web')
     );
@@ -109,6 +155,12 @@ export function planProductionLaneRange({
       );
     }
     webEvidenceSha = evidenceCommit.sha;
+    webBindReason = WEB_BIND_REASONS.selectedLane;
+  } else if (deployedSha !== currentSha) {
+    // Sealed product-lane receipts stay honest (ios/mac/operations). Web still
+    // runs so Production Release can bind jov.ie to current main.
+    runWeb = true;
+    webBindReason = WEB_BIND_REASONS.liveUnbound;
   }
 
   return {
@@ -121,6 +173,7 @@ export function planProductionLaneRange({
     selectedLanes: cumulative.selectedLanes,
     runWeb,
     webEvidenceSha,
+    webBindReason,
   };
 }
 
@@ -161,6 +214,9 @@ export function planProductionMarkerRecovery({
     selectedLanes,
     runWeb,
     webEvidenceSha: runWeb ? currentSha : null,
+    webBindReason: runWeb
+      ? WEB_BIND_REASONS.selectedLane
+      : WEB_BIND_REASONS.none,
   };
 }
 
@@ -489,6 +545,11 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
       currentReceipt,
     });
   } else {
+    const baseEvidence = classifyProductionBaseEvidence({
+      markerState: args['deployed-marker-state'],
+      deployedSha: args['deployed-sha'],
+      currentSha: args['current-sha'],
+    });
     const gitRange = collectProductionGitRange(
       args['deployed-sha'],
       args['current-sha']
@@ -498,10 +559,18 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
       currentSha: args['current-sha'],
       ...gitRange,
     });
+    plan.productionBaseEvidence = baseEvidence;
   }
 
   let webEvidence = null;
-  if (plan.runWeb) {
+  if (plan.runWeb && plan.webBindReason === WEB_BIND_REASONS.liveUnbound) {
+    webEvidence = {
+      sha: plan.currentSha,
+      lane: 'web',
+      source: 'live-unbound-bind',
+      selectedLanes: plan.selectedLanes,
+    };
+  } else if (plan.runWeb) {
     if (plan.webEvidenceSha === plan.currentSha) {
       currentReceipt ??= JSON.parse(
         readFileSync(args['current-receipt'], 'utf8')
@@ -540,6 +609,7 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
       [
         `selected_lanes=${plan.selectedLanes.join(',') || 'none'}`,
         `run_web=${plan.runWeb}`,
+        `web_bind_reason=${plan.webBindReason}`,
         `deployed_sha=${plan.deployedSha}`,
         `web_evidence_sha=${plan.webEvidenceSha ?? 'none'}`,
       ].join('\n') + '\n',
@@ -547,7 +617,7 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
     );
   }
   process.stdout.write(
-    `Production lane range ${plan.deployedSha}..${plan.currentSha}: ${plan.selectedLanes.join(',') || 'none'}; Web=${plan.runWeb}; evidence=${plan.webEvidenceSha ?? 'none'}\n`
+    `Production lane range ${plan.deployedSha}..${plan.currentSha}: ${plan.selectedLanes.join(',') || 'none'}; Web=${plan.runWeb}; bind=${plan.webBindReason}; evidence=${plan.webEvidenceSha ?? 'none'}\n`
   );
   return output;
 }

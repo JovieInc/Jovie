@@ -12,6 +12,8 @@ import {
   parseOklch,
 } from './lib/oklch.mjs';
 import {
+  COLOR_SOT_PATH,
+  COLOR_SOT_SCHEMA,
   PALETTE_PATH,
   REPO_ROOT,
   runOklchPaletteGuard,
@@ -24,7 +26,16 @@ const loadPalette = () =>
 
 test('canonical registry locks Mint/Orange/Red and surface-0..3', () => {
   const palette = loadPalette();
+  const colorSot = JSON.parse(
+    readFileSync(join(REPO_ROOT, COLOR_SOT_PATH), 'utf8')
+  );
   assert.equal(palette.schema, SCHEMA);
+  assert.equal(colorSot.schema, COLOR_SOT_SCHEMA);
+  assert.equal(colorSot.penNode, 'ZiaWI');
+  assert.equal(colorSot.accents.hex.ion, '#11AFFF');
+  assert.equal(colorSot.elevations.count, 5);
+  assert.equal(palette.authority, COLOR_SOT_SCHEMA);
+  assert.equal(palette.colorSot.penNode, 'ZiaWI');
   assert.deepEqual(palette.semantics, {
     success: 'mint',
     warning: 'orange',
@@ -93,4 +104,13 @@ test('guard rejects rogue stops, freehand derived colors, and off-token copy', (
   }).map(i => i.code);
   assert.ok(offCodes.includes('off-token'));
   assert.ok(offCodes.includes('docs'));
+});
+
+test('React palette hexes must project ZiaWI; ion cannot drift to #1F7BF5', () => {
+  const palette = loadPalette();
+  const drifted = structuredClone(palette);
+  drifted.swatches.ion.light.hex = '#1F7BF5';
+  drifted.swatches.ion.dark.hex = '#1F7BF5';
+  const codes = validateOklchPalette(drifted).map(i => i.code);
+  assert.ok(codes.includes('color-sot'));
 });

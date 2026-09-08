@@ -9,7 +9,7 @@ describe('production auth interaction hydration gate', () => {
     document.body.innerHTML = `
       <form data-auth-email-code-step="email">
         <input name="emailAddress" type="email" autocomplete="email" />
-        <button type="submit">Email me a Code</button>
+        <button type="submit">Send sign-in code</button>
       </form>
     `;
 

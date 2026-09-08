@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.2.0
+spec-version: 1.3.0
 doc-freshness: docs/marketing/COMPOSITION_RULES.md
 -->
 # Marketing Composition Rules

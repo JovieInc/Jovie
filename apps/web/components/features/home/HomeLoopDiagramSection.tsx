@@ -49,7 +49,7 @@ export function HomeLoopDiagramSection() {
     <section className='border-t border-white/[0.04] bg-black dark:bg-black px-6 py-32 sm:py-40'>
       <div className='mx-auto grid max-w-300 gap-16 lg:grid-cols-[320px_1fr] lg:items-center'>
         <div>
-          <h2 className='m-0 font-(--marketing-font-display) text-[clamp(2rem,4.5vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-primary-token'>
+          <h2 className='m-0 font-(--marketing-font-display) text-[clamp(2rem,4.5vw,3rem)] font-extrabold leading-[1.05] tracking-[-0.03em] text-primary-token line-clamp-2'>
             Stop Letting
             <br />
             Momentum Decay.

@@ -14,7 +14,7 @@ function QueryProbe() {
 describe('ClientProviders', () => {
   it('provides QueryClient even when skipCoreProviders is true', () => {
     render(
-      <ClientProviders publishableKey={undefined} skipCoreProviders>
+      <ClientProviders skipCoreProviders>
         <QueryProbe />
       </ClientProviders>
     );

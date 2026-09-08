@@ -75,6 +75,8 @@ export interface PitchChecklistStatus {
   readonly items: readonly PitchChecklistItem[];
   readonly firstMissing: PitchChecklistItem | null;
   readonly allResolved: boolean;
+  /** Known values or explicit `UNKNOWN: field` markers — drafting may proceed. */
+  readonly draftable: boolean;
 }
 
 const LISTEN_LINK_PATTERN = /https?:\/\/\S+/i;
@@ -164,10 +166,14 @@ export function getPitchChecklistStatus(
   });
 
   const firstMissing = items.find(item => item.status === 'unknown') ?? null;
+  const draftable = items.every(
+    item => item.status === 'known' || explicitUnknown.has(item.id)
+  );
   return {
     items,
     firstMissing,
     allResolved: firstMissing === null,
+    draftable,
   };
 }
 
@@ -180,9 +186,12 @@ export function formatPitchChecklistForPrompt(
       : `- ${item.label}: UNKNOWN`
   );
   if (status.firstMissing) {
+    const next = `Next missing field: ${status.firstMissing.label}. ${status.firstMissing.recommendHint}`;
     lines.push(
       '',
-      `Next missing field: ${status.firstMissing.label}. ${status.firstMissing.recommendHint}`
+      status.draftable
+        ? next
+        : `Do not draft until the curator checklist is resolved. ${next}`
     );
   }
   return ['## Curator Checklist', ...lines].join('\n');

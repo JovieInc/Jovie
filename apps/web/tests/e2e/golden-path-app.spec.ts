@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser } from '../helpers/clerk-auth';
+import { ensureSignedInUser } from '../helpers/auth';
 import {
   buildValidOnboardingHandle,
   createFreshUser,

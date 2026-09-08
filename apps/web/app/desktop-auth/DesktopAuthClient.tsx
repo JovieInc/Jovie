@@ -1,50 +1,65 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
+  copyDesktopAuthUrl,
+  type DesktopAuthActionResult,
   openDesktopAuthUrl,
   useDesktopAppBootSignal,
 } from '@/lib/desktop/electron-bridge';
 
-type BrowserOpenState = 'idle' | 'opening' | 'opened' | 'error';
+export type DesktopAuthOpenState = 'idle' | 'opening' | 'opened' | 'error';
+type CopyState = 'idle' | 'copying' | 'copied' | 'error';
 
 interface DesktopAuthClientProps {
   readonly authUrlParam: string | null;
 }
 
-const BROWSER_OPEN_TIMEOUT_MS = 5000;
+interface DesktopAuthHandoffActionsProps {
+  readonly authUrl?: string | null;
+  readonly onOpenStateChange?: (state: DesktopAuthOpenState) => void;
+  readonly resolveAuthUrl?: () => string | null;
+  readonly showCancelSignIn?: boolean;
+}
+
+const DESKTOP_AUTH_ACTION_TIMEOUT_MS = 5000;
+const PRIMARY_ACTION_CLASS =
+  'inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-app font-medium text-(--color-bg-base) transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white';
+const SECONDARY_ACTION_CLASS =
+  'inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 px-4 text-app font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 disabled:cursor-not-allowed disabled:opacity-55';
 
 function formatOpenError(reason?: string): string {
   if (reason === 'blocked-url' || reason === 'invalid-auth-url') {
     return 'Sign-in could not start. Close this window and try again from Jovie.';
   }
 
-  return 'The browser did not open. Try again, or close this window and start sign-in again.';
+  return 'The browser did not open. Try again, or copy the sign-in link.';
 }
 
-function formatBrowserOpenStatus(
-  openState: BrowserOpenState,
-  openError: string | null
-): string | null {
-  if (openState === 'opened') {
-    return 'Check your browser.';
+function formatCopyError(reason?: string): string {
+  if (reason === 'blocked-url' || reason === 'invalid-auth-url') {
+    return 'The sign-in link is no longer valid. Try opening the browser again.';
   }
 
-  return openError;
+  return 'The sign-in link could not be copied. Try again.';
 }
 
-async function openWithTimeout(authUrl: string) {
+async function runWithTimeout(
+  action: Promise<DesktopAuthActionResult>,
+  timeoutReason: string
+): Promise<DesktopAuthActionResult> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      openDesktopAuthUrl(authUrl),
-      new Promise<{ ok: false; reason: string }>(resolve => {
+      action,
+      new Promise<DesktopAuthActionResult>(resolve => {
         timeoutId = setTimeout(
-          () => resolve({ ok: false, reason: 'desktop-auth-open-timeout' }),
-          BROWSER_OPEN_TIMEOUT_MS
+          () => resolve({ ok: false, reason: timeoutReason }),
+          DESKTOP_AUTH_ACTION_TIMEOUT_MS
         );
       }),
     ]);
@@ -61,38 +76,160 @@ function getAppOrigin(): string {
     : globalThis.window.location.origin;
 }
 
-export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
-  // Auth handoff is a dedicated BrowserWindow outside ClientProviders.
-  // Still clear any shell boot watchdog if this surface owns the view.
-  useDesktopAppBootSignal();
-  const [openState, setOpenState] = useState<BrowserOpenState>('idle');
+export function DesktopAuthHandoffActions({
+  authUrl = null,
+  onOpenStateChange,
+  resolveAuthUrl,
+  showCancelSignIn = false,
+}: DesktopAuthHandoffActionsProps) {
+  const [openState, setOpenState] = useState<DesktopAuthOpenState>('idle');
   const [openError, setOpenError] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<CopyState>('idle');
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const primaryActionRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (openState === 'error') primaryActionRef.current?.focus();
+  }, [openState]);
+
+  const getAuthUrl = useCallback(
+    () => authUrl ?? resolveAuthUrl?.() ?? null,
+    [authUrl, resolveAuthUrl]
+  );
+
+  const updateOpenState = useCallback(
+    (state: DesktopAuthOpenState) => {
+      setOpenState(state);
+      onOpenStateChange?.(state);
+    },
+    [onOpenStateChange]
+  );
+
+  const openAuthUrl = useCallback(async () => {
+    const currentAuthUrl = getAuthUrl();
+    if (!currentAuthUrl || openState === 'opening' || copyState === 'copying') {
+      return;
+    }
+
+    updateOpenState('opening');
+    setOpenError(null);
+    setCopyState('idle');
+    setCopyError(null);
+    try {
+      const result = await runWithTimeout(
+        openDesktopAuthUrl(currentAuthUrl),
+        'desktop-auth-open-timeout'
+      );
+      if (result.ok) {
+        updateOpenState('opened');
+        return;
+      }
+      updateOpenState('error');
+      setOpenError(formatOpenError(result.reason));
+    } catch {
+      updateOpenState('error');
+      setOpenError(formatOpenError());
+    }
+  }, [copyState, getAuthUrl, openState, updateOpenState]);
+
+  const copyAuthUrl = useCallback(async () => {
+    const currentAuthUrl = getAuthUrl();
+    if (!currentAuthUrl || openState === 'opening' || copyState === 'copying') {
+      return;
+    }
+
+    setCopyState('copying');
+    setCopyError(null);
+    try {
+      const result = await runWithTimeout(
+        copyDesktopAuthUrl(currentAuthUrl),
+        'desktop-auth-copy-timeout'
+      );
+      if (result.ok) {
+        setCopyState('copied');
+        return;
+      }
+      setCopyState('error');
+      setCopyError(formatCopyError(result.reason));
+    } catch {
+      setCopyState('error');
+      setCopyError(formatCopyError());
+    }
+  }, [copyState, getAuthUrl, openState]);
+
+  const hasAuthUrl = authUrl !== null || resolveAuthUrl !== undefined;
+  const isBusy = openState === 'opening' || copyState === 'copying';
+  const openLabel =
+    openState === 'opening'
+      ? 'Opening Browser...'
+      : openState === 'opened'
+        ? 'Open Browser Again'
+        : openState === 'error'
+          ? 'Try Again'
+          : 'Continue in Browser';
+  const copyLabel =
+    copyState === 'copying' ? 'Copying Sign-In Link...' : 'Copy Sign-In Link';
+  const statusText =
+    copyState === 'copied'
+      ? 'Sign-in link copied.'
+      : (copyError ??
+        (openState === 'opened' ? 'Check your browser.' : openError));
+
+  return (
+    <>
+      <div
+        className='mt-8 flex w-full flex-col items-center justify-center gap-2'
+        data-desktop-auth-state={openState}
+        data-testid='desktop-auth-actions'
+      >
+        <button
+          ref={primaryActionRef}
+          type='button'
+          className={PRIMARY_ACTION_CLASS}
+          disabled={!hasAuthUrl || isBusy}
+          onClick={openAuthUrl}
+        >
+          {openLabel}
+        </button>
+        <button
+          type='button'
+          className={SECONDARY_ACTION_CLASS}
+          disabled={!hasAuthUrl || isBusy}
+          onClick={copyAuthUrl}
+        >
+          {copyLabel}
+        </button>
+        {showCancelSignIn ? (
+          <button
+            type='button'
+            className={SECONDARY_ACTION_CLASS}
+            onClick={() => {
+              closeDesktopAuthWindow().catch(() => {});
+            }}
+          >
+            Cancel Sign-In
+          </button>
+        ) : null}
+      </div>
+      <p
+        aria-live='polite'
+        role='status'
+        className='mt-3 min-h-10 text-xs leading-5 text-white/56'
+      >
+        {hasAuthUrl ? statusText : 'Start sign-in again from Jovie.'}
+      </p>
+    </>
+  );
+}
+
+export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
+  useDesktopAppBootSignal();
+  const [openState, setOpenState] = useState<DesktopAuthOpenState>('idle');
   const appOrigin = getAppOrigin();
   const authUrl = useMemo(
     () => sanitizeDesktopAuthUrl(authUrlParam, appOrigin),
     [authUrlParam, appOrigin]
   );
-
-  const openAuthUrl = useCallback(async () => {
-    if (!authUrl || openState === 'opening') return;
-    setOpenState('opening');
-    setOpenError(null);
-    try {
-      const result = await openWithTimeout(authUrl);
-      if (result.ok) {
-        setOpenState('opened');
-        return;
-      }
-      setOpenState('error');
-      setOpenError(formatOpenError(result.reason));
-    } catch {
-      setOpenState('error');
-      setOpenError(formatOpenError());
-    }
-  }, [authUrl, openState]);
-
-  const statusText = formatBrowserOpenStatus(openState, openError);
-  const isWaitingInBrowser = openState === 'opened';
 
   return (
     <main
@@ -101,40 +238,13 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
       data-testid='desktop-auth-handoff'
     >
       <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
-        <BrandLogo aria-hidden size={60} tone='white' />
+        <BrandLogo aria-hidden size={BRAND_MARK_SIZE.splash} tone='white' />
         <h1 className='sr-only'>Sign In To Jovie</h1>
-        <div className='mt-8 flex min-h-11 w-full flex-col items-center justify-center gap-2'>
-          {isWaitingInBrowser ? null : (
-            <button
-              type='button'
-              className='inline-flex h-11 w-full items-center justify-center rounded-full bg-white px-4 text-app font-medium text-(--color-bg-base) transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white'
-              disabled={!authUrl || openState === 'opening'}
-              onClick={openAuthUrl}
-            >
-              {openState === 'opening'
-                ? 'Opening Browser...'
-                : 'Continue in Browser'}
-            </button>
-          )}
-          {isWaitingInBrowser || !authUrl ? (
-            <button
-              type='button'
-              className='inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 px-4 text-app font-medium text-white/72 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
-              onClick={() => {
-                closeDesktopAuthWindow().catch(() => {});
-              }}
-            >
-              Cancel Sign-In
-            </button>
-          ) : null}
-        </div>
-        <p
-          aria-live='polite'
-          role='status'
-          className='mt-3 min-h-5 text-xs leading-5 text-white/56'
-        >
-          {authUrl ? statusText : 'Start sign-in again from Jovie.'}
-        </p>
+        <DesktopAuthHandoffActions
+          authUrl={authUrl}
+          onOpenStateChange={setOpenState}
+          showCancelSignIn
+        />
       </section>
     </main>
   );

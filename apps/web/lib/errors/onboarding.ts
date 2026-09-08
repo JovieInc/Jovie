@@ -36,6 +36,16 @@ export enum OnboardingErrorCode {
   NETWORK_ERROR = 'NETWORK_ERROR',
 }
 
+export const ONBOARDING_RECEIPT_PENDING_MESSAGE =
+  'Your profile is saved. Please retry to confirm setup.';
+
+export function createOnboardingReceiptPendingError(cause: unknown): Error {
+  return new Error(
+    `[ONBOARDING_RECEIPT_PENDING] ${ONBOARDING_RECEIPT_PENDING_MESSAGE}`,
+    { cause }
+  );
+}
+
 export interface OnboardingError {
   code: OnboardingErrorCode;
   message: string;

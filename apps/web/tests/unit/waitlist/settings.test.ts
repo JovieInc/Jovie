@@ -37,8 +37,12 @@ vi.mock('drizzle-orm', () => ({
 // Mocks for the new Redis + observability layer in settings.ts (gate cache hardening).
 // Redis returns null so tests exercise the mem-cache + DB fallback paths exactly
 // as before; breadcrumbs and warnings are no-ops.
+// withRetry logs final non-retryable failures via Sentry.captureException before
+// the JOV-3353 fail-soft catch returns defaults + captureWarning. The mock must
+// export captureException so vitest does not throw and skip fail-soft.
 vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: vi.fn(),
+  captureException: vi.fn(),
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -432,11 +436,116 @@ describe('migration-drift fail-soft (JOV-3353)', () => {
   });
 
   it('still throws non-drift DB errors (no broad swallow)', async () => {
-    setupDbSelectError(new Error('connection terminated unexpectedly'));
+    // Non-retryable so withRetry does not burn the 5s CI testTimeout on backoff.
+    // Transient connection errors still throw after retry (not fail-soft).
+    setupDbSelectError(new Error('syntax error in SQL'));
 
     await expect(isWaitlistGateEnabled()).rejects.toThrow(
-      'connection terminated unexpectedly'
+      'syntax error in SQL'
     );
     expect(captureWarning).not.toHaveBeenCalled();
+  });
+
+  it('throws transient connection errors after retry instead of fail-softing', async () => {
+    vi.useFakeTimers();
+    setupDbSelectError(new Error('connection terminated unexpectedly'));
+
+    try {
+      const assertion = expect(isWaitlistGateEnabled()).rejects.toThrow(
+        'connection terminated unexpectedly'
+      );
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(captureWarning).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('withRetry scoping (JOV-6137)', () => {
+  let getWaitlistSettings: typeof import('@/lib/waitlist/settings').getWaitlistSettings;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    mockDbSelect.mockClear();
+    mockDbInsert.mockClear();
+    mockDbUpdate.mockClear();
+    vi.mocked(captureWarning).mockClear();
+    // withRetry's terminal catch captures NON-retryable terminal errors via
+    // Sentry.captureException (correct behavior exercised by earlier suites in
+    // this file). vi.resetModules() does not reset vi.mock call history, so
+    // clear the Sentry mock here to keep this suite's double-log assertions
+    // scoped to their own test activity (JOV-6137).
+    const { captureException: captureExceptionMock } = await import(
+      '@sentry/nextjs'
+    );
+    vi.mocked(captureExceptionMock).mockClear();
+
+    const mod = await import('@/lib/waitlist/settings');
+    getWaitlistSettings = mod.getWaitlistSettings;
+  });
+
+  it('retries transient errors on the pooled client (default db) and fails after the bounded retry window', async () => {
+    vi.useFakeTimers();
+    setupDbSelectError(new Error('connection terminated unexpectedly'));
+
+    try {
+      const assertion = expect(getWaitlistSettings()).rejects.toThrow(
+        'connection terminated unexpectedly'
+      );
+      await vi.runAllTimersAsync();
+      await assertion;
+      // Bounded by withRetry (maxRetries=4): initial attempt + 3 retries.
+      // Exactly 4 — not the tx-path single attempt, and not unbounded.
+      expect(mockDbSelect).toHaveBeenCalledTimes(4);
+      expect(captureWarning).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not retry transient errors when a caller transaction is passed — the serializable retry owner restarts it (JOV-6137)', async () => {
+    // Simulates the Neon mid-tx abort: the tx client fails transiently.
+    // withRetry must NOT wrap this client, so the error surfaces after
+    // exactly ONE attempt for withSerializableRetry to restart cleanly.
+    const fakeTx = {
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi
+              .fn()
+              .mockRejectedValue(
+                new Error('connection terminated unexpectedly')
+              ),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof getWaitlistSettings>[0];
+
+    await expect(getWaitlistSettings(fakeTx)).rejects.toThrow(
+      'connection terminated unexpectedly'
+    );
+    // Exactly one attempt on the tx client — no inner retry loop.
+    expect(fakeTx.select).toHaveBeenCalledTimes(1);
+    // The pooled client is never touched on the tx path.
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(captureWarning).not.toHaveBeenCalled();
+  });
+
+  it('emits a single captureWarning for missing-relation drift (no withRetry terminal double-log) on the pooled path (JOV-6137)', async () => {
+    setupDbSelectError(createMissingWaitlistSettingsError());
+
+    const { captureException } = await import('@sentry/nextjs');
+
+    await expect(getWaitlistSettings()).resolves.toEqual(
+      expect.objectContaining({ gateEnabled: true })
+    );
+    // Drift intercepted inside the operation: withRetry never sees it, so
+    // its terminal logDbError captureException must not fire — the fail-soft
+    // warning is the only signal (under the pre-JOV-6137 wrapping, withRetry
+    // logged the same drift via Sentry.captureException first).
+    expect(captureWarning).toHaveBeenCalledTimes(1);
+    expect(captureException).not.toHaveBeenCalled();
   });
 });

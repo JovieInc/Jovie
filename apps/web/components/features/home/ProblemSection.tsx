@@ -25,7 +25,7 @@ export function ProblemSection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto'>
           <h2
-            className='text-center heading-gap-linear text-primary-token'
+            className='text-center heading-gap-linear text-primary-token line-clamp-2'
             style={{
               fontSize: 'var(--linear-h2-size)',
               fontWeight: 'var(--linear-font-weight-medium)',

@@ -82,8 +82,24 @@ describe('artist-parser', () => {
         role: 'main_artist',
         joinPhrase: ' & ',
         position: 1,
-        isPrimary: false,
+        isPrimary: true,
       });
+    });
+
+    it('keeps every Spotify album artist as a primary credit', () => {
+      const credits = parseMainArtists([
+        { id: 'spotify-tim-white', name: 'Tim White' },
+        { id: 'spotify-lynx', name: 'LYNX' },
+      ]);
+
+      expect(credits).toHaveLength(2);
+      expect(credits.map(credit => credit.name)).toEqual(['Tim White', 'LYNX']);
+      expect(credits.every(credit => credit.role === 'main_artist')).toBe(true);
+      expect(credits.every(credit => credit.isPrimary)).toBe(true);
+      expect(credits.map(credit => credit.spotifyId)).toEqual([
+        'spotify-tim-white',
+        'spotify-lynx',
+      ]);
     });
 
     it('does not split "&" when it looks like a single long band name', () => {

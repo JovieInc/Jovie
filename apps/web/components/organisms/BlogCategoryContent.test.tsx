@@ -131,7 +131,7 @@ describe('BlogCategoryContent', () => {
       source: 'apps/web/components/organisms/BlogCategoryContent.tsx',
       sourceExport: 'BlogCategoryContent',
       storyExport: 'Web024ArtistManagement',
-      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
+      sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1',
       fixture: 'content/blog/the-contact-problem.md',
     });
     expect(BLOG_CATEGORY_STORY_RECEIPT.sourceSha).not.toBe(

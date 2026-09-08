@@ -8,7 +8,7 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    size: 48,
+    size: 'chrome',
     tone: 'auto',
     variant: 'jovie',
   },
@@ -29,7 +29,7 @@ export const AlternateBrand: Story = {
   args: {
     variant: 'ov',
     tone: 'color',
-    size: 56,
+    size: 'splash',
     rounded: false,
   },
 };
@@ -66,7 +66,7 @@ export const WhiteTone: Story = {
 export const Square: Story = {
   args: {
     rounded: false,
-    size: 64,
+    size: 'control',
   },
 };
 

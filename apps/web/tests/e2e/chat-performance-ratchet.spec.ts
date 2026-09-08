@@ -13,7 +13,7 @@ import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
 } from '@/scripts/performance-interaction-report';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { waitForHydration } from './utils/smoke-test-utils';
 
 const CONVERSATION_ID = 'conv-chat-performance';

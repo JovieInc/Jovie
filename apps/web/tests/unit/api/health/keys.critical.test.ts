@@ -4,7 +4,7 @@ const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/env-server', () => ({ env: { DATABASE_URL: '' } }));
 vi.mock('@/lib/env-public', () => ({
-  publicEnv: { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '' },
+  publicEnv: { NEXT_PUBLIC_BETTER_AUTH_URL: '' },
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
 
