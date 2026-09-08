@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +22,8 @@ export const DEFAULT_AUDIT_PATH = path.join(
 export const CANONICAL_REGISTRY_PATH = 'canon/invariants.jsonl';
 export const STEWARDSHIP_SCHEMA = 'jovie-invariant-stewardship-audit/v1';
 export const GROWTH_LEARNING_INTAKE_SCHEMA = 'jovie-growth-learning-intake/v1';
+export const GROWTH_LEARNING_SOURCE_REVISION_DIGEST_ALGORITHM =
+  'sha256:sorted-source-id-ref-revision/v1';
 
 const GROWTH_LEARNING_PERIOD_PATTERN = /^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/;
 const GROWTH_LEARNING_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
@@ -98,6 +101,26 @@ function notPresentGrowthLearning() {
   };
 }
 
+function computeSourceRevisionDigest(records) {
+  const entries = records.flatMap(record =>
+    Array.isArray(record?.sources)
+      ? record.sources.map(source => ({
+          id: source?.id ?? null,
+          ref: source?.ref ?? null,
+          sourceRevision: source?.sourceRevision ?? null,
+        }))
+      : []
+  );
+  entries.sort((left, right) => {
+    const leftKey = JSON.stringify(left);
+    const rightKey = JSON.stringify(right);
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  });
+  return `sha256:${createHash('sha256')
+    .update(JSON.stringify(entries))
+    .digest('hex')}`;
+}
+
 /**
  * Validate the optional growth-learning intake carried by the existing
  * evidence-only stewardship snapshot. This is preparation/validation only:
@@ -131,13 +154,14 @@ export function validateGrowthLearningIntake(
   if (!GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceDigest ?? '')) {
     errors.push('growth-learning-source-digest-invalid');
   }
-  const expectedDedupeKey =
-    GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '') &&
-    GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceDigest ?? '')
-      ? `growth-learning:${intake.period}:${intake.sourceDigest}`
-      : null;
-  if (intake.dedupeKey !== expectedDedupeKey) {
-    errors.push('growth-learning-dedupe-key-invalid');
+  if (
+    intake.sourceRevisionDigestAlgorithm !==
+    GROWTH_LEARNING_SOURCE_REVISION_DIGEST_ALGORITHM
+  ) {
+    errors.push('growth-learning-source-revision-digest-algorithm-invalid');
+  }
+  if (!GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceRevisionDigest ?? '')) {
+    errors.push('growth-learning-source-revision-digest-invalid');
   }
   if (intake.maxSources !== GROWTH_LEARNING_MAX_SOURCES) {
     errors.push('growth-learning-source-limit-invalid');
@@ -147,24 +171,6 @@ export function validateGrowthLearningIntake(
   }
   if (intake.noDuplicateScheduler !== true) {
     errors.push('growth-learning-duplicate-scheduler-invalid');
-  }
-
-  if (!Array.isArray(intake.priorDedupeKeys)) {
-    errors.push('growth-learning-prior-dedupe-keys-missing');
-  } else {
-    const priorKeys = new Set();
-    for (const key of intake.priorDedupeKeys) {
-      if (!GROWTH_LEARNING_DEDUPE_PATTERN.test(key ?? '')) {
-        errors.push(`growth-learning-prior-dedupe-key-invalid:${key}`);
-      }
-      if (priorKeys.has(key)) {
-        errors.push(`growth-learning-prior-dedupe-key-duplicate:${key}`);
-      }
-      priorKeys.add(key);
-    }
-    if (expectedDedupeKey && priorKeys.has(expectedDedupeKey)) {
-      errors.push(`growth-learning-duplicate-dedupe-key:${expectedDedupeKey}`);
-    }
   }
 
   if (!Array.isArray(intake.records)) {
@@ -210,6 +216,40 @@ export function validateGrowthLearningIntake(
     }
     if (sourceCount > GROWTH_LEARNING_MAX_SOURCES) {
       errors.push('growth-learning-max-sources-exceeded');
+    }
+    const expectedSourceRevisionDigest = computeSourceRevisionDigest(
+      intake.records
+    );
+    if (intake.sourceRevisionDigest !== expectedSourceRevisionDigest) {
+      errors.push(
+        `growth-learning-source-revision-digest-mismatch:${expectedSourceRevisionDigest}`
+      );
+    }
+  }
+
+  const expectedDedupeKey =
+    GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '') &&
+    GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceRevisionDigest ?? '')
+      ? `growth-learning:${intake.period}:${intake.sourceRevisionDigest}`
+      : null;
+  if (intake.dedupeKey !== expectedDedupeKey) {
+    errors.push('growth-learning-dedupe-key-invalid');
+  }
+  if (!Array.isArray(intake.priorDedupeKeys)) {
+    errors.push('growth-learning-prior-dedupe-keys-missing');
+  } else {
+    const priorKeys = new Set();
+    for (const key of intake.priorDedupeKeys) {
+      if (!GROWTH_LEARNING_DEDUPE_PATTERN.test(key ?? '')) {
+        errors.push(`growth-learning-prior-dedupe-key-invalid:${key}`);
+      }
+      if (priorKeys.has(key)) {
+        errors.push(`growth-learning-prior-dedupe-key-duplicate:${key}`);
+      }
+      priorKeys.add(key);
+    }
+    if (expectedDedupeKey && priorKeys.has(expectedDedupeKey)) {
+      errors.push(`growth-learning-duplicate-dedupe-key:${expectedDedupeKey}`);
     }
   }
 
