@@ -120,7 +120,7 @@ def official_binary(env=None):
     newest = newest_version_binary(env)
     if newest is not None:
         return newest
-    path_hit = shutil.which("cursor-agent")
+    path_hit = shutil.which("cursor-agent", path=(env or os.environ).get("PATH", ""))
     if path_hit and _runnable(path_hit):
         return pathlib.Path(path_hit)
     return None
