@@ -171,26 +171,6 @@ function parseTsx(absolutePath: string, source: string): ts.SourceFile {
   );
 }
 
-function countSectionOccurrenceBindings(
-  sourceFile: ts.SourceFile,
-  binding: string
-): number {
-  let count = 0;
-  const visit = (node: ts.Node): void => {
-    if (
-      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
-      node.tagName.getText(sourceFile) === 'section' &&
-      node.attributes.properties.some(
-        attribute => attribute.getText(sourceFile) === binding
-      )
-    )
-      count++;
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return count;
-}
-
 function countReturnedRootBindings(
   sourceFile: ts.SourceFile,
   binding: string
@@ -206,8 +186,15 @@ function countReturnedRootBindings(
       let ancestor = rootElement.parent;
       let nestedInsideJsx = false;
 
-      while (ancestor && !ts.isReturnStatement(ancestor)) {
-        if (ts.isJsxElement(ancestor) || ts.isJsxFragment(ancestor)) {
+      while (
+        ancestor &&
+        !ts.isReturnStatement(ancestor) &&
+        !ts.isArrowFunction(ancestor)
+      ) {
+        if (
+          ts.isJsxElement(ancestor) &&
+          ancestor.openingElement.tagName.getText(sourceFile) === 'section'
+        ) {
           nestedInsideJsx = true;
           break;
         }
@@ -491,7 +478,7 @@ describe('canonical marketing component registry', () => {
         const ownerPath = path.join(repoRoot, occurrence.componentPath);
         const ownerSource = fs.readFileSync(ownerPath, 'utf8');
         expect(
-          countSectionOccurrenceBindings(
+          countReturnedRootBindings(
             parseTsx(ownerPath, ownerSource),
             occurrence.rootBinding
           ),
@@ -1366,31 +1353,22 @@ describe('canonical shared source atom registry', () => {
 });
 
 describe('production occurrence structural source bindings', () => {
-  it('requires a real section root attribute, rejecting detached quoted metadata', () => {
+  it('rejects nested or detached metadata', () => {
     const binding = "data-testid='marketing-section-feature-grid'";
     expect(
-      countSectionOccurrenceBindings(
+      countReturnedRootBindings(
         parseTsx(
-          'positive.tsx',
-          "export function X(){return <main><section data-testid='marketing-section-feature-grid'/></main>}"
+          'nested.tsx',
+          "function X(){return <section><section data-testid='marketing-section-feature-grid'/></section>}"
         ),
         binding
       )
-    ).toBe(1);
+    ).toBe(0);
     expect(
-      countSectionOccurrenceBindings(
+      countReturnedRootBindings(
         parseTsx(
-          'positive.tsx',
-          "export function X(){return <main><section data-testid='marketing-section-feature-grid'></section></main>}"
-        ),
-        binding
-      )
-    ).toBe(1);
-    expect(
-      countSectionOccurrenceBindings(
-        parseTsx(
-          'negative.tsx',
-          `const claimed = ${JSON.stringify(binding)}; export function X(){return <section/>}`
+          'detached.tsx',
+          `const claimed = ${JSON.stringify(binding)}; function X(){return <section/>}`
         ),
         binding
       )

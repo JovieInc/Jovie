@@ -26,6 +26,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   EXEMPTION_RATCHET_BASELINE,
+  getMarketingSection,
+  getRequiredVariantInputs,
   getRouteRecipeParity,
   MARKETING_RECIPE_IDS,
   MARKETING_RECIPES,
@@ -1356,6 +1358,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     const bindings = entry.renderedSections.filter(
       binding => binding.kind === 'approved-section'
     );
+    expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
     const rows = HOMEPAGE_LAUNCH_COPY.certified.sections;
     expect(bindings.slice(2, -1).map(binding => binding.occurrenceId)).toEqual(
       rows.map(row => row.id)
@@ -1398,6 +1401,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     const bindings = entry.renderedSections.filter(
       binding => binding.kind === 'approved-section'
     );
+    expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
     expect(bindings.map(binding => binding.sectionId)).toEqual([
       'hero',
       'how-it-works',
@@ -1421,10 +1425,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
 });
 
 describe('source-owned editorial input contract', () => {
-  it('permits absent media only for editorial and retains existing variant requirements', async () => {
-    const { getRequiredVariantInputs, getMarketingSection } = await import(
-      '@/data/marketing/sections'
-    );
+  it('permits absent media only for editorial and retains existing variant requirements', () => {
     expect(getRequiredVariantInputs('feature-split', 'editorial')).toEqual([
       'headline',
       'body',

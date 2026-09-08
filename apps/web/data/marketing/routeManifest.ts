@@ -219,7 +219,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'Nine scripted beats and source owners are inventoried. Editorial rows have an explicit optional-media source contract; search-close CTA ownership remains unresolved. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
-    specVersion: '1.0.0',
+    specVersion: '1.3.0',
     url: '/',
     healthCheck: {
       path: '/',
@@ -486,7 +486,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'Current left/no-media hero, two-column title/body safeguards, and inline CTA are intentional source output. Hero/grid source variants are explicit; inline CTA ownership remains unresolved and no terminal variant is substituted. No render or visual admission.',
     },
     status: 'active',
-    specVersion: '1.2.0',
+    specVersion: '1.3.0',
     url: '/youtube-thumbnails',
   },
   {
