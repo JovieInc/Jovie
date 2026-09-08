@@ -56,7 +56,7 @@ LINEAR_QUERY = (
 LINEAR_STAGES_QUERY = (
     "query($id: String!, $after: String) { project(id: $id) { issues(first: 100, after: $after, filter: { "
     "state: { name: { in: [\"Todo\", \"In Progress\", \"In Review\"] } } }) "
-    "{ totalCount pageInfo { hasNextPage endCursor } nodes { createdAt startedAt completedAt state { name } } } } }"
+    "{ pageInfo { hasNextPage endCursor } nodes { identifier title url assignee { name } createdAt startedAt completedAt state { name } } } } }"
 )
 SHIP_STAGES = (
     ("todo", "Todo/pickup"),
@@ -1196,9 +1196,55 @@ def _issue_fields(item: dict[str, Any]) -> tuple[str | None, str | None, str | N
         or _text(issue, ("identifier", "id"))
         or _text(running, ("issue_identifier", "identifier"))
     )
-    title = _text(item, ("title", "name")) or _text(issue, ("title", "name"))
-    url = _text(item, ("url", "html_url")) or _text(issue, ("url", "html_url"))
+    title = _text(item, ("title", "issue_title", "name")) or _text(issue, ("title", "name")) or _text(running, ("title", "issue_title"))
+    url = _text(item, ("url", "issue_url", "html_url")) or _text(issue, ("url", "html_url"))
     return ident, title, url
+
+
+def enrich_issue_titles(symphony: dict[str, Any], linear: dict[str, Any], *, now: datetime) -> dict[str, Any]:
+    """Join descriptive metadata only. Linear never establishes execution or failure."""
+    state = copy.deepcopy(symphony)
+    stamp = _iso(linear.get("generated_at"))
+    fresh = linear.get("ok") and not linear.get("stale") and stamp is not None and -10 <= (now - stamp).total_seconds() <= LINEAR_CACHE_SECONDS
+    issues = linear.get("issues") if fresh and isinstance(linear.get("issues"), dict) else {}
+    for row in state.get("rows", []):
+        issue = issues.get(row.get("id"), {})
+        if not row.get("title"):
+            row["title"] = _text(issue, ("title",))
+            row["title_source"] = "Linear" if row["title"] else None
+            row["title_gap"] = "issue title missing from runtime; " + ("no matching Linear issue" if fresh else "Linear metadata unavailable or stale")
+        assignee = issue.get("assignee")
+        if isinstance(assignee, dict):
+            row["issue_assignee"] = _text(assignee, ("name",))
+    return state
+
+
+def work_title(row: dict[str, Any]) -> str:
+    return row.get("title") or "UNKNOWN · " + (row.get("title_gap") or "issue title not reported")
+
+
+def recent_merges(flow: dict[str, Any]) -> list[dict[str, Any]]:
+    if flow.get("ok") is not True or flow.get("stale"):
+        return []
+    # Stable mergedAt order; never substitute update time or PR number.
+    rows = [row for row in flow.get("merged_rows", []) if isinstance(row, dict) and _iso(row.get("merged_at")) is not None]
+    return sorted(rows, key=lambda row: _iso(row["merged_at"]), reverse=True)
+
+
+def blocker_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[str]:
+    # An issue title, generic notification or launch time is not a failure cause/age.
+    cause = row.get("error") or ("Last report: " + row["last_message"] if row.get("last_message") else None)
+    cause = cause or "UNKNOWN · runtime did not report a failure reason"
+    stamp = row.get("blocked_at")
+    age = natural_time(stamp, now=now) if _iso(stamp) else "UNKNOWN · blocked time not reported"
+    retry = "Retry " + due_label(row["due_at"], now=now) if row.get("due_at") else "Next: runtime owner to inspect this attempt"
+    owner = " · issue owner " + row["issue_assignee"] if row.get("issue_assignee") else ""
+    return [
+        _rgb(RED, "✕ ", bold=True) + _rgb(FG, clip(f"{row.get('id') or UNKNOWN} · {work_title(row)}", width - 2), bold=True),
+        _rgb(FG, clip(f"  {cause}", width)),
+        _rgb(DIM, clip(f"  Blocked {age}{owner}", width)),
+        _rgb(FG, clip(f"  {retry}", width)),
+    ]
 
 
 def _execution_proof(
@@ -1305,6 +1351,7 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         "session_id": session_id,
         "pid": _int(item.get("codex_app_server_pid") or running.get("codex_app_server_pid")),
         "last_event_at": item.get("last_event_at") or running.get("last_event_at"),
+        "blocked_at": item.get("blocked_at") or item.get("blockedAt"),
         # A selected route/configuration is deliberately not execution evidence.
         "requested_model": _text(item, ("model", "requested_model")) or _text(running, ("model", "requested_model")),
         "execution_proof_valid": proof is not None,
@@ -1312,6 +1359,8 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         "executed_model": proof.get("model") if proof else None,
         "executed_provider": proof.get("provider") if proof else None,
         "executed_account_alias": proof.get("account_alias") if proof else None,
+        "executed_effort": proof.get("effort") if proof else None,
+        "initiator": proof.get("initiator") if proof else None,
     }
 
 
@@ -1485,7 +1534,7 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
             not isinstance(issues, dict)
             or not isinstance(issues.get("nodes"), list)
             or isinstance(issues.get("totalCount"), bool)
-            or not isinstance(issues.get("totalCount"), int)
+            or (issues.get("totalCount") is not None and not isinstance(issues.get("totalCount"), int))
             or not isinstance(page_info, dict)
             or not isinstance(page_info.get("hasNextPage"), bool)
         ):
@@ -1498,8 +1547,8 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "source_error": LINEAR_REQUEST_ERROR or "Linear project pagination metadata incomplete",
             }
         pages += 1
-        page_total = issues["totalCount"]
-        if page_total < 0 or page_total > MAX_LINEAR_ISSUES:
+        page_total = issues.get("totalCount")
+        if page_total is not None and (page_total < 0 or page_total > MAX_LINEAR_ISSUES):
             return {
                 "ok": False,
                 "review": None,
@@ -1573,6 +1622,7 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
         "review": review,
         "todo": todo,
         "pickup_durations": pickup or None,
+        "issues": {node["identifier"]: node for node in nodes if isinstance(node.get("identifier"), str)},
         "total_count": total_count if total_count is not None else len(nodes),
         "pages": pages,
         "generated_at": _now().isoformat(),
@@ -1621,10 +1671,21 @@ def _gh_json(args: list[str], *, timeout: float) -> Any | None:
 
 
 def _pr_list(state: str, fields: str, limit: str, *, timeout: float) -> Any:
-    return _gh_json(
-        ["pr", "list", "--repo", "JovieInc/Jovie", "--state", state, "--limit", limit, "--json", fields],
-        timeout=timeout,
-    )
+    if state != "merged":
+        return _gh_json(["pr", "list", "--repo", "JovieInc/Jovie", "--state", state, "--limit", limit, "--json", fields], timeout=timeout)
+    # Prove newest five: unseen mergedAt <= unseen updatedAt <= prefix boundary.
+    records = _gh_json(["pr", "list", "--repo", "JovieInc/Jovie", "--state", "merged", "--limit", "100", "--json", fields + ",updatedAt", "--search", "sort:updated-desc"], timeout=timeout)
+    if not isinstance(records, list):
+        return None
+    dated = [row for row in records if isinstance(row, dict) and _iso(row.get("mergedAt")) is not None]
+    if len(dated) != len(records):
+        return None
+    dated.sort(key=lambda row: _iso(row["mergedAt"]), reverse=True)
+    if len(records) >= 100:
+        boundary = _iso(records[-1].get("updatedAt")) if isinstance(records[-1], dict) else None
+        if len(dated) < 5 or boundary is None or boundary >= _iso(dated[4]["mergedAt"]):
+            return None  # Bounded scan cannot establish the actual latest merges.
+    return dated[:min(5, int(limit))]
 
 
 def _check_durs(rollups: Any, names: frozenset[str]) -> list[float]:
@@ -1661,6 +1722,8 @@ def fetch_github_ship(
     global _GITHUB_REFRESH_THREAD
     clock = _now()
     cached = load_json_dict(cache_path) if cache_path is not None else {}
+    if cached.get("merge_order") != "mergedAt-complete-top5-v1":
+        cached = {}
     cached_at = _iso(cached.get("generated_at"))
     cache_age = None if cached_at is None else max(0.0, (clock - cached_at).total_seconds())
     if cached.get("ok") is True and cache_age is not None and cache_age <= max_age_seconds:
@@ -1684,7 +1747,7 @@ def fetch_github_ship(
         return {"ok": False, "refreshing": True, "generated_at": None, "query_ms": None, "ci_matrix": []}
     query_started = time.perf_counter()
     open_prs = _pr_list("open", "number,title,createdAt,isDraft,labels,statusCheckRollup,mergeStateStatus", "10", timeout=timeout)
-    merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt,statusCheckRollup", "10", timeout=timeout)
+    merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt", "10", timeout=timeout)
     merge_group = _gh_json(["api", "repos/JovieInc/Jovie/actions/runs?event=merge_group&per_page=20"], timeout=timeout)
     if not isinstance(open_prs, list) or not isinstance(merged_prs, list):
         if cached.get("ok") is True and cache_age is not None and cache_age <= 300:
@@ -1807,6 +1870,7 @@ def fetch_github_ship(
         "merged_durations": merged_durations or None,
         "mq_durations": None,
         "merged_rows": merged_rows,
+        "merge_order": "mergedAt-complete-top5-v1",
     }
     if cache_path is not None:
         write_json(cache_path, result)
@@ -2130,16 +2194,16 @@ def _job_row(
         return _cells(color, widths, glyph, dash(row.get("position")), ident, "MERGING", dash(row.get("title")), "-", "-", "-", str(health["label"]), "-")
     if kind == "merged":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
-        return _cells(MINT, widths, "✓", "-", ident, "MERGED", dash(row.get("title")), "-", "-", "-", natural_time(row.get("merged_at"), now=now), "-")
+        return _cells(PURPLE, widths, "✓", "-", ident, "MERGED", dash(row.get("title")), "-", "-", "-", natural_time(row.get("merged_at"), now=now), "-")
     if row.get("stale"):
         return _cells(DIM, widths, "?", "-", dash(row.get("id")), UNKNOWN, dash(row.get("title") or "UNKNOWN · retained row; current :4041 truth unavailable"), dash(row.get("attempt")), dash(row.get("turn")), "-", UNKNOWN, "current source unavailable")
     if kind == "queued":
-        return _cells(PURPLE, widths, "…", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), "-", _execution_evidence(row))
+        return _cells(PURPLE, widths, "…", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · issue title not reported"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), "-", _execution_evidence(row))
     if kind == "retrying":
-        return _cells(ORANGE, widths, "↻", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), _execution_evidence(row))
+        return _cells(ORANGE, widths, "↻", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · issue title not reported"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), _execution_evidence(row))
     if kind == "blocked":
-        return _cells(RED, widths, "✕", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
-    return _cells(_stage_color(stage), widths, "●", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · :4041 title absent"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
+        return _cells(RED, widths, "✕", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · issue title not reported"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
+    return _cells(_stage_color(stage), widths, "●", "-", dash(row.get("id")), stage, dash(row.get("title") or "UNKNOWN · issue title not reported"), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), _execution_evidence(row))
 
 
 def _compact_work_header(width: int) -> list[str]:
@@ -2161,7 +2225,7 @@ def _compact_job_row(
     title_width = max(12, width - ident_width - stage_width - age_width - 10)
     kind = str(row.get("kind") or "running")
     ident = dash(row.get("id"))
-    title = dash(row.get("title") or "UNKNOWN · :4041 title absent")
+    title = dash(row.get("title") or "UNKNOWN · issue title not reported")
     stage = _work_stage(row)
     if row.get("stale"):
         return _rgb(DIM, clip(f"STALE {ident} | {title} | current execution UNKNOWN", width))
@@ -2193,7 +2257,7 @@ def _compact_job_row(
     evidence = _execution_evidence(row)
     if evidence != "UNKNOWN · execution evidence absent":
         title = f"{title} · {evidence}"
-    color = _semantic_color(status)
+    color = PURPLE if kind == "merged" else _semantic_color(status)
     columns = "  ".join(
         (
             _cell(glyph, 2),
@@ -2405,7 +2469,7 @@ def _metric_contract(metric: dict[str, Any], *, now: datetime, compact: bool = F
     return f"{source} · {unit} · {window} · / {denominator}{cause_text} · Updated {stamp}"
 
 
-def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
+def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime, show_details: bool = True) -> list[str]:
     payload = pressure if isinstance(pressure, dict) else {}
     known = payload.get("ok") is True
     freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
@@ -2464,7 +2528,7 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
         )
         for label, raw, detail, metric, gauge_value, gauge_denominator in raw_cells
     ]
-    heading_text = f"PRIMARY CAPACITY / PRESSURE · SYSTEM PRESSURE · host projection · Updated {freshness}"
+    heading_text = f"SYSTEM PRESSURE · Updated {freshness}"
     if width < 160:
         result = [_rgb(FG, clip(heading_text, width), bold=True)]
         label_width = 18
@@ -2472,7 +2536,8 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
             headline = f"{_cell(label, label_width)}  {value} {gauge}"
             result.append(_rgb(_semantic_color(status), clip(headline, width), bold=status == "failure"))
             contract = f"  {detail} · {_metric_contract(metric, now=now, compact=True)}"
-            result.append(_rgb(DIM, clip(contract, width)))
+            if show_details:
+                result.append(_rgb(DIM, clip(contract, width)))
         return result
     gap = 3
     col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
@@ -2484,12 +2549,12 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
     values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(f"{value} {gauge}", cell_width), bold=True), cell_width) for (_, value, status, _, _, gauge), cell_width in zip(cells, widths))
     details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, _, detail, _, _), cell_width in zip(cells, widths))
     contracts = spacer.join(pad_visible(_rgb(DIM, clip(contract, cell_width)), cell_width) for (_, _, _, _, contract, _), cell_width in zip(cells, widths))
-    return [pad_visible(heading, width), labels, values, details, contracts]
+    return [pad_visible(heading, width), labels, values] + ([details, contracts] if show_details else [])
 
 
 def _matrix_status(status: Any, width: int) -> str:
     normalized = str(status or "unknown")
-    text = {"success": "✓ PASS", "pending": "… RUN", "failure": "× FAIL", "unknown": "? UNKNOWN"}.get(normalized, "? UNKNOWN")
+    text = {"success": "✓", "pending": "…", "failure": "✕", "unknown": "? UNKNOWN"}.get(normalized, "? UNKNOWN")
     return _rgb(_semantic_color(normalized), _cell(text, width), bold=normalized == "failure")
 
 
@@ -2515,16 +2580,15 @@ def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) 
     freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
     if payload.get("stale") is True:
         freshness = f"STALE · {freshness}"
-    query_ms = _int(payload.get("query_ms")) if known else None
     total = _int(payload.get("open_count")) if known else None
     heading = (
         _rgb(FG, SHIPPING_DISPLAY_IA["ci_matrix"]["label"], bold=True)
-        + _rgb(DIM, f"  ·  cached GitHub rollup  ·  display {len(rows)} · sampled {len(sampled_rows)} · open {dash(total)}  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
+        + _rgb(DIM, f"  ·  {len(rows)} of {dash(total)} open PRs  ·  Updated {freshness}")
     )
     status_width = 10
     admission_width = 11
     gap = 2
-    item_width = max(30, width - (status_width * 5 + admission_width + gap * 6))
+    item_width = max(30, min(72, width - (status_width * 5 + admission_width + gap * 6)))
     header = "  ".join(
         [
             _cell("PR / WORK ITEM", item_width),
@@ -2693,7 +2757,7 @@ def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[s
     model = row.get("executed_model") if executed else None
     provider = row.get("executed_provider") if executed else None
     account = row.get("executed_account_alias") if executed else None
-    cause = row.get("error") or row.get("last_message") or row.get("last_event") or UNKNOWN
+    cause = row.get("error") or ("Last report: " + row["last_message"] if row.get("last_message") else None) or row.get("last_event") or UNKNOWN
     retry = due_label(row.get("due_at"), now=now) if row.get("due_at") else UNKNOWN
     progress = natural_time(row.get("last_event_at"), now=now)
     first = f"{row.get('id') or UNKNOWN}  {stage}  |  {row.get('title') or UNKNOWN}"
@@ -2710,30 +2774,61 @@ def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[s
     return [_rgb(color, clip(first, width), bold=True), _rgb(FG, clip(second, width)), _rgb(DIM, clip(third, width))]
 
 
-def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime) -> list[str]:
+def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime, max_slots: int = 10) -> list[str]:
     fresh = symphony.get("ok") and not symphony.get("stale")
-    recent = sum(execution_state(row, now=now) == "SESSION / RECENT EVENT" for row in symphony.get("rows", [])) if fresh else UNKNOWN
     source = "FRESH" if fresh else "STALE / UNAVAILABLE"
-    counts = "  ".join(f"{key} {symphony.get(key) if fresh and symphony.get(key) is not None else UNKNOWN}" for key in ("running", "queued", "retrying", "blocked"))
-    blocked = _int(symphony.get("blocked"))
-    retrying = _int(symphony.get("retrying"))
-    action = "Active sessions are reporting recent progress"
-    if not fresh:
-        action = "Restore official API through runtime owner; cached attempts are not running proof"
-    elif (blocked or 0) > 0 or (retrying or 0) > 0:
-        action = "Inspect blocked/retrying attempts; worker recovery owner controls intake"
-    elif not recent:
-        action = "No recent session events evidenced; inspect launcher/capacity with runtime owner"
-    if symphony.get("linear_gate_until"):
-        action = f"Linear rate limit gate until {symphony['linear_gate_until']} · runtime owner controls recovery"
-    lines = [
-        f"EXECUTION TRUTH  |  API {source}  |  service {symphony.get('service_state', UNKNOWN)}  |  remediation UNKNOWN (not exposed by :4041)",
-        f"Sessions with recent events {recent} jobs  |  reserved {counts}  |  configured ceiling {symphony.get('cap') if symphony.get('cap') is not None else UNKNOWN} slots  |  usable capacity UNKNOWN",
-        f"NEXT  {action}",
-        f"Source: :4041/api/v1/state · jobs/tokens · snapshot {natural_time(symphony.get('generated_at'), now=now)} · activity window 120s · shipped work requires separate receipts",
-        f"Configuration only: model {symphony.get('configured_model', UNKNOWN)} · WORKFLOW.md (not execution proof) | service/gate: systemd + linear-rate-limit.json · observed {natural_time(symphony.get('runtime_observed_at'), now=now)}",
-    ]
-    return [_rgb(ORANGE if not fresh else FG, clip(line, width), bold=index == 0) for index, line in enumerate(lines)]
+    rows = symphony.get("rows") if isinstance(symphony.get("rows"), list) else []
+    running_rows = [row for row in rows if row.get("kind") == "running"]
+    running = symphony.get("running") if fresh and isinstance(symphony.get("running"), int) else UNKNOWN
+    cap = symphony.get("cap") if isinstance(symphony.get("cap"), int) and symphony.get("cap") >= 0 else None
+    freshness = natural_time(symphony.get("generated_at"), now=now)
+    count_text = f"{running}/{cap}" if isinstance(running, int) and cap is not None else f"{running}/{cap if cap is not None else UNKNOWN}"
+    title = f"ACTIVE SLOTS · RUNNING: {count_text} · service {symphony.get('service_state', UNKNOWN)}"
+    corner = f"API {source} · {freshness}"
+    fill = max(1, width - len(title) - len(corner) - 7)
+    border_color = MINT if fresh and running == 0 else BLUE if fresh else ORANGE
+    lines = [_rgb(border_color, clip(f"┌─ {title} {'─' * fill} {corner} ┐", width), bold=True)]
+
+    observed_slots = max(len(running_rows), running if isinstance(running, int) else 0) if fresh else 0
+    visible_slots = min(max(cap or 0, observed_slots, 1 if cap is None else 0), max(1, max_slots))
+    if visible_slots == 0:
+        lines.append(_rgb(DIM, clip("│ No configured worker slots · usable capacity UNKNOWN", width)))
+    for index in range(visible_slots):
+        if not fresh:
+            body = f"│ ? Slot {index + 1} · UNKNOWN · runtime snapshot unavailable or stale"
+            lines.append(_rgb(FG, clip(body, width)))
+        elif index < len(running_rows):
+            row = running_rows[index]
+            route = "/".join(value for value in (row.get("executed_provider"), row.get("executed_model")) if value) or "route UNKNOWN"
+            body = f"│ ● Slot {index + 1} · {row.get('id') or UNKNOWN} · {work_title(row)}"
+            lines.append(_rgb(FG, clip(body, width), bold=True))
+            stage = execution_state(row, now=now)
+            activity = {
+                "SESSION / RECENT EVENT": "Recent progress", "STARTING / NO SESSION": "Starting · session not yet reported",
+                "SESSION / PROGRESS UNKNOWN": "Progress UNKNOWN · event time missing", "SESSION / NO RECENT PROGRESS": "No recent progress",
+                "SESSION / NO TOKENS": "Waiting for output", "SESSION / ERROR": "✕ Attempt error",
+            }.get(stage, stage)
+            detail = f"│   {activity} · {route} · account {row.get('executed_account_alias') or UNKNOWN} · event {natural_time(row.get('last_event_at'), now=now)}"
+            lines.append(_rgb(DIM, clip(detail, width)))
+            if row.get("error") or row.get("last_message"):
+                lines.append(_rgb(FG, clip("│   " + (row.get("error") or row["last_message"]), width)))
+        elif isinstance(running, int) and index < running:
+            body = f"│ ? Slot {index + 1} · assigned · issue and execution details not reported"
+            lines.append(_rgb(FG, clip(body, width)))
+        elif isinstance(running, int):
+            lines.append(_rgb(DIM, clip(f"│ ○ Slot {index + 1} · VACANT", width)))
+        else:
+            lines.append(_rgb(DIM, clip(f"│ ? Slot {index + 1} · occupancy UNKNOWN", width)))
+    if observed_slots > visible_slots:
+        lines.append(_rgb(FG, clip(f"│ … {observed_slots - visible_slots} more active runs", width)))
+    elif cap is not None and cap > visible_slots:
+        lines.append(_rgb(DIM, clip(f"│ … {cap - visible_slots} more configured slots not shown at this terminal height", width)))
+    if fresh and running == 0:
+        lines.append(_rgb(FG, clip("│ Nothing running", width), bold=True))
+    if not fresh or (isinstance(running, int) and running > 0 and not running_rows):
+        lines.append(_rgb(DIM, clip("│ Execution identity UNKNOWN until a live run receipt", width)))
+    lines.append(_rgb(border_color, "└" + ("─" * max(0, width - 2)) + "┘"))
+    return lines
 
 
 def execution_board(symphony: dict[str, Any], width: int, budget: int, *, now: datetime) -> list[str]:
@@ -2807,160 +2902,68 @@ def render(
 ) -> str:
     clock = now or _now()
     symphony = current_execution_view(symphony, now=clock)
-    # Direct render callers get the canonical full canvas unless they request a
-    # height. The live frame path always supplies the detected terminal size.
     cols, rows = terminal_size(width=width, height=height if height is not None else TARGET_HEIGHT)
-    measured = measured if isinstance(measured, dict) else {}
-    alive = compute_alive(measured.get("alive"))
-    wow = compute_wow(measured.get("wow"))
-    ships = count_ships_this_week(measured.get("ships"), now=clock)
     path = ship_path if isinstance(ship_path, dict) else empty_ship_path()
-    named = named_number_one(alive, wow, ships, symphony, path)
-    alive_spark = series_values(measured, "alive")
-    wow_spark = series_values(measured, "wow")
-    ships_spark = series_values(measured, "ships")
-    alive_detail = UNMEASURED if alive["status"] == UNKNOWN else f"cash {_money(alive['cashUsd'])}  burn {_money(alive['weeklyBurnUsd'])}  rev {_money(alive['weeklyRevenueUsd'])}"
-    wow_detail = UNMEASURED if wow["rate"] is None else f"{wow['basis']}  this {_money(wow['thisWeekRevenueUsd'])} / last {_money(wow['lastWeekRevenueUsd'])}"
-    gap = 2
-    col = (cols - gap * 3) // 4
-    leftover = cols - (col * 4 + gap * 3)
-    tile_widths = [col, col, col, col + leftover]
-    alive_color = DIM if alive["status"] == UNKNOWN else MINT if alive["status"] == "DEFAULT ALIVE" else RED
-    wow_color = DIM if wow["rate"] is None else MINT if wow["rate"] >= 0 else RED
-    ships_color = MINT if isinstance(ships["thisWeek"], int) and ships["thisWeek"] > 0 else DIM
-    ships_headline = UNKNOWN if ships["thisWeek"] is None else str(ships["thisWeek"])
-    ships_detail = UNMEASURED if ships["thisWeek"] is None else "receipted this week"
-    tiles = _tiles_row(
-        [
-            _tile("ALIVE", alive["status"], alive_detail, sparkline(alive_spark) if alive_spark else "-", alive_color, tile_widths[0]),
-            _tile("WOW", UNKNOWN if wow["rate"] is None else _pct(wow["rate"]), wow_detail, sparkline(wow_spark) if wow_spark else "-", wow_color, tile_widths[1]),
-            _tile("SHIPS", ships_headline, ships_detail, sparkline(ships_spark) if ships_spark else "-", ships_color, tile_widths[2]),
-            _tile("#1", named, f"symphony run {dash(symphony.get('running'))} retry {dash(symphony.get('retrying'))}", "-", PINK if named != "-" else DIM, tile_widths[3]),
-        ],
-        cols,
-    )
-    header = _header(
-        sha=sha,
-        freshness=natural_time(symphony.get("generated_at"), now=clock),
-        width=cols,
-    )
-    widths = _col_widths(cols)
-    tps_value = tps if tps is not None else compute_throughput(symphony.get("totals"), [], now=clock)
-    stage_baselines = {
-        str(stage.get("id")): stage
-        for stage in (path.get("stages") or [])
-        if isinstance(stage, dict) and stage.get("id")
-    }
-    compact = cols < 160
-    health_band = _operator_health_lines(
-        symphony=symphony,
-        pressure=system_pressure,
-        mq=mq,
-        ship_path=path,
-        pr_flow=pr_flow,
-        now=clock,
-        width=cols,
-    )
-    pressure_lines = _system_pressure_lines(system_pressure, cols, now=clock)
-    if compact:
-        lines = [header, *health_band, *pressure_lines, *_compact_work_header(cols)]
-        work_rows = [
-            _compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines)
-            for row in [*(symphony.get("rows") or []), *(mq.get("rows") or [])]
-            if isinstance(row, dict)
-        ]
-        footer = [*_ship_path_lines(path, cols)]
-        if rows >= 32:
-            footer.extend(_pr_flow_lines(pr_flow, cols, now=clock))
-        footer.append(_footer(symphony, cols, now=clock))
-    elif rows < 48:
-        lines = [
-            header,
-            _rgb(DIM, PRODUCT_DESCRIPTION),
-            "",
-            *health_band,
-            "",
-            *_hero_metrics(symphony, tps_value, mq, pr_flow, review, cols, now=clock),
-            "",
-            *pressure_lines,
-            "",
-            _rgb(FG, "CURRENT WORK · stable stage table · recent merges retained", bold=True),
-            _table_header(widths),
-            _rgb(DIM, "─" * cols),
-        ]
-        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
-        work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
-        if review is not None and review > 0:
-            work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
-        footer = ["", *_ship_path_lines(path, cols), _footer(symphony, cols, now=clock)]
-    else:
-        lines = [
-            header,
-            _rgb(DIM, PRODUCT_DESCRIPTION),
-            "",
-            *health_band,
-            "",
-            *_hero_metrics(symphony, tps_value, mq, pr_flow, review, cols, now=clock),
-            "",
-            *pressure_lines,
-            "",
-            _rgb(FG, "CURRENT WORK · stable stage table · recent merges retained", bold=True),
-            _table_header(widths),
-            _rgb(DIM, "─" * cols),
-        ]
-        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
-        work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
-        if review is not None and review > 0:
-            work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
-        footer = [
-            "",
-            *_ship_path_lines(path, cols),
-            "",
-            *_pr_flow_lines(pr_flow, cols, now=clock),
-            "",
-            *_ci_matrix_lines(pr_flow, cols, now=clock),
-            "",
-            _rgb(FG, "BUSINESS SIGNALS · measured receipt file · weekly windows · receipt-backed", bold=True),
-            *tiles,
-            "",
-            _footer(symphony, cols, now=clock),
-        ]
-    if compact and rows <= 32:
-        # Jobs outrank secondary shipping aggregates on short terminals.
-        lines = [header, *health_band, *pressure_lines[:1], *_compact_work_header(cols)]
-        footer = [*_ship_path_lines(path, cols)[:1], _footer(symphony, cols, now=clock)]
-    truth = execution_summary(symphony, cols, now=clock)
-    if cols >= 300 and rows >= 60 and review is not None and review > 0:
-        truth[0] = _rgb(FG, clip(ANSI_RE.sub("", truth[0]).rstrip() + f" | !  REVIEW QUEUE {review}", cols), bold=True)
-    lines[1:1] = [truth[0], truth[2]] if compact else truth
-    blocks = []
-    for row in symphony.get("rows", []):
-        blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
-    for row in mq.get("rows", []):
-        blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
     flow = pr_flow if isinstance(pr_flow, dict) else {}
-    if flow.get("ok") is True and flow.get("stale") is not True:
-        for row in (flow.get("merged_rows") or []):
-            if isinstance(row, dict):
-                blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
-    available = max(0, rows - len(lines) - len(footer))
-    # Preserve whole job cards and reserve an honest hidden-card count.
-    work_rows = []
-    for index, block in enumerate(blocks):
-        reserve = 1 if index < len(blocks) - 1 else 0
-        if len(work_rows) + len(block) + reserve > available:
-            if len(work_rows) < available:
-                work_rows.append(_rgb(DIM, clip(f"… {len(blocks) - index} more work items", cols)))
-            break
-        work_rows.extend(block)
-    if not blocks and available > 0:
-        work_rows = [_rgb(DIM, clip("· No active work receipts", cols))]
-    lines.extend(work_rows)
-    lines.extend([""] * max(0, available - len(work_rows)))
-    lines.extend(footer)
-    lines = lines[:rows]
-    lines.extend([""] * max(0, rows - len(lines)))
-    lines = [pad_visible(line, cols) for line in lines]
+    fresh = symphony.get("ok") and not symphony.get("stale")
+    count = lambda key: symphony.get(key) if fresh and isinstance(symphony.get(key), int) else UNKNOWN
+    active_limit = 1 if rows < 32 else 3 if rows < 60 else 5
+    lines = [_header(sha=sha, freshness=natural_time(symphony.get("generated_at"), now=clock), width=cols)]
+    lines.extend(execution_summary(symphony, cols, now=clock, max_slots=active_limit))
+    lines.append(_rgb(DIM, clip("Configured slots are a ceiling · usable capacity UNKNOWN", cols)))
+
+    gate = _iso(symphony.get("linear_gate_until"))
+    if gate is not None and gate > clock:
+        lines.append(_rgb(ORANGE, clip(f"Intake paused: Linear rate limit · reset {natural_time(gate, now=clock)} · runtime owner", cols)))
+
+    merged = recent_merges(flow)
+    merge_limit = 2 if rows < 32 else 3 if rows < 45 else 5
+    lines.append(_rgb(PURPLE, clip("RECENTLY MERGED · newest first · deployment verified separately", cols), bold=True))
+    for row in merged[:merge_limit]:
+        lines.append(_rgb(PURPLE, "✓ ") + _rgb(FG, clip(f"#{row.get('number') or UNKNOWN} · {row.get('title') or UNKNOWN} · {natural_time(row['merged_at'], now=clock)}", cols - 2)))
+    if not merged:
+        message = "Recent merge source UNKNOWN" if not flow.get("ok") or flow.get("stale") else "No dated merge receipts in the current window"
+        lines.append(_rgb(DIM, clip(message, cols)))
+    if len(merged) > merge_limit:
+        lines.append(_rgb(DIM, clip(f"… {len(merged) - merge_limit} more recent merges", cols)))
+
+    blocked = [row for row in symphony.get("rows", []) if row.get("kind") in {"blocked", "retrying"} and not row.get("stale")] if fresh else []
+    lines.append(_rgb(RED if blocked else DIM, clip(f"NEEDS ATTENTION · BLOCKED: {count('blocked')} · RETRYING: {count('retrying')}", cols), bold=True))
+    block_limit = max(1, min(5, (rows - len(lines) - 3) // 4))
+    for row in blocked[:block_limit]:
+        lines.extend(blocker_lines(row, cols, now=clock))
+    if len(blocked) > block_limit:
+        lines.append(_rgb(DIM, clip(f"… and {len(blocked) - block_limit} more blocked/retrying", cols)))
+    if not blocked:
+        message = "Blocked source UNKNOWN · restore runtime snapshot" if not fresh else "No blocked work" if count('blocked') == 0 and count('retrying') == 0 else "UNKNOWN · runtime did not report blocked/retry details"
+        lines.append(_rgb(DIM, clip(message, cols)))
+
+    pending = [row for row in symphony.get("rows", []) if row.get("kind") == "queued" and not row.get("stale")] if fresh else []
+    pending.extend(mq.get("rows", []) if mq.get("ok") and not mq.get("stale") else [])
+    if pending and rows - len(lines) > 4:
+        lines.append(_rgb(FG, "WAITING · issue / merge queue", bold=True))
+        limit = min(3, rows - len(lines) - 3)
+        for row in pending[:limit]:
+            ident = f"#{row.get('number')}/p{row.get('position')}" if row.get("kind") == "mq" else row.get("id") or UNKNOWN
+            lines.append(_rgb(FG, clip(f"… {ident} · {work_title(row)}", cols)))
+        if len(pending) > limit:
+            lines.append(_rgb(DIM, clip(f"… {len(pending) - limit} more waiting", cols)))
+    if review is not None and rows - len(lines) > 2:
+        lines.append(_rgb(DIM, clip(f"REVIEW {review} · waiting for review", cols)))
+
+    diagnostics = [
+        _operator_health_lines(symphony=symphony, pressure=system_pressure, mq=mq, ship_path=path, pr_flow=pr_flow, now=clock, width=cols),
+        _system_pressure_lines(system_pressure, cols, now=clock, show_details=False),
+        _ci_matrix_lines(pr_flow, cols, now=clock),
+        _pr_flow_lines(pr_flow, cols, now=clock),
+    ]
+    for section in diagnostics if rows >= 32 else []:
+        if len(lines) + len(section) + 2 <= rows:
+            lines.append("")
+            lines.extend(section)
+    lines.extend([""] * max(0, rows - len(lines) - 1))
+    lines.append(_rgb(DIM, clip("Sources: Symphony runtime · Linear titles · GitHub merges | ✓ complete  ✕ error  ? UNKNOWN", cols)))
+    lines = [pad_visible(line, cols) if visible_len(line) <= cols else _rgb(DIM, clip(line, cols)) for line in lines[:rows]]
     background = "\033[40m" if os.environ.get("TERM") == "linux" else f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m"
     return background + "\n".join(lines) + "\033[0m"
 
@@ -2980,6 +2983,7 @@ def frame(
     symphony = current_execution_view(symphony, now=clock)
     mq = retain_last_good_source("mq", fetch_mq(), now=clock)
     linear = retain_last_good_source("linear", fetch_linear_project_cached(), now=clock)
+    symphony = enrich_issue_titles(symphony, linear, now=clock)
     github_path = Path(os.environ.get("HUD_GITHUB_PATH", str(DEFAULT_GITHUB_STATE)))
     github = fetch_github_ship(
         cache_path=github_path,
