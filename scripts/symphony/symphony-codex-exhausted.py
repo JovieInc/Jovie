@@ -93,6 +93,7 @@ RUNTIME_NAMES = (
     "model-router.py",
     "model-registry.json",
     "provider_capacity.py",
+    "existing_pr_repair.py",
     "writer-owned-pr-promote.sh",
     "writer-owned-pr-promotion.mjs",
     "queue-deferral-receipt.mjs",
@@ -1480,6 +1481,9 @@ def check_admission(identifier: str, *, remount: bool = False) -> int:
     remount=True skips the admission-gate/v1 receipt so a DIRTY/CI-red
     autonomous head can continue after the receipt list went empty.
     """
+    if any(a["identifier"] == identifier for a in _repair_assignments()):
+        print("not admitted:existing_pr_repair_reserved_for_native_writer", file=sys.stderr)
+        return 1
     issue = _fetch_single_issue(identifier)
     if issue is None:
         print("not admitted:admission_unverifiable", file=sys.stderr)
@@ -1530,7 +1534,7 @@ class OpenPrIndex(dict):
 
 OPEN_PR_QUERY = """query($owner:String!,$name:String!,$cursor:String){
   repository(owner:$owner,name:$name){pullRequests(first:100,states:OPEN,after:$cursor){
-    nodes{number headRefName mergeStateStatus mergeable}
+    nodes{number headRefName headRefOid body headRepository{nameWithOwner} mergeStateStatus mergeable}
     pageInfo{hasNextPage endCursor}
   }}
 }"""
@@ -1579,6 +1583,21 @@ def _complete_open_prs(repo: str) -> list[dict] | None:
     return None
 
 
+def _repair_module():
+    path = pathlib.Path(__file__).resolve().with_name("existing_pr_repair.py")
+    spec = importlib.util.spec_from_file_location("symphony_existing_pr_repair", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _repair_assignments():
+    try:
+        return _repair_module().candidates(__file__)
+    except (OSError, ValueError, ImportError):
+        return []
+
+
 def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str, dict]:
     """Preserve sibling heads and repository-scoped unknown discovery evidence."""
     index = OpenPrIndex()
@@ -1586,6 +1605,7 @@ def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str,
     if os.environ.get("SYMPHONY_OPEN_PR_INDEX") == "empty":
         return index
     wanted = set(identifiers) if identifiers is not None else None
+    assignments = _repair_assignments()
     repos = ({repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
              if identifiers is not None else {JOV_REPO, LYB_REPO})
     for repo in sorted(repos):
@@ -1596,13 +1616,20 @@ def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str,
         for pr in payload:
             head = pr["headRefName"]
             match = AUTONOMOUS_HEAD_RE.fullmatch(head)
-            if match is None:
+            mapped = [a["identifier"] for a in assignments
+                      if a["repository"] == repo
+                      and a["identifier"] in _repair_module().marker_identifiers(pr)]
+            if match is None and not mapped:
                 continue
-            ident = (match.group(1) or match.group(2)).upper()
+            ident = (match.group(1) or match.group(2)).upper() if match else mapped[0]
             if wanted is not None and ident not in wanted:
                 continue
             entry = {
                 "number": pr["number"], "head": head, "repo": repo,
+                "operatorRepairOnly": bool(mapped),
+                "repairHeadMatches": any(_repair_module().matches(a, repo, pr) for a in assignments),
+                "headRefOid": pr.get("headRefOid"), "body": pr.get("body"),
+                "headRepository": pr.get("headRepository"),
                 "mergeStateStatus": pr.get("mergeStateStatus"),
                 "mergeable": pr.get("mergeable"),
             }
@@ -1620,7 +1647,7 @@ def _github_remount_identifiers() -> list[str]:
     remounts: list[str] = []
     for ident in index:
         verdict, _pr = _open_pr_verdict(ident, index)
-        if verdict == "remount" and ident not in remounts:
+        if verdict == "remount" and not (_pr or {}).get("operatorRepairOnly") and ident not in remounts:
             remounts.append(ident)
     return remounts
 
@@ -1706,6 +1733,8 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     pr = index.get(identifier)
     if pr is None:
         return "none", None
+    if pr.get("operatorRepairOnly") and not pr.get("repairHeadMatches"):
+        return "unknown", pr
     if len(pr.get("siblings", [])) > 1:
         return "unknown", pr
     repo = pr.get("repo")
@@ -2043,11 +2072,12 @@ def pickup_refuse_reason(
     pr_verdict: str,
     held: bool | None,
     codex_writer: bool = False,
+    existing_pr_repair: bool = False,
 ) -> str | None:
     """Typed reason to refuse a new writer. None means the issue may start.
 
-    Codex is never a second writer on In Review (lease-guard + router). The
-    sidecar may continue an In Review remount or receipt-less claimed head.
+    Codex In Review requires a validated exact-PR repair and its actual lease.
+    The sidecar retains its existing autonomous remount policy.
     """
     if not IDENTIFIER.fullmatch(identifier):
         return "malformed_identifier"
@@ -2074,9 +2104,58 @@ def pickup_refuse_reason(
         return "fallback_lease_held"
     if held is None:
         return "lock_gc_unverifiable"
-    if state == "in review" and (codex_writer or pr_verdict == "skip"):
+    if state == "in review" and (codex_writer or pr_verdict == "skip") and not (
+        existing_pr_repair and pr_verdict == "remount"
+    ):
         return "issue_in_review"
     return None
+
+
+def _validated_existing_pr_repair(identifier, issue, verdict, pr, *, inherited):
+    """An operator assignment may continue an existing head, never admit new work."""
+    module = _repair_module()
+    payload = module.load(identifier, __file__)
+    module.require(verdict == "remount" and isinstance(pr, dict)
+                   and module.matches(payload, _repo_for_identifier(identifier), pr),
+                   "assignment-pr-mismatch")
+    module.require(isinstance(issue, dict) and issue.get("identifier") == identifier
+                   and issue.get("id") == payload["issueId"], "assignment-tracker-mismatch")
+    module.require((_issue_state_name(issue) or "").strip().lower() == "in review",
+                   "assignment-state-not-in-review")
+    # Remount metadata still enforces team, held labels, and real workflow IDs.
+    ok, reason, meta = _issue_meta(issue, identifier, require_receipt=False, remount=True)
+    module.require(ok and meta is not None, f"assignment-admission-refused:{reason}")
+    module.check_workspace(payload, pr)
+    module.check_writer(payload, inherited=inherited)
+    return payload
+
+
+def repair_preflight_command(identifier, issue_revision):
+    try:
+        issue = _fetch_single_issue(identifier)
+        if not issue or issue.get("updatedAt") != issue_revision:
+            raise ValueError("assignment-tracker-revision-mismatch")
+        verdict, pr = _open_pr_verdict(identifier, _autonomous_open_pr_index([identifier]))
+        _validated_existing_pr_repair(identifier, issue, verdict, pr, inherited=False)
+    except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError) as exc:
+        print(f"REPAIR_REFUSED reason={exc}", file=sys.stderr)
+        return 78
+    print(f"REPAIR_PREFLIGHT_ADMITTED identifier={identifier}")
+    return 0
+
+
+def repair_assign_command(spec_path):
+    try:
+        spec = json.loads(pathlib.Path(spec_path).read_text())
+        identifier = spec["identifier"]
+        module = _repair_module()
+        payload = module.authorize(spec, __file__, _fetch_single_issue(identifier) or {},
+                                   _complete_open_prs(_repo_for_identifier(identifier)))
+    except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError) as exc:
+        print(f"REPAIR_ASSIGNMENT_REFUSED reason={exc}", file=sys.stderr)
+        return 78
+    print(json.dumps(payload, sort_keys=True))
+    return 0
 
 
 def pickup_check_command(identifier: str) -> int:
@@ -2104,9 +2183,28 @@ def pickup_check_command(identifier: str) -> int:
     held = _lock_held(lock_path) if lock_path.is_file() else False
     if _inherited_issue_lease_held(lock_path):
         held = False
+    repair = None
+    repair_error = None
+    reserved = (_pr or {}).get("operatorRepairOnly")
+    if reserved or (_issue_state_name(issue) or "").strip().lower() == "in review":
+        try:
+            repair = _validated_existing_pr_repair(identifier, issue, verdict, _pr, inherited=True)
+        except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError):
+            repair_error = "existing_pr_repair_unauthorized"
     reason = pickup_refuse_reason(
-        identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True
-    )
+        identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True,
+        existing_pr_repair=repair is not None,
+    ) or repair_error
+    if reason is None and repair is not None:
+        try:
+            # Fresh complete inventory closes the discovery-to-claim head race.
+            fresh_verdict, fresh_pr = _open_pr_verdict(identifier, _autonomous_open_pr_index([identifier]))
+            fresh_issue = _fetch_single_issue(identifier)
+            fresh = _validated_existing_pr_repair(identifier, fresh_issue, fresh_verdict, fresh_pr, inherited=True)
+            _repair_module().require(fresh == repair, "assignment-replaced")
+            _repair_module().claim(fresh, __file__)
+        except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError):
+            reason = "existing_pr_repair_claim_refused"
     lock_count = _fallback_lock_count()
     if reason is not None:
         _emit_pickup(
@@ -2244,6 +2342,10 @@ def _launch_fallback_workers(
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
             continue
         verdict, _pr = _open_pr_verdict(identifier, open_prs)
+        if (_pr or {}).get("operatorRepairOnly"):
+            _emit_pickup("skip", reason="existing_pr_repair_reserved", identifier=identifier,
+                         lock_count=_fallback_lock_count(), next_issue="")
+            continue
         if verdict != "remount" and not closure_intake_open:
             _emit_pickup(
                 "refuse",
@@ -2810,7 +2912,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
         return packaged if packaged.is_file() else source
 
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py")},
         "model-registry.json": registry,
         "writer-owned-pr-promote.sh": packaged_or_source(
             "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"
@@ -2890,7 +2992,7 @@ def _valid_bundle_file(name: str, path: pathlib.Path) -> bool:
             return not path.is_symlink() and path.is_file() and payload.get("schema_version") == 1
         except (OSError, TypeError, ValueError):
             return False
-    if name == "model-router.py":
+    if name in {"model-router.py", "existing_pr_repair.py"}:
         try:
             return not path.is_symlink() and path.is_file() and path.read_bytes().startswith(b"#!")
         except OSError:
@@ -2996,6 +3098,7 @@ def install(destination_root: str | None) -> int:
         for name, data in contents.items():
             if name in (
                 "model-router.py",
+                "existing_pr_repair.py",
                 "model-registry.json",
                 "writer-owned-pr-promotion.mjs",
             ):
@@ -3028,17 +3131,25 @@ def main() -> int:
             "open-pr-verdict",
             "gc-fallback-locks",
             "pickup-check",
+            "repair-preflight",
+            "repair-assign",
         ),
         default=default,
     )
     parser.add_argument("identifier", nargs="?")
     parser.add_argument("--destination-root")
+    parser.add_argument("--issue-revision")
+    parser.add_argument("--assignment-spec")
     parser.add_argument(
         "--remount",
         action="store_true",
         help="Skip admission-gate/v1 receipt (DIRTY/CI-red remount only)",
     )
     args = parser.parse_args()
+    if args.command == "repair-preflight":
+        return repair_preflight_command(args.identifier, args.issue_revision)
+    if args.command == "repair-assign":
+        return repair_assign_command(args.assignment_spec)
     if args.command == "install":
         return install(args.destination_root)
     if args.command == "reconcile":
