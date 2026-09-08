@@ -40,6 +40,7 @@ describe('HomepageNoScriptContent', () => {
   it('mirrors the nine certified sections in order', () => {
     const { rawMarkup, section } = renderFallback();
     const text = section?.textContent ?? '';
+    expect(text).not.toContain("Proof is earned. We don't borrow it.");
 
     expect(section).not.toBeNull();
     expect(section?.getAttribute('data-marketing-runtime-state')).toBe(
@@ -58,7 +59,6 @@ describe('HomepageNoScriptContent', () => {
 
     const ordered = [
       HOMEPAGE_LAUNCH_COPY.hero.subhead,
-      HOMEPAGE_LAUNCH_COPY.certified.proof.statement,
       ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
         item.headline,
         item.body,
