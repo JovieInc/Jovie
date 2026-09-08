@@ -11,6 +11,11 @@ const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
+const mockCleanupFounderReviewUploadLeases = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/founder-review/server', () => ({
+  cleanupFounderReviewUploadLeases: mockCleanupFounderReviewUploadLeases,
+}));
 
 vi.mock('@/lib/analytics/data-retention', () => ({
   runDataRetentionCleanup: mockRunDataRetentionCleanup,
@@ -131,6 +136,12 @@ describe('GET /api/cron/daily-maintenance', () => {
       unavailable: 0,
       failed: 0,
     });
+    mockCleanupFounderReviewUploadLeases.mockResolvedValue({
+      scanned: 1,
+      deletedOrphans: 1,
+      reconciled: 0,
+      failed: 0,
+    });
   });
 
   afterEach(() => {
@@ -204,6 +215,8 @@ describe('GET /api/cron/daily-maintenance', () => {
       },
     });
     expect(mockReconcileReleaseWorkflowRunOutcomes).toHaveBeenCalledTimes(1);
+    expect(data.results.founderReviewUploadLeases.success).toBe(true);
+    expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
     expect(data.results.dataRetention.success).toBe(true);
   });
 
@@ -228,6 +241,30 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(data.results.releaseOutcomeReconciliation).toMatchObject({
       success: false,
       error: '1 release outcome reconciliation failed',
+    });
+    expect(data.results.dataRetention).toMatchObject({ success: true });
+  });
+
+  it('reports quarantined founder-review leases as a maintenance failure', async () => {
+    mockCleanupFounderReviewUploadLeases.mockResolvedValue({
+      scanned: 2,
+      deletedOrphans: 1,
+      reconciled: 0,
+      failed: 1,
+    });
+
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.results.founderReviewUploadLeases).toMatchObject({
+      success: false,
+      error: '1 founder-review upload lease quarantined for manual cleanup',
     });
     expect(data.results.dataRetention).toMatchObject({ success: true });
   });

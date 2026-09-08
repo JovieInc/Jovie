@@ -140,18 +140,26 @@ describe('Popover', () => {
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
 
-      // Trigger should expose basic ARIA metadata without referencing
-      // unmounted content while the popover is closed.
+      // Trigger should expose dialog metadata while closed.
       expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
-      expect(trigger).not.toHaveAttribute('aria-controls');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      const closedControlsId = trigger.getAttribute('aria-controls');
+      if (closedControlsId) {
+        expect(
+          document.getElementById(closedControlsId)
+        ).not.toBeInTheDocument();
+      }
 
       fireEvent.click(trigger);
 
       // After opening, content should be rendered and associated via a role
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
       expect(trigger).toHaveAttribute('aria-controls');
+      const controlsId = trigger.getAttribute('aria-controls');
       const contentNode = screen.getByText('Test popover content');
       const contentWithRole = contentNode.closest('[role]');
       expect(contentWithRole).toBeInTheDocument();
+      expect(contentWithRole).toHaveAttribute('id', controlsId);
     });
 
     it('manages focus correctly - does not trap focus like Dialog', () => {
@@ -244,6 +252,18 @@ describe('Popover', () => {
       const content = screen.getByText('Test popover content').closest('div');
       expect(content).toHaveAttribute('data-side', 'top');
       expect(content).toHaveAttribute('data-align', 'start');
+    });
+
+    it('keeps content within narrow viewports and wraps long words', () => {
+      render(
+        <TestPopover open={true}>
+          A-long-unbroken-value-that-must-wrap-within-the-popover-viewport
+        </TestPopover>
+      );
+
+      const content = screen.getByTestId('popover-content');
+      expect(content).toHaveClass('max-w-full');
+      expect(content).toHaveClass('break-words');
     });
   });
 

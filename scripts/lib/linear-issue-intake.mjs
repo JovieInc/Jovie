@@ -56,6 +56,9 @@ export async function upsertLinearIssueByTitleFingerprint({
   title,
   description,
   priority = 1,
+  // Optional state name (e.g. 'Todo') resolved from the team's workflow so a
+  // newly created issue can skip the default intake state (JOV-5966).
+  createStateName = null,
   reopenTerminal = false,
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
@@ -77,7 +80,7 @@ export async function upsertLinearIssueByTitleFingerprint({
               team: { id: { eq: $teamId } }
               title: { contains: $fingerprint }
             }
-            first: 5
+            first: 25
           ) {
             nodes { id identifier url title description state { id name type } }
           }
@@ -91,12 +94,25 @@ export async function upsertLinearIssueByTitleFingerprint({
   );
   if (!found.ok) return found;
 
+  const matches = (found.data?.issues?.nodes ?? []).filter(node =>
+    String(node?.title ?? '').includes(fingerprint)
+  );
+  // Prefer a live issue over terminal duplicates so the canonical survivor
+  // keeps accumulating reports instead of reopening a marked dupe.
+  const terminalTypes = ['completed', 'canceled'];
   const match =
-    found.data?.issues?.nodes?.find(node =>
-      String(node?.title ?? '').includes(fingerprint)
-    ) ?? null;
+    matches.find(node => !terminalTypes.includes(node?.state?.type)) ??
+    matches[0] ??
+    null;
 
   if (!match) {
+    const states = found.data?.team?.states?.nodes ?? [];
+    const createStateId = createStateName
+      ? (states.find(state => state?.name === createStateName)?.id ?? null)
+      : null;
+    if (createStateName && !createStateId) {
+      return { ok: false, reason: 'linear_create_state_missing' };
+    }
     const created = await linearGraphql(
       {
         query: `
@@ -104,19 +120,26 @@ export async function upsertLinearIssueByTitleFingerprint({
             $title: String!
             $description: String!
             $priority: Int
+            $stateId: String
           ) {
             issueCreate(input: {
               teamId: "${JOVIE_TEAM_ID}"
               title: $title
               description: $description
               priority: $priority
+              stateId: $stateId
             }) {
               success
               issue { id identifier url }
             }
           }
         `,
-        variables: { title, description, priority },
+        variables: {
+          title,
+          description,
+          priority,
+          ...(createStateId ? { stateId: createStateId } : {}),
+        },
         apiKey,
         fetchImpl,
       },
@@ -144,11 +167,21 @@ export async function upsertLinearIssueByTitleFingerprint({
   const backlogState =
     states.find(state => state?.name === 'Backlog') ??
     states.find(state => state?.type === 'backlog');
+  const todoState =
+    states.find(state => state?.name === 'Todo') ??
+    states.find(state => state?.type === 'unstarted');
   if (terminal && reopenTerminal && !backlogState)
     return { ok: false, reason: 'linear_backlog_state_missing' };
   const input = {
     description,
-    ...(terminal && reopenTerminal ? { stateId: backlogState.id } : {}),
+    ...(terminal && reopenTerminal
+      ? {
+          stateId:
+            createStateName === 'Todo' && todoState
+              ? todoState.id
+              : backlogState.id,
+        }
+      : {}),
   };
   const updated = await linearGraphql(
     {

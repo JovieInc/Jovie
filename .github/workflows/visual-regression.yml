@@ -12,6 +12,7 @@
 # Functional assertions in the spec (horizontal scroll, CTA clipping) still fail the
 # refresh run — a broken layout never silently becomes the new baseline.
 name: Visual Regression
+# clock-class: skip-if-unchanged
 
 on:
   schedule:

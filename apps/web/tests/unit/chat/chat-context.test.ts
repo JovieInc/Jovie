@@ -218,16 +218,16 @@ describe('Chat session context: plan limitations', () => {
   it('includes free tier message limit when tools are restricted', () => {
     const prompt = buildSystemPrompt(mockArtistContext, mockReleases, {
       aiCanUseTools: false,
-      aiDailyMessageLimit: 5,
+      aiWeeklyMessageLimit: 5,
     });
-    expect(prompt).toContain('5 messages per day');
+    expect(prompt).toContain('5 messages per week');
     expect(prompt).toContain('Free');
   });
 
   it('omits plan limitations section when artist has Pro access', () => {
     const prompt = buildSystemPrompt(mockArtistContext, mockReleases, {
       aiCanUseTools: true,
-      aiDailyMessageLimit: 200,
+      aiWeeklyMessageLimit: 200,
     });
     expect(prompt).not.toContain('Plan Limitations');
   });

@@ -1,7 +1,20 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
+import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
+import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import { runDspInteraction } from './utils/public-surface-helpers';
+
+const diagnostics = new WeakMap<object, () => Promise<void>>();
+
+test.beforeEach(({ page }) => {
+  diagnostics.set(page, observeProfileAdmissionFailure(page));
+});
+
+test.afterEach(async ({ page }) => {
+  await diagnostics.get(page)?.();
+  diagnostics.delete(page);
+});
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -26,6 +39,122 @@ function intersectionArea(
 }
 
 test.describe('public profile browser admission', () => {
+  for (const viewport of [
+    { width: 1179, layout: 'compact' as const },
+    { width: 1180, layout: 'desktop' as const },
+  ]) {
+    test(`${viewport.width}px owns the expected public profile presentation`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: 932 });
+      const response = await page.goto(
+        '/renders/profile-admission?layout=public&state=unclaimed',
+        { waitUntil: 'domcontentloaded' }
+      );
+      expect(response?.status()).toBe(200);
+
+      const shell = page.getByTestId('public-profile-layout-shell');
+      await expect(shell).toHaveAttribute('data-layout', viewport.layout);
+      await expect(
+        page.getByTestId(
+          viewport.layout === 'desktop'
+            ? 'profile-desktop-surface'
+            : 'profile-compact-shell'
+        )
+      ).toBeVisible();
+      await expect(
+        page.getByTestId(
+          viewport.layout === 'desktop'
+            ? 'profile-desktop-surface'
+            : 'profile-compact-shell'
+        )
+      ).toHaveAttribute('data-interactive-ready', 'true');
+
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => resolve())
+        );
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => resolve())
+        );
+      });
+
+      if (viewport.layout === 'desktop') {
+        await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
+        await expect(page.getByTestId('profile-bottom-nav')).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+        await expect(page.getByTestId('profile-bottom-nav')).toBeVisible();
+      }
+
+      const audit = await auditPublicProfileLayout(page);
+      expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+    });
+  }
+
+  test('1512px public route blocks the founder-reported compact desktop hybrid', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1512, height: 932 });
+    const response = await page.goto(
+      '/renders/profile-admission?layout=public&state=unclaimed',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+
+    const shell = page.getByTestId('public-profile-layout-shell');
+    const desktop = page.getByTestId('profile-desktop-surface');
+    await expect(shell).toHaveAttribute('data-layout', 'desktop');
+    await expect(desktop).toBeVisible();
+    await expect(desktop).toHaveAttribute('data-interactive-ready', 'true');
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise<void>(resolve =>
+        requestAnimationFrame(() => resolve())
+      );
+      await new Promise<void>(resolve =>
+        requestAnimationFrame(() => resolve())
+      );
+    });
+
+    const desktopFrame = page.locator('.public-profile-layout-frame--desktop');
+    await expect
+      .poll(() => desktopFrame.boundingBox())
+      .toMatchObject({ width: 1298 });
+
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.claimCtaLineCount).toBe(1);
+    expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+    await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
+    await expect(page.getByTestId('profile-bottom-nav')).toHaveCount(0);
+    await testInfo.attach('public-profile-desktop-1512.png', {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+  });
+
+  test('deliberate red rejects the narrow desktop card, bottom nav, and wrapped claim CTA', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1512, height: 932 });
+    const response = await page.goto(
+      '/renders/profile-admission?violation=desktop-compact-shell',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+
+    const audit = await auditPublicProfileLayout(page);
+    const codes = new Set(audit.violations.map(violation => violation.code));
+    expect(codes.has('desktop_bottom_nav')).toBe(true);
+    expect(codes.has('desktop_compact_shell')).toBe(true);
+    expect(codes.has('desktop_stage_too_narrow')).toBe(true);
+    expect(codes.has('unlabeled_preview')).toBe(true);
+    expect(codes.has('claim_cta_wrap') || codes.has('claim_cta_overflow')).toBe(
+      true
+    );
+  });
+
   test('keeps consent, PAC, dock, and DSP actions operable', async ({
     page,
   }, testInfo) => {

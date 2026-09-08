@@ -1,3 +1,7 @@
+---
+paths: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"]
+---
+
 # Code Style
 
 TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint rules, hook patterns.

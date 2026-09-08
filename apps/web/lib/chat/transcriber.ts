@@ -26,7 +26,13 @@ export interface TranscriberCallbacks {
 export interface Transcriber {
   readonly isSupported: boolean;
   start(): void;
+  /** Graceful stop: the engine's pending final result still reaches `onTranscript`. */
   stop(): void;
+  /**
+   * Hard stop: aborts recognition and drops any late results so a cancelled
+   * or already-sent dictation can never re-populate the composer.
+   */
+  cancel(): void;
   dispose(): void;
 }
 
@@ -64,6 +70,8 @@ interface SpeechRecognitionInstance extends EventTarget {
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   start(): void;
   stop(): void;
+  /** Optional in the surface we type; Chrome, Safari and Edge implement it. */
+  abort?(): void;
 }
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
@@ -73,6 +81,19 @@ declare global {
     SpeechRecognition?: SpeechRecognitionConstructor;
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
   }
+}
+
+/**
+ * Join already-present text with newly dictated text, inserting a single
+ * space only when neither side already provides whitespace at the seam.
+ * Prevents "Hello" + "world" → "Helloworld" without double-spacing engines
+ * that already lead each result with a space.
+ */
+export function joinDictationText(base: string, addition: string): string {
+  if (!addition) return base;
+  if (!base) return addition;
+  if (/\s$/.test(base) || /^\s/.test(addition)) return base + addition;
+  return `${base} ${addition}`;
 }
 
 export function isWebSpeechTranscriptionSupported(
@@ -110,6 +131,12 @@ export function createWebSpeechTranscriber(
   let recognition: SpeechRecognitionInstance | null = null;
   let recognitionStartedAt: number | null = null;
   let firstTranscriptRecorded = false;
+  // Each engine instance gets a generation. Only the active generation may
+  // deliver results/end/error: cancel()/dispose() invalidate it outright, and
+  // a fresh start() supersedes it, so a stopped instance's late final result
+  // (or its `onend`) can never bleed into a newer session.
+  let generationCounter = 0;
+  let activeGeneration = 0;
 
   const nowMs = () => globalThis.performance?.now?.() ?? Date.now();
 
@@ -117,6 +144,20 @@ export function createWebSpeechTranscriber(
     recognition = null;
     recognitionStartedAt = null;
     firstTranscriptRecorded = false;
+  };
+
+  const haltRecognition = (mode: 'stop' | 'abort') => {
+    const active = recognition;
+    if (!active) return;
+    try {
+      if (mode === 'abort' && typeof active.abort === 'function') {
+        active.abort();
+      } else {
+        active.stop();
+      }
+    } catch {
+      // Already stopped — nothing to release.
+    }
   };
 
   const getRecognition = (): SpeechRecognitionInstance | null => {
@@ -131,8 +172,12 @@ export function createWebSpeechTranscriber(
     instance.continuous = true;
     instance.interimResults = true;
     instance.lang = lang;
+    generationCounter += 1;
+    const generation = generationCounter;
+    activeGeneration = generation;
 
     instance.onresult = (event: SpeechRecognitionEvent) => {
+      if (generation !== activeGeneration) return;
       let transcript = '';
       for (const result of Array.from(event.results)) {
         transcript += result[0]?.transcript ?? '';
@@ -152,11 +197,13 @@ export function createWebSpeechTranscriber(
     };
 
     instance.onend = () => {
+      if (generation !== activeGeneration) return;
       disposeRecognition();
       callbacks.onEnd?.();
     };
 
     instance.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (generation !== activeGeneration) return;
       if (event.error === 'aborted') return;
       callbacks.onError?.(normalizeSpeechError(event.error));
     };
@@ -180,11 +227,18 @@ export function createWebSpeechTranscriber(
       }
     },
     stop() {
-      recognition?.stop();
+      // Generation stays active: the engine emits its final result after stop().
+      haltRecognition('stop');
+      disposeRecognition();
+    },
+    cancel() {
+      activeGeneration = -1;
+      haltRecognition('abort');
       disposeRecognition();
     },
     dispose() {
-      recognition?.stop();
+      activeGeneration = -1;
+      haltRecognition('abort');
       disposeRecognition();
     },
   };

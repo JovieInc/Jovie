@@ -1,10 +1,72 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { safeFailureReceipt } from '../../ownerless-recovery-sweeper.mjs';
 import {
+  activeLinearCooldown,
   collectLinearConnectionPages,
   fetchTeamActiveIssueSnapshot,
+  fetchTeamFleetClosureIssueSnapshot,
+  LinearTransportError,
 } from '../linear-client.mjs';
+
+describe('active Linear cooldown', () => {
+  it('recovers the latest future deadline through pagination wrapping', () => {
+    const now = 1_800_000_000_000;
+    const resetAt = now + 60_000;
+    const error = {
+      code: 'PAGE_FETCH_FAILED',
+      resetAt: resetAt - 1_000,
+      cause: {
+        code: 'RATE_LIMITED',
+        metadata: { resetAt },
+      },
+    };
+
+    assert.deepEqual(activeLinearCooldown(error, now), {
+      resetAt,
+      retryAt: new Date(resetAt).toISOString(),
+    });
+  });
+
+  it('rejects expired, untyped, malformed, and cyclic cooldown evidence', () => {
+    const now = 1_800_000_000_000;
+    assert.equal(
+      activeLinearCooldown({ code: 'RATE_LIMITED', resetAt: now }, now),
+      null
+    );
+    assert.equal(
+      activeLinearCooldown({ code: 'HTTP', resetAt: now + 60_000 }, now),
+      null
+    );
+
+    const cyclic = { code: 'RATE_LIMITED', resetAt: 'not-a-number' };
+    cyclic.cause = cyclic;
+    assert.equal(activeLinearCooldown(cyclic, now), null);
+  });
+});
+
+// Mirrors the production payload captured from Linear when the fleet-closure
+// snapshot exceeded the 10000 query-complexity ceiling (HTTP 400 INPUT_ERROR).
+function complexityError() {
+  return new LinearTransportError(
+    'Linear GraphQL request failed (http, attempts=1)',
+    {
+      code: 'HTTP',
+      body: JSON.stringify({
+        errors: [
+          {
+            message: 'Query too complex',
+            extensions: {
+              code: 'INPUT_ERROR',
+              userPresentableMessage:
+                'The query is too complex. Complexity: 10226. Maximum allowed complexity: 10000.',
+            },
+          },
+        ],
+      }),
+    }
+  );
+}
 
 describe('exhaustive Linear pagination', () => {
   it('collects every page and emits a complete coverage receipt', async () => {
@@ -108,6 +170,33 @@ describe('exhaustive Linear pagination', () => {
     );
   });
 
+  it('surfaces attempts and resetAt when a page fetch exhausts rate-limit retries', async () => {
+    const cause = new LinearTransportError(
+      'Linear GraphQL request failed (rate_limited, attempts=5)',
+      {
+        code: 'RATE_LIMITED',
+        attempts: 5,
+        metadata: { retryable: false, resetAt: 1_800_000_000_000 },
+      }
+    );
+    await assert.rejects(
+      collectLinearConnectionPages(async () => {
+        throw cause;
+      }),
+      error => {
+        const err = /** @type {any} */ (error);
+        return (
+          err?.name === 'LinearPaginationError' &&
+          err?.code === 'PAGE_FETCH_FAILED' &&
+          err?.attempts === 5 &&
+          err?.resetAt === 1_800_000_000_000 &&
+          err?.cause === cause &&
+          err?.coverage?.reason === 'page-fetch-failed'
+        );
+      }
+    );
+  });
+
   it('binds active inventory to a terminal page, not a result cap', async () => {
     const requests = [];
     const result = await fetchTeamActiveIssueSnapshot('team-1', {
@@ -135,8 +224,8 @@ describe('exhaustive Linear pagination', () => {
     });
 
     assert.deepEqual(requests, [
-      { teamId: 'team-1', cursor: null },
-      { teamId: 'team-1', cursor: 'page-2' },
+      { teamId: 'team-1', cursor: null, pageSize: 50 },
+      { teamId: 'team-1', cursor: 'page-2', pageSize: 50 },
     ]);
     assert.equal(result.coverage.complete, true);
     assert.equal(result.coverage.scanned, 2);
@@ -165,5 +254,212 @@ describe('exhaustive Linear pagination', () => {
     assert.equal(result.coverage.pages, 21);
     assert.equal(result.coverage.complete, true);
     assert.equal(result.coverage.hasNextPage, false);
+  });
+
+  it('uses a bounded fleet-closure projection instead of the full backlog payload', async () => {
+    let query = '';
+    const result = await fetchTeamFleetClosureIssueSnapshot('team-1', {
+      graphqlImpl: async (source, input) => {
+        query = source;
+        const variables = /** @type {{
+         *   teamId: string;
+         *   pageSize: number;
+         *   stateNames: string[];
+         * }} */ (input);
+        assert.equal(variables.teamId, 'team-1');
+        assert.equal(variables.pageSize, 250);
+        assert.ok(variables.stateNames.includes('Done'));
+        return {
+          team: {
+            issues: {
+              nodes: [{ id: 'one', identifier: 'JOV-1' }],
+              pageInfo: { hasNextPage: false, endCursor: 'terminal' },
+            },
+          },
+        };
+      },
+    });
+    for (const required of [
+      'identifier',
+      'description',
+      'attachments(first: 50)',
+      'relations(first: 50)',
+      'comments(first: 50)',
+    ])
+      assert.match(query, new RegExp(required.replace(/[()]/g, '\\$&')));
+    for (const unused of [
+      'assignee',
+      'creator',
+      'labels(first:',
+      'project {',
+      'parent {',
+      'children(first:',
+    ])
+      assert.doesNotMatch(query, new RegExp(unused.replace(/[()]/g, '\\$&')));
+    assert.equal(result.coverage.complete, true);
+  });
+
+  it('renders a typed failure receipt without transport bodies or credentials', () => {
+    const cause = new LinearTransportError(
+      'Linear GraphQL request failed (auth, attempts=1)',
+      {
+        code: 'AUTH',
+        attempts: 1,
+        metadata: { status: 401, contentType: 'application/json' },
+        body: 'token=do-not-print',
+      }
+    );
+    const error = Object.assign(
+      new Error('Linear pagination page fetch failed', { cause }),
+      {
+        name: 'LinearPaginationError',
+        code: 'PAGE_FETCH_FAILED',
+        attempts: 1,
+        coverage: { complete: false, reason: 'page-fetch-failed' },
+      }
+    );
+    const receipt = safeFailureReceipt(error);
+
+    assert.equal(receipt.code, 'PAGE_FETCH_FAILED');
+    assert.equal(receipt.cause.code, 'AUTH');
+    assert.equal(receipt.cause.status, 401);
+    assert.doesNotMatch(JSON.stringify(receipt), /do-not-print|token=/);
+  });
+
+  describe('query-complexity page-size halving', () => {
+    it('retries the same page with a halved page size, then resumes', async () => {
+      const calls = [];
+      const result = await collectLinearConnectionPages(
+        async (cursor, pageSize) => {
+          calls.push([cursor, pageSize]);
+          if (calls.length === 1) throw complexityError();
+          if (!cursor) {
+            return {
+              nodes: [{ id: '1' }],
+              pageInfo: { hasNextPage: true, endCursor: 'page-2' },
+            };
+          }
+          return {
+            nodes: [{ id: '2' }],
+            pageInfo: { hasNextPage: false, endCursor: 'done' },
+          };
+        }
+      );
+
+      // 50 fails against the ceiling; the same cursor is retried at 25 and
+      // the rest of the connection paginates at the reduced size.
+      assert.deepEqual(calls, [
+        [null, 50],
+        [null, 25],
+        ['page-2', 25],
+      ]);
+      assert.deepEqual(
+        result.issues.map(issue => issue.id),
+        ['1', '2']
+      );
+      assert.equal(result.coverage.complete, true);
+      assert.equal(result.coverage.pages, 2);
+    });
+
+    it('fails closed with COMPLEXITY_FLOOR when the floor still fails', async () => {
+      const sizes = [];
+      await assert.rejects(
+        collectLinearConnectionPages(async (_cursor, pageSize) => {
+          sizes.push(pageSize);
+          throw complexityError();
+        }),
+        error => {
+          const err = /** @type {any} */ (error);
+          return (
+            err?.name === 'LinearPaginationError' &&
+            err?.code === 'COMPLEXITY_FLOOR' &&
+            err?.coverage?.complete === false &&
+            err?.coverage?.reason === 'complexity-floor' &&
+            /10000/.test(err?.message) &&
+            err?.cause?.code === 'HTTP'
+          );
+        }
+      );
+      assert.deepEqual(sizes, [50, 25, 12, 6]);
+    });
+
+    it('does not retry a non-complexity HTTP 400', async () => {
+      let calls = 0;
+      await assert.rejects(
+        collectLinearConnectionPages(async () => {
+          calls += 1;
+          throw new LinearTransportError(
+            'Linear GraphQL request failed (http, attempts=1)',
+            {
+              code: 'HTTP',
+              body: JSON.stringify({
+                errors: [
+                  {
+                    message: 'Invalid filter',
+                    extensions: { code: 'INPUT_ERROR' },
+                  },
+                ],
+              }),
+            }
+          );
+        }),
+        error => {
+          const err = /** @type {any} */ (error);
+          return (
+            err?.code === 'PAGE_FETCH_FAILED' && err?.cause?.code === 'HTTP'
+          );
+        }
+      );
+      assert.equal(calls, 1);
+    });
+
+    it('leaves rate-limited failures on the fail-fast path', async () => {
+      let calls = 0;
+      await assert.rejects(
+        collectLinearConnectionPages(async () => {
+          calls += 1;
+          throw new LinearTransportError(
+            'Linear GraphQL request failed (rate_limited, attempts=3)',
+            { code: 'RATE_LIMITED' }
+          );
+        }),
+        error => {
+          const err = /** @type {any} */ (error);
+          return (
+            err?.code === 'PAGE_FETCH_FAILED' &&
+            err?.cause?.code === 'RATE_LIMITED'
+          );
+        }
+      );
+      assert.equal(calls, 1);
+    });
+
+    it('threads the halved page size through the fleet snapshot query', async () => {
+      const requests = [];
+      const queries = [];
+      const result = await fetchTeamActiveIssueSnapshot('team-1', {
+        graphqlImpl: async (query, variables) => {
+          queries.push(query);
+          requests.push(variables);
+          if (requests.length === 1) throw complexityError();
+          return {
+            team: {
+              issues: {
+                nodes: [{ id: 'one' }],
+                pageInfo: { hasNextPage: false, endCursor: 'terminal' },
+              },
+            },
+          };
+        },
+      });
+
+      assert.match(queries[0], /first:\s*\$pageSize/);
+      assert.deepEqual(requests, [
+        { teamId: 'team-1', cursor: null, pageSize: 50 },
+        { teamId: 'team-1', cursor: null, pageSize: 25 },
+      ]);
+      assert.equal(result.coverage.complete, true);
+      assert.equal(result.coverage.scanned, 1);
+    });
   });
 });

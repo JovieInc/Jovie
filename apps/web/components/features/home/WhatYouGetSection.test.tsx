@@ -5,15 +5,23 @@ import { describe, expect, it } from 'vitest';
 import { WhatYouGetSection } from './WhatYouGetSection';
 
 describe('WhatYouGetSection', () => {
-  it('renders the feature grid heading and items', () => {
+  it('renders the bounded heading and feature list', () => {
     render(<WhatYouGetSection />);
+
     expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'What you get',
-      })
-    ).toBeInTheDocument();
-    expect(screen.getByText('Auto-updating profile essentials')).toBeVisible();
+      screen.getByRole('heading', { level: 2, name: 'What you get' })
+    ).toHaveClass('line-clamp-2', 'text-primary-token');
+
+    for (const cardTitle of [
+      'Auto-updating profile essentials',
+      'Built-in fan notifications',
+      'Premium by default',
+      'Actionable analytics',
+    ]) {
+      expect(
+        screen.getByRole('heading', { level: 3, name: cardTitle })
+      ).toBeInTheDocument();
+    }
   });
 
   it('uses canonical spacing tokens for feature spacing', () => {

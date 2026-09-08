@@ -328,7 +328,9 @@ test.describe('canonical /start onboarding chat', () => {
     await suppressDevToolbar(page);
   });
 
-  test('redirect shims land on /start without loops', async ({ page }) => {
+  test('redirect shims land on /start without loops and keep /waitlist public', async ({
+    page,
+  }) => {
     const navigations: string[] = [];
     page.on('framenavigated', frame => {
       if (frame === page.mainFrame()) navigations.push(frame.url());
@@ -342,7 +344,12 @@ test.describe('canonical /start onboarding chat', () => {
     expect(navigations.length).toBeLessThanOrEqual(3);
 
     await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/start(?:\?|$)/);
+    await expect(page).toHaveURL(/\/waitlist(?:\?|$)/);
+    await expect(page.locator('[data-auth-shell]')).toHaveAttribute(
+      'data-auth-chrome',
+      'splash-b'
+    );
+    await expect(page.locator(CHAT_PANEL)).toHaveCount(0);
   });
 
   test('first screen and root picker are visually stable', async ({ page }) => {

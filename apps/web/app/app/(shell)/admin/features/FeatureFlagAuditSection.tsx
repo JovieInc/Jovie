@@ -187,13 +187,27 @@ export function FeatureFlagAuditSection({
           <table className='w-full text-left text-xs'>
             <thead>
               <tr className='border-subtle border-b text-tertiary-token'>
-                <th className='px-3 py-2 font-medium'>Time</th>
-                <th className='px-3 py-2 font-medium'>Flag</th>
-                <th className='px-3 py-2 font-medium'>Env</th>
-                <th className='px-3 py-2 font-medium'>Action</th>
-                <th className='px-3 py-2 font-medium'>Change</th>
-                <th className='px-3 py-2 font-medium'>Actor</th>
-                <th className='px-3 py-2 font-medium'>Reason</th>
+                <th className='px-3 py-2 font-medium'>
+                  <span className='whitespace-nowrap'>Time</span>
+                </th>
+                <th className='px-3 py-2 font-medium'>
+                  <span className='whitespace-nowrap'>Flag</span>
+                </th>
+                <th className='px-3 py-2 font-medium'>
+                  <span className='whitespace-nowrap'>Env</span>
+                </th>
+                <th className='px-3 py-2 font-medium'>
+                  <span className='whitespace-nowrap'>Action</span>
+                </th>
+                <th className='px-3 py-2 font-medium'>
+                  <span className='whitespace-nowrap'>Change</span>
+                </th>
+                <th className='px-3 py-2 font-medium'>
+                  <span className='whitespace-nowrap'>Actor</span>
+                </th>
+                <th className='px-3 py-2 font-medium'>
+                  <span className='whitespace-nowrap'>Reason</span>
+                </th>
                 <th className='px-3 py-2 font-medium'>
                   <span className='sr-only'>Rollback</span>
                 </th>

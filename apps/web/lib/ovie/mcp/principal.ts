@@ -1,3 +1,4 @@
+import { isAdmin } from '@/lib/admin/roles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   extractBearer,
@@ -32,11 +33,15 @@ export async function resolveOviePrincipal(
   }
 
   const entitlements = await getCurrentUserEntitlements();
+  const adminRole =
+    entitlements.isAuthenticated && entitlements.userId
+      ? await isAdmin(entitlements.userId)
+      : false;
   return {
     authenticated: entitlements.isAuthenticated,
-    isAdmin: entitlements.isAdmin,
+    isAdmin: adminRole,
     subject: entitlements.userId ?? undefined,
     email: entitlements.email ?? undefined,
-    scopes: entitlements.isAdmin ? [...OVIE_OAUTH_SCOPES] : [],
+    scopes: adminRole ? [...OVIE_OAUTH_SCOPES] : [],
   };
 }

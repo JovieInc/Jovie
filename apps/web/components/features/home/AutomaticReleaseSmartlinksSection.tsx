@@ -43,7 +43,7 @@ export function AutomaticReleaseSmartlinksSection() {
         <div className='relative mx-auto max-w-linear-content'>
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
-            <h2 className='max-w-md marketing-h2-linear text-primary-token'>
+            <h2 className='max-w-md marketing-h2-linear text-primary-token line-clamp-2'>
               New Release?
               <br />
               Already Live.

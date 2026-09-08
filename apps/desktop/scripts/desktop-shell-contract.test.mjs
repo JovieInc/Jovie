@@ -79,6 +79,10 @@ test('desktop polls build-info and reloads only hud windows on deploy drift', as
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
   const tokenSource = await readFile(
     join(desktopRoot, 'src/system-b-tokens.ts'),
     'utf8'
@@ -224,7 +228,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     /localResult\.action === 'retry'[\s\S]*?win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/
   );
   const localDidFailLoadBlock = mainSource.match(
-    /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n      \}\n\n      console\.error/
+    /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n {6}\}\n\n {6}console\.error/
   );
   assert.ok(localDidFailLoadBlock);
   assert.equal(
@@ -239,7 +243,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
+  assert.match(mainSource, /COPY_DESKTOP_AUTH_URL_CHANNEL/);
   assert.match(mainSource, /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL/);
+  assert.match(preloadSource, /copyDesktopAuthUrl/);
   assert.match(mainSource, /function hideMainWindowForAuthHandoff\(\): void/);
   assert.match(
     mainSource,
@@ -371,7 +377,7 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   );
   assert.match(
     mainSource,
-    /isAuthReturnDeepLinkCandidate\(arg\) && !parseDesktopAuthReturnDeepLink\(arg\)/
+    /isAuthReturnDeepLinkCandidate\(arg\)\s*&&\s*!parseDesktopAuthReturnDeepLink\(arg\)/
   );
   assert.doesNotMatch(
     mainSource,
@@ -493,6 +499,18 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /function installElectronRuntimeMarker\(\)/);
   assert.match(preloadSource, /installElectronRuntimeMarker\(\);/);
   assert.match(preloadSource, /contextBridge\.exposeInMainWorld/);
+  assert.match(
+    preloadSource,
+    /getBuildIdentity: \(\) => ipcRenderer\.invoke\(GET_BUILD_IDENTITY_CHANNEL\)/
+  );
+  assert.match(
+    mainSource,
+    /const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity'/
+  );
+  assert.match(mainSource, /ipcMain\.handle\(\s*GET_BUILD_IDENTITY_CHANNEL/);
+  assert.match(mainSource, /resolveDesktopBuildIdentityIpcRequest\(\{/);
+  assert.match(mainSource, /trustedSender: isTrustedIpcSender\(event\)/);
+  assert.match(mainSource, /args,\s*identity: desktopBuildIdentity/);
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
@@ -545,7 +563,11 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /ipcMain\.handle\(\s*DICTATION_STATUS_CHANNEL,/);
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
-  assert.match(mainSource, /webSpeechFallbackAllowed: true/);
+  // Web Speech recognition is non-functional inside Electron (no Google
+  // speech keys → 'network' error on every start), so the shell must never
+  // advertise it as an allowed fallback; the renderer points at OS dictation.
+  assert.doesNotMatch(mainSource, /webSpeechFallbackAllowed: true/);
+  assert.match(mainSource, /use-(macos-)?system-dictation/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermission/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
@@ -814,6 +836,10 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
 
 test('desktop main-window hub regression contracts (desktop QA)', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const authRouteSource = await readFile(
+    join(desktopRoot, 'src/desktop-auth-browser-route.ts'),
+    'utf8'
+  );
   const updateSource = await readFile(
     join(desktopRoot, 'src/desktop-auto-update.ts'),
     'utf8'
@@ -877,10 +903,47 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   assert.match(mainSource, /buildAuthCompletionUrl\(pendingAuthCompletion\)/);
 
   // Fix: a forged flow-mismatch deep link keeps the in-flight login; only
-  // success and pkce-expired clear the pending flow.
+  // success and pkce-expired clear the pending flow. Expiry immediately
+  // replaces the dead attempt with the existing canonical handoff.
   assert.match(
     mainSource,
-    /if \(binding\.reason === 'pkce-expired'\) \{\s*\/\/[^\n]*\n\s*pendingDesktopAuthPkce = null;/
+    /if \(binding\.reason === 'pkce-expired'\) \{[\s\S]{0,300}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,200}?surfaceNoPendingAuthFlow\(\);/
+  );
+  assert.match(
+    mainSource,
+    /COPY_DESKTOP_AUTH_URL_CHANNEL,[\s\S]{0,900}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,600}?resolveDesktopBrowserAuthUrl\(authUrl\)[\s\S]{0,500}?clipboard\.writeText\(externalAuthUrl\)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /ipcMain\.handle\(\s*COPY_DESKTOP_AUTH_URL_CHANNEL[\s\S]{0,1400}?console\.(?:log|info|warn|error)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /ipcMain\.handle\(\s*COPY_DESKTOP_AUTH_URL_CHANNEL[\s\S]{0,1400}?return \{ ok: true, authUrl:/
+  );
+  assert.match(
+    mainSource,
+    /showDesktopAuthHandoff\(buildCentralDesktopAuthUrl\('sign_in', '\/app'\), \{[\s\S]{0,100}?recoveryNavigation: true/
+  );
+  assert.match(
+    mainSource,
+    /setDesktopAuthRecoveryNavigationPending\([\s\S]{0,180}?true[\s\S]{0,300}?const finishRecoveryNavigation[\s\S]{0,300}?false[\s\S]{0,180}?\.then\(finishRecoveryNavigation, finishRecoveryNavigation\)/
+  );
+  assert.match(
+    authRouteSource,
+    /state\.cache\.flowNonce === state\.pendingPkce\.flowNonce[\s\S]{0,120}?state\.cache\.codeChallenge === state\.pendingPkce\.codeChallenge/
+  );
+  assert.match(
+    authRouteSource,
+    /if \(state\.recoveryNavigationPending\) \{[\s\S]{0,180}?reason: 'auth-recovery-pending'/
+  );
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.on\('closed',[\s\S]{0,180}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,180}?restoreMainWindowAfterAuthHandoff\(\);/
+  );
+  assert.match(
+    mainSource,
+    /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,[\s\S]{0,400}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,300}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,200}?win\.close\(\);/
   );
 
   // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.

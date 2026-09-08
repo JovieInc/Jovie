@@ -1,4 +1,5 @@
 name: Neon Scheduled Branch Cleanup
+# clock-class: temporal-resource
 
 on:
   schedule:
@@ -42,6 +43,18 @@ jobs:
           protected_branches: 'main,development,preview,br-main,br-production'
           cleanup_threshold: ${{ github.event.inputs.cleanup_threshold || '5' }}
           minimum_branch_age_minutes: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }}
+
+      - name: Emit preview-env cleanup receipt
+        if: always()
+        run: |
+          set -euo pipefail
+          node scripts/ci/preview-env-admission.mjs emit-cleanup \
+            --kind neon-branch \
+            --environment "ephemeral Neon branches past TTL or provably orphaned" \
+            --cleanup-trigger heartbeat-reconciliation \
+            --proof "Daily heartbeat reconciliation pass completed; see Neon Branch Cleanup step log for deletions" \
+            --cleaned-by "neon-scheduled-cleanup.yml" \
+            --out "$RUNNER_TEMP/preview-env-cleanup-neon-scheduled.json"
 
       - name: Report cleanup summary
         if: always()

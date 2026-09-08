@@ -16,7 +16,7 @@ This is the digest. The opinions live in [`PRICING-PHILOSOPHY.md`](./PRICING-PHI
 - Hybrid solves the recurring-revenue-vs-usage-upside tradeoff: predictable base, scaling meter.
 - Hybrid is also the most-considered model among businesses *not yet* using it.
 
-**Jovie translation:** flat tiers leave money on the table once usage variance is meaningful. Today's caps (5/100/500 AI messages per day) are *limiters* — they cap downside. A hybrid model converts them into *meters* — they capture upside too. Candidates: fan-notification batches, canvases generated, releases launched, campaigns drafted.
+**Jovie translation:** flat tiers leave money on the table once usage variance is meaningful. The proposed caps (15/70/250 AI messages per week for Free/Pro/Max) are *limiters* — they cap downside. A hybrid model converts paid-plan excess into a dollar-denominated meter that captures upside without exposing customers to opaque credits. Candidates: fan-notification batches, canvases generated, releases launched, campaigns drafted.
 
 ## Trend 2 — Pricing Is a Continuous Experiment
 

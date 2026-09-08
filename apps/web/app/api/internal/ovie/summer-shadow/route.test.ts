@@ -44,6 +44,10 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv(
+      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
+      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
+    );
     mocks.verifyCronRequest.mockReturnValue(null);
     mocks.getVercelOidcToken.mockResolvedValue('test-vercel-oidc-token');
   });
@@ -103,7 +107,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
     expect(call).toBeDefined();
     const [url, init] = call as Parameters<typeof globalThis.fetch>;
     expect(String(url)).toBe(
-      'https://jovie-eve-shadow-staging.vercel.app/ovie/v1/summer-shadow/events'
+      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/events'
     );
     expect(init).toMatchObject({
       method: 'POST',
@@ -233,10 +237,131 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       typeof globalThis.fetch
     >;
     expect(String(streamUrl)).toBe(
-      'https://jovie-eve-shadow-staging.vercel.app/ovie/v1/summer-shadow/sessions/ses_shadow_1/stream?conversationId=conv_shadow_1&startIndex=7'
+      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/sessions/ses_shadow_1/stream?conversationId=conv_shadow_1&startIndex=7'
     );
     expect(streamInit).toMatchObject({
       headers: { authorization: 'Bearer test-vercel-oidc-token' },
+    });
+  });
+
+  it('forwards a bounded commercial snapshot without asserting its facts are verified', async () => {
+    const commercialSnapshot = {
+      schema: 'jovie.summer-commercial.snapshot/v1',
+      sources: [],
+      candidates: [],
+      activeCommercialId: null,
+      recurringMrrCents: null,
+      collectedCashCents: null,
+      committedOperatingCostCents: null,
+      employerCompensationCostCents: null,
+      availableCashAfterObligationsCents: null,
+      recordedFounderMinutesPerDay: null,
+    };
+    const fetch = vi.fn(async () =>
+      Response.json({ ok: true }, { status: 202 })
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect(
+      (await POST(request({ ...validEvent, commercialSnapshot }))).status
+    ).toBe(202);
+    const body = JSON.parse(
+      String(
+        (
+          fetch.mock.calls[0] as unknown as Parameters<typeof globalThis.fetch>
+        )[1]?.body
+      )
+    );
+    expect(body.commercialSnapshot).toEqual(commercialSnapshot);
+    expect(
+      (
+        await POST(
+          request({ ...validEvent, commercialSnapshot: { schema: 'other' } })
+        )
+      ).status
+    ).toBe(422);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('proxies authenticated commercial receipt readback as JSON', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({ consumption: 'UNKNOWN' })
+    );
+    vi.stubGlobal('fetch', fetch);
+    const response = await GET(
+      new Request(
+        'https://jov.ie/api/internal/ovie/summer-shadow?eventId=event-0001'
+      )
+    );
+    expect(response.headers.get('content-type')).toBe('application/json');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toEqual({ consumption: 'UNKNOWN' });
+    expect(String(fetch.mock.calls[0]?.[0])).toBe(
+      'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/commercial/event-0001'
+    );
+    expect(
+      (
+        await GET(
+          new Request(
+            'https://jov.ie/api/internal/ovie/summer-shadow?eventId=..'
+          )
+        )
+      ).status
+    ).toBe(400);
+    mocks.verifyCronRequest.mockReturnValue(
+      new Response(null, { status: 401 })
+    );
+    expect(
+      (
+        await GET(
+          new Request(
+            'https://jov.ie/api/internal/ovie/summer-shadow?eventId=event-0001'
+          )
+        )
+      ).status
+    ).toBe(401);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([404, 503])('preserves commercial proof status %s', async status => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ code: 'upstream' }, { status }))
+    );
+    const response = await GET(
+      new Request(
+        'https://jov.ie/api/internal/ovie/summer-shadow?eventId=event-0001'
+      )
+    );
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({
+      ok: false,
+      code:
+        status === 404
+          ? 'commercial_receipt_not_found'
+          : 'commercial_proof_unavailable',
+    });
+  });
+
+  it('preserves strict Eve commercial validation rejection', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ code: 'invalid_event' }, { status: 422 })
+      )
+    );
+    const response = await POST(
+      request({
+        ...validEvent,
+        commercialSnapshot: {
+          schema: 'jovie.summer-commercial.snapshot/v1',
+          candidates: 'invalid',
+        },
+      })
+    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      ok: false,
+      code: 'invalid_commercial_snapshot',
     });
   });
 

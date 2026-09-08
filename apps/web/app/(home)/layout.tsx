@@ -10,24 +10,16 @@ export default function HomeLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The homepage composes the shared PublicPageShell as an intentional
-  // variant: homepage header chrome (icon logo, no center nav), minimal
-  // footer, and no fixed-header main offset.
-  // Dual min-h-svh is intentional (Lovable-style hero shell): the outer
-  // container is at least viewport height, AND main holds the hero at full
-  // viewport height on its own. Header sits in flow above, footer below the
-  // fold. Scrolling reveals the footer; the hero is the first paint.
+  // The homepage uses the canonical marketing shell. Dual min-h-svh is
+  // intentional: the outer container is at least viewport height, and main
+  // holds the hero at full viewport height on its own.
   return (
     <PublicPageShell
       className='home-viewport dark min-h-svh overflow-x-clip bg-base text-primary-token'
-      footerClassName='system-b-mounted-home-footer'
-      footerVariant='minimal'
-      headerVariant='homepage'
-      logoSize='sm'
-      logoVariant='icon'
+      footerVariant='expanded'
+      headerVariant='landing'
       mainClassName='min-h-svh'
       mainOffset={false}
-      showHomepageCenterNav={false}
     >
       <HomeScrollWatcher />
       {children}

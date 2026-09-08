@@ -57,6 +57,17 @@ enum MobileChatNDJSONParser {
         clientTurnId: clientTurnId
       )
 
+    case "turn.state":
+      guard
+        let clientTurnId = json["clientTurnId"] as? String,
+        let state = json["state"] as? String
+      else { throw MobileChatClientError.decodingFailed }
+      return .turnState(
+        clientTurnId: clientTurnId,
+        state: state,
+        eveWorkId: json["eveWorkId"] as? String
+      )
+
     case "assistant.delta":
       guard
         let clientTurnId = json["clientTurnId"] as? String,

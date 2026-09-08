@@ -38,7 +38,7 @@ export function PreFooterCTA() {
           </div>
 
           {/* Main heading with improved typography hierarchy */}
-          <h2 className='text-4xl sm:text-5xl lg:text-6xl font-medium text-primary-token tracking-tight leading-[1.1] transition-colors duration-slower'>
+          <h2 className='text-4xl sm:text-5xl lg:text-6xl font-medium text-primary-token tracking-tight leading-[1.1] transition-colors duration-slower line-clamp-2'>
             {/* ui-casing-allow: marketing display headline */}
             Ready to turn fans
             <br />

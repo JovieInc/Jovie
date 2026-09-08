@@ -60,12 +60,12 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(dsDark).toContain('--app-shell-sidebar-background-rgb: 6 8 13;');
   });
 
-  it('uses Ion electric blue for routine action, focus, and selection', () => {
+  it('uses Ion electric blue for routine action and selection; mode-invariant blue for focus', () => {
     expect(dsDark).toContain('--noir-ion-ion: #11afff;');
     expect(dsDark).toContain('--color-accent-blue: #11afff;');
     expect(dsDark).toContain('--color-accent: var(--noir-ion-ion);');
-    expect(dsDark).toContain('--color-border-focus: var(--noir-ion-ion);');
-    expect(dsDark).toContain('--color-focus-ring: var(--noir-ion-focus-ring);');
+    expect(dsDark).toContain('--color-border-focus: #2563ff;');
+    expect(dsDark).toContain('--color-focus-ring: var(--color-border-focus);');
     expect(dsDark).toContain('--color-bg-selected: var(--noir-ion-selected);');
 
     expect(linearDark).toContain(

@@ -1,5 +1,7 @@
 # PR Flow — How Agents Ship (Canonical)
 
+<!-- JOV-INV-029: this document projects the executable PR lifecycle contract. -->
+
 The single source of truth for how code reaches `main`. The goal is **lights-out
 shipping: 100s of PRs/day, fully autonomous, zero human-in-the-loop except a
 genuine taste call.** Every rule here exists because the alternative was tried and
@@ -7,6 +9,25 @@ it collapsed — see [What broke on 2026-06-22](#what-broke-on-2026-06-22) for t
 forensics that justify each one.
 
 If you are an agent about to open a PR, read [Agent checklist](#agent-checklist).
+
+## Executable lifecycle contract (JOV-INV-029)
+
+The checked-in invariant registry is the authority for the delivery phases below;
+the existing owners remain responsible for their mutations. A handoff releases
+the implementation slot only after its exact-head receipt is acknowledged.
+
+| Phase | Owner | Completion proof |
+| --- | --- | --- |
+| Draft | Symphony | Evidence-complete draft and writer-owned handoff receipt |
+| Review | Writer | Exact-head review, CI, and ticket evidence |
+| Promotion | Gem | Native merge-queue admission at the same head |
+| Merge | GitHub native queue | Merge event; this is not activation |
+| Activation | Production controller | Exact deployed runtime proof |
+| Closure | Summer | Closure receipt referencing activation proof |
+
+Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
+and expired holds remain bounded repair/evidence outcomes. The policy digest is
+included in delivery receipts so a runtime can reject a mismatched contract.
 
 ## North star
 
@@ -49,7 +70,7 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | Tier | Jobs | Trigger |
 |---|---|---|
 | **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
-| **Merge queue** | combined-head `ci-fast`, path-selected Web unit/build, Mac test/package artifact, iOS Xcode build/test, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
+| **Merge queue** | combined-head `ci-fast`, path-selected Web unit/build, Mac test/package artifact, iOS unit + coverage fast gate, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
@@ -77,6 +98,19 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
+- **Admission is independent of prior production deployment.** A pending, missing,
+  or failed release checkpoint does not block an otherwise qualified source PR.
+  Exact-head source checks, explicit scoped incident holds, and required native
+  merge-group correctness, provenance, and ancestry checks remain enforced.
+  Admission receipts say `source-qualified`; they never certify production.
+  The production controller owns deployment serialization and exact runtime
+  certification. When main and production are healthy, exact-main review is
+  current, and integrity is clear, controller containment and production SHA
+  lag select `hold-intake`: qualified PRs continue through the native queue,
+  while controller containment still holds new implementation and deployment.
+  Capacity-dependent mutation requires its own accepted evidence. Unknown
+  source/review/integrity evidence still blocks admission. An
+  existing incident hold is cleared only by its own evidence.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
@@ -96,8 +130,16 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 | Anything else (logic, tests, docs, internal app) | Fast gate only → auto-merges when green. |
 
 - **Want a preview deploy?** Dispatch `CI` on the exact ref with
-  `run_preview_deploy=true`; external Vercel preview status remains
-  informational — see [`release.md`](../.claude/rules/release.md).
+  `run_preview_deploy=true` (optionally `preview_work_id` / `preview_reason`).
+  Hosted previews and ephemeral databases are explicit, expiring exceptions:
+  the Vercel Git integration never builds non-`main`/`production` refs, and
+  every admitted environment is recorded with the
+  `jovie-preview-env-admission/v1` contract and torn down with a
+  `jovie-preview-env-cleanup/v1` receipt (PR close →
+  `neon-ephemeral-branch-cleanup.yml` + `vercel-preview-cleanup.yml`; daily
+  `neon-scheduled-cleanup.yml` reconciles missed events). External Vercel
+  preview status remains informational — see
+  [`release.md`](../.claude/rules/release.md).
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
@@ -105,9 +147,11 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   `merge-queue-autoenroll` first revalidates the PR associated with the
   triggering PR/CI event at that event's exact published head. Because GitHub's
   shared concurrency group retains only one pending run, every surviving pass
-  may also recover a tiny deterministic cohort whose source-required checks are
+  may also recover a deterministic cohort whose source-required checks are
   freshly green. The event target, native re-entry, and missed-event recovery
-  share a hard cap of two admissions per run, the App-backed controller remains
+  share one admission path bounded only by native queue depth (a positive
+  `DRAIN_QUEUE_REENTRY_MAX_PER_RUN` re-caps admissions per run; default `0` =
+  uncapped), the App-backed controller remains
   the sole writer, and every mutation rechecks the live head, labels, base,
   queue depth, and native postcondition. Enrollment uses GitHub's native queue
   only. The `merge-queue` label is retired and must not be added, read, or
@@ -136,6 +180,11 @@ Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
 An agent conflict that already carries `needs-conflict-resolution` is reported
 without repeating the same label mutation on every drain pass.
+When a non-draft main PR's required source checks never registered any
+check-run on its exact head (missing, not failing), the drain re-fires source
+CI with a bounded close+reopen: at most two per run, heads at least two hours
+old, and never twice on the same exact head (a bot-comment marker is the
+idempotency record). Terminal red checks still route to the fix agent instead.
 When a merge-group run proves a classified product failure, Gem writes the
 bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
 refusal. That success status preserves source-head cleanliness while acting as

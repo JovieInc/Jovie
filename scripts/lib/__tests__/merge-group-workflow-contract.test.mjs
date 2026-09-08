@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -9,9 +10,11 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
+import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
+import { MERGE_GROUP_POLICY_DEADLINE_MS } from '../merge-group-member-policy.mjs';
 import {
   createGitRunner,
   formatMetaEnv,
@@ -26,6 +29,21 @@ const CI_WORKFLOW = readFileSync(
 );
 const IOS_CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
+  'utf8'
+);
+const IOS_TESTFLIGHT_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/ios-testflight.yml'),
+  'utf8'
+);
+const IOS_UNIT_TEST_RUNNER = readFileSync(
+  resolve(REPO_ROOT, 'apps/ios/scripts/run-unit-tests.sh'),
+  'utf8'
+);
+const IOS_UNIT_TEST_SCHEME = readFileSync(
+  resolve(
+    REPO_ROOT,
+    'apps/ios/Jovie.xcodeproj/xcshareddata/xcschemes/JovieUnitTests.xcscheme'
+  ),
   'utf8'
 );
 const PRODUCTION_RELEASE_WORKFLOW = readFileSync(
@@ -91,6 +109,36 @@ function getJobBlock(workflow, jobKey) {
     block.push(line);
   }
   return block.join('\n');
+}
+
+function getStepRunScript(jobBlock, stepName) {
+  const lines = jobBlock.split('\n');
+  const stepStart = lines.findIndex(
+    line => line === `      - name: ${stepName}`
+  );
+  expect(
+    stepStart,
+    `Missing workflow step: ${stepName}`
+  ).toBeGreaterThanOrEqual(0);
+  const stepEnd = lines.findIndex(
+    (line, index) => index > stepStart && /^      - /.test(line)
+  );
+  const stepLines = lines.slice(
+    stepStart,
+    stepEnd === -1 ? lines.length : stepEnd
+  );
+  const runStart = stepLines.findIndex(line => line === '        run: |');
+  expect(runStart, `Missing run block: ${stepName}`).toBeGreaterThanOrEqual(0);
+  return stepLines
+    .slice(runStart + 1)
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+}
+
+function materializeWorkflowDispatchScript(script) {
+  return script
+    .replaceAll('${{ github.event_name }}', 'workflow_dispatch')
+    .replace(/\$\{\{[^}]+\}\}/g, '');
 }
 
 function getMergeGroupReachableJobText(jobBlock) {
@@ -293,10 +341,12 @@ describe('merge_group workflow contract', () => {
 
   it('admits expensive queue lanes only while exact external gates are green', () => {
     const admission = getJobBlock(CI_WORKFLOW, 'ci-merge-group-admission');
+    const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
     expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
     );
@@ -331,6 +381,16 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).toContain('node "$policy"');
     expect(admission).not.toContain('secrets.');
+    expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
+    expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
+    expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
+    expect(sizeGuard).toContain('timeout-minutes: 1');
+    expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(sizeGuard).toContain('--policy=size');
+    expect(FORK_GATE_WORKFLOW).toContain('--policy=fork');
+    expect(MERGE_GROUP_POLICY_DEADLINE_MS).toBeLessThan(60_000);
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeGreaterThan(60_000);
+    expect(MERGE_GROUP_ADMISSION_WAIT_MS).toBeLessThan(120_000);
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
@@ -347,9 +407,8 @@ describe('merge_group workflow contract', () => {
     }
 
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
-    expect(remaining).toContain(
-      'CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}'
-    );
+    expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain('github.event_name }}" != "pull_request"');
     expect(remaining).toContain('echo "skip=false"');
     expect(remaining).toContain('apps/web/\\.storybook/');
@@ -762,6 +821,59 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('materializes the path artifact before a manual dispatch exits', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectScript = materializeWorkflowDispatchScript(
+      getStepRunScript(pathChanges, 'Detect path changes for all job types')
+    );
+    const homepageVisualScript = getStepRunScript(
+      pathChanges,
+      'Select rendered homepage visual gate'
+    );
+    const testRoot = mkdtempSync(join(tmpdir(), 'manual-path-artifact-'));
+    const detectOutput = join(testRoot, 'detect-output');
+    const visualOutput = join(testRoot, 'visual-output');
+    const summary = join(testRoot, 'summary.md');
+    writeFileSync(detectOutput, '');
+    writeFileSync(visualOutput, '');
+    writeFileSync(summary, '');
+
+    const baseEnv = {
+      ...process.env,
+      GITHUB_RUN_ATTEMPT: '1',
+      GITHUB_RUN_ID: '123',
+      GITHUB_SHA: 'a'.repeat(40),
+      GITHUB_STEP_SUMMARY: summary,
+      RUNNER_TEMP: testRoot,
+    };
+    const detect = spawnSync('bash', ['-c', detectScript], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: { ...baseEnv, GITHUB_OUTPUT: detectOutput },
+    });
+    expect(detect.status, detect.stderr || detect.stdout).toBe(0);
+
+    const changedPaths = join(
+      testRoot,
+      'product-lane-classification',
+      'changed-paths.txt'
+    );
+    expect(existsSync(changedPaths)).toBe(true);
+    expect(readFileSync(changedPaths, 'utf8')).toContain(
+      '.github/workflows/ci.yml'
+    );
+
+    const visual = spawnSync('bash', ['-c', homepageVisualScript], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: { ...baseEnv, GITHUB_OUTPUT: visualOutput },
+    });
+    expect(visual.status, visual.stderr || visual.stdout).toBe(0);
+    expect(readFileSync(visualOutput, 'utf8')).toContain(
+      'run_homepage_visual=true'
+    );
+  });
+
   it('selects product lanes independently and fails closed on selected lane results', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
@@ -992,6 +1104,47 @@ ${selectedGateScript}`,
     );
   });
 
+  it('keeps merge-group iOS fast while TestFlight requires the full regression', () => {
+    const iosHeader = IOS_CI_WORKFLOW.slice(
+      0,
+      IOS_CI_WORKFLOW.indexOf('\njobs:')
+    );
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const releaseRegression = getJobBlock(
+      IOS_TESTFLIGHT_WORKFLOW,
+      'full-regression'
+    );
+    const beta = getJobBlock(IOS_TESTFLIGHT_WORKFLOW, 'beta');
+
+    expect(iosHeader).toContain('full-regression:');
+    expect(iosHeader).toContain('default: false');
+    expect(iosGate).toContain('Run fast unit and coverage gate');
+    expect(iosGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
+    expect(iosGate).toContain('bash apps/ios/scripts/check_coverage.sh');
+    expect(iosGate).toContain('JOVIE_IOS_RESET_SIMULATOR: "0"');
+    expect(iosGate).toContain('if: ${{ !inputs.full-regression }}');
+    expect(iosGate).toContain('Run full simulator regression');
+    expect(iosGate).toContain('if: ${{ inputs.full-regression }}');
+    expect(iosGate).toContain('Capture simulator screenshots');
+    expect(IOS_UNIT_TEST_RUNNER).toContain(
+      'JOVIE_IOS_RESULT_BUNDLE_PATH="$RESULT_BUNDLE"'
+    );
+    expect(IOS_UNIT_TEST_RUNNER).toContain('JOVIE_IOS_SCHEME="JovieUnitTests"');
+    expect(IOS_UNIT_TEST_RUNNER).not.toContain(
+      '-resultBundlePath "$RESULT_BUNDLE"'
+    );
+    expect(IOS_UNIT_TEST_SCHEME).toMatch(/BlueprintName\s*=\s*"JovieTests"/);
+    expect(IOS_UNIT_TEST_SCHEME).not.toContain('JovieUITests');
+
+    expect(releaseRegression).toContain('uses: ./.github/workflows/ios-ci.yml');
+    expect(releaseRegression).toContain('full-regression: true');
+    expect(releaseRegression).toContain(
+      'checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}'
+    );
+    expect(beta).toContain('needs: [authorize-release, full-regression]');
+    expect(beta).toContain("needs.full-regression.result == 'success'");
+  });
+
   it('fails closed unless every changed component renders in live Storybook on the exact merge-group diff', () => {
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     const certification = buildLayout.indexOf(
@@ -1172,7 +1325,7 @@ ${selectedGateScript}`,
     }
   });
 
-  it('coalesces a short release wave before exact authorization and mutation', () => {
+  it('applies event-driven supersession instead of a fixed release-wave sleep', () => {
     const coalesce = getJobBlock(
       PRODUCTION_CONTROLLER_WORKFLOW,
       'coalesce-production'
@@ -1186,11 +1339,28 @@ ${selectedGateScript}`,
     expect(coalesce).toContain(
       "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
     );
-    expect(coalesce).toContain("COALESCE_DELAY_SECONDS: '60'");
-    expect(coalesce).toContain('sleep "$COALESCE_DELAY_SECONDS"');
-    expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
-    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
+    // No universal fixed delay: the bounded window derives from merge-queue
+    // depth and is capped inside the 5-minute job budget.
+    expect(coalesce).not.toContain('COALESCE_DELAY_SECONDS');
+    expect(coalesce).not.toContain('sleep 60');
+    expect(coalesce).toContain("COALESCE_PER_GENERATION_SECONDS: '30'");
+    expect(coalesce).toContain("COALESCE_MAX_SECONDS: '150'");
+    expect(coalesce).toContain('sleep "$wait_seconds"');
+    // Event sources: exact main and the merge queue only; no polling loop.
     expect(coalesce).toContain('commits/main');
+    expect(coalesce).toContain('mergeQueue(branch: "main")');
+    // Empty queue + current SHA proceeds without any wait.
+    expect(coalesce).toContain('if [ "$queue_depth" -eq 0 ]; then');
+    // Every decision emits a lineage receipt with reason, replacement SHA,
+    // time saved, and next state; any wait names benefit and deadline.
+    expect(coalesce).toContain('record_receipt');
+    expect(coalesce).toContain('time_saved_seconds');
+    expect(coalesce).toContain('expected_benefit');
+    expect(coalesce).toContain('deadline');
+    expect(coalesce).toContain('next_state');
+    expect(coalesce).toContain('$GITHUB_STEP_SUMMARY');
+    expect(coalesce).toContain('echo "is_current=false"');
+    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
       'needs: [coalesce-production, fleet-promotion]'
     );
@@ -1438,6 +1608,47 @@ ${selectedGateScript}`,
     expect(controller).toContain('.author_association == "COLLABORATOR"');
   });
 
+  it.each([
+    ['fork', FORK_GATE_WORKFLOW, 'merge-group-gate'],
+    ['size', SIZE_GUARD_WORKFLOW, 'merge-group-size'],
+  ])('loads the complete %s policy import closure from its sparse checkout', (_policy, workflow, job) => {
+    const block = getJobBlock(workflow, job);
+    const sparse = block.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+    expect(sparse, 'trusted policy sparse checkout').not.toBeNull();
+    const paths = sparse[1]
+      .trim()
+      .split('\n')
+      .map(line => line.trim());
+    const root = mkdtempSync(join(tmpdir(), 'jovie-policy-checkout-'));
+    const load = () =>
+      spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          "await import('./scripts/lib/merge-group-member-policy.mjs')",
+        ],
+        { cwd: root, encoding: 'utf8' }
+      );
+    try {
+      for (const path of paths) {
+        const target = resolve(root, path);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, readFileSync(resolve(REPO_ROOT, path)));
+      }
+      // Node discovers all transitive static imports in the actual policy.
+      const complete = load();
+      expect(complete.status, complete.stderr).toBe(0);
+      rmSync(resolve(root, 'scripts/lib/repo-hygiene-limits.mjs'));
+      const incomplete = load();
+      expect(incomplete.status).not.toBe(0);
+      expect(incomplete.stderr).toContain('ERR_MODULE_NOT_FOUND');
+      expect(incomplete.stderr).toContain('repo-hygiene-limits.mjs');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('revalidates mutable member policy on the exact combined head', () => {
     expect(FORK_GATE_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
@@ -1447,7 +1658,10 @@ ${selectedGateScript}`,
       "github.event_name == 'merge_group' && 'Fork PR Gate'"
     );
     expect(forkGate).toContain("github.event_name == 'merge_group'");
-    expect(forkGate).toContain('ref: ${{ github.event.merge_group.base_sha }}');
+    expect(forkGate).toContain('ref: main');
+    expect(forkGate).not.toContain(
+      'ref: ${{ github.event.merge_group.base_sha }}'
+    );
     expect(forkGate).toContain('persist-credentials: false');
     expect(forkGate).toContain('contents: read');
     expect(forkGate).toContain('pull-requests: read');
@@ -1469,9 +1683,30 @@ ${selectedGateScript}`,
     );
     expect(sizeGuard).toContain("github.event_name == 'merge_group'");
     expect(sizeGuard).toContain(
-      'ref: ${{ github.event.merge_group.base_sha }}'
+      "ref: ${{ github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0' && '7641ffa76d03326542541c62080735c28190a1f0' || 'main' }}"
     );
     expect(sizeGuard).toContain('persist-credentials: false');
+    expect(sizeGuard).toContain(
+      "if: github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0'"
+    );
+    expect(sizeGuard).toContain(
+      "timeout --kill-after=5s 40s bash --noprofile --norc <<'BOOTSTRAP_POLICY'"
+    );
+    expect(sizeGuard).toContain('GIT_CONFIG_COUNT=2');
+    expect(sizeGuard).toContain(
+      'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader'
+    );
+    expect(sizeGuard).toContain('GIT_CONFIG_VALUE_0="$AUTH_HEADER"');
+    expect(sizeGuard).toContain('GIT_CONFIG_KEY_1=core.hooksPath');
+    expect(sizeGuard).toContain('GIT_CONFIG_VALUE_1=/dev/null');
+    expect(sizeGuard).not.toContain('git config ');
+    expect(sizeGuard).toContain(
+      'BOOTSTRAP_HEAD: ${{ github.event.merge_group.head_sha }}'
+    );
+    expect(sizeGuard).not.toContain(
+      'ref: ${{ github.event.merge_group.head_sha }}'
+    );
+    expect(sizeGuard).toContain('scripts/lib/repo-hygiene-limits.mjs');
     expect(SIZE_GUARD_WORKFLOW).toContain('contents: read');
     expect(SIZE_GUARD_WORKFLOW).toContain('pull-requests: read');
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
@@ -1481,6 +1716,10 @@ ${selectedGateScript}`,
     expect(sizeGuard).toContain(
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
+    expect(MEMBER_POLICY).toContain('await enforceCombinedTreePayload({');
+    expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
+    expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
+    expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
     expect(sizeGuard).toContain("MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}");
     expect(sizeGuard).not.toContain('members were size-checked as source PRs');
     const sourceSizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');

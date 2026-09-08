@@ -12,7 +12,7 @@ const inputVariants = cva(
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
     'placeholder:text-tertiary-token',
     'hover:border-default',
-    'focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25',
+    'focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
     'disabled:cursor-not-allowed disabled:opacity-[var(--state-disabled-opacity)]',
     'transition-[background-color,border-color,box-shadow,color,opacity] duration-subtle ease-subtle motion-reduce:transition-none',
   ],

@@ -85,7 +85,7 @@ export function DashboardAudienceDemo() {
                 h => (
                   <th
                     key={h}
-                    className='px-3 py-2 font-medium text-tertiary-token border-b border-subtle'
+                    className='px-3 py-2 font-medium text-tertiary-token border-b border-subtle whitespace-nowrap'
                   >
                     {h}
                   </th>

@@ -5,12 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { HomepageNoScriptContent } from './HomepageNoScriptContent';
 
-const CONTENT_RATIO_TARGET = 0.05;
-
-// Official Is Agentic scan at 2026-08-30T09:17:52.555Z:
-// 1,778 content characters / 68,806 script-free body bytes = 2.6%.
-const REPORTED_BODY_BYTES = 68_806;
-const REPORTED_CONTENT_CHARACTERS = 1_778;
 const homepageSource = readFileSync(
   path.resolve(process.cwd(), 'app/(home)/page.tsx'),
   'utf8'
@@ -20,12 +14,16 @@ const homepageCss = readFileSync(
   'utf8'
 );
 
-function normalizedText(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
-}
-
-function contentRatio(bodyBytes: number, contentCharacters: number): number {
-  return contentCharacters / bodyBytes;
+function renderFallback() {
+  const rawMarkup = renderToStaticMarkup(<HomepageNoScriptContent />);
+  const document = new DOMParser().parseFromString(
+    `<body>${rawMarkup}</body>`,
+    'text/html'
+  );
+  return {
+    rawMarkup,
+    section: document.querySelector('section.homepage-no-script-content'),
+  };
 }
 
 describe('HomepageNoScriptContent', () => {
@@ -39,29 +37,46 @@ describe('HomepageNoScriptContent', () => {
     );
   });
 
-  it('keeps a canonical, user-readable fallback in the HTML document', () => {
-    const rawMarkup = renderToStaticMarkup(<HomepageNoScriptContent />);
-    const document = new DOMParser().parseFromString(
-      `<body>${rawMarkup}</body>`,
-      'text/html'
-    );
-    const fallbackSection = document.querySelector(
-      'section.homepage-no-script-content'
-    );
+  it('mirrors the nine certified sections in order', () => {
+    const { rawMarkup, section } = renderFallback();
+    const text = section?.textContent ?? '';
 
-    expect(fallbackSection).not.toBeNull();
+    expect(section).not.toBeNull();
     expect(rawMarkup).not.toContain('<noscript');
-    expect(fallbackSection?.querySelector('h2')?.textContent).toBe(
-      'Jovie for artists'
+    expect(section?.querySelector('h2')?.textContent).toBe(
+      HOMEPAGE_LAUNCH_COPY.hero.headline
     );
-    expect(fallbackSection?.textContent).toContain(
-      HOMEPAGE_LAUNCH_COPY.hero.subhead
-    );
-    expect(fallbackSection?.textContent).toContain(
-      HOMEPAGE_LAUNCH_COPY.faq[0].answer
-    );
-    expect(fallbackSection?.hasAttribute('hidden')).toBe(false);
-    expect(fallbackSection?.getAttribute('aria-hidden')).toBeNull();
+    expect(section?.hasAttribute('hidden')).toBe(false);
+    expect(section?.getAttribute('aria-hidden')).toBeNull();
+
+    const ordered = [
+      HOMEPAGE_LAUNCH_COPY.hero.subhead,
+      HOMEPAGE_LAUNCH_COPY.certified.proof.statement,
+      ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
+        item.headline,
+        item.body,
+      ]),
+      HOMEPAGE_LAUNCH_COPY.certified.close.headline,
+      HOMEPAGE_LAUNCH_COPY.certified.close.support,
+    ];
+    let cursor = -1;
+    for (const line of ordered) {
+      const index = text.indexOf(line, cursor + 1);
+      expect(
+        index,
+        `fallback is missing or misorders: ${line}`
+      ).toBeGreaterThan(cursor);
+      cursor = index;
+    }
+
+    // The only conversion is the name search; the fallback links it to /start.
+    const links = [...(section?.querySelectorAll('a') ?? [])];
+    expect(links.map(link => link.textContent)).toEqual([
+      HOMEPAGE_LAUNCH_COPY.hero.search.action,
+      'Contact support',
+    ]);
+    expect(links[0]?.getAttribute('href')).toBe('/start');
+    expect(text).not.toMatch(/Get started|Drop more music|waitlist/i);
   });
 
   it('hides only the progressive fallback for scripting-enabled browsers', () => {
@@ -73,32 +88,5 @@ describe('HomepageNoScriptContent', () => {
     )?.[0];
     expect(defaultRule).toBeDefined();
     expect(defaultRule).not.toContain('display: none');
-  });
-
-  it('passes the reported 5% ratio while keeping the old result red', () => {
-    const rawMarkup = renderToStaticMarkup(<HomepageNoScriptContent />);
-    const document = new DOMParser().parseFromString(
-      `<body>${rawMarkup}</body>`,
-      'text/html'
-    );
-    const fallbackText = normalizedText(
-      document.querySelector('section.homepage-no-script-content')
-        ?.textContent ?? ''
-    );
-    const fallbackBytes = Buffer.byteLength(rawMarkup, 'utf8');
-
-    const oldRatio = contentRatio(
-      REPORTED_BODY_BYTES,
-      REPORTED_CONTENT_CHARACTERS
-    );
-    const ratioWithFallback = contentRatio(
-      REPORTED_BODY_BYTES + fallbackBytes,
-      REPORTED_CONTENT_CHARACTERS + fallbackText.length
-    );
-
-    // Deliberate red: removing the fallback returns the observed 2.6% result.
-    expect(oldRatio).toBeLessThan(CONTENT_RATIO_TARGET);
-    expect(fallbackText.length).toBeGreaterThan(1_800);
-    expect(ratioWithFallback).toBeGreaterThanOrEqual(CONTENT_RATIO_TARGET);
   });
 });

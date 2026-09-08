@@ -86,29 +86,30 @@ export async function respondToOvieSummerAction(input: {
     if (action === 'complete') {
       const responseText =
         typeof body.response_text === 'string' ? body.response_text.trim() : '';
-      if (!claimToken || !responseText) {
-        return NextResponse.json({ ok: false }, { status: 400 });
-      }
       const toolBody =
         body.tool && typeof body.tool === 'object'
           ? (body.tool as Record<string, unknown>)
           : null;
+      const tool =
+        toolBody &&
+        typeof toolBody.name === 'string' &&
+        typeof toolBody.receiptId === 'string' &&
+        typeof toolBody.summary === 'string'
+          ? {
+              name: toolBody.name,
+              ok: toolBody.ok === true,
+              receiptId: toolBody.receiptId,
+              summary: toolBody.summary,
+            }
+          : undefined;
+      if (!claimToken || (!responseText && !tool)) {
+        return NextResponse.json({ ok: false }, { status: 400 });
+      }
       const completed = await completeOvieSummerTurn(input.store, {
         id,
         claimToken,
         responseText,
-        tool:
-          toolBody &&
-          typeof toolBody.name === 'string' &&
-          typeof toolBody.receiptId === 'string' &&
-          typeof toolBody.summary === 'string'
-            ? {
-                name: toolBody.name,
-                ok: toolBody.ok === true,
-                receiptId: toolBody.receiptId,
-                summary: toolBody.summary,
-              }
-            : undefined,
+        tool,
       });
       return NextResponse.json({
         ok: true,

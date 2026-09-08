@@ -1271,6 +1271,18 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
   text-wrap: balance;
 }
 
+/* Compact route title: the single owner for "type 28/620" utility-route
+   headings. Fixed size — no per-breakpoint overrides. */
+:where(.system-b-marketing-route-title) {
+  color: var(--system-b-text-primary);
+  font-family: var(--font-display);
+  font-size: var(--ds-marketing-route-title-size);
+  font-weight: var(--ds-marketing-route-title-weight);
+  letter-spacing: var(--ds-marketing-route-title-tracking);
+  line-height: var(--ds-marketing-route-title-leading);
+  text-wrap: balance;
+}
+
 :where(.system-b-voice-demo) {
   max-width: calc((var(--space-24) * 4) + var(--space-8) + var(--space-1));
   background: var(--system-b-bg-surface-1);

@@ -149,14 +149,13 @@ rules:
       # production deploy latency. Live ruleset 10512119 stays 1/0 until the
       # post-merge apply + canary.
       min_entries_to_merge: 5
-      max_entries_to_merge: 10
-      # Five simultaneous merge_group runs on 2026-08-15 started together, but
-      # four unit matrices inflated from ~1–2m to ~5–7m while build/layout held
-      # the critical path near 7m. Start at three prefixes so each ten-shard
-      # matrix gets useful hosted capacity; re-evaluate from measured queue wait.
-      max_entries_to_build: 3
+      # Tim tightened the live ruleset 2026-09-04 (was 60/3/10): solo group
+      # builds, 20-minute check budget, 5-entry merge batches. This file is
+      # the source of truth the drain's drift guard checks against.
+      max_entries_to_merge: 5
+      max_entries_to_build: 1
       min_entries_to_merge_wait_minutes: 10
-      check_response_timeout_minutes: 60
+      check_response_timeout_minutes: 20
 
   # Dormant rules are intentionally absent from this applied payload:
   # `required_signatures` and `non_fast_forward`. Live ruleset 10512119 does

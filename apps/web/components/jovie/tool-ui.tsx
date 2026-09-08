@@ -732,6 +732,7 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   deleteOrArchiveMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),
   researchArtistPresence: event => renderPresenceBuildArtifact(event),
+  surfaceLibraryOpportunities: event => renderPresenceBuildArtifact(event),
   assembleArtistProfile: event => renderPresenceBuildArtifact(event),
   generateSmartLink: event => renderPresenceBuildArtifact(event),
   draftWelcomePost: event => renderPresenceBuildArtifact(event),

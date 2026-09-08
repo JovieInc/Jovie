@@ -17,9 +17,19 @@ export interface OperatorLaunchRequest {
   readonly href?: string; readonly sshHost?: string;
 }
 
+export interface DesktopBuildIdentity {
+  readonly channel: string;
+  readonly version: string;
+  readonly sourceRevision: string | null;
+  readonly builtAt: string | null;
+  readonly provenance: 'verified' | 'development' | 'unverified';
+}
+
 export interface ElectronAPI {
   readonly platform: NodeJS.Platform;
   readonly electronVersion: string;
+  /** Main-process-validated package provenance. Optional for older shells. */
+  readonly getBuildIdentity?: () => Promise<DesktopBuildIdentity | null>;
   /** Register a callback that fires when electron-updater detects a new version. */
   readonly onUpdateAvailable: (cb: () => void) => void | (() => void);
   /** Register a callback that fires when the update download is complete. */
@@ -44,6 +54,11 @@ export interface ElectronAPI {
   }>;
   /** Open the desktop auth URL in the system browser from the handoff window. */
   readonly openDesktopAuthUrl?: (authUrl: string) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
+  /** Copy a main-process-validated desktop auth URL. */
+  readonly copyDesktopAuthUrl?: (authUrl: string) => Promise<{
     readonly ok: boolean;
     readonly reason?: string;
   }>;
@@ -188,6 +203,65 @@ export function getElectronAPI(): ElectronAPI | undefined {
  */
 export function isDesktopEnvironment(): boolean {
   return getRawElectronAPI() !== undefined;
+}
+
+/**
+ * Read package provenance from the context-isolated preload bridge.
+ *
+ * The bridge is the durable authority: attributes written onto the hosted
+ * document can be removed when Next.js hydrates its root `<html>` element.
+ */
+function parseDesktopBuildIdentity(
+  identity: unknown
+): DesktopBuildIdentity | undefined {
+  if (!identity || typeof identity !== 'object') return undefined;
+  const record = identity as Record<string, unknown>;
+  if (
+    typeof record.channel !== 'string' ||
+    typeof record.version !== 'string' ||
+    (record.sourceRevision !== null &&
+      typeof record.sourceRevision !== 'string') ||
+    (record.builtAt !== null && typeof record.builtAt !== 'string') ||
+    (record.provenance !== 'verified' &&
+      record.provenance !== 'development' &&
+      record.provenance !== 'unverified')
+  ) {
+    return undefined;
+  }
+  return record as unknown as DesktopBuildIdentity;
+}
+
+export function useDesktopBuildIdentity(): DesktopBuildIdentity | undefined {
+  const api = getRawElectronAPI();
+  const bridgeAvailable = typeof api?.getBuildIdentity === 'function';
+  const [resolved, setResolved] = useState<{
+    readonly api: Partial<ElectronAPI>;
+    readonly identity: DesktopBuildIdentity | undefined;
+  }>();
+
+  useEffect(() => {
+    if (!bridgeAvailable || !api?.getBuildIdentity) {
+      return;
+    }
+    let cancelled = false;
+    void api
+      .getBuildIdentity()
+      .then(value => {
+        if (!cancelled) {
+          setResolved({ api, identity: parseDesktopBuildIdentity(value) });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setResolved({ api, identity: undefined });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, bridgeAvailable]);
+
+  return bridgeAvailable && resolved?.api === api
+    ? resolved.identity
+    : undefined;
 }
 
 /**
@@ -413,6 +487,24 @@ export async function openDesktopAuthUrl(
     reportMissingBridgeMethod('openDesktopAuthUrl');
   }
   return openBrowserFallback(authUrl);
+}
+
+export async function copyDesktopAuthUrl(
+  authUrl: string
+): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.copyDesktopAuthUrl === 'function') {
+    const result = await api.copyDesktopAuthUrl(authUrl);
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason ?? 'desktop-auth-copy-failed',
+    };
+  }
+  if (api) {
+    reportMissingBridgeMethod('copyDesktopAuthUrl');
+  }
+  return { ok: false, reason: 'desktop-auth-copy-bridge-unavailable' };
 }
 
 export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
@@ -668,6 +760,7 @@ export const __testing = {
   safeOnUpdateDownloaded,
   startDesktopAuthHandoff,
   openDesktopAuthUrl,
+  copyDesktopAuthUrl,
   openPublicProfileInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,

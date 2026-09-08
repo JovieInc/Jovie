@@ -15,9 +15,27 @@ describe('SupportPageContent', () => {
   it('renders the exact shipped body in hero, channels, FAQ, CTA order', () => {
     const { container } = render(<SupportPageContent />);
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: "We're Here To Help." })
-    ).toBeVisible();
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: "We're Here To Help.",
+    });
+    expect(heading).toBeVisible();
+    // Compact route title owner ("type 28/620"): one shared class, no
+    // per-breakpoint Tailwind size ramp on the route.
+    expect(heading).toHaveClass(
+      'system-b-marketing-route-title',
+      'mt-6',
+      'text-primary-token'
+    );
+    for (const residue of [
+      'text-4xl',
+      'sm:text-5xl',
+      'lg:text-6xl',
+      'font-semibold',
+      'tracking-tight',
+    ]) {
+      expect(heading).not.toHaveClass(residue);
+    }
     expect(screen.getByTestId('support-hero')).toHaveAttribute(
       'aria-labelledby',
       'support-hero-heading'
@@ -39,7 +57,11 @@ describe('SupportPageContent', () => {
       .filter(link =>
         /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
       )) {
+      // Canonical 28px marketing Button atom; it owns the 44px touch target.
+      expect(action).toHaveAttribute('data-size', 'marketing');
+      expect(action).toHaveClass('h-7', 'rounded-full');
       expect(action).toHaveClass('before:h-11', 'before:min-w-11');
+      expect(action).not.toHaveClass('public-action-inline');
     }
     expect(
       screen.getByRole('link', { name: /send email to support team/i })
@@ -113,12 +135,12 @@ describe('SupportPageContent', () => {
       source: 'apps/web/components/organisms/SupportPageContent.tsx',
       sourceExport: 'SupportPageContent',
       storyExport: 'Web040Support',
-      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
+      sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1',
       proofScope: 'system-b-body-only',
       implementation: 'exact-production-body',
     });
     expect(storySource).toContain(
-      "sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997'"
+      "sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1'"
     );
     expect(storySource).toContain("proofScope: 'system-b-body-only'");
     expect(storySource).toContain("sourceExport: 'SupportPageContent'");

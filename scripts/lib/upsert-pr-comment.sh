@@ -15,7 +15,7 @@ marker="${2:?marker required}"
 body="${3:?body required}"
 repo="${GITHUB_REPOSITORY:-JovieInc/Jovie}"
 
-hidden="<!-- bot-comment:${marker} -->"
+hidden="<!-- bot-comment:${marker}${4:+:$4} -->"
 full_body="${hidden}
 ${body}"
 

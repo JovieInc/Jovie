@@ -1,28 +1,42 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   app,
   BrowserWindow,
+  clipboard,
   desktopCapturer,
   type IpcMainInvokeEvent,
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  type Session,
   screen,
   session,
-  type Session,
   shell,
 } from 'electron';
-import {
-  isTrayAppState,
-  MenuBarTray,
-  type TrayAction,
-  type TrayStatePayload,
-} from './tray';
 import { autoUpdater } from 'electron-updater';
+import {
+  DESKTOP_BUILD_IDENTITY_PRINT_FLAG,
+  DESKTOP_BUILD_IDENTITY_RESOURCE_NAME,
+  DESKTOP_BUILD_IDENTITY_SHELL_CSS,
+  DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
+  formatDesktopBuildIdentityDisplay,
+  renderDesktopBuildIdentitySection,
+  resolveDesktopBuildIdentity,
+  resolveDesktopBuildIdentityIpcRequest,
+  toDesktopBuildIdentityJson,
+} from './build-identity';
+import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
+import {
+  clearDesktopBrowserAuthRouteState,
+  type DesktopAuthIntent,
+  emptyDesktopBrowserAuthRouteState,
+  rememberDesktopBrowserAuthRoutePkce,
+  resolveDesktopBrowserAuthRoute,
+  setDesktopAuthRecoveryNavigationPending,
+} from './desktop-auth-browser-route';
 import {
   bindPendingDesktopAuthCompletion,
   DESKTOP_AUTH_FLOW_PARAM,
@@ -51,17 +65,6 @@ import {
   shouldGrantTrustedHudScreenPermissionCheck,
 } from './desktop-permissions';
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
-import {
-  DESKTOP_BUILD_IDENTITY_PRINT_FLAG,
-  DESKTOP_BUILD_IDENTITY_RESOURCE_NAME,
-  DESKTOP_BUILD_IDENTITY_SHELL_CSS,
-  DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
-  formatDesktopBuildIdentityDisplay,
-  renderDesktopBuildIdentitySection,
-  resolveDesktopBuildIdentity,
-  toDesktopBuildIdentityJson,
-} from './build-identity';
-import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
 import { APP_ENV, APP_URL } from './env';
 import {
   decideHudBuildReload,
@@ -77,20 +80,22 @@ import {
   type UrlDisposition,
 } from './navigation';
 import {
+  decideOperatorLaunch,
+  parseOperatorLaunchRequest,
+  terminalLaunchSpec,
+} from './operator-launch';
+import {
   OVIE_OPERATOR_TALK_ROUTE,
   ovieOperatorOpsHref,
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
-import {
-  decideOperatorLaunch,
-  parseOperatorLaunchRequest,
-  terminalLaunchSpec,
-} from './operator-launch';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
   createLocalHostedLoadRetryController,
+  type DesktopLoadFailureReason,
+  type DesktopLoadFailureView,
   decideAbortedMainFrameRecovery,
   decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
@@ -107,14 +112,18 @@ import {
   shouldArmRendererWatchdogsForAppEnv,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
-  type DesktopLoadFailureReason,
-  type DesktopLoadFailureView,
 } from './renderer-recovery';
 import {
   createSummerRuntimeBridge,
   type SummerRuntimeBridge,
 } from './summer-runtime-bridge';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
+import {
+  isTrayAppState,
+  MenuBarTray,
+  type TrayAction,
+  type TrayStatePayload,
+} from './tray';
 import { sanitizeWindowState, type WindowState } from './window-state';
 
 // Separate userData for non-production shells so local, staging, and production
@@ -191,6 +200,7 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
@@ -214,6 +224,7 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
+const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -254,16 +265,14 @@ const AUTH_HANDOFF_WINDOW_BOUNDS = {
   minHeight: 460,
 } as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
-const PUBLIC_PROFILE_PREVIEW_PARTITION =
-  'persist:jovie-public-profile-preview';
+const PUBLIC_PROFILE_PREVIEW_PARTITION = 'persist:jovie-public-profile-preview';
 const PUBLIC_PROFILE_PREVIEW_BOUNDS = {
   width: 390,
   height: 844,
   minWidth: 320,
   minHeight: 568,
 } as const;
-const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL =
-  'open-public-profile-in-browser';
+const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
@@ -275,7 +284,7 @@ let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
-let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
+let desktopBrowserAuthRouteState = emptyDesktopBrowserAuthRouteState();
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
@@ -397,7 +406,9 @@ async function openPublicProfileInBrowser(
   }
 }
 
-async function openExternalUrl(urlString: string): Promise<DesktopAuthOpenResult> {
+async function openExternalUrl(
+  urlString: string
+): Promise<DesktopAuthOpenResult> {
   const parsed = parseUrl(urlString);
   if (!parsed || !isAllowedExternalUrl(parsed)) {
     return { ok: false, reason: 'blocked-url' };
@@ -529,13 +540,6 @@ function sanitizeDesktopReturnRoute(
   return normalized;
 }
 
-function getDefaultDesktopReturnRoute(pathname: string): string {
-  return matchesPathPrefix(pathname, '/signup') ||
-    matchesPathPrefix(pathname, '/sign-up')
-    ? '/start'
-    : '/app';
-}
-
 function base64Url(buffer: Buffer): string {
   return buffer
     .toString('base64')
@@ -558,16 +562,22 @@ function createDesktopAuthPkce(): PendingDesktopAuthPkce {
 }
 
 function rememberDesktopAuthPkce(pkce: PendingDesktopAuthPkce): void {
-  pendingDesktopAuthPkce = pkce;
+  desktopBrowserAuthRouteState = rememberDesktopBrowserAuthRoutePkce(
+    desktopBrowserAuthRouteState,
+    pkce
+  );
   recentAuthCompletion = null;
 }
 
-function buildCentralDesktopAuthUrl(
-  intent: 'sign_in' | 'sign_up',
+function clearPendingDesktopAuthFlow(): void {
+  desktopBrowserAuthRouteState = clearDesktopBrowserAuthRouteState();
+}
+
+function createCentralDesktopAuthRoute(
+  intent: DesktopAuthIntent,
   returnTo: string
-): string {
+): { readonly authUrl: string; readonly pendingPkce: PendingDesktopAuthPkce } {
   const pkce = createDesktopAuthPkce();
-  rememberDesktopAuthPkce(pkce);
 
   const authUrl = new URL(DESKTOP_AUTH_START_PATH, APP_URL);
   authUrl.searchParams.set('client', 'electron');
@@ -576,46 +586,43 @@ function buildCentralDesktopAuthUrl(
   authUrl.searchParams.set('code_challenge', pkce.codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set(DESKTOP_AUTH_FLOW_PARAM, pkce.flowNonce);
-  return `${authUrl.pathname}${authUrl.search}`;
+  return {
+    authUrl: `${authUrl.pathname}${authUrl.search}`,
+    pendingPkce: pkce,
+  };
 }
 
-function isCentralDesktopAuthStartUrl(parsed: URL): boolean {
-  return (
-    parsed.origin === APP_ORIGIN &&
-    parsed.pathname === DESKTOP_AUTH_START_PATH &&
-    parsed.searchParams.get('client') === 'electron' &&
-    parsed.searchParams.get('code_challenge_method') === 'S256' &&
-    Boolean(parsed.searchParams.get('code_challenge')) &&
-    Boolean(sanitizeDesktopReturnRoute(parsed.searchParams.get('return_to')))
-  );
+function buildCentralDesktopAuthUrl(
+  intent: DesktopAuthIntent,
+  returnTo: string
+): string {
+  const created = createCentralDesktopAuthRoute(intent, returnTo);
+  rememberDesktopAuthPkce(created.pendingPkce);
+  return created.authUrl;
+}
+
+function resolveDesktopBrowserAuthUrl(urlString: string) {
+  const resolution = resolveDesktopBrowserAuthRoute({
+    state: desktopBrowserAuthRouteState,
+    urlString,
+    appOrigin: APP_ORIGIN,
+    authStartPath: DESKTOP_AUTH_START_PATH,
+    flowParam: DESKTOP_AUTH_FLOW_PARAM,
+    returnParam: DESKTOP_RETURN_PARAM,
+    parseUrl,
+    isDesktopAuthPath,
+    sanitizeReturnRoute: sanitizeDesktopReturnRoute,
+    matchesPathPrefix,
+    createCentralRoute: createCentralDesktopAuthRoute,
+  });
+  desktopBrowserAuthRouteState = resolution.state;
+  if (resolution.created) recentAuthCompletion = null;
+  return resolution;
 }
 
 function buildDesktopBrowserAuthUrl(urlString: string): string | null {
-  const parsed = parseUrl(urlString);
-  if (parsed && isCentralDesktopAuthStartUrl(parsed)) {
-    return `${parsed.pathname}${parsed.search}`;
-  }
-
-  if (
-    !parsed ||
-    parsed.origin !== APP_ORIGIN ||
-    !isDesktopAuthPath(parsed.pathname)
-  ) {
-    return null;
-  }
-
-  const desktopReturn =
-    sanitizeDesktopReturnRoute(parsed.searchParams.get(DESKTOP_RETURN_PARAM)) ??
-    sanitizeDesktopReturnRoute(parsed.searchParams.get('redirect_url')) ??
-    getDefaultDesktopReturnRoute(parsed.pathname);
-
-  parsed.searchParams.delete('oauth_error');
-  const intent =
-    matchesPathPrefix(parsed.pathname, '/signup') ||
-    matchesPathPrefix(parsed.pathname, '/sign-up')
-      ? 'sign_up'
-      : 'sign_in';
-  return buildCentralDesktopAuthUrl(intent, desktopReturn);
+  const resolution = resolveDesktopBrowserAuthUrl(urlString);
+  return resolution.ok ? resolution.authUrl : null;
 }
 
 function buildDesktopAuthHandoffUrl(authUrl: string): string {
@@ -664,7 +671,9 @@ function parseLegacyAuthReturnRouteDeepLink(urlString: string): string | null {
   return sanitizeDesktopReturnRoute(parsed.searchParams.get('route'));
 }
 
-function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null {
+function findLegacyAuthReturnRouteInArgv(
+  argv: readonly string[]
+): string | null {
   for (const arg of argv) {
     const route = parseLegacyAuthReturnRouteDeepLink(arg);
     if (route) return route;
@@ -672,16 +681,22 @@ function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null
   return null;
 }
 
+// Chromium's Web Speech recognition backend needs Google API keys that
+// Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
+// but every start() fails with a 'network' error (electron/electron#46143,
+// #7749). Advertising it as a fallback made the composer mic look live and
+// fail on every press. Report it unavailable so the renderer points at OS
+// dictation instead — macOS dictation types into any focused field here.
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
     nativeAvailable: false,
-    webSpeechFallbackAllowed: true,
-    mode: 'web-speech',
+    webSpeechFallbackAllowed: false,
+    mode: 'unavailable',
     reason:
       process.platform === 'darwin'
-        ? 'native-macos-dictation-is-system-owned-web-speech-fallback-enabled'
-        : 'native-dictation-unavailable-web-speech-fallback-enabled',
+        ? 'web-speech-unsupported-in-electron-use-macos-system-dictation'
+        : 'web-speech-unsupported-in-electron-use-system-dictation',
   };
 }
 
@@ -786,9 +801,7 @@ function restoreMainWindowAfterAuthHandoff(): void {
   mainWindowHiddenForAuthHandoff = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (
-      shouldRecoverAuthHandoffToCanonicalShell(
-        mainWindow.webContents.getURL()
-      )
+      shouldRecoverAuthHandoffToCanonicalShell(mainWindow.webContents.getURL())
     ) {
       const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
       void mainWindow.loadURL(buildDesktopAuthHandoffUrl(authUrl));
@@ -907,34 +920,39 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
 // persisted across launches; the new flow starts over.
 function surfaceNoPendingAuthFlow(): void {
   if (!app.isReady()) return;
+  if (desktopBrowserAuthRouteState.recoveryNavigationPending) return;
   const win =
     mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
   showWindow(win);
-  showDesktopAuthHandoff(buildCentralDesktopAuthUrl('sign_in', '/app'));
+  showDesktopAuthHandoff(buildCentralDesktopAuthUrl('sign_in', '/app'), {
+    recoveryNavigation: true,
+  });
 }
 
 function handleAuthCompletion(
   completion: NonNullable<ReturnType<typeof parseDesktopAuthReturnDeepLink>>
 ): void {
   const binding = bindPendingDesktopAuthCompletion(
-    pendingDesktopAuthPkce,
+    desktopBrowserAuthRouteState.pendingPkce,
     completion
   );
 
   if (!binding.ok) {
     reportDesktopAuthBindingFailure(reportDesktopSecurityEvent, binding);
     if (binding.reason === 'pkce-expired') {
-      // The pending flow is dead either way — drop it.
-      pendingDesktopAuthPkce = null;
+      // The pending flow is dead either way. Replace it with a fresh handoff
+      // so the user is not stranded after returning from an expired browser.
+      clearPendingDesktopAuthFlow();
+      surfaceNoPendingAuthFlow();
     } else if (binding.reason === 'no-pending-flow') {
       surfaceNoPendingAuthFlow();
     }
     // 'flow-mismatch' (a forged-but-well-formed deep link) must NOT clear the
-    // legitimate in-flight login — leave pendingDesktopAuthPkce untouched.
+    // legitimate in-flight login — leave the pending PKCE state untouched.
     return;
   }
 
-  pendingDesktopAuthPkce = null;
+  clearPendingDesktopAuthFlow();
 
   const nativeCompletion: DesktopAuthCompletion = {
     code: completion.code,
@@ -998,12 +1016,31 @@ function getRecentAuthCompletionForState(
   return recentAuthCompletion.completion;
 }
 
-function showDesktopAuthHandoff(authUrl: string): void {
+function showDesktopAuthHandoff(
+  authUrl: string,
+  options: { readonly recoveryNavigation?: boolean } = {}
+): void {
   const handoffUrl = buildDesktopAuthHandoffUrl(authUrl);
   hideMainWindowForAuthHandoff();
 
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
-    void authHandoffWindow.loadURL(handoffUrl);
+    const recoveryWindow = authHandoffWindow;
+    if (options.recoveryNavigation) {
+      desktopBrowserAuthRouteState = setDesktopAuthRecoveryNavigationPending(
+        desktopBrowserAuthRouteState,
+        true
+      );
+    }
+    const finishRecoveryNavigation = () => {
+      if (authHandoffWindow !== recoveryWindow) return;
+      desktopBrowserAuthRouteState = setDesktopAuthRecoveryNavigationPending(
+        desktopBrowserAuthRouteState,
+        false
+      );
+    };
+    void recoveryWindow
+      .loadURL(handoffUrl)
+      .then(finishRecoveryNavigation, finishRecoveryNavigation);
     showWindow(authHandoffWindow);
     return;
   }
@@ -1046,6 +1083,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
 
   authHandoffWindow.on('closed', () => {
     authHandoffWindow = null;
+    clearPendingDesktopAuthFlow();
     restoreMainWindowAfterAuthHandoff();
     // The handoff installed deny-all permission handlers on the shared default
     // session; restore the main window's trusted-audio policy.
@@ -1152,9 +1190,7 @@ function buildDesktopShellHtml(input: {
 </html>`;
 }
 
-function buildDesktopLoadFailureUrl(
-  failure: DesktopLoadFailureView
-): string {
+function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
   const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
   const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
   const html = buildDesktopShellHtml({
@@ -1298,7 +1334,9 @@ async function findReachableHostedUrl(
 ): Promise<string | null> {
   for (const candidate of hostedUrlCandidates(APP_URL, hostedUrl)) {
     const origin = new URL(candidate).origin;
-    if (await probeAppUrl(new URL('/api/health/build-info', origin).toString())) {
+    if (
+      await probeAppUrl(new URL('/api/health/build-info', origin).toString())
+    ) {
       return candidate;
     }
     if (await probeAppUrl(origin)) {
@@ -1403,8 +1441,8 @@ function showPublicProfilePreview(urlString: string): boolean {
     PUBLIC_PROFILE_PREVIEW_PARTITION,
     { cache: true }
   );
-  previewSession.setPermissionRequestHandler((_contents, _permission, callback) =>
-    callback(false)
+  previewSession.setPermissionRequestHandler(
+    (_contents, _permission, callback) => callback(false)
   );
   previewSession.setPermissionCheckHandler(() => false);
 
@@ -1444,14 +1482,17 @@ function showPublicProfilePreview(urlString: string): boolean {
     if (event.isMainFrame) return;
     event.preventDefault();
   });
-  preview.webContents.on('will-redirect', (event, url, _inPlace, isMainFrame) => {
-    const navigationUrl = resolveNavigationUrl(url);
-    if (getUrlDisposition(navigationUrl) === 'profile-preview') return;
-    event.preventDefault();
-    if (isMainFrame && getUrlDisposition(navigationUrl) === 'external') {
-      void openExternalUrl(navigationUrl);
+  preview.webContents.on(
+    'will-redirect',
+    (event, url, _inPlace, isMainFrame) => {
+      const navigationUrl = resolveNavigationUrl(url);
+      if (getUrlDisposition(navigationUrl) === 'profile-preview') return;
+      event.preventDefault();
+      if (isMainFrame && getUrlDisposition(navigationUrl) === 'external') {
+        void openExternalUrl(navigationUrl);
+      }
     }
-  });
+  );
   preview.webContents.setWindowOpenHandler(({ url }) => {
     const navigationUrl = resolveNavigationUrl(url);
     const disposition = getUrlDisposition(navigationUrl);
@@ -1781,7 +1822,10 @@ function attachRendererRecovery(
           showWindowNow(win);
           return;
         }
-        if (abortAction === 'arm-load-watchdog' && typeof validatedURL === 'string') {
+        if (
+          abortAction === 'arm-load-watchdog' &&
+          typeof validatedURL === 'string'
+        ) {
           armLoadWatchdog(resolveNavigationUrl(validatedURL));
         }
         return;
@@ -1797,14 +1841,17 @@ function attachRendererRecovery(
           retryUrl,
         });
         if (localResult.action === 'retry') {
-          console.warn('[Jovie Desktop] Local hosted load not ready, retrying', {
-            errorCode,
-            attempt: localResult.attempt,
-            validatedURL:
-              typeof validatedURL === 'string'
-                ? validatedURL.split('?')[0]
-                : validatedURL,
-          });
+          console.warn(
+            '[Jovie Desktop] Local hosted load not ready, retrying',
+            {
+              errorCode,
+              attempt: localResult.attempt,
+              validatedURL:
+                typeof validatedURL === 'string'
+                  ? validatedURL.split('?')[0]
+                  : validatedURL,
+            }
+          );
           // Chromium commits chrome-error://chromewebdata/ after a refused
           // loopback load. Keep the app-owned shell painted while the bounded
           // retry obligation remains active.
@@ -2417,6 +2464,18 @@ autoUpdater.on('error', () => {
   }
 });
 
+// Return only the already-validated identity, and only to the trusted app origin.
+ipcMain.handle(
+  GET_BUILD_IDENTITY_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    return resolveDesktopBuildIdentityIpcRequest({
+      trustedSender: isTrustedIpcSender(event),
+      args,
+      identity: desktopBuildIdentity,
+    });
+  }
+);
+
 // Allow renderer to trigger quit-and-install without exposing node access.
 ipcMain.handle(
   QUIT_AND_INSTALL_CHANNEL,
@@ -2523,12 +2582,42 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-request' };
     }
 
-    const browserAuthUrl = buildDesktopBrowserAuthUrl(authUrl);
-    if (!browserAuthUrl) {
-      return { ok: false, reason: 'invalid-auth-url' };
+    const resolution = resolveDesktopBrowserAuthUrl(authUrl);
+    if (!resolution.ok) {
+      return { ok: false, reason: resolution.reason };
     }
 
-    return openExternalUrl(new URL(browserAuthUrl, APP_URL).toString());
+    return openExternalUrl(new URL(resolution.authUrl, APP_URL).toString());
+  }
+);
+
+ipcMain.handle(
+  COPY_DESKTOP_AUTH_URL_CHANNEL,
+  (
+    event: IpcMainInvokeEvent,
+    authUrl: unknown,
+    ...args: unknown[]
+  ): DesktopAuthOpenResult => {
+    if (
+      !isTrustedDesktopAuthSender(event) ||
+      args.length !== 0 ||
+      typeof authUrl !== 'string'
+    ) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    const resolution = resolveDesktopBrowserAuthUrl(authUrl);
+    if (!resolution.ok) {
+      return { ok: false, reason: resolution.reason };
+    }
+
+    const externalAuthUrl = new URL(resolution.authUrl, APP_URL).toString();
+    try {
+      clipboard.writeText(externalAuthUrl);
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'clipboard-write-failed' };
+    }
   }
 );
 
@@ -2539,6 +2628,7 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-request' };
     }
 
+    clearPendingDesktopAuthFlow();
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win && !win.isDestroyed()) {
       win.close();
@@ -2604,7 +2694,8 @@ if (gotSingleInstanceLock) {
 
     const invalidAuthReturn = argv.some(
       arg =>
-        isAuthReturnDeepLinkCandidate(arg) && !parseDesktopAuthReturnDeepLink(arg)
+        isAuthReturnDeepLinkCandidate(arg) &&
+        !parseDesktopAuthReturnDeepLink(arg)
     );
     if (invalidAuthReturn) {
       reportDesktopSecurityEvent('auth-deep-link-invalid-params');
@@ -2617,7 +2708,9 @@ if (gotSingleInstanceLock) {
       return;
     }
 
-    const profileUrl = argv.find((arg: string) => canonicalPublicProfileUrl(arg));
+    const profileUrl = argv.find((arg: string) =>
+      canonicalPublicProfileUrl(arg)
+    );
     if (profileUrl) {
       showPublicProfilePreview(profileUrl);
       return;
@@ -2663,8 +2756,7 @@ app.whenReady().then(() => {
     applicationName: getDesktopAppDisplayName(),
     applicationVersion: desktopBuildIdentity.version,
     version:
-      desktopBuildIdentity.sourceRevision ??
-      DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
+      desktopBuildIdentity.sourceRevision ?? DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
     credits: formatDesktopBuildIdentityDisplay(desktopBuildIdentity),
   });
   console.info(

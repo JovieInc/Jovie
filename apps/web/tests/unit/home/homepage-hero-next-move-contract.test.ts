@@ -5,92 +5,118 @@ import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
-describe('homepage hero next-move contract (JOV-4475)', () => {
-  it('uses the exact approved headline and supporting line', () => {
-    expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Jovie helps you move your music forward.'
-    );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
-      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
-    );
-  });
+function readHeroCss(): string {
+  const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
+  const start = css.indexOf('HOMEPAGE EDITORIAL HERO START');
+  const end = css.indexOf('HOMEPAGE EDITORIAL HERO END', start);
+  return css.slice(start, end);
+}
 
-  it('keeps Get started as the sole primary conversion path', () => {
-    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.label).toBe('Get started');
-    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.href).toBe('/start');
-    expect(HOMEPAGE_LAUNCH_COPY.fallbackCta.href).toBe('/start');
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.label).toBe(
-      'See a live profile'
-    );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
-      '/artist-profiles'
-    );
-  });
-
-  it('demotes the live-profile path to a quiet ghost control in the poster hero', () => {
-    const heroSource = readFileSync(
-      path.join(webRoot, 'components/marketing/MarketingPosterHero.tsx'),
-      'utf8'
-    );
-    const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
-
-    expect(heroSource).toContain("data-testid='homepage-primary-cta'");
-    expect(heroSource).toContain("data-testid='homepage-secondary-cta'");
-    expect(heroSource).toContain("variant='primary'");
-    expect(heroSource).toContain("variant='ghost'");
-    expect(heroSource.match(/size='marketing'/gu)).toHaveLength(2);
-    expect(heroSource).not.toMatch(
-      /secondaryCta[\s\S]*?variant=['"]tertiary['"]/
-    );
-    expect(heroSource).not.toContain('active:scale');
-    expect(css).toMatch(
-      /\.homepage-poster-hero__action-button\s*\{[\s\S]*?border-radius: var\(--radius-pill\);[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
-    );
-  });
-
-  it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
-    const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
-    const heroCssStart = css.indexOf('HOMEPAGE POSTER HERO SYSTEM B START');
-    const heroCssEnd = css.indexOf(
-      'HOMEPAGE POSTER HERO SYSTEM B END',
-      heroCssStart
-    );
-    const heroCss = css.slice(heroCssStart, heroCssEnd);
-
-    expect(heroCss).toContain('--homepage-hero-reveal-delay: 100ms;');
-    expect(heroCss).toContain('@keyframes homepage-hero-content-reveal');
-    expect(heroCss).toContain('opacity: 0;');
-    expect(heroCss).toContain('opacity: 1;');
-    expect(heroCss).not.toMatch(
-      /@keyframes homepage-hero-content-reveal[\s\S]*?(?:transform|translate|scale|height|margin)/
-    );
-    expect(heroCss).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(heroCss).toContain('animation: none;');
-  });
-
-  it('keeps product proof on a truthful screenshot path, not Deep End mock copy', () => {
+describe('homepage hero contract (JOV-5864)', () => {
+  it('rejects raster media regardless of how it is mounted', () => {
     const pageSource = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    const commandCenterSource = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageHeroCommandCenter.tsx'),
+    const componentSource = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageEditorialHero.tsx'),
       'utf8'
     );
+    const heroSource = pageSource.slice(
+      pageSource.indexOf('function HomepageHero()'),
+      pageSource.indexOf('function HomepageUnlockedSections()')
+    );
+    const heroCss = readHeroCss();
+    const rejectedPhotoFixture = `
+      <picture><img src='/stock-nightlife.webp' /></picture>
+      .homepage-editorial-hero { background: image-set(url('/stock.jpg') 1x); }
+    `;
+    const rasterSourcePattern =
+      /<(?:picture|img|video|canvas)\b|\.(?:avif|gif|jpe?g|png|webp)\b/i;
+    const cssImagePattern = /\b(?:url|image-set)\s*\(/i;
 
-    expect(pageSource).toContain(
-      "getMarketingExportImage('dashboard-releases-sidebar-desktop')"
+    expect(rejectedPhotoFixture).toMatch(rasterSourcePattern);
+    expect(rejectedPhotoFixture).toMatch(cssImagePattern);
+    const heroImplementation = `${heroSource}\n${componentSource}\n${heroCss}`;
+    expect(heroImplementation).not.toMatch(rasterSourcePattern);
+    expect(heroImplementation).not.toMatch(cssImagePattern);
+  });
+
+  it('uses the exact locked headline and one-line support', () => {
+    expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
+      'Control how the world sees you.'
     );
-    expect(pageSource).toContain('<HomepageHeroCommandCenter');
-    expect(commandCenterSource).toContain('homepage-product-pane__image');
-    expect(commandCenterSource).toContain(
-      'Jovie authenticated releases workspace with a selected release and detail rail'
+    expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
+      'Find what the internet knows. Turn it into relationships.'
     );
-    expect(commandCenterSource).toMatch(/authenticated releases/i);
-    expect(commandCenterSource).not.toMatch(/The Deep End|Deep End/);
-    expect(pageSource).not.toMatch(
-      /function HomepageHero\(\)[\s\S]*?The Deep End/
+  });
+
+  it('keeps the existing name search as the sole primary conversion', () => {
+    expect(HOMEPAGE_LAUNCH_COPY.hero.search).toEqual({
+      placeholder: 'Search your name',
+      action: 'Find me',
+    });
+
+    const pageSource = readFileSync(
+      path.join(webRoot, 'app/(home)/page.tsx'),
+      'utf8'
     );
+    const heroSource = pageSource.slice(
+      pageSource.indexOf('function HomepageHero()'),
+      pageSource.indexOf('function HomepageUnlockedSections()')
+    );
+
+    expect(heroSource).toContain('search={HERO_COPY.search}');
+    expect(heroSource).not.toContain('primaryCta');
+    expect(heroSource).not.toContain('secondaryCta');
+    expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
+    expect(pageSource).not.toContain('/images/hero/');
+  });
+
+  it('keeps the one-line H1 contract and the two-line phone fallback', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: normal;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__support\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
+    );
+  });
+
+  it('keeps the editorial search wide and clips its aura to the pill', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__copy\s*\{[\s\S]*?width: min\([\s\S]*?100%[\s\S]*?\);[\s\S]*?\}/
+    );
+    expect(css).toContain('width: min(40rem, 100%);');
+    expect(css).toMatch(
+      /@media \(max-width: 1023px\)[\s\S]*?\.homepage-editorial-hero__search\s*\{[\s\S]*?width: 100%;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?inset: 0;[\s\S]*?clip-path: inset\(0 round var\(--radius-pill\)\);[\s\S]*?\}/
+    );
+  });
+
+  it('keeps the Find me pill on the 32/510 marketing button contract', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
+    );
+  });
+
+  it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
+    const css = readHeroCss();
+
+    expect(css).toContain('--homepage-hero-reveal-delay: 100ms;');
+    expect(css).toContain('animation: homepage-hero-content-reveal');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain('animation: none;');
   });
 
   it('mounts registry Artist Profile previews directly in phone frames', () => {
@@ -104,14 +130,22 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
   });
 
-  it('keeps homepage nav as Log in text only, with no second Get started', () => {
+  it('uses the canonical icon header with full marketing navigation', () => {
     const headerSource = readFileSync(
       path.join(webRoot, 'components/site/MarketingHeader.tsx'),
       'utf8'
     );
+    const layoutSource = readFileSync(
+      path.join(webRoot, 'app/(home)/layout.tsx'),
+      'utf8'
+    );
 
-    expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
-    expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
+    expect(headerSource).toContain('MARKETING_GLASS_DESKTOP_LINKS');
+    expect(headerSource).toContain("presentation === 'marketing-glass'");
+    expect(layoutSource).toContain("headerVariant='landing'");
+    expect(layoutSource).toContain("footerVariant='expanded'");
+    expect(layoutSource).not.toContain("logoVariant='word'");
+    expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
 
     const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
     expect(css).not.toMatch(

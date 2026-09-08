@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+// @coverage-via apps/web/tests/components/forms.test.tsx
+import { useEffect, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ErrorSummaryProps {
@@ -17,11 +18,12 @@ interface ErrorSummaryProps {
  */
 export function ErrorSummary({
   errors,
-  title = 'There is a problem',
+  title = 'Resolve Form Errors',
   className,
   onFocusField,
 }: Readonly<ErrorSummaryProps>) {
   const errorCount = Object.keys(errors).length;
+  const titleId = useId();
   const summaryRef = useRef<HTMLDivElement>(null);
 
   // Focus the error summary when errors are present
@@ -40,32 +42,29 @@ export function ErrorSummary({
     <div
       ref={summaryRef}
       className={cn(
-        'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 dark:border-red-500 p-4 rounded-md mb-6',
+        'mb-4 rounded-md border border-error/20 bg-error-subtle p-3 text-app text-error',
         className
       )}
       tabIndex={-1}
       role='alert'
-      aria-labelledby='error-summary-title'
+      aria-labelledby={titleId}
     >
-      <h2
-        id='error-summary-title'
-        className='text-lg font-semibold text-red-800 dark:text-red-200 mb-2'
-      >
+      <h2 id={titleId} className='text-app font-medium text-error'>
         {title}
       </h2>
 
-      <div className='text-red-700 dark:text-red-300'>
-        <p className='mb-2'>
+      <div>
+        <p className='mt-1 text-app text-error'>
           Please fix the following{' '}
           {errorCount === 1 ? 'error' : `${errorCount} errors`}:
         </p>
-        <ul className='list-disc pl-5 space-y-1'>
+        <ul className='mt-2 list-disc space-y-1 pl-5'>
           {Object.entries(errors).map(([fieldName, errorMessage]) => (
             <li key={fieldName}>
               {onFocusField ? (
                 <button
                   type='button'
-                  className='underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded'
+                  className='focus-ring-themed rounded-sm text-left text-error underline underline-offset-2 hover:text-error'
                   onClick={() => onFocusField(fieldName)}
                 >
                   {errorMessage}

@@ -48,7 +48,11 @@ describe('MarketingPosterHero', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(heading).toHaveClass('marketing-h1-max-two-lines');
+    expect(heading).toHaveClass(
+      'homepage-poster-hero__headline',
+      'marketing-h1-max-two-lines',
+      'line-clamp-2'
+    );
     expect(heading).not.toHaveAttribute('aria-label');
     const shell = screen.getByTestId('homepage-hero-shell');
     expect(shell).toHaveAttribute('aria-labelledby', heading.id);
@@ -61,7 +65,8 @@ describe('MarketingPosterHero', () => {
     expect(primaryLink).toHaveAttribute('href', '/signup');
     expect(primaryLink).toHaveAttribute('data-size', 'marketing');
     expect(primaryLink).toHaveAttribute('data-variant', 'primary');
-    expect(primaryLink).toHaveClass('h-8', 'text-sm', 'rounded-full');
+    expect(primaryLink).toHaveClass('h-7', 'text-sm', 'rounded-full');
+    expect(primaryLink).toHaveClass('before:h-11', 'before:min-w-11');
     expect(primaryLink).toHaveClass('homepage-poster-hero__action-button');
     expect(primaryLink).not.toHaveClass('active:scale-[0.98]');
 

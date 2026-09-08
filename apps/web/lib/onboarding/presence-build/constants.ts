@@ -5,6 +5,7 @@ export const ONBOARDING_PRESENCE_BUILD_WORKFLOW_KIND =
 
 export const PRESENCE_BUILD_STEPS = [
   'research_artist',
+  'surface_library_opportunities',
   'assemble_profile',
   'generate_smart_link',
   'draft_welcome_post',
@@ -15,6 +16,7 @@ export type PresenceBuildStepId = (typeof PRESENCE_BUILD_STEPS)[number];
 /** Tool names persisted on chat_messages.tool_calls for each step. */
 export const PRESENCE_BUILD_TOOL_NAMES = {
   research_artist: 'researchArtistPresence',
+  surface_library_opportunities: 'surfaceLibraryOpportunities',
   assemble_profile: 'assembleArtistProfile',
   generate_smart_link: 'generateSmartLink',
   draft_welcome_post: 'draftWelcomePost',
@@ -22,6 +24,7 @@ export const PRESENCE_BUILD_TOOL_NAMES = {
 
 export const PRESENCE_BUILD_STEP_LABELS = {
   research_artist: 'Research Artist',
+  surface_library_opportunities: 'Surface Library Opportunities',
   assemble_profile: 'Assemble Profile',
   generate_smart_link: 'Generate Smart Link',
   draft_welcome_post: 'Draft Welcome Post',

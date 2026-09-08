@@ -1,6 +1,15 @@
 import { createHash } from 'node:crypto';
 
-import { preAdmissionDecision } from './admission-policy.mjs';
+import {
+  isFounderSteeringAssignee,
+  preAdmissionDecision,
+} from './admission-policy.mjs';
+// JOV-INV-028: founder assignment carries steering, not a human hold.
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+  sameAdmissionTarget,
+} from './ownership-inventory.mjs';
 
 export const ADMISSION_SCAN_SCHEMA = 'symphony-admission-scan/v1';
 
@@ -103,14 +112,6 @@ const childrenOf = issue => issue?.children?.nodes || issue?.children || [];
 const stateOf = issue => issue?.state?.name || issue?.state || '';
 const identifierOf = issue => String(issue?.identifier || '').trim();
 
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  if (!assignee) return false;
-  return /tim(?:\s|-|_)*white|itstimwhite|^tim$/i.test(
-    `${assignee.id || ''} ${assignee.name || assignee.displayName || ''} ${assignee.email || ''}`
-  );
-}
-
 function sectionHeader(line) {
   const markdown = /^#{2,3}\s+(.+?)\s*$/.exec(line);
   if (markdown) return markdown[1].trim().toLowerCase();
@@ -149,7 +150,7 @@ function evidenceFor(issue) {
       /<!-- admission-gate\/v1 -->|admission[- ]approved/i.test(commentText),
   };
   const admissionReceipt = comments.some(comment =>
-    comment.startsWith('<!-- symphony-admission:v1 ')
+    scopedSymphonyAdmissionReceipt(issue, comment)
   );
   return {
     labels,
@@ -162,6 +163,27 @@ function evidenceFor(issue) {
         comments.some(comment => ACTIVE_PULL_REQUEST.test(comment))
     ),
   };
+}
+
+function scopedSymphonyAdmissionReceipt(issue, comment) {
+  if (!comment.startsWith('<!-- symphony-admission:v1 ')) return false;
+  try {
+    const payload = JSON.parse(
+      comment.slice(
+        '<!-- symphony-admission:v1 '.length,
+        comment.endsWith(' -->') ? -' -->'.length : undefined
+      )
+    );
+    const target = admissionTargetPacket(payload);
+    const expected = resolveAdmissionTarget(issue);
+    return (
+      expected.decision === 'admit' &&
+      Boolean(target) &&
+      sameAdmissionTarget(target, expected.target)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function historyFor(identifier, options) {
@@ -369,8 +391,10 @@ export function classifyAdmissionDisposition(issue, options = {}) {
   const state = stateOf(issue);
   if (!ACTIVE_STATES.has(state)) return emit('inactive-state');
 
-  if (isTimOwned(issue)) return emit('tim-owned');
-  if (issue.assignee) return emit('already-assigned');
+  // Founder assignment carries steering context; it is not an implementation
+  // lease and must never become a routine human hold.
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
+    return emit('already-assigned');
   if (evidence.nestedEvidenceIncomplete)
     return emit('nested-evidence-incomplete');
 

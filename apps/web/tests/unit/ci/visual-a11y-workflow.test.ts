@@ -188,7 +188,19 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(mergeReadyJob).toContain(
       'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
     );
-    expect(prReadyJob).not.toContain('ci-visual-snapshot-compare');
+    // JOV-5960: homepage PRs carry the compare on the source lane too, and a
+    // skipped compare is not green there.
+    expect(compareJob).toContain(
+      "needs.ci-path-changes.outputs.run_homepage_visual == 'true'"
+    );
+    expect(prReadyJob).toContain('ci-visual-snapshot-compare');
+    expect(prReadyJob).toContain(
+      'RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"'
+    );
+    expect(prReadyJob).toContain(
+      'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
+    );
+    expect(prReadyJob).toContain('skipped is not green (JOV-5960)');
   });
 
   it('scopes chat visual interactions to the active visible composer', () => {

@@ -30,6 +30,12 @@ describe('CLI landing page', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: CLI_HEADLINE })
     ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Install' })
+    ).toHaveClass('line-clamp-2');
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Commands' })
+    ).toHaveClass('line-clamp-2');
     expect(screen.getByText(CLI_SUBTITLE)).toBeVisible();
     expect(screen.getByTestId('cli-hero-install')).toHaveAttribute(
       'href',

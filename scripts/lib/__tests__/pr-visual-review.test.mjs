@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { evaluateVisualEvidence } from '../../../.github/scripts/pr-visual-evidence-gate.mjs';
@@ -90,6 +90,37 @@ describe('bounded PR visual review contract', () => {
       reason: 'ui-change',
       review_status: 'advisory',
     });
+    expect(
+      routeChangedFiles(['apps/web/components/jovie/JovieChat.tsx']).routes
+    ).toEqual(['/app/chat']);
+    expect(
+      routeChangedFiles(['apps/web/app/app/(shell)/chat/page.tsx']).routes
+    ).toEqual(['/app/chat']);
+  });
+
+  it('does not send API, server, or onboarding chat files to /app/chat', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/app/api/chat/route.ts',
+        'apps/web/app/api/chat/onboarding-handler.ts',
+        'apps/web/lib/chat/run.ts',
+        'apps/web/lib/mobile/chat/turn-handler.ts',
+        'apps/web/lib/ai/gateway-errors.ts',
+        'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
+        'apps/web/components/jovie/utils.ts',
+      ])
+    ).toEqual({
+      shouldReview: true,
+      routes: ['/'],
+      reason: 'ui-change',
+      review_status: 'advisory',
+    });
+  });
+
+  it('does not treat App Router (shell) catalog pages as chat chrome', () => {
+    expect(
+      routeChangedFiles(['apps/web/app/app/(shell)/library/page.tsx']).routes
+    ).toEqual(['/']);
   });
 
   it('routes the authenticated session boundary through chat instead of masking it with a public capture', () => {
@@ -123,6 +154,20 @@ describe('bounded PR visual review contract', () => {
       'Test-auth 303 did not include a redirect location.'
     );
     expect(capture).toContain('Test-auth handoff ended at');
+    expect(capture).toContain("waitUntil: route.startsWith('/app/')");
+    expect(capture).toContain("'domcontentloaded'");
+    expect(capture).toContain('waitForAuthenticatedShell');
+    expect(capture).toContain('/Inbox|Library|New Chat/');
+  });
+
+  it('skips postgres on the secretless visual-capture shell path', () => {
+    const dashboard = readFileSync(
+      'apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts',
+      'utf8'
+    );
+    expect(dashboard).toContain('shouldUseVisualCaptureSyntheticDashboard');
+    expect(dashboard).toContain('isVisualCaptureSyntheticAuthEnabled');
+    expect(dashboard).toContain('createE2EDashboardCoreData(clerkUserId)');
   });
 
   it('uses the canonical test-auth environment in the capture workflow', () => {
@@ -306,6 +351,22 @@ describe('bounded PR visual review contract', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
       await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves a capture path that redundantly includes the artifact directory', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'visual-artifact-'));
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('duplicated-artifact-directory'),
+    ]);
+    try {
+      await writeFile(join(directory, 'home-desktop.png'), png);
+      await expect(
+        readTrustedCapture(directory, `${basename(directory)}/home-desktop.png`)
+      ).resolves.toEqual(png);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
     }
   });
   it('separates objective findings from taste and never auto-fixes taste', () => {
@@ -523,6 +584,27 @@ describe('fail-closed visual evidence gate (JOV-5459)', () => {
       });
       expect(skipped.ok).toBe(true);
       expect(skipped.status).toBe('skipped');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a cancelled capture stage as failure, not success (fail-closed)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      await writeFile(join(dir, 'manifest.json'), JSON.stringify([]));
+
+      const cancelled = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'cancelled' },
+      });
+      expect(cancelled.ok).toBe(false);
+      expect(cancelled.status).toBe('unavailable');
+      expect(cancelled.failedStages).toEqual(['capture']);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

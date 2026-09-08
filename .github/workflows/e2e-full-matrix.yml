@@ -1,4 +1,5 @@
 name: E2E Full Browser Matrix
+# clock-class: skip-if-unchanged
 
 on:
   schedule:

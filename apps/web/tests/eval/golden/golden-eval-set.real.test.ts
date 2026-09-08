@@ -94,7 +94,7 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
 
           const systemPrompt = buildSystemPrompt(artistContext, releases, {
             aiCanUseTools: true,
-            aiDailyMessageLimit: 50,
+            aiWeeklyMessageLimit: 50,
             knowledgeContext: knowledgeContext || undefined,
           });
 
@@ -156,7 +156,7 @@ describe.skipIf(!REAL_EVAL_ENABLED)(
         async () => {
           const systemPrompt = buildSystemPrompt(artistContext, releases, {
             aiCanUseTools: true,
-            aiDailyMessageLimit: 50,
+            aiWeeklyMessageLimit: 50,
           });
 
           const result = await generateText({

@@ -164,6 +164,16 @@ describe('Ovie Mac HUD derivation', () => {
         mergeQueuePosition: 1,
       })
     ).toBe('merge_queue');
+    expect(
+      classifyOvieMacHudPullRequest({
+        isDraft: false,
+        reviewDecision: null,
+        mergeable: 'MERGEABLE',
+        labels: ['needs-human', 'no-auto'],
+        reviewRequestCount: 0,
+        mergeQueuePosition: null,
+      })
+    ).toBe('open');
   });
 
   it('composes and sorts the in-flight PR list by current status', () => {
@@ -186,9 +196,9 @@ describe('Ovie Mac HUD derivation', () => {
         }),
         prNode({
           number: 13,
-          title: 'Blocked by human taste',
+          title: 'Blocked by machine hold',
           updatedAt: '2026-08-19T00:00:00.000Z',
-          labels: { nodes: [{ name: 'human-review-required' }] },
+          labels: { nodes: [{ name: 'hold' }] },
         }),
       ],
       mergeQueueEntries: [

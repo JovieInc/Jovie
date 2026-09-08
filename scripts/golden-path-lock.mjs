@@ -391,6 +391,8 @@ async function runAutofix(args) {
     origin: receipt.origin,
     receipt,
   });
+  // JOV-5966: the intake itself dedupes by fingerprint (fail-closed) and
+  // files P0s straight into Todo, skipping the Triage queue.
   const linear = await createGoldenPathLinearIssue({
     fingerprint: receipt.fingerprint,
     prompt,

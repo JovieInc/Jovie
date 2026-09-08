@@ -220,7 +220,7 @@ export function ArtistProfileMonetizationSection({
         <div className='ap-monetization__header mx-auto px-5 sm:px-6 lg:px-0'>
           <div className='max-w-136'>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className={SHELL_H2_CLASS}>
+            <h2 className={`${SHELL_H2_CLASS} line-clamp-2`}>
               <span className='block'>Get paid.</span>
               <span className='block'>Again and again.</span>
             </h2>

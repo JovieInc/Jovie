@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Archive } from 'lucide-react';
@@ -51,7 +53,8 @@ describe('HeaderBulkActions', () => {
     expect(clear.className).toContain('overflow-visible');
     expect(clear.className).toContain('before:h-11');
     expect(clear.className).toContain('before:w-11');
-    expect(clear.className).toContain('focus-visible:ring-focus/55');
+    expect(clear).toHaveClass('focus-visible:ring-focus');
+    expect(clear).not.toHaveClass('focus-visible:ring-focus/55');
     expect(clear.className).toContain('hover:bg-interactive-hover');
     expect(clear.className).not.toContain('rounded-md');
     expect(clear.className).not.toContain('hover:bg-surface-1');
@@ -143,5 +146,13 @@ describe('HeaderBulkActions', () => {
       />
     );
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps the documented table header wrapper bounded to one line', () => {
+    const source = readFileSync(
+      resolve(__dirname, './HeaderBulkActions.tsx'),
+      'utf8'
+    );
+    expect(source).toContain("<th className='whitespace-nowrap'>");
   });
 });

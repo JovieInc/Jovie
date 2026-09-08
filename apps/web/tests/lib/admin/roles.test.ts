@@ -86,6 +86,17 @@ describe('Admin Roles', () => {
       expect(result).toBe(false);
     });
 
+    it('skips the database during secretless visual capture', async () => {
+      vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+      mockDbResult([{ isAdmin: true, userStatus: 'active', deletedAt: null }]);
+
+      const result = await isAdmin('user_visual_capture');
+
+      expect(result).toBe(false);
+      expect(dbModule.db.select).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
     it('should return true for user with admin role in database', async () => {
       const mockUserId = 'user_admin123';
       mockDbResult([{ isAdmin: true, userStatus: 'active', deletedAt: null }]);

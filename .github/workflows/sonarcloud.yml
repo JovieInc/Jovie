@@ -1,4 +1,5 @@
 name: SonarCloud
+# clock-class: skip-if-unchanged
 
 # Tech-debt scan — runs NIGHTLY against main, not as a per-PR gate. SonarCloud
 # was pure noise on PRs (advisory failures on mechanical/codemod diffs). Debt it

@@ -175,6 +175,51 @@ describe('AuthLayout', () => {
     expect(screen.getByLabelText('Go to homepage')).toBeInTheDocument();
   });
 
+  it('keeps default stack placement distinct from centered stack placement', async () => {
+    const { container, rerender } = render(
+      <AuthLayout formTitle='Sign In' layoutVariant='stack'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    const defaultColumn = container.querySelector('[data-auth-form-column]');
+    expect(defaultColumn).not.toBeNull();
+    expect(defaultColumn).toHaveClass('justify-start');
+    expect(defaultColumn).not.toHaveClass('justify-center');
+
+    rerender(
+      <AuthLayout
+        formTitle='Sign In'
+        layoutVariant='stack'
+        contentPlacement='center'
+      >
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    const centeredColumn = container.querySelector('[data-auth-form-column]');
+    expect(centeredColumn).not.toBeNull();
+    expect(centeredColumn).toHaveClass('justify-center');
+  });
+
+  it('reserves the splash-B logo slot while the mobile keyboard is visible', async () => {
+    keyboardVisible = true;
+    const { container } = render(
+      <AuthLayout formTitle='Sign In' chrome='splash-b'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    const slot = container.querySelector('[data-auth-splash-logo-slot]');
+    expect(slot).not.toBeNull();
+    expect(slot).toHaveClass('size-11');
+    const logoLink = container.querySelector('[data-auth-splash-logo-slot] a');
+    expect(logoLink).not.toBeNull();
+    expect(logoLink).toHaveAttribute('aria-hidden', 'true');
+    expect(logoLink).toHaveAttribute('tabIndex', '-1');
+    expect(logoLink).toHaveClass('opacity-0');
+  });
+
   it('hides non-form chrome while the mobile keyboard is visible', async () => {
     keyboardVisible = true;
     render(

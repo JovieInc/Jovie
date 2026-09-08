@@ -75,6 +75,9 @@ describe('Library product-first invariants', () => {
     expect(productCanon).toContain(
       'artist-business-outcome: paid conversion or attributed GMV'
     );
+    expect(productCanon).toContain('Onboarding exposure (JOV-5694)');
+    expect(productCanon).toContain('surface_library_opportunities');
+    expect(productCanon).toContain('ONBOARDING_WOW_TASK_QUEUE');
     expect(productCanon).not.toMatch(
       /primaryMetric:\s*(engagement|ctr|clicks?|impressions?|views?)/i
     );

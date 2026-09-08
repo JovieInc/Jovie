@@ -3,11 +3,12 @@
 import { createHash } from 'node:crypto';
 import {
   existsSync,
+  linkSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
@@ -47,8 +48,14 @@ const TIER_POLICY = Object.freeze({
     usageClass: 'premium-included',
   },
 });
-const ACTIVE_STATES = new Set(['todo', 'in progress', 'merging', 'rework']);
-const HANDOFF_STATES = new Set(['human review', 'in review']);
+const ACTIVE_STATES = new Set([
+  'todo',
+  'in progress',
+  'human review',
+  'merging',
+  'rework',
+]);
+const HANDOFF_STATES = new Set(['in review']);
 const TERMINAL_STATES = new Set([
   'done',
   'closed',
@@ -60,7 +67,7 @@ export const OFFICIAL_TIER_POLICY = TIER_POLICY;
 
 const registry = JSON.parse(
   readFileSync(
-    new URL('../hermes/config/model-registry.json', import.meta.url),
+    new URL('../symphony/config/model-registry.json', import.meta.url),
     'utf8'
   )
 );
@@ -444,9 +451,40 @@ export function materializeRoutingReceipt(issue, workspaceDir, options = {}) {
   if (!receipt) return null;
   mkdirSync(workspaceDir, { recursive: true });
   const target = join(workspaceDir, '.symphony-routing.json');
-  const tmp = `${target}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
-  renameSync(tmp, target);
+  const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
+  const matchesExisting = () => {
+    try {
+      return (
+        JSON.stringify(JSON.parse(readFileSync(target, 'utf8'))) ===
+        JSON.stringify(receipt)
+      );
+    } catch {
+      return false;
+    }
+  };
+  if (existsSync(target)) {
+    if (!matchesExisting())
+      throw new Error('symphony-routing-materialization-conflict');
+    return { path: target, receipt };
+  }
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, serialized, { mode: 0o600 });
+  try {
+    // Create the complete same-directory temp file atomically without ever
+    // replacing evidence written by another process.
+    linkSync(tmp, target);
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'EEXIST')
+      throw error;
+    if (!matchesExisting())
+      throw new Error('symphony-routing-materialization-conflict');
+  } finally {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      /* best-effort cleanup after the durable target has been created */
+    }
+  }
   return { path: target, receipt };
 }
 
@@ -759,6 +797,7 @@ export function classifyAppServerObservation({
 }
 
 const EXIT_CONFIG = 78;
+const EXIT_TEMPFAIL = 75;
 
 async function runLauncher(argv) {
   const flag = name => {
@@ -781,6 +820,16 @@ async function runLauncher(argv) {
     );
     process.exit(EXIT_CONFIG);
   };
+  const deferForCapacity = message => {
+    const reason = String(message || 'provider capacity unavailable').replace(
+      /\s+/g,
+      ' '
+    );
+    console.error(
+      `CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason=${JSON.stringify(reason)}`
+    );
+    process.exit(EXIT_TEMPFAIL);
+  };
   let issue;
   if (process.env.SYMPHONY_ROUTING_ISSUE_FILE) {
     issue = JSON.parse(
@@ -792,8 +841,12 @@ async function runLauncher(argv) {
   }
   if (!issue) fail(`issue not found: ${issueArg}`);
   const capacity = readCodexRotateCapacity();
-  if (!capacity || capacity.accounts === 0 || capacity.ready === 0)
+  if (!capacity || capacity.accounts === 0)
     fail('codex-rotate capacity is unavailable; refusing to route');
+  if (capacity.ready === 0)
+    deferForCapacity(
+      'all authenticated codex-rotate accounts are cooling down; retry after capacity recovers'
+    );
   const materialized = materializeRoutingReceipt(issue, workspace, {
     requireCapacityEvidence: true,
   });

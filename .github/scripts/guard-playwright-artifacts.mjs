@@ -25,7 +25,7 @@ import {
   resolve,
   sep,
 } from 'node:path';
-import { crc32, inflateSync } from 'node:zlib';
+import { validPlaywrightPng } from '../../scripts/lib/playwright-png.mjs';
 
 const SENSITIVE =
   /(?:^|_)(?:SECRET|PASSWORD|PASSPHRASE|PRIVATE_KEY(?!_ID(?:_|$))|API_KEY(?!_(?:ID|SID)(?:_|$))|ACCESS_KEY(?!_ID(?:_|$))|HASH_KEY(?!_ID(?:_|$))|DATABASE_URL|DSN|AUTHORIZATION|COOKIE|COOKIES|PROTECTION_BYPASS|ENCRYPT_KEY|ENCRYPTION_KEY|SIGNING_KEY(?!_ID(?:_|$))|SIGNER_KEY(?!_ID(?:_|$))|WEBHOOK_URL|DEPLOY_HOOK(?!_ID(?:_|$))|CAPABILITY_URL|(?:CERTIFICATE|PRIVATE_KEY|SIGNING_KEY|SIGNER_KEY)_(?:BASE64|B64)|CSC_LINK|GITLEAKS_LICENSE)(?:_|$)/;
@@ -363,77 +363,6 @@ function markdownRetainsSecret(text) {
 
 export function markdownContainsSecret(text, environment = process.env) {
   return markdownRetainsSecret(redactSecretValues(text, environment));
-}
-
-export function validPlaywrightPng(bytes) {
-  try {
-    if (!bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')))
-      return false;
-    let offset = 8;
-    let state = 0;
-    let width;
-    let height;
-    let channels;
-    const compressed = [];
-    while (offset < bytes.length) {
-      const length = bytes.readUInt32BE(offset);
-      const end = offset + length + 12;
-      if (end > bytes.length) return false;
-      const type = bytes.toString('ascii', offset + 4, offset + 8);
-      if (
-        crc32(bytes.subarray(offset + 4, offset + length + 8)) !==
-        bytes.readUInt32BE(offset + length + 8)
-      )
-        return false;
-      const data = bytes.subarray(offset + 8, offset + length + 8);
-      if (type === 'IHDR') {
-        if (state || length !== 13) return false;
-        width = data.readUInt32BE(0);
-        height = data.readUInt32BE(4);
-        const colorType = data[9];
-        if (
-          !width ||
-          !height ||
-          data[8] !== 8 ||
-          (colorType !== 2 && colorType !== 6) ||
-          !data.subarray(10).equals(Buffer.from([0, 0, 0]))
-        )
-          return false;
-        channels = colorType === 2 ? 3 : 4;
-        state = 1;
-      } else if (type === 'IDAT') {
-        if (state < 1 || state > 2) return false;
-        compressed.push(data);
-        state = 2;
-      } else if (type === 'IEND') {
-        if (state !== 2 || length || end !== bytes.length) return false;
-        state = 3;
-      } else return false;
-      offset = end;
-    }
-    const rowLength = 1 + width * channels;
-    const expected = rowLength * height;
-    if (
-      state !== 3 ||
-      !Number.isSafeInteger(expected) ||
-      expected > 100_000_000
-    )
-      return false;
-    const compressedBytes = Buffer.concat(compressed);
-    const { buffer: pixels, engine } = inflateSync(compressedBytes, {
-      info: true,
-      maxOutputLength: expected,
-    });
-    return (
-      engine.bytesWritten === compressedBytes.length &&
-      pixels.length === expected &&
-      Array.from({ length: height }, (_, row) => pixels[row * rowLength]).every(
-        filter => filter <= 4
-      )
-    );
-  } catch {
-    return false;
-  }
 }
 
 function inspect(paths, environment, options = {}) {
@@ -832,10 +761,19 @@ function runProducer(command) {
     maskValues(dynamicValues);
     const scanEnvironment = withDynamicSecretValues(process.env, dynamicValues);
     const configured = configuredPaths();
+    const producerOptions = options();
+    // Producer stages omit images by default, even when a job permits image
+    // inspection. Retaining a decoded image requires an explicit public-only
+    // declaration from the producer workflow; this keeps secret-bearing lanes
+    // from publishing captures by accident.
+    const allowPublicImages =
+      producerOptions.allowImages &&
+      process.env.PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES === 'true';
     const result = inspect(configured, scanEnvironment, {
-      ...options(),
+      ...producerOptions,
+      allowImages: allowPublicImages,
       allowEmptyPaths: !(process.env.PLAYWRIGHT_ARTIFACT_PATHS ?? '').trim(),
-      omitImages: true,
+      omitImages: !allowPublicImages,
     });
     if (result.findings.length) {
       poison(root);

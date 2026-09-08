@@ -72,6 +72,18 @@ async function openHomepageWithBanner(
   await waitForHydration(page);
 }
 
+function boxesOverlap(
+  first: { x: number; y: number; width: number; height: number },
+  second: { x: number; y: number; width: number; height: number }
+): boolean {
+  return !(
+    first.x + first.width <= second.x ||
+    second.x + second.width <= first.x ||
+    first.y + first.height <= second.y ||
+    second.y + second.height <= first.y
+  );
+}
+
 test.describe('Cookie banner @smoke', () => {
   test('cookie banner appears for new visitors', async ({ page }) => {
     test.setTimeout(90_000);
@@ -106,6 +118,46 @@ test.describe('Cookie banner @smoke', () => {
       ).toBeGreaterThanOrEqual(44);
     }
   });
+
+  for (const viewport of [
+    { name: 'desktop', width: 1280, height: 720 },
+    { name: 'mobile', width: 390, height: 844 },
+  ]) {
+    test(`cookie overlay preserves the homepage primary path on ${viewport.name}`, async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize(viewport);
+      await openHomepageWithBanner(page);
+
+      const banner = page.getByTestId('cookie-banner');
+      const findMe = page.getByTestId('homepage-primary-cta');
+      await expect(banner).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+      await expect(findMe).toBeVisible();
+
+      const bannerBox = await banner.boundingBox();
+      const findMeBox = await findMe.boundingBox();
+      expect(bannerBox).not.toBeNull();
+      expect(findMeBox).not.toBeNull();
+      expect(
+        boxesOverlap(bannerBox!, findMeBox!),
+        `Cookie banner overlaps Find me at ${viewport.width}x${viewport.height}`
+      ).toBe(false);
+
+      if (viewport.name === 'mobile') {
+        const menuButton = page.getByRole('button', { name: 'Open menu' });
+        await expect(menuButton).toBeVisible();
+        await menuButton.click();
+        const mobileNav = page.locator('#mobile-nav-panel');
+        await expect(mobileNav).toBeVisible();
+        await expect(
+          mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
+        ).toBeVisible();
+      }
+    });
+  }
 
   test('Accept all button is clickable and persists every optional category', async ({
     page,

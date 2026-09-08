@@ -43,7 +43,7 @@ const meta: Meta<typeof ProfilePrimaryTabPanel> = {
         slug: 'never-say-a-word',
         releaseType: 'single',
         releaseDate: '2026-08-01',
-        artworkUrl: '/images/avatars/tim-white-founder.jpg',
+        artworkUrl: '/images/avatars/tim-white.jpg',
         artistNames: ['Tim White'],
       },
     ],

@@ -25,12 +25,27 @@ export interface ParsedMobileChatTurnRequest {
   readonly chatMode: 'ov' | null;
 }
 
+export type MobileChatTurnLifecycle =
+  | 'queued'
+  | 'running'
+  | 'retrying'
+  | 'failed'
+  | 'canceled'
+  | 'completed';
+
 export type MobileChatNdjsonEvent =
   | {
       readonly type: 'turn.reserved';
       readonly conversationId: string;
       readonly turnId: string;
       readonly clientTurnId: string;
+      readonly eveWorkId?: string | null;
+    }
+  | {
+      readonly type: 'turn.state';
+      readonly clientTurnId: string;
+      readonly state: MobileChatTurnLifecycle;
+      readonly eveWorkId?: string | null;
     }
   | {
       readonly type: 'assistant.delta';

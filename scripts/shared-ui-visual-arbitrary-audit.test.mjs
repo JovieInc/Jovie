@@ -37,6 +37,14 @@ const CI_FAST_SOURCE = readFileSync(
   'utf8'
 );
 const GATE_SOURCE = readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8');
+const GLOBALS_CSS_SOURCE = readFileSync(
+  resolve(REPO_ROOT, 'apps/web/app/globals.css'),
+  'utf8'
+);
+const DESIGN_SYSTEM_CSS_SOURCE = readFileSync(
+  resolve(REPO_ROOT, 'apps/web/styles/design-system.css'),
+  'utf8'
+);
 const SCOPE = ['packages/ui'];
 const ATOM = 'packages/ui/atoms/button.tsx';
 const COVERED_PRODUCTION_SOURCES = [
@@ -69,21 +77,71 @@ export function DeliberateRedVisualArbitrary() {
 }
 `;
 
+const RETIRED_BASELINE_DELIBERATE_RED = `
+export function RetiredBaselineVisualArbitrary() {
+  return (
+    <div className="hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)] animate-[progress-indeterminate_1.5s_ease-in-out_infinite] max-h-[calc(100dvh-1rem)] w-[min(26rem,calc(100vw-1rem))] z-[150] tracking-[-0.015em]" />
+  );
+}
+`;
+
+const RETIRED_TOOLTIP_PILL_DELIBERATE_RED = `
+const compactTooltipShape =
+  contentVariant === 'compact'
+    ? 'rounded-full whitespace-nowrap'
+    : 'rounded-(--system-b-radius-overlay) max-w-56 break-words';
+`;
+
 const DELIBERATE_ALLOWED = `
 export function AllowedSemanticAndState() {
   return (
     <button
-      className="data-[state=open]:bg-surface-1 aria-[expanded=true]:text-primary-token opacity-[var(--state-disabled-opacity)] text-(--linear-text-primary) transition-[background-color,opacity] before:content-[''] origin-[--radix-dropdown-menu-content-transform-origin] [font-weight:var(--font-weight-medium)]"
+      className="data-[state=open]:bg-surface-1 aria-[expanded=true]:text-primary-token opacity-[var(--state-disabled-opacity)] h-[var(--radix-select-trigger-height)] min-w-[var(--radix-select-trigger-width)] max-h-overlay-viewport text-(--linear-text-primary) transition-[background-color,opacity] before:content-[''] origin-[--radix-dropdown-menu-content-transform-origin] [font-weight:var(--font-weight-medium)]"
     />
   );
 }
 `;
 
+const CSS_VAR_VISUAL_DELIBERATE_RED = `
+export function CssVarVisualDeliberateRed() {
+  return (
+    <div className="w-[var(--fixed-width)] rounded-[var(--radius)] z-[var(--layer)] text-[var(--color-error-foreground)] bg-[color-mix(in_srgb,var(--linear-bg-surface-1)_84%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] active:scale-[var(--scale-press)]" />
+  );
+}
+`;
+
+const ZERO_BASELINE_SOURCE_CONTRACT = {
+  'packages/ui/atoms/icon-button.tsx': [
+    'bg-icon-button-frosted',
+    'hover:bg-icon-button-frosted-hover',
+    'hover:bg-icon-button-pearl-quiet-hover',
+    'hover:shadow-sm',
+    'focus-visible:shadow-sm',
+  ],
+  'packages/ui/atoms/button.tsx': [
+    'text-error-foreground',
+    'active:scale-press',
+  ],
+  'packages/ui/atoms/progress.tsx': ['animate-progress-indeterminate'],
+  'packages/ui/atoms/sheet.tsx': [
+    'max-h-sheet-viewport',
+    'w-104 max-w-sheet-viewport',
+  ],
+  'packages/ui/atoms/tooltip.tsx': ['z-tooltip'],
+  'packages/ui/lib/overlay-styles.ts': [
+    'max-h-overlay-viewport',
+    'w-overlay-viewport',
+    'tracking-tight',
+    'z-sheet',
+  ],
+};
+
 test('repo shared-UI visual arbitrary findings match the shrink-only baseline', () => {
   const result = evaluateSharedUiVisualArbitraryAudit({ eventName: 'local' });
   assert.equal(result.ok, true, result.issues.join('\n'));
   assert.equal(result.status, 'pass');
-  assert.equal(result.totalFindings, 14);
+  assert.equal(result.totalFindings, 0);
+  assert.deepEqual(result.findings, []);
   assert.equal(result.scannedFiles.length, 59);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.equal(
@@ -108,8 +166,8 @@ test('baseline schema is exact file/value/count and sorted', () => {
   assert.deepEqual(validateVisualArbitraryBaseline(baseline), []);
   assert.equal(baseline.schema, SCHEMA);
   assert.deepEqual(baseline.scope, SCOPE);
-  assert.equal(baseline.totalFindings, 14);
-  assert.equal(baseline.findings.length, 11);
+  assert.equal(baseline.totalFindings, 0);
+  assert.deepEqual(baseline.findings, []);
   assert.ok(
     baseline.findings.every(
       finding => isSharedUiProductionSource(finding.file) && finding.count > 0
@@ -117,7 +175,7 @@ test('baseline schema is exact file/value/count and sorted', () => {
   );
   assert.match(
     serializeVisualArbitraryBaseline(baseline),
-    /"totalFindings": 14/
+    /"totalFindings": 0/
   );
   const bad = evaluateSharedUiVisualArbitraryAudit({
     baseline: { schema: 'nope' },
@@ -247,16 +305,134 @@ test('deliberate-red visual tokens are findings; semantic and state variants are
   }
 });
 
+test('every retired baseline utility remains deliberate-red', () => {
+  const red = collectVisualArbitraryFindingsFromSource(
+    'packages/ui/atoms/retired-baseline-red.tsx',
+    RETIRED_BASELINE_DELIBERATE_RED
+  );
+  assert.deepEqual(red.map(item => item.value).sort(), [
+    'animate-[progress-indeterminate_1.5s_ease-in-out_infinite]',
+    'hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
+    'max-h-[calc(100dvh-1rem)]',
+    'tracking-[-0.015em]',
+    'w-[min(26rem,calc(100vw-1rem))]',
+    'z-[150]',
+  ]);
+});
+
+test('css-variable visual utility families remain deliberate-red', () => {
+  const red = collectVisualArbitraryFindingsFromSource(
+    'packages/ui/atoms/css-var-visual-red.tsx',
+    CSS_VAR_VISUAL_DELIBERATE_RED
+  );
+  assert.deepEqual(red.map(item => item.value).sort(), [
+    'active:scale-[var(--scale-press)]',
+    'bg-[color-mix(in_srgb,var(--linear-bg-surface-1)_84%,transparent)]',
+    'hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)]',
+    'rounded-[var(--radius)]',
+    'text-[var(--color-error-foreground)]',
+    'w-[var(--fixed-width)]',
+    'z-[var(--layer)]',
+  ]);
+});
+
+function assertTooltipRoundedRectangleContract(source) {
+  assert.equal(
+    source.includes('rounded-full'),
+    false,
+    'tooltip compact content must not regress to a pill'
+  );
+  assert.equal(
+    source.includes('OVERLAY_CONTENT_RADIUS'),
+    true,
+    'tooltip content must use the shared rounded-rectangle radius'
+  );
+}
+
+test('retired compact tooltip pill remains deliberate-red', () => {
+  assert.throws(
+    () =>
+      assertTooltipRoundedRectangleContract(
+        RETIRED_TOOLTIP_PILL_DELIBERATE_RED
+      ),
+    /tooltip compact content must not regress to a pill/
+  );
+});
+
+test('zero baseline sources keep their canonical token and utility contracts', () => {
+  for (const [relativePath, requiredClasses] of Object.entries(
+    ZERO_BASELINE_SOURCE_CONTRACT
+  )) {
+    const source = readFileSync(resolve(REPO_ROOT, relativePath), 'utf8');
+    assert.deepEqual(
+      collectVisualArbitraryFindingsFromSource(relativePath, source),
+      [],
+      relativePath
+    );
+    for (const requiredClass of requiredClasses) {
+      assert.equal(source.includes(requiredClass), true, requiredClass);
+    }
+    if (relativePath === 'packages/ui/lib/overlay-styles.ts') {
+      assert.equal(source.includes('--ds-marketing'), false);
+    }
+    if (
+      relativePath === 'packages/ui/atoms/sheet.tsx' ||
+      relativePath === 'packages/ui/lib/overlay-styles.ts'
+    ) {
+      assert.equal(source.includes('[calc('), false, relativePath);
+      assert.equal(source.includes('-[calc('), false, relativePath);
+    }
+    if (relativePath === 'packages/ui/atoms/tooltip.tsx') {
+      assertTooltipRoundedRectangleContract(source);
+    }
+  }
+});
+
+test('canonical CSS authority preserves the retired values exactly', () => {
+  assert.match(
+    GLOBALS_CSS_SOURCE,
+    /--animate-progress-indeterminate:\s*progress-indeterminate 1\.5s ease-in-out\s+infinite;/
+  );
+  assert.match(GLOBALS_CSS_SOURCE, /@keyframes progress-indeterminate\s*\{/);
+  assert.match(GLOBALS_CSS_SOURCE, /--z-index-sheet:\s*65;/);
+  assert.match(GLOBALS_CSS_SOURCE, /--z-index-tooltip:\s*150;/);
+  assert.match(DESIGN_SYSTEM_CSS_SOURCE, /--space-4:\s*1rem;/);
+  assert.match(DESIGN_SYSTEM_CSS_SOURCE, /--space-8:\s*2rem;/);
+  assert.match(
+    DESIGN_SYSTEM_CSS_SOURCE,
+    /--ds-marketing-lede-tracking:\s*-0\.015em;/
+  );
+});
+
 test('classifier keeps exclusions narrow', () => {
   const cases = [
     ['w-[327px]', KINDS.VISUAL],
     ['text-[#fff]', KINDS.VISUAL],
     ['data-[state=open]', KINDS.STATE],
     ['opacity-[var(--state-disabled-opacity)]', KINDS.CSS_VAR],
+    ['disabled:opacity-[var(--state-disabled-opacity)]', KINDS.CSS_VAR],
+    ['opacity-[var(--state-partial-opacity)]', KINDS.CSS_VAR],
+    ['h-[var(--radix-select-trigger-height)]', KINDS.CSS_VAR],
+    ['min-w-[var(--radix-select-trigger-width)]', KINDS.CSS_VAR],
+    ['origin-[--radix-dropdown-menu-content-transform-origin]', KINDS.CSS_VAR],
+    ['max-h-[calc(100dvh-var(--space-8))]', KINDS.VISUAL],
+    ['w-[calc(100vw-var(--space-8))]', KINDS.VISUAL],
+    ['sm:!max-w-[calc(100vw-var(--space-4))]', KINDS.VISUAL],
+    ['w-[var(--fixed-width)]', KINDS.VISUAL],
+    ['rounded-[var(--radius)]', KINDS.VISUAL],
+    ['z-[var(--layer)]', KINDS.VISUAL],
+    ['text-[var(--color-error-foreground)]', KINDS.VISUAL],
     [
       'bg-[color-mix(in_srgb,var(--linear-bg-surface-1)_84%,transparent)]',
-      KINDS.CSS_VAR,
+      KINDS.VISUAL,
     ],
+    ['bg-[color:var(--surface-token)]', KINDS.VISUAL],
+    [
+      'hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)]',
+      KINDS.VISUAL,
+    ],
+    ['focus-visible:text-[color:var(--focus-text)]', KINDS.VISUAL],
+    ['active:scale-[var(--scale-press)]', KINDS.VISUAL],
     ['transition-[background-color,box-shadow]', KINDS.TRANSITION],
     ["before:content-['']", KINDS.CONTENT],
     ['[stroke-width:2.5]', KINDS.CSS_PROPERTY],
@@ -284,6 +460,20 @@ test('growth is a regression in every event, including merge_group', () => {
     assert.equal(verdict.status, 'regression');
     assert.match(verdict.issues.join('\n'), /w-\[327px\]/);
     assert.match(verdict.issues.join('\n'), /min-h-\[80px\]/);
+  }
+});
+
+test('zero baseline rejects the first visual arbitrary in every event', () => {
+  const baseline = toVisualArbitraryBaseline([]);
+  const current = [{ file: ATOM, value: 'w-[327px]', count: 1 }];
+  for (const eventName of ['local', 'pull_request', 'merge_group']) {
+    const verdict = compareVisualArbitraryBaseline(current, baseline, {
+      eventName,
+    });
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.status, 'regression');
+    assert.match(verdict.issues.join('\n'), /w-\[327px\]/);
+    assert.match(verdict.issues.join('\n'), /baseline ×0/);
   }
 });
 

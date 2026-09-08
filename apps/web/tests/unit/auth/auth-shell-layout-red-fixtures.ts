@@ -48,3 +48,31 @@ function SplitLayoutContent() {
   );
 }
 `;
+
+/** Form helper that re-owns shell padding and the canonical form width. */
+export const SHELL_OWNING_FORM_CONTAINER_SOURCE = `
+import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
+
+export function AuthFormContainer({ children }) {
+  return (
+    <div className='w-full px-4 sm:px-6'>
+      <div className={AUTH_FORM_MAX_WIDTH_CLASS}>{children}</div>
+    </div>
+  );
+}
+`;
+
+/** Legacy branding helper with its own breakpoint, gradients, and ornaments. */
+export const SHELL_OWNING_BRANDING_SOURCE = `
+const gradientVariants = {
+  primary: 'bg-gradient-to-br from-blue-600 via-purple-600 to-cyan-600',
+};
+
+export function AuthBranding() {
+  return (
+    <div className='hidden overflow-hidden lg:block bg-linear-to-br from-blue-600 via-purple-600 to-cyan-600'>
+      <div className='absolute top-20 left-20 w-32 h-32 rounded-full blur-xl animate-pulse' />
+    </div>
+  );
+}
+`;

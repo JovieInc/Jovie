@@ -52,6 +52,9 @@ describe('MarketingFooter', () => {
       'href',
       '/investors'
     );
+    expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
+      'line-clamp-2'
+    );
     expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
       'href',
       'https://status.jov.ie'

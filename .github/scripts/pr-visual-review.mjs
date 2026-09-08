@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 
 const MAX_DIFF = 18_000;
 const UI_FILE =
@@ -34,6 +34,21 @@ const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 // guard, not every page under the auth route group.
 const AUTHENTICATED_SHELL_CAPTURE_FILE =
   /^(?:apps\/web\/(?:proxy|middleware)\.[cm]?[jt]s|apps\/web\/lib\/auth\/(?:gate|session|auth-session-cookies)\.[cm]?[jt]sx?|apps\/web\/app\/app(?:\/\(shell\))?\/layout\.[cm]?[jt]sx?)$/i;
+
+/**
+ * Authenticated `/app/chat` capture is for visual chat/shell surfaces.
+ * API handlers, server turn execution, and onboarding helpers share the
+ * "chat" path token but are not the workspace chrome the fixture proves.
+ * App Router `(shell)` is a route group, not chat chrome; real chat pages
+ * under that group still match `/chat/i`.
+ */
+function isAuthenticatedChatUiChange(file) {
+  if (!/chat|shell/i.test(file)) return false;
+  if (/onboarding/i.test(file)) return false;
+  if (/^apps\/web\/(app\/api\/|lib\/)/.test(file)) return false;
+  if (/\(shell\)/.test(file) && !/chat/i.test(file)) return false;
+  return true;
+}
 
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
@@ -89,7 +104,7 @@ export function routeChangedFiles(files) {
       routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
     else if (/dynamic|profile|username|artist/i.test(file))
       routes.add(PUBLIC_PROFILE_CAPTURE_ROUTE);
-    else if (/chat|shell/i.test(file))
+    else if (isAuthenticatedChatUiChange(file))
       routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
     else routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
   }
@@ -341,7 +356,13 @@ export function inspectReviewBackendConfiguration({ grok, codex }) {
 }
 export async function readTrustedCapture(artifactRoot, capturePath) {
   const requestedRoot = resolve(artifactRoot);
-  const requested = resolve(requestedRoot, capturePath);
+  const artifactDirectory = basename(requestedRoot);
+  const recordedPath = String(capturePath ?? '').replaceAll('\\', '/');
+  const artifactPrefix = `${artifactDirectory}/`;
+  const normalizedPath = recordedPath.startsWith(artifactPrefix)
+    ? recordedPath.slice(artifactPrefix.length)
+    : recordedPath;
+  const requested = resolve(requestedRoot, normalizedPath);
   const requestedRelative = relative(requestedRoot, requested);
   if (
     requestedRelative.startsWith('..') ||

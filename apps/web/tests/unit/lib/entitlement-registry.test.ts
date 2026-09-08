@@ -12,6 +12,7 @@ import {
   isValidPlanId,
   type NumericEntitlement,
   type PlanId,
+  PRICING_COMPARISON,
   resolveCanonicalPlanId,
   resolveChatUsagePlan,
 } from '@/lib/entitlements/registry';
@@ -66,7 +67,7 @@ describe('Entitlement Registry Consistency', () => {
       'analyticsRetentionDays',
       'contactsLimit',
       'smartLinksLimit',
-      'aiDailyMessageLimit',
+      'aiWeeklyMessageLimit',
       'aiPitchGenPerRelease',
     ];
 
@@ -96,7 +97,7 @@ describe('Entitlement Registry Consistency', () => {
 
     const numericKeys: NumericEntitlement[] = [
       'analyticsRetentionDays',
-      'aiDailyMessageLimit',
+      'aiWeeklyMessageLimit',
     ];
 
     for (const key of numericKeys) {
@@ -176,6 +177,24 @@ describe('Entitlement Registry Consistency', () => {
     }
   });
 
+  it('pricing comparison uses the canonical weekly chat quota limits', () => {
+    const aiAssistant = PRICING_COMPARISON.find(
+      category => category.category === 'AI Assistant'
+    );
+    const weeklyMessages = aiAssistant?.features.find(
+      feature => feature.name === 'Weekly messages'
+    );
+
+    expect(weeklyMessages).toMatchObject({
+      free: '15 / week',
+      max: '250 / week',
+      pro: '70 / week',
+    });
+    expect(
+      aiAssistant?.features.some(feature => feature.name === 'Daily messages')
+    ).toBe(false);
+  });
+
   it('free plan has null price, paid plans have prices', () => {
     expect(ENTITLEMENT_REGISTRY.free.marketing.price).toBeNull();
     expect(ENTITLEMENT_REGISTRY.pro.marketing.price).not.toBeNull();
@@ -220,7 +239,7 @@ describe('Entitlement Registry Consistency', () => {
     expect(resolveChatUsagePlan('growth')).toBe('max');
     expect(resolveChatUsagePlan('pro')).toBe('pro');
     expect(resolveChatUsagePlan('founding')).toBe('pro');
-    expect(resolveChatUsagePlan('trial')).toBe('free');
+    expect(resolveChatUsagePlan('trial')).toBe('trial');
     expect(resolveChatUsagePlan(null)).toBe('free');
     expect(resolveChatUsagePlan('enterprise')).toBe('free');
   });

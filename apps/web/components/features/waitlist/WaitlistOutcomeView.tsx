@@ -134,7 +134,7 @@ function PrimaryCtaLink({
   readonly testId?: string;
 }) {
   return (
-    <Button asChild variant='primary' size='lg'>
+    <Button asChild variant='primary' size='marketing'>
       <Link href={href} data-testid={testId}>
         {label}
         <ArrowRight className='h-3.5 w-3.5' aria-hidden />
@@ -162,7 +162,7 @@ export function WaitlistOutcomeView({
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
       <div className='mb-5 flex items-center gap-3'>
-        <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/74'>
+        <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-accent'>
           <Icon className='h-4 w-4' aria-hidden />
         </span>
         <h1 className='text-xl font-semibold leading-6 text-primary-token'>
@@ -172,7 +172,7 @@ export function WaitlistOutcomeView({
       <p className='text-sm leading-6 text-white/62'>{body}</p>
       {copy.showNextSteps ? <NextSteps email={email} /> : null}
 
-      <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
+      <div className='mt-6 flex flex-col gap-3 sm:flex-row sm:gap-2'>
         {primaryHref && primaryLabel ? (
           <PrimaryCtaLink href={primaryHref} label={primaryLabel} />
         ) : null}
@@ -184,7 +184,12 @@ export function WaitlistOutcomeView({
           />
         ) : null}
         {canRetry ? (
-          <Button type='button' onClick={onRetry} variant='secondary' size='lg'>
+          <Button
+            type='button'
+            onClick={onRetry}
+            variant='secondary'
+            size='marketing'
+          >
             Try Again
           </Button>
         ) : null}
@@ -195,7 +200,7 @@ export function WaitlistOutcomeView({
               void signOut({ redirectUrl: APP_ROUTES.HOME });
             }}
             variant='secondary'
-            size='lg'
+            size='marketing'
             className={cn(
               'text-white/74 hover:text-white',
               canRetry && 'sm:ml-auto'

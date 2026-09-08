@@ -137,12 +137,12 @@ describe('JOV-5214 Ovie program contract', () => {
   });
 
   it('loads Eve-on-door instructions that do not claim to be Ovie', () => {
-    const turn = bindEveIdentityForTurn('ovie');
+    const turn = bindEveIdentityForTurn('summer');
     expect(turn.pack.surface).toBe('door');
     expect(turn.pack.isPersona).toBe(false);
     expect(turn.pack.conversationalAuthority).toBe('summer');
     expect(turn.instructions.toLowerCase()).not.toMatch(/you are ovie/);
-    expect(turn.instructions).toMatch(/ingest and ack/i);
+    expect(turn.instructions).toMatch(/reply as summer/i);
     assertModelMustNotSelfIdentifyAsOvie(turn.instructions);
   });
 });

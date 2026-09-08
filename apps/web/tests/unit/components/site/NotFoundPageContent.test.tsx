@@ -20,7 +20,7 @@ const rawVisualUtilityPattern =
   /\b(?:bg|border|text|ring|shadow|outline|rounded|h|w|max-w|min-h|min-w|tracking|leading|px|py|pt|pb)-\[/;
 
 describe('NotFoundPageContent', () => {
-  it('renders profile miss copy with both CTAs', () => {
+  it('renders profile miss copy with artist discovery', () => {
     render(<NotFoundPageContent variant='profile-miss' surface='profile' />);
 
     expect(
@@ -36,7 +36,7 @@ describe('NotFoundPageContent', () => {
     ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
   });
 
-  it('renders generic copy with both CTAs', () => {
+  it('renders generic copy with only the home action', () => {
     render(<NotFoundPageContent variant='generic' surface='root' />);
 
     expect(
@@ -49,8 +49,9 @@ describe('NotFoundPageContent', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go home' })).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Search artists' })
-    ).toBeInTheDocument();
+      screen.queryByRole('link', { name: 'Search artists' })
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 
   it('keeps the root and profile surfaces on their distinct code treatments', () => {
@@ -90,6 +91,7 @@ describe('NotFoundPageContent', () => {
     expect(source).not.toMatch(hardcodedHashColorPattern);
     expect(source).not.toMatch(rawVisualUtilityPattern);
     expect(source).toContain('`${prefix}-actions`');
+    expect(source).toContain('line-clamp-2');
     expect(source).toContain('`${prefix}-action-secondary`');
     expect(source).not.toContain('style={{');
   });

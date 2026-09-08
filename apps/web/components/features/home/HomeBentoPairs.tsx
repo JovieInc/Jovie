@@ -58,7 +58,7 @@ export function HomeBentoPairs() {
         <p className='mb-5 font-(--marketing-font-body) text-sm font-medium text-tertiary-token'>
           What it does
         </p>
-        <h2 className='m-0 max-w-[20ch] font-(--marketing-font-display) text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.028em] text-primary-token'>
+        <h2 className='m-0 max-w-[20ch] font-(--marketing-font-display) text-[clamp(2.25rem,5vw,3.5rem)] font-bold leading-[1.05] tracking-[-0.028em] text-primary-token line-clamp-2'>
           <span className='text-tertiary-token'>Turn attention</span>
           <br />
           <span className='text-primary-token'>into action.</span>

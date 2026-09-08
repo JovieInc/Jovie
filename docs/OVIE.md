@@ -7,6 +7,10 @@ Canonical program: [`docs/OVIE_PROGRAM.md`](OVIE_PROGRAM.md) (JOV-5214).
 
 `Tim -> Ovie -> Eve intake/ack -> durable Kanban -> Summer -> Symphony -> identified coding worker on Gem Ubuntu`
 
+Hermes and Trigger.dev are retired. Eve is Summer's approved durable target,
+but the Summer identity is unavailable until exact deployment and conversation
+receipts prove it. Ovie must not fall back to a local executor.
+
 ## Canonical Ops contract (JOV-5256)
 
 Packaged-app M1 consumes this exact contract. Do not add a second dashboard,
@@ -57,6 +61,15 @@ It composes Symphony runtime/task state, lease-guard capacity, native
 the typed fleet receipt. JOV-5249 consumes freshness UX. Shutdown retains the
 expired last-known marker. No Mac-journal fallback, merged-PR-as-shipped, or
 dispatch/retry/cancel/restart surface.
+
+The Summer Kanban projection (`SummerKanbanCard` in
+`apps/web/lib/ovie/summer-kanban.ts`, JOV-5761) extends the same conventions:
+every card carries per-source freshness in the shipping-state observation
+vocabulary (`fresh` / `stale` / `unknown`, never fresh on missing data), the
+accountable next action and next proof derived from its routing state and
+reason, and the terminal evidence reference once the card lands. All three are
+derived at read time from the existing initiative record — nothing is stored —
+and Eve remains denied from card transitions.
 
 If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-session` and writes the token onto the URL so the same tab can be bookmarked or thrown on a display.
 

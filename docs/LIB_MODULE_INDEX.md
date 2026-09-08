@@ -67,6 +67,7 @@
 | `utm/` | UTM parameter builder with presets, sorting, and share menu generators | `buildUTMUrl`, `UTM_PRESET_MAP`, `extractUTMParams` |
 | `monitoring/` | Performance monitoring for APIs, DB queries, middleware with request ID | `withApiPerformanceMonitoring`, `withDatabaseMonitoring` |
 | `fit-scoring/` | ICP fit scoring for creator profiles with Spotify enrichment | `calculateFitScore`, `getTopFitProfiles` |
+| `acquisition/` | Shared launch-experiment kernel (JOV-5911): Experiment 2 YouTube closed-loop audit, ICP, Tim-only send | `qualifyRegularlyUploadingChannel`, `nextAcquisitionPath`, `youtubeClosedLoopAttribution` |
 | `sentry/` | Sentry SDK factory: lite (public, ~20KB) vs full (dashboard, ~60KB) | `initSentry`, `getSentryMode`, `upgradeSentryToFull` |
 
 ## Billing
@@ -84,6 +85,7 @@
 | `ingestion/` | Social platform profile ingestion: scheduler, processor, avatar handling | `processor`, `scheduler`, `statusManager` |
 | `ingestion/jobs/` | Platform-specific ingestion processors (Linktree, Instagram, TikTok, YouTube, etc.) | `executeIngestionJob`, `processLinktreeJob` |
 | `ingestion/strategies/` | Platform-specific HTML extraction with URL validation | `detectIngestionPlatform`, `extractLinktree` |
+| `acquisition/` | Shared launch-acquisition loop for premade-profile and YouTube-growth experiments | `machineCertifyPremadeProfile`, `LAUNCH_ACQUISITION_OPTIMIZATION_CONTRACT` |
 | `intent-detection/` | AI intent classifier and pattern matching for chat command routing | `classifyIntent`, `routeIntent`, `INTENT_PATTERNS` |
 
 ## Infrastructure

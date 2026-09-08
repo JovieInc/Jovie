@@ -21,7 +21,12 @@ import type {
  * Valid plan IDs for rate limiting.
  * Used to validate plan strings and determine config lookup.
  */
-const VALID_PLAN_IDS: readonly PlanId[] = ['free', 'pro', 'max'] as const;
+const VALID_PLAN_IDS: readonly PlanId[] = [
+  'free',
+  'trial',
+  'pro',
+  'max',
+] as const;
 
 function isPlanId(value: string): value is PlanId {
   return (VALID_PLAN_IDS as ReadonlyArray<string>).includes(value);
@@ -29,8 +34,9 @@ function isPlanId(value: string): value is PlanId {
 
 /**
  * Normalize a plan string to a valid PlanId.
- * Maps legacy plan names (founding -> pro, growth -> max) and
- * returns 'free' for null, undefined, or unknown plans.
+ * Maps legacy plan names (founding -> pro, growth -> max) and returns 'free'
+ * for null, undefined, or unknown plans. Canonical plan IDs, including trial,
+ * are preserved so callers can provide plan-specific configs.
  */
 function normalizePlan(plan: PlanInput): PlanId {
   if (!plan || typeof plan !== 'string') {
@@ -39,9 +45,6 @@ function normalizePlan(plan: PlanInput): PlanId {
   const normalized = plan.toLowerCase();
   if (normalized === 'founding') return 'pro';
   if (normalized === 'growth') return 'max';
-  // Trial is a Pro-level experience while active; expired trials reach the
-  // limiter already normalized to 'free' by the entitlements layer.
-  if (normalized === 'trial') return 'pro';
   return isPlanId(normalized) ? normalized : 'free';
 }
 

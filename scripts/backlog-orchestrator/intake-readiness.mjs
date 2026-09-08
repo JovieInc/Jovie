@@ -1,6 +1,15 @@
 import { createHash } from 'node:crypto';
 
-import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import {
+  hasProtectedAdmissionLabel,
+  isFounderSteeringAssignee,
+} from './admission-policy.mjs';
+// JOV-INV-028: founder assignment carries steering, not a human hold.
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+  sameAdmissionTarget,
+} from './ownership-inventory.mjs';
 
 export const INTAKE_READINESS_SCHEMA = 'intake-readiness/v1';
 export const INTAKE_CONTROL_LOOP_SCHEMA = 'intake-control-loop/v1';
@@ -51,28 +60,40 @@ function sectionHeaders(description) {
     .filter(Boolean);
 }
 
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  return Boolean(
-    assignee &&
-      /tim(?:\s|-|_)*white|itstimwhite|^tim$/i.test(
-        `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''}`
-      )
-  );
-}
-
 function hasActiveOwnership(issue, labels) {
   const comments = issue?.comments?.nodes || issue?.comments || [];
   const hasReceipt = comments.some(comment =>
-    String(
-      typeof comment === 'string' ? comment : comment?.body || ''
-    ).startsWith('<!-- symphony-admission:v1 ')
+    scopedSymphonyAdmissionReceipt(
+      issue,
+      String(typeof comment === 'string' ? comment : comment?.body || '')
+    )
   );
   return (
     labels.includes('symphony') ||
     hasReceipt ||
     ['In Progress', 'In Review'].includes(issue?.state?.name)
   );
+}
+
+function scopedSymphonyAdmissionReceipt(issue, comment) {
+  if (!comment.startsWith('<!-- symphony-admission:v1 ')) return false;
+  try {
+    const payload = JSON.parse(
+      comment.slice(
+        '<!-- symphony-admission:v1 '.length,
+        comment.endsWith(' -->') ? -' -->'.length : undefined
+      )
+    );
+    const target = admissionTargetPacket(payload);
+    const expected = resolveAdmissionTarget(issue);
+    return (
+      expected.decision === 'admit' &&
+      Boolean(target) &&
+      sameAdmissionTarget(target, expected.target)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function disposition(issue, status, reason, extra = {}) {
@@ -120,9 +141,7 @@ export function classifyIntakeReadiness(issue, options = {}) {
     return disposition(issue, 'invalid', 'missing-identity', options);
   if (!INTAKE_STATES.has(state))
     return disposition(issue, 'owned-active', 'non-intake-state', options);
-  if (isTimOwned(issue))
-    return disposition(issue, 'decision-required', 'tim-owned', options);
-  if (issue.assignee)
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
     return disposition(issue, 'owned-active', 'already-assigned', options);
   if (hasActiveOwnership(issue, labels))
     return disposition(

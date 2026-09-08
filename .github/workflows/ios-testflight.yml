@@ -671,10 +671,20 @@ jobs:
             echo "No iOS release changes since the last successful TestFlight upload."
           fi
 
-  beta:
-    name: Upload Internal TestFlight
+  full-regression:
+    name: Full iOS release regression
     needs: [authorize-release]
     if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
+    uses: ./.github/workflows/ios-ci.yml
+    with:
+      checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}
+      concurrency-key: release-${{ needs.authorize-release.outputs.release_sha }}
+      full-regression: true
+
+  beta:
+    name: Upload Internal TestFlight
+    needs: [authorize-release, full-regression]
+    if: ${{ needs.authorize-release.result == 'success' && needs.full-regression.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
     runs-on: macos-26
     timeout-minutes: 75
     env:
@@ -717,9 +727,8 @@ jobs:
         shell: bash
         run: bash apps/ios/scripts/validate-testflight-env.sh
 
-      # Full simulator build/test already passed on this exact SHA through the
-      # merge-group iOS lane or direct-main fallback required by Main Release
-      # Ready. Repeating it here doubles macOS work without adding evidence.
+      # The full-regression predecessor validated this authorized SHA. Keep the
+      # archive job focused on current-main provenance and TestFlight upload.
       - name: Revalidate exact current main before archive
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { queryKeys } from '@/lib/queries/keys';
 import { DashboardActivityFeed } from './DashboardActivityFeed';
 import type { Activity, ActivityRange } from './types';
@@ -14,7 +15,7 @@ const storyActivities = [
     description: 'New fan viewed the profile from Instagram.',
     icon: 'visit',
     timestamp: '2026-08-31T18:20:00.000Z',
-    href: '/app/dashboard/audience',
+    href: APP_ROUTES.DASHBOARD_AUDIENCE,
   },
   {
     id: 'activity-story-2',

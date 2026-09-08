@@ -112,8 +112,8 @@ export interface PlanGateEntitlements {
   contactsLimit: number | null;
   /** Smart link limit based on plan (null = unlimited) */
   smartLinksLimit: number | null;
-  /** AI daily message limit based on plan */
-  aiDailyMessageLimit: number;
+  /** AI weekly message limit based on plan */
+  aiWeeklyMessageLimit: number;
   /** AI pitch generations per release based on plan (null = unlimited) */
   aiPitchGenPerRelease: number | null;
   /** Max files per chat upload batch (null = unlimited, Pro+) */

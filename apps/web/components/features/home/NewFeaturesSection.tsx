@@ -82,7 +82,7 @@ export function NewFeaturesSection() {
       <Container>
         {/* Section header */}
         <div className='text-center mb-12 sm:mb-16'>
-          <h2 className='text-3xl md:text-4xl font-medium tracking-tight text-primary-token'>
+          <h2 className='text-3xl md:text-4xl font-medium tracking-tight text-primary-token line-clamp-2'>
             Sharable profile{' '}
             <span className='text-accent-token'>built to convert</span>
           </h2>

@@ -1,4 +1,5 @@
 name: Visual & A11y Tests
+# clock-class: skip-if-unchanged
 
 # Storybook axe lane (JOV-4042). Playwright page-level visual compare lives in
 # visual-regression.yml (self-healing baselines + admin surfaces). This workflow

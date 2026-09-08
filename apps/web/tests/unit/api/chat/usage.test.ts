@@ -21,7 +21,7 @@ vi.mock('@/lib/redis', () => ({
 }));
 
 vi.mock('@/lib/rate-limit/limiters', () => ({
-  aiChatDailyPlanAwareLimiter: {
+  aiChatWeeklyPlanAwareLimiter: {
     getStatus: hoisted.getStatusMock,
   },
 }));
@@ -96,15 +96,30 @@ describe('GET /api/chat/usage', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.plan).toBe('free');
-    expect(body.dailyLimit).toBe(10);
+    expect(body.weeklyLimit).toBe(15);
     expect(body.remaining).toBe(7);
-    expect(body.used).toBe(3);
+    expect(body.used).toBe(8);
     expect(body.resetAt).toBe('2026-05-23T07:00:00.000Z');
-    expect(body.monthlyLimit).toBeGreaterThanOrEqual(280);
-    expect(body.monthlyUsed).toBe(3);
-    expect(body.monthlyRemaining).toBe(body.monthlyLimit - 3);
-    expect(body.monthlyResetAt).toMatch(/T00:00:00\.000Z$/);
+    expect(body.warningThreshold).toBe(3);
     expect(body.isExhausted).toBe(false);
+  });
+
+  it('returns trial plan with the trial weekly quota instead of Free copy', async () => {
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(
+      makeEntitlements({ plan: 'trial' })
+    );
+    hoisted.getStatusMock.mockReturnValue({ remaining: 12, resetTime: 0 });
+
+    const { GET } = await import('@/app/api/chat/usage/route');
+    const response = await GET();
+
+    const body = await response.json();
+    expect(body.plan).toBe('trial');
+    expect(body.weeklyLimit).toBe(50);
+    expect(body.remaining).toBe(12);
+    expect(body.used).toBe(38);
+    expect(body.warningThreshold).toBe(10);
+    expect(hoisted.getStatusMock).toHaveBeenCalledWith('user_123', 'trial');
   });
 
   it('returns usage for pro plan with correct warning threshold', async () => {
@@ -118,8 +133,8 @@ describe('GET /api/chat/usage', () => {
 
     const body = await response.json();
     expect(body.plan).toBe('pro');
-    expect(body.dailyLimit).toBe(100);
-    expect(body.warningThreshold).toBe(5);
+    expect(body.weeklyLimit).toBe(70);
+    expect(body.warningThreshold).toBe(14);
     expect(body.isNearLimit).toBe(true);
     expect(hoisted.getStatusMock).toHaveBeenCalledWith('user_123', 'pro');
   });
@@ -135,8 +150,8 @@ describe('GET /api/chat/usage', () => {
 
     const body = await response.json();
     expect(body.plan).toBe('pro');
-    expect(body.dailyLimit).toBe(100);
-    expect(body.remaining).toBe(88);
+    expect(body.weeklyLimit).toBe(70);
+    expect(body.remaining).toBe(70);
   });
 
   it('returns pro limits for isPro rows with missing raw plan via entitlements (#11365)', async () => {
@@ -158,8 +173,8 @@ describe('GET /api/chat/usage', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.plan).toBe('pro');
-    expect(body.dailyLimit).toBe(100);
-    expect(body.used).toBe(58);
+    expect(body.weeklyLimit).toBe(70);
+    expect(body.used).toBe(28);
     expect(body.remaining).toBe(42);
   });
 
@@ -178,7 +193,7 @@ describe('GET /api/chat/usage', () => {
     const body = await response.json();
     expect(body._stale).toBe(true);
     expect(body.plan).toBe('free');
-    expect(body.dailyLimit).toBe(10);
+    expect(body.weeklyLimit).toBe(15);
   });
 
   it('returns stale cached data when billing is unavailable', async () => {
@@ -191,16 +206,12 @@ describe('GET /api/chat/usage', () => {
 
     const cachedSnapshot = {
       plan: 'pro',
-      dailyLimit: 100,
+      weeklyLimit: 75,
       used: 5,
-      remaining: 95,
+      remaining: 70,
       isExhausted: false,
-      warningThreshold: 5,
+      warningThreshold: 15,
       isNearLimit: false,
-      monthlyLimit: 3100,
-      monthlyUsed: 5,
-      monthlyRemaining: 3095,
-      monthlyResetAt: '2026-07-01T00:00:00.000Z',
     };
     hoisted.getRedisMock.mockReturnValue({
       get: vi.fn().mockResolvedValue(cachedSnapshot),
@@ -213,7 +224,7 @@ describe('GET /api/chat/usage', () => {
     const body = await response.json();
     expect(body._stale).toBe(true);
     expect(body.plan).toBe('pro');
-    expect(body.remaining).toBe(95);
+    expect(body.remaining).toBe(70);
   });
 
   it('marks isExhausted when remaining is 0', async () => {
@@ -228,6 +239,6 @@ describe('GET /api/chat/usage', () => {
     const body = await response.json();
     expect(body.isExhausted).toBe(true);
     expect(body.remaining).toBe(0);
-    expect(body.used).toBe(10);
+    expect(body.used).toBe(15);
   });
 });

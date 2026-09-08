@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 /**
  * Waitlist layout - NO MORE REDIRECTS!

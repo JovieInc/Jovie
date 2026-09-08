@@ -38,19 +38,21 @@ export function NotFoundPageContent({
       )}
 
       <div className={`${prefix}-copy`}>
-        <h1 className={`${prefix}-title`}>{copy.title}</h1>
+        <h1 className={`line-clamp-2 ${prefix}-title`}>{copy.title}</h1>
         <p className={`${prefix}-description`}>{copy.description}</p>
 
         <div className={`${prefix}-actions`}>
           <Link href={APP_ROUTES.HOME} className={`${prefix}-action`}>
             Go home
           </Link>
-          <Link
-            href={APP_ROUTES.ARTIST_PROFILES}
-            className={`${prefix}-action-secondary`}
-          >
-            Search artists
-          </Link>
+          {variant === 'profile-miss' ? (
+            <Link
+              href={APP_ROUTES.ARTIST_PROFILES}
+              className={`${prefix}-action-secondary`}
+            >
+              Search artists
+            </Link>
+          ) : null}
         </div>
       </div>
     </>

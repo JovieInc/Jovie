@@ -33,6 +33,7 @@ describe('MarketingHero source-backed default story', () => {
       level: 1,
       name: 'Drop more music, with less work.',
     });
+    expect(heading).toHaveClass('marketing-hero-headline', 'line-clamp-2');
     expect(heading).toHaveAttribute(
       'id',
       MARKETING_HERO_DEFAULT_PROPS.headingId

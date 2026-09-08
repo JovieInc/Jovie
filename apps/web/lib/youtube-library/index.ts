@@ -15,6 +15,7 @@ export {
   resolveYouTubeCollaboratorClaims,
   type YouTubeCollaboratorClaim,
 } from './collaborators';
+export { hasConnectedYouTubeAccount } from './connection';
 export {
   type CatalogRecording,
   extractIsrcsFromText,
@@ -29,6 +30,7 @@ export {
   getVideoPkForProfile,
   type ListVideosForProfileInput,
   listPendingReleaseLinksForUser,
+  listVideosForLibraryProjection,
   listVideosForProfile,
   type PendingReleaseLinkItem,
   type PublicVideoListItem,
@@ -60,6 +62,11 @@ export {
   type ThumbnailExperimentState,
   type ThumbnailPromotion,
 } from './thumbnail-experiments';
+export {
+  deriveThumbnailCandidateReviewIds,
+  type RegisterThumbnailCandidateReviewResult,
+  registerThumbnailCandidateReview,
+} from './thumbnail-review';
 export type {
   YouTubeChannelVideo,
   YouTubeLibraryProvider,

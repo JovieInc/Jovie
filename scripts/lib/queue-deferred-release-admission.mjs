@@ -11,6 +11,7 @@ export const QUEUE_DEFERRED_RELEASE_MARKER =
 export const QUEUE_DEFERRED_RELEASE_ACTOR = 'jovie-bot[bot]';
 
 const SHA = /^[0-9a-f]{40}$/;
+const REPOSITORY = /^[^/\s]+\/[^/\s]+$/;
 const FALLBACK_REASON_CODES = new Set(['controller-failure', 'queue-unknown']);
 
 function exactSha(value) {
@@ -88,6 +89,12 @@ export function validateQueueDeferredRelease(candidate, now = Date.now()) {
   if (candidate.schema !== QUEUE_DEFERRED_RELEASE_SCHEMA) {
     errors.push(`schema must be ${QUEUE_DEFERRED_RELEASE_SCHEMA}`);
   }
+  if (
+    typeof candidate.repository !== 'string' ||
+    !REPOSITORY.test(candidate.repository)
+  ) {
+    errors.push('repository must be owner/name');
+  }
   if (!Number.isInteger(candidate.pr) || candidate.pr < 1) {
     errors.push('pr must be a positive integer');
   }
@@ -115,6 +122,7 @@ export function validateQueueDeferredRelease(candidate, now = Date.now()) {
     errors: [],
     receipt: {
       schema: QUEUE_DEFERRED_RELEASE_SCHEMA,
+      repository: candidate.repository,
       pr: candidate.pr,
       head: candidate.head,
       releasedAt,
@@ -184,6 +192,7 @@ export async function runCli(argv = process.argv.slice(2)) {
   if (command === 'render') {
     const body = renderQueueDeferredReleaseComment({
       schema: QUEUE_DEFERRED_RELEASE_SCHEMA,
+      repository: args.repository,
       pr: Number(args.pr),
       head: args.head,
       releasedAt: args['released-at'] ?? new Date().toISOString(),

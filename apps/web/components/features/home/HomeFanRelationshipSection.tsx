@@ -16,7 +16,7 @@ export function HomeFanRelationshipSection() {
           <div className='homepage-chapter-copy'>
             <h2
               id='homepage-fan-relationship-heading'
-              className='homepage-chapter-title'
+              className='homepage-chapter-title line-clamp-2'
             >
               {HOME_RELATIONSHIP_SECTION_CONTENT.title}
             </h2>

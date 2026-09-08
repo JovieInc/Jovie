@@ -30,7 +30,7 @@ const meta: Meta<typeof ProfileDesktopSurface> = {
     latestRelease: {
       title: 'Never Say A Word',
       slug: 'never-say-a-word',
-      artworkUrl: '/images/avatars/tim-white-founder.jpg',
+      artworkUrl: '/images/avatars/tim-white.jpg',
       releaseDate: '2026-08-01T00:00:00.000Z',
       releaseType: 'single',
     },

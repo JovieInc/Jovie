@@ -665,6 +665,10 @@ export function JovieChat({
       chatInputProps={chatInputProps}
       chatMode={chatMode}
       showThreadView={showThreadView}
+      // one-chrome-layer-v1: prompt suggests / starter cards XOR status
+      // banners — the usage banner yields whenever the empty state is already
+      // showing a chrome affordance layer.
+      suppressUsageAlert={!showThreadView && emptyStateAffordance !== 'none'}
       isRateLimited={isRateLimited}
       showManifest={showManifest}
       manifestCollapsed={manifestCollapsed}
@@ -788,7 +792,9 @@ export function JovieChat({
                       />
                     ) : showEmptyActionCards ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start gap-5 py-2 sm:py-3'
+                        // single-column-one-width-v1: the empty-state column
+                        // inherits the 45rem content shell — no stepped max-w.
+                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
                         data-testid='chat-empty-state-action-card-slot'
                       >
                         {showEmptyWelcome ? (
@@ -806,7 +812,8 @@ export function JovieChat({
                       </div>
                     ) : showEmptyPromptRail ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start pb-3'
+                        // single-column-one-width-v1: same shared column width.
+                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start pb-3'
                         data-testid='chat-empty-state-soft-suggestions-slot'
                       >
                         {showEmptyWelcome ? (

@@ -1,7 +1,7 @@
 # Shipping HUD visual evidence
 
 `../../screenshots/gem-symphony-hud-430x90.png` is a target-viewport render of the canonical
-`scripts/hermes/gem-checkin-hud.py` implementation in PR #16858.
+`scripts/symphony/gem-checkin-hud.py` implementation in PR #16858.
 
 - Viewport: 430 columns by 90 rows
 - Source: live official Symphony API on Gem at `127.0.0.1:4041`

@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/dashboard/SettingsUsageStatsSection.test.tsx
 
 import { Button } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
@@ -6,15 +7,16 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { UsageMeter } from '@/components/molecules/UsageMeter';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatUsageState } from '@/lib/chat-usage/copy';
 import { getChatUsageCopy } from '@/lib/chat-usage/copy';
-import { formatResetAt, getMonthlyUsage } from '@/lib/chat-usage/metrics';
+import { formatResetAt, getWeeklyUsageModel } from '@/lib/chat-usage/metrics';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
-const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-86';
+const USAGE_PANEL_MIN_HEIGHT_CLASS = 'min-h-96';
 
 interface UsagePanelShellProps {
   readonly children: ReactNode;
@@ -34,10 +36,6 @@ function UsagePanelShell({ children, className }: UsagePanelShellProps) {
   );
 }
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat('en-US').format(value);
-}
-
 function getStatusToneClasses(state: ChatUsageState): string {
   if (state === 'healthy') {
     return 'border-success/25 bg-success/10 text-success';
@@ -47,99 +45,11 @@ function getStatusToneClasses(state: ChatUsageState): string {
     return 'border-warning/25 bg-warning/10 text-warning';
   }
 
-  return 'border-error/25 bg-error/10 text-error';
-}
-
-function getProgressToneClasses(state: ChatUsageState): string {
-  if (state === 'healthy') {
-    return 'bg-success/10 [&::-moz-progress-bar]:bg-success [&::-webkit-progress-bar]:bg-success/10 [&::-webkit-progress-value]:bg-success';
+  if (state === 'exhausted') {
+    return 'border-error/25 bg-error/10 text-error';
   }
 
-  if (state === 'near_limit') {
-    return 'bg-warning/10 [&::-moz-progress-bar]:bg-warning [&::-webkit-progress-bar]:bg-warning/10 [&::-webkit-progress-value]:bg-warning';
-  }
-
-  return 'bg-error/10 [&::-moz-progress-bar]:bg-error [&::-webkit-progress-bar]:bg-error/10 [&::-webkit-progress-value]:bg-error';
-}
-
-interface UsageMeterRowProps {
-  readonly title: string;
-  readonly description: string;
-  readonly state: ChatUsageState;
-  readonly used: number;
-  readonly limit: number;
-  readonly remaining: number;
-  readonly resetAt: string | null | undefined;
-}
-
-function UsageMeterRow({
-  title,
-  description,
-  state,
-  used,
-  limit,
-  remaining,
-  resetAt,
-}: UsageMeterRowProps) {
-  const clampedUsed = Math.min(Math.max(0, used), Math.max(0, limit));
-  const progressMax = Math.max(1, limit);
-
-  return (
-    <div className='px-4 py-4 sm:px-5'>
-      <div className='flex flex-wrap items-start justify-between gap-3'>
-        <div className='min-w-0 space-y-1'>
-          <p className='text-app font-caption text-primary-token'>{title}</p>
-          <p className='text-xs leading-[17px] text-secondary-token'>
-            {description}
-          </p>
-        </div>
-        <div className='text-right text-xs leading-[17px] text-secondary-token'>
-          <p className='font-caption text-primary-token'>
-            {formatNumber(remaining)} left
-          </p>
-          <p>Resets {formatResetAt(resetAt)}</p>
-        </div>
-      </div>
-      <div className='mt-3 h-2 rounded-full bg-surface-0'>
-        <progress
-          aria-label={`${title} usage`}
-          value={clampedUsed}
-          max={progressMax}
-          className={cn(
-            'block h-2 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:rounded-full [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full',
-            getProgressToneClasses(state)
-          )}
-        />
-      </div>
-      <p className='mt-2 text-2xs text-tertiary-token'>
-        {formatNumber(clampedUsed)} of {formatNumber(limit)} messages used
-      </p>
-    </div>
-  );
-}
-
-interface UsageSummaryRowProps {
-  readonly label: string;
-  readonly value: string;
-  readonly detail?: string;
-}
-
-function UsageSummaryRow({ label, value, detail }: UsageSummaryRowProps) {
-  return (
-    <div className='flex min-h-14 items-center justify-between gap-4 px-4 py-3 sm:px-5'>
-      <div className='min-w-0'>
-        <p className='text-xs font-caption text-primary-token'>{label}</p>
-        {detail ? (
-          <p className='mt-0.5 text-2xs leading-[15px] text-secondary-token'>
-            {detail}
-          </p>
-        ) : null}
-      </div>
-      <p className='shrink-0 text-right text-xs font-caption text-primary-token'>
-        {value}
-      </p>
-    </div>
-  );
+  return 'border-subtle bg-surface-0 text-secondary-token';
 }
 
 function UsageLoadingState() {
@@ -149,21 +59,17 @@ function UsageLoadingState() {
         <div className='h-4 w-32 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
         <div className='mt-2 h-3 w-64 max-w-full animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
       </div>
-      <div className='divide-y divide-subtle'>
-        {['daily', 'monthly'].map(key => (
-          <div key={key} className='px-4 py-4 sm:px-5'>
-            <div className='flex justify-between gap-4'>
-              <div className='space-y-2'>
-                <div className='h-3 w-28 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
-                <div className='h-3 w-44 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
-              </div>
-              <div className='h-3 w-24 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
-            </div>
-            <div className='mt-3 h-2 rounded-full bg-surface-0'>
-              <div className='h-2 w-1/3 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none' />
-            </div>
+      <div className='px-4 py-4 sm:px-5'>
+        <div className='flex justify-between gap-4'>
+          <div className='space-y-2'>
+            <div className='h-3 w-28 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
+            <div className='h-3 w-44 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
           </div>
-        ))}
+          <div className='h-3 w-24 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
+        </div>
+        <div className='mt-3 h-2 rounded-full bg-surface-0'>
+          <div className='h-2 w-1/3 animate-pulse rounded-full bg-surface-2 motion-reduce:animate-none' />
+        </div>
       </div>
     </UsagePanelShell>
   );
@@ -192,10 +98,9 @@ function UsageMessageState({
 }
 
 export function SettingsUsageStatsSection() {
-  const { data, isLoading, error } = useChatUsageQuery({
+  const chatUsage = useChatUsageQuery({
     enabled: !env.IS_E2E,
   });
-
   if (env.IS_E2E) {
     return (
       <UsageMessageState
@@ -205,11 +110,11 @@ export function SettingsUsageStatsSection() {
     );
   }
 
-  if (isLoading) {
+  if (chatUsage.isLoading) {
     return <UsageLoadingState />;
   }
 
-  if (error) {
+  if (chatUsage.error) {
     return (
       <UsageMessageState
         title='Usage unavailable'
@@ -218,7 +123,7 @@ export function SettingsUsageStatsSection() {
     );
   }
 
-  if (!data) {
+  if (!chatUsage.data) {
     return (
       <UsageMessageState
         title='No usage recorded'
@@ -227,10 +132,14 @@ export function SettingsUsageStatsSection() {
     );
   }
 
-  const copy = getChatUsageCopy(data);
-  const showUpgradeCta = copy.state !== 'healthy';
-  const monthly = getMonthlyUsage(data);
-  const isStale = data._stale === true;
+  const copy = chatUsage.data ? getChatUsageCopy(chatUsage.data) : null;
+  const weeklyModel = chatUsage.data
+    ? getWeeklyUsageModel(chatUsage.data)
+    : null;
+  const showUpgradeCta =
+    copy?.state === 'near_limit' || copy?.state === 'exhausted';
+  const isStale = chatUsage.data?._stale === true;
+  const statusLabel = copy?.statusLabel ?? 'Usage unavailable';
 
   return (
     <UsagePanelShell>
@@ -238,29 +147,30 @@ export function SettingsUsageStatsSection() {
         <div className='min-w-0 space-y-1'>
           <div className='flex flex-wrap items-center gap-2'>
             <p className='text-app font-caption text-primary-token'>
-              {copy.summaryTitle}
+              {copy?.summaryTitle ?? 'Plan usage'}
             </p>
             <span
               className={cn(
                 'inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-medium tracking-wide',
-                getStatusToneClasses(copy.state)
+                getStatusToneClasses(copy?.state ?? 'unavailable')
               )}
             >
-              {copy.statusLabel}
+              {statusLabel}
             </span>
           </div>
           <p className='max-w-2xl text-xs leading-[17px] text-secondary-token'>
-            {copy.summaryDescription}
+            {copy?.summaryDescription ??
+              'Weekly AI message capacity for your current plan.'}
           </p>
         </div>
         {showUpgradeCta &&
-          (data.plan === 'free' ? (
+          (chatUsage.data?.plan === 'free' ? (
             <UpgradeButton size='sm' variant='primary'>
-              {copy.ctaLabel}
+              {copy?.ctaLabel}
             </UpgradeButton>
           ) : (
             <Button asChild size='sm' variant='secondary'>
-              <Link href={APP_ROUTES.PRICING}>{copy.ctaLabel}</Link>
+              <Link href={APP_ROUTES.PRICING}>{copy?.ctaLabel}</Link>
             </Button>
           ))}
       </div>
@@ -277,38 +187,21 @@ export function SettingsUsageStatsSection() {
         </div>
       ) : null}
 
-      <div className='divide-y divide-subtle'>
-        <UsageMeterRow
-          title='Daily Messages'
-          description='Quota for the current 24-hour window.'
-          state={copy.state}
-          used={data.used}
-          limit={data.dailyLimit}
-          remaining={data.remaining}
-          resetAt={data.resetAt}
-        />
-        <UsageMeterRow
-          title='Monthly Capacity'
-          description='Plan capacity across the current calendar month.'
-          state={copy.state}
-          used={monthly.used}
-          limit={monthly.limit}
-          remaining={monthly.remaining}
-          resetAt={monthly.resetAt}
-        />
-      </div>
+      {!weeklyModel ? (
+        <div className='border-b border-subtle px-4 py-2.5 text-2xs text-tertiary-token sm:px-5'>
+          Usage details could not be verified and are hidden.
+        </div>
+      ) : null}
 
-      <div className='mt-auto divide-y divide-subtle border-t border-subtle'>
-        <UsageSummaryRow
-          label='Plan'
-          value={copy.planLabel}
-          detail='Current chat entitlement'
-        />
-        <UsageSummaryRow
-          label='Remaining Today'
-          value={formatNumber(data.remaining)}
-          detail={`${formatNumber(data.dailyLimit)} daily messages included`}
-        />
+      <div>
+        {weeklyModel ? (
+          <UsageMeter
+            label='Weekly Messages'
+            description='AI messages remaining in the current seven-day window.'
+            model={weeklyModel}
+            resetLabel={`Resets ${formatResetAt(weeklyModel.resetAt)}`}
+          />
+        ) : null}
       </div>
     </UsagePanelShell>
   );

@@ -173,7 +173,35 @@ describe('visual CI harness', () => {
     );
   });
 
-  it('does not gate homepage viewport screenshots on whole-page network idle', () => {
+  it('keeps legacy homepage screenshots on document and visual readiness, not network idle', () => {
+    const source = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/visual-regression.spec.ts'),
+      'utf8'
+    );
+    const start = source.indexOf('async function openHomepageForScreenshot(');
+    const end = source.indexOf("test.describe('auth pages dark-mode", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const legacy = source.slice(start, end);
+    expect(legacy).not.toContain("waitUntil: 'networkidle'");
+    expect(legacy).not.toContain('test.skip(');
+    expect(legacy).toContain("waitUntil: 'domcontentloaded'");
+    expect(legacy).toContain(
+      "expect(response?.status(), 'homepage document must succeed').toBe(200)"
+    );
+    expect(legacy).toContain("expect(new URL(page.url()).pathname).toBe('/')");
+    expect(legacy).toContain("page.getByTestId('homepage-hero-shell')");
+    expect(legacy).toContain("page.locator('h1').first()");
+    expect(legacy).toContain('document.fonts.status');
+    expect(legacy).toContain('image.complete');
+    expect(legacy).toContain('image.naturalWidth === 0');
+    expect(
+      legacy.match(/await openHomepageForScreenshot\(page\)/g)
+    ).toHaveLength(3);
+    expect(legacy.match(/toHaveScreenshot\('homepage-/g)).toHaveLength(3);
+  });
+
+  it('does not gate any homepage viewport navigation on whole-page network idle', () => {
     const source = readFileSync(
       resolve(webWorkspace, 'tests/e2e/visual-regression.spec.ts'),
       'utf8'
@@ -190,6 +218,7 @@ describe('visual CI harness', () => {
     expect(blockEnd).toBeGreaterThan(blockStart);
 
     const homepageViewportBlock = source.slice(blockStart, blockEnd);
+    expect(homepageViewportBlock).not.toContain("waitUntil: 'networkidle'");
     const screenshotStart = homepageViewportBlock.indexOf(
       'test(`homepage screenshot at ${viewport.label}px`'
     );
@@ -226,20 +255,26 @@ describe('visual CI harness', () => {
     expect(helperEnd).toBeGreaterThan(helperStart);
 
     const helper = source.slice(helperStart, helperEnd);
-    const gotoStart = helper.indexOf("await page.goto('/', {");
+    const gotoStart = helper.indexOf('await page.goto(');
     const gotoEnd = helper.indexOf('\n  });', gotoStart);
 
     expect(gotoStart).toBeGreaterThanOrEqual(0);
     expect(gotoEnd).toBeGreaterThan(gotoStart);
 
     const gotoCall = helper.slice(gotoStart, gotoEnd);
+    expect(gotoCall).toContain(
+      "mode === 'signin' ? APP_ROUTES.HOME : APP_ROUTES.BRAND"
+    );
     expect(gotoCall).toContain("waitUntil: 'domcontentloaded'");
     expect(gotoCall).not.toContain("waitUntil: 'networkidle'");
     expect(source.match(/waitUntil: 'domcontentloaded'/g)).toHaveLength(3);
     expect(source).not.toContain("waitUntil: 'networkidle'");
+    expect(helper).toContain('await waitForHydration(page');
     expect(helper).toContain("await page.waitForLoadState('networkidle'");
     expect(helper).toContain('page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`)');
-    expect(helper).not.toContain("getByRole('link', { name:");
+    expect(helper).toContain(
+      "getByRole('link', { name: /start free trial/i })"
+    );
   });
 
   it('gates Storybook screenshots on rendered stories, not network idle', () => {

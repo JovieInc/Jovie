@@ -101,7 +101,7 @@ const routes = (
 export const DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE = Object.fromEntries([
   ...routes(
     'opportunity-decision',
-    '/app,/app/jovie-work,/app/youtube,/app/admin/interviews'
+    '/app,/app/jovie-work,/app/youtube,/app/admin/interviews,/app/admin/investors/updates'
   ),
   ...routes(
     'dashboard',

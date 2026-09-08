@@ -5,6 +5,8 @@ import type { CSSProperties } from 'react';
 import { useContext } from 'react';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 import {
+  type DesktopBuildIdentity,
+  useDesktopBuildIdentity,
   useDesktopNavigation,
   useIsElectronRuntime,
 } from '@/lib/desktop/electron-bridge';
@@ -18,6 +20,7 @@ const DESKTOP_CHANNEL_LABELS = {
 
 const DESKTOP_VERSION =
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const STAGING_DESKTOP_VERSION = /^\d+\.\d+\.\d+-staging\.[1-9]\d*\.[1-9]\d*$/;
 const FULL_SOURCE_REVISION = /^[0-9a-f]{40}$/;
 
 type DesktopChannel = keyof typeof DESKTOP_CHANNEL_LABELS;
@@ -32,17 +35,59 @@ function isDesktopChannel(value: string | undefined): value is DesktopChannel {
   return value !== undefined && value in DESKTOP_CHANNEL_LABELS;
 }
 
-function readDesktopReleaseIdentity(): DesktopReleaseIdentityLabel {
-  const dataset = globalThis.document?.documentElement.dataset;
-  const channel = dataset?.desktopChannel;
+function isTrustedDesktopIdentity(
+  identity: DesktopBuildIdentity | undefined
+): identity is DesktopBuildIdentity {
+  if (
+    identity?.provenance !== 'verified' &&
+    identity?.provenance !== 'development'
+  ) {
+    return false;
+  }
+  if (!isDesktopChannel(identity.channel)) return false;
+  const validVersion =
+    identity.channel === 'staging'
+      ? STAGING_DESKTOP_VERSION.test(identity.version)
+      : /^\d+\.\d+\.\d+$/.test(identity.version);
+  if (!validVersion) return false;
+  if (
+    identity.sourceRevision !== null &&
+    !FULL_SOURCE_REVISION.test(identity.sourceRevision)
+  ) {
+    return false;
+  }
+  if (identity.provenance === 'verified') {
+    if (
+      identity.channel === 'local' ||
+      identity.sourceRevision === null ||
+      identity.builtAt === null
+    ) {
+      return false;
+    }
+    const parsedBuiltAt = Date.parse(identity.builtAt);
+    return (
+      Number.isFinite(parsedBuiltAt) &&
+      new Date(parsedBuiltAt).toISOString() === identity.builtAt
+    );
+  }
+  return identity.builtAt === null;
+}
+
+function readDesktopReleaseIdentity(
+  bridgeIdentity: DesktopBuildIdentity | undefined
+): DesktopReleaseIdentityLabel {
+  const trustedBridgeIdentity = isTrustedDesktopIdentity(bridgeIdentity)
+    ? bridgeIdentity
+    : undefined;
+  const channel = trustedBridgeIdentity?.channel;
   const channelLabel = isDesktopChannel(channel)
     ? DESKTOP_CHANNEL_LABELS[channel]
     : 'Desktop';
-  const version = dataset?.desktopVersion;
+  const version = trustedBridgeIdentity?.version;
   const hasVersion =
     typeof version === 'string' && DESKTOP_VERSION.test(version);
   const versionLabel = hasVersion ? version : 'Version Unknown';
-  const sourceRevision = dataset?.desktopSourceRevision;
+  const sourceRevision = trustedBridgeIdentity?.sourceRevision ?? undefined;
   const hasSourceRevision =
     typeof sourceRevision === 'string' &&
     FULL_SOURCE_REVISION.test(sourceRevision);
@@ -73,7 +118,8 @@ function readDesktopReleaseIdentity(): DesktopReleaseIdentityLabel {
  */
 export function DesktopTitlebar() {
   const isDesktop = useIsElectronRuntime();
-  const releaseIdentity = readDesktopReleaseIdentity();
+  const identity = useDesktopBuildIdentity();
+  const releaseIdentity = readDesktopReleaseIdentity(identity);
   const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
   const sidebarCtx = useContext(SidebarContext);

@@ -371,6 +371,23 @@ describe('proxy.ts middleware', () => {
   // Catch-all handle hardening (JOV-3054)
   // ==========================================================================
   describe('catch-all handle hardening', () => {
+    it('redirects the canonical profile admission fixture to the monitored canary before dynamic routing', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/unfazed',
+        searchParams: { source: 'profile-admission' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(307);
+      const location = new URL(
+        res.headers.get('location') ?? '',
+        'https://localhost'
+      );
+      expect(location.pathname).toBe('/authqaprod');
+      expect(location.searchParams.get('source')).toBe('profile-admission');
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+
     it('redirects /login to /signin without touching the audience block', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/login' });
       const res = await callMiddleware(req);
@@ -697,6 +714,7 @@ describe('proxy.ts middleware', () => {
     it('does not run the audience block lookup for reserved public routes', async () => {
       const reservedRoutes = [
         '/start',
+        '/waitlist',
         '/pricing',
         '/about',
         '/investors',

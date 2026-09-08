@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ACQUISITION_REJECTION_REASONS } from '@/lib/acquisition';
 
 export const manualLeadSubmitSchema = z.object({
   urls: z.array(z.string().url()).min(1).max(500),
@@ -26,6 +27,9 @@ export const leadListQuerySchema = z.object({
 
 export const leadStatusUpdateSchema = z.object({
   status: z.enum(['approved', 'rejected']),
+  reason: z.enum(ACQUISITION_REJECTION_REASONS).optional(),
+  notes: z.string().trim().max(500).optional(),
+  capability: z.string().trim().max(200).optional(),
 });
 
 export const outreachListQuerySchema = z.object({

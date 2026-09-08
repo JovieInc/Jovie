@@ -3,6 +3,11 @@
 
 import { type UIMessage } from 'ai';
 import type { ChatErrorType, MessagePart } from '@/components/jovie/types';
+import {
+  GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
+  GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+  isGatewayBudgetExceededError,
+} from '@/lib/ai/gateway-errors';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -158,6 +163,8 @@ export function getOnboardingErrorMessage(
     case 'ONBOARDING_CHAT_PERSISTENCE_FAILED':
     case 'INTERNAL_ERROR':
       return 'Chat is temporarily unavailable. Try again in a moment.';
+    case GATEWAY_BUDGET_EXCEEDED_ERROR_CODE:
+      return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;
     default:
       break;
   }
@@ -173,6 +180,9 @@ export function getOnboardingErrorMessage(
   }
   if (/unauthorized|authentication required|auth_required/i.test(message)) {
     return 'Sign in to continue this chat.';
+  }
+  if (isGatewayBudgetExceededError(message)) {
+    return GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE;
   }
   return 'Jovie could not send your message. Try again.';
 }

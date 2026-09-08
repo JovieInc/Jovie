@@ -1,17 +1,23 @@
+# Summer production is owned by JovieInc/summer-config since 2026-09-05.
+# Keep these verification jobs; this repository must not deploy or promote
+# the private jovie-eve-shadow company runtime.
 name: Eve Pilot
 
 on:
   pull_request:
     paths:
       - 'apps/eve-pilot/**'
+      - 'packages/agent-transport-contracts/**'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/eve-pilot.yml'
   push:
     branches: [main]
     paths:
       - 'apps/eve-pilot/**'
+      - 'packages/agent-transport-contracts/**'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/eve-pilot.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,6 +27,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify-separated-apps:
+    name: Verify isolated ${{ matrix.identity }} application
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        identity: [jovie, summer]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Export the selected application without runtime data
+        run: node apps/eve-pilot/scripts/materialize-app.mjs '${{ matrix.identity }}' "$RUNNER_TEMP/isolated-agent"
+      - run: pnpm --dir "$RUNNER_TEMP/isolated-agent" install --ignore-workspace --frozen-lockfile
+      - run: pnpm --dir "$RUNNER_TEMP/isolated-agent" run typecheck
+      - run: pnpm --dir "$RUNNER_TEMP/isolated-agent" run test:coverage
+      - run: pnpm --dir "$RUNNER_TEMP/isolated-agent" run build
+      - run: pnpm --dir "$RUNNER_TEMP/isolated-agent" run test:built
+
   verify:
     name: Verify isolated Eve pilot
     runs-on: ubuntu-24.04
@@ -43,57 +71,3 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run test:coverage
       - run: pnpm run build
-
-  deploy-shadow:
-    name: Deploy existing Eve shadow pilot
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: verify
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    concurrency:
-      group: eve-shadow-non-production
-      cancel-in-progress: true
-    defaults:
-      run:
-        working-directory: apps/eve-pilot
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-          cache: pnpm
-          cache-dependency-path: apps/eve-pilot/pnpm-lock.yaml
-      - run: pnpm install --ignore-workspace --frozen-lockfile
-      - name: Bind the existing pilot to its dedicated Vercel project
-        run: |
-          if [ -z "$VERCEL_TOKEN" ]; then
-            echo 'VERCEL_TOKEN is required for the Eve shadow deployment.' >&2
-            exit 1
-          fi
-          pnpm exec vercel link \
-            --yes \
-            --project jovie-eve-shadow \
-            --scope jovie \
-            --token "$VERCEL_TOKEN"
-      - name: Deploy exact main source disabled to the preview shadow endpoint
-        run: |
-          deployment_url="$(pnpm exec vercel deploy \
-            --yes \
-            --scope jovie \
-            --token "$VERCEL_TOKEN" \
-            --meta "githubCommitSha=$GITHUB_SHA")"
-          case "$deployment_url" in
-            https://*.vercel.app) ;;
-            *)
-              echo 'Vercel did not return a valid preview deployment URL.' >&2
-              exit 1
-              ;;
-          esac
-          pnpm exec vercel alias set \
-            "$deployment_url" \
-            jovie-eve-shadow-staging.vercel.app \
-            --scope jovie \
-            --token "$VERCEL_TOKEN"

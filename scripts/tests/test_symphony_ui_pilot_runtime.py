@@ -9,7 +9,10 @@ Guards the contract that the orphan beam.smp incident violated:
   for 127.0.0.1:4041;
 - the install script materializes both onto a target home idempotently, keeps
   timestamped backups, and detects drift in --check mode except the bounded
-  runtime overlay on agent.max_concurrent_agents (1..8).
+  runtime overlay on agent.max_concurrent_agents (1..8);
+- the same installer activates the pressure-driven concurrency controller:
+  executable beside the reconciler, a systemd user service+timer pair, and
+  enable --now for its timer alongside symphony-reconciler.timer.
 
 No network, no systemd, no host state: everything runs against the repo
 checkout and a tmp_path target home. CI's pytest lane has no PyYAML, so the
@@ -29,19 +32,25 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / "scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
-UNIT = ROOT / "scripts/hermes/systemd/symphony-ui-pilot.service"
-GUARD = ROOT / "scripts/hermes/symphony-lease-guard"
-RECONCILER = ROOT / "scripts/hermes/symphony-reconciler.py"
-MODEL_ROUTER = ROOT / "scripts/hermes/model-router.py"
-MODEL_REGISTRY = ROOT / "scripts/hermes/config/model-registry.json"
-CAPABILITY_MANIFEST = ROOT / "scripts/hermes/config/symphony-reconciler-capabilities.json"
-RECONCILER_SERVICE = ROOT / "scripts/hermes/systemd/symphony-reconciler.service"
-RECONCILER_TIMER = ROOT / "scripts/hermes/systemd/symphony-reconciler.timer"
-INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
-FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
-REHAB_INSTALLER = ROOT / "scripts/hermes/install-gem-pr-rehabilitation.sh"
-USER_SYSTEMD_LIB = ROOT / "scripts/hermes/lib/user-systemd-context.sh"
+WORKFLOW = ROOT / "scripts/symphony/WORKFLOW.jovie-ui-pilot.md"
+UNIT = ROOT / "scripts/symphony/systemd/symphony-ui-pilot.service"
+GUARD = ROOT / "scripts/symphony/symphony-lease-guard"
+RECONCILER = ROOT / "scripts/symphony/symphony-reconciler.py"
+MODEL_ROUTER = ROOT / "scripts/symphony/model-router.py"
+MODEL_REGISTRY = ROOT / "scripts/symphony/config/model-registry.json"
+CAPABILITY_MANIFEST = ROOT / "scripts/symphony/config/symphony-reconciler-capabilities.json"
+RECONCILER_SERVICE = ROOT / "scripts/symphony/systemd/symphony-reconciler.service"
+RECONCILER_TIMER = ROOT / "scripts/symphony/systemd/symphony-reconciler.timer"
+DISK_RECLAIM = ROOT / "scripts/symphony/gem-disk-reclaim.py"
+DISK_RECLAIM_SERVICE = ROOT / "scripts/symphony/systemd/gem-disk-reclaim.service"
+DISK_RECLAIM_TIMER = ROOT / "scripts/symphony/systemd/gem-disk-reclaim.timer"
+CONTROLLER = ROOT / "scripts/symphony/symphony-concurrency-controller.py"
+CONTROLLER_SERVICE = ROOT / "scripts/symphony/systemd/symphony-concurrency-controller.service"
+CONTROLLER_TIMER = ROOT / "scripts/symphony/systemd/symphony-concurrency-controller.timer"
+INSTALLER = ROOT / "scripts/symphony/install-symphony-ui-pilot.sh"
+FLEET_INSTALLER = ROOT / "scripts/symphony/install-gem-fleet-controller.sh"
+REHAB_INSTALLER = ROOT / "scripts/symphony/install-gem-pr-rehabilitation.sh"
+USER_SYSTEMD_LIB = ROOT / "scripts/symphony/lib/user-systemd-context.sh"
 FLEET_WORKFLOW = ROOT / ".github/workflows/fleet-gate-refresh.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
@@ -319,11 +328,14 @@ def test_activation_exports_user_systemd_before_both_installers() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
     establish = activation.index("Establish lingering user-systemd session")
     official = activation.index(
-        "update-symphony-burrito.sh --skip-binary"
+        "update-symphony-burrito.sh --provider-runtime-only"
     )
-    install = activation.index("bash scripts/hermes/install-gem-fleet-controller.sh")
-    rehab = activation.index("bash scripts/hermes/install-gem-pr-rehabilitation.sh")
-    assert establish < official < install < rehab
+    managed_controller = activation.index(
+        "update-symphony-burrito.sh --managed-controller-only"
+    )
+    install = activation.index("bash scripts/symphony/install-gem-fleet-controller.sh")
+    rehab = activation.index("bash scripts/symphony/install-gem-pr-rehabilitation.sh")
+    assert establish < official < managed_controller < install < rehab
     assert "GITHUB_ENV" in activation
     assert "XDG_RUNTIME_DIR" in activation
     assert "DBUS_SESSION_BUS_ADDRESS" in activation
@@ -346,10 +358,10 @@ def test_activation_requires_official_runtime_and_retires_custom_automation() ->
     activation = ACTIVATION_WORKFLOW.read_text()
     assert "symphony-elixir.service" in activation
     assert 'DEFAULT_WORKSPACES = "~/symphony-elixir-workspaces"' in RECONCILER.read_text()
-    assert (
-        "update-symphony-burrito.sh --skip-binary"
-        in activation
-    )
+    assert "update-symphony-burrito.sh --provider-runtime-only" in activation
+    assert "update-symphony-burrito.sh --managed-controller-only" in activation
+    assert "update-symphony-burrito.sh --check" in activation
+    assert "update-symphony-burrito.sh --skip-binary" not in activation
     assert "--no-restart --retire-legacy" not in activation
     assert 'test "$main_pid" = "$after_pid"' not in activation
     assert "install-symphony-ui-pilot.sh" not in activation
@@ -357,11 +369,33 @@ def test_activation_requires_official_runtime_and_retires_custom_automation() ->
     assert "LoadState --value" in activation
     assert "symphony-ui-pilot.service" in activation
     assert "symphony-reconciler.timer" in activation
-    assert "symphony-grok-sidecar.timer" in activation
+    # The grok/kimi sidecar is the active coding lane, not a legacy unit;
+    # the activation mask-check must not retire it.
+    assert "symphony-grok-sidecar.service" not in activation
+    assert "symphony-grok-sidecar.timer" not in activation
     assert "ControlGroup --value" in activation
     assert "listener_pid" in activation
     assert "/proc/${listener_pid}/cgroup" in activation
     assert "ss -H -ltn 'sport = :4043'" in activation
+    assert "is-enabled --quiet gem-disk-reclaim.timer" in activation
+    assert "is-active --quiet gem-disk-reclaim.timer" in activation
+    assert "$HOME/.local/bin/gem-disk-reclaim" in activation
+    installer = INSTALLER.read_text()
+    assert "enable --now gem-disk-reclaim.timer" in installer
+    assert "restart symphony-ui-pilot.service" not in installer
+
+def test_disk_reclaim_systemd_unit_is_bounded_and_source_owned() -> None:
+    service = DISK_RECLAIM_SERVICE.read_text()
+    timer = DISK_RECLAIM_TIMER.read_text()
+    assert "%h/.local/bin/gem-disk-reclaim --apply --timeout-seconds 540" in service
+    assert "/usr/bin/flock -n /tmp/gem-disk-reclaim.lock" in service
+    assert "TimeoutStartSec=10min" in service
+    assert "ACTIONS_RUNNER_HOOK_JOB_STARTED" not in service
+    assert "ACTIONS_RUNNER_HOOK_JOB_COMPLETED" not in service
+    assert "OnUnitActiveSec=15min" in timer
+    assert "Persistent=true" in timer
+    assert "Unit=gem-disk-reclaim.service" in timer
+
 
 
 def test_workflow_server_and_workspace() -> None:
@@ -469,6 +503,9 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     runtime_receipt = tmp_path / ".local/lib/symphony-reconciler/runtime-receipt.json"
     reconciler_service = tmp_path / ".config/systemd/user/symphony-reconciler.service"
     reconciler_timer = tmp_path / ".config/systemd/user/symphony-reconciler.timer"
+    disk_reclaim = tmp_path / ".local/bin/gem-disk-reclaim"
+    disk_reclaim_service = tmp_path / ".config/systemd/user/gem-disk-reclaim.service"
+    disk_reclaim_timer = tmp_path / ".config/systemd/user/gem-disk-reclaim.timer"
     assert workflow.read_text() == WORKFLOW.read_text()
     assert unit.read_text() == UNIT.read_text()
     # JOV-5031: the lease guard installs executable so the before_run hook can
@@ -481,6 +518,8 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     assert model_router.stat().st_mode & 0o111
     assert model_registry.read_text() == MODEL_REGISTRY.read_text()
     assert capability_manifest.read_text() == CAPABILITY_MANIFEST.read_text()
+    assert disk_reclaim.read_text() == DISK_RECLAIM.read_text()
+    assert disk_reclaim.stat().st_mode & 0o111
     stored_receipt = json.loads(runtime_receipt.read_text())
     assert stored_receipt["schema"] == "symphony-runtime-receipt/v1"
     assert stored_receipt["installedAt"]
@@ -488,10 +527,25 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     assert stored_receipt["sourceHashes"] == stored_receipt["files"]
     assert reconciler_service.read_text() == RECONCILER_SERVICE.read_text()
     assert reconciler_timer.read_text() == RECONCILER_TIMER.read_text()
+    assert disk_reclaim_service.read_text() == DISK_RECLAIM_SERVICE.read_text()
+    assert disk_reclaim_timer.read_text() == DISK_RECLAIM_TIMER.read_text()
+    # The pressure-driven concurrency controller installs executable beside the
+    # reconciler with its systemd user service+timer pair.
+    controller = tmp_path / ".local/bin/symphony-concurrency-controller"
+    controller_service = (
+        tmp_path / ".config/systemd/user/symphony-concurrency-controller.service"
+    )
+    controller_timer = (
+        tmp_path / ".config/systemd/user/symphony-concurrency-controller.timer"
+    )
+    assert controller.read_text() == CONTROLLER.read_text()
+    assert controller.stat().st_mode & 0o111
+    assert controller_service.read_text() == CONTROLLER_SERVICE.read_text()
+    assert controller_timer.read_text() == CONTROLLER_TIMER.read_text()
     # Freshly installed state must pass drift detection.
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout
-    assert check.stdout.count("OK") == 10
+    assert check.stdout.count("OK") == 16
 
 
 def test_reconciler_records_exact_first_failure_without_escalating(tmp_path: Path) -> None:
@@ -667,6 +721,7 @@ def test_reconciler_never_stops_main_service_or_takes_alternate_ownership(
         SYMPHONY_STATE_URL=f"http://127.0.0.1:{server.server_port}/api/v1/state",
         SYMPHONY_WORKSPACE_ROOT=str(workspace_root),
         SYMPHONY_RECONCILER_STATE=str(tmp_path / "state"),
+        SYMPHONY_FLEET_GATE_RECEIPT=str(tmp_path / "missing-gate.json"),
         GEM_FLEET_GATE_RECEIPT=str(tmp_path / "missing-fleet-gate.json"),
         SYMPHONY_SYSTEMCTL=str(fake_systemctl),
     )
@@ -705,19 +760,19 @@ def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:
     assert _run_installer(tmp_path, "--check").returncode == 0
 
 
-def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path: Path) -> None:
+def test_installer_accepts_only_canonical_positive_runtime_concurrency_overlay(tmp_path: Path) -> None:
     assert _run_installer(tmp_path, "--no-daemon-reload").returncode == 0
     workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
     source = WORKFLOW.read_text()
 
-    for target in range(1, 9):
+    for target in (*range(1, 9), 9, 41, 128):
         _rewrite_installed_concurrency(workflow, str(target))
         accepted = _run_installer(tmp_path, "--check")
         assert accepted.returncode == 0, accepted.stdout
         assert f"OK {workflow}" in accepted.stdout
         assert f"runtime max_concurrent_agents={target}" in accepted.stdout
 
-    for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
+    for invalid in ("0", "-1", "1.5", "01", "08", "0001", "0008", "not-a-number"):
         workflow.write_text(
             source.replace("  max_concurrent_agents: 4", f"  max_concurrent_agents: {invalid}", 1)
         )
@@ -781,6 +836,12 @@ def test_installer_check_fails_closed_for_each_missing_reconciler_artifact(
         tmp_path / ".local/lib/symphony-reconciler/runtime-receipt.json",
         tmp_path / ".config/systemd/user/symphony-reconciler.service",
         tmp_path / ".config/systemd/user/symphony-reconciler.timer",
+        tmp_path / ".local/bin/gem-disk-reclaim",
+        tmp_path / ".config/systemd/user/gem-disk-reclaim.service",
+        tmp_path / ".config/systemd/user/gem-disk-reclaim.timer",
+        tmp_path / ".local/bin/symphony-concurrency-controller",
+        tmp_path / ".config/systemd/user/symphony-concurrency-controller.service",
+        tmp_path / ".config/systemd/user/symphony-concurrency-controller.timer",
     )
     for path in artifacts:
         original = path.read_bytes()
@@ -831,7 +892,13 @@ def test_installer_enables_reconciler_timer_without_restarting_main_service(
     commands = log.read_text().splitlines()
     assert "command=--user daemon-reload" in commands
     assert "command=--user enable --now symphony-reconciler.timer" in commands
+    assert "command=--user enable --now gem-disk-reclaim.timer" in commands
     assert all("symphony-ui-pilot.service" not in line for line in commands)
     assert "TIMER_ENABLED symphony-reconciler.timer" in result.stdout
+    assert "TIMER_ENABLED gem-disk-reclaim.timer" in result.stdout
+    assert "command=--user enable --now symphony-concurrency-controller.timer" in commands
+    assert all("symphony-ui-pilot.service" not in line for line in commands)
+    assert "TIMER_ENABLED symphony-reconciler.timer" in result.stdout
+    assert "TIMER_ENABLED symphony-concurrency-controller.timer" in result.stdout
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout

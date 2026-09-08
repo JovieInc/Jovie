@@ -19,6 +19,15 @@ Triple labels block idle hosts.
 ## Proposed fix
 Use one revision-scoped admission receipt.
 
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI
+
+## Optimization exception
+- Class: non-product
+- Justification: This control-plane admission receipt ships no user-facing page, link, asset, campaign, recommendation, or content variant.
+
 ## Acceptance criteria
 * Receipts admit work without the three labels.
 * Protected work stays excluded.`,
@@ -141,23 +150,57 @@ describe('revision-scoped admission receipt', () => {
     });
   });
 
-  it('revokes admission when a human-review label appears', () => {
-    const protectedIssue = admitted({
-      labels: { nodes: [{ name: 'human-review-required' }] },
+  it('rejects stale unscoped admission receipts that omit repository target fields', () => {
+    const original = admitted();
+    const body = admissionGate.buildAdmissionGateReceipt(original, {
+      now: NOW,
     });
+    const payload = JSON.parse(body.split('\n')[1]);
+    for (const field of [
+      'target_system',
+      'target_repo',
+      'artifact',
+      'verification_authority',
+    ]) {
+      delete payload[field];
+    }
+    const unscoped = `${admissionGate.ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${admissionGate.ADMISSION_GATE_SUFFIX}`;
+    const candidate = {
+      ...original,
+      comments: { nodes: [{ body: unscoped }] },
+    };
     assert.equal(
-      admissionGate.validateAdmissionCandidate(protectedIssue),
-      'protected-or-human-review'
-    );
-    assert.equal(
-      admissionGate.admissionGateReceipt(protectedIssue, { now: NOW }),
+      admissionGate.admissionGateReceipt(candidate, { now: NOW }),
       null
     );
-    assert.equal(admitter.hasAdmissionEvidence(protectedIssue).eligible, false);
-    assert.deepEqual(deterministicGates.admissionIntentLoad([protectedIssue]), {
-      count: 0,
-      identifiers: [],
-    });
+    assert.equal(admitter.hasAdmissionEvidence(candidate).eligible, false);
+  });
+
+  it('keeps admission live when legacy human or taste labels appear', () => {
+    for (const label of [
+      'human-review-required',
+      'needs-human',
+      'needs:taste',
+      'needs-human-taste',
+      'no-auto',
+    ]) {
+      const labeledIssue = admitted({
+        labels: { nodes: [{ name: label }] },
+      });
+      assert.equal(
+        admissionGate.validateAdmissionCandidate(labeledIssue),
+        null
+      );
+      assert.notEqual(
+        admissionGate.admissionGateReceipt(labeledIssue, { now: NOW }),
+        null
+      );
+      assert.equal(admitter.hasAdmissionEvidence(labeledIssue).eligible, true);
+      assert.deepEqual(deterministicGates.admissionIntentLoad([labeledIssue]), {
+        count: 1,
+        identifiers: [labeledIssue.identifier],
+      });
+    }
   });
 
   it('recovers a missing derived label from an existing receipt', async () => {

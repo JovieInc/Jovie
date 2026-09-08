@@ -1,0 +1,480 @@
+#!/usr/bin/env python3
+"""Replace a deliberately frozen Symphony generation without resuming old work.
+
+The caller supplies an immutable manifest that binds the running invocation,
+the protected LogYourBody service, preserved workspaces, and every promoted
+asset.  The official service must already be frozen.  This helper never freezes
+an active service as an admission shortcut and never mutates the protected
+service.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+
+
+SCHEMA = "symphony-frozen-generation-replacement/v1"
+RECEIPT_SCHEMA = "symphony-frozen-generation-receipt/v1"
+PROVIDER_SCHEMA = "symphony-provider-generation/v1"
+OFFICIAL_SERVICE = "symphony-elixir.service"
+PROTECTED_SERVICE = "symphony-lyb.service"
+ISSUE = re.compile(r"^[A-Z][A-Z0-9]+-[0-9]+$")
+SESSION = re.compile(r"^[A-Za-z0-9._:-]{1,160}$")
+
+
+class TransitionError(RuntimeError):
+    pass
+
+
+def digest(path: Path) -> str:
+    value = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def run(command: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(command, text=True, capture_output=True, check=False)
+    if check and result.returncode:
+        detail = (result.stderr or result.stdout).strip()
+        raise TransitionError(f"command failed ({result.returncode}): {' '.join(command)}: {detail}")
+    return result
+
+
+class Systemd:
+    def __init__(self, binary: str):
+        self.prefix = [binary, "--user"]
+
+    def show(self, service: str, properties: list[str]) -> dict[str, str]:
+        command = [*self.prefix, "show", service]
+        for prop in properties:
+            command.extend(("--property", prop))
+        command.append("--no-pager")
+        result = run(command)
+        values: dict[str, str] = {}
+        for line in result.stdout.splitlines():
+            key, separator, value = line.partition("=")
+            if separator:
+                values[key] = value
+        missing = [prop for prop in properties if prop not in values]
+        if missing:
+            raise TransitionError(f"systemd omitted properties for {service}: {','.join(missing)}")
+        return values
+
+    def running_services(self) -> list[str]:
+        result = run([*self.prefix, "list-units", "--type=service", "--state=running", "--plain", "--no-legend"])
+        return [line.split()[0] for line in result.stdout.splitlines() if line.split()]
+
+    def signal(self, service: str, signal: str, whom: str, *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return run([*self.prefix, "kill", f"--signal={signal}", f"--kill-whom={whom}", service], check=check)
+
+    def freeze(self, service: str) -> None:
+        run([*self.prefix, "freeze", service])
+
+    def thaw(self, service: str) -> None:
+        run([*self.prefix, "thaw", service])
+
+
+def load_manifest(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise TransitionError(f"invalid replacement manifest: {exc}") from exc
+    if not isinstance(data, dict) or data.get("schema") != SCHEMA:
+        raise TransitionError(f"replacement manifest must use {SCHEMA}")
+    if data.get("authorization") != "explicit-maintenance-replacement":
+        raise TransitionError("explicit maintenance replacement authorization is absent")
+    if data.get("service") != OFFICIAL_SERVICE or data.get("protectedService") != PROTECTED_SERVICE:
+        raise TransitionError("manifest service boundary is invalid")
+    return data
+
+
+def valid_hash(value: object) -> bool:
+    return isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value))
+
+
+def verify_provider_generation(path: Path, provider_root: Path) -> dict:
+    generation = path.resolve(strict=True)
+    if generation.parent != provider_root.resolve(strict=True):
+        raise TransitionError("provider generation is outside its managed store")
+    try:
+        receipt = json.loads((generation / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise TransitionError(f"invalid provider manifest: {exc}") from exc
+    if receipt.get("schema") != PROVIDER_SCHEMA or not isinstance(receipt.get("sha256"), dict):
+        raise TransitionError("provider manifest schema is invalid")
+    for name in ("agent-router", "codex-router", "codex-probe", "cursor-adapter", "entry"):
+        expected = receipt["sha256"].get(name)
+        target = generation / name
+        if target.is_symlink() or not target.is_file() or not os.access(target, os.X_OK):
+            raise TransitionError(f"provider generation member is invalid: {name}")
+        if not valid_hash(expected) or digest(target) != expected:
+            raise TransitionError(f"provider generation hash mismatch: {name}")
+    return receipt
+
+
+def git_snapshot(workspace: Path) -> dict:
+    head = run(["git", "-C", str(workspace), "rev-parse", "HEAD"]).stdout.strip()
+    status = run(["git", "-C", str(workspace), "status", "--porcelain=v1", "-z", "--untracked-files=all"]).stdout.encode()
+    git_dir = Path(run(["git", "-C", str(workspace), "rev-parse", "--absolute-git-dir"]).stdout.strip()).resolve(strict=True)
+    if git_dir != (workspace / ".git").resolve(strict=True) or git_dir.is_symlink():
+        raise TransitionError(f"workspace must use a regular contained .git directory: {workspace}")
+    return {
+        "head": head,
+        "statusSha256": hashlib.sha256(status).hexdigest(),
+        "statusEntries": len([entry for entry in status.split(b"\0") if entry]),
+        "gitDir": str(git_dir),
+    }
+
+
+def workspace_snapshot(entries: list[dict]) -> list[dict]:
+    if not entries or not isinstance(entries, list):
+        raise TransitionError("at least one preserved workspace is required")
+    snapshots = []
+    running = 0
+    for entry in entries:
+        if not isinstance(entry, dict) or not ISSUE.fullmatch(str(entry.get("issue", ""))):
+            raise TransitionError("workspace issue identifier is invalid")
+        if entry.get("state") not in ("running", "preserved"):
+            raise TransitionError("workspace state must be running or preserved")
+        if entry["state"] == "running":
+            running += 1
+        session = entry.get("sessionId")
+        if not isinstance(session, str) or not SESSION.fullmatch(session):
+            raise TransitionError(f"workspace sessionId is invalid for {entry['issue']}")
+        workspace = Path(str(entry.get("path", ""))).expanduser().resolve(strict=True)
+        if not workspace.is_dir():
+            raise TransitionError(f"workspace is unavailable: {workspace}")
+        checkpoint_files = entry.get("checkpointFiles")
+        if not isinstance(checkpoint_files, list) or not checkpoint_files:
+            raise TransitionError(f"workspace replay checkpoint is absent for {entry['issue']}")
+        checkpoints = {}
+        for relative in checkpoint_files:
+            candidate = (workspace / str(relative)).resolve(strict=True)
+            if workspace not in candidate.parents or not candidate.is_file():
+                raise TransitionError(f"checkpoint escapes workspace: {relative}")
+            checkpoints[str(candidate.relative_to(workspace))] = digest(candidate)
+        snapshots.append({
+            "issue": entry["issue"],
+            "state": entry["state"],
+            "sessionId": session,
+            "path": str(workspace),
+            "git": git_snapshot(workspace),
+            "checkpoints": checkpoints,
+        })
+    if running != 1:
+        raise TransitionError(f"manifest must identify exactly one running workspace, found {running}")
+    return snapshots
+
+
+def cgroup_pids(cgroup: str, cgroup_root: Path) -> list[int]:
+    relative = cgroup.lstrip("/")
+    procs_path = (cgroup_root / relative / "cgroup.procs").resolve(strict=True)
+    if cgroup_root.resolve(strict=True) not in procs_path.parents:
+        raise TransitionError("service cgroup escapes the cgroup root")
+    try:
+        return sorted({int(value) for value in procs_path.read_text().split()})
+    except (OSError, ValueError) as exc:
+        raise TransitionError(f"cannot read service cgroup processes: {exc}") from exc
+
+
+def kill_frozen_cgroup(systemd: Systemd, service: str, cgroup: str, cgroup_root: Path) -> None:
+    # TERM can synchronously empty the frozen cgroup. On some systemd versions,
+    # a redundant kill then exits 1 even though the required postcondition is
+    # already true. Trust only the cgroup: skip it when empty, and require it to
+    # be empty after any best-effort KILL regardless of the command exit code.
+    if not cgroup_pids(cgroup, cgroup_root):
+        return
+    result = systemd.signal(service, "KILL", "all", check=False)
+    remaining = cgroup_pids(cgroup, cgroup_root)
+    if remaining:
+        detail = (result.stderr or result.stdout).strip()
+        suffix = f": {detail}" if detail else ""
+        raise TransitionError(f"official frozen cgroup still has live processes after KILL: {remaining}{suffix}")
+
+
+def process_snapshot(cgroup: str, cgroup_root: Path, proc_root: Path, workspaces: list[dict], main_pid: int) -> list[dict]:
+    pids = cgroup_pids(cgroup, cgroup_root)
+    if main_pid not in pids:
+        raise TransitionError("service MainPID is absent from its cgroup")
+    roots = [Path(entry["path"]) for entry in workspaces]
+    snapshot = []
+    for pid in pids:
+        process = proc_root / str(pid)
+        try:
+            cwd = (process / "cwd").resolve(strict=True)
+            command = (process / "cmdline").read_bytes()
+        except OSError as exc:
+            raise TransitionError(f"cannot capture cgroup process {pid}: {exc}") from exc
+        workspace = next((str(root) for root in roots if cwd == root or root in cwd.parents), None)
+        snapshot.append({"pid": pid, "cwd": str(cwd), "workspace": workspace, "cmdlineSha256": hashlib.sha256(command).hexdigest()})
+    if not any(entry["workspace"] for entry in snapshot):
+        raise TransitionError("no service process is bound to the running workspace")
+    return snapshot
+
+
+def json_health(url: str, timeout: float) -> dict:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            data = json.load(response)
+    except Exception as exc:
+        raise TransitionError(f"health read failed for {url}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise TransitionError(f"health response is not an object: {url}")
+    return data
+
+
+def atomic_install(source: Path, destination: Path, expected: str, mode: int) -> None:
+    if source.is_symlink() or not source.is_file() or digest(source) != expected:
+        raise TransitionError(f"staged asset hash mismatch: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
+    os.close(descriptor)
+    temporary_path = Path(temporary)
+    try:
+        shutil.copyfile(source, temporary_path)
+        temporary_path.chmod(mode)
+        if digest(temporary_path) != expected:
+            raise TransitionError(f"copied asset hash mismatch: {destination}")
+        os.replace(temporary_path, destination)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def switch_symlink(target: Path, destination: Path) -> None:
+    temporary = destination.with_name(f".{destination.name}.tmp.{os.getpid()}")
+    temporary.unlink(missing_ok=True)
+    try:
+        temporary.symlink_to(target)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def frozen_service_snapshot(systemd: Systemd, manifest: dict) -> tuple[dict, dict]:
+    properties = ["MainPID", "InvocationID", "ControlGroup", "FreezerState", "Restart", "KillMode", "RefuseManualStop", "ActiveState"]
+    official = systemd.show(OFFICIAL_SERVICE, properties)
+    expected = manifest.get("expected", {})
+    required = {
+        "MainPID": str(expected.get("mainPid", "")),
+        "InvocationID": str(expected.get("invocationId", "")),
+        "ControlGroup": str(expected.get("controlGroup", "")),
+        "FreezerState": "frozen",
+        "Restart": "always",
+        "KillMode": "control-group",
+        "RefuseManualStop": "yes",
+        "ActiveState": "active",
+    }
+    drift = {key: (official.get(key), value) for key, value in required.items() if official.get(key) != value}
+    if drift:
+        raise TransitionError(f"official frozen-service identity drift: {drift}")
+    protected = systemd.show(PROTECTED_SERVICE, ["MainPID", "FreezerState", "ActiveState", "ControlGroup"])
+    if protected["MainPID"] != str(manifest.get("protectedPid")) or protected["ActiveState"] != "active":
+        raise TransitionError("protected service identity drift")
+    if protected["FreezerState"] == "frozen" or protected["ControlGroup"] == official["ControlGroup"]:
+        raise TransitionError("protected service is frozen or shares the official cgroup")
+    frozen = []
+    for service in systemd.running_services():
+        state = systemd.show(service, ["FreezerState"])["FreezerState"]
+        if state == "frozen":
+            frozen.append(service)
+    if frozen != [OFFICIAL_SERVICE]:
+        raise TransitionError(f"official service must be the only frozen user service: {frozen}")
+    return official, protected
+
+
+def assets_from_manifest(manifest: dict, target_home: Path) -> list[dict]:
+    assets = manifest.get("assets")
+    if not isinstance(assets, list) or {item.get("name") for item in assets if isinstance(item, dict)} != {"binary", "workflow"}:
+        raise TransitionError("manifest must bind exactly binary and workflow assets")
+    result = []
+    expected_destinations = {
+        "binary": (target_home / ".local/bin/symphony").resolve(strict=False),
+        "workflow": (target_home / ".config/symphony/WORKFLOW.md").resolve(strict=False),
+    }
+    for item in assets:
+        source = Path(str(item.get("source", ""))).expanduser().resolve(strict=True)
+        destination = Path(str(item.get("destination", ""))).expanduser().resolve(strict=False)
+        expected = item.get("sha256")
+        mode = item.get("mode")
+        if not valid_hash(expected) or mode not in (0o644, 0o755):
+            raise TransitionError(f"invalid asset contract: {item.get('name')}")
+        if destination != expected_destinations[item["name"]] or source == destination:
+            raise TransitionError(f"asset destination is outside the managed boundary: {item.get('name')}")
+        result.append({**item, "sourcePath": source, "destinationPath": destination})
+    return result
+
+
+def write_receipt(path: Path, receipt: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    os.close(descriptor)
+    temporary_path = Path(temporary)
+    try:
+        temporary_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary_path.chmod(0o600)
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def transition(manifest: dict, *, systemctl: str, cgroup_root: Path, proc_root: Path) -> dict:
+    systemd = Systemd(systemctl)
+    target_home = Path(str(manifest.get("targetHome", ""))).expanduser().resolve(strict=True)
+    state_dir = Path(str(manifest.get("stateDir", ""))).expanduser().resolve(strict=True)
+    receipt_path = Path(str(manifest.get("receiptPath", ""))).expanduser().resolve(strict=False)
+    if state_dir != (target_home / ".local/state/symphony-elixir").resolve(strict=True):
+        raise TransitionError("stateDir is outside the managed target home")
+    if state_dir not in receipt_path.parents:
+        raise TransitionError("receiptPath is outside the managed state directory")
+    lock_path = state_dir / "frozen-generation-transition.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        official, protected = frozen_service_snapshot(systemd, manifest)
+        timeout = float(manifest.get("timeoutSeconds", 120))
+        if timeout < 5 or timeout > 600:
+            raise TransitionError("timeoutSeconds must be between 5 and 600")
+        protected_url = str(manifest.get("protectedApiUrl", ""))
+        api_url = str(manifest.get("apiUrl", ""))
+        if not protected_url.startswith("http://127.0.0.1:4042/") or not api_url.startswith("http://127.0.0.1:4041/"):
+            raise TransitionError("health URLs must remain on the protected 4041/4042 loopback boundary")
+        json_health(protected_url, min(timeout, 5))
+        workspaces_before = workspace_snapshot(manifest.get("workspaces"))
+        processes_before = process_snapshot(official["ControlGroup"], cgroup_root, proc_root, workspaces_before, int(official["MainPID"]))
+        assets = assets_from_manifest(manifest, target_home)
+        provider_root = state_dir / "provider-generations"
+        provider = Path(str(manifest.get("providerGeneration", ""))).expanduser().resolve(strict=True)
+        provider_receipt = verify_provider_generation(provider, provider_root)
+        provider_current = provider_root / "current"
+        if not provider_current.is_symlink():
+            raise TransitionError("provider current pointer is not managed")
+        old_provider = provider_current.resolve(strict=True)
+        verify_provider_generation(old_provider, provider_root)
+        backup = Path(tempfile.mkdtemp(prefix="frozen-replacement-", dir=state_dir))
+        promoted = False
+        keep_backup = False
+        try:
+            for item in assets:
+                destination = item["destinationPath"]
+                if destination.is_symlink() or not destination.is_file():
+                    raise TransitionError(f"managed asset destination is not a regular file: {destination}")
+                shutil.copy2(destination, backup / item["name"])
+                atomic_install(item["sourcePath"], destination, item["sha256"], item["mode"])
+            switch_symlink(provider, provider_current)
+            promoted = True
+            for item in assets:
+                if digest(item["destinationPath"]) != item["sha256"]:
+                    raise TransitionError(f"promoted asset readback mismatch: {item['name']}")
+            verify_provider_generation(provider_current.resolve(strict=True), provider_root)
+            # TERM communicates the intended service lifecycle. KILL to the
+            # complete still-frozen cgroup prevents any old command from
+            # executing between thaw and systemd's replacement generation.
+            systemd.signal(OFFICIAL_SERVICE, "TERM", "main")
+            kill_frozen_cgroup(systemd, OFFICIAL_SERVICE, official["ControlGroup"], cgroup_root)
+            systemd.thaw(OFFICIAL_SERVICE)
+            deadline = time.monotonic() + timeout
+            new_state = None
+            while time.monotonic() < deadline:
+                candidate = systemd.show(OFFICIAL_SERVICE, ["MainPID", "InvocationID", "ActiveState", "FreezerState"])
+                if candidate["MainPID"] not in ("", "0", official["MainPID"]) and candidate["InvocationID"] != official["InvocationID"] and candidate["ActiveState"] == "active" and candidate["FreezerState"] != "frozen":
+                    try:
+                        json_health(api_url, min(2, timeout))
+                    except TransitionError:
+                        time.sleep(0.1)
+                        continue
+                    new_state = candidate
+                    break
+                time.sleep(0.1)
+            if new_state is None:
+                raise TransitionError("replacement generation did not become healthy before timeout")
+            for item in assets:
+                if digest(item["destinationPath"]) != item["sha256"]:
+                    raise TransitionError(f"post-start asset drift: {item['name']}")
+            verify_provider_generation(provider_current.resolve(strict=True), provider_root)
+            workspaces_after = workspace_snapshot(manifest.get("workspaces"))
+            if workspaces_after != workspaces_before:
+                raise TransitionError("workspace or checkpoint state changed during replacement")
+            protected_after = systemd.show(PROTECTED_SERVICE, ["MainPID", "ActiveState", "FreezerState"])
+            if protected_after != {"MainPID": protected["MainPID"], "ActiveState": "active", "FreezerState": protected["FreezerState"]}:
+                raise TransitionError("protected service changed during replacement")
+            json_health(protected_url, min(timeout, 5))
+            receipt = {
+                "schema": RECEIPT_SCHEMA,
+                "status": "succeeded",
+                "old": {"mainPid": int(official["MainPID"]), "invocationId": official["InvocationID"], "processes": processes_before},
+                "new": {"mainPid": int(new_state["MainPID"]), "invocationId": new_state["InvocationID"]},
+                "protected": {"service": PROTECTED_SERVICE, "mainPid": int(protected["MainPID"])},
+                "workspaces": workspaces_after,
+                "assets": {item["name"]: item["sha256"] for item in assets},
+                "provider": {"generation": str(provider), "sha256": provider_receipt["sha256"]},
+            }
+            write_receipt(receipt_path, receipt)
+            return receipt
+        except BaseException as exc:
+            # If the replacement was thawed, re-freeze it before restoring the
+            # exact old bytes. The unit remains frozen: recovery requires a new
+            # explicit manifest, so a partial generation never resumes.
+            keep_backup = True
+            containment_error = None
+            try:
+                current = systemd.show(OFFICIAL_SERVICE, ["FreezerState"])
+                if current["FreezerState"] != "frozen":
+                    systemd.freeze(OFFICIAL_SERVICE)
+                if systemd.show(OFFICIAL_SERVICE, ["FreezerState"])["FreezerState"] != "frozen":
+                    raise TransitionError("official service did not enter frozen rollback containment")
+            except BaseException as freeze_exc:
+                containment_error = freeze_exc
+            if containment_error is not None:
+                failure = {"schema": RECEIPT_SCHEMA, "status": "rollback-containment-failed", "error": str(exc), "containmentError": str(containment_error), "oldMainPid": int(official["MainPID"]), "protectedPid": int(protected["MainPID"]), "backupPath": str(backup), "workspaces": workspaces_before}
+                write_receipt(receipt_path, failure)
+                raise TransitionError(f"replacement failed and rollback could not freeze the official service: {containment_error}") from exc
+            for item in assets:
+                saved = backup / item["name"]
+                if saved.is_file():
+                    atomic_install(saved, item["destinationPath"], digest(saved), item["mode"])
+            if promoted:
+                switch_symlink(old_provider, provider_current)
+            failure = {"schema": RECEIPT_SCHEMA, "status": "failed-closed", "error": str(exc), "oldMainPid": int(official["MainPID"]), "protectedPid": int(protected["MainPID"]), "backupPath": str(backup), "workspaces": workspaces_before}
+            write_receipt(receipt_path, failure)
+            raise
+        finally:
+            if not keep_backup:
+                shutil.rmtree(backup, ignore_errors=True)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--systemctl", default="systemctl")
+    parser.add_argument("--cgroup-root", type=Path, default=Path("/sys/fs/cgroup"))
+    parser.add_argument("--proc-root", type=Path, default=Path("/proc"))
+    parser.add_argument("--lease-fd", type=int, required=True)
+    args = parser.parse_args(argv)
+    try:
+        os.fstat(args.lease_fd)
+        fcntl.flock(args.lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        manifest = load_manifest(args.manifest)
+        receipt = transition(manifest, systemctl=args.systemctl, cgroup_root=args.cgroup_root, proc_root=args.proc_root)
+    except (OSError, TransitionError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+        print(f"FROZEN_REPLACEMENT_RED {exc}", file=sys.stderr)
+        return 30
+    print("FROZEN_REPLACEMENT_OK " + json.dumps(receipt, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

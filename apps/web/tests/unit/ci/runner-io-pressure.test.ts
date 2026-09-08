@@ -11,7 +11,7 @@ import {
   ioPressureConfigFromEnv,
   parseIoFullAvg10,
 } from '../../../../../.github/runner-host/autoscaler/io-pressure';
-import { diagnoseCiFailure } from '../../../../../scripts/hermes/jobs/ci-failure-diagnosis';
+import { diagnoseCiFailure } from '../../../../../scripts/symphony/jobs/ci-failure-diagnosis';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 const pressure = (fullAvg10: string) =>

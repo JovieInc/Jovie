@@ -122,7 +122,7 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 
 | Schema File | Tables | Key Relations |
 |-------------|--------|---------------|
-| `investors.ts` | `investorLinks`, `investorSettings`, `investorViews` | Standalone investor portal tables; `investorViews.pagePath` stores page views and `/investor-portal#event/...` engagement paths (no separate event table) |
+| `investors.ts` | `investorLinks`, `investorSettings`, `investorViews`, `investorStakeholderRecords`, `investorUpdateDrafts`, `investorUpdateCandidates`, `investorUpdateCandidateDecisions`, `investorUpdateFinalApprovals`, `investorUpdateDeliveryEvents` | Portal tables plus append-only Taste Inbox ledger; candidates/source records → `memory_source_records`; decisions → candidates; approvals → drafts; delivery events → approvals. No send path. |
 
 ### Referrals
 

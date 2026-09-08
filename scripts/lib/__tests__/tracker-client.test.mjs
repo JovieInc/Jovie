@@ -18,7 +18,7 @@ async function loadTrackerClient({ execFileSync, env = {} } = {}) {
       process.env[key] = env[key];
     }
   }
-  return import('../../hermes/lib/tracker-client.ts');
+  return import('../../symphony/lib/tracker-client.ts');
 }
 
 function jsonResponse(body, status = 200) {
@@ -200,7 +200,12 @@ describe.skip('historical GitHub-first tracker-client behavior', () => {
 describe('voice memo ingest retry contract', () => {
   it('keeps queued issue spans out of the handled filed-issue count', () => {
     const source = readFileSync(
-      join(import.meta.dirname, '..', '..', 'hermes/jobs/voice-memo-ingest.ts'),
+      join(
+        import.meta.dirname,
+        '..',
+        '..',
+        'symphony/jobs/voice-memo-ingest.ts'
+      ),
       'utf8'
     );
     expect(source).toContain('issue_queued_keeping_memo_for_retry');

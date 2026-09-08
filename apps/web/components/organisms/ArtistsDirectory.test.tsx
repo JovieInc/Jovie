@@ -13,7 +13,7 @@ describe('ArtistsDirectory', () => {
     );
     expect(
       ARTISTS_DIRECTORY_STORY_PROFILES.map(profile => profile.avatarUrl)
-    ).toEqual(['/images/avatars/tim-white-founder.jpg']);
+    ).toEqual(['/images/avatars/tim-white.jpg']);
     expect(
       ARTISTS_DIRECTORY_STORY_PROFILES.map(profile => profile.username)
     ).toEqual(['tim']);

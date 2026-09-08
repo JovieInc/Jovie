@@ -8,6 +8,7 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryMerchProductOption } from '@/lib/library/graph-types';
 import type {
   LibraryCatalogType,
   LibraryLifecycleStage,
@@ -16,11 +17,13 @@ import {
   resolveLibraryCatalogType,
   resolveLibraryLifecycleStage,
 } from '@/lib/library/lifecycle-stage';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import {
   DEFAULT_LIBRARY_PROFILE_VISIBILITY,
   type LibraryProfileItemKind,
   type LibraryProfileVisibility,
 } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { hashLibraryWaveformSeed } from './library-waveform-peaks';
@@ -59,6 +62,13 @@ export type LibraryGridDensity = 'compact' | 'comfortable' | 'spacious';
 export type LibraryViewMode = 'grid' | 'list' | 'table';
 
 export type LibraryMediaOrientation = 'landscape' | 'portrait';
+
+export type LibraryAssetSourceProvider = 'youtube' | 'discography' | 'merch';
+
+export interface LibraryAssetSource {
+  readonly provider: LibraryAssetSourceProvider;
+  readonly canonicalId: string;
+}
 
 export interface LibraryReleaseAsset {
   readonly itemKind?: LibraryItemKind;
@@ -111,10 +121,14 @@ export interface LibraryReleaseAsset {
   readonly mediaOrientation?: LibraryMediaOrientation;
   readonly share?: LibraryAssetShareViewModel | null;
   readonly catalogType?: LibraryCatalogType;
+  readonly source?: LibraryAssetSource;
   readonly linkedReleaseId?: string | null;
   readonly documentStage?: CreatorDocumentListItem['stage'];
   readonly privacyStatus?: string | null;
   readonly lifecycleStage?: LibraryLifecycleStage;
+  readonly relatedMerchTitles?: readonly string[];
+  readonly relationshipCount?: number;
+  readonly postReleaseDownloadCount?: number;
 }
 
 export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {
@@ -304,6 +318,7 @@ export function buildLibraryMerchAssets(
     return {
       itemKind: 'merch',
       id: assetId,
+      source: { provider: 'merch', canonicalId: card.id },
       title: card.title,
       artist: artistName,
       artworkUrl: imageUrl,
@@ -447,6 +462,7 @@ export function buildLibraryYouTubeAssets(
     const asset: LibraryReleaseAsset = {
       itemKind: 'video',
       catalogType,
+      source: { provider: 'youtube', canonicalId: video.videoId },
       linkedReleaseId: video.releaseLink?.releaseId ?? null,
       id: assetId,
       title: video.title,
@@ -506,6 +522,91 @@ export function getLibraryItemKind(
   asset: LibraryReleaseAsset
 ): LibraryItemKind {
   return asset.itemKind ?? 'release';
+}
+
+export function libraryGraphEntityId(asset: LibraryReleaseAsset): string {
+  if (asset.source?.canonicalId) {
+    return asset.source.canonicalId;
+  }
+  if (asset.itemKind === 'merch' && asset.id.startsWith('merch-')) {
+    return asset.id.slice('merch-'.length);
+  }
+  if (asset.itemKind === 'video' && asset.id.startsWith('youtube-')) {
+    return asset.id.slice('youtube-'.length);
+  }
+  return asset.id;
+}
+
+export function attachLibraryProductGraph(
+  assets: readonly LibraryReleaseAsset[],
+  input: {
+    readonly merchProducts?: readonly LibraryMerchProductOption[];
+    readonly relationships?: readonly LibraryRelationshipView[];
+    readonly postReleaseBundle?: LibraryPostReleaseBundle;
+  }
+): readonly LibraryReleaseAsset[] {
+  const merchProducts = input.merchProducts ?? [];
+  const relationships = input.relationships ?? [];
+  const downloads = input.postReleaseBundle?.downloads ?? [];
+  if (
+    merchProducts.length === 0 &&
+    relationships.length === 0 &&
+    downloads.length === 0
+  ) {
+    return assets;
+  }
+
+  const merchTitleById = new Map(
+    merchProducts.map(product => [product.id, product.title] as const)
+  );
+  const downloadsByReleaseId = new Map<string, number>();
+  for (const download of downloads) {
+    downloadsByReleaseId.set(
+      download.releaseId,
+      (downloadsByReleaseId.get(download.releaseId) ?? 0) + 1
+    );
+  }
+
+  return assets.map(asset => {
+    const entityId = libraryGraphEntityId(asset);
+    const related = relationships.filter(
+      relationship =>
+        relationship.subjectId === entityId ||
+        relationship.objectId === entityId
+    );
+    const relatedMerchTitles = [
+      ...new Set(
+        related
+          .filter(relationship => relationship.kind === 'features_merch')
+          .map(
+            relationship =>
+              merchTitleById.get(
+                relationship.objectId === entityId
+                  ? relationship.subjectId
+                  : relationship.objectId
+              ) ?? null
+          )
+          .filter((title): title is string => Boolean(title))
+      ),
+    ];
+    const postReleaseDownloadCount =
+      asset.itemKind === 'merch' || asset.itemKind === 'video'
+        ? 0
+        : (downloadsByReleaseId.get(asset.id) ?? 0);
+    if (
+      related.length === 0 &&
+      relatedMerchTitles.length === 0 &&
+      postReleaseDownloadCount === 0
+    ) {
+      return asset;
+    }
+    return {
+      ...asset,
+      relatedMerchTitles,
+      relationshipCount: related.length,
+      postReleaseDownloadCount,
+    };
+  });
 }
 
 /**

@@ -21,3 +21,11 @@ describe('VisualQaReviewPanel typography contract', () => {
     expect(panelSource).toContain("from '@/components/feedback'");
   });
 });
+
+describe('VisualQaReviewPanel reference id contract', () => {
+  it('precomputes sequential HUD-VQA ids without mutating render-scope state', () => {
+    expect(panelSource).toContain('surfaceReferenceIds');
+    expect(panelSource).not.toContain('surfaceIndex');
+    expect(panelSource).toContain("padStart(3, '0')");
+  });
+});

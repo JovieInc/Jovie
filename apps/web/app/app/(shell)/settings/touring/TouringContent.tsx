@@ -66,6 +66,7 @@ function CalendarSubscribeRow({
       <SettingsActionRow
         icon={<Calendar className='h-4 w-4' aria-hidden />}
         title='Subscribe URL'
+        disabled={!isPublicProfile}
         description={
           isPublicProfile
             ? 'Anyone with this link sees your confirmed tour dates in Google, Apple, or Outlook calendar. Public — share with your team, manager, or industry contacts.'

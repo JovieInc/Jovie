@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   ensureJovieRepoCwd,
   resolveJovieRepoFromScript,
-} from '../../hermes/lib/ensure-jovie-repo-cwd.ts';
+} from '../../symphony/lib/ensure-jovie-repo-cwd.ts';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
@@ -23,10 +23,10 @@ describe('ensure-jovie-repo-cwd', () => {
     }
   });
 
-  it('resolveJovieRepoFromScript walks up from scripts/hermes/jobs', () => {
+  it('resolveJovieRepoFromScript walks up from scripts/symphony/jobs', () => {
     const moduleUrl = `file://${join(
       REPO_ROOT,
-      'scripts/hermes/jobs/ci-failure-monitor.ts'
+      'scripts/symphony/jobs/ci-failure-monitor.ts'
     )}`;
     expect(resolveJovieRepoFromScript(moduleUrl)).toBe(REPO_ROOT);
   });
@@ -37,7 +37,7 @@ describe('ensure-jovie-repo-cwd', () => {
 
     const moduleUrl = `file://${join(
       REPO_ROOT,
-      'scripts/hermes/jobs/pr-stuck-monitor.ts'
+      'scripts/symphony/jobs/pr-stuck-monitor.ts'
     )}`;
     const repoRoot = ensureJovieRepoCwd(moduleUrl);
 
@@ -51,7 +51,7 @@ describe('ensure-jovie-repo-cwd', () => {
 
     const moduleUrl = `file://${join(
       REPO_ROOT,
-      'scripts/hermes/jobs/pr-stuck-monitor.ts'
+      'scripts/symphony/jobs/pr-stuck-monitor.ts'
     )}`;
     const repoRoot = ensureJovieRepoCwd(moduleUrl);
 

@@ -63,7 +63,7 @@ def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     assert "actions: write" not in block(visual, 2, "review")
 
 def test_active_facades_are_linear_only_and_fail_closed() -> None:
-    tracker = read(ROOT / "scripts/hermes/lib/tracker-client.ts")
+    tracker = read(ROOT / "scripts/symphony/lib/tracker-client.ts")
     assert "api.linear.app/graphql" in tracker and "issueCreate" in tracker
     assert "node:child_process" not in tracker and "gh issue" not in tracker
     legacy = read(ROOT / "scripts/lib/tracker.mjs")
@@ -77,7 +77,12 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     assert "fileLinearIssue" in qa and "fileGithubIssue" not in qa
     golden = read(ROOT / "scripts/golden-path-lock.mjs")
     intake = read(ROOT / "scripts/lib/golden-path-intake.mjs")
-    assert intake.count("mutation CreateGoldenPathLockIssue") == 1
+    shared = read(ROOT / "scripts/lib/linear-issue-intake.mjs")
+    assert "upsertLinearIssueByTitleFingerprint" in intake and "createGithubIssue" not in intake
+    # JOV-5966: fail-closed fingerprint dedupe before create lives in the
+    # shared primitive; the golden-path intake wraps it and skips Triage.
+    assert "createStateName: 'Todo'" in intake
+    assert shared.index("query FindIssueByFingerprint") < shared.index("mutation CreateDedupedLinearIssue")
     assert "createGoldenPathLinearIssue" in golden and "createGithubIssue" not in golden
     observability_linear = read(ROOT / "scripts/observability-issue-linear.mjs")
     assert "upsertLinearIssueByTitleFingerprint" in observability_linear
@@ -91,13 +96,13 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     assert gate < autofix.index("cursorRequest", gate)
 
 def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
-    shipper = read(ROOT / "scripts/hermes/jobs/codex-issue-shipper.ts")
+    shipper = read(ROOT / "scripts/symphony/jobs/codex-issue-shipper.ts")
     run = shipper.split("async function runShipper", 1)[1]
     assert run.index("GITHUB_ISSUE_INTAKE_RETIRED") < run.index("loadHermesEnv()")
-    entry = read(ROOT / "scripts/hermes/shipper-gated-entrypoint.py")
+    entry = read(ROOT / "scripts/symphony/shipper-gated-entrypoint.py")
     main = entry.split("def main() -> int:", 1)[1]
     assert main.index("GITHUB_ISSUE_INTAKE_RETIRED") < main.index("load_env_file")
-    bootstrap = read(ROOT / "scripts/hermes/bootstrap-pro-launchd.sh")
+    bootstrap = read(ROOT / "scripts/symphony/bootstrap-pro-launchd.sh")
     retired = bootstrap.split("for label in co.jovie.hermes.cron-codex-issue-shipper", 1)[1].split("done", 1)[0]
     assert "launchctl disable" in retired and "launchctl bootstrap" not in retired
     launch = read(ROOT / "scripts/create-launch-issues.sh")
@@ -111,7 +116,7 @@ def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
 
 def test_reporting_and_instructions_cannot_restore_canonical_github_intake() -> None:
     report = read(WF / "agent-harness-health-report.yml")
-    hud = read(ROOT / "scripts/hermes/gem-ops-hud.py")
+    hud = read(ROOT / "scripts/symphony/gem-ops-hud.py")
     menu = read(ROOT / "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift")
     assert "gh issue" not in report and "GitHub Issues are historical" in report
     assert "GITHUB_ISSUE_FALLBACK_RETIRED = True" in hud
@@ -121,7 +126,7 @@ def test_reporting_and_instructions_cannot_restore_canonical_github_intake() -> 
     assert "githubIssueFallbackRetired = true" in menu
     assert menu.count("fetchGitHubInProgressCount") == 1
     assert "no GitHub Issue fallback" in menu
-    scoreboard = read(ROOT / "scripts/hermes/jobs/pipeline-scoreboard.ts")
+    scoreboard = read(ROOT / "scripts/symphony/jobs/pipeline-scoreboard.ts")
     assert "GITHUB_ISSUE_SCOREBOARD_RETIRED = true" in scoreboard
     copilot = read(ROOT / ".github/copilot-instructions.md")
     assert "Canonical intake**: Linear only" in copilot

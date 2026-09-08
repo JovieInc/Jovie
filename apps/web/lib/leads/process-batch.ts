@@ -1,4 +1,8 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
+import {
+  acquisitionFunnelAttribution,
+  experimentIdForLeadSource,
+} from '@/lib/acquisition';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
@@ -121,6 +125,9 @@ async function processOneLead(
         leadId,
         eventType:
           qualification.status === 'qualified' ? 'qualified' : 'disqualified',
+        ...acquisitionFunnelAttribution(
+          experimentIdForLeadSource(qualification.sourcePlatform)
+        ),
         metadata: {
           disqualificationReason: qualification.disqualificationReason,
           fitScore: qualification.fitScore,
@@ -168,6 +175,7 @@ async function processOneLead(
           {
             leadId,
             eventType: 'disqualified',
+            ...acquisitionFunnelAttribution(experimentIdForLeadSource(null)),
             metadata: {
               disqualificationReason: 'scrape_failed',
             },

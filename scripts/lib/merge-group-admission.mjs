@@ -2,6 +2,21 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+const CANONICAL_ADMISSION_ACTOR = 'jovie-bot';
+const CANONICAL_ADMISSION_ENQUEUER = 'jovie-bot[bot]';
+const ADMISSION_RECEIPT_CONTEXT = 'jovie-queue-admission/v2';
+const ADMISSION_RECEIPT_PATTERN =
+  /^checkpoint=(verified|controller-repair|source-qualified);main=([0-9a-f]{40});pr=([1-9][0-9]*)$/;
+const ADMISSION_RECEIPT_MAX_DELAY_MS = 5 * 60_000;
+const ADMISSION_WORKFLOW_NAME = 'Merge Queue Auto-Enroll';
+const ADMISSION_WORKFLOW_PATH = '.github/workflows/merge-queue-autoenroll.yml';
+const ADMISSION_PRODUCER_EVENTS = new Set([
+  'pull_request',
+  'push',
+  'repository_dispatch',
+  'workflow_dispatch',
+  'workflow_run',
+]);
 const QUEUE_HEAD_PR_PATTERN =
   /^refs\/heads\/gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[0-9a-f]+$/;
 const REQUIRED_CHECKS = Object.freeze(['Fork PR Gate', 'PR Size Guard']);
@@ -33,7 +48,8 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
   'success',
   'timed_out',
 ]);
-const MAX_WAIT_MS = 60_000;
+export const MERGE_GROUP_ADMISSION_WAIT_MS = 90_000;
+const MAX_WAIT_MS = MERGE_GROUP_ADMISSION_WAIT_MS;
 const POLL_INTERVAL_MS = 3_000;
 const MAX_API_REQUEST_MS = 10_000;
 const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
@@ -58,9 +74,36 @@ const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
     }
   }
 }`;
+const ADMISSION_TIMELINE_QUERY = `query MergeGroupAdmissionTimeline(
+  $owner:String!,
+  $name:String!,
+  $pr:Int!
+){
+  repository(owner:$owner,name:$name){
+    pullRequest(number:$pr){
+      timelineItems(last:1,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){
+        nodes{
+          __typename
+          ... on AddedToMergeQueueEvent{
+            id
+            createdAt
+            actor{__typename login}
+            enqueuer{login}
+          }
+          ... on RemovedFromMergeQueueEvent{
+            id
+            createdAt
+            actor{__typename login}
+          }
+        }
+        pageInfo{hasNextPage}
+      }
+    }
+  }
+}`;
 const REQUIRED_ENV_MESSAGE =
   'GITHUB_EVENT_PATH, GH_TOKEN, GITHUB_SHA, and GITHUB_REPOSITORY are required';
-export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v1';
+export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v2';
 
 export class MergeGroupAdmissionError extends Error {
   constructor(message) {
@@ -137,11 +180,218 @@ export function validateMergeGroupAdmissionEvent(
     fail('merge_group head_commit does not match head_sha');
   }
   return {
+    baseSha,
     headRef: group.head_ref,
     headSha,
     prNumber,
     repository,
   };
+}
+
+export function classifyCanonicalAdmissionProvenance({
+  evidence,
+  lineagePayload = null,
+  runPayload,
+  sourceHeadSha,
+  statusPayload,
+  timelinePayload,
+}) {
+  const timeline =
+    timelinePayload?.data?.repository?.pullRequest?.timelineItems;
+  if (
+    (Array.isArray(timelinePayload?.errors) &&
+      timelinePayload.errors.length > 0) ||
+    !Array.isArray(timeline?.nodes) ||
+    timeline.nodes.length > 1 ||
+    timeline?.pageInfo?.hasNextPage !== false
+  ) {
+    fail('merge queue admission timeline evidence is incomplete or malformed');
+  }
+  const latest = timeline.nodes.at(-1);
+  if (!latest)
+    return { state: 'pending', detail: 'admission event not visible' };
+  if (latest.__typename !== 'AddedToMergeQueueEvent') {
+    return { state: 'pending', detail: 'latest queue event is not admission' };
+  }
+  const admittedAt = Date.parse(String(latest.createdAt ?? ''));
+  if (
+    typeof latest.id !== 'string' ||
+    latest.id.length === 0 ||
+    !Number.isFinite(admittedAt)
+  ) {
+    fail('merge queue admission event is malformed');
+  }
+  if (
+    latest.actor?.__typename !== 'Bot' ||
+    latest.actor?.login !== CANONICAL_ADMISSION_ACTOR ||
+    latest.enqueuer?.login !== CANONICAL_ADMISSION_ENQUEUER
+  ) {
+    fail(`merge queue admission actor is not ${CANONICAL_ADMISSION_ENQUEUER}`);
+  }
+
+  if (
+    !statusPayload ||
+    !Array.isArray(statusPayload.statuses) ||
+    linkHasNext(statusPayload.link) ||
+    statusPayload.sha !== sourceHeadSha
+  ) {
+    fail('canonical admission receipt listing is incomplete or malformed');
+  }
+  // Other integrations may write the same public status context. They cannot
+  // supersede or poison the Jovie Bot receipt stream. Within the canonical
+  // stream, the immutable status id establishes creation order and lets a
+  // later corrected receipt supersede a malformed historical sibling.
+  const receipts = statusPayload.statuses
+    .filter(
+      status =>
+        status?.context === ADMISSION_RECEIPT_CONTEXT &&
+        status?.creator?.type === 'Bot' &&
+        status?.creator?.login === CANONICAL_ADMISSION_ENQUEUER &&
+        Number.isInteger(status?.id) &&
+        status.id > 0
+    )
+    .sort((left, right) => left.id - right.id);
+  const receipt = receipts.at(-1);
+  if (!receipt)
+    return { state: 'pending', detail: 'admission receipt not visible' };
+  const match = ADMISSION_RECEIPT_PATTERN.exec(
+    String(receipt.description ?? '')
+  );
+  const receiptAt = Date.parse(String(receipt.updated_at ?? ''));
+  const [, checkpoint, mainSha, receiptPr] = match ?? [];
+  if (
+    receipt.state !== 'success' ||
+    !match ||
+    !Number.isFinite(receiptAt) ||
+    !Number.isInteger(runPayload?.id) ||
+    runPayload.id < 1 ||
+    runPayload.name !== ADMISSION_WORKFLOW_NAME ||
+    runPayload.path !== ADMISSION_WORKFLOW_PATH ||
+    runPayload.html_url !== receipt.target_url ||
+    runPayload.repository?.full_name !== evidence.repository ||
+    runPayload.head_repository?.full_name !== evidence.repository ||
+    !Number.isInteger(runPayload.run_attempt) ||
+    runPayload.run_attempt < 1
+  ) {
+    fail('canonical admission receipt is malformed or untrusted');
+  }
+  const targetRunId = canonicalAdmissionRunId(receipt, evidence.repository);
+  if (targetRunId !== runPayload.id) {
+    fail('canonical admission receipt is malformed or untrusted');
+  }
+  const producerEvent = runPayload.event;
+  if (!ADMISSION_PRODUCER_EVENTS.has(producerEvent)) {
+    fail('canonical admission producer is not bound to its admission scope');
+  }
+  if (
+    !SHA_PATTERN.test(String(runPayload.head_sha ?? '')) ||
+    typeof runPayload.head_branch !== 'string' ||
+    runPayload.head_branch.length === 0 ||
+    (producerEvent !== 'pull_request' && runPayload.head_branch !== 'main')
+  ) {
+    fail('canonical admission producer is not bound to its admission scope');
+  }
+  if (
+    receiptAt < admittedAt ||
+    receiptAt - admittedAt > ADMISSION_RECEIPT_MAX_DELAY_MS
+  ) {
+    fail('canonical admission receipt is not bound to the admission time');
+  }
+  if (
+    NONTERMINAL_CHECK_STATUSES.has(runPayload.status) &&
+    runPayload.status !== 'in_progress'
+  ) {
+    return {
+      state: 'pending',
+      detail: 'canonical admission producer has not started',
+    };
+  }
+  const runCreatedAt = Date.parse(String(runPayload.created_at ?? ''));
+  const runUpdatedAt = Date.parse(String(runPayload.updated_at ?? ''));
+  if (
+    !['in_progress', 'completed'].includes(runPayload.status) ||
+    (runPayload.status === 'in_progress' && runPayload.conclusion !== null) ||
+    (runPayload.status === 'completed' &&
+      !TERMINAL_CHECK_CONCLUSIONS.has(runPayload.conclusion)) ||
+    !Number.isFinite(runCreatedAt) ||
+    !Number.isFinite(runUpdatedAt) ||
+    runCreatedAt > admittedAt ||
+    runUpdatedAt < runCreatedAt ||
+    (runPayload.status === 'completed' && runUpdatedAt < receiptAt)
+  ) {
+    fail('canonical admission producer run identity is inconsistent');
+  }
+  if (Number(receiptPr) !== evidence.prNumber) {
+    fail('canonical admission receipt is not bound to the merge-group PR');
+  }
+  if (mainSha !== evidence.baseSha) {
+    validatePreservedCheckpointLineage({
+      baseSha: evidence.baseSha,
+      checkpointMainSha: mainSha,
+      lineagePayload,
+    });
+  }
+  return {
+    state: 'verified',
+    admittedAt: new Date(admittedAt).toISOString(),
+    checkpoint,
+    checkpointMainSha: mainSha,
+    receiptAt: new Date(receiptAt).toISOString(),
+  };
+}
+
+function validatePreservedCheckpointLineage({
+  baseSha,
+  checkpointMainSha,
+  lineagePayload,
+}) {
+  if (
+    !lineagePayload ||
+    lineagePayload.status !== 'ahead' ||
+    lineagePayload.base_commit?.sha !== checkpointMainSha ||
+    lineagePayload.merge_base_commit?.sha !== checkpointMainSha ||
+    lineagePayload.commits?.at(-1)?.sha !== baseSha
+  ) {
+    fail(
+      'preserved admission checkpoint is not an ancestor of merge-group base'
+    );
+  }
+}
+
+function canonicalAdmissionRunId(receipt, repository) {
+  try {
+    const target = new URL(String(receipt?.target_url ?? ''));
+    const expectedPrefix = `/${repository}/actions/runs/`;
+    if (
+      target.protocol !== 'https:' ||
+      target.hostname !== 'github.com' ||
+      target.search ||
+      target.hash ||
+      !target.pathname.startsWith(expectedPrefix)
+    ) {
+      return null;
+    }
+    const runId = target.pathname.slice(expectedPrefix.length);
+    return /^[1-9][0-9]*$/.test(runId) ? Number(runId) : null;
+  } catch {
+    return null;
+  }
+}
+
+function latestCanonicalReceiptForLookup(statuses) {
+  return Array.isArray(statuses)
+    ? statuses
+        .filter(
+          status =>
+            status?.context === ADMISSION_RECEIPT_CONTEXT &&
+            status?.creator?.type === 'Bot' &&
+            status?.creator?.login === CANONICAL_ADMISSION_ENQUEUER &&
+            Number.isInteger(status?.id) &&
+            status.id > 0
+        )
+        .sort((left, right) => left.id - right.id)
+        .at(-1)
+    : null;
 }
 
 function linkHasNext(link) {
@@ -412,6 +662,7 @@ function defaultSleep(delayMs) {
 
 export async function waitForMergeGroupAdmission({
   event,
+  loadAdmissionProvenance,
   loadCheckRuns,
   loadLiveQueueEntries,
   loadQueueRef,
@@ -424,6 +675,7 @@ export async function waitForMergeGroupAdmission({
 }) {
   const evidence = validateMergeGroupAdmissionEvent(event);
   if (
+    typeof loadAdmissionProvenance !== 'function' ||
     typeof loadCheckRuns !== 'function' ||
     typeof loadLiveQueueEntries !== 'function' ||
     typeof loadQueueRef !== 'function'
@@ -468,6 +720,20 @@ export async function waitForMergeGroupAdmission({
     const queueRef = await loadQueueRef({ ...evidence, deadlineMs });
     validateQueueRef(queueRef, evidence);
 
+    const sourceHeadSha = liveReceipt.liveEntry?.sourceHeadSha;
+    if (!SHA_PATTERN.test(String(sourceHeadSha ?? ''))) {
+      fail('live merge queue entry omitted its exact source head');
+    }
+    let provenance = await loadAdmissionProvenance({
+      ...evidence,
+      deadlineMs,
+      sourceHeadSha,
+    });
+
+    if (!['pending', 'verified'].includes(provenance?.state)) {
+      fail('canonical admission provenance result is malformed');
+    }
+
     const pages = await Promise.all(
       REQUIRED_CHECKS.map(checkName =>
         loadCheckRuns({ ...evidence, checkName, deadlineMs })
@@ -491,19 +757,51 @@ export async function waitForMergeGroupAdmission({
       );
     }
 
-    if (states.every(state => state.state === 'success')) {
+    if (
+      provenance.state === 'verified' &&
+      states.every(state => state.state === 'success')
+    ) {
       const finalQueueRef = await loadQueueRef({ ...evidence, deadlineMs });
       validateQueueRef(finalQueueRef, evidence);
       const finalLiveReceipt = await readLiveReceipt();
       if (!finalLiveReceipt.admitted) {
         return { ...evidence, admitted: false, receipt: finalLiveReceipt };
       }
+      const finalSourceHeadSha = finalLiveReceipt.liveEntry?.sourceHeadSha;
+      if (finalSourceHeadSha !== sourceHeadSha) {
+        fail('live merge queue source head changed during admission');
+      }
+      provenance = await loadAdmissionProvenance({
+        ...evidence,
+        deadlineMs,
+        sourceHeadSha,
+      });
+      if (!['pending', 'verified'].includes(provenance?.state)) {
+        fail('canonical admission provenance result is malformed');
+      }
+      if (provenance.state !== 'verified') {
+        const remainingMs = deadlineMs - now();
+        if (remainingMs <= 0) {
+          fail(
+            `required merge-group checks did not pass within ${maxWaitMs}ms`
+          );
+        }
+        onStatus(
+          `Merge-group admission pending (attempt ${attempt}): provenance=${provenance.detail ?? provenance.state}, external checks=success`
+        );
+        await sleep(Math.min(pollIntervalMs, remainingMs));
+        continue;
+      }
       onStatus(
         `Merge-group admission passed for ${
           evidence.headSha
         }: ${REQUIRED_CHECKS.join(', ')}`
       );
-      return { ...evidence, admitted: true, receipt: finalLiveReceipt };
+      return {
+        ...evidence,
+        admitted: true,
+        receipt: { ...finalLiveReceipt, admissionProvenance: provenance },
+      };
     }
 
     const remainingMs = deadlineMs - now();
@@ -514,7 +812,7 @@ export async function waitForMergeGroupAdmission({
       (name, index) => `${name}=${states[index].detail}`
     ).join(', ');
     onStatus(
-      `Merge-group admission pending (attempt ${attempt}): ${gateStatus}`
+      `Merge-group admission pending (attempt ${attempt}): provenance=${provenance.detail ?? provenance.state}, ${gateStatus}`
     );
     await sleep(Math.min(pollIntervalMs, remainingMs));
   }
@@ -601,6 +899,65 @@ function createGitHubAdmissionApi({
   const encodedRepository = encodePathParts(repository);
   const encodedHeadRef = encodePathParts(headRef.slice('refs/'.length));
   return {
+    async loadAdmissionProvenance({
+      baseSha,
+      deadlineMs,
+      prNumber,
+      sourceHeadSha,
+    }) {
+      const [timelinePayload, statusResult] = await Promise.all([
+        githubGraphqlRequest(
+          ADMISSION_TIMELINE_QUERY,
+          { name, owner, pr: prNumber },
+          { deadlineMs, env, fetchImpl, token }
+        ),
+        githubRequest(
+          `/repos/${encodedRepository}/commits/${sourceHeadSha}/statuses?per_page=100&page=1`,
+          { deadlineMs, env, fetchImpl, token }
+        ),
+      ]);
+      const receipt = latestCanonicalReceiptForLookup(statusResult.data);
+      const runId = receipt
+        ? canonicalAdmissionRunId(receipt, repository)
+        : null;
+      const runPayload = runId
+        ? (
+            await githubRequest(
+              `/repos/${encodedRepository}/actions/runs/${runId}`,
+              { deadlineMs, env, fetchImpl, token }
+            )
+          ).data
+        : null;
+      const v2Binding = receipt
+        ? ADMISSION_RECEIPT_PATTERN.exec(String(receipt.description ?? ''))
+        : null;
+      const checkpointMainSha = v2Binding?.[2] ?? null;
+      const lineagePayload =
+        checkpointMainSha && checkpointMainSha !== baseSha
+          ? (
+              await githubRequest(
+                `/repos/${encodedRepository}/compare/${checkpointMainSha}...${baseSha}`,
+                { deadlineMs, env, fetchImpl, token }
+              )
+            ).data
+          : null;
+      return classifyCanonicalAdmissionProvenance({
+        evidence: {
+          baseSha,
+          prNumber,
+          repository,
+        },
+        lineagePayload,
+        runPayload,
+        sourceHeadSha,
+        statusPayload: {
+          link: statusResult.link,
+          sha: sourceHeadSha,
+          statuses: statusResult.data,
+        },
+        timelinePayload,
+      });
+    },
     async loadLiveQueueEntries({ deadlineMs }) {
       const entries = [];
       let cursor = null;

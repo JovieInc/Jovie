@@ -18,7 +18,7 @@ Pricing ships, gets measured, gets re-shipped. Same lifecycle as any feature.
 
 Subscription base captures predictability for the business. Usage meter captures upside as artists scale. Both must exist by the time Jovie crosses $50K MRR. Until then, flat tiers are fine — the usage data isn't there yet.
 
-- Current caps (5 / 100 / 500 AI messages per day) are *limiters*. The hybrid future converts them into *meters* (overage, credit packs, or both).
+- The proposed weekly caps (15 / 70 / 250 AI messages for Free / Pro / Max) are *limiters*. The hybrid future converts paid-plan excess into explicit dollar-denominated overage, never opaque credits.
 - Meter candidates, ranked by signal-to-implementation cost: fan-notification batches, canvases generated, releases launched, campaigns drafted, AI messages above plan.
 - **57% of hyper-growth companies use hybrid pricing.** This is not a fringe pattern.
 - The migration story is tracked in [JOV-2450](https://linear.app/jovie/issue/JOV-2450) — this doc says *that* it happens, not *when*.

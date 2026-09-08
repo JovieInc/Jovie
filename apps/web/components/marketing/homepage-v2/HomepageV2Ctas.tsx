@@ -31,7 +31,7 @@ export function HomepageStoryHeader({
       className={cn(centered ? 'mx-auto text-center' : 'max-w-xl', className)}
     >
       <h2
-        className={cn('homepage-story-heading', headlineClassName)}
+        className={cn('homepage-story-heading line-clamp-2', headlineClassName)}
         data-testid={headlineTestId}
       >
         {headline}

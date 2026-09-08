@@ -189,7 +189,7 @@ describe('SimpleTooltip', () => {
         </TestWrapper>
       );
       expect(screen.getByTestId('tooltip-content')).toHaveClass(
-        'rounded-full',
+        'rounded-(--system-b-radius-overlay)',
         'whitespace-nowrap'
       );
 
@@ -248,6 +248,22 @@ describe('SimpleTooltip', () => {
       expect(screen.getByTestId('tooltip-content')).toHaveTextContent(
         'Span tooltip'
       );
+      expect(screen.getByTestId('span-trigger')).toHaveAttribute(
+        'tabindex',
+        '0'
+      );
+    });
+
+    it('preserves an explicitly configured trigger tabIndex', () => {
+      render(
+        <TestWrapper>
+          <SimpleTooltip content='Tooltip' defaultOpen>
+            <span tabIndex={-1}>Trigger</span>
+          </SimpleTooltip>
+        </TestWrapper>
+      );
+
+      expect(screen.getByText('Trigger')).toHaveAttribute('tabindex', '-1');
     });
   });
 });

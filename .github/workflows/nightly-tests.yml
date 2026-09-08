@@ -9,6 +9,7 @@
 # 90-minute buffer before the fixed 09:00 UTC screenshot and Tuesday harness.
 
 name: Nightly Tests
+# clock-class: skip-if-unchanged
 
 on:
   schedule:

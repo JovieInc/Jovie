@@ -6,6 +6,7 @@ import {
   parseDesktopBuildIdentityRecord,
   renderDesktopBuildIdentitySection,
   resolveDesktopBuildIdentity,
+  resolveDesktopBuildIdentityIpcRequest,
   toDesktopBuildIdentityJson,
 } from '../src/build-identity.ts';
 
@@ -86,6 +87,31 @@ test('matching packaged production identity is verified and copyable', () => {
   expect(`${copy}\n${toDesktopBuildIdentityJson(identity)}`).not.toMatch(
     /secret|password|token|credential|ghs_|sk_/i
   );
+});
+
+test('identity IPC returns the exact resolved record only for trusted zero-argument calls', () => {
+  const identity = resolve();
+  expect(
+    resolveDesktopBuildIdentityIpcRequest({
+      trustedSender: true,
+      args: [],
+      identity,
+    })
+  ).toBe(identity);
+  expect(
+    resolveDesktopBuildIdentityIpcRequest({
+      trustedSender: false,
+      args: [],
+      identity,
+    })
+  ).toBeNull();
+  expect(
+    resolveDesktopBuildIdentityIpcRequest({
+      trustedSender: true,
+      args: ['unexpected'],
+      identity,
+    })
+  ).toBeNull();
 });
 
 test('development builds keep revision and mark build time unavailable', () => {

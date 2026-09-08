@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
+import { HYGIENE_LIMITS } from './repo-hygiene-limits.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
 // Fail closed at the checked-in native queue's max_entries_to_merge ceiling.
-const MAX_GROUP_MEMBERS = 10;
+const MAX_GROUP_MEMBERS = 5;
 const SIZE_BYPASS_LABELS = new Set(['big-pr', 'codemod']);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
 const OPINIONATED_REVIEW_STATES = new Set([
@@ -15,6 +16,10 @@ const OPINIONATED_REVIEW_STATES = new Set([
 ]);
 const SIZE_EXCLUSION_PATTERN =
   /pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|\/generated\/|\.gen\.|__snapshots__\/|\.snap$|\.svg$|\.po$|\/dist\/|\/build\/|\.min\.|drizzle\/migrations\/meta\//;
+const REGULAR_FILE_MODES = new Set(['100644', '100755']);
+const MAX_API_RESPONSE_BYTES = 64 * 1024 * 1024;
+const MAX_API_REQUEST_MS = 10_000;
+export const MERGE_GROUP_POLICY_DEADLINE_MS = 45_000;
 
 export class MergeGroupPolicyEvidenceError extends Error {
   constructor(message) {
@@ -300,6 +305,108 @@ export function evaluateSizeMemberPolicy({ pr, files, maxLines, maxFiles }) {
   });
 }
 
+export function parseTrackedRegularTree(payload) {
+  if (
+    !payload ||
+    payload.truncated !== false ||
+    !SHA_PATTERN.test(String(payload.sha ?? '')) ||
+    !Array.isArray(payload.tree)
+  ) {
+    fail('combined tree listing is missing, truncated, or malformed');
+  }
+  const seenPaths = new Set();
+  let bytes = 0;
+  let files = 0;
+  for (const entry of payload.tree) {
+    const { mode, path, sha, size, type } = entry ?? {};
+    if (
+      !/^[0-7]{6}$/.test(String(mode ?? '')) ||
+      typeof path !== 'string' ||
+      path.length === 0 ||
+      !SHA_PATTERN.test(String(sha ?? '')) ||
+      !['blob', 'commit', 'tree'].includes(type)
+    ) {
+      fail('combined tree listing contains malformed evidence');
+    }
+    if (seenPaths.has(path))
+      fail(`combined tree repeats tracked path: ${path}`);
+    seenPaths.add(path);
+
+    if (REGULAR_FILE_MODES.has(mode)) {
+      if (type !== 'blob' || !Number.isSafeInteger(size) || size < 0) {
+        fail(`combined tree has invalid regular-file evidence: ${path}`);
+      }
+      bytes += size;
+      if (!Number.isSafeInteger(bytes)) {
+        fail('combined tree byte total is unsafe');
+      }
+      files += 1;
+      continue;
+    }
+
+    const supportedNonRegular =
+      (mode === '040000' && type === 'tree' && size === undefined) ||
+      (mode === '120000' &&
+        type === 'blob' &&
+        Number.isSafeInteger(size) &&
+        size >= 0) ||
+      (mode === '160000' && type === 'commit' && size === undefined);
+    if (!supportedNonRegular) {
+      fail(`combined tree has unsupported tracked mode ${mode}: ${path}`);
+    }
+  }
+  return { bytes, files };
+}
+
+export async function enforceCombinedTreePayload({
+  deadlineMs = undefined,
+  headSha,
+  maxTrackedBytes = HYGIENE_LIMITS.maxTrackedBytes,
+  now = Date.now,
+  repository,
+  request = githubRequest,
+  token,
+}) {
+  requireSha(headSha, 'merge_group.head_sha');
+  splitRepository(repository);
+  if (!token) fail('combined tree token is required');
+  requireDeadline(deadlineMs, now);
+  if (!Number.isSafeInteger(maxTrackedBytes) || maxTrackedBytes < 1) {
+    fail('combined tree byte budget is invalid');
+  }
+
+  const encodedRepository = repository
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+  const commit = await request(
+    `/repos/${encodedRepository}/git/commits/${headSha}`,
+    { deadlineMs, token }
+  );
+  const treeSha = commit.data?.tree?.sha;
+  if (
+    commit.data?.sha !== headSha ||
+    !SHA_PATTERN.test(String(treeSha ?? ''))
+  ) {
+    fail('combined head commit evidence is missing or malformed');
+  }
+
+  const tree = await request(
+    `/repos/${encodedRepository}/git/trees/${treeSha}?recursive=1`,
+    { deadlineMs, token }
+  );
+  if (tree.data?.sha !== treeSha) {
+    fail('combined tree does not match the exact head commit');
+  }
+  const result = parseTrackedRegularTree(tree.data);
+  if (result.bytes > maxTrackedBytes) {
+    fail(
+      `${result.bytes} bytes of tracked regular files exceeds the ${maxTrackedBytes}-byte combined-tree budget`
+    );
+  }
+  return result;
+}
+
 function splitRepository(fullName) {
   const parts = fullName.split('/');
   if (parts.length !== 2 || parts.some(part => !part))
@@ -311,20 +418,93 @@ function linkHasNext(link) {
   return typeof link === 'string' && /<[^>]+>;\s*rel="next"/.test(link);
 }
 
-async function githubRequest(path, { token, method = 'GET', body } = {}) {
-  const apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com';
+function requireDeadline(deadlineMs, now = Date.now) {
+  if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= now()) {
+    fail('merge-group policy API deadline is missing or expired');
+  }
+  return deadlineMs;
+}
+
+export async function readBoundedResponseText(
+  response,
+  path,
+  maxBytes = MAX_API_RESPONSE_BYTES
+) {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength !== null) {
+    if (!/^\d+$/.test(contentLength)) {
+      fail(`GitHub API response has an invalid content length for ${path}`);
+    }
+    if (Number(contentLength) > maxBytes) {
+      fail(`GitHub API response exceeded the bounded size for ${path}`);
+    }
+  }
+  if (!response.body) return '';
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > maxBytes) {
+      await reader.cancel();
+      fail(`GitHub API response exceeded the bounded size for ${path}`);
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+/**
+ * @param {string} path
+ * @param {{ token?: string, method?: string, body?: unknown, deadlineMs?: number,
+ * env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, now?: () => number,
+ * timeoutSignal?: (milliseconds: number) => AbortSignal }} [options]
+ * @returns {Promise<{data: any, link?: string | null}>}
+ */
+export async function githubRequest(
+  path,
+  {
+    token,
+    method = 'GET',
+    body,
+    deadlineMs,
+    env = process.env,
+    fetchImpl = fetch,
+    now = Date.now,
+    timeoutSignal = AbortSignal.timeout,
+  } = {}
+) {
+  requireDeadline(deadlineMs, now);
+  const remainingMs = deadlineMs - now();
+  const apiUrl = env.GITHUB_API_URL || 'https://api.github.com';
   const url = path.startsWith('http') ? path : `${apiUrl}${path}`;
-  const response = await fetch(url, {
-    method,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await response.text();
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: timeoutSignal(
+        Math.max(1, Math.min(MAX_API_REQUEST_MS, remainingMs))
+      ),
+    });
+  } catch (error) {
+    fail(
+      `GitHub API request failed for ${path}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+  const text = await readBoundedResponseText(response, path);
   let data;
   try {
     data = text ? JSON.parse(text) : null;
@@ -339,13 +519,22 @@ async function githubRequest(path, { token, method = 'GET', body } = {}) {
   return { data, link: response.headers.get('link') };
 }
 
-async function githubPages(path, { token, maxPages = 30 } = {}) {
+async function githubPages(
+  path,
+  {
+    token = undefined,
+    maxPages = 30,
+    deadlineMs = undefined,
+    request = githubRequest,
+  } = {}
+) {
   const rows = [];
   for (let page = 1; page <= maxPages; page += 1) {
     const separator = path.includes('?') ? '&' : '?';
-    const result = await githubRequest(
+    const result = await request(
       `${path}${separator}per_page=100&page=${page}`,
       {
+        deadlineMs,
         token,
       }
     );
@@ -364,17 +553,31 @@ async function githubPages(path, { token, maxPages = 30 } = {}) {
   fail(`GitHub API pagination exceeded ${maxPages} pages for ${path}`);
 }
 
-async function fetchPullRequest(repository, number, token) {
-  const result = await githubRequest(`/repos/${repository}/pulls/${number}`, {
+async function fetchPullRequest(
+  repository,
+  number,
+  token,
+  deadlineMs,
+  request = githubRequest
+) {
+  const result = await request(`/repos/${repository}/pulls/${number}`, {
+    deadlineMs,
     token,
   });
   return result.data;
 }
 
-async function fetchComparison(repository, baseSha, headSha, token) {
-  const result = await githubRequest(
+async function fetchComparison(
+  repository,
+  baseSha,
+  headSha,
+  token,
+  deadlineMs,
+  request = githubRequest
+) {
+  const result = await request(
     `/repos/${repository}/compare/${baseSha}...${headSha}`,
-    { token }
+    { deadlineMs, token }
   );
   return result.data;
 }
@@ -388,19 +591,52 @@ function parsePolicy(argv) {
   return policy;
 }
 
-async function runPolicy() {
-  const policy = parsePolicy(process.argv.slice(2));
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!token || !eventPath) fail('GH_TOKEN and GITHUB_EVENT_PATH are required');
+export async function runPolicy({
+  argv = process.argv.slice(2),
+  env = process.env,
+  event: providedEvent = undefined,
+  log = console.log,
+  now = Date.now,
+  request = githubRequest,
+} = {}) {
+  const policy = parsePolicy(argv);
+  const token = env.GH_TOKEN || env.GITHUB_TOKEN;
+  const eventPath = env.GITHUB_EVENT_PATH;
+  if (!token || (!eventPath && !providedEvent)) {
+    fail('GH_TOKEN and GITHUB_EVENT_PATH are required');
+  }
 
-  const event = JSON.parse(await readFile(eventPath, 'utf8'));
+  const event = providedEvent ?? JSON.parse(await readFile(eventPath, 'utf8'));
   const { baseSha, headSha, repository } = validateMergeGroupEvent(event);
+  const deadlineMs = now() + MERGE_GROUP_POLICY_DEADLINE_MS;
 
-  const comparison = await fetchComparison(repository, baseSha, headSha, token);
+  if (policy === 'size') {
+    const payload = await enforceCombinedTreePayload({
+      deadlineMs,
+      headSha,
+      now,
+      repository,
+      request,
+      token,
+    });
+    log(
+      `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
+    );
+  }
+
+  const comparison = await fetchComparison(
+    repository,
+    baseSha,
+    headSha,
+    token,
+    deadlineMs,
+    request
+  );
   const members = resolveMergeGroupMembers({ event, comparison });
   const pullRequests = await Promise.all(
-    members.map(member => fetchPullRequest(repository, member.number, token))
+    members.map(member =>
+      fetchPullRequest(repository, member.number, token, deadlineMs, request)
+    )
   );
   pullRequests.forEach((pr, index) =>
     assertCurrentPullRequest(members[index], pr)
@@ -413,6 +649,8 @@ async function runPolicy() {
         pr.head.repo.fork
           ? githubPages(`/repos/${repository}/pulls/${pr.number}/reviews`, {
               token,
+              deadlineMs,
+              request,
             })
           : []
       )
@@ -421,8 +659,8 @@ async function runPolicy() {
       evaluateForkMemberPolicy({ pr, reviews: reviews[index] })
     );
   } else {
-    const maxLines = Number(process.env.MAX_LINES ?? '800');
-    const maxFiles = Number(process.env.MAX_FILES ?? '40');
+    const maxLines = Number(env.MAX_LINES ?? '800');
+    const maxFiles = Number(env.MAX_FILES ?? '40');
     const files = await Promise.all(
       pullRequests.map(pr => {
         const labels = labelsFor(pr);
@@ -434,6 +672,8 @@ async function runPolicy() {
           ? []
           : githubPages(`/repos/${repository}/pulls/${pr.number}/files`, {
               token,
+              deadlineMs,
+              request,
             });
       })
     );
@@ -449,7 +689,7 @@ async function runPolicy() {
 
   for (let index = 0; index < members.length; index += 1) {
     const result = results[index];
-    console.log(
+    log(
       `PR #${members[index].number}: ${result.passed ? 'PASS' : 'FAIL'} — ${result.reason}`
     );
   }
@@ -457,7 +697,7 @@ async function runPolicy() {
   if (failed >= 0) {
     fail(`PR #${members[failed].number} failed ${policy} merge-group policy`);
   }
-  console.log(
+  log(
     `Validated ${members.length} merge-group member(s) for ${policy} policy.`
   );
 }

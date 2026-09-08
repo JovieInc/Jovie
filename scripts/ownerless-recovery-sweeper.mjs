@@ -1,18 +1,35 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
+import { activeLinearCooldown } from './backlog-orchestrator/linear-client.mjs';
+import { TODO_STATE_ID } from './backlog-orchestrator/stale-lease-guard.mjs';
 import {
+  buildPrFleetClosureAudit,
   evaluateRecoveryCandidate,
+  findOfficialSymphonyLease,
   hasCompletePatch,
+  hasFleetClosureRemediationLease,
+  isRecoveryHoldLabel,
+  MINIMUM_OWNERLESS_MS,
+  ownerlessSince,
+  parseFleetClosureRemediationLeases,
+  renderFleetClosureRemediationLease,
+  renderPrFleetClosureAudit,
   renderRecoveryReceipt,
-  validateRecoveryMergeProof,
+  shouldDispatchOwnerlessRecovery,
 } from './lib/ownerless-recovery-policy.mjs';
 import { classifyQueueCheckBlockers } from './lib/pr-check-failures.mjs';
+import { readPullRequestQueueState } from './merge-queue-backend.mjs';
 
 const execFileAsync = promisify(execFile);
 const repo =
   process.env.REPO || process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const dryRun = /^(1|true)$/i.test(process.env.DRY_RUN || 'false');
+const EXACT_SHA = /^[0-9a-f]{40}$/;
+const JOVIE_LINEAR_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+const OFFICIAL_SYMPHONY_STATE_URL =
+  process.env.SYMPHONY_STATE_URL || 'http://127.0.0.1:4041/api/v1/state';
 
 async function gh(args) {
   const { stdout } = await execFileAsync('gh', args, {
@@ -35,10 +52,231 @@ async function mainHead() {
   return gh(['api', `repos/${repo}/git/ref/heads/main`, '--jq', '.object.sha']);
 }
 
+async function policyHead() {
+  const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+    env: process.env,
+  });
+  return stdout.trim();
+}
+
+export async function resolveExactMainPolicyHead(dependencies = {}) {
+  const { mainHeadImpl = mainHead, policyHeadImpl = policyHead } = dependencies;
+  const [checkedOutHead, liveMain] = await Promise.all([
+    policyHeadImpl(),
+    mainHeadImpl(),
+  ]);
+  if (!EXACT_SHA.test(checkedOutHead) || !EXACT_SHA.test(liveMain)) {
+    throw new Error(
+      'ownerless recovery requires exact lowercase policy and main SHAs'
+    );
+  }
+  if (checkedOutHead !== liveMain) {
+    throw new Error(
+      `ownerless recovery policy head ${checkedOutHead} is not live main ${liveMain}`
+    );
+  }
+  return liveMain;
+}
+
 const openPulls = (base = '') =>
   pages(
     `repos/${repo}/pulls?state=open${base ? `&base=${base}` : ''}&per_page=100`
   );
+
+async function linearActiveIssueSnapshot() {
+  const linear = await import('./backlog-orchestrator/linear-client.mjs');
+  return linear.fetchTeamFleetClosureIssueSnapshot(JOVIE_LINEAR_TEAM_ID);
+}
+
+export async function recoveryIssueSnapshot(
+  open,
+  fetchSnapshot = linearActiveIssueSnapshot
+) {
+  if (!open.some(pr => pr?.draft !== true && pr?.isDraft !== true)) return null;
+  return fetchSnapshot();
+}
+
+async function linearClient() {
+  return import('./backlog-orchestrator/linear-client.mjs');
+}
+
+/**
+ * @typedef {{name: string, payload?: {action?: string, label?: {name?: string}, pull_request?: {draft: boolean, state: string, base: {ref: string}, number?: number, created_at?: string, labels?: Array<{name: string}>, assignees?: Array<unknown>}}}} RecoveryEvent
+ */
+
+/**
+ * @param {NodeJS.ProcessEnv} environment
+ * @param {(path: string, encoding: 'utf8') => string} readEventFile
+ * @returns {RecoveryEvent}
+ */
+export function readRecoveryEvent(
+  environment = process.env,
+  readEventFile = readFileSync
+) {
+  const name = environment.GITHUB_EVENT_NAME || 'manual';
+  if (name !== 'pull_request') return { name, payload: {} };
+  const path = environment.GITHUB_EVENT_PATH;
+  if (!path) throw new Error('Pull-request recovery event context is missing');
+  return { name, payload: JSON.parse(readEventFile(path, 'utf8')) };
+}
+
+function readRecoveryTimeline(number) {
+  return pages(`repos/${repo}/issues/${number}/timeline?per_page=100`);
+}
+
+/** @param {RecoveryEvent} event */
+export async function recoveryEventDecision(
+  { name, payload = {} },
+  { now = Date.now(), readTimeline = readRecoveryTimeline } = {}
+) {
+  if (name === 'manual' || name === 'workflow_dispatch') {
+    return { required: true, reason: 'explicit-audit' };
+  }
+  if (name !== 'pull_request') {
+    return { required: false, reason: 'unrelated-event' };
+  }
+  if (!['opened', 'reopened', 'unlabeled'].includes(payload.action)) {
+    return { required: false, reason: 'unrelated-pr-action' };
+  }
+  const pr = payload.pull_request;
+  if (!pr || typeof pr.draft !== 'boolean' || !pr.base?.ref) {
+    throw new Error('Pull-request recovery eligibility is indeterminate');
+  }
+  if (pr.draft || pr.state !== 'open' || pr.base.ref !== 'main') {
+    return { required: false, reason: 'not-ready-main-pr' };
+  }
+  // Opening/reopening a ready PR retains the full closure/ownership audit.
+  if (payload.action !== 'unlabeled') {
+    return { required: true, reason: 'ready-pr-opened-or-reopened' };
+  }
+  if (!isRecoveryHoldLabel(payload.label?.name)) {
+    return { required: false, reason: 'unrelated-label-removed' };
+  }
+  if (
+    (pr.labels ?? []).some(label => isRecoveryHoldLabel(label.name ?? label))
+  ) {
+    return { required: false, reason: 'recovery-still-held' };
+  }
+  if ((pr.assignees ?? []).length > 0) {
+    return { required: false, reason: 'assigned-pr' };
+  }
+  const created = Date.parse(pr.created_at);
+  if (!Number.isFinite(created) || !Number.isInteger(pr.number)) {
+    throw new Error('Pull-request recovery age is indeterminate');
+  }
+  if (now - created < MINIMUM_OWNERLESS_MS) {
+    return { required: false, reason: 'ownerless-under-threshold' };
+  }
+  // A conflict-label removal after rebase is not a fresh ownerless hour.
+  // Reuse the canonical assignment timeline rule before any tracker scan.
+  const ownershipStart = ownerlessSince(pr, await readTimeline(pr.number));
+  if (ownershipStart === null) {
+    return { required: false, reason: 'ownerless-under-threshold' };
+  }
+  const since = Date.parse(ownershipStart);
+  if (!Number.isFinite(since)) {
+    throw new Error('Pull-request ownership timeline is indeterminate');
+  }
+  if (now - since < MINIMUM_OWNERLESS_MS) {
+    return { required: false, reason: 'ownerless-under-threshold' };
+  }
+  return { required: true, reason: 'eligible-recovery-hold-released' };
+}
+
+// A PR event is recovery demand only while its exact head lacks a native owner.
+// Read current GitHub metadata, never treat the event payload as queue truth.
+export async function recoveryNativeAdmissionDecision(
+  event,
+  readQueueState = readPullRequestQueueState
+) {
+  if (event.name !== 'pull_request') return { required: true };
+  const pr = event.payload?.pull_request;
+  if (!Number.isInteger(pr?.number) || !EXACT_SHA.test(pr?.head?.sha ?? '')) {
+    throw new Error('Recovery event exact PR head is indeterminate');
+  }
+  const state = await readQueueState({ repository: repo, number: pr.number });
+  if (state?.number !== pr.number || state?.headRefOid !== pr.head.sha) {
+    throw new Error('Recovery event current head is indeterminate or changed');
+  }
+  if (
+    !['OPEN', 'CLOSED', 'MERGED'].includes(state.state) ||
+    typeof state.isDraft !== 'boolean'
+  ) {
+    throw new Error('Recovery event current PR state is indeterminate');
+  }
+  if (state.state !== 'OPEN' || state.isDraft === true) {
+    return { required: false, reason: 'current-pr-not-ready' };
+  }
+  if (
+    typeof state.queued !== 'boolean' ||
+    typeof state.autoMergeEnabled !== 'boolean'
+  ) {
+    throw new Error('Recovery event native admission is indeterminate');
+  }
+  if (state.queued || state.autoMergeEnabled) {
+    return { required: false, reason: 'exact-head-native-admission-owned' };
+  }
+  return { required: true };
+}
+
+export async function fetchOfficialSymphonyState({
+  fetchImpl = globalThis.fetch,
+  url = OFFICIAL_SYMPHONY_STATE_URL,
+  attempts = 3,
+  retryDelayMs = 250,
+  sleepImpl = sleep,
+} = {}) {
+  let lastError = 'not-read';
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response?.ok) {
+        lastError = `http-${response?.status || 'unknown'}`;
+      } else {
+        const body = /** @type {Record<string, unknown> | null} */ (
+          await response.json()
+        );
+        if (
+          body &&
+          typeof body === 'object' &&
+          !Array.isArray(body) &&
+          typeof (body.observedAt || body.generated_at) === 'string' &&
+          Array.isArray(body.running) &&
+          Array.isArray(body.retrying) &&
+          Array.isArray(body.blocked)
+        ) {
+          return { ...body, source: 'official-symphony-state' };
+        }
+        lastError = 'malformed-state';
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    if (attempt < attempts) await sleepImpl(retryDelayMs);
+  }
+  return { source: 'official-symphony-state', error: lastError };
+}
+
+function prPacketMap(linearIssues) {
+  const packetIssue = linearIssues.find(
+    issue => String(issue?.identifier || '').toUpperCase() === 'JOV-5610'
+  );
+  const text = [
+    packetIssue?.title,
+    packetIssue?.description,
+    ...(packetIssue?.comments?.nodes ?? packetIssue?.comments ?? []).map(
+      comment => comment?.body ?? comment
+    ),
+  ].join('\n');
+  return Object.fromEntries(
+    [...text.matchAll(/\b(?:PR\s*#|pull\/)(\d+)\b/gi)].map(match => [
+      match[1],
+      'JOV-5610',
+    ])
+  );
+}
 
 async function pages(endpoint) {
   const value = await ghJson([
@@ -92,11 +330,6 @@ async function repoGraph(query, fields = {}) {
   return data?.data?.repository;
 }
 
-async function readQueueProof(number) {
-  const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid isInMergeQueue autoMergeRequest{enabledAt} mergedAt mergeCommit{oid} mergeQueueEntry{id position state}}}}`;
-  return (await repoGraph(query, { number }))?.pullRequest ?? null;
-}
-
 async function openStackHeadShas(mainSha) {
   const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100){pageInfo{hasNextPage} nodes{number headRefOid commits(first:100){pageInfo{hasNextPage} nodes{commit{oid}}} timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT],first:100){pageInfo{hasNextPage} nodes{... on HeadRefForcePushedEvent{beforeCommit{oid} afterCommit{oid}}}}}}}}`;
   const pulls = (await repoGraph(query))?.pullRequests;
@@ -138,7 +371,7 @@ async function openStackHeadShas(mainSha) {
   return [...stackHeads, ...priorCommits.flat()];
 }
 
-async function upsertReceipt(number, body) {
+async function upsertReceipt(number, body, dedupeKey) {
   await execFileAsync(
     'bash',
     [
@@ -146,9 +379,14 @@ async function upsertReceipt(number, body) {
       String(number),
       'ownerless-recovery',
       body,
+      dedupeKey,
     ],
     {
-      env: { ...process.env, GITHUB_REPOSITORY: repo },
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: repo,
+        BOT_COMMENT_TRUSTED_AUTHORS_JSON: '["jovie-bot[bot]"]',
+      },
       maxBuffer: 5 * 1024 * 1024,
     }
   );
@@ -192,25 +430,86 @@ async function candidateEvidence(summary, mainSha, openHeadShas) {
   };
 }
 
-async function promote(summary, mainSha, evidence, decision) {
+const dispatchExactAdmission = (
+  number,
+  expectedHead,
+  mainSha,
+  ownerlessSince
+) =>
+  gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${repo}/dispatches`,
+    '-f',
+    'event_type=ownerless-recovery-admission',
+    '-F',
+    `client_payload[pr_number]=${number}`,
+    '-f',
+    `client_payload[head_sha]=${expectedHead}`,
+    '-f',
+    `client_payload[main_sha]=${mainSha}`,
+    '-f',
+    `client_payload[ownerless_since]=${ownerlessSince}`,
+  ]);
+
+export function classifyQueueOwnership(queueState, expectedHead) {
+  if (
+    !queueState ||
+    queueState.headRefOid?.toLowerCase() !== expectedHead.toLowerCase()
+  ) {
+    return { action: 'fail', outcome: 'queue-ownership-head-mismatch' };
+  }
+  if (queueState.queued === true) {
+    return { action: 'no_dispatch', outcome: 'already-delegated-exact-head' };
+  }
+  if (queueState.autoMergeEnabled === true) {
+    return { action: 'fail', outcome: 'foreign-auto-merge-hold' };
+  }
+  return { action: 'dispatch', outcome: 'unowned-exact-head' };
+}
+export const countsAsRecoveryFailure = result =>
+  !result.queued && result.pending === false && !result.dryRun;
+export const countsAsRecoveryDispatch = result =>
+  result.pending && !result.promoted;
+
+export async function dispatchRecoveryIntent(
+  summary,
+  mainSha,
+  evidence,
+  decision,
+  dependencies = {}
+) {
+  const deps = {
+    apiJsonImpl: apiJson,
+    checksAreGreenImpl: checksAreGreen,
+    dispatchExactAdmissionImpl: dispatchExactAdmission,
+    evaluateRecoveryCandidateImpl: evaluateRecoveryCandidate,
+    mainHeadImpl: mainHead,
+    nowImpl: () => new Date().toISOString(),
+    pagesImpl: pages,
+    prCommandImpl: prCommand,
+    readPullRequestQueueStateImpl: readPullRequestQueueState,
+    upsertReceiptImpl: upsertReceipt,
+    ...dependencies,
+  };
   const number = summary.number;
   const expectedHead = evidence.pr.head.sha;
   if (dryRun) {
     console.log(`[dry-run] #${number} eligible: ${decision.lanes.join(',')}`);
     return { queued: false, dryRun: true };
   }
-
-  const liveMain = await mainHead();
-  const live = await apiJson(`repos/${repo}/pulls/${number}`);
-  const liveTimeline = await pages(
-    `repos/${repo}/issues/${number}/timeline?per_page=100`
-  );
-  const liveDecision = evaluateRecoveryCandidate({
+  const [liveMain, live, liveTimeline] = await Promise.all([
+    deps.mainHeadImpl(),
+    deps.apiJsonImpl(`repos/${repo}/pulls/${number}`),
+    deps.pagesImpl(`repos/${repo}/issues/${number}/timeline?per_page=100`),
+  ]);
+  const liveDecision = deps.evaluateRecoveryCandidateImpl({
     ...evidence,
     pr: live,
     timeline: liveTimeline,
     mainSha: liveMain,
-    checksPassing: await checksAreGreen(number),
+    checksPassing: await deps.checksAreGreenImpl(number),
   });
   if (
     liveMain !== mainSha ||
@@ -220,9 +519,8 @@ async function promote(summary, mainSha, evidence, decision) {
     console.log(`#${number} changed before mutation; skipped`);
     return { queued: false };
   }
-
-  const writeReceipt = (outcome, proof = null) =>
-    upsertReceipt(
+  const writeReceipt = outcome =>
+    deps.upsertReceiptImpl(
       number,
       renderRecoveryReceipt({
         pr: number,
@@ -230,84 +528,56 @@ async function promote(summary, mainSha, evidence, decision) {
         main: mainSha,
         ownerlessSince: liveDecision.ownerlessSince,
         lanes: liveDecision.lanes,
-        action: 'gh-pr-merge-auto-squash',
+        action: 'dispatch-to-merge-queue-autoenroll',
         outcome,
-        mergeQueueState: proof?.mergeQueueEntry?.state,
-        mergeQueuePosition: proof?.mergeQueueEntry?.position,
-        mergeQueueEntryId: proof?.mergeQueueEntry?.id,
-        observedAt: new Date().toISOString(),
-      })
+        observedAt: deps.nowImpl(),
+      }),
+      `${expectedHead}-${outcome}`
     );
-
+  let ownership;
+  try {
+    const queueArgs = /** @type {any} */ ({
+      backend: 'native',
+      repository: repo,
+      number,
+    });
+    ownership = classifyQueueOwnership(
+      await deps.readPullRequestQueueStateImpl(queueArgs),
+      expectedHead
+    );
+  } catch (error) {
+    await writeReceipt('queue-ownership-read-failed');
+    throw error;
+  }
+  if (ownership.action === 'no_dispatch') {
+    await writeReceipt(ownership.outcome);
+    console.log(`#${number} exact head is already in the native queue`);
+    return { queued: true, pending: false };
+  }
+  if (ownership.action === 'fail') {
+    await writeReceipt(ownership.outcome);
+    return { queued: false, pending: false };
+  }
   await writeReceipt('attempting');
-
-  const restoreDraft = live.draft;
-  const restoreDeferred = (live.labels ?? []).some(
-    label => label.name === 'queue-deferred'
-  );
   const compensate = async () => {
     const failures = [];
-    const current = await apiJson(`repos/${repo}/pulls/${number}`).catch(
-      () => null
-    );
+    const current = await deps
+      .apiJsonImpl(`repos/${repo}/pulls/${number}`)
+      .catch(() => null);
     if (!current) failures.push('state-read');
-    if (
-      restoreDeferred &&
-      (!current ||
-        !current.labels.some(label => label.name === 'queue-deferred'))
-    ) {
-      await prCommand('edit', number, '--add-label', 'queue-deferred').catch(
-        () => failures.push('queue-deferred-restore')
-      );
-    }
-    if (restoreDraft && current?.draft !== true) {
-      await prCommand('ready', number, '--undo').catch(() =>
-        failures.push('draft-restore')
-      );
-    }
+    if (live.draft && current?.draft !== true)
+      await deps
+        .prCommandImpl('ready', number, '--undo')
+        .catch(() => failures.push('draft-restore'));
     return failures;
   };
-  const disableAuto = async () => {
-    await prCommand('merge', number, '--disable-auto').catch(() => null);
-    const proof = await readQueueProof(number).catch(() => null);
-    const safe =
-      proof?.state === 'OPEN' &&
-      proof.headRefOid === expectedHead &&
-      proof.autoMergeRequest == null &&
-      proof.isInMergeQueue === false;
-    return { proof, safe };
-  };
-
   try {
-    if (live.draft) {
-      await prCommand('ready', number);
-    }
-    if (restoreDeferred) {
-      await prCommand('edit', number, '--remove-label', 'queue-deferred');
-    }
-
-    const postMutationEvidence = await candidateEvidence(
-      summary,
-      mainSha,
-      await openStackHeadShas(mainSha)
-    );
-    const postMutationChecksPassing =
-      restoreDraft || (await checksAreGreen(number));
-    const [postMutationMain, postMutationPr] = await Promise.all([
-      mainHead(),
-      apiJson(`repos/${repo}/pulls/${number}`),
+    if (live.draft) await deps.prCommandImpl('ready', number);
+    const [postMain, postPr] = await Promise.all([
+      deps.mainHeadImpl(),
+      deps.apiJsonImpl(`repos/${repo}/pulls/${number}`),
     ]);
-    const postMutationDecision = evaluateRecoveryCandidate({
-      ...postMutationEvidence,
-      pr: postMutationPr,
-      mainSha: postMutationMain,
-      checksPassing: true,
-    });
-    if (
-      postMutationMain !== mainSha ||
-      postMutationPr.head.sha !== expectedHead ||
-      !postMutationDecision.eligible
-    ) {
+    if (postMain !== mainSha || postPr.head.sha !== expectedHead) {
       const failures = await compensate();
       await writeReceipt(
         failures.length === 0
@@ -316,11 +586,11 @@ async function promote(summary, mainSha, evidence, decision) {
       );
       return { queued: false };
     }
-    if (restoreDraft) {
+    if (live.draft) {
       await writeReceipt('promoted-awaiting-checks');
-      return { queued: false, pending: true };
+      return { queued: false, pending: true, promoted: true };
     }
-    if (!postMutationChecksPassing) {
+    if (!(await deps.checksAreGreenImpl(number))) {
       const failures = await compensate();
       await writeReceipt(
         failures.length === 0
@@ -329,88 +599,253 @@ async function promote(summary, mainSha, evidence, decision) {
       );
       return { queued: false };
     }
-
-    await prCommand(
-      'merge',
+    await deps.dispatchExactAdmissionImpl(
       number,
-      '--auto',
-      '--squash',
-      '--match-head-commit',
-      expectedHead
+      expectedHead,
+      mainSha,
+      liveDecision.ownerlessSince
     );
   } catch (error) {
-    const racedProof = await readQueueProof(number).catch(() => null);
-    const raced = validateRecoveryMergeProof(racedProof, expectedHead);
-    if (raced.proven) {
-      await writeReceipt(raced.outcome, racedProof);
-      console.log(
-        `#${number} recovery action: ${raced.outcome} (concurrent controller)`
-      );
-      return { queued: true };
-    }
-    const disabled = await disableAuto();
-    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
-    if (concurrent.proven) {
-      await writeReceipt(concurrent.outcome, disabled.proof);
-      return { queued: true };
-    }
-    if (!disabled.safe) {
-      await writeReceipt(
-        'merge-request-unproven-disable-failed',
-        disabled.proof
-      );
-      return { queued: false };
-    }
     const failures = await compensate();
     await writeReceipt(
       failures.length === 0
-        ? 'merge-request-failed-compensated'
-        : `merge-request-compensation-failed:${failures.join(',')}`
+        ? 'dispatch-failed-compensated'
+        : `dispatch-failed-compensation-failed:${failures.join(',')}`
     );
     throw error;
   }
-
-  let proof = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    proof = await readQueueProof(number);
-    if (validateRecoveryMergeProof(proof, expectedHead).proven) break;
-    await new Promise(resolve => setTimeout(resolve, 2_000));
-  }
-  const verified = validateRecoveryMergeProof(proof, expectedHead);
-  if (!verified.proven) {
-    const disabled = await disableAuto();
-    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
-    if (concurrent.proven) {
-      await writeReceipt(concurrent.outcome, disabled.proof);
-      return { queued: true };
-    }
-    if (!disabled.safe) {
-      await writeReceipt('requested-unproven-disable-failed', disabled.proof);
-      console.log(
-        `#${number} recovery action: requested-unproven-disable-failed`
-      );
-      return { queued: false };
-    }
-    const failures = await compensate();
-    const outcome =
-      failures.length === 0
-        ? 'requested-unproven-compensated'
-        : `requested-unproven-compensation-failed:${failures.join(',')}`;
-    await writeReceipt(outcome, proof);
-    console.log(`#${number} recovery action: ${outcome}`);
-    return { queued: false };
-  }
-  await writeReceipt(verified.outcome, proof);
-  console.log(`#${number} recovery action: ${verified.outcome}`);
-  return { queued: true };
+  await writeReceipt('delegated-exact-head-admission');
+  console.log(
+    `#${number} recovery action: delegated exact head to Merge Queue Auto-Enroll`
+  );
+  return { queued: false, pending: true };
 }
 
-export async function run() {
-  const mainSha = await mainHead();
-  const open = await openPulls('main');
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const mutationSucceeded = result =>
+  result === undefined ||
+  result === true ||
+  (result !== false &&
+    result?.success !== false &&
+    [result?.commentCreate?.success, result?.issueUpdate?.success]
+      .filter(value => value !== undefined)
+      .every(Boolean));
+const stateName = issue =>
+  String(issue?.state?.name || issue?.state || '').trim();
+
+export async function processFleetClosureRemediationIntents(
+  audit,
+  dependencies = {}
+) {
+  const deps = {
+    clientImpl: null,
+    fetchOfficialSymphonyStateImpl: fetchOfficialSymphonyState,
+    nowImpl: () => new Date().toISOString(),
+    sleepImpl: sleep,
+    symphonyReadbackAttempts: 3,
+    symphonyReadbackDelayMs: 1000,
+    todoStateId: process.env.FLEET_REMEDIATION_TODO_STATE_ID || TODO_STATE_ID,
+    todoStateName: 'Todo',
+    ...dependencies,
+  };
+  const client = deps.clientImpl ?? (await linearClient());
+  const waitLease = async identifier => {
+    let last = { ok: false, reason: 'symphony-state-not-read' };
+    for (
+      let attempt = 1;
+      attempt <= deps.symphonyReadbackAttempts;
+      attempt += 1
+    ) {
+      try {
+        last = findOfficialSymphonyLease(
+          await deps.fetchOfficialSymphonyStateImpl(),
+          identifier,
+          { now: new Date(deps.nowImpl()) }
+        );
+      } catch (error) {
+        last = {
+          ok: false,
+          reason: 'symphony-state-read-threw',
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+      if (last.ok) return { ...last, attempts: attempt };
+      if (attempt < deps.symphonyReadbackAttempts)
+        await deps.sleepImpl(deps.symphonyReadbackDelayMs);
+    }
+    return { ...last, attempts: deps.symphonyReadbackAttempts };
+  };
+  const results = [];
+  for (const intent of (audit?.remediationIntents ?? []).filter(
+    intent => intent?.action === 'reattach-remediation-lane' && intent.issue
+  )) {
+    const record = (status, extra = {}) =>
+      results.push({ ...intent, status, ...extra });
+    const fail = (reason, extra = {}) => record('failed', { reason, ...extra });
+    let issue = await client.fetchIssue(intent.issue);
+    if (!issue?.id) {
+      fail('issue-read-failed');
+      continue;
+    }
+    const currentLease = await waitLease(intent.issue);
+    if (currentLease.ok) {
+      record('idempotent', { readback: currentLease });
+      continue;
+    }
+    if (currentLease.reason !== 'symphony-lease-readback-missing') {
+      fail(currentLease.reason, { readback: currentLease });
+      continue;
+    }
+    try {
+      const conflictingLease = (issue?.comments?.nodes ?? issue?.comments ?? [])
+        .flatMap(comment =>
+          parseFleetClosureRemediationLeases(comment?.body ?? comment)
+        )
+        .find(
+          receipt =>
+            receipt.pr === intent.pr &&
+            receipt.head === intent.head &&
+            receipt.issue === intent.issue &&
+            (receipt.reason !== intent.reason ||
+              receipt.action !== 'reattach-remediation-lane' ||
+              receipt.consumer !== 'symphony-linear-writer')
+        );
+      if (conflictingLease) {
+        fail('intent-conflict');
+        continue;
+      }
+      if (!hasFleetClosureRemediationLease(issue, intent)) {
+        const created = await client.addComment(
+          issue.id,
+          renderFleetClosureRemediationLease({
+            ...intent,
+            observedAt: deps.nowImpl(),
+          })
+        );
+        if (!mutationSucceeded(created)) {
+          fail('intent-create-failed');
+          continue;
+        }
+        issue = await client.fetchIssue(intent.issue);
+        if (!hasFleetClosureRemediationLease(issue, intent)) {
+          fail('intent-readback-missing');
+          continue;
+        }
+      }
+      if (stateName(issue) !== deps.todoStateName) {
+        if (typeof client.transitionIssue !== 'function') {
+          fail('linear-transition-unavailable');
+          continue;
+        }
+        if (
+          !mutationSucceeded(
+            await client.transitionIssue(issue.id, deps.todoStateId)
+          )
+        ) {
+          fail('linear-transition-failed');
+          continue;
+        }
+        issue = await client.fetchIssue(intent.issue);
+        if (
+          stateName(issue) !== deps.todoStateName ||
+          !hasFleetClosureRemediationLease(issue, intent)
+        ) {
+          fail('linear-transition-readback-missing');
+          continue;
+        }
+      }
+    } catch (error) {
+      fail('linear-mutation-threw', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+    const lease = await waitLease(intent.issue);
+    if (lease.ok) {
+      record('reattached', { readback: lease });
+    } else if (lease.reason === 'symphony-lease-readback-missing') {
+      // Linear Todo plus the exact, read-back remediation receipt is the
+      // durable queue owned by official Symphony. A healthy runtime may be at
+      // capacity, so absence from its active/retrying projection is pending
+      // work rather than a failed dispatch.
+      record('queued', { readback: lease });
+    } else {
+      fail(lease.reason, { readback: lease });
+    }
+  }
+  return { ok: results.every(result => result.status !== 'failed'), results };
+}
+
+export async function run({
+  eventContext = readRecoveryEvent(),
+  readEventTimeline = readRecoveryTimeline,
+  readEventQueueState = readPullRequestQueueState,
+  now = Date.now(),
+  resolvePolicyHead = resolveExactMainPolicyHead,
+  readOpenPulls = openPulls,
+  readIssueSnapshot = linearActiveIssueSnapshot,
+} = {}) {
+  const event = await recoveryEventDecision(eventContext, {
+    readTimeline: readEventTimeline,
+    now,
+  });
+  if (!event.required) {
+    console.log(`Ownerless recovery skipped: ${event.reason}`);
+    return;
+  }
+  const admission = await recoveryNativeAdmissionDecision(
+    eventContext,
+    readEventQueueState
+  );
+  if (!admission.required) {
+    console.log(`Ownerless recovery skipped: ${admission.reason}`);
+    return;
+  }
+  const mainSha = await resolvePolicyHead();
+  const snapshotStartedAt = new Date().toISOString();
+  const open = await readOpenPulls('main');
+  const snapshotCompletedAt = new Date().toISOString();
+  const linearSnapshot = await recoveryIssueSnapshot(open, readIssueSnapshot);
+  if (linearSnapshot === null) {
+    console.log('Ownerless recovery skipped: no non-draft open PRs');
+    return;
+  }
+  const linearIssues = linearSnapshot.issues;
+  const audit = buildPrFleetClosureAudit({
+    repository: repo,
+    pullRequests: open,
+    linearIssues,
+    prPacketMap: prPacketMap(linearIssues),
+    symphonyState: await fetchOfficialSymphonyState(),
+    snapshot: {
+      complete: true,
+      startedAt: snapshotStartedAt,
+      completedAt: snapshotCompletedAt,
+      linear: linearSnapshot.coverage,
+    },
+    now: new Date(snapshotCompletedAt),
+  });
+  console.log(renderPrFleetClosureAudit(audit));
+  const remediation = await processFleetClosureRemediationIntents(audit);
+  console.log(
+    JSON.stringify({
+      schema: 'jovie-pr-fleet-remediation-run/v1',
+      ...remediation,
+    })
+  );
+  if (!shouldDispatchOwnerlessRecovery(audit)) {
+    console.error(
+      `Ownerless recovery sweep blocked by PR fleet closure audit: ${audit.violations
+        .map(violation => violation.reason)
+        .join(', ')}`
+    );
+    process.exitCode = 1;
+    return;
+  }
   const openHeadShas = await openStackHeadShas(mainSha);
-  let promoted = 0;
-  let unproven = 0;
+  let dispatched = 0;
+  let alreadyQueued = 0;
+  let failed = 0;
   for (const summary of open) {
     try {
       const evidence = await candidateEvidence(summary, mainSha, openHeadShas);
@@ -423,33 +858,80 @@ export async function run() {
         console.log(`#${summary.number} skipped: ${preliminary.reason}`);
         continue;
       }
-      const checksPassing = await checksAreGreen(summary.number);
-      const decision = checksPassing
+      const decision = (await checksAreGreen(summary.number))
         ? preliminary
         : { eligible: false, reason: 'focused-checks-not-green' };
       if (!decision.eligible) {
         console.log(`#${summary.number} skipped: ${decision.reason}`);
         continue;
       }
-      const result = await promote(summary, mainSha, evidence, decision);
-      if (result.queued) promoted += 1;
-      else if (!result.dryRun && !result.pending) unproven += 1;
+      const result = await dispatchRecoveryIntent(
+        summary,
+        mainSha,
+        evidence,
+        decision
+      );
+      if (result.queued) alreadyQueued += 1;
+      else if (countsAsRecoveryDispatch(result)) dispatched += 1;
+      else if (countsAsRecoveryFailure(result)) failed += 1;
     } catch (error) {
-      unproven += 1;
+      failed += 1;
       console.error(
         `#${summary.number} recovery failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
   console.log(
-    `Ownerless recovery sweep complete: promoted=${promoted} unproven=${unproven} dryRun=${dryRun}`
+    `Ownerless recovery sweep complete: dispatched=${dispatched} alreadyQueued=${alreadyQueued} failed=${failed} dryRun=${dryRun}`
   );
-  if (unproven > 0) process.exitCode = 1;
+  if (failed > 0) process.exitCode = 1;
+}
+
+export function safeFailureReceipt(error) {
+  const err = /** @type {any} */ (error);
+  const cause = /** @type {any} */ (err?.cause);
+  return {
+    schema: 'jovie-ownerless-recovery-failure/v1',
+    name: err?.name ?? 'Error',
+    message: err?.message ?? String(error),
+    code: err?.code ?? null,
+    attempts: err?.attempts ?? null,
+    resetAt: err?.resetAt ?? null,
+    coverage: err?.coverage ?? null,
+    cause: cause
+      ? {
+          name: cause.name ?? 'Error',
+          message: cause.message ?? String(cause),
+          code: cause.code ?? null,
+          attempts: cause.attempts ?? null,
+          status: cause.metadata?.status ?? null,
+          contentType: cause.metadata?.contentType ?? null,
+        }
+      : null,
+  };
+}
+
+export function ownerlessRecoveryFailureDisposition(error, now = Date.now()) {
+  const cooldown = activeLinearCooldown(error, now);
+  return {
+    ...safeFailureReceipt(error),
+    status: cooldown ? 'deferred' : 'blocked',
+    ...(cooldown ?? {}),
+  };
 }
 
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {
   run().catch(error => {
-    console.error(error instanceof Error ? error.stack : String(error));
+    const disposition = ownerlessRecoveryFailureDisposition(error);
+    console.error(JSON.stringify(disposition));
+    if (disposition.status === 'deferred') {
+      console.error(
+        `Linear credential cooldown is active; the scheduled recovery clock will retry at or after ${disposition.retryAt}.`
+      );
+      process.exitCode = 0;
+      return;
+    }
+    if (error instanceof Error && error.stack) console.error(error.stack);
     process.exitCode = 1;
   });
 }

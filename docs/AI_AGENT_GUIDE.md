@@ -1,5 +1,10 @@
 # AI Agent Developer Guide
 
+Use this file as an API/cron/webhook inventory. For execution policy start at
+[CLAUDE.md](../CLAUDE.md); for instruction, skill, or harness changes read the
+[context contract](agent-context/README.md). Search the relevant section instead
+of loading this inventory for unrelated tasks.
+
 Quick-reference for AI agents working in the Jovie codebase. For hard guardrails and enforcement rules, see [`AGENTS.md`](../AGENTS.md).
 
 ---
@@ -113,6 +118,15 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 | `/api/cron/process-pre-saves` | GET | CRON_SECRET | Process pre-save queue |
 | `/api/cron/schedule-release-notifications` | GET | CRON_SECRET | Schedule release alerts |
 | `/api/cron/send-release-notifications` | GET | CRON_SECRET | Send release alerts |
+
+### Inbox Founder Reviews (authenticated founder surface)
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/inbox/founder-reviews` | GET/POST | Clerk | List or persist owner-bound review receipts before Inbox decisions |
+| `/api/inbox/founder-reviews/upload-token` | POST | Clerk / signed Blob callback | Issue private-audio upload tokens and persist expiring cleanup leases |
+| `/api/inbox/founder-reviews/[id]/media` | GET/DELETE | Clerk | Stream or delete retained private audio for an owned receipt |
+| `/api/inbox/founder-reviews/[id]/outcome` | PATCH | Clerk | Persist failed action state or verify applied state from canonical suggested actions |
 
 ### Dashboard (authenticated creator)
 

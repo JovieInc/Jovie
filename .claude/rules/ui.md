@@ -1,3 +1,7 @@
+---
+paths: ["apps/web/**/*.tsx", "apps/web/**/*.css", "packages/ui/**", "DESIGN.md", "docs/design-system/**"]
+---
+
 # UI System
 
 Design system, component hierarchy, surfaces, taste rules. Always read `DESIGN.md` before making any visual decisions.
