@@ -854,6 +854,25 @@ test('staging mainline proof permits main advancement but rejects stale or diver
     })
   );
 
+  assert.throws(
+    () =>
+      assertMainlineAncestorCompare({
+        comparison: mainline,
+        currentMainSha: currentSha,
+        releaseSha: 'short',
+      }),
+    /Release SHA is malformed/
+  );
+  assert.throws(
+    () =>
+      assertMainlineAncestorCompare({
+        comparison: mainline,
+        currentMainSha: 'short',
+        releaseSha,
+      }),
+    /Current main SHA is malformed/
+  );
+
   for (const comparison of [
     { ...mainline, status: 'behind', behind_by: 1 },
     {
