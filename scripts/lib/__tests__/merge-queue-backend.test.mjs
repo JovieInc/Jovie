@@ -531,6 +531,52 @@ function executeHoldIntakePreflight({
 }
 
 describe('merge queue backend resolution', () => {
+  it.each([
+    ['normal', 0],
+    ['hold-intake', 0],
+    ['draft-only', 0],
+    ['controller-repair-only', 1],
+    ['isolated-only', 1],
+    ['deferred-release-only', 1],
+  ])('the real drain preserves pending intent only for unleased mode %s', (mode, expectedStatus) => {
+    const drain = readFileSync(
+      join(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    const expression = drain.match(
+      /if ! jq -e --arg expected_head "\$expected_head" --arg promotion_mode "\$DRAIN_PROMOTION_MODE" '([\s\S]*?)' <<</
+    )?.[1];
+    expect(expression).toBeTruthy();
+    const result = spawnSync(
+      'jq',
+      [
+        '-e',
+        '--arg',
+        'expected_head',
+        HEAD,
+        '--arg',
+        'promotion_mode',
+        mode,
+        expression ?? 'error("missing predicate")',
+      ],
+      {
+        encoding: 'utf8',
+        input: JSON.stringify({
+          disposition: 'auto-merge-pending',
+          state: {
+            state: 'OPEN',
+            isDraft: false,
+            headRefOid: HEAD,
+            isInMergeQueue: false,
+            mergeQueueEntry: null,
+            autoMergeRequest: AUTO_MERGE,
+          },
+        }),
+      }
+    );
+    expect(result.status, result.stderr).toBe(expectedStatus);
+  });
+
   it('defaults bare callers to the live native backend', () => {
     expect(DEFAULT_MERGE_QUEUE_BACKEND).toBe('native');
     expect(resolveMergeQueueBackend()).toBe('native');
