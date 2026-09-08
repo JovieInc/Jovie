@@ -265,6 +265,7 @@
     "@vercel/toolbar": "^0.2.5",
     "ai": "^6.0.137",
     "better-auth": "1.7.0-rc.1",
+    "chart.js": "4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
