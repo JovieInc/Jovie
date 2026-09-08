@@ -3,6 +3,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  evaluateGrowthLearning,
+  GROWTH_LEARNING_INVARIANT_ID,
+} from '../invariants/growth-learning-policy.mjs';
+
+// Consumer binding for JOV-INV-028: validate growth intake before projection.
 
 const ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -14,6 +20,14 @@ export const DEFAULT_AUDIT_PATH = path.join(
 );
 export const CANONICAL_REGISTRY_PATH = 'canon/invariants.jsonl';
 export const STEWARDSHIP_SCHEMA = 'jovie-invariant-stewardship-audit/v1';
+export const GROWTH_LEARNING_INTAKE_SCHEMA = 'jovie-growth-learning-intake/v1';
+
+const GROWTH_LEARNING_PERIOD_PATTERN = /^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/;
+const GROWTH_LEARNING_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
+const GROWTH_LEARNING_DEDUPE_PATTERN =
+  /^growth-learning:\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3]):sha256:[a-f0-9]{64}$/;
+const GROWTH_LEARNING_MAX_SOURCES = 5;
+const GROWTH_LEARNING_MAX_PROPOSALS = 1;
 
 const CLASSIFICATIONS = new Set([
   'approved',
@@ -71,6 +85,147 @@ function requireDate(value, label, errors) {
 
 function pairId(kind, left, right) {
   return `${kind}:${[left.id, right.id].sort().join(':')}`;
+}
+
+function notPresentGrowthLearning() {
+  return {
+    invariantId: GROWTH_LEARNING_INVARIANT_ID,
+    status: 'not-present',
+    records: 0,
+    dedupeKey: null,
+    errors: [],
+    results: [],
+  };
+}
+
+/**
+ * Validate the optional growth-learning intake carried by the existing
+ * evidence-only stewardship snapshot. This is preparation/validation only:
+ * it never sends, publishes, spends, connects an account, or changes canon.
+ */
+export function validateGrowthLearningIntake(
+  intake,
+  { now = new Date() } = {}
+) {
+  if (intake === undefined) return notPresentGrowthLearning();
+
+  const errors = [];
+  const results = [];
+  if (!intake || typeof intake !== 'object' || Array.isArray(intake)) {
+    return {
+      ...notPresentGrowthLearning(),
+      status: 'invalid',
+      errors: ['growth-learning-intake-missing-or-invalid'],
+    };
+  }
+
+  if (intake.schemaVersion !== GROWTH_LEARNING_INTAKE_SCHEMA) {
+    errors.push('growth-learning-intake-schema-invalid');
+  }
+  if (intake.authority !== 'evidence-only') {
+    errors.push('growth-learning-intake-authority-invalid');
+  }
+  if (!GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '')) {
+    errors.push('growth-learning-period-invalid');
+  }
+  if (!GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceDigest ?? '')) {
+    errors.push('growth-learning-source-digest-invalid');
+  }
+  const expectedDedupeKey =
+    GROWTH_LEARNING_PERIOD_PATTERN.test(intake.period ?? '') &&
+    GROWTH_LEARNING_DIGEST_PATTERN.test(intake.sourceDigest ?? '')
+      ? `growth-learning:${intake.period}:${intake.sourceDigest}`
+      : null;
+  if (intake.dedupeKey !== expectedDedupeKey) {
+    errors.push('growth-learning-dedupe-key-invalid');
+  }
+  if (intake.maxSources !== GROWTH_LEARNING_MAX_SOURCES) {
+    errors.push('growth-learning-source-limit-invalid');
+  }
+  if (intake.maxProposals !== GROWTH_LEARNING_MAX_PROPOSALS) {
+    errors.push('growth-learning-proposal-limit-invalid');
+  }
+  if (intake.noDuplicateScheduler !== true) {
+    errors.push('growth-learning-duplicate-scheduler-invalid');
+  }
+
+  if (!Array.isArray(intake.priorDedupeKeys)) {
+    errors.push('growth-learning-prior-dedupe-keys-missing');
+  } else {
+    const priorKeys = new Set();
+    for (const key of intake.priorDedupeKeys) {
+      if (!GROWTH_LEARNING_DEDUPE_PATTERN.test(key ?? '')) {
+        errors.push(`growth-learning-prior-dedupe-key-invalid:${key}`);
+      }
+      if (priorKeys.has(key)) {
+        errors.push(`growth-learning-prior-dedupe-key-duplicate:${key}`);
+      }
+      priorKeys.add(key);
+    }
+    if (expectedDedupeKey && priorKeys.has(expectedDedupeKey)) {
+      errors.push(`growth-learning-duplicate-dedupe-key:${expectedDedupeKey}`);
+    }
+  }
+
+  if (!Array.isArray(intake.records)) {
+    errors.push('growth-learning-records-missing');
+  } else {
+    if (intake.records.length > GROWTH_LEARNING_MAX_PROPOSALS) {
+      errors.push('growth-learning-max-proposals-exceeded');
+    }
+    const recordIds = new Set();
+    let sourceCount = 0;
+    for (const record of intake.records) {
+      const recordId = record?.id ?? '<missing>';
+      if (recordIds.has(recordId)) {
+        errors.push(`growth-learning-record-duplicate:${recordId}`);
+      }
+      recordIds.add(recordId);
+      if (record?.sourceDigest !== intake.sourceDigest) {
+        errors.push(`growth-learning-record-digest-mismatch:${recordId}`);
+      }
+      sourceCount += Array.isArray(record?.sources) ? record.sources.length : 0;
+
+      let result;
+      try {
+        result = evaluateGrowthLearning(record, { now });
+      } catch (error) {
+        errors.push(
+          `growth-learning-record-threw:${recordId}:${error instanceof Error ? error.message : 'unknown'}`
+        );
+        continue;
+      }
+      results.push({
+        id: recordId,
+        eligible: result.eligible,
+        causalCertification: result.causalCertification,
+        nextAction: result.nextAction,
+        warnings: result.warnings,
+      });
+      if (!result.ok) {
+        errors.push(
+          `growth-learning-record-rejected:${recordId}:${result.errors.join('|')}`
+        );
+      }
+    }
+    if (sourceCount > GROWTH_LEARNING_MAX_SOURCES) {
+      errors.push('growth-learning-max-sources-exceeded');
+    }
+  }
+
+  return {
+    invariantId: GROWTH_LEARNING_INVARIANT_ID,
+    status:
+      errors.length > 0
+        ? 'invalid'
+        : intake.records?.length
+          ? 'validated'
+          : 'empty',
+    records: Array.isArray(intake.records) ? intake.records.length : 0,
+    dedupeKey: intake.dedupeKey ?? null,
+    errors: [...new Set(errors)],
+    results,
+  };
 }
 
 function computedFindings(audit, errors) {
@@ -217,7 +372,7 @@ function computedFindings(audit, errors) {
   return findings.sort((left, right) => left.id.localeCompare(right.id));
 }
 
-export function validateStewardshipAudit(audit) {
+export function validateStewardshipAudit(audit, { now = new Date() } = {}) {
   const errors = [];
   if (audit?.schemaVersion !== STEWARDSHIP_SCHEMA) {
     errors.push('unsupported schemaVersion');
@@ -257,7 +412,16 @@ export function validateStewardshipAudit(audit) {
   if (!Array.isArray(audit?.founderQueue)) {
     errors.push('founderQueue must be an array');
   }
-  if (errors.length > 0) return { ok: false, errors, findings: [] };
+  const growthLearning = validateGrowthLearningIntake(
+    audit?.growthLearningIntake,
+    { now }
+  );
+  for (const error of growthLearning.errors) {
+    errors.push(`${GROWTH_LEARNING_INVARIANT_ID}: ${error}`);
+  }
+  if (errors.length > 0) {
+    return { ok: false, errors, findings: [], growthLearning };
+  }
 
   const findings = computedFindings(audit, errors);
   const declared = audit.declaredFindings.map(item => item.id).sort();
@@ -277,7 +441,7 @@ export function validateStewardshipAudit(audit) {
       errors.push(`founderQueue ${question.id} needs evidence`);
     }
   }
-  return { ok: errors.length === 0, errors, findings };
+  return { ok: errors.length === 0, errors, findings, growthLearning };
 }
 
 export function projectStewardshipAudit(
@@ -299,7 +463,9 @@ export function projectStewardshipAudit(
       sourceGaps: (audit.sources || []).filter(
         source => source.status !== 'covered' && source.status !== 'excluded'
       ).length,
+      growthLearningRecords: validation.growthLearning?.records ?? 0,
     },
+    growthLearning: validation.growthLearning ?? notPresentGrowthLearning(),
     actionableExceptions: validation.findings.map(finding => ({
       ...finding,
       owner: declaredById.get(finding.id)?.owner ?? 'summer',
@@ -317,9 +483,12 @@ export function loadStewardshipAudit(inputPath = DEFAULT_AUDIT_PATH) {
   return JSON.parse(fs.readFileSync(inputPath, 'utf8'));
 }
 
-export function runStewardshipAudit(inputPath = DEFAULT_AUDIT_PATH) {
+export function runStewardshipAudit(
+  inputPath = DEFAULT_AUDIT_PATH,
+  { now = new Date() } = {}
+) {
   const audit = loadStewardshipAudit(inputPath);
-  const validation = validateStewardshipAudit(audit);
+  const validation = validateStewardshipAudit(audit, { now });
   return {
     audit,
     validation,

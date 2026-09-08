@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - 'canon/invariants.jsonl'
+      - 'scripts/invariants/**'
       - 'apps/web/lib/ovie/generated/invariant-stewardship.current-week.json'
       - 'scripts/invariant-stewardship/**'
       - 'scripts/invariants/performance-factory.mjs'

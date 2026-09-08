@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { GROWTH_LEARNING_SCHEMA } from '../invariants/growth-learning-policy.mjs';
 import {
   DEFAULT_AUDIT_PATH,
+  GROWTH_LEARNING_INTAKE_SCHEMA,
   loadStewardshipAudit,
   projectStewardshipAudit,
   validateStewardshipAudit,
@@ -45,9 +47,18 @@ function candidate(overrides) {
   };
 }
 
+const GROWTH_NOW = new Date('2026-09-07T00:00:00.000Z');
+
+function growthLearningIntake() {
+  const intake = clone(loadStewardshipAudit().growthLearningIntake);
+  assert.equal(intake.schemaVersion, GROWTH_LEARNING_INTAKE_SCHEMA);
+  assert.equal(intake.records[0].schemaVersion, GROWTH_LEARNING_SCHEMA);
+  return intake;
+}
+
 test('current-week audit records source, date, authority, and lifecycle', () => {
   const audit = loadStewardshipAudit();
-  const result = validateStewardshipAudit(audit);
+  const result = validateStewardshipAudit(audit, { now: GROWTH_NOW });
   assert.deepEqual(result.errors, []);
   assert.equal(result.ok, true);
   assert.ok(audit.candidates.length >= 27);
@@ -61,6 +72,16 @@ test('current-week audit records source, date, authority, and lifecycle', () => 
   }
   const projection = projectStewardshipAudit(audit, result);
   assert.equal(projection.summary.founderDecisions, 0);
+  assert.equal(projection.growthLearning.status, 'validated');
+  assert.equal(projection.summary.growthLearningRecords, 1);
+  assert.equal(
+    projection.growthLearning.dedupeKey,
+    'growth-learning:2026-W36:sha256:cee5dbfd608ac62bedddfba151a689ebdb20c0aa8be32c25c409ea5ac9e4a9aa'
+  );
+  assert.equal(
+    projection.growthLearning.results[0]?.nextAction,
+    'hold-for-founder-authorization'
+  );
   assert.equal(
     projection.summary.actionableExceptions,
     projection.actionableExceptions.length
@@ -217,6 +238,7 @@ test('cadence composes the existing workflow and does not create another schedul
   assert.match(workflow, /repository_dispatch:/);
   assert.match(workflow, /founder-decision-recorded/);
   assert.match(workflow, /invariant-enforcement-failed/);
+  assert.match(workflow, /scripts\/invariants\/\*\*/);
   assert.match(workflow, /node scripts\/invariant-stewardship\/audit\.mjs/);
   assert.equal(
     fs.existsSync('.github/workflows/invariant-stewardship.yml'),
@@ -239,4 +261,79 @@ test('generated audit artifact remains evidence-only beside executable authority
     source => source.kind === 'codex-task-history'
   );
   assert.equal(tasks.status, 'partial');
+  assert.equal(audit.growthLearningIntake.authority, 'evidence-only');
+  assert.equal(audit.growthLearningIntake.records.length, 1);
+});
+
+test('weekly stewardship caller validates the bounded growth intake receipt', () => {
+  const audit = clone(loadStewardshipAudit());
+  audit.growthLearningIntake = growthLearningIntake();
+
+  const result = validateStewardshipAudit(audit, { now: GROWTH_NOW });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.growthLearning.errors, []);
+  assert.equal(result.growthLearning.status, 'validated');
+  assert.equal(result.growthLearning.records, 1);
+  assert.equal(result.growthLearning.results[0].eligible, true);
+  assert.equal(
+    result.growthLearning.results[0].causalCertification,
+    'not-certified'
+  );
+
+  const projection = projectStewardshipAudit(audit, result);
+  assert.equal(projection.summary.growthLearningRecords, 1);
+  assert.equal(projection.growthLearning.status, 'validated');
+  assert.equal(
+    projection.growthLearning.results[0].nextAction,
+    'hold-for-founder-authorization'
+  );
+});
+
+test('weekly stewardship caller preserves existing authority for internal measurement', () => {
+  const audit = clone(loadStewardshipAudit());
+  const intake = growthLearningIntake();
+  intake.records[0].proposal = {
+    ...intake.records[0].proposal,
+    authorizationScope: 'existing-authority',
+    executionAuthority: 'existing-authority',
+    externalActions: ['measurement-only'],
+  };
+  audit.growthLearningIntake = intake;
+
+  const result = validateStewardshipAudit(audit, { now: GROWTH_NOW });
+  assert.equal(result.ok, true);
+  assert.equal(
+    result.growthLearning.results[0].nextAction,
+    'proceed-under-existing-authority'
+  );
+});
+
+test('weekly stewardship caller rejects authority escalation and duplicate intake', () => {
+  const audit = clone(loadStewardshipAudit());
+  const intake = growthLearningIntake();
+  intake.priorDedupeKeys = [intake.dedupeKey];
+  intake.records[0].proposal = {
+    ...intake.records[0].proposal,
+    executionAuthority: 'self-authorized',
+    externalActions: ['send-outreach'],
+  };
+  audit.growthLearningIntake = intake;
+
+  const result = validateStewardshipAudit(audit, { now: GROWTH_NOW });
+  assert.equal(result.ok, false);
+  assert.equal(result.growthLearning.status, 'invalid');
+  assert.match(
+    result.errors.join('\n'),
+    /JOV-INV-028: growth-learning-duplicate-dedupe-key/
+  );
+  assert.match(
+    result.errors.join('\n'),
+    /JOV-INV-028: growth-learning-record-rejected:growth-learning-2026-09-04-yc-signal-fit/
+  );
+  assert.match(result.errors.join('\n'), /authority-escalation/);
+  assert.match(result.errors.join('\n'), /forbidden-authority:send-outreach/);
+
+  const projection = projectStewardshipAudit(audit, result);
+  assert.equal(projection.growthLearning.status, 'invalid');
+  assert.equal(projection.growthLearning.results[0].eligible, false);
 });
