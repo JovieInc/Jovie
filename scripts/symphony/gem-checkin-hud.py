@@ -1226,8 +1226,7 @@ def work_title(row: dict[str, Any]) -> str:
 def recent_merges(flow: dict[str, Any]) -> list[dict[str, Any]]:
     if flow.get("ok") is not True or flow.get("stale"):
         return []
-    # Python's stable sort preserves source order on equal timestamps. A missing
-    # timestamp is never a recent merge receipt; updatedAt/PR number are not dates.
+    # Stable mergedAt order; never substitute update time or PR number.
     rows = [row for row in flow.get("merged_rows", []) if isinstance(row, dict) and _iso(row.get("merged_at")) is not None]
     return sorted(rows, key=lambda row: _iso(row["merged_at"]), reverse=True)
 
@@ -1674,9 +1673,7 @@ def _gh_json(args: list[str], *, timeout: float) -> Any | None:
 def _pr_list(state: str, fields: str, limit: str, *, timeout: float) -> Any:
     if state != "merged":
         return _gh_json(["pr", "list", "--repo", "JovieInc/Jovie", "--state", state, "--limit", limit, "--json", fields], timeout=timeout)
-    # GitHub cannot sort by mergedAt. Scan a bounded updated-desc prefix:
-    # every unseen merge is <= its updatedAt <= this prefix's last updatedAt.
-    # Only accept the newest five when that boundary proves none were omitted.
+    # Prove newest five: unseen mergedAt <= unseen updatedAt <= prefix boundary.
     records = _gh_json(["pr", "list", "--repo", "JovieInc/Jovie", "--state", "merged", "--limit", "100", "--json", fields + ",updatedAt", "--search", "sort:updated-desc"], timeout=timeout)
     if not isinstance(records, list):
         return None
@@ -2472,7 +2469,7 @@ def _metric_contract(metric: dict[str, Any], *, now: datetime, compact: bool = F
     return f"{source} · {unit} · {window} · / {denominator}{cause_text} · Updated {stamp}"
 
 
-def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
+def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime, show_details: bool = True) -> list[str]:
     payload = pressure if isinstance(pressure, dict) else {}
     known = payload.get("ok") is True
     freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
@@ -2531,7 +2528,7 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
         )
         for label, raw, detail, metric, gauge_value, gauge_denominator in raw_cells
     ]
-    heading_text = f"PRIMARY CAPACITY / PRESSURE · SYSTEM PRESSURE · host projection · Updated {freshness}"
+    heading_text = f"SYSTEM PRESSURE · Updated {freshness}"
     if width < 160:
         result = [_rgb(FG, clip(heading_text, width), bold=True)]
         label_width = 18
@@ -2539,7 +2536,8 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
             headline = f"{_cell(label, label_width)}  {value} {gauge}"
             result.append(_rgb(_semantic_color(status), clip(headline, width), bold=status == "failure"))
             contract = f"  {detail} · {_metric_contract(metric, now=now, compact=True)}"
-            result.append(_rgb(DIM, clip(contract, width)))
+            if show_details:
+                result.append(_rgb(DIM, clip(contract, width)))
         return result
     gap = 3
     col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
@@ -2551,7 +2549,7 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
     values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(f"{value} {gauge}", cell_width), bold=True), cell_width) for (_, value, status, _, _, gauge), cell_width in zip(cells, widths))
     details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, _, detail, _, _), cell_width in zip(cells, widths))
     contracts = spacer.join(pad_visible(_rgb(DIM, clip(contract, cell_width)), cell_width) for (_, _, _, _, contract, _), cell_width in zip(cells, widths))
-    return [pad_visible(heading, width), labels, values, details, contracts]
+    return [pad_visible(heading, width), labels, values] + ([details, contracts] if show_details else [])
 
 
 def _matrix_status(status: Any, width: int) -> str:
@@ -2582,16 +2580,15 @@ def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) 
     freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
     if payload.get("stale") is True:
         freshness = f"STALE · {freshness}"
-    query_ms = _int(payload.get("query_ms")) if known else None
     total = _int(payload.get("open_count")) if known else None
     heading = (
         _rgb(FG, SHIPPING_DISPLAY_IA["ci_matrix"]["label"], bold=True)
-        + _rgb(DIM, f"  ·  cached GitHub rollup  ·  display {len(rows)} · sampled {len(sampled_rows)} · open {dash(total)}  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
+        + _rgb(DIM, f"  ·  {len(rows)} of {dash(total)} open PRs  ·  Updated {freshness}")
     )
     status_width = 10
     admission_width = 11
     gap = 2
-    item_width = max(30, width - (status_width * 5 + admission_width + gap * 6))
+    item_width = max(30, min(72, width - (status_width * 5 + admission_width + gap * 6)))
     header = "  ".join(
         [
             _cell("PR / WORK ITEM", item_width),
@@ -2828,7 +2825,7 @@ def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime, ma
         lines.append(_rgb(DIM, clip(f"│ … {cap - visible_slots} more configured slots not shown at this terminal height", width)))
     if fresh and running == 0:
         lines.append(_rgb(FG, clip("│ Nothing running", width), bold=True))
-    if not fresh or not running_rows:
+    if not fresh or (isinstance(running, int) and running > 0 and not running_rows):
         lines.append(_rgb(DIM, clip("│ Execution identity UNKNOWN until a live run receipt", width)))
     lines.append(_rgb(border_color, "└" + ("─" * max(0, width - 2)) + "┘"))
     return lines
@@ -2905,8 +2902,6 @@ def render(
 ) -> str:
     clock = now or _now()
     symphony = current_execution_view(symphony, now=clock)
-    # Direct render callers get the canonical full canvas unless they request a
-    # height. The live frame path always supplies the detected terminal size.
     cols, rows = terminal_size(width=width, height=height if height is not None else TARGET_HEIGHT)
     path = ship_path if isinstance(ship_path, dict) else empty_ship_path()
     flow = pr_flow if isinstance(pr_flow, dict) else {}
@@ -2921,7 +2916,6 @@ def render(
     if gate is not None and gate > clock:
         lines.append(_rgb(ORANGE, clip(f"Intake paused: Linear rate limit · reset {natural_time(gate, now=clock)} · runtime owner", cols)))
 
-    # Reserve recent outcomes and actionable blockers even on an 80x24 terminal.
     merged = recent_merges(flow)
     merge_limit = 2 if rows < 32 else 3 if rows < 60 else 5
     lines.append(_rgb(PURPLE, clip("RECENTLY MERGED · newest first · deployment verified separately", cols), bold=True))
@@ -2957,10 +2951,9 @@ def render(
     if review is not None and rows - len(lines) > 2:
         lines.append(_rgb(DIM, clip(f"REVIEW {review} · waiting for review", cols)))
 
-    # Diagnostics follow work. Omit entire optional sections when space is scarce.
     diagnostics = [
         _operator_health_lines(symphony=symphony, pressure=system_pressure, mq=mq, ship_path=path, pr_flow=pr_flow, now=clock, width=cols),
-        _system_pressure_lines(system_pressure, cols, now=clock),
+        _system_pressure_lines(system_pressure, cols, now=clock, show_details=False),
         _ci_matrix_lines(pr_flow, cols, now=clock),
         _pr_flow_lines(pr_flow, cols, now=clock),
     ]
