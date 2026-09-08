@@ -2292,6 +2292,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        # A cold macOS pnpm cache save can outlive all product evidence and
+        # consume the merge-queue deadline. Keep the exact fetch/install path,
+        # but do not register setup-node's post-job cache save for this lane.
+        with:
+          package_cache: 'false'
       - name: Bind staging package identity to the exact CI attempt
         id: desktop-staging-identity
         shell: bash
