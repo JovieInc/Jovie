@@ -49,7 +49,7 @@ function candidate(overrides) {
 }
 
 const FIXTURE_NOW = new Date('2026-01-05T00:00:00.000Z');
-const CURRENT_ARTIFACT_NOW = new Date('2026-09-07T00:00:00.000Z');
+const CURRENT_ARTIFACT_NOW = new Date('2026-09-09T00:00:00.000Z');
 
 function fixedGrowthSource(id, ref, sourceRevision) {
   return {
@@ -233,6 +233,26 @@ test('current-week artifact validates against a stable review clock', () => {
   assert.equal(
     result.growthLearning.results[0]?.nextAction,
     'hold-for-founder-authorization'
+  );
+  assert.deepEqual(
+    audit.growthLearningIntake.records[0].sources.map(source => source.id),
+    [
+      'yc-growth-learning',
+      'product-canon',
+      'vercel-open-source-program-spring-2026',
+      'vercel-labs-agent-browser-v0-37-1',
+      'vercel-sandbox-agent-architecture',
+    ]
+  );
+  assert.equal(
+    audit.growthLearningIntake.records[0].sources.some(
+      source => source.id === 'guillermo-rauch-public-posts'
+    ),
+    false
+  );
+  assert.equal(
+    result.growthLearning.dedupeKey,
+    'growth-learning:2026-W36:sha256:3d9c198c314db3ad230729b72a8326d5113d54341b7ab6d55492b0f209714f2b'
   );
   assert.match(
     result.growthLearning.dedupeKey,

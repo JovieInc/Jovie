@@ -50,8 +50,8 @@
     "period": "2026-W36",
     "sourceDigest": "sha256:cee5dbfd608ac62bedddfba151a689ebdb20c0aa8be32c25c409ea5ac9e4a9aa",
     "sourceRevisionDigestAlgorithm": "sha256:sorted-source-id-ref-revision/v1",
-    "sourceRevisionDigest": "sha256:d3cca1c51491cb8c431e7c125e536dcbd79f853bb750350798b55b1796c4ce58",
-    "dedupeKey": "growth-learning:2026-W36:sha256:d3cca1c51491cb8c431e7c125e536dcbd79f853bb750350798b55b1796c4ce58",
+    "sourceRevisionDigest": "sha256:3d9c198c314db3ad230729b72a8326d5113d54341b7ab6d55492b0f209714f2b",
+    "dedupeKey": "growth-learning:2026-W36:sha256:3d9c198c314db3ad230729b72a8326d5113d54341b7ab6d55492b0f209714f2b",
     "maxSources": 5,
     "maxProposals": 1,
     "noDuplicateScheduler": true,
@@ -100,7 +100,7 @@
             "publishedAtKnown": false,
             "publishedAtPrecision": "unknown",
             "accessedAt": "2026-09-05T01:33:49.300Z",
-            "sourceRevision": "repo-snapshot:7ec357acb45d0e0a21d9dac66cb75bf88d25ae33:canon/PRODUCT.md",
+            "sourceRevision": "repo-snapshot:c9589bcd2987b30d65b8300ed557b9943ae3375e:canon/PRODUCT.md",
             "provenance": "Repository read of canonical product guidance.",
             "incentiveOrBias": "Internal product framing is a scope guard, not customer evidence.",
             "observedFacts": [
@@ -116,6 +116,86 @@
             },
             "status": "active",
             "duplicateOf": null
+          },
+          {
+            "id": "vercel-open-source-program-spring-2026",
+            "ref": "https://vercel.com/blog/vercel-open-source-program-spring-2026-cohort",
+            "title": "Vercel Open Source Program — Spring 2026 cohort",
+            "kind": "vercel-official-program",
+            "publishedAt": "2026-06-29T00:00:00.000Z",
+            "publishedAtKnown": true,
+            "publishedAtPrecision": "day",
+            "accessedAt": "2026-09-08T22:55:18.000Z",
+            "sourceRevision": "vercel-blog:published-2026-06-29:vercel-open-source-program-spring-2026-cohort",
+            "provenance": "Vercel first-party program announcement; bounded public-signal handoff.",
+            "incentiveOrBias": "A vendor program announcement may emphasize benefits and does not establish eligibility, customer value, or a general cash grant.",
+            "observedFacts": [
+              "The program accepts open-source maintainer cohorts four times per year.",
+              "The described maintainer benefit is 3600 USD in Vercel platform credits, third-party credits, and guidance."
+            ],
+            "inferences": [
+              "This is a credits-and-support opportunity to observe and verify for eligibility, not authorization to apply or spend."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-08T22:55:18.000Z",
+              "ttlDays": 30
+            },
+            "status": "active",
+            "duplicateOf": null
+          },
+          {
+            "id": "vercel-labs-agent-browser-v0-37-1",
+            "ref": "https://github.com/vercel-labs/agent-browser/releases/tag/v0.37.1",
+            "title": "vercel-labs agent-browser v0.37.1",
+            "kind": "vercel-labs-release",
+            "publishedAt": "2026-09-08T16:05:56.000Z",
+            "publishedAtKnown": true,
+            "publishedAtPrecision": "instant",
+            "accessedAt": "2026-09-08T22:55:18.000Z",
+            "sourceRevision": "vercel-labs/agent-browser:v0.37.1",
+            "provenance": "Vercel Labs first-party release; bounded public-signal handoff.",
+            "incentiveOrBias": "A maintained release highlights shipped fixes and is not evidence that Jovie has the corresponding bottleneck or should adopt the tool.",
+            "observedFacts": [
+              "The release fixed Windows headless Chrome desktop artifacts and process-tree cleanup."
+            ],
+            "inferences": [
+              "This is a comparison candidate only if Windows browser-worker cleanup is measured as a current bottleneck."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-08T22:55:18.000Z",
+              "ttlDays": 14
+            },
+            "status": "active",
+            "duplicateOf": null
+          },
+          {
+            "id": "vercel-sandbox-agent-architecture",
+            "ref": "https://vercel.com/changelog/run-cursor-cloud-agents-vercel-sandbox",
+            "title": "Run Cursor Cloud Agents on Vercel Sandbox",
+            "kind": "vercel-official-changelog",
+            "publishedAt": "2026-09-03T00:00:00.000Z",
+            "publishedAtKnown": true,
+            "publishedAtPrecision": "day",
+            "accessedAt": "2026-09-08T22:55:18.000Z",
+            "sourceRevision": "vercel-changelog:published-2026-09-03:run-cursor-cloud-agents-vercel-sandbox",
+            "provenance": "Vercel first-party changelog; bounded public-signal handoff.",
+            "incentiveOrBias": "Vendor architecture material presents a provider's operating model and does not prove fit, cost, or authorization for Jovie's runtime.",
+            "observedFacts": [
+              "The reference architecture uses an isolated Firecracker microVM per agent request, a scale-to-zero worker pool, durable retries, and short-lived user-scoped credentials.",
+              "The Cursor self-hosted machines path requires Cursor Enterprise."
+            ],
+            "inferences": [
+              "This is an adopt-first comparison for an isolated worker bottleneck, not authorization to replace Symphony or add a control plane."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-08T22:55:18.000Z",
+              "ttlDays": 14
+            },
+            "status": "active",
+            "duplicateOf": null
           }
         ],
         "claim": {
@@ -125,14 +205,17 @@
           "measurementVerified": false,
           "observedFacts": [
             "The source-bound research supports testing a downstream creator outcome.",
-            "No randomized Jovie outcome has been observed."
+            "No randomized Jovie outcome has been observed.",
+            "The verified Vercel sources provide bounded signals about agent tooling, open-source credits, and worker bottlenecks; they do not establish Jovie customer demand."
           ],
           "inferences": [
-            "A transparent signal-specific preview may be a bounded activation hypothesis."
+            "A transparent signal-specific preview may be a bounded activation hypothesis.",
+            "The Vercel signals remain comparison candidates and do not authorize adoption, program application, or external action."
           ],
           "counterevidence": [
             "The source is not a controlled Jovie study and does not prove activation, revenue, retention, or causality.",
-            "Unknown or unmatched outcomes remain missing and must be reported by arm."
+            "Unknown or unmatched outcomes remain missing and must be reported by arm.",
+            "Vendor program and architecture claims require current eligibility, license, overlap, credential-boundary, cost, and measured-bottleneck checks before any decision."
           ]
         },
         "fit": {
