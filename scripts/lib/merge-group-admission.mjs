@@ -30,6 +30,7 @@ const LIVE_QUEUE_ENTRY_STATES = new Set([
 ]);
 const LIVE_QUEUE_PAGE_SIZE = 100;
 const MAX_LIVE_QUEUE_PAGES = 10;
+const MAX_ADMISSION_STATUS_PAGES = 10;
 const NONTERMINAL_CHECK_STATUSES = new Set([
   'in_progress',
   'pending',
@@ -879,6 +880,75 @@ async function githubRequest(
   return { data, link: response.headers.get('link') };
 }
 
+// Fetch only consecutive pages from the exact source-head endpoint. Never use
+// a Link URL as an authenticated request destination or accept a partial list.
+async function loadAdmissionStatuses(path, options) {
+  const statuses = [];
+  const ids = new Set();
+  for (let page = 1; page <= MAX_ADMISSION_STATUS_PAGES; page += 1) {
+    const result = await githubRequest(
+      `${path}?per_page=100&page=${page}`,
+      options
+    );
+    if (!Array.isArray(result.data) || result.data.length > 100) {
+      fail('canonical admission receipt page is malformed');
+    }
+    for (const status of result.data) {
+      if (
+        !Number.isSafeInteger(status?.id) ||
+        status.id < 1 ||
+        ids.has(status.id)
+      ) {
+        fail(
+          'canonical admission receipt page has invalid or repeated status ids'
+        );
+      }
+      ids.add(status.id);
+      statuses.push(status);
+    }
+    let next = null;
+    for (const part of result.link ? result.link.split(',') : []) {
+      const match = /^\s*<([^>]+)>;\s*rel="(next|prev|first|last)"\s*$/.exec(
+        part
+      );
+      if (!match) fail('canonical admission receipt pagination is malformed');
+      if (match[2] === 'next') {
+        const expected = new URL(
+          `${options.env.GITHUB_API_URL || 'https://api.github.com'}${path}?per_page=100&page=${page + 1}`
+        );
+        let target;
+        try {
+          target = new URL(match[1]);
+        } catch {
+          fail('canonical admission receipt pagination is malformed');
+        }
+        // GitHub emits numeric repository aliases in Link even when requested
+        // by owner/name. Recognize that shape, but still request our own path.
+        const sourceSha = path.split('/').at(-2);
+        if (
+          new RegExp(`^/repositories/[1-9][0-9]*/statuses/${sourceSha}$`).test(
+            target.pathname
+          )
+        ) {
+          target.pathname = expected.pathname;
+        }
+        target.searchParams.sort();
+        expected.searchParams.sort();
+        if (
+          next ||
+          target.href !== expected.href ||
+          result.data.length !== 100
+        ) {
+          fail('canonical admission receipt pagination is malformed');
+        }
+        next = match[1];
+      }
+    }
+    if (!next) return { data: statuses, link: null };
+  }
+  fail('canonical admission receipt pagination limit exhausted');
+}
+
 async function githubGraphqlRequest(query, variables, options) {
   const result = await githubRequest('/graphql', {
     ...options,
@@ -911,8 +981,8 @@ function createGitHubAdmissionApi({
           { name, owner, pr: prNumber },
           { deadlineMs, env, fetchImpl, token }
         ),
-        githubRequest(
-          `/repos/${encodedRepository}/commits/${sourceHeadSha}/statuses?per_page=100&page=1`,
+        loadAdmissionStatuses(
+          `/repos/${encodedRepository}/commits/${sourceHeadSha}/statuses`,
           { deadlineMs, env, fetchImpl, token }
         ),
       ]);
