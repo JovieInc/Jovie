@@ -158,7 +158,7 @@ export async function POST(request: Request) {
               Authorization: `Bearer ${token}`,
               'Content-Type': input.mediaType,
             },
-            body: input.bytes,
+            body: new Uint8Array(input.bytes),
             timeoutMs: 15_000,
             context: 'YouTube thumbnail mutation',
           }
