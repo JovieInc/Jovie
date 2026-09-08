@@ -251,7 +251,7 @@
     "@tanstack/react-query": "^5.102.8",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.24",
-    "@tiptap/core": "3.30.4",
+    "@tiptap/core": "3.30.5",
     "@tiptap/extension-placeholder": "3.30.4",
     "@tiptap/pm": "3.30.4",
     "@tiptap/react": "3.30.4",
@@ -282,7 +282,7 @@
     "lucide-react": "^1.38.0",
     "mdast-util-to-string": "^4.0.0",
     "motion": "^13.1.1",
-    "next": "16.2.11",
+    "next": "16.3.3",
     "next-themes": "^0.4.6",
     "nuqs": "^2.10.1",
     "passkit-generator": "3.5.7",
@@ -360,6 +360,6 @@
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
     "vite": "8.1.0",
-    "vitest": "4.1.10"
+    "vitest": "5.0.0"
   }
 }
