@@ -2917,7 +2917,7 @@ def render(
         lines.append(_rgb(ORANGE, clip(f"Intake paused: Linear rate limit · reset {natural_time(gate, now=clock)} · runtime owner", cols)))
 
     merged = recent_merges(flow)
-    merge_limit = 2 if rows < 32 else 3 if rows < 60 else 5
+    merge_limit = 2 if rows < 32 else 3 if rows < 45 else 5
     lines.append(_rgb(PURPLE, clip("RECENTLY MERGED · newest first · deployment verified separately", cols), bold=True))
     for row in merged[:merge_limit]:
         lines.append(_rgb(PURPLE, "✓ ") + _rgb(FG, clip(f"#{row.get('number') or UNKNOWN} · {row.get('title') or UNKNOWN} · {natural_time(row['merged_at'], now=clock)}", cols - 2)))

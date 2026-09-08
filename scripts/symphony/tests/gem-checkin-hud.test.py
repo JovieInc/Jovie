@@ -319,7 +319,7 @@ class ReadableWorkTests(unittest.TestCase):
         self.assertEqual(HUD.recent_merges({"ok": True, "merged_rows": ties}), ties)
         self.assertEqual(HUD.recent_merges({**flow, "stale": True}), [])
         self.assertEqual(HUD.recent_merges({"ok": False}), [])
-        self.assertEqual(len(rows), 10)
+        self.assertEqual((len(rows), strip(paint(pr_flow=flow, width=215, height=45)).count(" · Change ")), (10, 5))
 
     def test_github_updated_prefix_proves_latest_merges_before_truncation(self):
         recent = [{"number": i, "mergedAt": (NOW-dt.timedelta(minutes=i)).isoformat(), "updatedAt": NOW.isoformat()} for i in range(5)]
