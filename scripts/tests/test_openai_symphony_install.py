@@ -28,7 +28,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn('jovie-symphony-workspace cleanup "$PWD"', workflow)
         self.assertRegex(
             workflow,
-            re.compile(r"^\s+command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
+            re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
         )
         self.assertIn("symphony-agent-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)
