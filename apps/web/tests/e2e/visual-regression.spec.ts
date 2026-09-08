@@ -55,7 +55,7 @@ async function openHomepageForScreenshot(
   });
   expect(response?.status(), 'homepage document must succeed').toBe(200);
   expect(new URL(page.url()).pathname).toBe('/');
-  await expect(page.getByTestId('homepage-hero-shell')).toBeVisible();
+  await expect(page.getByTestId('marketing-section-hero')).toBeVisible();
   await expect(page.locator('h1').first()).toBeVisible();
   // Visual readiness belongs to the viewport, not unrelated network traffic.
   await expect

@@ -19,7 +19,9 @@ export function HomepageClose() {
   return (
     <section
       className='homepage-close'
-      data-testid='homepage-close'
+      data-testid='marketing-section-cta'
+      data-homepage-testid='homepage-close'
+      data-marketing-owner='apps/web/components/homepage/HomepageClose.tsx'
       aria-labelledby='homepage-close-heading'
     >
       <div className='homepage-close__inner'>

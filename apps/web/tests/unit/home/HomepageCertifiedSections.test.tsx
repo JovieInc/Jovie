@@ -45,7 +45,21 @@ describe('HomepageCertifiedSections', () => {
   it('renders proof logos and sections 2-8 with the locked copy, in order', () => {
     render(<HomepageCertifiedSections previews={PREVIEWS} />);
 
-    const proof = screen.getByTestId('homepage-proof');
+    const proof = screen.getByTestId('marketing-section-logo-cloud');
+    expect(proof).toHaveAttribute('data-homepage-testid', 'homepage-proof');
+    expect(proof).toHaveAttribute('data-marketing-variant', 'inline-strip');
+    expect(
+      screen.getAllByTestId('marketing-section-feature-split')
+    ).toHaveLength(HOMEPAGE_LAUNCH_COPY.certified.sections.length);
+    for (const row of screen.getAllByTestId(
+      'marketing-section-feature-split'
+    )) {
+      expect(row).toHaveAttribute('data-marketing-variant', 'editorial');
+      expect(row).toHaveAttribute(
+        'data-marketing-owner',
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx'
+      );
+    }
     expect(proof).toHaveTextContent(
       HOMEPAGE_LAUNCH_COPY.certified.proof.statement
     );
@@ -65,8 +79,11 @@ describe('HomepageCertifiedSections', () => {
       HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.headline)
     );
     for (const section of HOMEPAGE_LAUNCH_COPY.certified.sections) {
-      const region = screen.getByTestId(`homepage-section-${section.id}`);
+      const region = document.querySelector<HTMLElement>(
+        `[data-homepage-testid="homepage-section-${section.id}"]`
+      )!;
       expect(region).toHaveTextContent(section.body);
+      expect(region).toHaveAttribute('data-marketing-occurrence', section.id);
       expect(region).toHaveAttribute(
         'aria-labelledby',
         `homepage-section-${section.id}-heading`
@@ -75,20 +92,26 @@ describe('HomepageCertifiedSections', () => {
 
     // Real product exports only where the copy talks about the profile.
     expect(
-      within(screen.getByTestId('homepage-section-connected')).getAllByRole(
-        'img'
-      )
+      within(
+        document.querySelector<HTMLElement>(
+          '[data-homepage-testid="homepage-section-connected"]'
+        )!
+      ).getAllByRole('img')
     ).toHaveLength(1);
     expect(
-      within(screen.getByTestId('homepage-section-relationships')).getAllByRole(
-        'img'
-      )
+      within(
+        document.querySelector<HTMLElement>(
+          '[data-homepage-testid="homepage-section-relationships"]'
+        )!
+      ).getAllByRole('img')
     ).toHaveLength(3);
     for (const id of ['found', 'know', 'smarter', 'built']) {
       expect(
-        within(screen.getByTestId(`homepage-section-${id}`)).queryAllByRole(
-          'img'
-        )
+        within(
+          document.querySelector<HTMLElement>(
+            `[data-homepage-testid="homepage-section-${id}"]`
+          )!
+        ).queryAllByRole('img')
       ).toHaveLength(0);
     }
 

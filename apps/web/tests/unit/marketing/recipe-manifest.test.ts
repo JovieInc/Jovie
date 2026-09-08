@@ -1347,3 +1347,102 @@ describe('marketing adversarial-review invariants', () => {
     expect(true).toBe(true);
   });
 });
+
+// Source inventory checks only. Mounted identity remains the route-health gate.
+describe('current acquisition source inventory (JOV-4065)', () => {
+  it('retains all six homepage beats and their actual outer-section owners', async () => {
+    const { HOMEPAGE_LAUNCH_COPY } = await import('@/data/homepageLaunchCopy');
+    const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === '/')!;
+    const bindings = entry.renderedSections.filter(
+      binding => binding.kind === 'approved-section'
+    );
+    const rows = HOMEPAGE_LAUNCH_COPY.certified.sections;
+    expect(bindings.slice(2, -1).map(binding => binding.occurrenceId)).toEqual(
+      rows.map(row => row.id)
+    );
+    expect(rows.map(row => row.id)).toEqual([
+      'connected',
+      'found',
+      'know',
+      'relationships',
+      'smarter',
+      'built',
+    ]);
+    expect(bindings.map(binding => binding.sectionId)).toEqual([
+      'hero',
+      'logo-cloud',
+      ...rows.map(() => 'feature-split'),
+      'cta',
+    ]);
+    expect(bindings.map(binding => binding.componentPath)).toEqual([
+      'apps/web/components/homepage/HomepageEditorialHero.tsx',
+      ...Array(rows.length + 1).fill(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx'
+      ),
+      'apps/web/components/homepage/HomepageClose.tsx',
+    ]);
+    // Source inventory must not clear incomplete root/variant registration.
+    expect(entry.bindingEvidence.status).toBe('unverified');
+    expect(bindings.map(binding => binding.variantId)).toEqual([
+      'centered-none',
+      'inline-strip',
+      ...rows.map(() => 'editorial'),
+      undefined,
+    ]);
+  });
+
+  it('keeps the YouTube hero DOM owner separate from its inline section owners', () => {
+    const entry = MARKETING_ROUTE_MANIFEST.find(
+      route => route.url === '/youtube-thumbnails'
+    )!;
+    const bindings = entry.renderedSections.filter(
+      binding => binding.kind === 'approved-section'
+    );
+    expect(bindings.map(binding => binding.sectionId)).toEqual([
+      'hero',
+      'how-it-works',
+      'feature-grid',
+      'cta',
+    ]);
+    expect(bindings.map(binding => binding.componentPath)).toEqual([
+      'apps/web/components/marketing/MarketingHero.tsx',
+      ...Array(3).fill(
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
+      ),
+    ]);
+    expect(entry.bindingEvidence.status).toBe('unverified');
+    expect(bindings.map(binding => binding.variantId)).toEqual([
+      'left-none',
+      '3-step-strip',
+      'two-column-text',
+      undefined,
+    ]);
+  });
+});
+
+describe('source-owned editorial input contract', () => {
+  it('permits absent media only for editorial and retains existing variant requirements', async () => {
+    const { getRequiredVariantInputs, getMarketingSection } = await import(
+      '@/data/marketing/sections'
+    );
+    expect(getRequiredVariantInputs('feature-split', 'editorial')).toEqual([
+      'headline',
+      'body',
+    ]);
+    expect(getRequiredVariantInputs('feature-split', 'phone-right')).toContain(
+      'media'
+    );
+    expect(getMarketingSection('feature-split').requiredInputs).toContain(
+      'media'
+    );
+    expect(
+      getMarketingSection('feature-split').variants.length
+    ).toBeLessThanOrEqual(6);
+    expect(() =>
+      getRequiredVariantInputs('feature-split', 'missing')
+    ).toThrow();
+    expect(() =>
+      getRequiredVariantInputs('feature-split', 'screenshot-right')
+    ).toThrow();
+  });
+});

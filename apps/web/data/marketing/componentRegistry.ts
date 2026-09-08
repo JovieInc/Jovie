@@ -22,6 +22,13 @@ interface MarketingPenRootResolution {
   readonly penVariantRoots?: Readonly<Record<string, MarketingPenContractId>>;
   readonly rootProofs: readonly MarketingPenRootProof[];
   readonly unresolvedReason?: string;
+  /** Additional structural source bindings; rendered owner proof remains separate. */
+  readonly occurrenceProofs?: readonly {
+    readonly variantId: string;
+    readonly componentPath: string;
+    readonly rootBinding: string;
+    readonly delegatedProofs?: readonly MarketingPenRootProof[];
+  }[];
 }
 
 export interface MarketingPenRootProof {
@@ -223,88 +230,179 @@ const sourceRoot = (
 });
 
 const SECTION_RESOLUTIONS = {
-  hero: sourceRoot(
-    'apps/web/components/marketing/MarketingHero.tsx',
-    'MarketingHero',
-    MARKETING_PEN_CONTRACT_IDS.section.hero,
-    'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}',
-    1,
-    [
+  hero: {
+    ...sourceRoot(
+      'apps/web/components/marketing/MarketingHero.tsx',
+      'MarketingHero',
+      MARKETING_PEN_CONTRACT_IDS.section.hero,
+      'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}',
+      1,
+      [
+        {
+          source: 'apps/web/components/marketing/MarketingPosterHero.tsx',
+          binding: '<MarketingHero',
+          occurrences: 1,
+          kind: 'source',
+        },
+        {
+          source:
+            'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx',
+          binding: '<MarketingHero',
+          occurrences: 1,
+          kind: 'source',
+        },
+      ]
+    ),
+    occurrenceProofs: [
       {
-        source: 'apps/web/components/marketing/MarketingPosterHero.tsx',
-        binding: '<MarketingHero',
-        occurrences: 1,
-        kind: 'source',
+        variantId: 'centered-none',
+        componentPath: 'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        rootBinding: "data-testid='marketing-section-hero'",
+        delegatedProofs: [],
       },
       {
-        source: 'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx',
-        binding: '<MarketingHero',
-        occurrences: 1,
-        kind: 'source',
+        variantId: 'left-none',
+        componentPath: 'apps/web/components/marketing/MarketingHero.tsx',
+        rootBinding: 'data-marketing-variant={sectionVariant}',
+        delegatedProofs: [
+          {
+            source:
+              'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+            binding: "sectionVariant='left-none'",
+            occurrences: 1,
+            kind: 'source',
+          },
+        ],
       },
-    ]
-  ),
-  'logo-cloud': sourceRoot(
-    'apps/web/components/features/home/HomeTrustSection.tsx',
-    'HomeTrustSection',
-    MARKETING_PEN_CONTRACT_IDS.section.logoCloud,
-    'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}',
-    2,
-    [
+    ],
+  },
+  'logo-cloud': {
+    ...sourceRoot(
+      'apps/web/components/features/home/HomeTrustSection.tsx',
+      'HomeTrustSection',
+      MARKETING_PEN_CONTRACT_IDS.section.logoCloud,
+      'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}',
+      2,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx',
+          binding: '<HomeTrustSection',
+          occurrences: 1,
+          kind: 'source',
+        },
+      ]
+    ),
+    occurrenceProofs: [
       {
-        source:
-          'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx',
-        binding: '<HomeTrustSection',
-        occurrences: 1,
-        kind: 'source',
+        variantId: 'inline-strip',
+        componentPath:
+          'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        rootBinding: "data-testid='marketing-section-logo-cloud'",
+        delegatedProofs: [
+          {
+            source:
+              'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+            binding: '<HomeTrustSection',
+            occurrences: 1,
+            kind: 'source',
+          },
+        ],
       },
-    ]
-  ),
-  'feature-grid': sourceRoot(
-    'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
-    'ArtistProfileOutcomesCarousel',
-    MARKETING_PEN_CONTRACT_IDS.section.featureGrid,
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureGrid}',
-    1,
-    [
+    ],
+  },
+  'feature-grid': {
+    ...sourceRoot(
+      'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
+      'ArtistProfileOutcomesCarousel',
+      MARKETING_PEN_CONTRACT_IDS.section.featureGrid,
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureGrid}',
+      1,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+          binding: 'data-pen-contract={penContractId}',
+          occurrences: 1,
+        },
+      ]
+    ),
+    occurrenceProofs: [
       {
-        source:
-          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
+        variantId: 'two-column-text',
+        componentPath:
+          'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        rootBinding: "data-testid='marketing-section-feature-grid'",
+        delegatedProofs: [
+          {
+            source:
+              'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+            binding: '<MarketingFeatureGrid items={copy.safeguards.items} />',
+            occurrences: 1,
+            kind: 'source',
+          },
+          {
+            source: 'apps/web/components/marketing/MarketingFeatureGrid.tsx',
+            binding:
+              "className={className ?? 'mt-8 grid gap-8 sm:grid-cols-2'}",
+            occurrences: 1,
+            kind: 'jsx-root',
+          },
+        ],
       },
-    ]
-  ),
-  'feature-split': sourceRoot(
-    'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
-    'ArtistProfileAdaptiveSection',
-    MARKETING_PEN_CONTRACT_IDS.section.featureSplit,
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}',
-    1,
-    [
+    ],
+  },
+  'feature-split': {
+    ...sourceRoot(
+      'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
+      'ArtistProfileAdaptiveSection',
+      MARKETING_PEN_CONTRACT_IDS.section.featureSplit,
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}',
+      1,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+          binding: 'data-pen-contract={penContractId}',
+          occurrences: 1,
+        },
+      ]
+    ),
+    occurrenceProofs: [
       {
-        source:
-          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
+        variantId: 'editorial',
+        componentPath:
+          'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        rootBinding: "data-testid='marketing-section-feature-split'",
+        delegatedProofs: [],
       },
-    ]
-  ),
-  'how-it-works': sourceRoot(
-    'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
-    'ArtistProfileHowItWorks',
-    MARKETING_PEN_CONTRACT_IDS.section.howItWorks,
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.section.howItWorks}',
-    1,
-    [
+    ],
+  },
+  'how-it-works': {
+    ...sourceRoot(
+      'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
+      'ArtistProfileHowItWorks',
+      MARKETING_PEN_CONTRACT_IDS.section.howItWorks,
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.section.howItWorks}',
+      1,
+      [
+        {
+          source:
+            'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+          binding: 'data-pen-contract={penContractId}',
+          occurrences: 1,
+        },
+      ]
+    ),
+    occurrenceProofs: [
       {
-        source:
-          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
+        variantId: '3-step-strip',
+        componentPath:
+          'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        rootBinding: "data-testid='marketing-section-how-it-works'",
       },
-    ]
-  ),
+    ],
+  },
   'social-proof': sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
     'ArtistProfileSocialProof',

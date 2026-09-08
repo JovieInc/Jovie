@@ -18,6 +18,7 @@ import {
 } from '@/data/designSystem';
 import {
   MARKETING_COMPONENT_REGISTRY,
+  MARKETING_ROUTE_MANIFEST,
   MARKETING_SECTION_IDS,
   MARKETING_SECTION_REGISTRY,
   MARKETING_SECTIONS,
@@ -168,6 +169,26 @@ function parseTsx(absolutePath: string, source: string): ts.SourceFile {
     true,
     ts.ScriptKind.TSX
   );
+}
+
+function countSectionOccurrenceBindings(
+  sourceFile: ts.SourceFile,
+  binding: string
+): number {
+  let count = 0;
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.tagName.getText(sourceFile) === 'section' &&
+      node.attributes.properties.some(
+        attribute => attribute.getText(sourceFile) === binding
+      )
+    )
+      count++;
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return count;
 }
 
 function countReturnedRootBindings(
@@ -466,6 +487,29 @@ describe('canonical marketing component registry', () => {
         entry.id
       ).toBe(true);
 
+      for (const occurrence of entry.occurrenceProofs ?? []) {
+        const ownerPath = path.join(repoRoot, occurrence.componentPath);
+        const ownerSource = fs.readFileSync(ownerPath, 'utf8');
+        expect(
+          countSectionOccurrenceBindings(
+            parseTsx(ownerPath, ownerSource),
+            occurrence.rootBinding
+          ),
+          `${entry.id}/${occurrence.variantId} outer root`
+        ).toBe(1);
+        for (const delegated of occurrence.delegatedProofs ?? []) {
+          const delegatedPath = path.join(repoRoot, delegated.source);
+          const delegatedSource = fs.readFileSync(delegatedPath, 'utf8');
+          const count =
+            delegated.kind === 'jsx-root'
+              ? countReturnedRootBindings(
+                  parseTsx(delegatedPath, delegatedSource),
+                  delegated.binding
+                )
+              : countOccurrences(delegatedSource, delegated.binding);
+          expect(count).toBe(delegated.occurrences);
+        }
+      }
       for (const proof of entry.rootProofs) {
         const proofPath = path.join(repoRoot, proof.source);
         const source = fs.readFileSync(proofPath, 'utf8');
@@ -827,13 +871,20 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
       candidate => candidate.id === variantId
     );
 
-  it('feature-grid registers the shipped four-row ledger as the sole active body', () => {
+  it('feature-grid retains the default ledger alongside the source-bound text grid', () => {
     expect(sectionEntry('feature-grid')).toMatchObject({
       sourceBacked: true,
       resolvedSource:
         'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
       exportName: 'ArtistProfileOutcomesCarousel',
-      variants: ['4-ledger', '3-large', '4-equal', '6-compact', 'icon-list'],
+      variants: [
+        'two-column-text',
+        '4-ledger',
+        '3-large',
+        '4-equal',
+        '6-compact',
+        'icon-list',
+      ],
       defaultVariant: '4-ledger',
       storybookTitle: 'Marketing/Sections/feature-grid',
     });
@@ -1312,4 +1363,65 @@ describe('canonical shared source atom registry', () => {
       expect(ref.overrides).toHaveLength(1);
     }
   });
+});
+
+describe('production occurrence structural source bindings', () => {
+  it('requires a real section root attribute, rejecting detached quoted metadata', () => {
+    const binding = "data-testid='marketing-section-feature-grid'";
+    expect(
+      countSectionOccurrenceBindings(
+        parseTsx(
+          'positive.tsx',
+          "export function X(){return <main><section data-testid='marketing-section-feature-grid'/></main>}"
+        ),
+        binding
+      )
+    ).toBe(1);
+    expect(
+      countSectionOccurrenceBindings(
+        parseTsx(
+          'positive.tsx',
+          "export function X(){return <main><section data-testid='marketing-section-feature-grid'></section></main>}"
+        ),
+        binding
+      )
+    ).toBe(1);
+    expect(
+      countSectionOccurrenceBindings(
+        parseTsx(
+          'negative.tsx',
+          `const claimed = ${JSON.stringify(binding)}; export function X(){return <section/>}`
+        ),
+        binding
+      )
+    ).toBe(0);
+  });
+});
+
+it('binds every nonterminal acquisition occurrence to its declared variant owner', () => {
+  for (const url of ['/', '/youtube-thumbnails']) {
+    const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === url)!;
+    expect(route.bindingEvidence.status).toBe('unverified');
+    for (const binding of route.renderedSections) {
+      expect(binding.kind).toBe('approved-section');
+      if (binding.kind !== 'approved-section')
+        throw new Error('Unresolved acquisition proposal');
+      const section = MARKETING_SECTION_REGISTRY.find(
+        entry => entry.sectionId === binding.sectionId
+      )!;
+      if (binding.sectionId === 'cta') {
+        expect(section.sourceBacked).toBe(false);
+        expect(binding.variantId).toBeUndefined();
+        continue;
+      }
+      expect(section.occurrenceProofs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            variantId: binding.variantId,
+            componentPath: binding.componentPath,
+          }),
+        ])
+      );
+    }
+  }
 });

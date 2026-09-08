@@ -30,6 +30,7 @@ describe('marketing route health contract', () => {
         ...MARKETING_ROUTE_MANIFEST[0],
         glob: '(marketing)/future/[slug]/page.tsx',
         url: '/future/*',
+        healthCheck: undefined,
       })
     ).toThrow(/concrete healthCheck\.path/);
     expect(() =>
@@ -45,6 +46,7 @@ describe('marketing route health contract', () => {
         ...MARKETING_ROUTE_MANIFEST[0],
         glob: '(marketing)/future/page.tsx',
         url: 'future',
+        healthCheck: undefined,
       })
     ).toThrow(/concrete absolute path/);
   });
