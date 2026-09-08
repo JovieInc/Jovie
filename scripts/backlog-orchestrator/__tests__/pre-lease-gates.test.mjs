@@ -62,6 +62,22 @@ function planEvidence() {
       'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     ],
     rollback: 'Revert the gate commit and remove the receipt comments',
+    value: {
+      authority: 'founder-request',
+      decisionId: 'task-pre-lease-gates',
+      rationale: 'Bind evidence before agent work begins',
+      expectedBenefit: 'Prevent unqualified work and reduce repair churn',
+      validation: 'Verify one admission-to-draft flow',
+      sanity: {
+        basis: 'measured',
+        concurrency: 1,
+        demandPerDay: 1,
+        criticalPath: [{ stage: 'pre-lease', durationMs: 60_000 }],
+        bottleneck: 'context lookup',
+        simplification: 'use one revision-scoped receipt chain',
+        owner: 'Summer',
+      },
+    },
     target: {
       target_system: 'jovie-product',
       target_repo: 'JovieInc/Jovie',
