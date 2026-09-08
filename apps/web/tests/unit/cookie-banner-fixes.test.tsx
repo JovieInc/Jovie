@@ -288,7 +288,11 @@ describe('CookieModal loads saved preferences', () => {
       screen.getByRole('link', { name: /cookie policy/i }).className
     ).toContain('min-h-12');
     const close = screen.getByRole('button', { name: 'Close' });
-    expect(close.className).toContain('size-12');
+    // CookieModal consumes Dialog's shared close atom: 36px visible, 44px hit target.
+    expect(close.className).toContain('size-9');
+    expect(close.className).toContain('before:h-11');
+    expect(close.className).toContain('before:w-11');
+    expect(close.className).not.toContain('size-12');
   });
 
   it('calls onSave and onClose when Save Preferences succeeds', async () => {
