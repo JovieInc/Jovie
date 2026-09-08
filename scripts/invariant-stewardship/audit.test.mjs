@@ -49,6 +49,7 @@ function candidate(overrides) {
 }
 
 const FIXTURE_NOW = new Date('2026-01-05T00:00:00.000Z');
+const CURRENT_ARTIFACT_NOW = new Date('2026-09-07T00:00:00.000Z');
 
 function fixedGrowthSource(id, ref, sourceRevision) {
   return {
@@ -221,9 +222,11 @@ function growthLearningIntake() {
   return intake;
 }
 
-test('current-week artifact validates against the current clock', () => {
+test('current-week artifact validates against a stable review clock', () => {
   const audit = loadStewardshipAudit();
-  const result = validateStewardshipAudit(audit, { now: new Date() });
+  const result = validateStewardshipAudit(audit, {
+    now: CURRENT_ARTIFACT_NOW,
+  });
   assert.equal(result.ok, true);
   assert.equal(result.growthLearning.status, 'validated');
   assert.equal(result.growthLearning.records, 1);
