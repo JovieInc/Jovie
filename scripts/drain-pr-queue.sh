@@ -784,7 +784,7 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
     --arg expected_main "$expected_main" \
     --arg enqueued_at "$enqueued_at" '
     [ .[][]? | select(.context == $context) ]
-    | sort_by(.updated_at)
+    | sort_by(.updated_at, (.id // 0))
     | last
     | . as $receipt
     | ($receipt.description | capture("^checkpoint=(?<checkpoint>verified|controller-repair|source-qualified);main=(?<main>[0-9a-f]{40});pr=(?<pr>[1-9][0-9]*)$")) as $binding

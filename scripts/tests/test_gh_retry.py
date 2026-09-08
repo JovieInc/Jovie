@@ -5376,6 +5376,7 @@ class TestNativeAdmissionReceiptReconciliation:
         receipt_main: str,
         checkpoint: str = "verified",
         receipt_creator: str = "jovie-bot[bot]",
+        older_receipt_creator: str | None = None,
         receipt_at: str | None,
         enqueued_at: str | None = "2026-09-07T12:00:00Z",
         dequeue_response: str = '{"skipped":false,"state":{"queued":false}}',
@@ -5423,7 +5424,14 @@ class TestNativeAdmissionReceiptReconciliation:
             if receipt_at is None
             else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint={checkpoint};main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"{receipt_creator}"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
         )
-        plural_status_json = json.dumps([[], json.loads(status_json)["statuses"]])
+        plural_statuses = json.loads(status_json)["statuses"]
+        if older_receipt_creator is not None:
+            plural_statuses[0]["id"] = 2
+            older = json.loads(json.dumps(plural_statuses[0]))
+            older["id"] = 1
+            older["creator"]["login"] = older_receipt_creator
+            plural_statuses.append(older)
+        plural_status_json = json.dumps([[], plural_statuses])
         combined_status = json.loads(status_json)
         for receipt in combined_status["statuses"]:
             receipt["creator"] = None
@@ -5529,6 +5537,10 @@ class TestNativeAdmissionReceiptReconciliation:
         _, dequeue_log = self._write_fixture(
             tmp_path, receipt_main="a" * 40,
             receipt_at="2026-09-07T12:00:02Z", receipt_creator=receipt_creator,
+            older_receipt_creator=(
+                "untrusted-bot[bot]" if receipt_creator == "jovie-bot[bot]"
+                else "jovie-bot[bot]"
+            ),
         )
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
