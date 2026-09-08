@@ -37,6 +37,8 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 
+export const MARKETING_CERTIFICATION_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx" components/homepage/HomepageNoScriptContent.test.tsx components/marketing/MarketingHero.test.tsx tests/unit/home/HomepageCertifiedSections.test.tsx tests/unit/home/HomepageEditorialHero.test.tsx tests/unit/marketing/component-registry.test.ts tests/unit/marketing/recipe-manifest.test.ts tests/unit/marketing/route-health-contract.test.ts components/site/PublicPageShell.test.tsx --coverage.enabled --coverage.provider=v8 --coverage.include=data/marketing/componentRegistry.ts --coverage.include=data/marketing/routeManifest.ts --coverage.include=data/marketing/sections.ts --coverage.include=components/marketing/MarketingHero.tsx --coverage.thresholds.perFile=true --coverage.thresholds.lines=80 --coverage.thresholds.statements=80 --coverage.thresholds.branches=75 --coverage.thresholds.functions=75';
 export const CERTIFICATION_KERNEL_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
 export const DESKTOP_RELEASE_COVERAGE_COMMAND =
@@ -119,6 +121,8 @@ const LANES = [
     name: 'Structural Contract',
     nextLocalCommand:
       'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+      ' && ' +
+      MARKETING_CERTIFICATION_COMMAND +
       ' && ' +
       CERTIFICATION_KERNEL_COMMAND +
       ' && ' +
@@ -662,6 +666,8 @@ function runStructural() {
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
   ];
   const webParts = [
+    // JOV-6104: measured marketing contracts must run for registry-only edits.
+    MARKETING_CERTIFICATION_COMMAND,
     'pnpm next:proxy-guard',
     'pnpm tailwind:check',
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',

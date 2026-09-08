@@ -16,6 +16,7 @@ import {
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
+  MARKETING_CERTIFICATION_COMMAND,
   selectLanes,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
@@ -542,6 +543,8 @@ describe('ci-fast bounded parallel workflow', () => {
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
+        MARKETING_CERTIFICATION_COMMAND +
+        ' && ' +
         CERTIFICATION_KERNEL_COMMAND +
         ' && ' +
         DESKTOP_RELEASE_COVERAGE_COMMAND,
@@ -643,6 +646,67 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'lib/__tests__/component-live-storybook-certification.test.mjs'
     );
+  });
+
+  it('selects structural CI for marketing registry-only edits and enforces per-file coverage', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeDefined();
+    for (const path of [
+      'apps/web/data/marketing/componentRegistry.ts',
+      'apps/web/data/marketing/routeManifest.ts',
+      'apps/web/data/marketing/sections.ts',
+    ]) {
+      const selected = spawnSync('grep', ['-qE', pattern], {
+        input: `${path}\n`,
+      });
+      expect(selected.status, path).toBe(0);
+    }
+    const marketingAlt = 'apps/web/data/marketing/';
+    expect(pattern).toContain(`${marketingAlt}|`);
+    const stripped = pattern.replace(`${marketingAlt}|`, '');
+    expect(stripped).not.toBe(pattern);
+    for (const path of [
+      'apps/web/data/marketing/componentRegistry.ts',
+      'apps/web/data/marketing/routeManifest.ts',
+      'apps/web/data/marketing/sections.ts',
+    ]) {
+      const red = spawnSync('grep', ['-qE', stripped], {
+        input: `${path}\n`,
+      });
+      expect(red.status, `deliberate-red ${path}`).not.toBe(0);
+    }
+    const start = CI_FAST_SOURCE.indexOf('const webParts = [');
+    const web = CI_FAST_SOURCE.slice(
+      start,
+      CI_FAST_SOURCE.indexOf('const parts = [', start)
+    );
+    expect(web).toContain('MARKETING_CERTIFICATION_COMMAND');
+    const command = MARKETING_CERTIFICATION_COMMAND;
+    expect(LANE_COMMANDS.structural).toContain(command);
+    for (const selector of [
+      'app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.test.tsx',
+      'components/homepage/HomepageNoScriptContent.test.tsx',
+      'components/marketing/MarketingHero.test.tsx',
+      'tests/unit/home/HomepageCertifiedSections.test.tsx',
+      'tests/unit/home/HomepageEditorialHero.test.tsx',
+      'tests/unit/marketing/component-registry.test.ts',
+      'tests/unit/marketing/recipe-manifest.test.ts',
+      'tests/unit/marketing/route-health-contract.test.ts',
+      'components/site/PublicPageShell.test.tsx',
+      '--coverage.enabled',
+      '--coverage.provider=v8',
+      '--coverage.include=data/marketing/componentRegistry.ts',
+      '--coverage.include=data/marketing/routeManifest.ts',
+      '--coverage.include=data/marketing/sections.ts',
+      '--coverage.include=components/marketing/MarketingHero.tsx',
+      '--coverage.thresholds.perFile=true',
+      '--coverage.thresholds.lines=80',
+      '--coverage.thresholds.statements=80',
+      '--coverage.thresholds.branches=75',
+      '--coverage.thresholds.functions=75',
+    ])
+      expect(command).toContain(selector);
+    expect(command).not.toContain('passWithNoTests');
   });
 
   it('runs the lockfile specifier preflight before expensive fast lanes', () => {
