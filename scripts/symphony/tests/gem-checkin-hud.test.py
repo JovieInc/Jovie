@@ -199,7 +199,7 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertTrue(full.splitlines()[0].endswith("API FRESH · just now ┐"))
 
         bounded = strip("\n".join(HUD.execution_summary({"ok": True, "rows": rows, "running": 5, "cap": 12, "generated_at": NOW.isoformat()}, 240, now=NOW, max_slots=4)))
-        self.assertIn("… 8 more configured slots not shown at this terminal height", bounded)
+        self.assertIn("… 1 more active runs", bounded)
         self.assertNotIn("VACANT", bounded)
 
         stale = strip("\n".join(HUD.execution_summary({"ok": False, "stale": True, "rows": rows, "running": None, "cap": 2, "generated_at": NOW.isoformat()}, 240, now=NOW)))
@@ -358,6 +358,24 @@ class ReadableWorkTests(unittest.TestCase):
             self.assertIsNone(HUD._pr_list("merged", "number,mergedAt", "10", timeout=2))
             HUD._pr_list("open", "number", "10", timeout=2)
             self.assertNotIn("--search", fetch.call_args.args[0])
+
+    def test_missing_or_reduced_cap_keeps_live_titles_and_reports_overflow(self):
+        rows = [{"kind": "running", "id": f"JOV-{i}", "title": f"Title {i}"} for i in range(3)]
+        for cap in (None, 0, 1):
+            state = {"ok": True, "running": 3, "cap": cap, "rows": rows, "linear_gate_until": "2026-08-31T12:05:00Z"}
+            text = strip(paint(state, width=240, height=60))
+            for i in range(3): self.assertIn(f"Title {i}", text)
+            self.assertIn("Intake paused: Linear rate limit", text)
+            bounded = strip("\n".join(HUD.execution_summary(state, 120, now=NOW, max_slots=1)))
+            self.assertIn("2 more active runs", bounded)
+
+    def test_linear_live_schema_has_no_total_count_and_retains_titles(self):
+        self.assertNotIn("totalCount", HUD.LINEAR_STAGES_QUERY)
+        payload = {"data": {"project": {"issues": {"nodes": [{"identifier": "JOV-1", "title": "Actual title", "state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": False}}}}}
+        with mock.patch.object(HUD, "_linear_request", return_value=payload): result = HUD.fetch_linear_project()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["total_count"], 1)
+        self.assertEqual(result["issues"]["JOV-1"]["title"], "Actual title")
 
     def test_projection_refresh_rejects_old_order_cache_and_omits_expensive_merged_checks(self):
         with mock.patch.object(HUD, "load_json_dict", return_value={"ok": True, "generated_at": NOW.isoformat()}), mock.patch.object(HUD, "_now", return_value=NOW), mock.patch.object(HUD, "_pr_list", return_value=[]) as listing, mock.patch.object(HUD, "_gh_json", return_value={}), mock.patch.object(HUD, "fetch_mq", return_value={}), mock.patch.object(HUD, "_github_flow_counts", return_value=None), mock.patch.object(HUD, "write_json"):
@@ -611,7 +629,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(len(empty.splitlines()), 40)
         self.assertEqual(len(busy.splitlines()), 40)
         self.assertIn("ACTIVE SLOTS", busy)
-        self.assertIn("more configured slots", busy)
+        self.assertIn("more active runs", busy)
 
     def test_header_has_quiet_identity_description_and_natural_freshness(self):
         state, _ = fetch_state(official_state(generated_at="2026-08-31T11:58:00Z"))

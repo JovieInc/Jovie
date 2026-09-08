@@ -56,7 +56,7 @@ LINEAR_QUERY = (
 LINEAR_STAGES_QUERY = (
     "query($id: String!, $after: String) { project(id: $id) { issues(first: 100, after: $after, filter: { "
     "state: { name: { in: [\"Todo\", \"In Progress\", \"In Review\"] } } }) "
-    "{ totalCount pageInfo { hasNextPage endCursor } nodes { identifier title url assignee { name } createdAt startedAt completedAt state { name } } } } }"
+    "{ pageInfo { hasNextPage endCursor } nodes { identifier title url assignee { name } createdAt startedAt completedAt state { name } } } } }"
 )
 SHIP_STAGES = (
     ("todo", "Todo/pickup"),
@@ -1535,7 +1535,7 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
             not isinstance(issues, dict)
             or not isinstance(issues.get("nodes"), list)
             or isinstance(issues.get("totalCount"), bool)
-            or not isinstance(issues.get("totalCount"), int)
+            or (issues.get("totalCount") is not None and not isinstance(issues.get("totalCount"), int))
             or not isinstance(page_info, dict)
             or not isinstance(page_info.get("hasNextPage"), bool)
         ):
@@ -1548,8 +1548,8 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "source_error": LINEAR_REQUEST_ERROR or "Linear project pagination metadata incomplete",
             }
         pages += 1
-        page_total = issues["totalCount"]
-        if page_total < 0 or page_total > MAX_LINEAR_ISSUES:
+        page_total = issues.get("totalCount")
+        if page_total is not None and (page_total < 0 or page_total > MAX_LINEAR_ISSUES):
             return {
                 "ok": False,
                 "review": None,
@@ -2792,7 +2792,8 @@ def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime, ma
     border_color = MINT if fresh and running == 0 else BLUE if fresh else ORANGE
     lines = [_rgb(border_color, clip(f"┌─ {title} {'─' * fill} {corner} ┐", width), bold=True)]
 
-    visible_slots = 1 if cap is None else min(cap, max(1, max_slots))
+    observed_slots = max(len(running_rows), running if isinstance(running, int) else 0) if fresh else 0
+    visible_slots = min(max(cap or 0, observed_slots, 1 if cap is None else 0), max(1, max_slots))
     if visible_slots == 0:
         lines.append(_rgb(DIM, clip("│ No configured worker slots · usable capacity UNKNOWN", width)))
     for index in range(visible_slots):
@@ -2821,7 +2822,9 @@ def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime, ma
             lines.append(_rgb(DIM, clip(f"│ ○ Slot {index + 1} · VACANT", width)))
         else:
             lines.append(_rgb(DIM, clip(f"│ ? Slot {index + 1} · occupancy UNKNOWN", width)))
-    if cap is not None and cap > visible_slots:
+    if observed_slots > visible_slots:
+        lines.append(_rgb(FG, clip(f"│ … {observed_slots - visible_slots} more active runs", width)))
+    elif cap is not None and cap > visible_slots:
         lines.append(_rgb(DIM, clip(f"│ … {cap - visible_slots} more configured slots not shown at this terminal height", width)))
     if fresh and running == 0:
         lines.append(_rgb(FG, clip("│ Nothing running", width), bold=True))
@@ -2913,6 +2916,10 @@ def render(
     lines = [_header(sha=sha, freshness=natural_time(symphony.get("generated_at"), now=clock), width=cols)]
     lines.extend(execution_summary(symphony, cols, now=clock, max_slots=active_limit))
     lines.append(_rgb(DIM, clip("Configured slots are a ceiling · usable capacity UNKNOWN", cols)))
+
+    gate = _iso(symphony.get("linear_gate_until"))
+    if gate is not None and gate > clock:
+        lines.append(_rgb(ORANGE, clip(f"Intake paused: Linear rate limit · reset {natural_time(gate, now=clock)} · runtime owner", cols)))
 
     # Reserve recent outcomes and actionable blockers even on an 80x24 terminal.
     merged = recent_merges(flow)
