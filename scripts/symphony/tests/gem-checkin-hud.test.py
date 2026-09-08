@@ -490,7 +490,7 @@ class OperatorReceiptTests(unittest.TestCase):
         self.receipt.unlink()
         HUD.os.mkfifo(self.receipt)
         self.packet["externalRepairs"] = [self.repair]
-        def timeout(*_): raise TimeoutError("FIFO reader blocked")
+        def timeout(*_): raise AssertionError("FIFO reader blocked")
         previous = signal.signal(signal.SIGALRM, timeout)
         signal.alarm(2)
         try: self.assertNotIn("external_summary", self.read())
