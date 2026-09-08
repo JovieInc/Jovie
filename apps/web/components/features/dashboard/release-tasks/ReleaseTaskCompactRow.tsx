@@ -3,6 +3,7 @@
 import React from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { cn } from '@/lib/utils';
 import { ReleaseTaskDueBadge } from './ReleaseTaskDueBadge';
 import {
   isReleaseTaskAutomated,
@@ -46,7 +47,10 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
       <button
         type='button'
         onClick={() => onNavigate(task.id)}
-        className='flex-1 truncate text-left text-2xs outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'
+        className={cn(
+          'flex-1 truncate text-left text-2xs outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+          isAi && 'opacity-70'
+        )}
       >
         <ReleaseTaskTitleText className='block' isDone={isDone}>
           {task.title}

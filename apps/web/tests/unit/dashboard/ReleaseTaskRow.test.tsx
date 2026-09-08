@@ -152,4 +152,21 @@ describe('ReleaseTaskCompactRow', () => {
       screen.getByRole('button', { name: /Pitch playlist/ }).className
     ).not.toContain('hover:text-accent');
   });
+
+  it('preserves automated-task disclosure while removing legacy hover', () => {
+    render(
+      <ReleaseTaskCompactRow
+        task={createTask({ assigneeType: 'ai_workflow' })}
+        onNavigate={vi.fn()}
+        onToggle={vi.fn()}
+      />
+    );
+
+    const taskButton = screen.getByRole('button', {
+      name: /Pitch playlist.*AI/,
+    });
+
+    expect(taskButton.className).toContain('opacity-70');
+    expect(taskButton.className).not.toContain('hover:text-accent');
+  });
 });
