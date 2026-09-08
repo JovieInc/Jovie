@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { CONTROL_PLANE_OPTIMIZATION_EXCEPTION } from '../../invariants/optimization-contract.mjs';

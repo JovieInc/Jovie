@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy formatting while adding bounded evidence.
 /**
  * Canonical plan approval boundary for the Jovie backlog control plane.
  *

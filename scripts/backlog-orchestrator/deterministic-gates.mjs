@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy formatting while adding bounded evidence.
 /** No-model plan and admission gate orchestration. */
 
 import {
