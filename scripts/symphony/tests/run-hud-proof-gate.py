@@ -12,7 +12,7 @@ import types
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/gem-checkin-hud.test.py"
 TARGETS = {
-    "gem-checkin-hud.py": {"retain_last_good_source", "_normalize_row", "fetch_symphony", "execution_state", "execution_lines", "execution_summary", "execution_board", "current_execution_view", "read_runtime_context", "_issue_fields", "enrich_issue_titles", "work_title", "recent_merges", "blocker_lines", "_pr_list", "_matrix_status", "_system_pressure_lines", "_ci_matrix_lines", "fetch_linear_project", "render"},
+    "gem-checkin-hud.py": {"retain_last_good_source", "_normalize_row", "fetch_symphony", "execution_state", "execution_lines", "execution_summary", "execution_board", "current_execution_view", "read_runtime_context", "_issue_fields", "enrich_issue_titles", "work_title", "recent_merges", "blocker_lines", "_pr_list", "_matrix_status", "_system_pressure_lines", "_ci_matrix_lines", "fetch_linear_project", "render", "clip", "terminal_size", "fixed_section", "fixed_slots", "read_operator_context"},
 }
 
 

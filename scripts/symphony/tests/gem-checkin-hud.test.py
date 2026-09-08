@@ -8,6 +8,7 @@ import json
 import pathlib
 import re
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -96,7 +97,7 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertNotIn("stale", state["rows"][0])
         text = strip(paint(retained, width=430, height=90))
         self.assertIn("API STALE / UNAVAILABLE", text)
-        self.assertIn("Execution identity UNKNOWN", text)
+        self.assertIn("Current native job snapshot unavailable", text)
         self.assertNotIn("SESSION / RECENT EVENT", text)
 
     def test_missing_old_future_and_boundary_snapshots(self):
@@ -412,6 +413,142 @@ class ReadableWorkTests(unittest.TestCase):
         unknown = strip("\n".join(HUD.execution_summary({"ok": True, "cap": 1, "rows": []}, 120, now=NOW)))
         self.assertIn("occupancy UNKNOWN", unknown)
         self.assertNotIn("VACANT", unknown)
+
+
+class StableCanvasTests(unittest.TestCase):
+    def test_service_reads_actual_console_geometry(self):
+        import fcntl
+        import os
+        import struct
+        import subprocess
+        import termios
+        template = (ROOT / "scripts/symphony/systemd/gem-ship-hud.service.template").read_text()
+        command = next(line for line in template.splitlines() if line.startswith("ExecStart="))
+        self.assertNotIn("--width", command)
+        self.assertNotIn("--height", command)
+        self.assertIn("UnsetEnvironment=COLUMNS LINES", template)
+        master, slave = os.openpty()
+        try:
+            fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 45, 215, 0, 0))
+            probe = "import importlib.util,json,sys; s=importlib.util.spec_from_file_location('hud',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(json.dumps(m.terminal_size()))"
+            subprocess.run([sys.executable, "-c", probe, str(SOURCE)], stdout=slave, stderr=subprocess.PIPE, check=True, timeout=5, env={k: v for k, v in os.environ.items() if k not in {"COLUMNS", "LINES"}})
+            self.assertEqual(json.loads(os.read(master, 4096).decode().strip()), [215, 45])
+        finally:
+            os.close(master)
+            os.close(slave)
+
+    def test_zero_one_five_zero_and_queue_blockers_keep_every_anchor(self):
+        merges = {"ok": True, "generated_at": NOW.isoformat(), "merged_rows": [{"number": i, "title": f"Merge {i}", "merged_at": NOW.isoformat()} for i in range(5)], "ci_matrix": [{"number": 99, "title": "Check association", "fast": "success"}]}
+        labels = ("ACTIVE SLOTS", "RECENTLY MERGED", "NEEDS ATTENTION", "WAITING", "OPERATOR HEALTH", "CI MATRIX", "Sources:")
+        for width, height in ((80, 24), (120, 40), (215, 45), (430, 90)):
+            anchors = []
+            for count, blocked_count, queue_count in ((0, 0, 0), (1, 1, 4), (5, 3, 1), (0, 0, 0)):
+                runs = [{"kind": "running", "id": f"JOV-{i}", "title": f"Distinct work {i} fix Slot 1 visibility", "session_id": f"s{i}", "tokens_total": 10, "last_event_at": NOW.isoformat(), "last_message": "Making progress\nwith a multiline report\t" * (i + 1)} for i in range(count)]
+                blocks = [{"kind": "blocked", "id": f"BLOCK-{i}", "title": "Restore cache", "error": "Dependency JOV-9 unavailable", "blocked_at": STARTED} for i in range(blocked_count)]
+                state = {"ok": True, "cap": 5, "running": count, "blocked": blocked_count, "retrying": 0, "rows": runs + blocks}
+                mq = {"ok": True, "rows": [{"kind": "mq", "number": i, "title": f"Queue {i}"} for i in range(queue_count)]}
+                plain = strip(paint(state, mq, width=width, height=height, pr_flow=merges))
+                lines = plain.splitlines()
+                anchors.append({label: next((i for i, line in enumerate(lines) if label in line), None) for label in labels})
+                self.assertEqual((len(lines), set(map(len, lines))), (height, {width}))
+                for slot in range(1, 6): self.assertEqual(sum(f"Slot {slot} ·" in line for line in lines), 1)
+                if count == 0: self.assertNotIn("Execution identity UNKNOWN", plain)
+                if count == 5: self.assertIn("Distinct work 1 fix Slot 1 visibility", plain)
+                if blocked_count:
+                    for text in ("Restore cache", "Dependency JOV-9", "Next:"): self.assertIn(text, plain)
+                if height >= 45: self.assertEqual(plain.count(" · Merge "), 5)
+            self.assertTrue(all(value == anchors[0] for value in anchors))
+            if (width, height) == (215, 45):
+                self.assertEqual(anchors[0]["RECENTLY MERGED"], 16)
+                self.assertEqual(anchors[0]["CI MATRIX"], 33)
+
+    def test_control_characters_cannot_move_the_console_cursor(self):
+        self.assertEqual(HUD.clip("title\nreport\tline\r\x1b[2J", 40).strip(), "title report line  [2J")
+
+    def test_fixed_slot_unknown_overflow_and_error_keep_evidence(self):
+        unknown = strip("\n".join(HUD.fixed_slots({"ok": False, "rows": []}, 215, now=NOW, detail=True)))
+        self.assertEqual(len(unknown.splitlines()), 12)
+        self.assertNotIn("VACANT", unknown)
+        state = {"ok": True, "running": 6, "cap": 5, "rows": [{"kind": "running", "id": "JOV-1", "title": "Repair", "error": "Quota exhausted", "session_id": "s", "tokens_total": 1, "last_event_at": NOW.isoformat()}]}
+        plain = strip("\n".join(HUD.fixed_slots(state, 215, now=NOW, detail=True)))
+        for text in ("1 more active runs", "Quota exhausted", "Attempt error", "assigned · issue details not reported"): self.assertIn(text, plain)
+
+
+class OperatorReceiptTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = pathlib.Path(temporary.name)
+        self.workflow = self.root / "WORKFLOW.md"
+        self.workflow.write_text("max_concurrent_agents: 5")
+        self.receipt = self.root / ".local/state/symphony-elixir/result.md"
+        self.receipt.parent.mkdir(parents=True)
+        self.receipt.write_text("Completed source repair")
+        self.packet = {"updatedAt": NOW.isoformat(), "runtimeInvocation": "native-id", "workflowSha256": HUD.hashlib.sha256(self.workflow.read_bytes()).hexdigest(), "expiresAt": (NOW + dt.timedelta(minutes=5)).isoformat(), "intakeSummary": "No eligible leased issues", "nextAction": "Owner must deliver assignment validation", "externalRepairs": []}
+        self.repair = {"nativeWorker": False, "issueIdentifier": "JOV-5552", "title": "Repair components", "status": "completed-source-repair", "active": False, "receiptPath": str(self.receipt), "receiptSha256": HUD.hashlib.sha256(self.receipt.read_bytes()).hexdigest()}
+        for patch in (mock.patch.object(HUD, "DEFAULT_WORKFLOW", self.workflow), mock.patch.object(HUD.Path, "home", return_value=self.root), mock.patch.object(HUD, "load_json_dict", side_effect=lambda _: self.packet)):
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def read(self, results=None):
+        with mock.patch.object(HUD.subprocess, "run", side_effect=results or [mock.Mock(returncode=0, stdout="native-id\n")]):
+            return HUD.read_operator_context(now=NOW)
+
+    def test_completed_receipt_is_historical_and_hash_bound(self):
+        self.packet["externalRepairs"] = [self.repair]
+        result = self.read()
+        self.assertEqual(result["intake_summary"], "No eligible leased issues")
+        self.assertIn("source repair completed", result["external_summary"])
+        self.assertIn("hosted CI unverified", result["external_summary"])
+        self.assertNotIn("active", result["external_summary"])
+        self.receipt.write_text("Changed receipt")
+        self.assertNotIn("external_summary", self.read())
+        self.receipt.unlink()
+        self.assertNotIn("external_summary", self.read())
+
+    def test_fifo_receipt_never_blocks_the_frame(self):
+        import signal
+        self.receipt.unlink()
+        HUD.os.mkfifo(self.receipt)
+        self.packet["externalRepairs"] = [self.repair]
+        def timeout(*_): raise AssertionError("FIFO reader blocked")
+        previous = signal.signal(signal.SIGALRM, timeout)
+        signal.alarm(2)
+        try: self.assertNotIn("external_summary", self.read())
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous)
+
+    def test_stale_wrong_workflow_and_wrong_invocation_fail_closed(self):
+        for key, value in (("updatedAt", STARTED.replace("11:57", "11:50")), ("updatedAt", None), ("updatedAt", (NOW + dt.timedelta(minutes=1)).isoformat()), ("workflowSha256", "wrong"), ("runtimeInvocation", None)):
+            with mock.patch.dict(self.packet, {key: value}): self.assertEqual(self.read(), {})
+        for result in (mock.Mock(returncode=0, stdout="other"), mock.Mock(returncode=1, stdout=""), OSError("unavailable")):
+            self.assertEqual(self.read([result]), {})
+        self.workflow.unlink()
+        self.assertEqual(self.read(), {})
+
+    def test_active_receipt_requires_matching_live_pid_invocation_and_unit(self):
+        live = mock.Mock(returncode=0, stdout="ActiveState=active\nMainPID=42\nInvocationID=repair-id\n")
+        self.packet["externalRepairs"] = [{**self.repair, "active": True, "pid": 42, "invocationId": "repair-id", "unit": "symphony-pr-repair-jov5552.service", "route": "Grok 4.6 operator"}]
+        results = lambda: [mock.Mock(returncode=0, stdout="native-id"), live]
+        for unit in ("symphony-pr-repair-jov5552.service", "symphony-pr-qualification-jov5552-6dba.service"):
+            with mock.patch.dict(self.packet["externalRepairs"][0], {"unit": unit}): self.assertIn("External operator active", self.read(results())["external_summary"])
+        for change in ({"pid": 0}, {"pid": 41}, {"invocationId": None}, {"invocationId": "old"}, {"unit": "unrelated.service"}, {"nativeWorker": True}):
+            with mock.patch.dict(self.packet["externalRepairs"][0], change): self.assertNotIn("external_summary", self.read(results()))
+        for response in (mock.Mock(returncode=0, stdout="ActiveState=inactive\nMainPID=0\n"), mock.Mock(returncode=1, stdout=""), OSError("unavailable")):
+            self.assertNotIn("external_summary", self.read([mock.Mock(returncode=0, stdout="native-id"), response]))
+
+    def test_expiry_and_invalid_external_receipts_do_not_invent_work(self):
+        self.packet["expiresAt"] = STARTED
+        with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="native-id")):
+            self.assertIn("Native trial stopped", HUD.read_operator_context(now=NOW, service_state="failed")["intake_summary"])
+        self.packet["externalRepairs"] = "invalid"
+        self.assertIn("receipt expired", self.read()["intake_summary"])
+        self.packet["externalRepairs"] = [None, {**self.repair, "receiptPath": str(self.workflow)}, {**self.repair, "status": "unknown"}]
+        self.assertNotIn("external_summary", self.read())
+        self.receipt.write_bytes(b"x" * 1_000_001)
+        self.packet["externalRepairs"] = [self.repair]
+        self.assertNotIn("external_summary", self.read())
 
 
 class UltrawideHudTests(unittest.TestCase):
@@ -1264,7 +1401,7 @@ class UltrawideHudTests(unittest.TestCase):
                 pr_flow={"ok": True, "open_count": 1, "opened_24h": 1, "merged_24h": 0, "generated_at": sampled_at, "query_ms": 10, "ci_matrix": []},
             )
         )
-        self.assertIn("┌─ × CRITICAL · OPERATOR HEALTH", plain)
+        self.assertIn("× CRITICAL · OPERATOR HEALTH", plain)
         self.assertIn("STALLED/BLOCKED 1", plain)
         self.assertIn("CPU LOAD / STALL RED", plain)
         order = ["ACTIVE SLOTS", "RECENTLY MERGED", "BLOCKED:", "OPERATOR HEALTH", "SYSTEM PRESSURE", "CI MATRIX", "PR FLOW"]
