@@ -2871,7 +2871,7 @@ describe('exact-head queue receipt proof', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
-  it('fails closed on a missing receipt and does not treat auto-merge as membership', async () => {
+  it('rejects auto-merge success without an authoritative native queue entry', async () => {
     const wait = vi.fn(async () => {});
     const autoMergeOnly = prState({ autoMergeRequest: AUTO_MERGE });
     expect(hasAuthoritativeExactHeadQueueReceipt(autoMergeOnly, HEAD)).toBe(
