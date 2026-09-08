@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import math
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import threading
@@ -186,7 +188,7 @@ def visible_len(text: str) -> int:
 def clip(text: str, width: int, *, tail: bool = False) -> str:
     if width <= 0:
         return ""
-    plain = ANSI_RE.sub("", text)
+    plain = "".join(c if c >= " " and c != "\x7f" else " " for c in ANSI_RE.sub("", text))
     if len(plain) <= width:
         return plain + (" " * (width - len(plain)))
     if width <= 1:
@@ -2885,6 +2887,94 @@ def current_execution_view(symphony: dict[str, Any], *, now: datetime) -> dict[s
     return state
 
 
+def fixed_section(lines: list[str], height: int) -> list[str]:
+    return lines[:height] + [""] * max(0, height - len(lines))
+
+
+def fixed_slots(symphony: dict[str, Any], width: int, *, now: datetime, detail: bool) -> list[str]:
+    """Five persistent positions; state changes never change this panel's height."""
+    fresh = symphony.get("ok") and not symphony.get("stale")
+    runs = [r for r in symphony.get("rows", []) if r.get("kind") == "running"] if fresh else []
+    running, cap = symphony.get("running"), symphony.get("cap")
+    lines = [execution_summary(symphony, width, now=now, max_slots=5)[0]]
+    for index in range(5):
+        if index < len(runs):
+            row = runs[index]
+            single = execution_summary({**symphony, "rows": [row], "running": 1, "cap": 1}, width, now=now, max_slots=1)
+            body = single[1].replace("Slot 1", f"Slot {index + 1}", 1)
+            explanation = single[2]
+            if row.get("error") or row.get("last_message"):
+                explanation = _rgb(FG, clip(f"{ANSI_RE.sub('', single[2]).rstrip()} · {row.get('error') or row['last_message']}", width))
+            if not detail:
+                activity = ANSI_RE.sub("", single[2]).lstrip("│ ").split(" · ")[0]
+                body = _rgb(FG, clip(ANSI_RE.sub("", body).rstrip() + " · " + activity, width))
+        else:
+            assigned = fresh and isinstance(running, int) and index < running
+            known = fresh and isinstance(running, int) and isinstance(cap, int)
+            state = "assigned · issue details not reported" if assigned else "VACANT" if known and index < cap else "NOT CONFIGURED" if known else "UNKNOWN · runtime snapshot unavailable or stale"
+            body = _rgb(FG if assigned else DIM, clip(f"│ {'?' if assigned or not known else '○'} Slot {index + 1} · {state}", width))
+            explanation = _rgb(FG, "│ Nothing running") if fresh and running == 0 and index == 0 else _rgb(DIM, "│ Current native job snapshot unavailable") if not fresh and index == 0 else ""
+        lines.append(body)
+        if detail:
+            lines.append(explanation)
+    extra = max(len(runs), running if fresh and isinstance(running, int) else 0) - 5
+    footer = f"│ … {extra} more active runs" if extra > 0 else "└" + "─" * max(0, width - 2) + "┘"
+    return [*lines, _rgb(DIM, clip(footer, width))]
+
+
+def read_operator_context(*, now: datetime, service_state: str | None = None) -> dict[str, Any]:
+    """Read the runtime owner's adjacent packet; never add rows to native execution."""
+    packet = load_json_dict(DEFAULT_WORKFLOW.with_name("packet.json"))
+    stamp = _iso(packet.get("updatedAt"))
+    if stamp is None or not -10 <= (now - stamp).total_seconds() <= 300:
+        return {}
+    try:
+        if hashlib.sha256(DEFAULT_WORKFLOW.read_bytes()).hexdigest() != packet.get("workflowSha256"):
+            return {}
+        result = subprocess.run(["systemctl", "--user", "show", "symphony-elixir.service", "--property=InvocationID", "--value"], capture_output=True, text=True, timeout=1, check=False)
+        if result.returncode or not packet.get("runtimeInvocation") or result.stdout.strip() != packet["runtimeInvocation"]:
+            return {}
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    expiry = _iso(packet.get("expiresAt"))
+    expired = expiry is not None and expiry <= now
+    summary, action = packet.get("intakeSummary"), packet.get("nextAction")
+    if expired:
+        summary = f"Native trial stopped · {summary or 'runtime owner has not reported the reason'}" if service_state in {"inactive", "failed"} else "Trial receipt expired · current intake UNKNOWN"
+    context = {"intake_summary": summary if isinstance(summary, str) else None, "intake_action": action if isinstance(action, str) else None}
+    repairs = packet.get("externalRepairs")
+    for repair in repairs[:3] if isinstance(repairs, list) else []:
+        if not isinstance(repair, dict) or repair.get("nativeWorker") is not False:
+            continue
+        identity = f"{repair.get('issueIdentifier') or UNKNOWN} · {repair.get('title') or UNKNOWN}"
+        try:
+            if repair.get("active") is True:
+                unit = repair.get("unit")
+                if not isinstance(unit, str) or not re.fullmatch(r"symphony-pr-repair-[a-zA-Z0-9_-]+\.service", unit):
+                    continue
+                result = subprocess.run(["systemctl", "--user", "show", unit, "--property=ActiveState,MainPID,InvocationID"], capture_output=True, text=True, timeout=1, check=False)
+                live = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+                if result.returncode or live.get("ActiveState") != "active" or _int(repair.get("pid")) in (None, 0) or live.get("MainPID") != str(repair["pid"]) or not repair.get("invocationId") or live.get("InvocationID") != repair["invocationId"]:
+                    continue
+                context["external_summary"] = f"External repair active · {identity} · reported route {repair.get('route') or UNKNOWN}"
+            elif repair.get("status") == "completed-source-repair":
+                receipt = Path(str(repair.get("receiptPath") or "")).resolve()
+                receipt.relative_to((Path.home() / ".local/state/symphony-elixir").resolve())
+                fd = os.open(receipt, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+                with os.fdopen(fd, "rb") as stream:
+                    if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                        continue
+                    data = stream.read(1_000_001)
+                    if len(data) > 1_000_000 or hashlib.sha256(data).hexdigest() != repair.get("receiptSha256"):
+                        continue
+                context["external_summary"] = f"External source repair completed · {identity} · hosted CI unverified"
+        except (OSError, ValueError, subprocess.SubprocessError):
+            continue
+        if context.get("external_summary"):
+            break
+    return context
+
+
 def render(
     *,
     symphony: dict[str, Any],
@@ -2903,64 +2993,59 @@ def render(
     clock = now or _now()
     symphony = current_execution_view(symphony, now=clock)
     cols, rows = terminal_size(width=width, height=height if height is not None else TARGET_HEIGHT)
-    path = ship_path if isinstance(ship_path, dict) else empty_ship_path()
     flow = pr_flow if isinstance(pr_flow, dict) else {}
     fresh = symphony.get("ok") and not symphony.get("stale")
     count = lambda key: symphony.get(key) if fresh and isinstance(symphony.get(key), int) else UNKNOWN
-    active_limit = 1 if rows < 32 else 3 if rows < 60 else 5
     lines = [_header(sha=sha, freshness=natural_time(symphony.get("generated_at"), now=clock), width=cols)]
-    lines.extend(execution_summary(symphony, cols, now=clock, max_slots=active_limit))
-    lines.append(_rgb(DIM, clip("Configured slots are a ceiling · usable capacity UNKNOWN", cols)))
-
+    lines.extend(fixed_slots(symphony, cols, now=clock, detail=rows >= 40))
+    summary = symphony.get("intake_summary") or ("Native service stopped · current job snapshot unavailable" if symphony.get("service_state") in {"inactive", "failed"} else "Nothing running · intake reason not reported by runtime owner" if fresh and count("running") == 0 else "Native intake status UNKNOWN")
+    action = symphony.get("intake_action") or "Runtime owner: publish a current intake receipt · usable capacity UNKNOWN"
     gate = _iso(symphony.get("linear_gate_until"))
     if gate is not None and gate > clock:
-        lines.append(_rgb(ORANGE, clip(f"Intake paused: Linear rate limit · reset {natural_time(gate, now=clock)} · runtime owner", cols)))
+        summary = f"Intake paused: Linear rate limit · reset {natural_time(gate, now=clock)}"
+        action = "Next: runtime owner resumes intake after the recorded reset"
+    lines.extend([_rgb(ORANGE, clip(f"Intake: {summary}", cols)), _rgb(FG, clip(f"Next: {action}", cols)), _rgb(DIM, clip(symphony.get("external_summary") or "External repairs: no verified receipt · native counts exclude external work", cols))])
 
+    merge_limit = 5 if rows >= 45 else 3 if rows >= 32 else 2
     merged = recent_merges(flow)
-    merge_limit = 2 if rows < 32 else 3 if rows < 45 else 5
-    lines.append(_rgb(PURPLE, clip("RECENTLY MERGED · newest first · deployment verified separately", cols), bold=True))
-    for row in merged[:merge_limit]:
-        lines.append(_rgb(PURPLE, "✓ ") + _rgb(FG, clip(f"#{row.get('number') or UNKNOWN} · {row.get('title') or UNKNOWN} · {natural_time(row['merged_at'], now=clock)}", cols - 2)))
+    lines.append(_rgb(PURPLE, "RECENTLY MERGED · newest first · deployment verified separately", bold=True))
+    merge_lines = [_rgb(PURPLE, "✓ ") + _rgb(FG, clip(f"#{r.get('number') or UNKNOWN} · {r.get('title') or UNKNOWN} · {natural_time(r['merged_at'], now=clock)}", cols - 2)) for r in merged[:merge_limit]]
     if not merged:
-        message = "Recent merge source UNKNOWN" if not flow.get("ok") or flow.get("stale") else "No dated merge receipts in the current window"
-        lines.append(_rgb(DIM, clip(message, cols)))
-    if len(merged) > merge_limit:
-        lines.append(_rgb(DIM, clip(f"… {len(merged) - merge_limit} more recent merges", cols)))
+        merge_lines = [_rgb(DIM, "Recent merge source UNKNOWN" if not flow.get("ok") or flow.get("stale") else "No dated merge receipts in the current window")]
+    lines.extend(fixed_section(merge_lines, merge_limit))
 
-    blocked = [row for row in symphony.get("rows", []) if row.get("kind") in {"blocked", "retrying"} and not row.get("stale")] if fresh else []
-    lines.append(_rgb(RED if blocked else DIM, clip(f"NEEDS ATTENTION · BLOCKED: {count('blocked')} · RETRYING: {count('retrying')}", cols), bold=True))
-    block_limit = max(1, min(5, (rows - len(lines) - 3) // 4))
-    for row in blocked[:block_limit]:
-        lines.extend(blocker_lines(row, cols, now=clock))
-    if len(blocked) > block_limit:
-        lines.append(_rgb(DIM, clip(f"… and {len(blocked) - block_limit} more blocked/retrying", cols)))
+    blocked = [r for r in symphony.get("rows", []) if r.get("kind") in {"blocked", "retrying"} and not r.get("stale")] if fresh else []
+    block_limit = 5 if rows >= 60 else 1
+    lines.append(_rgb(RED if blocked else DIM, f"NEEDS ATTENTION · BLOCKED: {count('blocked')} · RETRYING: {count('retrying')}", bold=True))
+    block_lines = [line for row in blocked[:block_limit] for line in blocker_lines(row, cols, now=clock)]
     if not blocked:
-        message = "Blocked source UNKNOWN · restore runtime snapshot" if not fresh else "No blocked work" if count('blocked') == 0 and count('retrying') == 0 else "UNKNOWN · runtime did not report blocked/retry details"
-        lines.append(_rgb(DIM, clip(message, cols)))
+        block_lines = [_rgb(DIM, "Blocked source UNKNOWN · restore runtime snapshot" if not fresh else "No blocked work" if count("blocked") == 0 and count("retrying") == 0 else "UNKNOWN · runtime did not report blocked/retry details")]
+    lines.extend(fixed_section(block_lines, block_limit * 4))
+    lines.append(_rgb(DIM, f"… and {len(blocked) - block_limit} more blocked/retrying") if len(blocked) > block_limit else "")
 
-    pending = [row for row in symphony.get("rows", []) if row.get("kind") == "queued" and not row.get("stale")] if fresh else []
+    pending = [r for r in symphony.get("rows", []) if r.get("kind") == "queued" and not r.get("stale")] if fresh else []
     pending.extend(mq.get("rows", []) if mq.get("ok") and not mq.get("stale") else [])
-    if pending and rows - len(lines) > 4:
-        lines.append(_rgb(FG, "WAITING · issue / merge queue", bold=True))
-        limit = min(3, rows - len(lines) - 3)
-        for row in pending[:limit]:
-            ident = f"#{row.get('number')}/p{row.get('position')}" if row.get("kind") == "mq" else row.get("id") or UNKNOWN
-            lines.append(_rgb(FG, clip(f"… {ident} · {work_title(row)}", cols)))
-        if len(pending) > limit:
-            lines.append(_rgb(DIM, clip(f"… {len(pending) - limit} more waiting", cols)))
-    if review is not None and rows - len(lines) > 2:
-        lines.append(_rgb(DIM, clip(f"REVIEW {review} · waiting for review", cols)))
+    wait_budget = 6 if rows >= 60 else 4 if rows >= 45 else 3 if rows >= 32 else 2
+    wait_limit = wait_budget - 2
+    lines.append(_rgb(FG, "WAITING · issue / merge queue", bold=True))
+    waiting = []
+    for row in pending[:wait_limit]:
+        ident = f"#{row.get('number')}/p{row.get('position')}" if row.get("kind") == "mq" else row.get("id") or UNKNOWN
+        waiting.append(_rgb(FG, clip(f"… {ident} · {work_title(row)}", cols)))
+    lines.extend(fixed_section(waiting, wait_limit))
+    extra = f" · {len(pending) - wait_limit} more waiting" if len(pending) > wait_limit else ""
+    lines.append(_rgb(DIM, clip(f"REVIEW {review if review is not None else UNKNOWN} · waiting for review{extra}", cols)))
 
-    diagnostics = [
-        _operator_health_lines(symphony=symphony, pressure=system_pressure, mq=mq, ship_path=path, pr_flow=pr_flow, now=clock, width=cols),
-        _system_pressure_lines(system_pressure, cols, now=clock, show_details=False),
-        _ci_matrix_lines(pr_flow, cols, now=clock),
-        _pr_flow_lines(pr_flow, cols, now=clock),
-    ]
-    for section in diagnostics if rows >= 32 else []:
-        if len(lines) + len(section) + 2 <= rows:
-            lines.append("")
-            lines.extend(section)
+    health = _operator_health_lines(symphony=symphony, pressure=system_pressure, mq=mq, ship_path=ship_path or empty_ship_path(), pr_flow=pr_flow, now=clock, width=cols)
+    health_title = ANSI_RE.sub("", health[0]).lstrip("┌─ ").split(" ─")[0]
+    lines.append(_rgb(RED if "CRITICAL" in health_title else DIM, clip(health_title + " · " + ANSI_RE.sub("", health[1]).strip("│ "), cols)))
+    if rows >= 60:
+        lines.extend(fixed_section(_system_pressure_lines(system_pressure, cols, now=clock, show_details=False), 7 if cols < 160 else 3))
+    ci_budget = min(11, rows - len(lines) - 1)
+    if ci_budget >= 4:
+        lines.extend(fixed_section(_ci_matrix_lines(pr_flow, cols, now=clock), ci_budget))
+    if rows - len(lines) >= 5 and rows >= 60:
+        lines.extend(fixed_section(_pr_flow_lines(pr_flow, cols, now=clock), 4))
     lines.extend([""] * max(0, rows - len(lines) - 1))
     lines.append(_rgb(DIM, clip("Sources: Symphony runtime · Linear titles · GitHub merges | ✓ complete  ✕ error  ? UNKNOWN", cols)))
     lines = [pad_visible(line, cols) if visible_len(line) <= cols else _rgb(DIM, clip(line, cols)) for line in lines[:rows]]
@@ -2980,6 +3065,7 @@ def frame(
     cap = read_workflow_cap()
     symphony = retain_last_good_source("symphony", fetch_symphony(symphony_url, cap=cap), now=clock)
     symphony.update(read_runtime_context(now=clock))
+    symphony.update(read_operator_context(now=clock, service_state=symphony.get("service_state")))
     symphony = current_execution_view(symphony, now=clock)
     mq = retain_last_good_source("mq", fetch_mq(), now=clock)
     linear = retain_last_good_source("linear", fetch_linear_project_cached(), now=clock)
