@@ -41,8 +41,7 @@ export function AuthProviderButtonSlot({
       data-auth-provider-pending={pending ? 'true' : undefined}
       onClick={onClick}
       className={cn(
-        'relative flex h-8 min-h-8 w-full items-center justify-center gap-(--space-2) rounded-full border px-(--space-4) text-sm font-[510] tracking-normal',
-        'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        'flex h-8 min-h-8 w-full items-center justify-center gap-(--space-2) rounded-full border px-(--space-4) text-sm font-[510] tracking-normal',
         'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40',
         isDisabled && 'cursor-wait opacity-75',
@@ -63,7 +62,7 @@ export function AuthProviderButtonSlots({
   return (
     <fieldset
       data-auth-provider-slots
-      className='grid grid-cols-1 gap-3'
+      className='grid grid-cols-1 gap-1.5'
       aria-busy='true'
     >
       <legend className='sr-only'>Loading social sign-in options</legend>

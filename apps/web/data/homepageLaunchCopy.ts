@@ -2,8 +2,8 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
-// Prelaunch front-door label and destination. Server-side waitlist gate
-// still handles post-auth routing.
+// Prelaunch front-door label. JOV-5085 locks Get started → /start.
+// Server-side waitlist gate handles post-/start routing, not the homepage href.
 export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract(
   FEATURE_FLAGS.WAITLIST_ENABLED
 );

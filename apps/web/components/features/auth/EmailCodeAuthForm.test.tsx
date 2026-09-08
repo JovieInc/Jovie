@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTH_CLASSES } from '@/lib/auth/constants';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 
 // Better Auth client calls resolve with `{ data, error }` instead of
@@ -70,55 +69,12 @@ async function submitCode(code: string) {
   });
 }
 
-function expectAuthEntryCta(button: HTMLElement) {
-  const classNames = button.getAttribute('class')?.split(/\s+/) ?? [];
-  expect(classNames).toEqual(
-    expect.arrayContaining(AUTH_CLASSES.authEntryCta.split(' '))
-  );
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('location', { assign: locationAssign } as unknown as Location);
 });
 
 describe('EmailCodeAuthForm', () => {
-  it('uses auth-entry CTA geometry across email, code, and lockout states', async () => {
-    sendVerificationOtp.mockResolvedValueOnce({
-      data: { success: true },
-      error: null,
-    });
-
-    renderForm();
-
-    const emailButton = screen.getByRole('button', {
-      name: /continue with email/i,
-    });
-    expectAuthEntryCta(emailButton);
-
-    await submitEmail();
-
-    const verifyButton = await screen.findByRole('button', {
-      name: /verify code/i,
-    });
-    expectAuthEntryCta(verifyButton);
-
-    signInEmailOtp.mockResolvedValueOnce({
-      data: null,
-      error: {
-        code: 'TOO_MANY_ATTEMPTS',
-        message: 'Too many attempts',
-        status: 403,
-      },
-    });
-    await submitCode('111111');
-
-    const lockedButton = await screen.findByRole('button', {
-      name: /request a new code/i,
-    });
-    expectAuthEntryCta(lockedButton);
-  });
-
   it('stays on the email step and shows an error when send returns an error result', async () => {
     sendVerificationOtp.mockResolvedValueOnce({
       data: null,

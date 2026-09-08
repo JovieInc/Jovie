@@ -714,7 +714,6 @@ describe('proxy.ts middleware', () => {
     it('does not run the audience block lookup for reserved public routes', async () => {
       const reservedRoutes = [
         '/start',
-        '/waitlist',
         '/pricing',
         '/about',
         '/investors',

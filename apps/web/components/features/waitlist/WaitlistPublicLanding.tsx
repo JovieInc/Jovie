@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   WAITLIST_FRONT_DOOR_CONTEXT,
@@ -11,11 +10,10 @@ import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { page, track } from '@/lib/analytics';
 
 /**
- * Unauthenticated /waitlist handoff (JOV-5334 / JOV-5376).
+ * Unauthenticated /waitlist handoff (JOV-5376).
  *
  * Splash B chrome: centered 32 mark, empty field, sign-up shell.
- * Get started on marketing pages lands here instead of unfinished /start chat.
- * Auth completion continues into /start.
+ * Public Get started lands here. Auth completion continues into /start.
  */
 export function WaitlistPublicLanding() {
   useEffect(() => {
@@ -25,23 +23,21 @@ export function WaitlistPublicLanding() {
   }, []);
 
   return (
-    <AuthenticatedAuthEntryGuard>
-      <AuthLayout
-        formTitle='Get started'
-        showFormTitle={false}
-        showFooterPrompt={false}
-        layoutVariant='stack'
-        chrome='splash-b'
-      >
-        <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
-        <AuthShell
-          mode='sign-up'
-          forceOppositeModeHardNavigation
-          oppositeModeUrl={APP_ROUTES.SIGNIN}
-          fallbackRedirectUrl={APP_ROUTES.START}
-          suppressOneTap
-        />
-      </AuthLayout>
-    </AuthenticatedAuthEntryGuard>
+    <AuthLayout
+      formTitle='Get started'
+      showFormTitle={false}
+      showFooterPrompt={false}
+      layoutVariant='stack'
+      chrome='splash-b'
+    >
+      <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
+      <AuthShell
+        mode='sign-up'
+        forceOppositeModeHardNavigation
+        oppositeModeUrl={APP_ROUTES.SIGNIN}
+        fallbackRedirectUrl={APP_ROUTES.START}
+        suppressOneTap
+      />
+    </AuthLayout>
   );
 }

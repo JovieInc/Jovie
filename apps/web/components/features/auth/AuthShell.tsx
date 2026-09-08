@@ -367,7 +367,7 @@ function AuthOAuthStartSurface({
       {hasProviders ? (
         <fieldset
           data-auth-provider-slots
-          className='grid grid-cols-1 gap-3'
+          className='grid grid-cols-1 gap-1.5'
           aria-busy={providersBusy ? 'true' : undefined}
         >
           <legend className='sr-only'>Social sign-in options</legend>

@@ -44,8 +44,8 @@ describe('WaitlistSuccessView', () => {
     render(<WaitlistSuccessView />);
 
     const resume = screen.getByRole('link', { name: 'Resume At Start' });
-    expect(resume).toHaveAttribute('data-size', 'marketing');
-    expect(resume).toHaveClass('h-8');
+    expect(resume).toHaveAttribute('data-size', 'lg');
+    expect(resume).toHaveClass('h-11');
   });
 
   it('keeps server state and redirects route-owned while the story uses the exact body', () => {
@@ -64,8 +64,9 @@ describe('WaitlistSuccessView', () => {
     expect(routeSource).toContain(
       "import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';"
     );
-    expect(routeSource).toContain('resolveRequestAuthIdentity');
-    expect(routeSource).toContain('knownAuthIdentity: identity');
+    expect(routeSource).toContain(
+      'resolveUserState({ createDbUserIfMissing: false })'
+    );
     expect(routeSource).toContain('redirect(waitlistRedirect)');
     expect(routeSource).toContain(
       'if (access?.entryId && isWaitlistPendingStatus(access.status))'
@@ -105,9 +106,9 @@ describe('WaitlistSuccessView', () => {
     expect(outcomeSource).not.toContain('PRIMARY_CTA_CLASS');
     expect(outcomeSource).not.toContain('SECONDARY_BTN_CLASS');
     expect(outcomeSource).toContain(
-      "<Button asChild variant='primary' size='marketing'>"
+      "<Button asChild variant='primary' size='lg'>"
     );
     expect(outcomeSource).toContain("variant='secondary'");
-    expect(outcomeSource).toContain("size='marketing'");
+    expect(outcomeSource).toContain("size='lg'");
   });
 });

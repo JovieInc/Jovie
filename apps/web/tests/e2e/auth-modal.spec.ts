@@ -63,25 +63,11 @@ async function prepareHomepage(page: import('@playwright/test').Page) {
   }
 }
 
-async function prepareSignupEntryPage(page: import('@playwright/test').Page) {
-  await blockAnalytics(page);
-
-  await page.goto(APP_ROUTES.BRAND, {
-    waitUntil: 'domcontentloaded',
-    timeout: AUTH_MODAL_TIMEOUT,
-  });
-  await waitForHydration(page, { timeout: AUTH_MODAL_TIMEOUT });
-}
-
 async function openInterceptedModal(
   page: import('@playwright/test').Page,
   mode: 'signin' | 'signup'
 ) {
-  if (mode === 'signin') {
-    await prepareHomepage(page);
-  } else {
-    await prepareSignupEntryPage(page);
-  }
+  await prepareHomepage(page);
 
   if (mode === 'signin') {
     await page
@@ -90,7 +76,7 @@ async function openInterceptedModal(
       .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
   } else {
     await page
-      .getByRole('link', { name: /start free trial/i })
+      .locator('[data-cta-sign-up="true"]')
       .first()
       .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
   }
@@ -149,7 +135,7 @@ test.describe('Intercepted auth modal', () => {
     );
   });
 
-  test('opens sign-up from a same-origin sign-up entry', async ({ page }) => {
+  test('opens sign-up from the homepage primary CTA', async ({ page }) => {
     await openInterceptedModal(page, 'signup');
 
     await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
@@ -161,13 +147,13 @@ test.describe('Intercepted auth modal', () => {
     await expectSharedAuthSurface(page);
   });
 
-  test('marketing sign-up entry opens the same shared sign-up auth surface', async ({
+  test('request access opens the same shared sign-up auth surface', async ({
     page,
   }) => {
-    await prepareSignupEntryPage(page);
+    await prepareHomepage(page);
 
     await page
-      .getByRole('link', { name: /start free trial/i })
+      .getByRole('link', { name: /request access/i })
       .first()
       .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
 

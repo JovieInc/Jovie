@@ -7,18 +7,9 @@ import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
 import {
   CanonicalUserState,
   getWaitlistAccess,
-  resolveRequestAuthIdentity,
   resolveUserState,
 } from '@/lib/auth/gate';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
-
-function canUseE2ETestAuthFallback(): boolean {
-  return (
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
-    process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
-    process.env.VERCEL_ENV !== 'preview'
-  );
-}
 
 function WaitlistRouteWithContract({
   children,
@@ -34,8 +25,8 @@ function WaitlistRouteWithContract({
 }
 
 /**
- * /waitlist is the waitlist-first public handoff (JOV-5334 / JOV-5376) and the
- * durable pending receipt (JOV-5001 / JOV-2132).
+ * /waitlist is the waitlist-first public handoff (JOV-5376) and the durable
+ * pending receipt (JOV-5001 / JOV-2132).
  *
  * Unauthenticated visitors get splash-B sign-up. Pre-receipt authenticated
  * states recover to /start chat. They must not render the retired
@@ -59,19 +50,7 @@ export default async function WaitlistPage() {
     );
   }
 
-  const identity = await resolveRequestAuthIdentity();
-  if (!identity.clerkUserId && !canUseE2ETestAuthFallback()) {
-    return (
-      <WaitlistRouteWithContract>
-        <WaitlistPublicLanding />
-      </WaitlistRouteWithContract>
-    );
-  }
-
-  const authResult = await resolveUserState({
-    createDbUserIfMissing: false,
-    ...(identity.clerkUserId ? { knownAuthIdentity: identity } : {}),
-  });
+  const authResult = await resolveUserState({ createDbUserIfMissing: false });
   const waitlistRedirect = getWaitlistRouteRedirect(authResult.state);
   if (waitlistRedirect) {
     redirect(waitlistRedirect);

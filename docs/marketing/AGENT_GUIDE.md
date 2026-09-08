@@ -94,7 +94,7 @@ pnpm --filter @jovie/web run qa:marketing:route-health
 It follows `MARKETING_ROUTE_MANIFEST` and checks every concrete target for a
 successful response, no 404/boundary/auth wall/failed request/runtime or
 console error; recipe routes also prove shared header/footer. Wildcards need a
-fixture. `/waitlist` is a public waitlist-first page, not a redirect.
+fixture and `/waitlist → /start` is the only allowed redirect.
 
 It uses supported capture flags (`NEXT_DISABLE_TOOLBAR=1`,
 `NEXT_PUBLIC_E2E_MODE=1`, `PUBLIC_NOAUTH_SMOKE=1`) and asserts dev chrome is

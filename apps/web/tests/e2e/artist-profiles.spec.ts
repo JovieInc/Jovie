@@ -1,4 +1,3 @@
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -103,7 +102,7 @@ test.describe('Artist Profiles Landing', () => {
   test('hero renders with headline and CTAs', async ({ page }) => {
     const claimLink = page
       .getByRole('link', {
-        name: /get started/i,
+        name: /claim your profile/i,
       })
       .first();
 
@@ -113,7 +112,7 @@ test.describe('Artist Profiles Landing', () => {
       })
     ).toBeVisible();
     await expect(claimLink).toBeVisible();
-    await expect(claimLink).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+    await expect(claimLink).toHaveAttribute('href', /\/start/);
     await expectFullyInViewport(page, claimLink);
   });
 
@@ -126,11 +125,11 @@ test.describe('Artist Profiles Landing', () => {
       })
     ).toBeVisible();
     await expect(
-      page.getByTestId('final-cta-action').getByText(/get started/i)
+      page.getByTestId('final-cta-action').getByText(/claim your profile/i)
     ).toBeVisible();
     await expect(page.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
-      PUBLIC_WAITLIST_URL
+      /\/start/
     );
   });
 
@@ -160,11 +159,12 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    const claimLink = page.getByRole('link', { name: /get started/i }).first();
+    const claimLink = page
+      .getByRole('link', { name: /claim your profile/i })
+      .first();
     await expect(claimLink).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(claimLink).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
     await expectFullyInViewport(page, claimLink);
   });
 
