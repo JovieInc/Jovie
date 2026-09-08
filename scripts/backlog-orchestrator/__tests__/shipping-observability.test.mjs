@@ -147,7 +147,7 @@ describe('shipping observability projection', () => {
       now: NOW,
     });
     assert.equal(unknown.qualification.status, UNKNOWN);
-    assert.equal(unknown.throughput.value, 0);
+    assert.equal(unknown.throughput.status, UNKNOWN);
   });
 
   it('reports retry causes and the oldest qualified blocked chain', () => {

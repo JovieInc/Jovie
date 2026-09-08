@@ -209,6 +209,8 @@ export function projectShippingChain(receipts, { now = new Date().toISOString(),
     ...(lastAgeMs < 0 || lastAgeMs > staleAfterMs ? ['stale-observation'] : []),
   ];
   const terminal = last.stage === 'production-proven';
+  if (terminal && !value.value?.observedOutcome)
+    defects.push('missing-observed-outcome');
   const qualification = defects.length
     ? unknown(defects.join(','), 'Gem', 'repair-attribution-instrumentation-before-shipping-claim')
     : terminal
@@ -252,15 +254,23 @@ export function projectShippingPortfolio(
       .filter((item) => ['repair-pending', 'evidence-pending', 'external-blocked'].includes(item.stage))
       .sort((left, right) => time(left.observedAt) - time(right.observedAt))[0] || null;
   const unqualified = items.filter((item) => item.qualification?.status === UNKNOWN);
+  const unknownMetric = (name) =>
+    unknown(`${name}-unqualified`, 'Gem', 'repair-chain-evidence-before-portfolio-claim');
   return {
     schema: SHIPPING_OBSERVABILITY_SCHEMA,
     items,
-    throughput: measured(completed.length, {
-      windowMs,
-      cutoff: new Date(cutoff).toISOString(),
-    }),
-    active: measured(open.filter((item) => item.executionState === 'active').length, 'qualified-open-chains'),
-    waiting: measured(open.filter((item) => item.executionState === 'waiting').length, 'qualified-open-chains'),
+    throughput: unqualified.length
+      ? unknownMetric('throughput')
+      : measured(completed.length, {
+          windowMs,
+          cutoff: new Date(cutoff).toISOString(),
+        }),
+    active: unqualified.length
+      ? unknownMetric('active')
+      : measured(open.filter((item) => item.executionState === 'active').length, 'qualified-open-chains'),
+    waiting: unqualified.length
+      ? unknownMetric('waiting')
+      : measured(open.filter((item) => item.executionState === 'waiting').length, 'qualified-open-chains'),
     retries: measured(
       qualified.reduce((sum, item) => sum + item.retries.value, 0),
       'qualified-chains'
