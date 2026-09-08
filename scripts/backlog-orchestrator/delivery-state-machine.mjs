@@ -776,9 +776,6 @@ export function transitionDeliveryReceipt(
       event: nonEmpty(transition.event) || 'state-transition',
       failure: transition.failure || null,
       deployedSha: exactSha(transition.deployedSha),
-      ...(transition.evidence && typeof transition.evidence === 'object'
-        ? { evidence: transition.evidence }
-        : {}),
     },
   };
 }

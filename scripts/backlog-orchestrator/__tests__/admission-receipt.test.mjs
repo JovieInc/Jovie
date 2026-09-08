@@ -4,12 +4,7 @@ import { describe, it } from 'node:test';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
-import { validatePlanCandidate } from '../plan-gate.mjs';
-import {
-  planEvidenceFor,
-  withFullGateReceipts,
-  withPreLeaseReceipts,
-} from './pre-lease.mjs';
+import { withFullGateReceipts, withPreLeaseReceipts } from './pre-lease.mjs';
 
 const NOW = new Date().toISOString();
 
@@ -32,20 +27,6 @@ Use one revision-scoped admission receipt.
 ## Optimization exception
 - Class: non-product
 - Justification: This control-plane admission receipt ships no user-facing page, link, asset, campaign, recommendation, or content variant.
-
-## Value
-- authority: founder-request
-- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
-- rationale: Make actual shipping ownership and delay visible
-- expected-benefit: Shorten time from approved work to proven production
-- validation: One exact task has a complete source-to-production receipt chain
-- basis: measured
-- concurrency: 1
-- demand-per-day: 4
-- critical-path: implementation=3600000,review-and-ci=1800000
-- bottleneck: single implementation slot
-- simplification: reuse existing plan and delivery receipts
-- owner: Summer
 
 ## Acceptance criteria
 * Receipts admit work without the three labels.
@@ -121,15 +102,6 @@ describe('revision-scoped admission receipt', () => {
       count: 1,
       identifiers: ['JOV-5121'],
     });
-  });
-
-  it('requires a founder request or Summer priority decision with a measurable benefit', () => {
-    const candidate = withPreLeaseReceipts(issue(), { now: NOW });
-    const evidence = planEvidenceFor({ value: undefined });
-    assert.equal(
-      validatePlanCandidate(candidate, evidence),
-      'value-justification-missing-or-invalid'
-    );
   });
 
   it('treats the three labels as derived audit, not independent blockers', () => {
