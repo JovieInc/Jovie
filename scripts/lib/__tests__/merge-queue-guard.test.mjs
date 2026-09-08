@@ -2243,7 +2243,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       deterministicMemberFailure: 'isolate-and-remove',
       transientFailure: 'bounded-retry',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(1);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(2);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
     expect(

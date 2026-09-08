@@ -170,6 +170,36 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   `evaluate` → merge → `active`) exists only to land a fix that repairs the queue
   itself, when the queue can't yet land it. It is not the normal path.
 
+### Native build capacity (JOV-6107)
+
+**Ship now:** use two concurrent native speculative groups after this policy
+lands. The 2026-09-08 Team-plan readback and
+[GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
+give 60 standard hosted jobs and five macOS jobs across the organization.
+CI run 34282800645 peaked at 19 hosted jobs for one combined head; the
+22:00:25 UTC organization snapshot observed at least seven other hosted jobs.
+Two groups plus that background need 45 jobs; three would need 64. A group
+selecting both iOS and Mac needs two macOS jobs, leaving one reserve at two
+groups. The five self-hosted Linux runners do not provide capacity for these
+hosted product lanes.
+
+Source preflight accepts integer build counts from one through the reviewed
+ceiling of two and records the actual count and any difference from the target.
+This permits source-first rollout and a one-field rollback without blocking
+normal admission. Apply only `max_entries_to_build: 1 → 2` to live ruleset
+10512119 after the source lands; preserve the live 20-minute budget, ALLGREEN,
+all required checks, empty bypass actors, min/max merge 1/5 and wait zero.
+The separate pending source cohort minimum/wait values are not part of this
+apply. Roll back only the build count to one if runner waits or speculative
+invalidation outweigh the measured throughput gain.
+
+**Re-evaluate when:** a complete simultaneous-group window supplies job waits,
+peak fanout, Mac usage, invalidations and actual merges/hour, or verified account
+limits change. **Then:** raise the source ceiling only when measured total and
+Mac demand fit with background headroom. This is a capacity ceiling, not a
+permanent preference for two. Required tests run on every synthetic head;
+GitHub's merge batch limit does not combine their builds or reuse stale results.
+
 ### Native queue reconciliation
 
 `drain-pr-queue.sh` reads authoritative GitHub queue state, not the audit
