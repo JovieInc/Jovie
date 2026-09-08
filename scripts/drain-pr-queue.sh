@@ -790,9 +790,16 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
         and $receipt.state == "success"
         and (($binding.pr | tonumber) == $pr)
         # Native entries survive main advancing. Required Merge Group Admission
-        # proves ancestry for source receipts before any merge; do not dequeue
-        # and re-enqueue valid intent merely because its original base moved.
-        and ($expected_main == "" or $binding.main == $expected_main or $binding.checkpoint == "source-qualified")
+        # proves ancestry before any merge. Do not dequeue a valid typed
+        # receipt (verified, controller-repair, or source-qualified) merely
+        # because its original base moved.
+        and (
+          $expected_main == ""
+          or $binding.main == $expected_main
+          or $binding.checkpoint == "source-qualified"
+          or $binding.checkpoint == "verified"
+          or $binding.checkpoint == "controller-repair"
+        )
         and ($receipt.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
         and ($expected_target == "" or $receipt.target_url == $expected_target)
         and (

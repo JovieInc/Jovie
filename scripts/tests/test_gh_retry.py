@@ -5455,7 +5455,7 @@ class TestNativeAdmissionReceiptReconciliation:
         [
             ("a" * 40, "2026-09-07T12:00:02Z", False),
             ("a" * 40, "2026-09-07T11:59:59Z", True),
-            ("b" * 40, "2026-09-07T12:00:02Z", True),
+            ("b" * 40, "2026-09-07T12:00:02Z", False),
             ("a" * 40, None, True),
         ],
     )
@@ -5492,10 +5492,13 @@ class TestNativeAdmissionReceiptReconciliation:
         else:
             assert "=fresh exact-checkpoint native admission" in result.stdout
 
-    def test_source_receipt_survives_main_advance_during_unrelated_deployment(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("checkpoint", ["source-qualified", "verified", "controller-repair"])
+    def test_typed_receipt_survives_main_advance_during_unrelated_deployment(
+        self, tmp_path: Path, checkpoint: str
+    ) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path, receipt_main="b" * 40,
-            receipt_at="2026-09-07T12:00:02Z", checkpoint="source-qualified",
+            receipt_at="2026-09-07T12:00:02Z", checkpoint=checkpoint,
         )
         result = _run_bash(_drain_command(
             tmp_path, backend="native",
@@ -5510,8 +5513,8 @@ class TestNativeAdmissionReceiptReconciliation:
     ) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path,
-            receipt_main="b" * 40,
-            receipt_at="2026-09-07T12:00:02Z",
+            receipt_main="a" * 40,
+            receipt_at="2026-09-07T11:59:59Z",
             dequeue_response=(
                 '{"skipped":true,"reason":"queue-entry-changed",'
                 '"state":{"queued":true}}'
