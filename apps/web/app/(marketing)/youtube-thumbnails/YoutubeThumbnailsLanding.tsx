@@ -6,6 +6,7 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY as copy } from '@/data/youtubeThumbnailsCopy';
 import { YoutubeThumbnailPasteForm } from './YoutubeThumbnailPasteForm';
@@ -106,10 +107,11 @@ export function YoutubeThumbnailsLanding() {
           </MarketingContainer>
         </section>
 
-        <section
+        <MarketingCtaSection
           aria-labelledby='youtube-thumbnails-included-heading'
           className='py-16 sm:py-20'
           data-testid='marketing-section-cta'
+          data-marketing-variant='included-single'
           data-marketing-owner='apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
         >
           <MarketingContainer width='page'>
@@ -138,7 +140,7 @@ export function YoutubeThumbnailsLanding() {
               </div>
             </div>
           </MarketingContainer>
-        </section>
+        </MarketingCtaSection>
       </main>
     </MarketingPageShell>
   );

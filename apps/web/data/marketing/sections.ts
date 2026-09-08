@@ -1424,6 +1424,27 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
           'placement=mid-page after a proof beat (B2B C6: mid-page CTAs only after proof); cadence-budgeted',
         status: 'unproven',
       },
+      {
+        id: 'editorial-search',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'centered',
+        requiredInputs: ['headline', 'inputSlot'],
+        chooseWhen:
+          'placement=terminal AND interaction=name-search (HomepageClose)',
+        exemplar: { route: '/', section: 'close' },
+        status: 'active',
+      },
+      {
+        id: 'included-single',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'centered',
+        chooseWhen:
+          'placement=terminal AND interaction=included-product-link (YouTube included CTA)',
+        exemplar: { route: '/youtube-thumbnails', section: 'included' },
+        status: 'active',
+      },
     ],
     defaultVariant: 'final-single-claim',
     proofClass: 'none',
@@ -1459,7 +1480,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       touchTarget: 'CTA ≥44×44 at sm',
       reducedMotion: 'no motion',
     },
-    component: 'components/marketing/MarketingFooterCta',
+    component: 'components/site/MarketingCtaSection',
     failureModes: [
       'CTAs before value/proof established (B2B anti-pattern #7)',
       'Multiple competing primary asks (B2B anti-pattern #6: one primary label repeated verbatim)',

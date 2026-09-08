@@ -27,6 +27,7 @@ import {
   marketingPenSelector,
   validateMarketingPenRegistry,
 } from '@/data/marketing';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const repoRoot = path.resolve(__dirname, '../../../../..');
 
@@ -178,7 +179,10 @@ function countReturnedRootBindings(
   let matches = 0;
 
   function visit(node: ts.Node): void {
-    if (ts.isJsxAttribute(node) && node.getText(sourceFile) === binding) {
+    if (
+      (ts.isJsxAttribute(node) || ts.isJsxSpreadAttribute(node)) &&
+      node.getText(sourceFile) === binding
+    ) {
       const openingElement = node.parent.parent;
       const rootElement = ts.isJsxOpeningElement(openingElement)
         ? openingElement.parent
@@ -193,7 +197,9 @@ function countReturnedRootBindings(
       ) {
         if (
           ts.isJsxElement(ancestor) &&
-          ancestor.openingElement.tagName.getText(sourceFile) === 'section'
+          ['section', 'MarketingCtaSection'].includes(
+            ancestor.openingElement.tagName.getText(sourceFile)
+          )
         ) {
           nestedInsideJsx = true;
           break;
@@ -461,7 +467,12 @@ describe('canonical marketing component registry', () => {
 
       expect(entry.resolvedSource, entry.id).toBeTruthy();
       expect(entry.exportName, entry.id).toBeTruthy();
-      expect(entry.penRootIds, entry.id).toHaveLength(1);
+      if (entry.penRootId === null) {
+        expect(entry.penRootIds, entry.id).toEqual([]);
+        expect(entry.penIdentityReason?.trim(), entry.id).toBeTruthy();
+      } else {
+        expect(entry.penRootIds, entry.id).toHaveLength(1);
+      }
       expect(entry.rootProofs.length, entry.id).toBeGreaterThan(0);
 
       const resolvedPath = path.join(repoRoot, entry.resolvedSource as string);
@@ -838,13 +849,14 @@ describe('canonical marketing component registry', () => {
     );
   });
 
-  it('keeps section.cta unresolved until JOV-5356 converges the production shell root', () => {
+  it('resolves section.cta production ownership without fabricating a Pen identity', () => {
     expect(
       MARKETING_COMPONENT_REGISTRY.find(entry => entry.id === 'section.cta')
     ).toMatchObject({
-      sourceBacked: false,
-      unresolvedReason:
-        'A production shell root exists, but section.cta convergence is pending JOV-5356.',
+      sourceBacked: true,
+      penRootId: null,
+      penRootIds: [],
+      exportName: 'MarketingCtaSection',
     });
   });
 });
@@ -1387,11 +1399,6 @@ it('binds every nonterminal acquisition occurrence to its declared variant owner
       const section = MARKETING_SECTION_REGISTRY.find(
         entry => entry.sectionId === binding.sectionId
       )!;
-      if (binding.sectionId === 'cta') {
-        expect(section.sourceBacked).toBe(false);
-        expect(binding.variantId).toBeUndefined();
-        continue;
-      }
       expect(section.occurrenceProofs).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1402,4 +1409,181 @@ it('binds every nonterminal acquisition occurrence to its declared variant owner
       );
     }
   }
+});
+
+function hasCtaDelegation(
+  sourceText: string,
+  binding: string,
+  exportName: string
+): boolean {
+  const file = parseTsx('consumer.tsx', sourceText);
+  const importsOwner = file.statements.some(
+    statement =>
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text ===
+        '@/components/site/MarketingCtaSection' &&
+      !statement.importClause?.isTypeOnly &&
+      statement.importClause?.namedBindings &&
+      ts.isNamedImports(statement.importClause.namedBindings) &&
+      statement.importClause.namedBindings.elements.some(
+        element =>
+          element.name.text === 'MarketingCtaSection' &&
+          !element.propertyName &&
+          !element.isTypeOnly
+      )
+  );
+  const consumer = file.statements.find(
+    (statement): statement is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(statement) &&
+      statement.name?.text === exportName &&
+      Boolean(
+        statement.modifiers?.some(
+          modifier => modifier.kind === ts.SyntaxKind.ExportKeyword
+        )
+      )
+  );
+  if (!consumer?.body || !importsOwner) return false;
+  let count = 0;
+  function visitReturned(node: ts.Node, insideSection = false) {
+    if (ts.isFunctionLike(node)) return;
+    if (ts.isJsxSelfClosingElement(node)) {
+      if (
+        node.tagName.getText(file) === 'MarketingCtaSection' &&
+        !insideSection &&
+        node.attributes.properties.some(prop => prop.getText(file) === binding)
+      )
+        count += 1;
+      return;
+    }
+    if (ts.isJsxElement(node)) {
+      const opening = node.openingElement;
+      const tag = opening.tagName.getText(file);
+      if (
+        tag === 'MarketingCtaSection' &&
+        !insideSection &&
+        opening.attributes.properties.some(
+          prop => prop.getText(file) === binding
+        )
+      )
+        count += 1;
+      for (const child of node.children)
+        visitReturned(
+          child,
+          insideSection || tag === 'section' || tag === 'MarketingCtaSection'
+        );
+      return;
+    }
+    ts.forEachChild(node, child => visitReturned(child, insideSection));
+  }
+  function visitBody(node: ts.Node) {
+    if (ts.isFunctionLike(node)) return;
+    if (ts.isReturnStatement(node) && node.expression) {
+      visitReturned(node.expression);
+      return;
+    }
+    ts.forEachChild(node, visitBody);
+  }
+  visitBody(consumer.body);
+  return count === 1;
+}
+
+describe('CTA source identity and optional Pen mapping', () => {
+  it('rejects missing and mixed Pen metadata without waiving native source requirements', () => {
+    const cta = MARKETING_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'section.cta'
+    )!;
+    expect(validateMarketingPenRegistry([cta])).toEqual([]);
+    for (const change of [
+      { penIdentityReason: '' },
+      { penRootIds: [MARKETING_PEN_CONTRACT_IDS.shell.finalCta] },
+      { penVariantRoots: { other: MARKETING_PEN_CONTRACT_IDS.shell.finalCta } },
+    ]) {
+      expect(
+        validateMarketingPenRegistry([
+          { ...cta, ...change } as MarketingRegistryEntry,
+        ]).map(issue => issue.code)
+      ).toContain('invalid-pen-identity');
+    }
+    expect(
+      validateMarketingPenRegistry([{ ...cta, rootProofs: [] }]).map(
+        issue => issue.code
+      )
+    ).toContain('unresolved-source-root');
+  });
+  it('proves the inert native section and actual imported delegated bodies, rejecting detached or fake owners', () => {
+    const ownerPath = 'apps/web/components/site/MarketingCtaSection.tsx';
+    const owner = fs.readFileSync(path.join(repoRoot, ownerPath), 'utf8');
+    const parsed = parseTsx(ownerPath, owner);
+    expect(hasNamedExport(parsed, 'MarketingCtaSection')).toBe(true);
+    expect(countReturnedRootBindings(parsed, '{...props}')).toBe(1);
+    expect(owner).toContain('return <section {...props} />');
+    for (const [file, binding] of [
+      [
+        'apps/web/components/homepage/HomepageClose.tsx',
+        "data-marketing-variant='editorial-search'",
+      ],
+      [
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        "data-marketing-variant='included-single'",
+      ],
+      [
+        'apps/web/components/site/MarketingTerminalCta.tsx',
+        'data-pen-contract={penContractId}',
+      ],
+    ]) {
+      const text = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+      expect(
+        hasCtaDelegation(text, binding, path.basename(file, '.tsx')),
+        file
+      ).toBe(true);
+      expect(
+        hasCtaDelegation(
+          text.replace('@/components/site/MarketingCtaSection', '@/fake-owner'),
+          binding,
+          path.basename(file, '.tsx')
+        )
+      ).toBe(false);
+      expect(
+        hasCtaDelegation(
+          text
+            .replaceAll('<MarketingCtaSection', '<section')
+            .replaceAll('</MarketingCtaSection>', '</section>'),
+          binding,
+          path.basename(file, '.tsx')
+        )
+      ).toBe(false);
+    }
+    const binding = "data-marketing-variant='editorial-search'";
+    expect(
+      hasCtaDelegation(
+        `import { MarketingCtaSection } from '@/components/site/MarketingCtaSection'; const stamp = ${JSON.stringify(binding)}; export function Fake(){ return <section/>; }`,
+        binding,
+        'Fake'
+      )
+    ).toBe(false);
+    const imported = `import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';`;
+    expect(
+      hasCtaDelegation(
+        `${imported} export function HomepageClose(){ return <MarketingCtaSection ${binding}/>; }`,
+        binding,
+        'HomepageClose'
+      )
+    ).toBe(true);
+    const helper = `function Unused(){ return <MarketingCtaSection ${binding}>Unused</MarketingCtaSection>; }`;
+    expect(
+      hasCtaDelegation(
+        `${imported} ${helper} export function HomepageClose(){ return <section/>; }`,
+        binding,
+        'HomepageClose'
+      )
+    ).toBe(false);
+    expect(
+      hasCtaDelegation(
+        `import type { MarketingCtaSection } from '@/components/site/MarketingCtaSection'; export function HomepageClose(){ return <MarketingCtaSection ${binding}/>; }`,
+        binding,
+        'HomepageClose'
+      )
+    ).toBe(false);
+  });
 });
