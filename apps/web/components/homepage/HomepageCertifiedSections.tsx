@@ -83,7 +83,10 @@ export function HomepageCertifiedSections({
     <>
       <section
         className='homepage-certified-proof'
-        data-testid='homepage-proof'
+        data-testid='marketing-section-logo-cloud'
+        data-homepage-testid='homepage-proof'
+        data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
+        data-marketing-variant='inline-strip'
         aria-label='Proof'
       >
         <p className='homepage-certified-proof__statement'>{proof.statement}</p>
@@ -106,7 +109,11 @@ export function HomepageCertifiedSections({
             key={section.id}
             id={section.id}
             className='homepage-certified-section'
-            data-testid={`homepage-section-${section.id}`}
+            data-testid='marketing-section-feature-split'
+            data-homepage-testid={`homepage-section-${section.id}`}
+            data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
+            data-marketing-variant='editorial'
+            data-marketing-occurrence={section.id}
             data-align={index % 2 === 0 ? 'start' : 'end'}
             data-media={media ? 'true' : 'false'}
             aria-labelledby={headingId}

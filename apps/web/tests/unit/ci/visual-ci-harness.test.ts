@@ -190,7 +190,7 @@ describe('visual CI harness', () => {
       "expect(response?.status(), 'homepage document must succeed').toBe(200)"
     );
     expect(legacy).toContain("expect(new URL(page.url()).pathname).toBe('/')");
-    expect(legacy).toContain("page.getByTestId('homepage-hero-shell')");
+    expect(legacy).toContain("page.getByTestId('marketing-section-hero')");
     expect(legacy).toContain("page.locator('h1').first()");
     expect(legacy).toContain('document.fonts.status');
     expect(legacy).toContain('image.complete');

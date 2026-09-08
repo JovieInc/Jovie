@@ -33,7 +33,10 @@ export function HomepageEditorialHero({
     <section
       className='homepage-editorial-hero'
       aria-labelledby={headingId}
-      data-testid='homepage-hero-shell'
+      data-testid='marketing-section-hero'
+      data-homepage-testid='homepage-hero-shell'
+      data-marketing-owner='apps/web/components/homepage/HomepageEditorialHero.tsx'
+      data-marketing-variant='centered-none'
     >
       <HomepageCertifiedExposure />
       <div

@@ -61,7 +61,7 @@ test.describe('Homepage', () => {
   test('renders the editorial hero with the name search as the only control', async ({
     page,
   }) => {
-    const hero = page.getByTestId('homepage-hero-shell');
+    const hero = page.getByTestId('marketing-section-hero');
 
     await expect(hero).toBeVisible();
     await expect(hero.getByText('operating system')).toHaveCount(0);
@@ -193,7 +193,7 @@ test.describe('Homepage', () => {
   }) => {
     await expect(
       page
-        .getByTestId('homepage-hero-shell')
+        .getByTestId('marketing-section-hero')
         .locator('[data-hero-layer="active"]')
     ).toHaveCount(1);
     const copy = page.locator('.homepage-editorial-hero__copy');
@@ -252,8 +252,8 @@ test.describe('Homepage', () => {
     }
 
     const sectionIds = [
-      'homepage-hero-shell',
-      'homepage-proof',
+      'marketing-section-hero',
+      'marketing-section-logo-cloud',
       'homepage-section-connected',
       'homepage-section-found',
       'homepage-section-know',
@@ -267,7 +267,9 @@ test.describe('Homepage', () => {
         ids.map(
           id =>
             document
-              .querySelector(`[data-testid="${id}"]`)
+              .querySelector(
+                `[data-testid="${id}"], [data-homepage-testid="${id}"]`
+              )
               ?.getBoundingClientRect().top ?? Number.NaN
         ),
       sectionIds
@@ -277,13 +279,13 @@ test.describe('Homepage', () => {
 
     const heroToProofBoundary = await page.evaluate(() => {
       const hero = document.querySelector<HTMLElement>(
-        '[data-testid="homepage-hero-shell"]'
+        '[data-testid="marketing-section-hero"]'
       );
       const stack = document.querySelector<HTMLElement>(
         '[data-testid="homepage-story-stack"]'
       );
       const proofSection = document.querySelector<HTMLElement>(
-        '[data-testid="homepage-proof"]'
+        '[data-testid="marketing-section-logo-cloud"]'
       );
       if (!(hero && stack && proofSection)) return null;
       return {
@@ -304,7 +306,7 @@ test.describe('Homepage', () => {
 
     // Section 2 is the earned-proof statement plus verified logos on the page
     // background, never a frosted card.
-    const proof = page.getByTestId('homepage-proof');
+    const proof = page.getByTestId('marketing-section-logo-cloud');
     await expect(proof).toHaveText("Proof is earned. We don't borrow it.");
     await expect(
       proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
@@ -349,7 +351,9 @@ test.describe('Homepage', () => {
         'Jovie adapts to your work without reducing you to a category.',
       ],
     ] as const) {
-      const section = page.getByTestId(`homepage-section-${id}`);
+      const section = page.locator(
+        `[data-homepage-testid="homepage-section-${id}"]`
+      );
       await expect(
         section.getByRole('heading', { level: 2, name: headline })
       ).toBeVisible();
@@ -357,14 +361,18 @@ test.describe('Homepage', () => {
     }
 
     // Real product exports load at device quality where they appear.
-    const connected = page.getByTestId('homepage-section-connected');
+    const connected = page.locator(
+      '[data-homepage-testid="homepage-section-connected"]'
+    );
     await connected.scrollIntoViewIfNeeded();
     await expect(connected.locator('img')).toHaveCount(1);
-    const relationships = page.getByTestId('homepage-section-relationships');
+    const relationships = page.locator(
+      '[data-homepage-testid="homepage-section-relationships"]'
+    );
     await relationships.scrollIntoViewIfNeeded();
     await expect(relationships.locator('img')).toHaveCount(3);
     const exportSelector =
-      '[data-testid="homepage-section-connected"] img, [data-testid="homepage-section-relationships"] img';
+      '[data-homepage-testid="homepage-section-connected"] img, [data-homepage-testid="homepage-section-relationships"] img';
     await page.waitForFunction(
       selector =>
         Array.from(document.querySelectorAll<HTMLImageElement>(selector)).every(
@@ -394,7 +402,7 @@ test.describe('Homepage', () => {
     }
 
     // Section 9 repeats the name search; CTA is Find me, never Search.
-    const close = page.getByTestId('homepage-close');
+    const close = page.getByTestId('marketing-section-cta');
     await close.scrollIntoViewIfNeeded();
     await expect(
       close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
@@ -507,7 +515,7 @@ test.describe('Homepage', () => {
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
     const [heroInlinePadding, searchMaterial] = await Promise.all([
-      page.getByTestId('homepage-hero-shell').evaluate(element => {
+      page.getByTestId('marketing-section-hero').evaluate(element => {
         const style = getComputedStyle(element);
         return (
           Number.parseFloat(style.paddingLeft) +
@@ -635,7 +643,7 @@ test.describe('Homepage', () => {
       const copy = page.locator('.homepage-editorial-hero__copy');
       const copyBox = await copy.boundingBox();
       const heroBox = await page
-        .getByTestId('homepage-hero-shell')
+        .getByTestId('marketing-section-hero')
         .boundingBox();
       const copyCenter = (copyBox?.x ?? 0) + (copyBox?.width ?? 0) / 2;
       expect(Math.abs(copyCenter - viewport.width / 2)).toBeLessThanOrEqual(8);

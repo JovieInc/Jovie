@@ -37,6 +37,8 @@ interface MarketingHeroBaseProps {
  * caller-provided children.
  */
 export interface MarketingHeroShellProps extends MarketingHeroBaseProps {
+  /** Explicit section metadata is supported only by shell mode. */
+  readonly sectionVariant?: string;
   /**
    * - `centered`: single column, text centered, constrained to page width
    * - `left`: single column, text left-aligned, constrained to page width
@@ -124,11 +126,13 @@ function MarketingHeroFrame({
   className,
   headingId,
   testId,
+  sectionVariant,
   children,
 }: Readonly<{
   className: string;
   headingId?: string;
   testId?: string;
+  sectionVariant?: string;
   children: ReactNode;
 }>) {
   return (
@@ -137,6 +141,12 @@ function MarketingHeroFrame({
       className={className}
       aria-labelledby={headingId}
       data-testid={testId}
+      data-marketing-owner={
+        sectionVariant
+          ? 'apps/web/components/marketing/MarketingHero.tsx'
+          : undefined
+      }
+      data-marketing-variant={sectionVariant}
     >
       {children}
     </section>
@@ -171,11 +181,13 @@ function MarketingHeroShell({
   children,
   headingId,
   testId,
+  sectionVariant,
 }: MarketingHeroShellProps) {
   return (
     <MarketingHeroFrame
       headingId={headingId}
       testId={testId}
+      sectionVariant={sectionVariant}
       className={cn(
         variant !== 'unstyled' && 'relative w-full',
         variant !== 'unstyled' &&
