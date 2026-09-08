@@ -104,7 +104,13 @@ Rules:
   merge-group correctness, provenance, and ancestry checks remain enforced.
   Admission receipts say `source-qualified`; they never certify production.
   The production controller owns deployment serialization and exact runtime
-  certification. An existing incident hold is cleared only by its own evidence.
+  certification. When main and production are healthy, exact-main review is
+  current, and integrity is clear, controller containment and production SHA
+  lag select `hold-intake`: qualified PRs continue through the native queue,
+  while controller containment still holds new implementation and deployment.
+  Capacity-dependent mutation requires its own accepted evidence. Unknown
+  source/review/integrity evidence still blocks admission. An
+  existing incident hold is cleared only by its own evidence.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;

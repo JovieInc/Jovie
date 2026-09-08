@@ -329,7 +329,8 @@ case "$DRAIN_PROMOTION_MODE" in
         .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.promotionContinues == true and
         .closureAdmission.remediationContinues == true and
-        .alreadyAdmittedCohort.newIntakeAllowed == .closureAdmission.newIssueIntakeAllowed
+        (.alreadyAdmittedCohort.newIntakeAllowed | type == "boolean") and
+        (.alreadyAdmittedCohort.newIntakeAllowed == false or .closureAdmission.newIssueIntakeAllowed == true)
       elif $mode == "controller-repair-only" then
         .state == "AMBER" and
         .signals.main.status == "green" and

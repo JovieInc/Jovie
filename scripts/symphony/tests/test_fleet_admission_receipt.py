@@ -134,6 +134,25 @@ def evaluate_receipt(**overrides):
     return GATE_MODULE.evaluate(signals(**overrides), now_iso())
 
 
+def legacy_controller_repair_receipt():
+    """Preserve validation of receipts emitted before runtime/source decoupling."""
+    receipt = evaluate_receipt(controller={"status": "failed"})
+    receipt["promotionMode"] = "controller-repair-only"
+    receipt["controllerRepairAdmission"] = {
+        "allowed": True, "condition": "controller-failure",
+        "mainSha": SHA, "deployedSha": SHA,
+        "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+        "maxConcurrent": 1, "deploymentsAllowed": False,
+        "runtimeActivationAllowed": False,
+        "authority": "canonical-merge-queue-controller",
+    }
+    receipt["alreadyAdmittedCohort"] = {
+        "preserve": True, "newIntakeAllowed": False,
+        "semantics": "preserve-cohort-and-admit-one-controller-repair",
+    }
+    return receipt
+
+
 def inject_inventories(receipt: dict[str, object]) -> dict[str, object]:
     closure = dict(receipt["signals"]["closureHealth"])
     closure["classifications"] = huge_classifications()
@@ -153,8 +172,10 @@ def drain_authorization_jq() -> str:
 
 
 class FleetAdmissionReceiptTests(unittest.TestCase):
-    def project_mode(self, **overrides):
-        receipt = inject_inventories(evaluate_receipt(**overrides))
+    def project_mode(self, _receipt=None, **overrides):
+        receipt = inject_inventories(
+            evaluate_receipt(**overrides) if _receipt is None else _receipt
+        )
         source_bytes = len(json.dumps(receipt).encode())
         projection = PROJECT.project_fleet_admission_receipt(receipt)
         self.assertGreater(source_bytes, PROJECT.MAX_ADMISSION_JSON_BYTES)
@@ -184,13 +205,18 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
             ({"controller": {"status": "failed"}}, "controller-repair-only"),
             ({"main": {"status": "red", "sha": SHA}}, "draft-only"),
             ({"production": {"status": "green", "deployedSha": "b" * 40}}, "hold-intake"),
+            ({"controller": {"status": "failed"}}, "hold-intake"),
             ({"integrity": {"status": "active", "reason": "credential-compromise", "detail": "keys leaked"}}, "blocked"),
         ]
         jq = shutil.which("jq")
         self.assertIsNotNone(jq)
         for overrides, mode in cases:
             with self.subTest(mode=mode):
-                _source, projection = self.project_mode(**overrides)
+                _source, projection = self.project_mode(
+                    _receipt=legacy_controller_repair_receipt()
+                    if mode == "controller-repair-only" else None,
+                    **overrides,
+                )
                 self.assertEqual(projection["promotionMode"], mode)
                 if mode != "normal":
                     accepted = subprocess.run(
@@ -276,8 +302,35 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
         self.assertEqual(blocked["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
 
-    def test_controller_repair_projection_binds_provenance_and_rejects_forgery(self):
+    def test_runtime_intake_hold_survives_projection_without_bypassing_closure(self):
         receipt = evaluate_receipt(controller={"status": "failed"})
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(projected["promotionMode"], "hold-intake")
+        self.assertTrue(projected["alreadyAdmittedCohort"]["preserve"])
+        self.assertFalse(projected["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertFalse(projected["workAdmission"]["newIssueLeaseAllowed"])
+
+        receipt = evaluate_receipt(
+            controller={"status": "failed"},
+            closureHealth={
+                **signals()["closureHealth"], "status": "red",
+                "newIssueIntakeAllowed": False,
+                "reasons": ["closure-observation-unknown"],
+            },
+        )
+        for invalid_intake in (True, None, "false"):
+            receipt["alreadyAdmittedCohort"]["newIntakeAllowed"] = invalid_intake
+            rejected = subprocess.run(
+                [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+                input=json.dumps(receipt), capture_output=True, text=True, check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+        receipt["alreadyAdmittedCohort"]["newIntakeAllowed"] = True
+        with self.assertRaisesRegex(PROJECT.AdmissionProjectionError, "bypasses closure intake"):
+            PROJECT.project_fleet_admission_receipt(receipt)
+
+    def test_controller_repair_projection_binds_provenance_and_rejects_forgery(self):
+        receipt = legacy_controller_repair_receipt()
         self.assertEqual(receipt["promotionMode"], "controller-repair-only")
 
         projection = PROJECT.project_fleet_admission_receipt(receipt)

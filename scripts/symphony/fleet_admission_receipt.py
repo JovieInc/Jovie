@@ -462,9 +462,11 @@ def _project_cohort(value: object, promotion_mode: str, intake: bool) -> dict[st
             raise AdmissionProjectionError(
                 "hold-intake must preserve the admitted cohort"
             )
-        if new_intake is not intake:
+        # Runtime containment may impose a stricter intake hold than closure.
+        # A receipt can narrow authority, never bypass a closure intake hold.
+        if new_intake and not intake:
             raise AdmissionProjectionError(
-                "alreadyAdmittedCohort.newIntakeAllowed contradicts closure intake"
+                "alreadyAdmittedCohort.newIntakeAllowed bypasses closure intake"
             )
     projected: dict[str, Any] = {
         "preserve": preserve,

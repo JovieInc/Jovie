@@ -1062,13 +1062,14 @@ class DeploymentBindingTests(unittest.TestCase):
         # New-issue intake stays closed; only promotion resumes.
         self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
-        # Any additional closure reason keeps the gate blocked.
+        # Unrelated closure debt still holds intake, not qualified source promotion.
         signals["closureHealth"]["reasons"] = [
             "native-queue-empty-with-eligible-over-15m",
             "duplicate-issue-lanes-unresolved",
         ]
         receipt = self.evaluate(signals)
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
 
     def test_stale_or_missing_capacity_closes_mutation_admission(self):
         stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
@@ -1349,7 +1350,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
 
-    def test_failed_controller_observation_admits_only_controller_repair(self):
+    def test_failed_controller_observation_preserves_qualified_source_admission(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
@@ -1362,8 +1363,8 @@ class DeploymentBindingTests(unittest.TestCase):
             "error": "controller-observation-failed: Connection refused",
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
-        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
         self.assertFalse(receipt["alreadyAdmittedCohort"]["newIntakeAllowed"])
@@ -1390,8 +1391,8 @@ class DeploymentBindingTests(unittest.TestCase):
                     "reasons": reasons,
                 }
                 receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-                self.assertEqual(receipt["promotionMode"], "controller-repair-only")
-                self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
+                self.assertEqual(receipt["promotionMode"], "hold-intake")
+                self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
                 self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
     def test_unknown_closure_observation_blocks_controller_repair(self):
@@ -1409,7 +1410,7 @@ class DeploymentBindingTests(unittest.TestCase):
             "reasons": ["closure-observation-unknown"],
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
         self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
 
     def test_unrelated_closure_debt_still_blocks_controller_repair(self):
@@ -1430,7 +1431,7 @@ class DeploymentBindingTests(unittest.TestCase):
             ],
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
         self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
 
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
@@ -1723,6 +1724,50 @@ class DeploymentBindingTests(unittest.TestCase):
             {"production-deployment-unbound"},
         )
 
+    def test_contained_runtime_does_not_freeze_qualified_source_promotion(self):
+        for deployed_sha in (MAIN_SHA, "b" * 40):
+            with self.subTest(deployed_sha=deployed_sha):
+                signals = dict(GREEN_SIGNALS)
+                signals["production"] = {"status": "green", "deployedSha": deployed_sha}
+                signals["controller"] = {"status": "failed", "detail": "connection refused"}
+                signals["queue"] = {"status": "unknown", "detail": "gh pr list exit 1"}
+                signals["closureHealth"] = {
+                    **GREEN_SIGNALS["closureHealth"],
+                    "status": "red", "newIssueIntakeAllowed": False,
+                    "reasons": ["closure-observation-unknown"],
+                }
+                signals["concurrencyEvidence"] = {
+                    **GREEN_SIGNALS["concurrencyEvidence"],
+                    "source": "untrusted-capacity-source",
+                }
+                receipt = self.evaluate(signals)
+                self.assertEqual(receipt["promotionMode"], "hold-intake")
+                self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertFalse(receipt["concurrency"]["gem"]["newMutationAllowed"])
+                self.assertFalse(receipt["productionUnboundRepairAdmission"]["allowed"])
+
+    def test_runtime_hold_does_not_override_unknown_source_or_integrity(self):
+        for key, value in (
+            ("main", {"status": "unknown"}),
+            ("controller", {"status": "unknown"}),
+            ("production", {"status": "unknown"}),
+            ("integrity", {"status": "active", "reason": next(iter(MODULE.SEVERE_REASONS))}),
+            ("independentReview", {**GREEN_SIGNALS["independentReview"], "headSha": "b" * 40}),
+        ):
+            with self.subTest(signal=key):
+                signals = dict(GREEN_SIGNALS)
+                signals["controller"] = {"status": "failed"}
+                signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+                signals[key] = value
+                receipt = self.evaluate(signals)
+                self.assertEqual(receipt["promotionMode"], "blocked")
+                self.assertFalse(receipt["promotionAdmission"]["allowed"])
+                self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
     def test_controller_failure_blocks_deployment(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
@@ -1730,7 +1775,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
-    def test_controller_failure_allows_only_exact_source_repair_admission(self):
+    def test_controller_failure_allows_qualified_source_admission(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["controller"] = {"status": "failed"}
@@ -1738,18 +1783,18 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
 
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
         self.assertEqual(
             receipt["controllerRepairAdmission"],
             {
-                "allowed": True,
-                "condition": "controller-failure",
-                "mainSha": MAIN_SHA,
-                "deployedSha": "b" * 7,
+                "allowed": False,
+                "condition": None,
+                "mainSha": None,
+                "deployedSha": None,
                 "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
-                "maxConcurrent": 1,
+                "maxConcurrent": 0,
                 "deploymentsAllowed": False,
                 "runtimeActivationAllowed": False,
                 "authority": "canonical-merge-queue-controller",
@@ -1760,7 +1805,7 @@ class DeploymentBindingTests(unittest.TestCase):
             {
                 "preserve": True,
                 "newIntakeAllowed": False,
-                "semantics": "preserve-cohort-and-admit-one-controller-repair",
+                "semantics": "preserve-cohort-and-stop-new-implementation-intake",
             },
         )
 

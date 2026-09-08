@@ -1393,16 +1393,21 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     hold_intake_allowed = (
         state == "AMBER"
-        and controller.get("status") == "green"
+        and review_allowed
         and main.get("status") == "green"
         and production.get("status") == "green"
-        and production_unbound
         and integrity.get("status") in {"clear", "resolved"}
-        and len(reasons) == 1
-        and reasons[0]["code"] == "production-deployment-unbound"
+        # Runtime containment and deployment lag hold runtime/intake authority,
+        # not independently qualified PRs. The native controller still checks
+        # each exact source head and required combined-head admission evidence.
+        and {reason["code"] for reason in reasons}
+        <= {"controller-failure", "production-deployment-unbound"}
     )
+    runtime_intake_hold = hold_intake_allowed and controller.get("status") == "failed"
     unbound_repair_allowed = (
         hold_intake_allowed
+        and controller.get("status") == "green"
+        and production_unbound
         and review_allowed
         and capacity_fresh
         and gem_concurrency >= 1
@@ -1471,9 +1476,14 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
+    # The existing typed repair exception carries authority only when selected.
+    # A hold-intake receipt must not simultaneously advertise that exception.
+    controller_repair_allowed = (
+        controller_repair_allowed and promotion_mode == "controller-repair-only"
+    )
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed:
+    elif not closure_intake_allowed or runtime_intake_hold:
         # Existing validation/review work remains useful, but no new
         # implementation or fallback PR may begin while Summer holds intake
         # (JOV-INV-011). Capacity evidence no longer gates intake: missing
@@ -1507,7 +1517,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     # closure, so duplicate lanes cannot freeze Grok/Kimi remediations.
     remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
-    if not closure_intake_allowed:
+    if not closure_intake_allowed or runtime_intake_hold:
         cohort = {
             **cohort,
             "newIntakeAllowed": False,
