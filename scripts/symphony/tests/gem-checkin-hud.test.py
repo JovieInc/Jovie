@@ -96,7 +96,7 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertNotIn("stale", state["rows"][0])
         text = strip(paint(retained, width=430, height=90))
         self.assertIn("API STALE / UNAVAILABLE", text)
-        self.assertIn("model UNKNOWN", text)
+        self.assertIn("model/account/effort/initiator UNKNOWN", text)
         self.assertNotIn("SESSION / RECENT EVENT", text)
 
     def test_missing_old_future_and_boundary_snapshots(self):
@@ -167,29 +167,44 @@ class ExecutionTruthTests(unittest.TestCase):
         text = strip("\n".join(HUD.execution_summary(state, 430, now=NOW)))
         self.assertIn("service active", text)
         self.assertIn("API STALE / UNAVAILABLE", text)
-        self.assertIn("RUNNING: UNKNOWN · live count unavailable", text)
-        self.assertIn("configured ceiling/model are not running proof", text)
+        self.assertIn("RUNNING: UNKNOWN/30", text)
+        self.assertIn("model/account/effort/initiator UNKNOWN", text)
 
     def test_execution_summary_makes_idle_running_and_failures_obvious(self):
-        idle = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [], "running": 0, "blocked": 0, "retrying": 0, "service_state": "active", "generated_at": NOW.isoformat()}, 430, now=NOW)))
-        self.assertIn("RUNNING: 0 · Nothing running", idle)
-        self.assertIn("ACTIVE RUNS: Nothing running", idle)
-        self.assertIn("BLOCKED: 0 · None", idle)
-        self.assertIn("RETRYING: 0 · None", idle)
+        idle = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [], "running": 0, "cap": 2, "service_state": "active", "generated_at": NOW.isoformat()}, 430, now=NOW)))
+        self.assertIn("ACTIVE SLOTS · RUNNING: 0/2", idle)
+        self.assertEqual(idle.count("VACANT"), 2)
+        self.assertIn("Nothing running", idle)
 
         rows = [
             {"kind": "running", "id": "JOV-1", "session_id": "s1", "tokens_total": 12, "last_event_at": NOW.isoformat(), "executed_provider": "openai", "executed_model": "gpt-test"},
             {"kind": "blocked", "id": "JOV-2", "error": "launch failed", "started": STARTED},
             {"kind": "retrying", "id": "JOV-3", "last_message": "transient provider error", "started": STARTED},
         ]
-        busy = strip("\n".join(HUD.execution_summary({"ok": True, "rows": rows, "running": 1, "blocked": 1, "retrying": 1, "service_state": "active", "generated_at": NOW.isoformat()}, 430, now=NOW)))
-        self.assertIn("RUNNING: 1 · active work reported", busy)
-        self.assertIn("ACTIVE RUNS:", busy)
+        busy = strip("\n".join(HUD.execution_summary({"ok": True, "rows": rows, "running": 1, "cap": 2, "service_state": "active", "generated_at": NOW.isoformat()}, 430, now=NOW)))
+        self.assertIn("RUNNING: 1/2", busy)
         self.assertIn("JOV-1 · SESSION / RECENT EVENT · openai/gpt-test", busy)
-        self.assertIn("BLOCKED: 1", busy)
-        self.assertIn("JOV-2 · 3 minutes ago · launch failed", busy)
-        self.assertIn("RETRYING: 1", busy)
-        self.assertIn("JOV-3 · 3 minutes ago · transient provider error", busy)
+        self.assertEqual(busy.count("VACANT"), 1)
+
+    def test_active_slots_reserve_capacity_and_bound_overflow_truthfully(self):
+        rows = [
+            {"kind": "running", "id": f"JOV-{index}", "session_id": f"s-{index}", "tokens_total": 1, "last_event_at": NOW.isoformat()}
+            for index in range(5)
+        ]
+        full = strip("\n".join(HUD.execution_summary({"ok": True, "rows": rows, "running": 5, "cap": 10, "generated_at": NOW.isoformat()}, 240, now=NOW)))
+        self.assertIn("RUNNING: 5/10", full)
+        self.assertEqual(full.count("SESSION / RECENT EVENT"), 5)
+        self.assertEqual(full.count("VACANT"), 5)
+        self.assertTrue(full.splitlines()[0].endswith("API FRESH · just now ┐"))
+
+        bounded = strip("\n".join(HUD.execution_summary({"ok": True, "rows": rows, "running": 5, "cap": 12, "generated_at": NOW.isoformat()}, 240, now=NOW, max_slots=4)))
+        self.assertIn("… 8 more configured slots not shown at this terminal height", bounded)
+        self.assertNotIn("VACANT", bounded)
+
+        stale = strip("\n".join(HUD.execution_summary({"ok": False, "stale": True, "rows": rows, "running": None, "cap": 2, "generated_at": NOW.isoformat()}, 240, now=NOW)))
+        self.assertIn("RUNNING: UNKNOWN/2", stale)
+        self.assertEqual(stale.count("live :4041 source unavailable"), 2)
+        self.assertNotIn("VACANT", stale)
 
     def test_notification_event_does_not_replace_useful_last_message(self):
         row = {
@@ -204,11 +219,11 @@ class ExecutionTruthTests(unittest.TestCase):
 
     def test_next_action_tracks_actual_failure_state(self):
         active = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [{"kind": "running", "session_id": "s", "tokens_total": 1, "last_event_at": NOW.isoformat()}], "running": 1, "retrying": 0, "blocked": 0}, 430, now=NOW)))
-        retry = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [], "running": 0, "retrying": 1, "blocked": 0}, 430, now=NOW)))
-        self.assertIn("RUNNING: 1 · active work reported", active)
-        self.assertIn("RETRYING: 0 · None", active)
-        self.assertIn("RUNNING: 0 · Nothing running", retry)
-        self.assertIn("RETRYING: 1", retry)
+        idle = strip("\n".join(HUD.execution_summary({"ok": True, "rows": [], "running": 0, "cap": 1}, 430, now=NOW)))
+        self.assertIn("RUNNING: 1/UNKNOWN", active)
+        self.assertIn("SESSION / RECENT EVENT", active)
+        self.assertIn("RUNNING: 0/1", idle)
+        self.assertIn("Nothing running", idle)
 
     def test_compact_shows_stable_stage_table_without_execution_cards(self):
         row = {"kind": "running", "id": "JOV-1", "title": "Visible work", "session_id": "session-1", "tokens_total": 10, "last_event_at": NOW.isoformat(), "executed_model": "gpt-5.6-sol"}
@@ -216,7 +231,7 @@ class ExecutionTruthTests(unittest.TestCase):
         text = strip(paint(state, width=120, height=40))
         self.assertIn("STAGE", text)
         self.assertIn("IMPLEMENTING", text)
-        self.assertNotIn("SESSION / RECENT EVENT", text)
+        self.assertIn("SESSION / RECENT EVENT", text)
         failed = {**row, "last_event": "turn_failed"}
         self.assertEqual(HUD.execution_state(failed, now=NOW), "SESSION / ERROR")
         self.assertIn("Executed: UNKNOWN", strip("\n".join(HUD.execution_lines(failed, 430, now=NOW))))
@@ -225,11 +240,11 @@ class ExecutionTruthTests(unittest.TestCase):
             compact = strip(paint(state, width=width, height=height))
             self.assertIn("JOV-0", compact)
             self.assertIn("IMPLEMENTING", compact)
-            self.assertNotIn("SESSION / RECENT EVENT", compact)
+            self.assertIn("SESSION / RECENT EVENT", compact)
         for width in (120, 200):
             state["rows"] = [{**row, "id": f"JOV-{i}", "kind": "queued"} for i in range(4)]
             text = strip(paint(state, width=width, height=40))
-            self.assertIn("QUEUED", text)
+            self.assertIn("QUEUED" if width < 160 else "ACTIVE SLOTS", text)
             self.assertNotIn("12 more", text)
             for line in text.splitlines():
                 self.assertLessEqual(len(line), width)
@@ -249,7 +264,7 @@ class ExecutionTruthTests(unittest.TestCase):
     def test_ultrawide_preserves_review_queue(self):
         for width, height in ((300, 60), (430, 90)):
             text = strip(paint(review=7, width=width, height=height))
-            self.assertIn("!  REVIEW QUEUE 7", text)
+            self.assertIn("REVIEW QUEUE: 7", text)
 
     def test_full_canvas_does_not_scroll_last_line(self):
         frame = paint(width=430, height=90)
@@ -314,7 +329,7 @@ class UltrawideHudTests(unittest.TestCase):
         output = paint(width=200)
         plain, source = strip(output), SOURCE.read_text(encoding="utf-8")
         self.assertIn("get_terminal_size", source)
-        for token in ("ST", "TRY/TURN", "TOKENS", "ELAPSED", "EVIDENCE / PR"):
+        for token in ("ACTIVE SLOTS", "RECENTLY MERGED", "BLOCKED:"):
             self.assertIn(token, plain)
         header = plain.splitlines()[0]
         self.assertGreaterEqual(len(header), 80)
@@ -351,14 +366,11 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(state["rows"][1]["attempt"], 2)
         self.assertEqual(state["rows"][1]["turn"], 4)
         plain = strip(paint(state, {"ok": True, "count": 1, "rows": [{"kind": "mq", "number": 16796, "title": "check-in HUD + burrito", "enqueued": STARTED, "position": 5}]}, 11, measured={"ships": {"receipts": [receipt()]}}))
-        for token in ("JOV-5491", "2/4", "3m", "JOV-5488", "in 5m", "1/8", "FAILURES", "QUEUE", "Symphony :4041 up", "hook_failed 1", "totals in 45.7K out 23.5K", "receipted this week"):
+        for token in ("JOV-5491", "RUNNING: 1/8", "FAILURES", "QUEUE", "Symphony :4041 up", "hook_failed 1", "totals in 45.7K out 23.5K", "receipted this week"):
             self.assertIn(token, plain)
         self.assertNotIn("OpenAI", plain)
-        running_line = next(line for line in plain.splitlines() if line.startswith("●") and "JOV-5491" in line)
-        self.assertIn("turn completed", running_line)
-        current_work = plain.split("CURRENT WORK", 1)[1]
-        self.assertLess(current_work.index("JOV-5488"), current_work.index("JOV-5491"))
-        self.assertLess(current_work.index("JOV-5491"), current_work.index("#16796"))
+        running_line = next(line for line in plain.splitlines() if "Slot 1" in line and "JOV-5491" in line)
+        self.assertIn("UNKNOWN", running_line)
         self.assertNotIn("GEM OPERATIONS", plain)
         self.assertNotIn("$0", plain)
 
@@ -467,11 +479,12 @@ class UltrawideHudTests(unittest.TestCase):
                 counts={"running": 30, "retrying": 0, "blocked": 0},
             )
         )
+        busy_state["cap"] = 30
         busy = strip(paint(busy_state, width=200, height=40))
         self.assertEqual(len(empty.splitlines()), 40)
         self.assertEqual(len(busy.splitlines()), 40)
-        self.assertIn("CURRENT WORK", busy)
-        self.assertIn("more work items", busy)
+        self.assertIn("ACTIVE SLOTS", busy)
+        self.assertIn("more configured slots", busy)
 
     def test_header_has_quiet_identity_description_and_natural_freshness(self):
         state, _ = fetch_state(official_state(generated_at="2026-08-31T11:58:00Z"))
@@ -512,13 +525,12 @@ class UltrawideHudTests(unittest.TestCase):
 
     def test_numeric_work_columns_are_right_aligned_and_vendor_is_hidden(self):
         state, _ = fetch_state(official_state())
-        plain = strip(paint(state, width=200, height=40))
-        header = next(line for line in plain.splitlines() if "TRY/TURN" in line)
-        current_work = plain.split("CURRENT WORK", 1)[1]
-        row = next(line for line in current_work.splitlines() if "JOV-5491" in line)
+        widths = HUD._col_widths(200)
+        header = strip(HUD._table_header(widths))
+        row = strip(HUD._job_row(next(item for item in state["rows"] if item["kind"] == "running"), widths, now=NOW))
         self.assertEqual(header.index("TOKENS") + len("TOKENS"), row.index("12.3K") + len("12.3K"))
         self.assertEqual(header.index("ELAPSED") + len("ELAPSED"), row.index("3m") + len("3m"))
-        self.assertNotIn("OpenAI", plain)
+        self.assertNotIn("OpenAI", row)
 
     def test_token_notation_boundaries_are_uppercase_and_promote_units(self):
         cases = (
@@ -567,23 +579,10 @@ class UltrawideHudTests(unittest.TestCase):
             self.assertNotIn(token, plain)
 
     def test_queue_position_is_own_column_for_pr_and_missing_reference(self):
-        output = paint(
-            symphony={"ok": True, "running": 0, "retrying": 0, "blocked": 0, "cap": 3, "rows": [], "up": True, "totals": None, "rate_limits": None, "seconds_running": None},
-            mq={
-                "ok": True,
-                "count": 2,
-                "rows": [
-                    {"kind": "mq", "number": 16796, "title": "Has PR", "enqueued": STARTED, "position": 5},
-                    {"kind": "mq", "number": None, "title": "Missing PR", "enqueued": STARTED, "position": 6},
-                ],
-            },
-            width=220,
-            height=70,
-        )
-        plain = strip(output)
-        header = next(line for line in plain.splitlines() if "POS" in line and "EVIDENCE / PR" in line)
-        pr_line = next(line for line in plain.splitlines() if "#16796" in line)
-        missing_line = next(line for line in plain.splitlines() if "Missing PR" in line)
+        widths = HUD._col_widths(220)
+        header = strip(HUD._table_header(widths))
+        pr_line = strip(HUD._job_row({"kind": "mq", "number": 16796, "title": "Has PR", "enqueued": STARTED, "position": 5}, widths, now=NOW))
+        missing_line = strip(HUD._job_row({"kind": "mq", "number": None, "title": "Missing PR", "enqueued": STARTED, "position": 6}, widths, now=NOW))
         pos_col = header.index("POS")
         id_col = header.index("ID")
         stage_col = header.index("STAGE")
@@ -595,10 +594,10 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(missing_line[pos_col:id_col].strip(), "6")
         self.assertEqual(missing_line[id_col:stage_col].strip(), "-")
         self.assertEqual(missing_line[workspace_col:].strip(), "-")
-        self.assertNotIn("pos 6", plain)
-        self.assertNotIn("pos 5", plain)
+        self.assertNotIn("pos 6", missing_line)
+        self.assertNotIn("pos 5", pr_line)
 
-    def test_current_work_is_one_table_with_source_gap_and_recent_merge(self):
+    def test_active_slots_and_recent_merge_are_separate_truth_sections(self):
         symphony = {
             "ok": True,
             "running": 1,
@@ -617,13 +616,38 @@ class UltrawideHudTests(unittest.TestCase):
             "merged_rows": [{"kind": "merged", "stage": "merged", "number": 17323, "title": "Repair HUD", "merged_at": NOW.isoformat()}],
         }
         plain = strip(paint(symphony=symphony, pr_flow=flow, width=430, height=90))
-        self.assertEqual(plain.count("CURRENT WORK"), 1)
-        self.assertIn("BOOTSTRAPPING", plain)
-        self.assertIn("UNKNOWN · :4041 title absent", plain)
+        self.assertEqual(plain.count("ACTIVE SLOTS"), 1)
+        self.assertEqual(plain.count("RECENTLY MERGED"), 1)
+        self.assertIn("JOV-1", plain)
         self.assertIn("MERGED", plain)
         self.assertIn("#17323", plain)
-        self.assertNotIn("BLOCKED · 0 receipts", plain)
-        self.assertNotIn("SESSION / RECENT EVENT", plain)
+        self.assertIn("BLOCKED: 0", plain)
+
+    def test_recent_merge_and_blocked_sections_are_bounded_and_stable(self):
+        blocked = [
+            {"kind": "blocked", "id": f"JOV-B{index}", "error": f"failure {index}", "blocked_at": STARTED}
+            for index in range(7)
+        ]
+        merged = [
+            {"kind": "merged", "number": 18000 + index, "title": f"Merged {index}", "merged_at": NOW.isoformat()}
+            for index in range(6)
+        ]
+        plain = strip(
+            paint(
+                symphony={"ok": True, "running": 0, "retrying": 0, "blocked": 7, "cap": 1, "rows": blocked, "generated_at": NOW.isoformat()},
+                pr_flow={"ok": True, "open_count": 0, "opened_24h": 0, "merged_24h": 6, "merged_rows": merged, "ci_matrix": []},
+                width=430,
+                height=90,
+            )
+        )
+        self.assertLess(plain.index("ACTIVE SLOTS"), plain.index("RECENTLY MERGED"))
+        self.assertLess(plain.index("RECENTLY MERGED"), plain.index("BLOCKED: 7"))
+        for index in range(5):
+            self.assertIn(f"#{18000 + index} · MERGED", plain)
+            self.assertIn(f"JOV-B{index} · 3 minutes ago · failure {index}", plain)
+        self.assertNotIn("#18005 · MERGED", plain)
+        self.assertNotIn("JOV-B5 ·", plain)
+        self.assertIn("… and 2 more blocked", plain)
 
     def test_rendered_table_exposes_failure_message_and_execution_identity(self):
         symphony = {
@@ -640,6 +664,8 @@ class UltrawideHudTests(unittest.TestCase):
                     "session_id": "session-1",
                     "last_event": "turn_failed",
                     "last_message": "quota exhausted",
+                    "last_event_at": NOW.isoformat(),
+                    "tokens_total": 1,
                     "executed_model": "gpt-5.6-sol",
                     "executed_provider": "codex",
                     "executed_account_alias": "seat-b",
@@ -648,11 +674,10 @@ class UltrawideHudTests(unittest.TestCase):
             "up": True,
         }
         plain = strip(paint(symphony=symphony, width=430, height=90))
-        current_work = plain.split("CURRENT WORK", 1)[1]
-        row = next(line for line in current_work.splitlines() if "JOV-44" in line)
-        self.assertIn("BLOCKED", row)
-        self.assertIn("gpt-5.6-sol/codex/seat-b", row)
-        self.assertIn("quota exhausted", row)
+        row = next(line for line in plain.splitlines() if "Slot 1" in line and "JOV-44" in line)
+        self.assertIn("SESSION / ERROR", row)
+        self.assertIn("codex/gpt-5.6-sol", row)
+        self.assertIn("account seat-b", row)
 
     def test_ci_success_is_separate_from_admission_hold(self):
         self.assertEqual(HUD.admission_status({"isDraft": False, "mergeStateStatus": "BLOCKED"}, in_merge_queue=False), "blocked")
@@ -1085,11 +1110,10 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("┌─ × CRITICAL · OPERATOR HEALTH", plain)
         self.assertIn("STALLED/BLOCKED 1", plain)
         self.assertIn("CPU LOAD / STALL RED", plain)
-        order = ["OPERATOR HEALTH", "AGENTS", "PRIMARY CAPACITY / PRESSURE", "CURRENT WORK", "SHIP", "PR FLOW", "CI MATRIX", "BUSINESS SIGNALS"]
+        order = ["ACTIVE SLOTS", "OPERATOR HEALTH", "AGENTS", "PRIMARY CAPACITY / PRESSURE", "RECENTLY MERGED", "BLOCKED:", "SHIP", "PR FLOW", "CI MATRIX", "BUSINESS SIGNALS"]
         for before, after in zip(order, order[1:]):
             self.assertLess(plain.index(before), plain.index(after))
-        current_work = plain.split("CURRENT WORK", 1)[1]
-        self.assertLess(current_work.index("JOV-1"), current_work.index("JOV-2"))
+        self.assertLess(plain.index("JOV-2"), plain.index("JOV-1"))
 
     def test_only_operator_action_metrics_receive_hero_blocks(self):
         output = strip(
@@ -1131,7 +1155,7 @@ class UltrawideHudTests(unittest.TestCase):
                     self.assertEqual(len(lines), height)
                     self.assertTrue(all(len(line) == width for line in lines))
                     self.assertIn("OPERATOR HEALTH", plain)
-                    self.assertIn("CURRENT WORK", plain)
+                    self.assertIn("CURRENT WORK" if width < 160 else "RECENTLY MERGED", plain)
                     self.assertIn("SHIP", plain)
             self.assertEqual(geometries[0], geometries[1])
             self.assertEqual(geometries[1], geometries[2])

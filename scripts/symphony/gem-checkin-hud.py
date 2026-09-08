@@ -1305,6 +1305,7 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         "session_id": session_id,
         "pid": _int(item.get("codex_app_server_pid") or running.get("codex_app_server_pid")),
         "last_event_at": item.get("last_event_at") or running.get("last_event_at"),
+        "blocked_at": item.get("blocked_at") or item.get("blockedAt"),
         # A selected route/configuration is deliberately not execution evidence.
         "requested_model": _text(item, ("model", "requested_model")) or _text(running, ("model", "requested_model")),
         "execution_proof_valid": proof is not None,
@@ -1312,6 +1313,8 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         "executed_model": proof.get("model") if proof else None,
         "executed_provider": proof.get("provider") if proof else None,
         "executed_account_alias": proof.get("account_alias") if proof else None,
+        "executed_effort": proof.get("effort") if proof else None,
+        "initiator": proof.get("initiator") if proof else None,
     }
 
 
@@ -2130,7 +2133,7 @@ def _job_row(
         return _cells(color, widths, glyph, dash(row.get("position")), ident, "MERGING", dash(row.get("title")), "-", "-", "-", str(health["label"]), "-")
     if kind == "merged":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
-        return _cells(MINT, widths, "✓", "-", ident, "MERGED", dash(row.get("title")), "-", "-", "-", natural_time(row.get("merged_at"), now=now), "-")
+        return _cells(PURPLE, widths, "✓", "-", ident, "MERGED", dash(row.get("title")), "-", "-", "-", natural_time(row.get("merged_at"), now=now), "-")
     if row.get("stale"):
         return _cells(DIM, widths, "?", "-", dash(row.get("id")), UNKNOWN, dash(row.get("title") or "UNKNOWN · retained row; current :4041 truth unavailable"), dash(row.get("attempt")), dash(row.get("turn")), "-", UNKNOWN, "current source unavailable")
     if kind == "queued":
@@ -2193,7 +2196,7 @@ def _compact_job_row(
     evidence = _execution_evidence(row)
     if evidence != "UNKNOWN · execution evidence absent":
         title = f"{title} · {evidence}"
-    color = _semantic_color(status)
+    color = PURPLE if kind == "merged" else _semantic_color(status)
     columns = "  ".join(
         (
             _cell(glyph, 2),
@@ -2710,57 +2713,46 @@ def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[s
     return [_rgb(color, clip(first, width), bold=True), _rgb(FG, clip(second, width)), _rgb(DIM, clip(third, width))]
 
 
-def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime) -> list[str]:
+def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime, max_slots: int = 10) -> list[str]:
     fresh = symphony.get("ok") and not symphony.get("stale")
     source = "FRESH" if fresh else "STALE / UNAVAILABLE"
     rows = symphony.get("rows") if isinstance(symphony.get("rows"), list) else []
     running_rows = [row for row in rows if row.get("kind") == "running"]
-
-    def summary_rows(kind: str) -> list[str]:
-        selected = [row for row in rows if row.get("kind") == kind]
-        values = []
-        for row in selected[:4]:
-            reason = row.get("error") or row.get("last_message") or row.get("last_event") or row.get("title") or UNKNOWN
-            stamp = row.get("last_event_at") or row.get("started")
-            age = natural_time(stamp, now=now) if _iso(stamp) else elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
-            values.append(f"  {row.get('id') or UNKNOWN} · {age} · {reason}")
-        hidden = len(selected) - len(values)
-        if hidden:
-            values.append(f"  +{hidden} more")
-        return values
-
     running = symphony.get("running") if fresh and isinstance(symphony.get("running"), int) else UNKNOWN
-    if running == 0:
-        running_state = "Nothing running"
-    elif running == UNKNOWN:
-        running_state = "live count unavailable"
-    else:
-        running_state = "active work reported"
-    active = []
-    if fresh:
-        for row in running_rows[:4]:
+    cap = symphony.get("cap") if isinstance(symphony.get("cap"), int) and symphony.get("cap") >= 0 else None
+    freshness = natural_time(symphony.get("generated_at"), now=now)
+    count_text = f"{running}/{cap}" if isinstance(running, int) and cap is not None else f"{running}/{cap if cap is not None else UNKNOWN}"
+    title = f"ACTIVE SLOTS · RUNNING: {count_text} · service {symphony.get('service_state', UNKNOWN)}"
+    corner = f"API {source} · {freshness}"
+    fill = max(1, width - len(title) - len(corner) - 7)
+    border_color = MINT if fresh and running == 0 else BLUE if fresh else ORANGE
+    lines = [_rgb(border_color, clip(f"┌─ {title} {'─' * fill} {corner} ┐", width), bold=True)]
+
+    visible_slots = 1 if cap is None else min(cap, max(1, max_slots))
+    if visible_slots == 0:
+        lines.append(_rgb(DIM, clip("│ No configured worker slots", width)))
+    for index in range(visible_slots):
+        if not fresh:
+            body = f"│ ? Slot {index + 1} · UNKNOWN · live :4041 source unavailable"
+            lines.append(_rgb(FG, clip(body, width)))
+        elif index < len(running_rows):
+            row = running_rows[index]
             route = "/".join(value for value in (row.get("executed_provider"), row.get("executed_model")) if value) or "route UNKNOWN"
-            active.append(f"  {row.get('id') or UNKNOWN} · {execution_state(row, now=now)} · {route} · event {natural_time(row.get('last_event_at'), now=now)}")
-    active_header = (
-        "ACTIVE RUNS: UNKNOWN · live source unavailable"
-        if not fresh
-        else "ACTIVE RUNS: Nothing running" if running == 0
-        else "ACTIVE RUNS: identity/model/account/effort/initiator UNKNOWN · :4041 supplied count only" if not active
-        else "ACTIVE RUNS:"
-    )
-    blocked = symphony.get("blocked") if fresh and isinstance(symphony.get("blocked"), int) else UNKNOWN
-    retrying = symphony.get("retrying") if fresh and isinstance(symphony.get("retrying"), int) else UNKNOWN
-    lines = [
-        f"RUNNING: {running} · {running_state}  |  service {symphony.get('service_state', UNKNOWN)}  |  API {source}  |  snapshot {natural_time(symphony.get('generated_at'), now=now)}",
-        active_header,
-        *active,
-        f"BLOCKED: {blocked}" + (" · UNKNOWN · live source unavailable" if not fresh else " · None" if blocked == 0 else " · identity/reason/age UNKNOWN" if not summary_rows("blocked") else ""),
-        *summary_rows("blocked"),
-        f"RETRYING: {retrying}" + (" · UNKNOWN · live source unavailable" if not fresh else " · None" if retrying == 0 else " · identity/reason/age UNKNOWN" if not summary_rows("retrying") else ""),
-        *summary_rows("retrying"),
-        "Source: :4041 live activity · executed model UNKNOWN without a run receipt · configured ceiling/model are not running proof · useful completion/merge/deploy require separate fresh receipts",
-    ]
-    return [_rgb(ORANGE if not fresh else FG, clip(line, width), bold=index == 0) for index, line in enumerate(lines)]
+            body = f"│ ● Slot {index + 1} · {row.get('id') or UNKNOWN} · {execution_state(row, now=now)} · {route} · account {row.get('executed_account_alias') or UNKNOWN} · effort {row.get('executed_effort') or UNKNOWN} · by {row.get('initiator') or UNKNOWN} · event {natural_time(row.get('last_event_at'), now=now)}"
+            lines.append(_rgb(FG, clip(body, width)))
+        elif isinstance(running, int) and index < running:
+            body = f"│ ● Slot {index + 1} · ACTIVE · identity/model/account/effort/initiator UNKNOWN"
+            lines.append(_rgb(FG, clip(body, width)))
+        else:
+            lines.append(_rgb(DIM, clip(f"│ ○ Slot {index + 1} · VACANT", width)))
+    if cap is not None and cap > visible_slots:
+        lines.append(_rgb(DIM, clip(f"│ … {cap - visible_slots} more configured slots not shown at this terminal height", width)))
+    if fresh and running == 0:
+        lines.append(_rgb(FG, clip("│ Nothing running", width), bold=True))
+    if not fresh or not running_rows:
+        lines.append(_rgb(DIM, clip("│ Execution identity · model/account/effort/initiator UNKNOWN until a live run receipt", width)))
+    lines.append(_rgb(border_color, "└" + ("─" * max(0, width - 2)) + "┘"))
+    return lines
 
 
 def execution_board(symphony: dict[str, Any], width: int, budget: int, *, now: datetime) -> list[str]:
@@ -2900,7 +2892,7 @@ def render(
         if rows >= 32:
             footer.extend(_pr_flow_lines(pr_flow, cols, now=clock))
         footer.append(_footer(symphony, cols, now=clock))
-    elif rows < 48:
+    elif rows < 70:
         lines = [
             header,
             _rgb(DIM, PRODUCT_DESCRIPTION),
@@ -2911,9 +2903,7 @@ def render(
             "",
             *pressure_lines,
             "",
-            _rgb(FG, "CURRENT WORK · stable stage table · recent merges retained", bold=True),
-            _table_header(widths),
-            _rgb(DIM, "─" * cols),
+            _rgb(PURPLE, "┌─ RECENTLY MERGED · latest 5 native merge receipts", bold=True),
         ]
         work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
         work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
@@ -2931,9 +2921,7 @@ def render(
             "",
             *pressure_lines,
             "",
-            _rgb(FG, "CURRENT WORK · stable stage table · recent merges retained", bold=True),
-            _table_header(widths),
-            _rgb(DIM, "─" * cols),
+            _rgb(PURPLE, "┌─ RECENTLY MERGED · latest 5 native merge receipts", bold=True),
         ]
         work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
         work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
@@ -2956,24 +2944,53 @@ def render(
         # Jobs outrank secondary shipping aggregates on short terminals.
         lines = [header, *health_band, *pressure_lines[:1], *_compact_work_header(cols)]
         footer = [*_ship_path_lines(path, cols)[:1], _footer(symphony, cols, now=clock)]
-    truth = execution_summary(symphony, cols, now=clock)
-    if cols >= 300 and rows >= 60 and review is not None and review > 0:
-        truth[0] = _rgb(FG, clip(ANSI_RE.sub("", truth[0]).rstrip() + f" | !  REVIEW QUEUE {review}", cols), bold=True)
+    slot_limit = 1 if compact or rows < 48 else 4 if rows < 70 else 10
+    truth = execution_summary(symphony, cols, now=clock, max_slots=slot_limit)
+    if review is not None and review > 0:
+        truth.insert(-1, _rgb(ORANGE, clip(f"│ REVIEW QUEUE: {review}", cols), bold=True))
     if compact:
-        blocked_truth = next(line for line in truth if ANSI_RE.sub("", line).startswith("BLOCKED:"))
-        lines[1:1] = [truth[0], blocked_truth]
+        lines[1:1] = truth[:2]
     else:
         lines[1:1] = truth
     blocks = []
-    for row in symphony.get("rows", []):
-        blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
-    for row in mq.get("rows", []):
-        blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
     flow = pr_flow if isinstance(pr_flow, dict) else {}
-    if flow.get("ok") is True and flow.get("stale") is not True:
-        for row in (flow.get("merged_rows") or []):
-            if isinstance(row, dict):
-                blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
+    if compact:
+        for row in symphony.get("rows", []):
+            blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines)])
+        for row in mq.get("rows", []):
+            blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines)])
+        if flow.get("ok") is True and flow.get("stale") is not True:
+            for row in (flow.get("merged_rows") or []):
+                if isinstance(row, dict):
+                    blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines)])
+    else:
+        merged_rows = [row for row in (flow.get("merged_rows") or []) if isinstance(row, dict)][:5] if flow.get("ok") is True and flow.get("stale") is not True else []
+        for row in merged_rows:
+            ident = f"#{row['number']}" if isinstance(row.get("number"), int) else UNKNOWN
+            body = clip(f"{ident} · MERGED · {natural_time(row.get('merged_at'), now=clock)} · {row.get('title') or UNKNOWN}", cols - 2)
+            blocks.append([_rgb(PURPLE, "✓ ", bold=True) + _rgb(FG, body)])
+        if not merged_rows:
+            message = "Recent merge source UNKNOWN" if flow.get("ok") is not True or flow.get("stale") is True else "No native merge receipts in the current window"
+            blocks.append([_rgb(DIM, clip(f"· {message}", cols))])
+        blocks.append([_rgb(PURPLE, "└" + ("─" * max(0, cols - 2)) + "┘")])
+        blocks.append([""])
+
+        blocked_rows = [row for row in (symphony.get("rows") or []) if isinstance(row, dict) and row.get("kind") == "blocked"]
+        blocked_count = symphony.get("blocked") if symphony.get("ok") and not symphony.get("stale") and isinstance(symphony.get("blocked"), int) else UNKNOWN
+        retrying_count = symphony.get("retrying") if symphony.get("ok") and not symphony.get("stale") and isinstance(symphony.get("retrying"), int) else UNKNOWN
+        blocks.append([_rgb(RED, clip(f"┌─ BLOCKED: {blocked_count} · RETRYING: {retrying_count} · retained until resolved or state changes", cols), bold=True)])
+        for row in blocked_rows[:5]:
+            reason = row.get("error") or row.get("last_message") or row.get("last_event") or row.get("title") or UNKNOWN
+            stamp = row.get("blocked_at") or row.get("last_event_at") or row.get("started")
+            age = natural_time(stamp, now=clock) if _iso(stamp) else UNKNOWN
+            body = clip(f"{row.get('id') or UNKNOWN} · {age} · {reason}", cols - 2)
+            blocks.append([_rgb(RED, "✕ ", bold=True) + _rgb(FG, body)])
+        if len(blocked_rows) > 5:
+            blocks.append([_rgb(DIM, clip(f"… and {len(blocked_rows) - 5} more blocked", cols))])
+        elif not blocked_rows:
+            message = "Blocked source UNKNOWN" if not symphony.get("ok") or symphony.get("stale") else "No blocked work"
+            blocks.append([_rgb(DIM, clip(f"· {message}", cols))])
+        blocks.append([_rgb(RED if blocked_rows else DIM, "└" + ("─" * max(0, cols - 2)) + "┘")])
     available = max(0, rows - len(lines) - len(footer))
     # Preserve whole job cards and reserve an honest hidden-card count.
     work_rows = []
