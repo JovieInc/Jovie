@@ -174,9 +174,9 @@ describe('exhaustive Symphony admission dispositions', () => {
   it('gives protected, sensitive, active, parent, incomplete, and stale work typed outcomes', () => {
     const cases = [
       [
-        issue('JOV-30', { assignee: { id: 'tim', name: 'Tim White' } }),
+        issue('JOV-30', { assignee: { id: 'other', name: 'Other Owner' } }),
         'deferred',
-        'tim-owned',
+        'already-assigned',
       ],
       [
         issue('JOV-31', { labels: { nodes: [{ name: 'needs-human' }] } }),
@@ -213,6 +213,20 @@ describe('exhaustive Symphony admission dispositions', () => {
     ];
     for (const [candidate, outcome, reason] of cases)
       expect(candidate, outcome, reason);
+  });
+
+  it('treats founder assignment as steering rather than a human hold', () => {
+    const result = classify(
+      issue('JOV-29', {
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+        labels: { nodes: [{ name: 'needs:taste' }] },
+      })
+    );
+
+    assert.equal(result.outcome, 'eligible');
+    assert.equal(result.reason.code, 'deterministic-safe');
+    assert.equal(result.reason.layer, 'admission');
   });
 
   it('ignores legacy human holds while preserving machine incident holds', () => {

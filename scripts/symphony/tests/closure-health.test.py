@@ -6,6 +6,7 @@ import importlib.util
 import json
 import pathlib
 import re
+import subprocess
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -1808,6 +1809,46 @@ class ClosureObservationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "owner/name"):
             MODULE._repo_parts("Jovie")
 
+    def test_graphql_snapshot_retries_command_failure_and_keeps_redacted_stderr(self):
+        pages = [
+            {
+                "data": {
+                    "repository": {
+                        "main": {"target": {"oid": "a" * 40}},
+                        "pullRequests": {"totalCount": 0, "nodes": []},
+                        "merged": {"nodes": []},
+                    }
+                }
+            }
+        ]
+        transient = subprocess.CalledProcessError(
+            1,
+            ["gh", "api", "graphql"],
+            stderr="GraphQL transport reset Authorization: bearer-sensitive",
+        )
+        completed = mock.Mock(stdout=MODULE.json.dumps(pages))
+        with mock.patch.object(
+            MODULE.subprocess, "run", side_effect=[transient, completed]
+        ) as run:
+            result = MODULE._run_graphql_snapshot("JovieInc/Jovie")
+
+        self.assertEqual(result["mainOid"], "a" * 40)
+        self.assertEqual(run.call_count, 2)
+
+        limited = subprocess.CalledProcessError(
+            1,
+            ["gh", "api", "graphql"],
+            stderr="HTTP 429 rate limit Authorization: bearer-sensitive",
+        )
+        with mock.patch.object(
+            MODULE.subprocess, "run", side_effect=limited
+        ) as run:
+            with self.assertRaisesRegex(ValueError, "HTTP 429 rate limit") as raised:
+                MODULE._run_graphql_snapshot("JovieInc/Jovie")
+        self.assertEqual(run.call_count, 1)
+        self.assertNotIn("bearer-sensitive", str(raised.exception))
+        self.assertIn("[REDACTED]", str(raised.exception))
+
     def test_queue_controller_maps_terminal_active_and_missing_runs(self):
         cases = [
             ({"status": "completed", "conclusion": "success"}, "green"),
@@ -1858,6 +1899,7 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(snapshot_read.call_args.args[1], expected_deadline)
         self.assertEqual(promotion_read.call_args.args[3], expected_deadline)
         self.assertEqual(controller_read.call_args.args[1], expected_deadline)
+        self.assertEqual(controller_read.call_count, 1)
 
     def test_live_observer_emits_typed_health_and_fails_closed_on_transport(self):
         prs = [

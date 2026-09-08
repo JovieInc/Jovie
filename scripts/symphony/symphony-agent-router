@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Existing-runtime provider launcher for the official :4041 Symphony service.
-# A definite pre-start Codex capacity miss immediately falls through to the
-# next authenticated provider in the same launch. Only one app-server is ever
-# exec'd, so Symphony retains the issue lease and cannot create duplicate work.
+# Codex app-server launcher for the official :4041 Symphony service.
+# CLI-only providers run in the isolated fallback worker, which shares this
+# launcher's issue lease. They cannot enter the app-server protocol boundary.
 set -euo pipefail
 
 home="${SYMPHONY_HOME:-$HOME}"
@@ -33,147 +32,9 @@ fi
 export SYMPHONY_ISSUE_LEASE_FD=9
 guard="${SYMPHONY_CAPACITY_GUARD:-$home/.local/bin/symphony-capacity-guard.py}"
 codex_probe="${SYMPHONY_CODEX_ACCOUNT_PROBE:-$home/.local/bin/codex-account-probe}"
-cursor="${SYMPHONY_CURSOR_EXECUTABLE:-$home/.local/bin/cursor-agent-std}"
-cursor_adapter="${SYMPHONY_CURSOR_ADAPTER:-$home/.local/bin/cursor-appserver-adapter}"
 auto_route="${SYMPHONY_AUTO_ROUTE:-$home/.local/bin/symphony-auto-route.mjs}"
 router_hotfix="${SYMPHONY_CODEX_ROUTER:-$home/.local/bin/symphony-codex-router-hotfix}"
 state_dir="${SYMPHONY_PROVIDER_ROUTE_STATE_DIR:-$home/.local/state/symphony-provider-router}"
-provider_locks_dir="${SYMPHONY_PROVIDER_LOCKS_DIR:-$state_dir/locks}"
-model="${SYMPHONY_CURSOR_MODEL:-gpt-5.6-luna-high}"
-probe_cooldown_seconds="${SYMPHONY_PROVIDER_PROBE_COOLDOWN_SECONDS:-60}"
-cooldown_state="$state_dir/provider-cooldowns.json"
-cooldown_lock="$state_dir/provider-cooldowns.lock"
-
-reserve_provider_slot() {
-  local provider="$1"
-  mkdir -p "$provider_locks_dir"
-  # The descriptor is intentionally inherited by the provider adapter. This
-  # makes the reservation cover the probe-to-spawn interval and the worker's
-  # lifetime; a crash releases it through the kernel.
-  exec 8>"$provider_locks_dir/$provider.lock"
-  if ! flock -n 8; then
-    exec 8>&-
-    return 1
-  fi
-  return 0
-}
-
-update_provider_cooldown() {
-  local provider="$1" action="$2" reason="${3:-}"
-  mkdir -p "$state_dir"
-  python3 - "$cooldown_state" "$cooldown_lock" "$provider" "$action" "$probe_cooldown_seconds" "$reason" <<'PY'
-import datetime
-import fcntl
-import json
-import os
-import pathlib
-import sys
-
-state_path = pathlib.Path(sys.argv[1])
-lock_path = pathlib.Path(sys.argv[2])
-provider, action, seconds, reason = sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6]
-lock_path.touch(mode=0o600, exist_ok=True)
-with lock_path.open("r+") as lock:
-    fcntl.flock(lock, fcntl.LOCK_EX)
-    try:
-        state = json.loads(state_path.read_text()) if state_path.exists() else {
-            "schema": "symphony-provider-cooldowns/v1",
-            "providers": {},
-        }
-    except (OSError, json.JSONDecodeError) as exc:
-        print(
-            "CAPACITY_RECONCILE_REQUIRED "
-            "schema=symphony-provider-cooldowns/v1 reason=state-unreadable",
-            file=sys.stderr,
-        )
-        raise SystemExit(75) from exc
-    if (
-        not isinstance(state, dict)
-        or state.get("schema") not in (None, "symphony-provider-cooldowns/v1")
-        or not isinstance(state.get("providers"), dict)
-    ):
-        print(
-            "CAPACITY_RECONCILE_REQUIRED "
-            "schema=symphony-provider-cooldowns/v1 reason=state-schema-mismatch",
-            file=sys.stderr,
-        )
-        raise SystemExit(75)
-    state["schema"] = "symphony-provider-cooldowns/v1"
-    providers = state.setdefault("providers", {})
-    if action == "mark":
-        now = datetime.datetime.now(datetime.timezone.utc)
-        providers[provider] = {
-            "unavailableUntil": (now + datetime.timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z"),
-            "reason": reason,
-        }
-    elif action == "clear":
-        providers.pop(provider, None)
-    temporary = state_path.with_name(f".{state_path.name}.{os.getpid()}.tmp")
-    temporary.write_text(json.dumps(state, sort_keys=True) + "\n")
-    temporary.chmod(0o600)
-    os.replace(temporary, state_path)
-    directory_descriptor = os.open(state_path.parent, os.O_RDONLY | os.O_DIRECTORY)
-    try:
-        os.fsync(directory_descriptor)
-    finally:
-        os.close(directory_descriptor)
-PY
-}
-
-provider_is_cooling() {
-  local provider="$1"
-  mkdir -p "$state_dir"
-  python3 - "$cooldown_state" "$cooldown_lock" "$provider" <<'PY'
-import datetime
-import fcntl
-import json
-import pathlib
-import sys
-
-state_path = pathlib.Path(sys.argv[1])
-lock_path = pathlib.Path(sys.argv[2])
-provider = sys.argv[3]
-lock_path.touch(mode=0o600, exist_ok=True)
-with lock_path.open("r+") as lock:
-    fcntl.flock(lock, fcntl.LOCK_SH)
-    try:
-        raw = json.loads(state_path.read_text()) if state_path.exists() else {
-            "schema": "symphony-provider-cooldowns/v1",
-            "providers": {},
-        }
-        if (
-            not isinstance(raw, dict)
-            or raw.get("schema") not in (None, "symphony-provider-cooldowns/v1")
-            or not isinstance(raw.get("providers"), dict)
-        ):
-            raise RuntimeError("state-schema-mismatch")
-        raw["schema"] = "symphony-provider-cooldowns/v1"
-        provider_state = raw.get("providers", {}).get(provider)
-        if provider_state is not None and not isinstance(provider_state, dict):
-            raise RuntimeError("provider-state-schema-mismatch")
-        value = (provider_state or {}).get("unavailableUntil")
-        deadline = (
-            datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
-            if value
-            else None
-        )
-    except (
-        OSError,
-        ValueError,
-        TypeError,
-        AttributeError,
-        json.JSONDecodeError,
-        RuntimeError,
-    ) as exc:
-        print(
-            "CAPACITY_RECONCILE_REQUIRED "
-            f"schema=symphony-provider-cooldowns/v1 reason={exc}",
-            file=sys.stderr,
-        )
-        raise SystemExit(75) from exc
-raise SystemExit(0 if deadline and deadline > datetime.datetime.now(datetime.timezone.utc) else 1)
-PY
-}
 
 write_receipt() {
   local provider="$1" selected_model="$2" reason="$3" temporary
@@ -238,10 +99,10 @@ prepare_codex_route() {
   node "$auto_route" >/dev/null 2>&1 && [ -s "$workspace/.symphony-routing.json" ]
 }
 
-# Codex subscription capacity is the primary delivery lane. Reuse the already
+# Codex subscription capacity is the official app-server lane. Reuse the already
 # verified workspace receipt so launching an already-leased issue does not
 # make a redundant tracker request. A missing receipt may be prepared once;
-# failure falls through to Cursor in this same Symphony-owned launch.
+# failure remains retryable while the isolated CLI fallback lane continues.
 if ! "$guard" >/dev/null 2>&1 && [ -x "$codex_probe" ]; then
   # codex-rotate's cooldown file is a cache of provider state, not the source
   # of truth. Revalidate one cooling account under the existing account and
@@ -253,31 +114,5 @@ if "$guard" >/dev/null 2>&1 && prepare_codex_route; then
   launch_codex "$@"
 fi
 
-# Cursor is the immediate authenticated fallback. Its status and model
-# inventory are authenticated, read-only pre-start evidence. Definite probe
-# failures enter one shared cooldown so concurrent issues do not stampede an
-# unavailable provider. Symphony remains the only owner of later retries.
-if provider_is_cooling cursor; then
-  :
-else
-  provider_status=$?
-  if [ "$provider_status" -ne 1 ]; then
-    exit "$provider_status"
-  fi
-  if reserve_provider_slot cursor; then
-    if [ -x "$cursor" ] && [ -x "$cursor_adapter" ] &&
-       "$cursor" status 2>/dev/null | grep -q 'Logged in' &&
-       "$cursor" models 2>/dev/null | awk -v model="$model" '$1 == model { found=1 } END { exit !found }'; then
-      update_provider_cooldown cursor clear
-      write_receipt cursor "$model" "eligible-primary-provider"
-      unset LINEAR_API_KEY CODEX_HOME OPENAI_API_KEY
-      export CURSOR_BIN="$cursor" CURSOR_MODEL="$model"
-      exec "$cursor_adapter" "$@"
-    elif [ -x "$cursor" ] && [ -x "$cursor_adapter" ]; then
-      update_provider_cooldown cursor mark "authenticated-capacity-probe-failed"
-    fi
-  fi
-fi
-
-echo 'CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason="no authenticated provider has eligible pre-start capacity"' >&2
+echo 'CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason="codex app-server capacity unavailable; CLI-only providers remain isolated"' >&2
 exit 75

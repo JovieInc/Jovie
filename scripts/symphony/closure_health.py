@@ -1905,6 +1905,21 @@ def _run_graphql_snapshot(repo: str, deadline: float | None = None) -> dict[str,
             return _run_graphql_snapshot_once(repo, observation_deadline)
         except ValueError as error:
             last_error = error
+        except subprocess.CalledProcessError as error:
+            detail = re.sub(
+                r"(?i)(bearer|authorization|token|api[-_ ]?key|secret|password)(\s*[:=]?\s*)\S+",
+                r"\1\2[REDACTED]",
+                str(error.stderr or error),
+            )
+            detail = " ".join(detail.split())[:512]
+            last_error = ValueError(
+                f"GitHub closure snapshot command failed (exit {error.returncode}): {detail}"
+            )
+            # A rate-limit response is an authoritative cooldown, not a
+            # transient transport failure. Leave it for the next event instead
+            # of spending more of the exhausted budget in this observation.
+            if re.search(r"(?i)rate limit|HTTP 429", detail):
+                break
     raise last_error or ValueError("GitHub closure snapshot failed")
 
 
@@ -2002,8 +2017,6 @@ def observe_closure_health(
         )
         snapshot = {
             "repository": repo,
-            "controller": _observe_queue_controller(repo),
-
             "controller": _observe_queue_controller(repo, deadline),
             "openPrs": len(prs),
             "eligiblePrs": len(eligible),

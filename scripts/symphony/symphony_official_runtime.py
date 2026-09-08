@@ -6,6 +6,8 @@ the deployed service unit, workflow shape, request-budget math, closure
 stop-line admission, permanent-error dead-letter receipts, and rate-limit
 classification artifacts; OpenAI owns the binary itself. The selected Codex
 account remains host-owned configuration and is never pinned by this source.
+# JOV-INV-029: runtime admission is the draft-phase owner; activation requires
+# separate production proof and is never inferred from a green wrapper.
 """
 
 from __future__ import annotations
@@ -519,8 +521,12 @@ def validate_source(
             )
         if workflow.server_port != OFFICIAL_PORT:
             errors.append(f"workflow_server_port:{workflow.server_port}")
-        if "git clone --depth 1 https://github.com/JovieInc/Jovie.git ." not in workflow.after_create:
-            errors.append("workflow_after_create_missing_https_clone")
+        if 'jovie-symphony-workspace-create" "$PWD"' not in workflow.after_create:
+            errors.append("workflow_after_create_missing_managed_wrapper")
+        if "git clone " in workflow.after_create:
+            errors.append("workflow_after_create_bypasses_managed_wrapper")
+        if 'jovie-symphony-workspace cleanup "$PWD"' not in workflow.after_create:
+            errors.append("workflow_before_remove_missing_managed_cleanup")
         if "git@" in workflow.after_create:
             errors.append("workflow_after_create_uses_ssh")
         if "mix " in workflow.after_create:

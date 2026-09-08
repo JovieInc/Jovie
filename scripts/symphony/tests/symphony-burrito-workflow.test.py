@@ -120,12 +120,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("`symphony-concurrency-controller.py` | observer/overlay", authority_map)
         self.assertIn("`symphony-reconciler.py` | retired by the official updater", authority_map)
         self.assertIn("symphony-provider-route/v1", authority_map)
+        self.assertIn("Cursor/Grok/Kimi CLI executors", authority_map)
+        self.assertIn("native Codex app-server transport", authority_map)
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]
-        self.assertIn("git clone --depth 1 https://github.com/JovieInc/Jovie.git .", hook)
+        self.assertIn('jovie-symphony-workspace-create" "$PWD"', hook)
+        self.assertNotIn("git clone ", hook)
         self.assertTrue("git@" not in hook and "mix " not in hook)
-        self.assertIn("symphony-nvme-package-cache.sh after-create", hook)
+        self.assertIn('jovie-symphony-workspace cleanup "$PWD"', hook)
         self.assertIn("pnpm install --offline --frozen-lockfile --ignore-scripts", WORKFLOW)
         self.assertIn("before_remove:", WORKFLOW)
         self.assertIn("symphony-nvme-package-cache.sh before-remove", WORKFLOW)
@@ -395,6 +398,34 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     for error in missing_rework["errors"]
                 ),
                 missing_rework["errors"],
+            )
+
+            direct_clone = check(
+                WORKFLOW.replace(
+                    'exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"',
+                    "git clone --depth 1 https://github.com/JovieInc/Jovie.git .",
+                )
+            )
+            self.assertFalse(direct_clone["ok"])
+            self.assertIn(
+                "workflow_after_create_missing_managed_wrapper",
+                direct_clone["errors"],
+            )
+            self.assertIn(
+                "workflow_after_create_bypasses_managed_wrapper",
+                direct_clone["errors"],
+            )
+
+            missing_cleanup = check(
+                WORKFLOW.replace(
+                    '    sudo -n /usr/local/sbin/jovie-symphony-workspace cleanup "$PWD" || cleanup_status=$?\n',
+                    "",
+                )
+            )
+            self.assertFalse(missing_cleanup["ok"])
+            self.assertIn(
+                "workflow_before_remove_missing_managed_cleanup",
+                missing_cleanup["errors"],
             )
 
     def test_linear_eligible_count_uses_team_key_pagination(self):
@@ -1289,7 +1320,61 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(overlay.returncode, 0, overlay.stdout + overlay.stderr)
-            self.assertIn("bounded max_concurrent_agents overlay accepted", overlay.stdout)
+            self.assertIn("adaptive max_concurrent_agents overlay accepted", overlay.stdout)
+            existing.write_text(
+                existing.read_text().replace(
+                    "max_concurrent_agents: 4", "max_concurrent_agents: 128"
+                )
+            )
+            adaptive_overlay = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                adaptive_overlay.returncode,
+                0,
+                adaptive_overlay.stdout + adaptive_overlay.stderr,
+            )
+            codex_entry = target_home / ".local/bin/symphony-codex-entry"
+            codex_entry.write_bytes(agent_router.read_bytes())
+            codex_entry.chmod(0o755)
+            promoted = subprocess.run(
+                ["bash", str(updater), "--provider-runtime-only"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(promoted.returncode, 0, promoted.stdout + promoted.stderr)
+            managed_readback = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                managed_readback.returncode,
+                0,
+                managed_readback.stdout + managed_readback.stderr,
+            )
+            self.assertIn("PROVIDER_OK", managed_readback.stdout)
+            helper.write_text("drifted non-provider helper\n")
+            helper_drift = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(helper_drift.returncode, 1)
+            self.assertIn(f"DRIFT {helper}", helper_drift.stdout)
+            helper.write_bytes(
+                (ROOT / "scripts/symphony/symphony_official_runtime.py").read_bytes()
+            )
             existing.write_text(
                 existing.read_text().replace("interval_ms: 30000", "interval_ms: 31000")
             )
@@ -1426,7 +1511,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 (target_home / ".config/systemd/user/symphony-elixir.service").exists()
             )
 
-    def test_deliberate_red_activation_cannot_reinstall_custom_runtime(self):
+    def test_managed_generation_activation_composes_provider_and_controller_installers(self):
         activation = (
             ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
         ).read_text(encoding="utf-8")
@@ -1434,10 +1519,16 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertNotIn("install-symphony-ui-pilot.sh", activation)
-        self.assertIn(
-            "update-symphony-burrito.sh --skip-binary",
-            activation,
+        provider = activation.index(
+            "update-symphony-burrito.sh --provider-runtime-only"
         )
+        controller = activation.index("install-gem-fleet-controller.sh")
+        adaptive = activation.index("symphony-concurrency-controller.py")
+        provider_check = activation.index("update-symphony-burrito.sh --check")
+        self.assertLess(provider, controller)
+        self.assertLess(controller, adaptive)
+        self.assertLess(adaptive, provider_check)
+        self.assertNotIn("update-symphony-burrito.sh --skip-binary", activation)
         self.assertNotIn("--no-restart --retire-legacy", activation)
         self.assertNotIn('test "$main_pid" = "$after_pid"', activation)
         self.assertIn('readonly SERVICE="symphony-elixir.service"', fleet)

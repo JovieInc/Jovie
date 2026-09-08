@@ -115,6 +115,20 @@ describe('HeroSpotifySearch', () => {
       expect(label).toHaveClass('sr-only');
     });
 
+    it('keeps the editorial accessible name aligned with its visible placeholder', () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+
+      expect(
+        screen.getByPlaceholderText('Search your name')
+      ).toHaveAccessibleName('Search your name');
+    });
+
     it('renders combobox role on input', () => {
       renderComponent();
       expect(getInput()).toHaveAttribute('role', 'combobox');

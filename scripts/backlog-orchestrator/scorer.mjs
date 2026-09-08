@@ -181,11 +181,6 @@ export function hasValidActiveMachineLease(
   if (labelsOf(issue).some(label => PROTECTED_LEASE_LABELS.has(label))) {
     return false;
   }
-  const assignee = `${issue?.assignee?.id || ''} ${issue?.assignee?.name || ''} ${issue?.assignee?.email || ''}`;
-  if (/tim(?:\s|-|_)*white|itstimwhite|^tim(?:\s|$)/i.test(assignee)) {
-    return false;
-  }
-
   const evidence = latestMachineEvidence(issue);
   if (!evidence || !isFreshEvidence(evidence, now)) return false;
   const body = evidenceBody(evidence);

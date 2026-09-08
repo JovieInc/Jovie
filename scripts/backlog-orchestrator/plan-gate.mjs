@@ -10,7 +10,10 @@
 
 import { createHash } from 'node:crypto';
 import { validateOptimizationContract } from '../invariants/optimization-contract.mjs';
-import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import {
+  hasProtectedAdmissionLabel,
+  isFounderSteeringAssignee,
+} from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
 import {
   admissionTargetPacket,
@@ -28,7 +31,6 @@ const ALLOWED_STATES = new Set(['Triage', 'Backlog', 'Todo']);
 const CREDENTIAL_PATTERN =
   /credential|secret|password|api[ -]?key|access token|private key/i;
 const SYNTHETIC_PATTERN = /synthetic|bundle|workstream|batch|epic-only/i;
-const TIM_PATTERN = /tim(?:\s|-|_)*white|itstimwhite|^tim$/i;
 const REPO_BY_TEAM = Object.freeze({
   JOV: 'JovieInc/Jovie',
   LYB: 'JovieInc/LogYourBody',
@@ -74,14 +76,6 @@ function nonEmptyList(value) {
   return (
     (Array.isArray(value) && value.length > 0 && value.every(nonEmptyString)) ||
     nonEmptyString(value)
-  );
-}
-
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  if (!assignee) return false;
-  return TIM_PATTERN.test(
-    `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''} ${assignee.displayName || ''}`
   );
 }
 
@@ -131,7 +125,8 @@ export function validatePlanCandidate(issue, evidence) {
   if (!ALLOWED_STATES.has(state)) return 'ambiguous-or-inactive-state';
   if (['Done', 'Canceled', 'Cancelled', 'Closed'].includes(state))
     return 'closed-issue';
-  if (isTimOwned(issue)) return 'tim-owned';
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
+    return 'already-assigned';
   if (
     hasProtectedAdmissionLabel(issue) ||
     labelsOf(issue).includes('synthetic')

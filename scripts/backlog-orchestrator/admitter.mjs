@@ -792,14 +792,6 @@ export function isConcreteJovieIssue(issue) {
   return Boolean(issue?.id && /^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''));
 }
 
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  if (!assignee) return false;
-  const text =
-    `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''} ${assignee.displayName || ''}`.toLowerCase();
-  return /tim(?:\s|-|_)*white|itstimwhite|^tim$/.test(text);
-}
-
 export function hasAdmissionEvidence(issue, classification = issue) {
   const labels = new Set([...namesOf(issue), ...namesOf(classification)]);
   const planReceipt = planGateReceipt(issue);
@@ -892,7 +884,6 @@ function candidateAdmissionDecision(classification, bundledIds) {
       !bundledIds.has(classification.identifier) &&
       classification.category === 'triageable' &&
       ['Triage', 'Backlog', 'Todo'].includes(state) &&
-      !isTimOwned(issue) &&
       !issue.pullRequestUrl &&
       evidence.eligible,
     preAdmission,

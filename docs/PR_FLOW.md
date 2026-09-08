@@ -1,5 +1,7 @@
 # PR Flow — How Agents Ship (Canonical)
 
+<!-- JOV-INV-029: this document projects the executable PR lifecycle contract. -->
+
 The single source of truth for how code reaches `main`. The goal is **lights-out
 shipping: 100s of PRs/day, fully autonomous, zero human-in-the-loop except a
 genuine taste call.** Every rule here exists because the alternative was tried and
@@ -7,6 +9,25 @@ it collapsed — see [What broke on 2026-06-22](#what-broke-on-2026-06-22) for t
 forensics that justify each one.
 
 If you are an agent about to open a PR, read [Agent checklist](#agent-checklist).
+
+## Executable lifecycle contract (JOV-INV-029)
+
+The checked-in invariant registry is the authority for the delivery phases below;
+the existing owners remain responsible for their mutations. A handoff releases
+the implementation slot only after its exact-head receipt is acknowledged.
+
+| Phase | Owner | Completion proof |
+| --- | --- | --- |
+| Draft | Symphony | Evidence-complete draft and writer-owned handoff receipt |
+| Review | Writer | Exact-head review, CI, and ticket evidence |
+| Promotion | Gem | Native merge-queue admission at the same head |
+| Merge | GitHub native queue | Merge event; this is not activation |
+| Activation | Production controller | Exact deployed runtime proof |
+| Closure | Summer | Closure receipt referencing activation proof |
+
+Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
+and expired holds remain bounded repair/evidence outcomes. The policy digest is
+included in delivery receipts so a runtime can reject a mismatched contract.
 
 ## North star
 

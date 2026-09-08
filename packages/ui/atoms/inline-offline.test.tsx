@@ -14,7 +14,16 @@ describe('InlineOfflineNotice', () => {
     expect(notice).toHaveAttribute('aria-atomic', 'true');
     expect(notice).toHaveAttribute('data-state', 'offline');
     expect(notice.className).toContain('text-app');
-    expect(notice.className).toContain('bg-(--state-offline-bg)');
+    expect(notice.className).toContain('border-warning/30');
+    expect(notice.className).toContain('bg-warning-subtle');
+    expect(notice.className).toContain('text-warning');
+  });
+
+  it('does not bypass semantic warning tokens with arbitrary state variables', () => {
+    render(<InlineOfflineNotice data-testid='offline-notice' />);
+
+    const notice = screen.getByTestId('offline-notice');
+    expect(notice.className).not.toMatch(/--state-offline-(border|bg|fg)/);
   });
 
   it('calls retry handler when retry button is clicked', async () => {

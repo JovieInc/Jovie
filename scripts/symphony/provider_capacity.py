@@ -79,6 +79,13 @@ def validate_state(value: object) -> dict[str, Any]:
                 raise ValueError(f"provider capacity {name} must be non-negative")
         if item.get("recoverAfter") is not None:
             _utc(str(item["recoverAfter"]))
+        observed_capacity = item.get("observedCapacity")
+        if observed_capacity is not None and (
+            not isinstance(observed_capacity, int)
+            or isinstance(observed_capacity, bool)
+            or observed_capacity < 0
+        ):
+            raise ValueError("provider observed capacity must be non-negative")
     for event_id, fingerprint in events.items():
         if not isinstance(event_id, str) or not event_id or not isinstance(fingerprint, str):
             raise ValueError("provider capacity event ledger is invalid")
@@ -118,11 +125,24 @@ def provider_record(
             or observed_capacity < 0
         ):
             raise ValueError("observed capacity must be a non-negative integer")
-        # A live measurement seeds a new provider and can lower a stale state,
-        # but it must not erase an adaptive decrease on every reconcile.
+        previous_observation = current.get("observedCapacity")
         if not existed:
             current["limit"] = observed_capacity
-            current["source"] = "live-observation"
+        elif (
+            isinstance(previous_observation, int)
+            and previous_observation != observed_capacity
+        ):
+            # Apply only the measurement delta. Replaying the same observation
+            # must not erase adaptive pressure, while a changed provider-local
+            # signal can raise or lower admission without a global ceiling.
+            delta = observed_capacity - previous_observation
+            current["limit"] = max(0, current.get("limit", 0) + delta)
+        elif previous_observation is None:
+            current["limit"] = min(
+                current.get("limit", observed_capacity), observed_capacity
+            )
+        current["observedCapacity"] = observed_capacity
+        current["source"] = "live-observation"
     current.setdefault("limit", 1)
     current.setdefault("source", "runtime-floor")
     current.setdefault("status", "available")

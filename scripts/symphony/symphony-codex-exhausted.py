@@ -34,10 +34,6 @@ MAX_GROK_CANARY_TIMEOUT_SECONDS = 60.0
 DEFAULT_GROK_SURVIVAL_SECONDS = 90.0
 MAX_GROK_SURVIVAL_SECONDS = 120.0
 CONTROL_TIMEOUT_SECONDS = 10.0
-DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
-MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
-DEFAULT_KIMI_MAX = 4  # independent Max Kimi OAuth chairs; SYMPHONY_GROK_MAX must not consume these
-MAX_KIMI_MAX = 10
 STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 min; 45 min would recycle live work
 # Unlocked leftover JOV-*.lock files older than this cannot keep pickup idle.
 # Held live implement/remount locks are never TTL-expired.
@@ -859,17 +855,23 @@ def _grok_ship_one_executable() -> str | None:
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
-def _env_seat_cap(name: str, default: int, hard_max: int) -> int:
-    try:
-        value = int(os.environ.get(name, default))
-    except (TypeError, ValueError):
-        return default
-    return max(0, min(value, hard_max))
-
-
-def _kimi_limit() -> int:
-    # Independent Max Kimi OAuth chairs; SYMPHONY_GROK_MAX must not consume these.
-    return _env_seat_cap("SYMPHONY_KIMI_MAX", DEFAULT_KIMI_MAX, MAX_KIMI_MAX)
+def _observed_capacity_override(provider: str) -> int | None:
+    """Read a provider-local observation without imposing a scheduler ceiling."""
+    names = (
+        f"SYMPHONY_{provider.upper()}_OBSERVED_CAPACITY",
+        # Compatibility for existing hosts: MAX is interpreted as the latest
+        # observation and is no longer clamped to a hidden global maximum.
+        f"SYMPHONY_{provider.upper()}_MAX",
+    )
+    for name in names:
+        raw = os.environ.get(name)
+        if raw is None or raw == "":
+            continue
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def _oidc_seat(entry: object) -> bool:
@@ -898,27 +900,24 @@ def _kimi_oauth_seats() -> int | None:
     return 1 if _oidc_seat(payload) else 0
 
 
-def _live_oauth_seats() -> int | None:
-    """Live Max Grok + Max Kimi OAuth chairs from local credential files."""
-    grok = _grok_oauth_seats()
-    kimi = _kimi_oauth_seats()
-    if grok is None and kimi is None:
-        return None
-    return (grok or 0) + (kimi or 0)
-
-
 def _grok_limit() -> int:
-    raw = os.environ.get("SYMPHONY_GROK_MAX")
-    if raw is not None:
-        try:
-            return max(0, min(int(raw), MAX_GROK_MAX))
-        except (TypeError, ValueError):
-            return DEFAULT_GROK_MAX
-    seats = _live_oauth_seats()
-    if seats is None or seats <= 0:
-        # Missing Grok/Kimi files, or Codex-only exhaustion, must not serial-pin.
-        return DEFAULT_GROK_MAX
-    return max(1, min(MAX_GROK_MAX, max(DEFAULT_GROK_MAX, seats)))
+    observed = _observed_capacity_override("grok")
+    if observed is not None:
+        return observed
+    seats = _grok_oauth_seats()
+    if seats is not None:
+        return seats
+    return 1 if _grok_executable() else 0
+
+
+def _kimi_limit() -> int:
+    observed = _observed_capacity_override("kimi")
+    if observed is not None:
+        return observed
+    seats = _kimi_oauth_seats()
+    if seats is not None:
+        return seats
+    return 1 if _kimi_executable() else 0
 
 
 def _parse_oauth_seats(payload: object) -> int | None:
@@ -944,9 +943,9 @@ def _parse_oauth_seats(payload: object) -> int | None:
 
 def _probe_oauth_seats(provider: str) -> int | None:
     """Per-provider live OAuth chairs via env pin or CLI probe. None means unverifiable."""
-    env_key = (
-        "SYMPHONY_GROK_OAUTH_SEATS" if provider == "grok" else "SYMPHONY_KIMI_OAUTH_SEATS"
-    )
+    if provider not in {"grok", "kimi"}:
+        return None
+    env_key = f"SYMPHONY_{provider.upper()}_OAUTH_SEATS"
     raw = os.environ.get(env_key)
     if raw is not None and raw != "":
         try:
@@ -985,29 +984,27 @@ def _probe_oauth_seats(provider: str) -> int | None:
 
 
 def _provider_seat_limit(provider: str) -> int:
-    env_cap = _grok_limit() if provider == "grok" else _kimi_limit()
     oauth = _probe_oauth_seats(provider)
-    if oauth is None:
-        return env_cap
-    return min(env_cap, oauth)
+    if oauth is not None:
+        return oauth
+    if provider == "grok":
+        return _grok_limit()
+    if provider == "kimi":
+        return _kimi_limit()
+    return 0
 
 
 def _provider_measured_capacity(provider: str) -> int:
     """Read one provider's current measured budget without a global cap."""
-    env_key = f"SYMPHONY_{provider.upper()}_MAX"
-    raw = os.environ.get(env_key)
-    if raw is not None:
-        try:
-            return max(0, int(raw))
-        except (TypeError, ValueError):
-            return 0
+    if provider in {"grok", "kimi"}:
+        return _provider_seat_limit(provider)
+    observed = _observed_capacity_override(provider)
+    if observed is not None:
+        return observed
     if provider == "cursor":
         # The registry proves the CLI executor, while one installed Cursor
         # session is the only portable seat observation available here.
         return 1 if _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") else 0
-    if provider in {"grok", "kimi"}:
-        measured = _probe_oauth_seats(provider)
-        return measured if measured is not None else _provider_seat_limit(provider)
     return 0
 
 
@@ -1028,15 +1025,20 @@ def _provider_capacity_state() -> tuple[object | None, pathlib.Path]:
         state = module.read_state(path, now)
         changed = False
         for provider in _fallback_provider_names():
-            if provider in state["providers"]:
+            observed_capacity = _provider_measured_capacity(provider)
+            current = state["providers"].get(provider)
+            if (
+                isinstance(current, dict)
+                and current.get("observedCapacity") == observed_capacity
+            ):
                 continue
             state = module.apply_observation(
                 state,
                 provider=provider,
                 kind="capacity_observed",
-                event_id=f"seed:{provider}",
+                event_id=f"capacity:{provider}:{observed_capacity}:{now}",
                 observed_at=now,
-                observed_capacity=_provider_measured_capacity(provider),
+                observed_capacity=observed_capacity,
             )
             changed = True
         if changed:

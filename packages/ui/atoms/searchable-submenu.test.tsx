@@ -461,6 +461,18 @@ describe('SearchableList', () => {
       render(<SearchableList items={items} onSelect={vi.fn()} />);
       expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
     });
+
+    it('deliberate-red: preserves compact visuals inside a 44px hit target', () => {
+      const { container } = render(
+        <SearchableList items={sampleItems} onSelect={vi.fn()} />
+      );
+      const appleButton = getItemButton(container, 'Apple');
+
+      expect(appleButton).toHaveClass('min-h-8');
+      expect(appleButton).not.toHaveClass('min-h-11');
+      expect(appleButton.className).toContain('before:h-11');
+      expect(appleButton.className).toContain('before:min-w-11');
+    });
   });
 });
 
@@ -523,5 +535,25 @@ describe('SearchableSubmenu', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(onSelect).toHaveBeenCalledWith(sections[0].items[2]);
+  });
+
+  it('keeps the trigger and clear control touch targets at 44px', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderSubmenu();
+
+    const trigger = document.querySelector(
+      '[data-slot="searchable-submenu-trigger"]'
+    );
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.className).toContain('before:h-11');
+    expect(trigger.className).toContain('before:min-w-11');
+
+    await user.hover(screen.getByText('Choose platform'));
+    const input = await screen.findByRole('combobox', { name: 'Search...' });
+    await user.type(input, 'apple', { skipClick: true });
+
+    const clear = screen.getByRole('button', { name: 'Clear search' });
+    expect(clear.className).toContain('before:h-11');
+    expect(clear.className).toContain('before:min-w-11');
   });
 });

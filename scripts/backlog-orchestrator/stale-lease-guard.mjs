@@ -2,10 +2,14 @@
  * Durable recovery for stale machine-agent leases.
  *
  * This guard is deliberately narrower than ordinary backlog admission. It only
- * releases an unassigned In Progress issue when the latest machine-agent
- * evidence is terminal, the lease is stale but still within a bounded window,
- * and there is no evidence of an open PR or human protection.
+ * releases an In Progress issue without another implementation owner when the
+ * latest machine-agent evidence is terminal, the lease is stale but still
+ * within a bounded window, and there is no evidence of an open PR or machine
+ * protection. Founder assignment remains steering, not an implementation
+ * lease.
  */
+
+import { isFounderSteeringAssignee } from './admission-policy.mjs';
 
 export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const STALE_LEASE_RECOVERY_COMMENT =
@@ -114,7 +118,7 @@ export function classifyStaleLease(
   if (issue?.state?.name !== 'In Progress') {
     return { eligible: false, reason: 'not-in-progress' };
   }
-  if (issue.assignee) {
+  if (issue.assignee && !isFounderSteeringAssignee(issue)) {
     return { eligible: false, reason: 'assigned' };
   }
   if (labelsOf(issue).some(label => protectedLabels.has(label))) {

@@ -1,5 +1,5 @@
 name: Production Controller
-# Invariant consumer: JOV-INV-010.
+# Invariant consumer: JOV-INV-010. JOV-INV-029: merge is not activation.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Symphony
 # capability-gap: Event-driven supersession must read live merge-queue depth,

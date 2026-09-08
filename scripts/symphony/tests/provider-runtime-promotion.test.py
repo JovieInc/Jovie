@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the actual provider filesystem transaction and launcher paths."""
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -58,10 +59,10 @@ class PromotionTests(unittest.TestCase):
         path.write_text(text)
         path.chmod(0o755)
 
-    def run_helper(self, rollback=0, dry=0, stage=0):
+    def run_helper(self, rollback=0, dry=0, stage=0, check=0):
         output = io.StringIO()
         status = 0
-        with patch.object(sys, "argv", [str(HELPER), str(self.repo), str(self.home), str(self.state), str(rollback), str(dry), str(stage)]), contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+        with patch.object(sys, "argv", [str(HELPER), str(self.repo), str(self.home), str(self.state), str(rollback), str(dry), str(stage), str(check)]), contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             try:
                 runpy.run_path(str(HELPER), run_name="__main__")
             except SystemExit as exc:
@@ -81,6 +82,22 @@ class PromotionTests(unittest.TestCase):
         self.assertEqual(self.launch("symphony-codex-entry"), "old:old\nold\nold")
         self.assertEqual(self.run_helper()[0], 0)
         self.assertEqual(self.launch("symphony-agent-router"), "new:new\nnew\nnew")
+
+    def test_check_binds_sources_launcher_and_aliases_to_current_generation(self):
+        self.assertEqual(self.run_helper(check=1)[0], 10)
+        self.assertEqual(self.run_helper()[0], 0)
+        status, output = self.run_helper(check=1)
+        self.assertEqual(status, 0, output)
+        self.assertIn("PROVIDER_OK", output)
+        source = self.source / "codex-account-probe.sh"
+        original = source.read_text()
+        self.write(source, self.content(source.name, "drifted"))
+        self.assertEqual(self.run_helper(check=1)[0], 10)
+        self.write(source, original)
+        alias = self.bin / "symphony-codex-entry"
+        alias.unlink()
+        alias.symlink_to((self.store / "previous").resolve() / "entry")
+        self.assertEqual(self.run_helper(check=1)[0], 10)
 
     def test_failed_readback_rolls_back_both_aliases(self):
         self.assertEqual(self.run_helper()[0], 0)
@@ -242,6 +259,17 @@ class PromotionTests(unittest.TestCase):
         alias.symlink_to(generation / "entry")
         self.assertEqual(self.run_helper()[0], 10)
 
+    def test_rejects_self_consistent_launcher_pointing_outside_generation(self):
+        self.assertEqual(self.run_helper()[0], 0)
+        generation = (self.store / "current").resolve()
+        entry = generation / "entry"
+        entry.write_text("#!/usr/bin/env bash\nexec /tmp/unowned-provider \"$@\"\n")
+        entry.chmod(0o755)
+        manifest = json.loads((generation / "manifest.json").read_text())
+        manifest["sha256"]["entry"] = hashlib.sha256(entry.read_bytes()).hexdigest()
+        (generation / "manifest.json").write_text(json.dumps(manifest))
+        self.assertEqual(self.run_helper()[0], 10)
+
     def test_rejects_external_generation_and_missing_source(self):
         self.store.mkdir(parents=True)
         (self.store / "current").symlink_to(self.root)
@@ -274,9 +302,20 @@ class PromotionTests(unittest.TestCase):
         env = {**os.environ, "SYMPHONY_ELIXIR_HOME": str(self.home)}
         result = subprocess.run(["bash", str(UPDATER), "--provider-runtime-only"], env=env, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+        first_generation = (self.store / "current").resolve(strict=True)
         self.assertEqual(before, {path: path.read_bytes() for path in protected})
         self.assertNotIn("ACTIVE_ISSUES", result.stdout)
         self.assertNotIn("RESTARTED", result.stdout)
+        # A production activation encounters an already-managed current link.
+        # The supported provider operation must promote through its lock and
+        # retain an exact rollback generation without touching service config.
+        promoted = subprocess.run(["bash", str(UPDATER), "--provider-runtime-only"], env=env, text=True, capture_output=True)
+        self.assertEqual(promoted.returncode, 0, promoted.stderr)
+        self.assertNotEqual((self.store / "current").resolve(strict=True), first_generation)
+        self.assertEqual((self.store / "previous").resolve(strict=True), first_generation)
+        self.assertEqual(before, {path: path.read_bytes() for path in protected})
+        for alias in (self.bin / "symphony-agent-router", self.bin / "symphony-codex-entry"):
+            self.assertEqual(alias.resolve(strict=True), (self.store / "current").resolve(strict=True) / "entry")
         result = subprocess.run(["bash", str(UPDATER), "--skip-binary", "--no-restart"], env=env, capture_output=True)
         self.assertEqual(result.returncode, 10)
         self.assertEqual(before, {path: path.read_bytes() for path in protected})

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const WRITER_PROOF_SCHEMA = 'jovie-writer-pr-proof/v1'; // JOV-INV-022
+// JOV-INV-029: writer owns review handoff; promotion and activation remain downstream.
 export const WRITER_PROMOTION_BLOCKER_SCHEMA =
   'jovie-writer-pr-promotion-blocker/v1';
 

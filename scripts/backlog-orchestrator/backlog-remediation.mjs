@@ -47,7 +47,6 @@ const COMPLIANCE_TEXT =
 const EPIC_TEXT = /\b(?:epic(?:-only)?|workstream|bundle|multi[- ]issue)\b/i;
 
 const EXCLUSION_BY_ADMISSION = Object.freeze({
-  'tim-owned': 'human-taste-or-steering',
   'protected-policy': 'machine-hold',
   'sensitive-or-external-work': 'credential-or-provisioning',
   'parent-or-bundle': 'broad-epic',

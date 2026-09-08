@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { classifyProductionMarkerEvidence } from '../../../.github/scripts/production-marker-state.mjs';
 import {
   CANONICAL_NATIVE_MUTATION_ACTOR,
   canAcceptExactHeadQueueReceipt,
@@ -28,6 +29,10 @@ import {
   SELECTOR_BLOCKING_LABELS,
   validateNativePreflightEvidence,
 } from '../../merge-queue-backend.mjs';
+import {
+  attestationMatchesControllerRepair,
+  renderControllerRepairAttestation,
+} from '../controller-repair-attestation.mjs';
 import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -275,6 +280,8 @@ function executeAdmissionScope({
   workflowEvent = 'pull_request',
   pullRequests = [],
   pullRequestEvent = null,
+  productionAdmissionAllowed = true,
+  fleetPromotionMode = 'normal',
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
@@ -317,6 +324,16 @@ function executeAdmissionScope({
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
           MANUAL_HEAD: '',
+          PRODUCTION_ADMISSION_ALLOWED: productionAdmissionAllowed
+            ? 'true'
+            : 'false',
+          PRODUCTION_CHECKPOINT_STATE: productionAdmissionAllowed
+            ? 'verified'
+            : 'none',
+          PRODUCTION_CHECKPOINT_REASON: productionAdmissionAllowed
+            ? 'verified_marker'
+            : 'no_marker',
+          FLEET_PROMOTION_MODE: fleetPromotionMode,
           MOCK_PULL_REQUESTS: JSON.stringify(pullRequests),
           PATH: `${binPath}:${process.env.PATH}`,
           REPO: REPOSITORY,
@@ -337,6 +354,119 @@ function executeAdmissionScope({
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+function executeReleaseCheckpoint({
+  state,
+  reason,
+  mainSha = HEAD,
+  workflowId = 12345,
+}) {
+  const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
+  const script = workflowRunScript(
+    workflow,
+    'Resolve production release checkpoint'
+  );
+  const directory = mkdtempSync(join(tmpdir(), 'production-checkpoint-'));
+  const outputPath = join(directory, 'output.txt');
+  const binPath = join(directory, 'bin');
+  mkdirSync(binPath);
+  writeFileSync(
+    join(binPath, 'gh'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' '${workflowId}'\n`
+  );
+  writeFileSync(
+    join(binPath, 'node'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' '${JSON.stringify({ state, reason })}'\n`
+  );
+  chmodSync(join(binPath, 'gh'), 0o755);
+  chmodSync(join(binPath, 'node'), 0o755);
+  writeFileSync(outputPath, '');
+  try {
+    const result = spawnSync(
+      'bash',
+      ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: outputPath,
+          MAIN_SHA: mainSha,
+          PATH: `${binPath}:${process.env.PATH}`,
+          REPO: REPOSITORY,
+        },
+      }
+    );
+    if (result.status !== 0) {
+      throw new Error(
+        `Release checkpoint failed (${result.status}): ${result.stderr || result.stdout}`
+      );
+    }
+    const lines = readFileSync(outputPath, 'utf8').trim().split('\n');
+    return {
+      lines,
+      outputs: Object.fromEntries(lines.map(line => line.split('=', 2))),
+    };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function exactProductionMarkerEvidence({
+  evidenceSha = HEAD,
+  markerSha = evidenceSha,
+  expired = false,
+  conclusion = 'success',
+  runRepository = REPOSITORY,
+} = {}) {
+  const workflowId = 9876;
+  const controllerRun = 54321;
+  return {
+    sha: evidenceSha,
+    repo: REPOSITORY,
+    controllerWorkflowId: workflowId,
+    markers: [
+      {
+        artifact: {
+          id: 777,
+          name: `production-generation-verified-${markerSha}`,
+          expired,
+          workflowRunId: controllerRun,
+        },
+        payload: {
+          sha: markerSha,
+          deploymentId: 'dpl_ExactProduction123',
+          controllerRun: String(controllerRun),
+          controllerAttempt: '1',
+        },
+        attemptRun: {
+          id: controllerRun,
+          run_attempt: 1,
+          workflow_id: workflowId,
+          path: '.github/workflows/production-controller.yml',
+          head_sha: markerSha,
+          head_branch: 'main',
+          head_repository: { full_name: runRepository },
+          event: 'workflow_run',
+          status: 'completed',
+          conclusion,
+        },
+        attemptJobs: [
+          {
+            id: 999,
+            name: 'Production Verified',
+            run_id: controllerRun,
+            run_attempt: 1,
+            head_sha: markerSha,
+            head_branch: 'main',
+            status: 'completed',
+            conclusion: 'success',
+          },
+        ],
+      },
+    ],
+    recoveryArtifacts: [],
+  };
 }
 
 function executeHoldIntakePreflight({
@@ -815,6 +945,208 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('(( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 ))');
     expect(drain).toContain('select((.n | tostring) != $admission_pr)');
     expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
+  });
+
+  it('pauses only new admission paths until exact current production is verified', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const checkpoint = workflowStep(
+      workflow,
+      'Resolve production release checkpoint'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+
+    expect(workflow).toContain('actions: read');
+    expect(checkpoint).toContain('.github/scripts/production-marker-state.mjs');
+    expect(checkpoint).toContain("echo 'admission_allowed=false'");
+    expect(checkpoint).toContain(
+      'if [[ "$checkpoint_state" == \'verified\' ]]'
+    );
+    expect(checkpoint).toContain("echo 'admission_allowed=true'");
+    expect(checkpoint).toContain('existing queue entries continue');
+    expect(scope).toContain(
+      '"${FLEET_PROMOTION_MODE:-blocked}" != \'controller-repair-only\''
+    );
+    expect(scope).toContain("admission_disposition='neutral'");
+    expect(scope).toContain('production-release-checkpoint-');
+    expect(scope).toContain('recover_holds=0');
+    expect(scope).toContain('reconcile_queue_reentry=0');
+    expect(
+      enroll.match(
+        /steps\.release-checkpoint\.outputs\.admission_allowed == 'true'/g
+      )
+    ).toHaveLength(3);
+
+    const blocked = executeAdmissionScope({
+      productionAdmissionAllowed: false,
+      pullRequestEvent: {
+        action: 'labeled',
+        label: { name: 'ready-to-merge' },
+        sender: { login: 'jovie-bot[bot]' },
+        pull_request: {
+          number: 16546,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+    });
+    expect(blocked).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'production-release-checkpoint-none-no_marker',
+        pr_number: '',
+        head_sha: '',
+        recover_holds: '0',
+        deferred_release: '0',
+        reconcile_queue_reentry: '0',
+      })
+    );
+
+    const boundedRepair = executeAdmissionScope({
+      productionAdmissionAllowed: false,
+      fleetPromotionMode: 'controller-repair-only',
+      pullRequestEvent: {
+        action: 'labeled',
+        label: { name: 'ready-to-merge' },
+        sender: { login: 'jovie-bot[bot]' },
+        pull_request: {
+          number: 16546,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+    });
+    expect(boundedRepair).toEqual(
+      expect.objectContaining({
+        disposition: 'candidate',
+        reason: 'pull-request-exact-head',
+        pr_number: '16546',
+        head_sha: HEAD,
+      })
+    );
+    expect(scope).toContain(
+      'preserving one attested controller-repair-only candidate'
+    );
+    expect(enroll).toContain('DRAIN_PROMOTION_MODE:');
+    expect(enroll).toContain('needs.fleet-policy.outputs.mode');
+
+    const unavailable = executeReleaseCheckpoint({
+      state: 'none',
+      reason: 'no_marker',
+    });
+    expect(unavailable.outputs).toEqual(
+      expect.objectContaining({
+        admission_allowed: 'false',
+        state: 'none',
+        reason: 'no_marker',
+      })
+    );
+    expect(checkpoint).not.toMatch(/--method\s+(POST|PUT|PATCH|DELETE)/);
+
+    const verified = executeReleaseCheckpoint({
+      state: 'verified',
+      reason: 'exact_attempt_verified',
+    });
+    expect(verified.outputs).toEqual(
+      expect.objectContaining({
+        admission_allowed: 'true',
+        state: 'verified',
+        reason: 'exact_attempt_verified',
+      })
+    );
+    expect(
+      verified.lines.filter(line => line === 'admission_allowed=true')
+    ).toHaveLength(1);
+  });
+
+  it('accepts only exact trusted production marker evidence at the checkpoint', () => {
+    expect(
+      classifyProductionMarkerEvidence(exactProductionMarkerEvidence())
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_attempt_verified',
+    });
+
+    const rejected = [
+      exactProductionMarkerEvidence({ expired: true }),
+      exactProductionMarkerEvidence({
+        evidenceSha: OTHER_HEAD,
+        markerSha: HEAD,
+      }),
+      exactProductionMarkerEvidence({ runRepository: 'attacker/fork' }),
+      exactProductionMarkerEvidence({ conclusion: 'failure' }),
+      exactProductionMarkerEvidence({ conclusion: 'cancelled' }),
+    ].map(evidence => classifyProductionMarkerEvidence(evidence));
+
+    expect(rejected).toHaveLength(5);
+    expect(rejected.every(result => result.state !== 'verified')).toBe(true);
+    expect(rejected.map(result => result.reason)).toEqual([
+      'malformed_or_contradictory_marker',
+      'malformed_or_contradictory_marker',
+      'contradictory_marker_attempt',
+      'unsafe_or_contradictory_rollback',
+      'unsafe_or_contradictory_rollback',
+    ]);
+  });
+
+  it('keeps the controller repair escape exact, independently owned, and expiring', () => {
+    const now = Date.parse('2026-09-06T18:00:00.000Z');
+    const changedPathsSha256 = 'c'.repeat(64);
+    const operationId = 'run-34050357620-attempt-1';
+    const body = renderControllerRepairAttestation(
+      {
+        schema: 'jovie-controller-repair-attestation/v1',
+        kind: 'controller-runtime-repair',
+        condition: 'controller-failure',
+        repository: REPOSITORY,
+        pr: 16546,
+        head: HEAD,
+        mainSha: OTHER_HEAD,
+        reviewAuthority: 'independent-llm-review',
+        reviewId: 'review-release-repair-1',
+        reviewedHead: HEAD,
+        changedPathsSha256,
+        operationId,
+        issuedAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + 15 * 60_000).toISOString(),
+        deploymentsAllowed: false,
+        runtimeActivationAllowed: false,
+      },
+      now
+    );
+    const exactScope = {
+      repository: REPOSITORY,
+      pr: 16546,
+      head: HEAD,
+      mainSha: OTHER_HEAD,
+      changedPathsSha256,
+      operationId,
+    };
+
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        minimumValidForMs: 2 * 60_000,
+        now: now + 10 * 60_000,
+      })
+    ).toBe(true);
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        minimumValidForMs: 1,
+        now: now + 15 * 60_000 + 1,
+      })
+    ).toBe(false);
+    expect(
+      attestationMatchesControllerRepair(body, {
+        ...exactScope,
+        head: OTHER_HEAD,
+        minimumValidForMs: 1,
+        now: now + 10 * 60_000,
+      })
+    ).toBe(false);
   });
 
   it('recovers missing-CI heads with a bounded, per-head-idempotent close+reopen', () => {

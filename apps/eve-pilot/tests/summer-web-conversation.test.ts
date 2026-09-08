@@ -185,6 +185,193 @@ describe('authenticated persistent Summer conversation', () => {
     expect((await f.send(input(busyIndex + 1))).status).toBe(409);
     expect(f.dispatch).toHaveBeenCalledOnce();
   });
+  it('recovers an empty product session from the verified canonical Eve tail', async () => {
+    const f = fixture();
+    expect((await f.send(input(1))).status).toBe(202);
+    await readConversationResult({
+      store: f.store,
+      eventId: id(1),
+      principalHash: input().principalHash,
+      deploymentId: input().deploymentId,
+      stream: async () => stream(events(input(1))),
+    });
+
+    const recoveredInput = { ...input(2), deploymentId: 'dpl_next' };
+    expect((await f.send(recoveredInput)).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+    expect(f.dispatch.mock.calls[1]?.[2]).toBe('ses_summer');
+    expect(f.records.get(conversationPath('intents', id(2)))).toMatchObject({
+      previousEventId: id(1),
+    });
+    expect(f.records.get(conversationPath('successors', id(1)))).toEqual({
+      eventId: id(2),
+    });
+
+    expect((await f.send(recoveredInput)).status).toBe(200);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+
+    await readConversationResult({
+      store: f.store,
+      eventId: id(2),
+      principalHash: input().principalHash,
+      deploymentId: recoveredInput.deploymentId,
+      stream: async () =>
+        stream(events(recoveredInput, 'Second answer', 'turn_2')),
+    });
+    expect(
+      (await f.send({ ...input(3), deploymentId: recoveredInput.deploymentId }))
+        .status
+    ).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledTimes(3);
+    expect(f.dispatch.mock.calls[2]?.[2]).toBe('ses_summer');
+    expect(f.records.get(conversationPath('intents', id(3)))).toMatchObject({
+      previousEventId: id(2),
+    });
+  });
+  it('recovers through the canonical tail when failed local history has no Eve receipt', async () => {
+    const f = fixture();
+    expect((await f.send(input(1))).status).toBe(202);
+    await readConversationResult({
+      store: f.store,
+      eventId: id(1),
+      principalHash: input().principalHash,
+      deploymentId: input().deploymentId,
+      stream: async () => stream(events(input(1))),
+    });
+    const staleLocalText = 'failed local turn must not become Eve context';
+    const recoveredInput: ConversationInput = {
+      ...input(2),
+      deploymentId: 'dpl_next',
+      canonicalTailRecovery: true,
+      history: [
+        { role: 'user', text: staleLocalText },
+        { role: 'assistant', text: '' },
+      ],
+    };
+    expect((await f.send(recoveredInput)).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+    expect(f.dispatch.mock.calls[1]?.[0]).toMatchObject({
+      history: [],
+      canonicalTailRecovery: true,
+    });
+    expect(f.dispatch.mock.calls[1]?.[1]).not.toContain(staleLocalText);
+    expect(f.dispatch.mock.calls[1]?.[2]).toBe('ses_summer');
+    expect((await f.send(recoveredInput)).status).toBe(200);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+  });
+  it('never dispatches unverified local history when no canonical tail exists', async () => {
+    const f = fixture();
+    const staleLocalText = 'unverified local turn must not become Eve context';
+    const recoveredInput: ConversationInput = {
+      ...input(1),
+      canonicalTailRecovery: true,
+      history: [{ role: 'user', text: staleLocalText }],
+    };
+
+    expect((await f.send(recoveredInput)).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledOnce();
+    expect(f.dispatch.mock.calls[0]?.[0]).toMatchObject({
+      eventId: id(1),
+      history: [],
+      canonicalTailRecovery: true,
+    });
+    expect(f.dispatch.mock.calls[0]?.[1]).not.toContain(staleLocalText);
+    expect(f.dispatch.mock.calls[0]?.[2]).toBeNull();
+  });
+  it('fails closed when canonical-tail recovery is pending or crosses a binding', async () => {
+    const pending = fixture();
+    expect((await pending.send(input(1))).status).toBe(202);
+    const recoveryHistory = [
+      { role: 'user' as const, text: 'local failed turn' },
+      { role: 'assistant' as const, text: '' },
+    ];
+    const pendingResponse = await pending.send({
+      ...input(2),
+      canonicalTailRecovery: true,
+      history: recoveryHistory,
+    });
+    expect(pendingResponse.status).toBe(409);
+    expect(await pendingResponse.json()).toMatchObject({
+      code: 'conversation_busy',
+      blockingEvent: {
+        eventId: id(1),
+        deploymentId: input().deploymentId,
+      },
+    });
+    expect(pending.dispatch).toHaveBeenCalledOnce();
+
+    pending.records.delete(conversationPath('accepted', id(1)));
+    pending.records.delete(conversationPath('admissions', id(1)));
+    const unresolvedResponse = await pending.send({
+      ...input(3),
+      canonicalTailRecovery: true,
+      history: recoveryHistory,
+    });
+    expect(unresolvedResponse.status).toBe(409);
+    expect(await unresolvedResponse.json()).toEqual({
+      ok: false,
+      code: 'conversation_busy',
+    });
+    expect(pending.dispatch).toHaveBeenCalledOnce();
+
+    const mismatched = fixture();
+    mismatched.records.set(conversationPath('successors', 'root'), {
+      eventId: id(1),
+    });
+    mismatched.records.set(conversationPath('results', id(1)), {
+      eventId: id(1),
+      conversationId: input().conversationId,
+      principalHash: 'b'.repeat(43),
+      deploymentId: input().deploymentId,
+      sessionId: 'ses_other',
+      startIndex: 0,
+      model: 'zai/glm-5.3-flash',
+      dailySlot: 1,
+      utcDay: '2026-09-05',
+      turnId: 'turn_other',
+      responseText: 'Other principal response',
+      status: 'completed',
+      nextStartIndex: 3,
+    });
+    const mismatchedResponse = await mismatched.send({
+      ...input(2),
+      canonicalTailRecovery: true,
+      history: recoveryHistory,
+    });
+    expect(mismatchedResponse.status).toBe(409);
+    expect(await mismatchedResponse.json()).toMatchObject({
+      code: 'canonical_binding_conflict',
+    });
+    expect(mismatched.dispatch).not.toHaveBeenCalled();
+  });
+  it('fails closed on malformed canonical recovery and rejects mixed predecessor recovery', async () => {
+    const malformed = fixture();
+    malformed.records.set(conversationPath('successors', 'root'), {
+      eventId: 'malformed',
+    });
+    const malformedResponse = await malformed.send({
+      ...input(2),
+      canonicalTailRecovery: true,
+      history: [{ role: 'user', text: 'preserved local turn' }],
+    });
+    expect(malformedResponse.status).toBe(503);
+    expect(await malformedResponse.json()).toMatchObject({
+      code: 'canonical_tail_unavailable',
+    });
+    expect(malformed.dispatch).not.toHaveBeenCalled();
+
+    const mixed = fixture();
+    const mixedResponse = await mixed.send({
+      ...input(2),
+      previousEventId: id(1),
+      canonicalTailRecovery: true,
+    });
+    expect(mixedResponse.status).toBe(422);
+    expect(await mixedResponse.json()).toMatchObject({
+      code: 'invalid_tail_recovery',
+    });
+    expect(mixed.dispatch).not.toHaveBeenCalled();
+  });
   it('canonicalizes property order and permits only one same-event dispatch', async () => {
     const f = fixture();
     const value = input();
@@ -246,7 +433,7 @@ describe('authenticated persistent Summer conversation', () => {
     expect((await f.send(input())).status).toBe(409);
     expect(f.dispatch).not.toHaveBeenCalled();
   });
-  it('rejects a predecessor bound to another deployment', async () => {
+  it('continues the canonical session across an immutable deployment rollout', async () => {
     const f = fixture();
     await f.send(input());
     await readConversationResult({
@@ -256,15 +443,39 @@ describe('authenticated persistent Summer conversation', () => {
       deploymentId: input().deploymentId,
       stream: async () => stream(events(input())),
     });
-    expect(
-      (
-        await f.send({
-          ...input(2),
-          previousEventId: id(1),
-          deploymentId: 'dpl_other',
-        })
-      ).status
-    ).toBe(409);
+    const response = await f.send({
+      ...input(2),
+      previousEventId: id(1),
+      deploymentId: 'dpl_other',
+    });
+    expect(response.status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledTimes(2);
+    expect(f.dispatch.mock.calls[1]?.[2]).toBe('ses_summer');
+    expect(f.records.get(conversationPath('accepted', id(2)))).toMatchObject({
+      deploymentId: 'dpl_other',
+    });
+  });
+  it.each([
+    'eventId',
+    'principalHash',
+    'sessionId',
+    'nextStartIndex',
+    'status',
+  ])('rejects malformed or misbound predecessor %s before dispatch', async field => {
+    const f = fixture();
+    await f.send(input());
+    await readConversationResult({
+      store: f.store,
+      eventId: id(1),
+      principalHash: input().principalHash,
+      deploymentId: input().deploymentId,
+      stream: async () => stream(events(input())),
+    });
+    const path = conversationPath('results', id(1));
+    f.records.set(path, { ...f.records.get(path), [field]: 'invalid' });
+    expect((await f.send({ ...input(2), previousEventId: id(1) })).status).toBe(
+      409
+    );
     expect(f.dispatch).toHaveBeenCalledOnce();
   });
   it('shares the commercial UTC budget and exposes its reset without dispatch', async () => {

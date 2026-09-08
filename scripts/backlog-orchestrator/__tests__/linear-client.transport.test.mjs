@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import * as linear from '../linear-client.mjs';
@@ -14,10 +18,30 @@ const jsonResponse = (
   text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
 });
 
+let clock = Date.now();
+/** @param {string} query @param {any} variables @param {any} options */
+function graphql(query, variables, options) {
+  return linear.graphql(query, variables, {
+    ...options,
+    nowImpl: () => clock,
+    sleepImpl: async ms => {
+      await options.sleepImpl?.(ms);
+      clock += ms;
+    },
+  });
+}
+
 function withKey(key, fn) {
   const previous = process.env.LINEAR_API_KEY;
+  const previousDir = process.env.LINEAR_BACKOFF_STATE_DIR;
+  const directory = fs.mkdtempSync(join(tmpdir(), 'linear-backoff-test-'));
+  process.env.LINEAR_BACKOFF_STATE_DIR = directory;
+  clock = Date.now();
   process.env.LINEAR_API_KEY = key;
   return Promise.resolve(fn()).finally(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+    if (previousDir === undefined) delete process.env.LINEAR_BACKOFF_STATE_DIR;
+    else process.env.LINEAR_BACKOFF_STATE_DIR = previousDir;
     if (previous === undefined) delete process.env.LINEAR_API_KEY;
     else process.env.LINEAR_API_KEY = previous;
   });
@@ -27,7 +51,7 @@ describe('Gem Linear transport', () => {
   it('accepts valid JSON, preserves the raw Authorization header, and returns data', async () => {
     await withKey('linear-test-secret', async () => {
       let request;
-      const data = await linear.graphql(
+      const data = await graphql(
         'query Viewer { viewer { id } }',
         {},
         {
@@ -48,7 +72,7 @@ describe('Gem Linear transport', () => {
   it('classifies non-JSON and malformed responses without exposing their body', async () => {
     await withKey('body-secret', async () => {
       await assert.rejects(
-        linear.graphql(
+        graphql(
           'query Html { viewer { id } }',
           {},
           {
@@ -70,7 +94,7 @@ describe('Gem Linear transport', () => {
       );
 
       await assert.rejects(
-        linear.graphql(
+        graphql(
           'query Broken { viewer { id } }',
           {},
           {
@@ -108,11 +132,13 @@ describe('Gem Linear transport', () => {
       ]) {
         let attempts = 0;
         const sleeps = [];
-        const data = await linear.graphql(
+        const data = await graphql(
           'query Retry { viewer { id } }',
           {},
           {
             retryBaseMs: 3,
+            rateLimitBaseMs: 3,
+            randomImpl: () => 0,
             fetchImpl: async () => {
               const result =
                 sequence[Math.min(attempts++, sequence.length - 1)];
@@ -128,7 +154,7 @@ describe('Gem Linear transport', () => {
       }
 
       await assert.rejects(
-        linear.graphql(
+        graphql(
           'query RetryExhausted { viewer { id } }',
           {},
           {
@@ -178,7 +204,7 @@ describe('Gem Linear transport', () => {
     await withKey('metadata-secret', async () => {
       const body = `${'x'.repeat(400)} token=metadata-secret`;
       await assert.rejects(
-        linear.graphql(
+        graphql(
           'query Metadata { viewer { id } }',
           {},
           {
@@ -247,7 +273,7 @@ describe('Gem Linear rate-limit backoff', () => {
     await withKey('ratelimit-secret', async () => {
       let attempts = 0;
       const sleeps = [];
-      const data = await linear.graphql(
+      const data = await graphql(
         'query RateLimited { viewer { id } }',
         {},
         {
@@ -273,7 +299,7 @@ describe('Gem Linear rate-limit backoff', () => {
       let attempts = 0;
       const sleeps = [];
       await assert.rejects(
-        linear.graphql(
+        graphql(
           'query Plain400 { viewer { id } }',
           {},
           {
@@ -301,10 +327,10 @@ describe('Gem Linear rate-limit backoff', () => {
     await withKey('hint-secret', async () => {
       for (const headers of [
         { 'retry-after': '30' },
-        { 'x-ratelimit-requests-reset': String(Date.now() + 45_000) },
+        { 'x-ratelimit-requests-reset': String(clock + 75_000) },
       ]) {
         const sleeps = [];
-        const data = await linear.graphql(
+        const data = await graphql(
           'query Hints { viewer { id } }',
           {},
           {
@@ -333,7 +359,7 @@ describe('Gem Linear rate-limit backoff', () => {
     await withKey('jitter-secret', async () => {
       const sleeps = [];
       let attempts = 0;
-      const data = await linear.graphql(
+      const data = await graphql(
         'query Jitter { viewer { id } }',
         {},
         {
@@ -359,7 +385,7 @@ describe('Gem Linear rate-limit backoff', () => {
       const sleeps = [];
       const before = Date.now();
       await assert.rejects(
-        linear.graphql(
+        graphql(
           'query Exhausted { viewer { id } }',
           {},
           {
@@ -394,7 +420,7 @@ describe('Gem Linear rate-limit backoff', () => {
       let attempts = 0;
       const sleeps = [];
       await assert.rejects(
-        linear.graphql(
+        graphql(
           'query Bounded { viewer { id } }',
           {},
           {
@@ -449,5 +475,363 @@ describe('Gem reconciliation idempotency', () => {
     issue.comments.nodes.push({ body: 'persisted' });
     await reconcileIssues({ issues: [issue], client });
     assert.equal(calls, 1);
+  });
+});
+
+describe('durable credential budget', () => {
+  const query = 'query Viewer { viewer { id } }';
+  const limited = () =>
+    jsonResponse('<html>busy</html>', {
+      status: 429,
+      contentType: 'text/html',
+      headers: { 'retry-after': '60' },
+    });
+  const isLimited = (/** @type {any} */ error) =>
+    error.code === 'RATE_LIMITED' &&
+    Number.isSafeInteger(error.metadata.resetAt);
+
+  it('persists HTML 429 across independent processes, isolates keys, and resumes at expiry', async () => {
+    await withKey('durable-secret', async () => {
+      let calls = 0;
+      const resetAt = clock + 60_000;
+      await assert.rejects(
+        graphql(
+          query,
+          {},
+          {
+            rateLimitMaxAttempts: 1,
+            fetchImpl: async () => {
+              calls++;
+              return limited();
+            },
+          }
+        ),
+        isLimited
+      );
+      for (let i = 0; i < 2; i++) {
+        await assert.rejects(
+          graphql(
+            query,
+            {},
+            {
+              fetchImpl: async () => {
+                calls++;
+                return jsonResponse({ data: {} });
+              },
+            }
+          ),
+          (/** @type {any} */ error) =>
+            isLimited(error) &&
+            error.attempts === 0 &&
+            error.metadata.resetAt === resetAt
+        );
+      }
+      const child = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `
+        import { graphql } from ${JSON.stringify(new URL('../linear-client.mjs', import.meta.url).href)};
+        let calls = 0;
+        try { await graphql('query {}', {}, { nowImpl: () => ${clock}, fetchImpl: async () => { calls++; throw Error('unexpected fetch'); } }); }
+        catch (error) { console.log(JSON.stringify({ code: error.code, resetAt: error.metadata?.resetAt, calls })); }
+      `,
+        ],
+        { encoding: 'utf8', env: process.env }
+      );
+      assert.equal(child.status, 0, child.stderr);
+      assert.deepEqual(JSON.parse(child.stdout), {
+        code: 'RATE_LIMITED',
+        resetAt,
+        calls: 0,
+      });
+      assert.equal(calls, 1);
+      process.env.LINEAR_API_KEY = 'unrelated-secret';
+      assert.deepEqual(
+        await graphql(
+          query,
+          {},
+          { fetchImpl: async () => jsonResponse({ data: { other: true } }) }
+        ),
+        { other: true }
+      );
+      process.env.LINEAR_API_KEY = 'durable-secret';
+      clock = resetAt;
+      assert.deepEqual(
+        await graphql(
+          query,
+          {},
+          {
+            fetchImpl: async () => {
+              calls++;
+              return jsonResponse({ data: { resumed: true } });
+            },
+          }
+        ),
+        { resumed: true }
+      );
+      assert.equal(calls, 2);
+    });
+  });
+
+  it('uses private persistent user state when no state directory is configured', async () => {
+    await withKey('default-location-secret', async () => {
+      const home = fs.mkdtempSync(join(tmpdir(), 'linear-default-home-'));
+      try {
+        const env = /** @type {NodeJS.ProcessEnv} */ ({
+          ...process.env,
+          HOME: home,
+        });
+        delete env.LINEAR_BACKOFF_STATE_DIR;
+        const child = spawnSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            `
+          import { graphql } from ${JSON.stringify(new URL('../linear-client.mjs', import.meta.url).href)};
+          let calls = 0;
+          for (let i = 0; i < 2; i++) {
+            try { await graphql('query {}', {}, { rateLimitMaxAttempts: 1, fetchImpl: async () => {
+              calls++; return { status: 429, headers: new Headers({'retry-after': '60'}), text: async () => { throw Error('body unavailable'); } };
+            } }); } catch (error) { if (error.code !== 'RATE_LIMITED') throw error; }
+          }
+          console.log(calls);
+        `,
+          ],
+          { encoding: 'utf8', env }
+        );
+        assert.equal(child.status, 0, child.stderr);
+        assert.equal(child.stdout.trim(), '1');
+        const root = join(home, '.local', 'state', 'jovie-linear-backoff');
+        assert.equal(fs.statSync(root).mode & 0o777, 0o700);
+        assert.equal(fs.readdirSync(root).length, 1);
+      } finally {
+        fs.rmSync(home, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('keeps credential values out of private persisted paths, contents, and errors', async () => {
+    await withKey('must-never-be-persisted', async () => {
+      await assert.rejects(
+        graphql(
+          query,
+          {},
+          { rateLimitMaxAttempts: 1, fetchImpl: async () => limited() }
+        ),
+        (/** @type {any} */ error) => {
+          assert.equal(
+            JSON.stringify(error).includes('must-never-be-persisted'),
+            false
+          );
+          return isLimited(error);
+        }
+      );
+      const root = process.env.LINEAR_BACKOFF_STATE_DIR;
+      const scopes = fs.readdirSync(root);
+      assert.equal(scopes.length, 1);
+      assert.match(scopes[0], /^[a-f0-9]{64}$/);
+      assert.equal(fs.statSync(join(root, scopes[0])).mode & 0o777, 0o700);
+      for (const name of fs.readdirSync(join(root, scopes[0]))) {
+        const path = join(root, scopes[0], name);
+        assert.equal(fs.statSync(path).mode & 0o777, 0o600);
+        assert.equal(
+          fs.readFileSync(path, 'utf8').includes('must-never-be-persisted'),
+          false
+        );
+      }
+    });
+  });
+
+  it('fails closed on malformed or non-private state without making a request', async () => {
+    for (const variant of [
+      'json',
+      'schema',
+      'permissions',
+      'symlink',
+      'directory',
+      'pending',
+    ]) {
+      await withKey('malformed-secret', async () => {
+        await assert.rejects(
+          graphql(
+            query,
+            {},
+            { rateLimitMaxAttempts: 1, fetchImpl: async () => limited() }
+          ),
+          isLimited
+        );
+        const root = process.env.LINEAR_BACKOFF_STATE_DIR;
+        const scope = join(root, fs.readdirSync(root)[0]);
+        const path = join(scope, fs.readdirSync(scope)[0]);
+        if (variant === 'pending')
+          fs.writeFileSync(join(scope, '.pending-abcd'), '{', { mode: 0o600 });
+        if (variant === 'json') fs.writeFileSync(path, '{');
+        if (variant === 'schema')
+          fs.writeFileSync(
+            path,
+            JSON.stringify({ schema: 1, resetAt: 'invalid' })
+          );
+        if (variant === 'permissions') fs.chmodSync(path, 0o644);
+        if (variant === 'directory') fs.chmodSync(scope, 0o755);
+        if (variant === 'symlink') {
+          fs.unlinkSync(path);
+          fs.symlinkSync('/dev/null', path);
+        }
+        let calls = 0;
+        await assert.rejects(
+          graphql(
+            query,
+            {},
+            {
+              fetchImpl: async () => {
+                calls++;
+                return limited();
+              },
+            }
+          ),
+          (/** @type {any} */ error) => error.code === 'BACKOFF_STATE_INVALID'
+        );
+        assert.equal(calls, 0);
+      });
+    }
+  });
+
+  it('composes simultaneous cooldown writers by the latest reset without shortening it', async () => {
+    await withKey('concurrent-secret', async () => {
+      const now = clock;
+      await Promise.all(
+        [120, 30].map(seconds =>
+          assert.rejects(
+            graphql(
+              query,
+              {},
+              {
+                rateLimitMaxAttempts: 1,
+                fetchImpl: async () =>
+                  jsonResponse(
+                    {},
+                    { status: 429, headers: { 'retry-after': String(seconds) } }
+                  ),
+              }
+            ),
+            isLimited
+          )
+        )
+      );
+      clock = now + 60_000;
+      await assert.rejects(
+        graphql(
+          query,
+          {},
+          {
+            fetchImpl: async () => {
+              throw Error('must not fetch');
+            },
+          }
+        ),
+        (/** @type {any} */ error) =>
+          isLimited(error) && error.metadata.resetAt === now + 120_000
+      );
+    });
+  });
+
+  it('checks another writer extending the reset before an in-call retry', async () => {
+    await withKey('extension-secret', async () => {
+      let calls = 0;
+      await assert.rejects(
+        graphql(
+          query,
+          {},
+          {
+            rateLimitBaseMs: 10,
+            randomImpl: () => 0,
+            fetchImpl: async () => {
+              calls++;
+              return jsonResponse({}, { status: 429 });
+            },
+            sleepImpl: async () => {
+              const root = process.env.LINEAR_BACKOFF_STATE_DIR;
+              const scope = join(root, fs.readdirSync(root)[0]);
+              const resetAt = clock + 5000;
+              fs.writeFileSync(
+                join(scope, `${resetAt}-abcd.json`),
+                JSON.stringify({ schema: 1, resetAt }),
+                { mode: 0o600 }
+              );
+            },
+          }
+        ),
+        (/** @type {any} */ error) => isLimited(error) && error.attempts === 0
+      );
+      assert.equal(calls, 1);
+    });
+  });
+
+  it('fails closed if cooldown publication fails after a 429', async () => {
+    await withKey('write-failure-secret', async () => {
+      let calls = 0;
+      await assert.rejects(
+        graphql(
+          query,
+          {},
+          {
+            fetchImpl: async () => {
+              calls++;
+              const root = process.env.LINEAR_BACKOFF_STATE_DIR;
+              const scope = join(root, fs.readdirSync(root)[0]);
+              fs.rmdirSync(scope);
+              fs.writeFileSync(scope, 'blocked', { mode: 0o600 });
+              return limited();
+            },
+          }
+        ),
+        (/** @type {any} */ error) => error.code === 'BACKOFF_STATE_INVALID'
+      );
+      assert.equal(calls, 1);
+      await assert.rejects(
+        graphql(
+          query,
+          {},
+          {
+            fetchImpl: async () => {
+              calls++;
+              return limited();
+            },
+          }
+        ),
+        (/** @type {any} */ error) => error.code === 'BACKOFF_STATE_INVALID'
+      );
+      assert.equal(calls, 1);
+    });
+  });
+
+  it('retains truthful incomplete pagination when the next page hits a durable cooldown', async () => {
+    await withKey('partial-secret', async () => {
+      let pages = 0;
+      await assert.rejects(
+        linear.collectLinearConnectionPages(async () => {
+          if (++pages === 1)
+            return {
+              nodes: [{ id: 'one' }],
+              pageInfo: { hasNextPage: true, endCursor: 'page-one' },
+            };
+          return graphql(
+            query,
+            {},
+            { rateLimitMaxAttempts: 1, fetchImpl: async () => limited() }
+          );
+        }),
+        (/** @type {any} */ error) =>
+          error.code === 'PAGE_FETCH_FAILED' &&
+          error.coverage.complete === false &&
+          error.coverage.pages === 1 &&
+          error.coverage.scanned === 1 &&
+          error.coverage.endCursor === 'page-one' &&
+          Number.isSafeInteger(error.resetAt)
+      );
+    });
   });
 });

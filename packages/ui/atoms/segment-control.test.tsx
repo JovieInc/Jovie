@@ -448,6 +448,23 @@ describe('SegmentControl', () => {
         'whitespace-nowrap'
       );
     });
+
+    it('allows flexed triggers to shrink within narrow controls', () => {
+      render(
+        <SegmentControl
+          value='audience'
+          onValueChange={vi.fn()}
+          options={[
+            { value: 'audience', label: 'Audience engagement overview' },
+            { value: 'sources', label: 'Acquisition sources' },
+          ]}
+        />
+      );
+
+      expect(
+        screen.getByRole('tab', { name: 'Audience engagement overview' })
+      ).toHaveClass('min-w-0');
+    });
   });
 
   describe('Accessibility', () => {

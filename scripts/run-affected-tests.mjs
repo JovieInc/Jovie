@@ -534,6 +534,8 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/symphony/config/model-registry.json',
   'scripts/symphony/closure_health.py',
   'scripts/symphony/gem-disk-reclaim.py',
+  'scripts/symphony/gem-symphony-workspace-boot-simulate',
+  'scripts/symphony/gem-workspace-migrate.py',
   'scripts/symphony/gem-pr-drain.py',
   'scripts/symphony/gem-ops-hud.py',
   'scripts/symphony/gem-priority-gate.py',
@@ -542,15 +544,20 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/symphony/gem_repo_registry.py',
   'scripts/symphony/gem_rehabilitation_policy.py',
   'scripts/symphony/install-gem-fleet-controller.sh',
+  'scripts/symphony/install-gem-symphony-storage.sh',
   'scripts/symphony/install-gem-pr-rehabilitation.sh',
   'scripts/symphony/install-symphony-ui-pilot.sh',
   'scripts/symphony/model-router.py',
+  'scripts/symphony/jovie-symphony-workspace',
+  'scripts/symphony/jovie-symphony-workspace-create',
   'scripts/symphony/symphony-reconciler.py',
   'scripts/symphony/systemd/gem-disk-reclaim.service',
   'scripts/symphony/systemd/gem-disk-reclaim.timer',
   'scripts/symphony/systemd/gem-pr-drain.service',
   'scripts/symphony/systemd/gem-pr-drain.timer',
   'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
   'scripts/symphony/tests/gem-pr-drain.test.py',
   'scripts/symphony/tests/gem-ops-hud.test.py',
   'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
@@ -570,6 +577,8 @@ const GEM_PR_REHABILITATION_LANE = new Set([
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/symphony/tests/closure-health.test.py',
   'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
   'scripts/symphony/tests/gem-priority-gate.test.py',
   'scripts/symphony/tests/gem-pr-drain.test.py',
   'scripts/symphony/tests/gem-ops-hud.test.py',
@@ -602,6 +611,39 @@ const GEM_CHECKIN_HUD_LANE = new Set([
 const GEM_CHECKIN_HUD_PYTHON_TESTS = [
   'scripts/symphony/tests/gem-checkin-hud.test.py',
   'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+];
+const GEM_STORAGE_PRIMARY_INPUTS = new Set([
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/gem-symphony-workspace-boot-simulate',
+  'scripts/symphony/gem-workspace-migrate.py',
+  'scripts/symphony/install-gem-symphony-storage.sh',
+  'scripts/symphony/jovie-symphony-workspace',
+  'scripts/symphony/jovie-symphony-workspace-create',
+  'scripts/symphony/symphony_official_runtime.py',
+  'scripts/symphony/systemd/gem-disk-reclaim.service',
+]);
+const GEM_STORAGE_LANE = new Set([
+  ...GEM_STORAGE_PRIMARY_INPUTS,
+  '.github/workflows/ci.yml',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
+  'scripts/tests/test_openai_symphony_install.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+]);
+const GEM_STORAGE_PYTHON_TESTS = [
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
+];
+const GEM_STORAGE_PYTEST_TESTS = [
+  'scripts/tests/test_openai_symphony_install.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
 ];
 const SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS = new Set([
   'scripts/symphony/symphony-codex-exhausted.py',
@@ -1114,6 +1156,24 @@ export function buildAffectedTestPlan(
       pythonTests: [],
       pythonUnittestTests: GEM_CHECKIN_HUD_PYTHON_TESTS,
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [],
+    };
+  }
+  const isBoundedGemStorageChange =
+    files.some(file => GEM_STORAGE_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => GEM_STORAGE_LANE.has(file));
+  if (isBoundedGemStorageChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: GEM_STORAGE_PYTEST_TESTS,
+      pythonUnittestTests: GEM_STORAGE_PYTHON_TESTS,
+      scriptVitestTests: [
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
       nodeTests: [],
     };
   }

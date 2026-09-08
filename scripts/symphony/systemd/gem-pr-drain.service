@@ -13,4 +13,5 @@ Environment=GEM_MODEL_REGISTRY=%h/gem-workspace/config/model-registry.json
 Environment=GEM_GROK_EXECUTABLE=%h/.grok/bin/grok
 Environment=GEM_MODEL_PROBE_EXECUTABLE_TIMEOUT=5
 Environment=GEM_MODEL_PROBE_TOTAL_TIMEOUT=15
+EnvironmentFile=-%h/.config/symphony/summer-bottleneck.env
 ExecStart=/usr/bin/flock -n /tmp/gem-pr-drain.lock /usr/bin/python3 %h/gem-workspace/scripts/gem-repo-drain-cycle.py

@@ -164,6 +164,11 @@ check_one() {
   return "$rc"
 }
 
+check_provider_runtime() {
+  python3 "$REPO_ROOT/scripts/symphony/provider_runtime_promotion.py" \
+    "$REPO_ROOT" "$TARGET_HOME" "$STATE_DIR" 0 0 0 1
+}
+
 check_workflow() {
   local src="$1" dst="$2"
   if [ ! -f "$dst" ]; then
@@ -181,14 +186,14 @@ def normalized(path):
     if len(matches) != 1:
         return None
     value = int(matches[0][1])
-    if not 1 <= value <= 8:
+    if value < 1:
         return None
     return pattern.sub(r"\g<1>__RUNTIME_OVERLAY__\g<3>", text)
 
 raise SystemExit(0 if normalized(sys.argv[1]) == normalized(sys.argv[2]) else 1)
 PY
   then
-    echo "OK $dst (bounded max_concurrent_agents overlay accepted)"
+    echo "OK $dst (adaptive max_concurrent_agents overlay accepted)"
   else
     echo "DRIFT $dst"
     return 1
@@ -437,11 +442,15 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   check_workflow "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
   check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
-  check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
   check_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" || rc=1
-  check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
-  check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
-  check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
+  if [ -L "$STATE_DIR/provider-generations/current" ]; then
+    check_provider_runtime || rc=1
+  else
+    check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
+    check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
+    check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
+    check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
+  fi
   check_one "$SAFE_RESTART_SRC" "$SAFE_RESTART_DST" || rc=1
   check_one "$FROZEN_TRANSITION_SRC" "$FROZEN_TRANSITION_DST" || rc=1
   exit "$rc"

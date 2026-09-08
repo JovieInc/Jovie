@@ -35,25 +35,27 @@ const PRODUCER_KEY_ID = 'jovie-production-2026-09';
 function snapshot(
   overrides: {
     eventId?: string;
+    observedAt?: string;
     sourceVersion?: string;
     closure?: Record<string, unknown>;
     queue?: Record<string, unknown>;
     release?: Record<string, unknown>;
     runner?: Record<string, unknown>;
-    ciAudit?: Record<string, unknown>;
+    ciAudit?: Record<string, unknown> | null;
   } = {}
 ) {
   const source = overrides.sourceVersion ?? SOURCE;
+  const observedAt = overrides.observedAt ?? NOW.toISOString();
   const body = {
     schema: 'jovie.eve.summer-bottleneck-snapshot/v1',
     eventId: overrides.eventId ?? 'evt_bottleneck_0001',
-    observedAt: NOW.toISOString(),
+    observedAt,
     sourceVersion: source,
     signals: {
       closure: {
         schema: 'jovie.eve.summer-closure-projection/v1',
         sourceSchema: 'jovie-closure-health/v1',
-        observedAt: NOW.toISOString(),
+        observedAt,
         sourceDigest: '1'.repeat(64),
         sourceRevision: source,
         status: 'healthy',
@@ -64,7 +66,7 @@ function snapshot(
       queue: {
         schema: 'jovie.eve.summer-queue-projection/v1',
         sourceSchema: 'github-merge-queue-entry/v1',
-        observedAt: NOW.toISOString(),
+        observedAt,
         sourceDigest: '2'.repeat(64),
         sourceRevision: source,
         blockedSince: null,
@@ -75,7 +77,7 @@ function snapshot(
       release: {
         schema: 'jovie.eve.summer-release-projection/v1',
         sourceSchema: 'jovie-controller-snapshot/v1',
-        observedAt: NOW.toISOString(),
+        observedAt,
         sourceDigest: '3'.repeat(64),
         sourceRevision: source,
         blockedSince: '2026-09-02T07:00:00.000Z',
@@ -86,18 +88,30 @@ function snapshot(
       },
       runner: {
         schema: 'jovie.eve.summer-runner-projection/v1',
-        sourceSchema: 'symphony-lease-guard-report/v1',
-        observedAt: NOW.toISOString(),
+        sourceSchema: 'symphony-runner-projection/v1',
+        observedAt,
         sourceDigest: '4'.repeat(64),
         sourceRevision: source,
         blockedSince: null,
+        capacitySource: {
+          schema: 'symphony-lease-guard-report/v1',
+          observedAt,
+          sourceDigest: '6'.repeat(64),
+          sourceRevision: source,
+        },
+        workSource: {
+          schema: 'symphony-runtime-state/v1',
+          observedAt,
+          sourceDigest: '7'.repeat(64),
+          sourceRevision: source,
+        },
         capacityAvailable: 2,
         queuedWork: 0,
         ...overrides.runner,
       },
       ciAudit: {
         schema: 'jovie-ci-bottleneck-audit/v1',
-        observedAt: NOW.toISOString(),
+        observedAt,
         sourceDigest: '5'.repeat(64),
         sourceRevision: source,
         classes: [
@@ -150,14 +164,18 @@ function snapshot(
             handle: 'audit:affected-only-units',
           },
         ],
-        ...overrides.ciAudit,
+        ...(overrides.ciAudit ?? {}),
       },
     },
   };
+  const signedBody =
+    overrides.ciAudit === null
+      ? { ...body, signals: { ...body.signals, ciAudit: null } }
+      : body;
   return {
-    ...body,
+    ...signedBody,
     producerAttestation: signSummerBottleneckProducerAttestation(
-      body,
+      signedBody,
       PRODUCER_PRIVATE_KEY,
       PRODUCER_KEY_ID
     ),
@@ -288,6 +306,54 @@ describe('Summer bottleneck loop', () => {
         .filter(item => summerCiImprovementClassIds.some(id => id === item.id))
         .every(item => item.inEnvelope)
     ).toBe(true);
+  });
+
+  it.each([
+    { capacityAvailable: 0, queuedWork: null },
+    { capacityAvailable: null, queuedWork: 1 },
+  ])('does not infer runner starvation from an unknown runner signal: %o', runner => {
+    const ranking = rankSummerBottlenecks(
+      snapshot({
+        runner: {
+          ...runner,
+          blockedSince: '2026-09-02T04:00:00.000Z',
+        },
+      }),
+      NOW
+    );
+
+    expect(ranking.map(item => item.id)).not.toContain(
+      'runner-capacity-starvation'
+    );
+  });
+
+  it('suppresses CI and runner repair when their source authorities are unknown', () => {
+    const ranking = rankSummerBottlenecks(
+      snapshot({
+        ciAudit: null,
+        runner: {
+          sourceRevision: null,
+          queuedWork: null,
+          blockedSince: '2026-09-02T04:00:00.000Z',
+          workSource: {
+            schema: 'symphony-runtime-state/v1',
+            observedAt: NOW.toISOString(),
+            sourceDigest: '7'.repeat(64),
+            sourceRevision: null,
+          },
+        },
+      }),
+      NOW
+    );
+
+    expect(ranking.map(item => item.id)).not.toContain(
+      'runner-capacity-starvation'
+    );
+    expect(
+      ranking.filter(item =>
+        summerCiImprovementClassIds.some(id => id === item.id)
+      )
+    ).toEqual([]);
   });
 
   it.each(
@@ -472,20 +538,36 @@ describe('Summer bottleneck loop', () => {
     expect(restarted.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
   });
 
-  it('is a cheap no-op on an unchanged later cadence', async () => {
-    const proof = harness();
-    await ingestSummerBottleneckSnapshot(snapshot(), proof.dependencies);
+  it('dispatches once when only freshness metadata changes on a later cadence', async () => {
+    const shared = memoryStore();
+    const first = harness(shared);
+    await ingestSummerBottleneckSnapshot(snapshot(), first.dependencies);
+    const later = new Date(NOW.getTime() + 60_000);
+    const second = harness(shared, { now: () => later });
+    const replay = await ingestSummerBottleneckSnapshot(
+      snapshot({ observedAt: later.toISOString() }),
+      second.dependencies
+    );
     const unchanged = await ingestSummerBottleneckSnapshot(
-      snapshot({ eventId: 'evt_bottleneck_0002' }),
-      proof.dependencies
+      snapshot({
+        eventId: 'evt_bottleneck_0002',
+        observedAt: later.toISOString(),
+      }),
+      second.dependencies
     );
 
+    expect(replay).toMatchObject({
+      decision: 'duplicate-replay-rejected',
+      terminal: true,
+    });
     expect(unchanged).toMatchObject({
       decision: 'unchanged-noop',
       terminal: true,
     });
-    expect(proof.dispatchToSymphony).toHaveBeenCalledTimes(1);
-    expect(proof.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
+    expect(first.dispatchToSymphony).toHaveBeenCalledTimes(1);
+    expect(second.dispatchToSymphony).not.toHaveBeenCalled();
+    expect(first.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
+    expect(second.observeSymphonyOutcome).not.toHaveBeenCalled();
   });
 
   it('holds and escalates an out-of-envelope top bottleneck without dispatch', async () => {

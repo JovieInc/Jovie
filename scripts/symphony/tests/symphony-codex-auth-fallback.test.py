@@ -416,6 +416,8 @@ class FallbackTests(unittest.TestCase):
             "SYMPHONY_OPEN_PR_INDEX": "empty",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
+            "SYMPHONY_PROVIDER_CAPACITY_STATE": str(self.root / "provider-capacity.json"),
+            "SYMPHONY_GROK_OBSERVED_CAPACITY": "4",
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
@@ -451,6 +453,8 @@ class FallbackTests(unittest.TestCase):
             "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
+            "SYMPHONY_PROVIDER_CAPACITY_STATE": str(self.root / "provider-capacity.json"),
+            "SYMPHONY_GROK_OBSERVED_CAPACITY": "4",
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
@@ -478,6 +482,11 @@ class FallbackTests(unittest.TestCase):
             "SYMPHONY_FALLBACK_RECEIPT_DIR": str(self.root / "fallback-receipts"),
         })
         env.update({key: str(value) for key, value in overrides.items()})
+        if (
+            "SYMPHONY_GROK_MAX" in overrides
+            and "SYMPHONY_GROK_OBSERVED_CAPACITY" not in overrides
+        ):
+            env.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
         return env
 
     def command(self, name, body):
@@ -1618,7 +1627,7 @@ PY
             self.assertIsNone(module._linear_identifiers())
         self.assertEqual(len(LinearHandler.requests), 2)
 
-    def test_grok_limit_autoscales_from_live_oauth_seats_not_codex(self):
+    def test_grok_capacity_is_provider_local_and_has_no_fixed_ceiling(self):
         module = self.load_controller_module()
         with tempfile.TemporaryDirectory() as tmp:
             home = pathlib.Path(tmp)
@@ -1645,8 +1654,8 @@ PY
             with mock.patch.object(module.pathlib.Path, "home", return_value=home):
                 with mock.patch.dict(os.environ):
                     os.environ.pop("SYMPHONY_GROK_MAX", None)
-                    self.assertEqual(module._live_oauth_seats(), 2)
-                    self.assertEqual(module._grok_limit(), 4)
+                    os.environ.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
+                    self.assertEqual(module._grok_limit(), 1)
                 extra = {
                     f"https://auth.x.ai::{index}": {
                         "auth_mode": "oidc",
@@ -1658,17 +1667,23 @@ PY
                 (grok / "auth.json").write_text(json.dumps(extra), encoding="utf-8")
                 with mock.patch.dict(os.environ):
                     os.environ.pop("SYMPHONY_GROK_MAX", None)
-                    self.assertEqual(module._live_oauth_seats(), 7)
-                    self.assertEqual(module._grok_limit(), 7)
-                with mock.patch.dict(os.environ, {"SYMPHONY_GROK_MAX": "0"}):
-                    self.assertEqual(module._grok_limit(), 0)
+                    os.environ.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
+                    self.assertEqual(module._grok_limit(), 6)
+                with mock.patch.dict(
+                    os.environ, {"SYMPHONY_GROK_OBSERVED_CAPACITY": "25"}
+                ):
+                    self.assertEqual(module._grok_limit(), 25)
 
-    def test_default_grok_limit_and_only_machine_labels_gate_admission(self):
+    def test_no_fixed_provider_ceiling_and_only_machine_labels_gate_admission(self):
         module = self.load_controller_module()
-        self.assertEqual(module.DEFAULT_GROK_MAX, 4)
-        self.assertEqual(module.MAX_GROK_MAX, 10)
-        self.assertEqual(module.DEFAULT_KIMI_MAX, 4)
-        self.assertEqual(module.MAX_KIMI_MAX, 10)
+        for name in (
+            "DEFAULT_GROK_MAX", "MAX_GROK_MAX", "DEFAULT_KIMI_MAX", "MAX_KIMI_MAX"
+        ):
+            self.assertFalse(hasattr(module, name))
+        with mock.patch.dict(
+            os.environ, {"SYMPHONY_CURSOR_OBSERVED_CAPACITY": "40"}
+        ):
+            self.assertEqual(module._provider_measured_capacity("cursor"), 40)
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("no-symphony", module.BLOCKED_ADMISSION_LABELS)
         for label in ("held", "manual-incident"):
@@ -1959,6 +1974,7 @@ PY
                 "SYMPHONY_KIMI_MAX": "8",
                 "GEM_KIMI_EXECUTABLE": str(kimi),
                 "GEM_GROK_EXECUTABLE": "/missing",
+                "SYMPHONY_GROK_OBSERVED_CAPACITY": "8",
             },
             clear=False,
         ):
@@ -3450,11 +3466,40 @@ PY
         self.assertTrue(created.exists())
 
     def test_grok_ship_one_retries_cursor_model_flag_when_grok_46_rejected(self):
-        """Live JOV-5220: cursor argv uses --model grok-4.6, not -m."""
+        """Cursor executes through the generic worker while its shared issue lease is held."""
         created = self.root / "pr-created"
+        self.command(
+            "flock",
+            """
+            /usr/bin/python3 - <<'PY'
+import fcntl
+
+fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+PY
+            """,
+        )
+        self.command(
+            "assert-lease-held",
+            """
+            /usr/bin/python3 - "$SYMPHONY_FALLBACK_LEASE_DIR/JOV-7.lock" "$GEM_EVENTS" <<'PY'
+import fcntl
+import pathlib
+import sys
+
+with pathlib.Path(sys.argv[1]).open("a+") as candidate:
+    try:
+        fcntl.flock(candidate, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        pathlib.Path(sys.argv[2]).open("a").write("cursor shared lease held\\n")
+    else:
+        raise SystemExit("cursor ran without the shared issue lease")
+PY
+            """,
+        )
         self.command(
             "cursor-agent",
             'printf "cursor %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'assert-lease-held\n'
             'case " $* " in\n'
             '  *" --model grok-4.6 "*)\n'
             '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
@@ -3523,6 +3568,7 @@ PY
         events = self.events.read_text()
         self.assertIn("--model grok-4.6", events)
         self.assertIn("--model cursor-grok-4.6-high-fast", events)
+        self.assertEqual(events.count("cursor shared lease held"), 2)
         self.assertTrue(created.exists())
 
     def test_grok_ship_one_changelog_strip_failure_still_invokes_grok(self):
@@ -4281,6 +4327,11 @@ class FallbackLockGcTests(unittest.TestCase):
                 self.module,
                 "_issue_meta",
                 return_value=(True, "admitted", {"issue_revision": "2026-08-22T00:00:00Z"}),
+            ),
+            mock.patch.object(
+                self.module,
+                "_provider_measured_capacity",
+                side_effect=lambda provider: 1 if provider == "grok" else 0,
             ),
             mock.patch.object(
                 self.module, "_control", side_effect=lambda command: launches.append(command) or True

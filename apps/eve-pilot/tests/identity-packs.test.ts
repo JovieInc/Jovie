@@ -37,6 +37,15 @@ describe('eve identity instruction packs', () => {
     expect(() => turn.require('symphony-heal')).toThrow(
       EvePilotCapabilityDeniedError
     );
+    expect(() => turn.require('governor-admit')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
+    expect(() => turn.require('governor-route')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
+    expect(() => turn.require('governor-enforce')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
   });
 
@@ -59,21 +68,36 @@ describe('eve identity instruction packs', () => {
       'Photon and all external-recipient messaging are disabled'
     );
     expect(turn.instructions).toContain('Do not speak as Ovie or Jovie');
+    expect(turn.instructions).toContain(
+      'Governor path (admit, route, enforce)'
+    );
+    expect(() => turn.require('governor-admit')).not.toThrow();
+    expect(() => turn.require('governor-route')).not.toThrow();
+    expect(() => turn.require('governor-enforce')).not.toThrow();
     expect(() => turn.require('privileged-gbrain-write')).toThrow(
       EvePilotCapabilityDeniedError
     );
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
   });
 
-  it('binds a read-only Summer shadow only through the explicit Ovie route', () => {
+  it('keeps the Summer shadow route read-only while the Summer pack has the governor path', () => {
     const turn = eveIdentityForChannel('ovie-summer-shadow');
     expect(turn.pack).toMatchObject({
       id: 'summer',
       role: 'company-operator',
       canIngestAck: false,
       canReadGbrain: false,
+      canGovernorAdmit: true,
+      canGovernorRoute: true,
+      canGovernorEnforce: true,
     });
     expect(turn.instructions).toContain('Read-only');
+    expect(turn.instructions).toContain(
+      'Governor path (admit, route, enforce)'
+    );
+    expect(() => turn.require('governor-admit')).not.toThrow();
+    expect(() => turn.require('governor-route')).not.toThrow();
+    expect(() => turn.require('governor-enforce')).not.toThrow();
     expect(() => turn.require('ingest-ack')).toThrow(
       EvePilotCapabilityDeniedError
     );

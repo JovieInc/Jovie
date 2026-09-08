@@ -330,21 +330,24 @@ const fleet = {
     };
     if (!raw || typeof raw !== 'object')
       return { healthy: false, reason: 'symphony-state-malformed' };
-    const observedAt = String(raw.observedAt || '');
+    // The official Symphony API uses snake_case while persisted policy
+    // receipts use camelCase. Accept both representations of the same
+    // timestamp so a healthy live controller is not rejected as malformed.
+    const observedAt = String(raw.observedAt || raw.generated_at || '');
     const observedMs = Date.parse(observedAt);
     if (!Number.isFinite(observedMs))
+      return { healthy: false, reason: 'symphony-state-malformed' };
+    if (
+      !Array.isArray(raw.running) ||
+      !Array.isArray(raw.retrying) ||
+      !Array.isArray(raw.blocked)
+    )
       return { healthy: false, reason: 'symphony-state-malformed' };
     const ageMs = now.getTime() - observedMs;
     if (ageMs < -30_000 || ageMs >= staleAfterMs)
       return { healthy: false, reason: 'symphony-state-stale' };
     const entries = key =>
-      new Set(
-        fleet.unique(
-          (Array.isArray(raw[key]) ? raw[key] : [])
-            .map(fleet.leaseId)
-            .filter(Boolean)
-        )
-      );
+      new Set(fleet.unique(raw[key].map(fleet.leaseId).filter(Boolean)));
     return {
       healthy: true,
       reason: null,

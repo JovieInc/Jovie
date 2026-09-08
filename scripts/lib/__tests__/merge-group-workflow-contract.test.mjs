@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -108,6 +109,36 @@ function getJobBlock(workflow, jobKey) {
     block.push(line);
   }
   return block.join('\n');
+}
+
+function getStepRunScript(jobBlock, stepName) {
+  const lines = jobBlock.split('\n');
+  const stepStart = lines.findIndex(
+    line => line === `      - name: ${stepName}`
+  );
+  expect(
+    stepStart,
+    `Missing workflow step: ${stepName}`
+  ).toBeGreaterThanOrEqual(0);
+  const stepEnd = lines.findIndex(
+    (line, index) => index > stepStart && /^      - /.test(line)
+  );
+  const stepLines = lines.slice(
+    stepStart,
+    stepEnd === -1 ? lines.length : stepEnd
+  );
+  const runStart = stepLines.findIndex(line => line === '        run: |');
+  expect(runStart, `Missing run block: ${stepName}`).toBeGreaterThanOrEqual(0);
+  return stepLines
+    .slice(runStart + 1)
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+}
+
+function materializeWorkflowDispatchScript(script) {
+  return script
+    .replaceAll('${{ github.event_name }}', 'workflow_dispatch')
+    .replace(/\$\{\{[^}]+\}\}/g, '');
 }
 
 function getMergeGroupReachableJobText(jobBlock) {
@@ -786,6 +817,59 @@ describe('merge_group workflow contract', () => {
     );
     expect(mergeGroupBranch).not.toMatch(
       /(?:DIFF_BASE|CHANGED_FILES|git fetch).*\${{ github\.base_ref }}/
+    );
+  });
+
+  it('materializes the path artifact before a manual dispatch exits', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectScript = materializeWorkflowDispatchScript(
+      getStepRunScript(pathChanges, 'Detect path changes for all job types')
+    );
+    const homepageVisualScript = getStepRunScript(
+      pathChanges,
+      'Select rendered homepage visual gate'
+    );
+    const testRoot = mkdtempSync(join(tmpdir(), 'manual-path-artifact-'));
+    const detectOutput = join(testRoot, 'detect-output');
+    const visualOutput = join(testRoot, 'visual-output');
+    const summary = join(testRoot, 'summary.md');
+    writeFileSync(detectOutput, '');
+    writeFileSync(visualOutput, '');
+    writeFileSync(summary, '');
+
+    const baseEnv = {
+      ...process.env,
+      GITHUB_RUN_ATTEMPT: '1',
+      GITHUB_RUN_ID: '123',
+      GITHUB_SHA: 'a'.repeat(40),
+      GITHUB_STEP_SUMMARY: summary,
+      RUNNER_TEMP: testRoot,
+    };
+    const detect = spawnSync('bash', ['-c', detectScript], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: { ...baseEnv, GITHUB_OUTPUT: detectOutput },
+    });
+    expect(detect.status, detect.stderr || detect.stdout).toBe(0);
+
+    const changedPaths = join(
+      testRoot,
+      'product-lane-classification',
+      'changed-paths.txt'
+    );
+    expect(existsSync(changedPaths)).toBe(true);
+    expect(readFileSync(changedPaths, 'utf8')).toContain(
+      '.github/workflows/ci.yml'
+    );
+
+    const visual = spawnSync('bash', ['-c', homepageVisualScript], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: { ...baseEnv, GITHUB_OUTPUT: visualOutput },
+    });
+    expect(visual.status, visual.stderr || visual.stdout).toBe(0);
+    expect(readFileSync(visualOutput, 'utf8')).toContain(
+      'run_homepage_visual=true'
     );
   });
 

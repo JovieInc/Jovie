@@ -154,6 +154,35 @@ class JovieOwnershipTests(unittest.TestCase):
         update_one.assert_not_called()
         remote.assert_not_called()
 
+    def test_revoked_local_admission_stops_before_inventory_or_mutation(self):
+        receipt = stale_capacity_receipt()
+        receipt["remediationAdmission"]["localAllowed"] = False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = pathlib.Path(tmp)
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(MODULE, "STATE", state),
+                mock.patch.object(MODULE, "ARTIFACT", state / "latest.json"),
+                mock.patch.object(MODULE, "POLICY_ENABLED", True),
+                mock.patch.object(MODULE, "evaluate_remediation_gate", return_value=receipt),
+                mock.patch.object(MODULE, "capacity", return_value=8),
+                mock.patch.object(MODULE, "inventory") as inventory,
+                mock.patch.object(MODULE, "update_one") as update_one,
+                mock.patch.object(MODULE, "run") as remote,
+                mock.patch.object(MODULE.sys, "argv", [str(SOURCE)]),
+                redirect_stdout(stdout),
+            ):
+                exit_code = MODULE.main()
+
+        document = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0, document)
+        self.assertEqual(document["remediation_admission"], "blocked")
+        self.assertEqual(document["selected"], [])
+        inventory.assert_not_called()
+        update_one.assert_not_called()
+        remote.assert_not_called()
+
     def test_closed_capacity_contract_rejects_mismatched_mutation(self):
         receipt = stale_capacity_receipt()
         validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")

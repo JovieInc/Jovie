@@ -14,6 +14,7 @@ import tempfile
 repo, home, state = (pathlib.Path(value).resolve() for value in sys.argv[1:4])
 rollback, dry_run = map(int, sys.argv[4:6])
 stage_only = int(sys.argv[6]) if len(sys.argv) > 6 else 0
+check_only = int(sys.argv[7]) if len(sys.argv) > 7 else 0
 root = state / "provider-generations"
 bin_dir = home / ".local/bin"
 names = {
@@ -27,6 +28,14 @@ current = root / "current"
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def launcher_text(generation):
+    entry = "#!/usr/bin/env bash\nset -euo pipefail\n"
+    for key, name in [("SYMPHONY_CODEX_ROUTER", "codex-router"),
+                      ("SYMPHONY_CODEX_ACCOUNT_PROBE", "codex-probe"),
+                      ("SYMPHONY_CURSOR_ADAPTER", "cursor-adapter")]:
+        entry += f"export {key}={shlex.quote(str(generation / name))}\n"
+    return entry + f"exec {shlex.quote(str(generation / 'agent-router'))} \"$@\"\n"
 
 def switch(target, destination):
     temporary = destination.with_name(destination.name + f".tmp.{os.getpid()}")
@@ -45,6 +54,8 @@ def verify(generation):
         path = generation / name
         if path.is_symlink() or not os.access(path, os.X_OK) or digest(path) != receipt["sha256"][name]:
             raise ValueError(f"provider generation hash/mode mismatch: {name}")
+    if (generation / "entry").read_text() != launcher_text(generation):
+        raise ValueError("provider generation launcher dependency mismatch")
     return receipt
 
 def stage(sources, prefix):
@@ -54,13 +65,7 @@ def stage(sources, prefix):
         (generation / name).chmod(0o755)
     # Embed the immutable directory: resolving the moving current symlink at
     # launch time could otherwise combine an old entry with new dependencies.
-    entry = "#!/usr/bin/env bash\nset -euo pipefail\n"
-    for key, name in [("SYMPHONY_CODEX_ROUTER", "codex-router"),
-                      ("SYMPHONY_CODEX_ACCOUNT_PROBE", "codex-probe"),
-                      ("SYMPHONY_CURSOR_ADAPTER", "cursor-adapter")]:
-        entry += f"export {key}={shlex.quote(str(generation / name))}\n"
-    entry += f"exec {shlex.quote(str(generation / 'agent-router'))} \"$@\"\n"
-    (generation / "entry").write_text(entry)
+    (generation / "entry").write_text(launcher_text(generation))
     (generation / "entry").chmod(0o755)
     receipt = {"schema": "symphony-provider-generation/v1", "sha256": {
         name: digest(generation / name) for name in [*names, "entry"]}}
@@ -92,6 +97,19 @@ try:
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (root / "promotion.lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
+        if check_only:
+            if not current.is_symlink():
+                raise ValueError("managed provider generation is not installed")
+            target = current.resolve(strict=True)
+            receipt = verify(target)
+            for name, source in sources.items():
+                if digest(source) != receipt["sha256"][name]:
+                    raise ValueError(f"provider generation source mismatch: {name}")
+            for alias in aliases:
+                if not alias.is_symlink() or alias.resolve(strict=True) != target / "entry":
+                    raise ValueError(f"provider alias readback mismatch: {alias.name}")
+            print("PROVIDER_OK " + json.dumps(receipt["sha256"], sort_keys=True))
+            raise SystemExit(0)
         if stage_only:
             target = stage(sources, "source-")
             print("PROVIDER_STAGED " + str(target))

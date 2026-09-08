@@ -9,7 +9,7 @@ from typing import Any
 
 SCHEMA = "jovie-fleet-gate/v1"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
-# Keep in sync with gem-priority-gate.MAX_GROK_MAX / symphony-codex-exhausted.MAX_GROK_MAX.
+# This incident-only guard is separate from provider-local adaptive capacity.
 UNBOUND_REPAIR_MAX_CONCURRENT_CEILING = 40
 PROMOTION_MODES = frozenset(
     {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
