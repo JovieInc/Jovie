@@ -2950,13 +2950,13 @@ def read_operator_context(*, now: datetime, service_state: str | None = None) ->
         try:
             if repair.get("active") is True:
                 unit = repair.get("unit")
-                if not isinstance(unit, str) or not re.fullmatch(r"symphony-pr-repair-[a-zA-Z0-9_-]+\.service", unit):
+                if not isinstance(unit, str) or not re.fullmatch(r"symphony-pr-(?:repair|qualification)-[a-zA-Z0-9_-]+\.service", unit):
                     continue
                 result = subprocess.run(["systemctl", "--user", "show", unit, "--property=ActiveState,MainPID,InvocationID"], capture_output=True, text=True, timeout=1, check=False)
                 live = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
                 if result.returncode or live.get("ActiveState") != "active" or _int(repair.get("pid")) in (None, 0) or live.get("MainPID") != str(repair["pid"]) or not repair.get("invocationId") or live.get("InvocationID") != repair["invocationId"]:
                     continue
-                context["external_summary"] = f"External repair active · {identity} · reported route {repair.get('route') or UNKNOWN}"
+                context["external_summary"] = f"External operator active · {identity} · reported route {repair.get('route') or UNKNOWN}"
             elif repair.get("status") == "completed-source-repair":
                 receipt = Path(str(repair.get("receiptPath") or "")).resolve()
                 receipt.relative_to((Path.home() / ".local/state/symphony-elixir").resolve())

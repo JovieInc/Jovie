@@ -531,7 +531,8 @@ class OperatorReceiptTests(unittest.TestCase):
         live = mock.Mock(returncode=0, stdout="ActiveState=active\nMainPID=42\nInvocationID=repair-id\n")
         self.packet["externalRepairs"] = [{**self.repair, "active": True, "pid": 42, "invocationId": "repair-id", "unit": "symphony-pr-repair-jov5552.service", "route": "Grok 4.6 operator"}]
         results = lambda: [mock.Mock(returncode=0, stdout="native-id"), live]
-        self.assertIn("External repair active", self.read(results())["external_summary"])
+        for unit in ("symphony-pr-repair-jov5552.service", "symphony-pr-qualification-jov5552-6dba.service"):
+            with mock.patch.dict(self.packet["externalRepairs"][0], {"unit": unit}): self.assertIn("External operator active", self.read(results())["external_summary"])
         for change in ({"pid": 0}, {"pid": 41}, {"invocationId": None}, {"invocationId": "old"}, {"unit": "unrelated.service"}, {"nativeWorker": True}):
             with mock.patch.dict(self.packet["externalRepairs"][0], change): self.assertNotIn("external_summary", self.read(results()))
         for response in (mock.Mock(returncode=0, stdout="ActiveState=inactive\nMainPID=0\n"), mock.Mock(returncode=1, stdout=""), OSError("unavailable")):
