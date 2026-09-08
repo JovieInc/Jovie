@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import {
   buildNativeQueuePolicyReadback,
   isPendingNativeCohortCutoverField,
+  isSupportedNativeBuildConcurrency,
   mergeNativeQueuePolicyObservations,
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
@@ -345,6 +346,7 @@ export function validateNativePreflightEvidence({
       Object.entries(NATIVE_QUEUE_POLICY).map(([field, expected]) => [
         `merge_queue ${field} must be ${expected}`,
         mergeQueue[field] === expected ||
+          isSupportedNativeBuildConcurrency(field, mergeQueue[field]) ||
           isPendingNativeCohortCutoverField(field),
       ])
     ),
@@ -375,7 +377,9 @@ export function validateNativePreflightEvidence({
   }
   const policyReadback = buildNativeQueuePolicyReadback(mergeQueue);
   const blockingDrift = policyReadback.drift.filter(
-    field => !isPendingNativeCohortCutoverField(field)
+    field =>
+      !isPendingNativeCohortCutoverField(field) &&
+      !isSupportedNativeBuildConcurrency(field, mergeQueue[field])
   );
   if (blockingDrift.length > 0) {
     errors.push(

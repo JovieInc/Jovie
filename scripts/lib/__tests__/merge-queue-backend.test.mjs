@@ -57,7 +57,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":2,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -81,7 +81,7 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   checkResponseTimeout: 1200,
-  maximumEntriesToBuild: 1,
+  maximumEntriesToBuild: 2,
   maximumEntriesToMerge: 5,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 5,
@@ -1568,6 +1568,93 @@ describe('native live preflight', () => {
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
   });
 
+  it.each([
+    1, 2,
+  ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
+    const result = validateNativePreflightEvidence({
+      ruleset: VALID_RULESET,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      liveQueueConfiguration: {
+        ...VALID_LIVE_QUEUE_CONFIGURATION,
+        maximumEntriesToBuild: buildCount,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.policyReadback.observed.max_entries_to_build).toBe(
+      buildCount
+    );
+    expect(result.policyReadback.matched).toBe(buildCount === 2);
+    expect(result.policyReadback.drift).toEqual(
+      buildCount === 1 ? ['max_entries_to_build'] : []
+    );
+  });
+
+  it.each([
+    0,
+    3,
+    100,
+    -1,
+    1.5,
+    '2',
+    null,
+    undefined,
+    true,
+  ])('rejects unqualified or malformed build count %s', buildCount => {
+    const ruleset = {
+      ...VALID_RULESET,
+      rules: VALID_RULESET.rules.map(rule =>
+        rule.type === 'merge_queue'
+          ? {
+              ...rule,
+              parameters: {
+                ...rule.parameters,
+                max_entries_to_build: buildCount,
+              },
+            }
+          : rule
+      ),
+    };
+    const result = validateNativePreflightEvidence({
+      ruleset,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain('max_entries_to_build');
+  });
+
+  it.each([
+    ['check_response_timeout_minutes', 21],
+    ['grouping_strategy', 'HEADGREEN'],
+    ['max_entries_to_merge', 6],
+  ])('still rejects %s drift while using rollback build concurrency', (field, value) => {
+    const result = validateNativePreflightEvidence({
+      ruleset: {
+        ...VALID_RULESET,
+        rules: VALID_RULESET.rules.map(rule =>
+          rule.type === 'merge_queue'
+            ? {
+                ...rule,
+                parameters: {
+                  ...rule.parameters,
+                  max_entries_to_build: 1,
+                  [field]: value,
+                },
+              }
+            : rule
+        ),
+      },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain(field);
+  });
+
   it('does not fail enroll preflight when GraphQL live max_entries_to_build matches the lock', () => {
     const staleRest = {
       ...VALID_RULESET,
@@ -1603,7 +1690,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 1 },
+      observed: { max_entries_to_build: 2 },
     });
   });
 
@@ -1616,7 +1703,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 1 },
+      observed: { max_entries_to_build: 2 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -1735,7 +1822,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 1 },
+        observed: { max_entries_to_build: 2 },
       },
     });
   });
