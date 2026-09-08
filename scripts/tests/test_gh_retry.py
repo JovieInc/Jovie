@@ -5375,6 +5375,7 @@ class TestNativeAdmissionReceiptReconciliation:
         *,
         receipt_main: str,
         checkpoint: str = "verified",
+        receipt_creator: str = "jovie-bot[bot]",
         receipt_at: str | None,
         enqueued_at: str | None = "2026-09-07T12:00:00Z",
         dequeue_response: str = '{"skipped":false,"state":{"queued":false}}',
@@ -5420,8 +5421,13 @@ class TestNativeAdmissionReceiptReconciliation:
         status_json = (
             '{"statuses":[]}'
             if receipt_at is None
-            else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint={checkpoint};main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
+            else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint={checkpoint};main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"{receipt_creator}"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
         )
+        plural_status_json = json.dumps([[], json.loads(status_json)["statuses"]])
+        combined_status = json.loads(status_json)
+        for receipt in combined_status["statuses"]:
+            receipt["creator"] = None
+        combined_status_json = json.dumps(combined_status)
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -5436,8 +5442,13 @@ class TestNativeAdmissionReceiptReconciliation:
                   echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
                   exit 0
                 fi
-                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
-                  echo '{status_json}'
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/statuses?per_page=100" ]]; then
+                  [[ " $* " == *" --paginate --slurp "* ]] || exit 2
+                  echo '{plural_status_json}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status" ]]; then
+                  echo '{combined_status_json}'
                   exit 0
                 fi
                 if [[ "$1" == "api" ]]; then exit 1; fi
@@ -5507,6 +5518,26 @@ class TestNativeAdmissionReceiptReconciliation:
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert dequeue_log.read_text(encoding="utf-8") == ""
         assert "=fresh exact-checkpoint native admission" in result.stdout
+
+    @pytest.mark.parametrize("receipt_creator", ["jovie-bot[bot]", "untrusted-bot[bot]"])
+    def test_plural_status_preserves_manual_admission_only_for_canonical_actor(
+        self, tmp_path: Path, receipt_creator: str
+    ) -> None:
+        # Production's combined endpoint omits creator. The paginated plural
+        # endpoint proves the author even when a manual run executes on main
+        # and admits a different PR head; unknown authors still fail closed.
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="a" * 40,
+            receipt_at="2026-09-07T12:00:02Z", receipt_creator=receipt_creator,
+        )
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert dequeue_log.read_text(encoding="utf-8").splitlines() == (
+            [] if receipt_creator == "jovie-bot[bot]" else ["1001"]
+        )
 
     def test_guarded_dequeue_skip_does_not_clear_the_queue_snapshot(
         self, tmp_path: Path

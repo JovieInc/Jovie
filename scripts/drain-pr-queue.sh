@@ -770,7 +770,10 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
 queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint-main] [enqueued-at]
   local n="$1" head="$2" expected_target="${3:-}" expected_main="${4:-}" enqueued_at="${5:-}" statuses latest
   [[ "$n" =~ ^[1-9][0-9]*$ && "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
-  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+  # The combined /status response omits creator even for authentic bot writes.
+  # Read plural statuses so manual/main-triggered admission retains its actual
+  # author instead of requiring the producer's main SHA to equal the PR SHA.
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/statuses?per_page=100" --paginate --slurp 2>/dev/null)"; then
     return 1
   fi
   latest="$(jq -c \
@@ -780,7 +783,7 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
     --arg expected_target "$expected_target" \
     --arg expected_main "$expected_main" \
     --arg enqueued_at "$enqueued_at" '
-    [ .statuses[]? | select(.context == $context) ]
+    [ .[][]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
     | . as $receipt
