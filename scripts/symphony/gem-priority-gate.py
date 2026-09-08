@@ -1393,16 +1393,21 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     hold_intake_allowed = (
         state == "AMBER"
-        and controller.get("status") == "green"
+        and review_allowed
         and main.get("status") == "green"
         and production.get("status") == "green"
-        and production_unbound
         and integrity.get("status") in {"clear", "resolved"}
-        and len(reasons) == 1
-        and reasons[0]["code"] == "production-deployment-unbound"
+        # Runtime containment and deployment lag hold runtime/intake authority,
+        # not independently qualified PRs. The native controller still checks
+        # each exact source head and required combined-head admission evidence.
+        and {reason["code"] for reason in reasons}
+        <= {"controller-failure", "production-deployment-unbound"}
     )
+    runtime_intake_hold = hold_intake_allowed and controller.get("status") == "failed"
     unbound_repair_allowed = (
         hold_intake_allowed
+        and controller.get("status") == "green"
+        and production_unbound
         and review_allowed
         and capacity_fresh
         and gem_concurrency >= 1
@@ -1449,31 +1454,24 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     ):
         promotion_mode = "draft-only"
     elif hold_intake_allowed:
+        # Empty-queue closure red is a FEED signal, not a stop. When the only
+        # runtime reasons are controller-failure and/or production SHA lag,
+        # this branch resumes qualified promotion. Do not mint hold-intake from
+        # a weaker fallback: consumers now require exact-main review and those
+        # bounded reasons, and a rejectable receipt fails the fleet projector.
         promotion_mode = "hold-intake"
     elif controller_repair_allowed:
         promotion_mode = "controller-repair-only"
-    elif (
-        state == "AMBER"
-        and main.get("status") == "green"
-        and production.get("status") == "green"
-        and integrity.get("status") in {"clear", "resolved"}
-        and closure_health.get("status") == "red"
-        and set(closure_health.get("reasons") or [])
-        <= {"native-queue-empty-with-eligible-over-15m"}
-    ):
-        # An empty native queue with eligible PRs waiting is a FEED signal,
-        # not a stop signal: blocking admission here deadlocks the loop
-        # (queue stays empty because admission is blocked; closure stays red
-        # because the queue is empty; controller then fails on queue-noop).
-        # Live 2026-09-03: 10+ mergeable PRs stranded with an empty queue.
-        # New-issue intake stays closed (closure red); only promotion of
-        # already-green work resumes.
-        promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
+    # The existing typed repair exception carries authority only when selected.
+    # A hold-intake receipt must not simultaneously advertise that exception.
+    controller_repair_allowed = (
+        controller_repair_allowed and promotion_mode == "controller-repair-only"
+    )
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed:
+    elif not closure_intake_allowed or runtime_intake_hold:
         # Existing validation/review work remains useful, but no new
         # implementation or fallback PR may begin while Summer holds intake
         # (JOV-INV-011). Capacity evidence no longer gates intake: missing
@@ -1507,7 +1505,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     # closure, so duplicate lanes cannot freeze Grok/Kimi remediations.
     remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
-    if not closure_intake_allowed:
+    if not closure_intake_allowed or runtime_intake_hold:
         cohort = {
             **cohort,
             "newIntakeAllowed": False,

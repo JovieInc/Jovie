@@ -39,9 +39,9 @@
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, controller-repair-only,
 #                         draft-only, hold-intake, deferred-release-only,
 #                         or blocked
-#   DRAIN_PRODUCTION_CHECKPOINT_STATE  verified when the exact current-main
-#     production checkpoint authorized admission; controller-repair-only uses
-#     its existing exact attestation instead
+#   Admission receipts bind source qualification to exact main/head; release
+#     verification is not ordinary merge authority. Scoped repair retains its
+#     existing exact attestation.
 #   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
@@ -298,6 +298,20 @@ case "$DRAIN_PROMOTION_MODE" in
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
       elif $mode == "hold-intake" then
+        (.reasons | type == "array" and length > 0) and
+        all(.reasons[]; .code | IN("controller-failure", "production-deployment-unbound")) and
+        (.signals.integrity.status | IN("clear", "resolved")) and
+        (.signals.controller.status | IN("green", "failed")) and
+        .reviewAdmission.allowed == true and
+        .reviewAdmission.required == true and
+        .reviewAdmission.authority == "Gem" and
+        .reviewAdmission.scope == "exact-main-head" and
+        .reviewAdmission.reviewer == "Gem" and
+        .reviewAdmission.reason == "fresh-exact-head-independent-review" and
+        (.reviewAdmission.reviewId | type == "string" and length > 0) and
+        (.reviewAdmission.observedAt | type == "string" and length > 0) and
+        (.signals.main.sha | test("^[0-9a-f]{40}$")) and
+        .reviewAdmission.headSha == .signals.main.sha and
         .state == "AMBER" and
         .signals.main.status == "green" and
         .signals.production.status == "green" and
@@ -329,7 +343,8 @@ case "$DRAIN_PROMOTION_MODE" in
         .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.promotionContinues == true and
         .closureAdmission.remediationContinues == true and
-        .alreadyAdmittedCohort.newIntakeAllowed == .closureAdmission.newIssueIntakeAllowed
+        (.alreadyAdmittedCohort.newIntakeAllowed | type == "boolean") and
+        (.alreadyAdmittedCohort.newIntakeAllowed == false or .closureAdmission.newIssueIntakeAllowed == true)
       elif $mode == "controller-repair-only" then
         .state == "AMBER" and
         .signals.main.status == "green" and
@@ -770,7 +785,10 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
 queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint-main] [enqueued-at]
   local n="$1" head="$2" expected_target="${3:-}" expected_main="${4:-}" enqueued_at="${5:-}" statuses latest
   [[ "$n" =~ ^[1-9][0-9]*$ && "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
-  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+  # The combined /status response omits creator even for authentic bot writes.
+  # Read plural statuses so manual/main-triggered admission retains its actual
+  # author instead of requiring the producer's main SHA to equal the PR SHA.
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/statuses?per_page=100" --paginate --slurp 2>/dev/null)"; then
     return 1
   fi
   latest="$(jq -c \
@@ -780,16 +798,26 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
     --arg expected_target "$expected_target" \
     --arg expected_main "$expected_main" \
     --arg enqueued_at "$enqueued_at" '
-    [ .statuses[]? | select(.context == $context) ]
-    | sort_by(.updated_at)
+    [ .[][]? | select(.context == $context) ]
+    | sort_by(.updated_at, (.id // 0))
     | last
     | . as $receipt
-    | ($receipt.description | capture("^checkpoint=(?<checkpoint>verified|controller-repair);main=(?<main>[0-9a-f]{40});pr=(?<pr>[1-9][0-9]*)$")) as $binding
+    | ($receipt.description | capture("^checkpoint=(?<checkpoint>verified|controller-repair|source-qualified);main=(?<main>[0-9a-f]{40});pr=(?<pr>[1-9][0-9]*)$")) as $binding
     | select(
         $receipt != null
         and $receipt.state == "success"
         and (($binding.pr | tonumber) == $pr)
-        and ($expected_main == "" or $binding.main == $expected_main)
+        # Native entries survive main advancing. Required Merge Group Admission
+        # proves ancestry before any merge. Do not dequeue a valid typed
+        # receipt (verified, controller-repair, or source-qualified) merely
+        # because its original base moved.
+        and (
+          $expected_main == ""
+          or $binding.main == $expected_main
+          or $binding.checkpoint == "source-qualified"
+          or $binding.checkpoint == "verified"
+          or $binding.checkpoint == "controller-repair"
+        )
         and ($receipt.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
         and ($expected_target == "" or $receipt.target_url == $expected_target)
         and (
@@ -828,11 +856,8 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
   fi
   if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
     checkpoint="controller-repair"
-  elif [[ "${DRAIN_PRODUCTION_CHECKPOINT_STATE:-}" == "verified" ]]; then
-    checkpoint="verified"
   else
-    echo "    !! refusing admission receipt for #$n without a verified production checkpoint" >&2
-    return 1
+    checkpoint="source-qualified"
   fi
   if [[ ! "${FLEET_POLICY_MAIN_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "    !! refusing admission receipt for #$n without an exact checkpoint main SHA" >&2
@@ -2050,17 +2075,16 @@ echo "$SNAP" | jq -r '
     "  non-main: " + ([.[] | select(main_target | not)] | length | tostring)
   ] | .[]'
 
-# Queue membership is not admission authority. When the exact production
-# checkpoint is verified, remove any native entry that cannot prove a fresh,
-# exact-head v2 receipt for that checkpoint. The same sole writer may then
+# Queue membership is not admission authority. Remove any native entry that
+# cannot prove a fresh exact-head v2 source receipt. Ancestry after main moves
+# is enforced by the required Merge Group Admission check. The same sole writer may then
 # re-enroll an otherwise eligible PR and persist new evidence after the new
 # AddedToMergeQueueEvent. Missing queue timestamps fail closed before mutation.
 if [[ "${DRAIN_RECONCILE_ADMISSION_RECEIPTS:-0}" == "1" ]]; then
   if [[ "$MERGE_QUEUE_BACKEND" != "native" \
     || "$DRAIN_PROMOTION_MODE" != "normal" \
-    || "${DRAIN_PRODUCTION_CHECKPOINT_STATE:-}" != "verified" \
     || ! "${FLEET_POLICY_MAIN_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "::error::Admission receipt reconciliation requires native normal mode and an exact verified checkpoint" >&2
+    echo "::error::Admission receipt reconciliation requires native normal mode and an exact current main SHA" >&2
     exit 1
   fi
   echo "=== DEQUEUE (unproven native admission -> canonical re-entry) ==="

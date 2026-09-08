@@ -342,6 +342,28 @@ def _project_review(value: object) -> dict[str, Any]:
     return projected
 
 
+def _validate_hold_intake_projection(projected: dict[str, Any]) -> None:
+    if projected["promotionMode"] != "hold-intake":
+        return
+    signals = projected["signals"]
+    reasons = {reason["code"] for reason in projected["reasons"]}
+    if not reasons or not reasons <= {"controller-failure", "production-deployment-unbound"}:
+        raise AdmissionProjectionError("hold-intake reasons are not bounded")
+    if (
+        projected["state"] != "AMBER"
+        or signals["main"]["status"] != "green"
+        or signals["production"]["status"] != "green"
+        or signals["integrity"]["status"] not in {"clear", "resolved"}
+        or signals.get("controller", {}).get("status") not in {"green", "failed"}
+        or projected["promotionAdmission"]["allowed"]
+        or projected["isolatedPromotionAdmission"]["allowed"]
+    ):
+        raise AdmissionProjectionError("hold-intake requires healthy source and clear integrity")
+    review = projected["reviewAdmission"]
+    if not review["allowed"] or review["headSha"] != signals["main"]["sha"]:
+        raise AdmissionProjectionError("hold-intake requires allowed exact-main review")
+
+
 def _validate_controller_repair_projection(projected: dict[str, Any]) -> None:
     repair = projected["controllerRepairAdmission"]
     if not repair["allowed"]:
@@ -462,9 +484,11 @@ def _project_cohort(value: object, promotion_mode: str, intake: bool) -> dict[st
             raise AdmissionProjectionError(
                 "hold-intake must preserve the admitted cohort"
             )
-        if new_intake is not intake:
+        # Runtime containment may impose a stricter intake hold than closure.
+        # A receipt can narrow authority, never bypass a closure intake hold.
+        if new_intake and not intake:
             raise AdmissionProjectionError(
-                "alreadyAdmittedCohort.newIntakeAllowed contradicts closure intake"
+                "alreadyAdmittedCohort.newIntakeAllowed bypasses closure intake"
             )
     projected: dict[str, Any] = {
         "preserve": preserve,
@@ -551,6 +575,7 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
         is not closure_admission["newIssueIntakeAllowed"]
     ):
         raise AdmissionProjectionError("closure signal and admission disagree")
+    _validate_hold_intake_projection(projected)
     _validate_controller_repair_projection(projected)
     _reject_inventories(projected, "admission")
     encoded = json.dumps(projected, separators=(",", ":"), sort_keys=True)

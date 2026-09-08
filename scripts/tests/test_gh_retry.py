@@ -82,6 +82,19 @@ def _summer_closure_admission(
     }
 
 
+def _hold_intake_evidence() -> dict[str, object]:
+    return {
+        "reasons": [{"code": "production-deployment-unbound"}],
+        "reviewAdmission": {
+            "allowed": True, "required": True, "authority": "Gem",
+            "scope": "exact-main-head", "headSha": "a" * 40,
+            "reviewer": "Gem", "reason": "fresh-exact-head-independent-review",
+            "reviewId": "test-exact-main-review",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+
 def _production_unbound_hold_receipt(
     *, closure_status: str = "healthy", intake_allowed: bool = True
 ) -> dict[str, object]:
@@ -89,6 +102,7 @@ def _production_unbound_hold_receipt(
         "schema": "jovie-fleet-gate/v1",
         "state": "AMBER",
         "promotionMode": "hold-intake",
+        **_hold_intake_evidence(),
         "observedAt": datetime.now(timezone.utc).isoformat(),
         "closureAdmission": _summer_closure_admission(
             intake_allowed=intake_allowed, status=closure_status
@@ -819,7 +833,7 @@ class TestNullCreatorQueueReceiptProvenance:
         assert logs["enroll"].read_text(encoding="utf-8").splitlines() == ["1001"]
         posted = logs["post"].read_text(encoding="utf-8")
         assert "context=jovie-queue-admission/v2" in posted
-        assert f"description=checkpoint=verified;main={'a' * 40};pr=1001" in posted
+        assert f"description=checkpoint=source-qualified;main={'a' * 40};pr=1001" in posted
         assert "target_url=https://github.com/JovieInc/Jovie/actions/runs/77" in posted
 
     def test_reentry_rejects_a_receipt_written_by_another_bot(
@@ -1941,7 +1955,10 @@ class TestDrainPrQueueWiring:
             ("malformed", "success", "verified", 1, "1"),
             ("failure", "failure", "verified", 1, "1"),
             ("valid", "success", "verified", 0, "0"),
-            ("valid", "success", "unavailable", 1, "1"),
+            ("valid", "success", "unavailable", 0, "0"),
+            ("valid", "success", "none", 0, "0"),
+            ("source-failure", "success", "none", 3, "0"),
+            ("pending", "success", "none", 0, "0"),
             ("pending", "success", "verified", 0, "0"),
             ("malformed-pending", "success", "verified", 1, "1"),
         ],
@@ -1955,11 +1972,15 @@ class TestDrainPrQueueWiring:
         expected_returncode: int,
         expected_dequeues: str,
     ) -> None:
+        real_node = shutil.which("node")
+        assert real_node is not None
         head = "a" * 40
         dequeue_calls = tmp_path / "dequeue-calls"
         dequeue_calls.write_text("0", encoding="utf-8")
         status_posts = tmp_path / "status-posts"
         status_posts.write_text("", encoding="utf-8")
+        enroll_calls = tmp_path / "enroll-calls"
+        enroll_calls.write_text("", encoding="utf-8")
         fake_node = tmp_path / "node"
         fake_node.write_text(
             textwrap.dedent(
@@ -1971,6 +1992,7 @@ class TestDrainPrQueueWiring:
                   preflight) exit 0 ;;
                   list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll)
+                    echo enroll >>"{enroll_calls}"
                     if [[ "${{FAKE_ENROLL_MODE:?}}" == "failure" ]]; then
                       exit 1
                     fi
@@ -2002,7 +2024,9 @@ class TestDrainPrQueueWiring:
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
-                  --classify-queue) echo '[]' ;;
+                  --classify-queue) "{real_node}" "$@" ;;
+                  explain-selector) "{real_node}" "$@" ;;
+                  prove-receipt) echo '{{"ok":false,"explanation":{{"reason":"not-queued"}},"state":{{"queued":false}}}}' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
                 """
@@ -2021,6 +2045,10 @@ class TestDrainPrQueueWiring:
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
+                  if [[ "${{FAKE_ENROLL_MODE:?}}" == "source-failure" ]]; then
+                    echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}}]'
+                    exit 0
+                  fi
                   echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
@@ -2065,23 +2093,25 @@ class TestDrainPrQueueWiring:
             f"stdout={result.stdout}\nstderr={result.stderr}"
         )
         assert dequeue_calls.read_text(encoding="utf-8").strip() == expected_dequeues
-        if enroll_mode == "valid" and checkpoint_state == "verified":
+        if enroll_mode == "valid":
             assert "+native-queue on #101" in result.stdout
             assert "state AWAITING_CHECKS, position 3" in result.stdout
         elif enroll_mode == "pending":
             assert "+auto-merge intent on #101" in result.stdout
             assert "+native-queue on #101" not in result.stdout
             assert status_posts.read_text(encoding="utf-8") == ""
+        elif enroll_mode == "source-failure":
+            assert enroll_calls.read_text(encoding="utf-8") == ""
+            assert status_posts.read_text(encoding="utf-8") == ""
+            assert "+native-queue" not in result.stdout
         else:
             assert "native enrollment" in result.stderr
         if dequeue_mode == "failure":
             assert "CRITICAL: could not compensate unproven" in result.stderr
-        if enroll_mode == "valid" and checkpoint_state == "verified":
+        if enroll_mode == "valid":
             posted = status_posts.read_text(encoding="utf-8")
             assert "context=jovie-queue-admission/v2" in posted
-            assert f"description=checkpoint=verified;main={'a' * 40};pr=101" in posted
-        if enroll_mode == "valid" and checkpoint_state != "verified":
-            assert "without a verified production checkpoint" in result.stderr
+            assert f"description=checkpoint=source-qualified;main={'a' * 40};pr=101" in posted
 
     def test_composite_ci_reentry_recovers_only_bounded_exact_bot_receipts(
         self, tmp_path: Path
@@ -2969,6 +2999,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3058,6 +3089,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3147,6 +3179,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3236,6 +3269,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3795,6 +3829,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3889,6 +3924,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -4038,6 +4074,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -5358,6 +5395,9 @@ class TestNativeAdmissionReceiptReconciliation:
         tmp_path: Path,
         *,
         receipt_main: str,
+        checkpoint: str = "verified",
+        receipt_creator: str = "jovie-bot[bot]",
+        older_receipt_creator: str | None = None,
         receipt_at: str | None,
         enqueued_at: str | None = "2026-09-07T12:00:00Z",
         dequeue_response: str = '{"skipped":false,"state":{"queued":false}}',
@@ -5403,8 +5443,20 @@ class TestNativeAdmissionReceiptReconciliation:
         status_json = (
             '{"statuses":[]}'
             if receipt_at is None
-            else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint=verified;main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
+            else f'{{"statuses":[{{"context":"jovie-queue-admission/v2","state":"success","description":"checkpoint={checkpoint};main={receipt_main};pr=1001","creator":{{"type":"Bot","login":"{receipt_creator}"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{receipt_at}"}}]}}'
         )
+        plural_statuses = json.loads(status_json)["statuses"]
+        if older_receipt_creator is not None:
+            plural_statuses[0]["id"] = 2
+            older = json.loads(json.dumps(plural_statuses[0]))
+            older["id"] = 1
+            older["creator"]["login"] = older_receipt_creator
+            plural_statuses.append(older)
+        plural_status_json = json.dumps([[], plural_statuses])
+        combined_status = json.loads(status_json)
+        for receipt in combined_status["statuses"]:
+            receipt["creator"] = None
+        combined_status_json = json.dumps(combined_status)
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -5419,8 +5471,13 @@ class TestNativeAdmissionReceiptReconciliation:
                   echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
                   exit 0
                 fi
-                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
-                  echo '{status_json}'
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/statuses?per_page=100" ]]; then
+                  [[ " $* " == *" --paginate --slurp "* ]] || exit 2
+                  echo '{plural_status_json}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status" ]]; then
+                  echo '{combined_status_json}'
                   exit 0
                 fi
                 if [[ "$1" == "api" ]]; then exit 1; fi
@@ -5438,7 +5495,7 @@ class TestNativeAdmissionReceiptReconciliation:
         [
             ("a" * 40, "2026-09-07T12:00:02Z", False),
             ("a" * 40, "2026-09-07T11:59:59Z", True),
-            ("b" * 40, "2026-09-07T12:00:02Z", True),
+            ("b" * 40, "2026-09-07T12:00:02Z", False),
             ("a" * 40, None, True),
         ],
     )
@@ -5475,13 +5532,53 @@ class TestNativeAdmissionReceiptReconciliation:
         else:
             assert "=fresh exact-checkpoint native admission" in result.stdout
 
+    @pytest.mark.parametrize("checkpoint", ["source-qualified", "verified", "controller-repair"])
+    def test_typed_receipt_survives_main_advance_during_unrelated_deployment(
+        self, tmp_path: Path, checkpoint: str
+    ) -> None:
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="b" * 40,
+            receipt_at="2026-09-07T12:00:02Z", checkpoint=checkpoint,
+        )
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0 DRAIN_PRODUCTION_CHECKPOINT_STATE=none",
+        ))
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert dequeue_log.read_text(encoding="utf-8") == ""
+        assert "=fresh exact-checkpoint native admission" in result.stdout
+
+    @pytest.mark.parametrize("receipt_creator", ["jovie-bot[bot]", "untrusted-bot[bot]"])
+    def test_plural_status_preserves_manual_admission_only_for_canonical_actor(
+        self, tmp_path: Path, receipt_creator: str
+    ) -> None:
+        # Production's combined endpoint omits creator. The paginated plural
+        # endpoint proves the author even when a manual run executes on main
+        # and admits a different PR head; unknown authors still fail closed.
+        _, dequeue_log = self._write_fixture(
+            tmp_path, receipt_main="a" * 40,
+            receipt_at="2026-09-07T12:00:02Z", receipt_creator=receipt_creator,
+            older_receipt_creator=(
+                "untrusted-bot[bot]" if receipt_creator == "jovie-bot[bot]"
+                else "jovie-bot[bot]"
+            ),
+        )
+        result = _run_bash(_drain_command(
+            tmp_path, backend="native",
+            extra_env="DRAIN_PROMOTION_MODE=normal DRAIN_RECONCILE_ADMISSION_RECEIPTS=1 DRAIN_RECONCILE_MISSED_ADMISSION=0",
+        ))
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert dequeue_log.read_text(encoding="utf-8").splitlines() == (
+            [] if receipt_creator == "jovie-bot[bot]" else ["1001"]
+        )
+
     def test_guarded_dequeue_skip_does_not_clear_the_queue_snapshot(
         self, tmp_path: Path
     ) -> None:
         _, dequeue_log = self._write_fixture(
             tmp_path,
-            receipt_main="b" * 40,
-            receipt_at="2026-09-07T12:00:02Z",
+            receipt_main="a" * 40,
+            receipt_at="2026-09-07T11:59:59Z",
             dequeue_response=(
                 '{"skipped":true,"reason":"queue-entry-changed",'
                 '"state":{"queued":true}}'
