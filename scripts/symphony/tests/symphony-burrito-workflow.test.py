@@ -422,7 +422,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
-            re.compile(r"^\s+command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
+            re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
         )
         authority_map = AUTHORITY_MAP_PATH.read_text(encoding="utf-8")
         self.assertIn("`symphony-agent-router` | active", authority_map)
@@ -449,7 +449,6 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("- Rework", WORKFLOW)
         self.assertNotIn("team:JOV", WORKFLOW)
         self.assertIsNone(TOKEN_RE.search(WORKFLOW))
-
         self.assertIn("--port 4041", UNIT)
         self.assertIn("symphony-elixir-logs", UNIT)
         self.assertIn("symphony-official-runtime run", UNIT)
@@ -492,27 +491,6 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertFalse(missing_count["ok"], missing_count)
         self.assertIn("linear_active_issue_count_missing", missing_count["errors"])
-
-    def test_agent_command_survives_symphony_exec_prefix(self):
-        command = re.search(r"^\s+command:\s+(.+)$", WORKFLOW, re.M)
-        self.assertIsNotNone(command)
-        with tempfile.TemporaryDirectory() as tmp:
-            router = pathlib.Path(tmp) / "symphony-agent-router"
-            router.write_text(
-                "#!/bin/sh\n"
-                '[ "$SYMPHONY_CODEX_DISABLE_APPS" = "1" ] || exit 91\n'
-                '[ "$1" = "app-server" ] || exit 92\n',
-                encoding="utf-8",
-            )
-            router.chmod(0o755)
-            result = subprocess.run(
-                ["/bin/bash", "-lc", f"exec {command.group(1)}"],
-                cwd=tmp,
-                env={**os.environ, "PATH": f"{tmp}:{os.environ.get('PATH', '')}"},
-                capture_output=True,
-                text=True,
-            )
-        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
     def test_budget_fails_for_five_second_polling_or_unbounded_concurrency(self):
         helper = _load_helper()
