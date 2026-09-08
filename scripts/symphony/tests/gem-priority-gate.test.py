@@ -1071,6 +1071,27 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["promotionMode"], "hold-intake")
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
 
+    def test_queue_empty_feed_does_not_mint_hold_intake_without_review(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "headSha": "b" * 40,
+        }
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["native-queue-empty-with-eligible-over-15m"],
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertNotEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["reviewAdmission"]["allowed"])
+
     def test_stale_or_missing_capacity_closes_mutation_admission(self):
         stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
         for evidence in (

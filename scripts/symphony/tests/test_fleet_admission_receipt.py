@@ -330,6 +330,31 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(PROJECT.AdmissionProjectionError, "bypasses closure intake"):
             PROJECT.project_fleet_admission_receipt(receipt)
 
+    def test_queue_empty_feed_projects_only_when_hold_intake_evidence_is_complete(self):
+        closure = {
+            **signals()["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["native-queue-empty-with-eligible-over-15m"],
+        }
+        receipt = evaluate_receipt(
+            controller={"status": "failed"},
+            closureHealth=closure,
+        )
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(projected["promotionMode"], "hold-intake")
+        accepted = subprocess.run(
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+            input=json.dumps(projected), capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        review = dict(signals()["independentReview"])
+        review["headSha"] = "b" * 40
+        stale = evaluate_receipt(independentReview=review, closureHealth=closure)
+        self.assertNotEqual(stale["promotionMode"], "hold-intake")
+        PROJECT.project_fleet_admission_receipt(stale)
+
     def assert_hold_intake_rejected(self, receipt):
         encoded = json.dumps(receipt)
         for command in (
