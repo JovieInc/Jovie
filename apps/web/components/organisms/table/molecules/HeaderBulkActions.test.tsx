@@ -53,7 +53,8 @@ describe('HeaderBulkActions', () => {
     expect(clear.className).toContain('overflow-visible');
     expect(clear.className).toContain('before:h-11');
     expect(clear.className).toContain('before:w-11');
-    expect(clear.className).toContain('focus-visible:ring-focus/55');
+    expect(clear).toHaveClass('focus-visible:ring-focus');
+    expect(clear).not.toHaveClass('focus-visible:ring-focus/55');
     expect(clear.className).toContain('hover:bg-interactive-hover');
     expect(clear.className).not.toContain('rounded-md');
     expect(clear.className).not.toContain('hover:bg-surface-1');

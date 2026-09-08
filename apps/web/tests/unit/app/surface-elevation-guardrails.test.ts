@@ -86,7 +86,7 @@ describe('surface elevation guardrails', () => {
     );
     expect(designSystem).toContain('--focus-ring-width: 1px;');
     expect(designSystem).toMatch(
-      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--linear-bg-page\)[\s\S]*0 0 0 4px color-mix\(in oklab, var\(--linear-border-focus\) 55%/
+      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--linear-bg-page\)[\s\S]*0 0 0 4px var\(--color-border-focus\);/
     );
     expect(designSystem).toMatch(
       /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus\s*{[\s\S]*outline:\s*none;/
