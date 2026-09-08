@@ -359,6 +359,18 @@ class ReadableWorkTests(unittest.TestCase):
             HUD._pr_list("open", "number", "10", timeout=2)
             self.assertNotIn("--search", fetch.call_args.args[0])
 
+    def test_projection_refresh_rejects_old_order_cache_and_omits_expensive_merged_checks(self):
+        with mock.patch.object(HUD, "load_json_dict", return_value={"ok": True, "generated_at": NOW.isoformat()}), mock.patch.object(HUD, "_now", return_value=NOW), mock.patch.object(HUD, "_pr_list", return_value=[]) as listing, mock.patch.object(HUD, "_gh_json", return_value={}), mock.patch.object(HUD, "fetch_mq", return_value={}), mock.patch.object(HUD, "_github_flow_counts", return_value=None), mock.patch.object(HUD, "write_json"):
+            projection = HUD.fetch_github_ship(allow_background=False)
+            self.assertTrue(projection["ok"])
+            self.assertEqual(listing.call_count, 2)
+            self.assertEqual(listing.call_args_list[1].args[0], "merged")
+            self.assertNotIn("statusCheckRollup", listing.call_args_list[1].args[1])
+            self.assertEqual(projection["merge_order"], "mergedAt-complete-top5-v1")
+            with mock.patch.object(HUD, "load_json_dict", return_value=projection):
+                self.assertTrue(HUD.fetch_github_ship()["cache_hit"])
+                self.assertEqual(listing.call_count, 2)
+
     def test_blocker_does_not_substitute_title_event_or_start_for_cause_and_age(self):
         row = {"id": "JOV-3", "title": "Fix artwork", "last_event": "notification", "started": STARTED}
         text = strip("\n".join(HUD.blocker_lines(row, 120, now=NOW)))

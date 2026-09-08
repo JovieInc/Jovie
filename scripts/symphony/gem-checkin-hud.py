@@ -1750,7 +1750,7 @@ def fetch_github_ship(
         return {"ok": False, "refreshing": True, "generated_at": None, "query_ms": None, "ci_matrix": []}
     query_started = time.perf_counter()
     open_prs = _pr_list("open", "number,title,createdAt,isDraft,labels,statusCheckRollup,mergeStateStatus", "10", timeout=timeout)
-    merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt,statusCheckRollup", "10", timeout=timeout)
+    merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt", "10", timeout=timeout)
     merge_group = _gh_json(["api", "repos/JovieInc/Jovie/actions/runs?event=merge_group&per_page=20"], timeout=timeout)
     if not isinstance(open_prs, list) or not isinstance(merged_prs, list):
         if cached.get("ok") is True and cache_age is not None and cache_age <= 300:
