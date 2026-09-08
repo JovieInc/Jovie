@@ -45,10 +45,10 @@ describe('Vercel source contract', () => {
     assert.equal(config.buildCommand, 'corepack pnpm run build');
     assert.equal(config.outputDirectory, '.next');
     // The current native Vercel policy builds release branches and skips PRs.
-    for (const [branch, status] of [
-      ['main', 1],
-      ['production', 1],
-      ['codex/test', 0],
+    for (const { branch, status } of [
+      { branch: 'main', status: 1 },
+      { branch: 'production', status: 1 },
+      { branch: 'codex/test', status: 0 },
     ]) {
       const result = spawnSync('bash', ['-c', config.ignoreCommand], {
         env: { ...process.env, VERCEL_GIT_COMMIT_REF: branch },
