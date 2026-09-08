@@ -434,12 +434,17 @@ function receiptPassedForSource(
     );
   }
 
+  if (!receipt.ref.trim() || !receipt.digest?.trim()) {
+    return blocker(
+      FAILED_BLOCKER_CODES[receipt.tier],
+      receipt.tier,
+      receipt.id,
+      `${receipt.tier} receipt requires an evidence reference and content digest.`
+    );
+  }
+
   const packetSourceSha = sourceSha(packet);
-  if (
-    packetSourceSha &&
-    receipt.sourceSha !== null &&
-    receipt.sourceSha !== packetSourceSha
-  ) {
+  if (!packetSourceSha || receipt.sourceSha !== packetSourceSha) {
     return blocker(
       'evidence_source_sha_mismatch',
       receipt.tier,
@@ -503,13 +508,13 @@ function collectSourceBlockers(packet: CertificationReviewPacket) {
   }
 
   const blockers: CertificationBlocker[] = [];
-  if (!source.sha.trim()) {
+  if (!/^[0-9a-f]{40}$/i.test(source.sha)) {
     blockers.push(
       blocker(
         'source_missing',
         'canonical_source',
         'source.sha',
-        'Canonical source SHA is required.'
+        'Canonical source must identify a full 40-hex commit SHA.'
       )
     );
   }
@@ -629,6 +634,16 @@ function collectMediaReceiptBlockers(
       )
     );
   }
+  if (!media.ref.trim() || !media.digest?.trim()) {
+    blockers.push(
+      blocker(
+        'required_media_failed',
+        'required_variants',
+        media.id,
+        'Required media needs an evidence reference and content digest.'
+      )
+    );
+  }
   if (media.variantId !== variant.id) {
     blockers.push(
       blocker(
@@ -639,11 +654,7 @@ function collectMediaReceiptBlockers(
       )
     );
   }
-  if (
-    packetSourceSha &&
-    media.sourceSha !== null &&
-    media.sourceSha !== packetSourceSha
-  ) {
+  if (!packetSourceSha || media.sourceSha !== packetSourceSha) {
     blockers.push(
       blocker(
         'evidence_source_sha_mismatch',

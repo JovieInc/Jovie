@@ -53,6 +53,24 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
+    const webParts = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const webParts = ['),
+      CI_FAST_SOURCE.indexOf(
+        'const parts = [',
+        CI_FAST_SOURCE.indexOf('const webParts = [')
+      )
+    );
+    expect(webParts).toContain(
+      'tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts'
+    );
+    expect(webParts).toContain(
+      '--coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96'
+    );
+    expect(webParts).not.toContain('--passWithNoTests');
+    expect(WORKFLOW).toContain('apps/web/lib/agent-os/certification\\.ts$|');
+  });
+
   it('covers every lane exactly once across the explicit hosted groups', () => {
     const laneIds = Object.values(LANE_GROUPS).flat();
 

@@ -94,6 +94,108 @@ function approve(packet: CertificationReviewPacket) {
   return recorded.decision;
 }
 describe('certification admission kernel', () => {
+  it.each([
+    '',
+    'not-a-commit',
+    'a'.repeat(39),
+    'g'.repeat(40),
+  ])('rejects malformed source identity %s', sha => {
+    const packet = reviewPacket();
+    if (!packet.source) throw new Error('missing fixture source');
+    const admission = evaluateCertificationAdmission({
+      packet: {
+        ...packet,
+        source: { ...packet.source, sha, expectedSha: sha },
+      },
+    });
+    expect(admission.state).toBe('working');
+    expect(admission.blockers.map(item => item.code)).toContain(
+      'source_missing'
+    );
+  });
+
+  it.each([
+    'canonicalReferences',
+    'invariantEvaluation',
+    'testsCoverage',
+    'visualProof',
+  ] as const)('rejects unbound or unusable %s receipts', group => {
+    for (const invalid of [
+      { sourceSha: null },
+      { sourceSha: '' },
+      { ref: ' ' },
+      { digest: null },
+      { digest: ' ' },
+    ]) {
+      const packet = reviewPacket();
+      const admission = evaluateCertificationAdmission({
+        packet: { ...packet, [group]: [{ ...packet[group][0], ...invalid }] },
+      });
+      expect(admission.state).toBe('working');
+      expect(admission.tasteInboxCard).toBeNull();
+      expect(admission.blockers.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('rejects unbound required variant and media evidence', () => {
+    const packet = reviewPacket();
+    const variant = packet.requiredVariants[0];
+    if (!variant.proof) throw new Error('missing fixture proof');
+    for (const invalid of [
+      { sourceSha: null },
+      { ref: '' },
+      { digest: null },
+    ]) {
+      const proofResult = evaluateCertificationAdmission({
+        packet: {
+          ...packet,
+          requiredVariants: [
+            { ...variant, proof: { ...variant.proof, ...invalid } },
+          ],
+        },
+      });
+      const mediaResult = evaluateCertificationAdmission({
+        packet: {
+          ...packet,
+          itemMedia: [{ ...packet.itemMedia[0], ...invalid }],
+        },
+      });
+      expect(proofResult.state).toBe('working');
+      expect(mediaResult.state).toBe('working');
+    }
+  });
+
+  it.each([
+    'ci',
+    'queueMerge',
+    'deploy',
+    'runtimeDogfood',
+  ] as const)('rejects unbound %s operational proof', group => {
+    const packet = reviewPacket();
+    const decision = approve(packet);
+    const operational = {
+      ci: [receipt('ci')],
+      queueMerge: [receipt('queue_merge')],
+      deploy: [receipt('deploy')],
+      runtimeDogfood: [receipt('runtime_dogfood')],
+    };
+    const admission = evaluateCertificationAdmission({
+      packet: {
+        ...packet,
+        operational: {
+          ...operational,
+          [group]: [{ ...operational[group][0], sourceSha: null }],
+        },
+      },
+      decisions: [decision],
+      requestedState: 'monitored',
+    });
+    expect(admission.transition.allowed).toBe(false);
+    expect(admission.transition.blockers.map(item => item.code)).toContain(
+      `${operational[group][0].tier}_failed`
+    );
+  });
+
   it('emits one Taste Inbox card only when a review packet is complete', () => {
     const packet = reviewPacket();
     const admission = evaluateCertificationAdmission({ packet });
