@@ -52,7 +52,7 @@
       "storySources": ["packages/ui/atoms/input.stories.tsx"],
       "testSources": ["packages/ui/atoms/input.test.tsx"],
       "penRootId": null,
-      "sourceDigest": "f244d5e43b26b5d8ee7668eb45933a955cd51781e9a4a9e144eee7cdd4e4dff2"
+      "sourceDigest": "baa12303f361963cfc88c69049bf7f08ec3fd47fb27cfa4eae3888f46c35d3aa"
     }
   ],
   "legacy": {
