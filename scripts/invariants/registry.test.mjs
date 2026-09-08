@@ -75,9 +75,7 @@ describe('canonical invariant registry', () => {
       structuredClone(getInvariant(candidate, 'JOV-INV-025'))
     );
     assert.match(
-      validateInvariantRegistry(candidate, {
-        verifyBindings: false,
-      }).errors.join('\n'),
+      validateInvariantRegistry(candidate).errors.join('\n'),
       /JOV-INV-025: duplicate stable identity/
     );
   });
