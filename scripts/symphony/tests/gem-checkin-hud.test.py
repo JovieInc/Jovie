@@ -416,6 +416,27 @@ class ReadableWorkTests(unittest.TestCase):
 
 
 class StableCanvasTests(unittest.TestCase):
+    def test_service_reads_actual_console_geometry(self):
+        import fcntl
+        import os
+        import struct
+        import subprocess
+        import termios
+        template = (ROOT / "scripts/symphony/systemd/gem-ship-hud.service.template").read_text()
+        command = next(line for line in template.splitlines() if line.startswith("ExecStart="))
+        self.assertNotIn("--width", command)
+        self.assertNotIn("--height", command)
+        self.assertIn("UnsetEnvironment=COLUMNS LINES", template)
+        master, slave = os.openpty()
+        try:
+            fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 45, 215, 0, 0))
+            probe = "import importlib.util,json,sys; s=importlib.util.spec_from_file_location('hud',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(json.dumps(m.terminal_size()))"
+            subprocess.run([sys.executable, "-c", probe, str(SOURCE)], stdout=slave, stderr=subprocess.PIPE, check=True, timeout=5, env={k: v for k, v in os.environ.items() if k not in {"COLUMNS", "LINES"}})
+            self.assertEqual(json.loads(os.read(master, 4096).decode().strip()), [215, 45])
+        finally:
+            os.close(master)
+            os.close(slave)
+
     def test_zero_one_five_zero_and_queue_blockers_keep_every_anchor(self):
         merges = {"ok": True, "generated_at": NOW.isoformat(), "merged_rows": [{"number": i, "title": f"Merge {i}", "merged_at": NOW.isoformat()} for i in range(5)], "ci_matrix": [{"number": 99, "title": "Check association", "fast": "success"}]}
         labels = ("ACTIVE SLOTS", "RECENTLY MERGED", "NEEDS ATTENTION", "WAITING", "OPERATOR HEALTH", "CI MATRIX", "Sources:")
