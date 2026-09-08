@@ -147,6 +147,37 @@ export function assertMainlineAncestorCompare({
   );
 }
 
+export function assertCommitDescendantCompare({
+  ancestorSha,
+  comparison,
+  descendantSha,
+}) {
+  invariant(SHA_PATTERN.test(ancestorSha), 'Ancestor SHA is malformed.');
+  invariant(SHA_PATTERN.test(descendantSha), 'Descendant SHA is malformed.');
+  const identical =
+    descendantSha === ancestorSha &&
+    comparison?.status === 'identical' &&
+    comparison.ahead_by === 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.length === 0;
+  const advanced =
+    descendantSha !== ancestorSha &&
+    comparison?.status === 'ahead' &&
+    Number.isInteger(comparison.ahead_by) &&
+    comparison.ahead_by > 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.at(-1)?.sha === descendantSha;
+  invariant(
+    comparison &&
+      (identical || advanced) &&
+      comparison.base_commit?.sha === ancestorSha &&
+      comparison.merge_base_commit?.sha === ancestorSha &&
+      Number.isInteger(comparison.behind_by) &&
+      comparison.behind_by === 0,
+    'Desktop staging source would move backward or leave its published lineage.'
+  );
+}
+
 export function parseLatestMacYaml(contents) {
   invariant(typeof contents === 'string', 'Updater metadata must be text.');
   const metadata = { files: [] };
@@ -577,6 +608,17 @@ class GitHubClient {
     });
   }
 
+  async assertCommitDescendant(ancestorSha, descendantSha) {
+    const comparison = await this.request(
+      `/repos/${this.repository}/compare/${ancestorSha}...${descendantSha}`
+    );
+    assertCommitDescendantCompare({
+      ancestorSha,
+      comparison,
+      descendantSha,
+    });
+  }
+
   async uploadAsset(release, name, buffer) {
     const uploadUrl = release.upload_url?.replace(/\{\?.*$/, '');
     invariant(
@@ -890,29 +932,34 @@ async function rollPublishedStaging({
   client,
   localBuffers,
   output,
+  previous,
   release,
   releaseSha,
   version,
 }) {
   const channelFile = 'staging-mac.yml';
-  const previous = {
-    tagSha: await client.resolveTagCommit('desktop-staging'),
-    targetCommitish: release.target_commitish,
-    version: release.name,
-  };
   invariant(
     SHA_PATTERN.test(previous.tagSha) &&
-      typeof previous.targetCommitish === 'string' &&
-      previous.targetCommitish.length > 0 &&
+      previous.targetCommitish === previous.tagSha &&
       STAGING_SEMVER_PATTERN.test(previous.version),
     'Staging release identity has malformed provenance.'
   );
+  invariant(
+    (await client.resolveTagCommit('desktop-staging')) === previous.tagSha &&
+      release.target_commitish === previous.targetCommitish,
+    'Staging release changed after publication authorization.'
+  );
+  await client.assertCommitDescendant(previous.tagSha, releaseSha);
+  await client.assertMainlineAncestor(releaseSha);
   for (const [name, buffer] of localBuffers) {
     if (name !== channelFile) {
       await uploadOrVerifyAsset(client, release, name, buffer);
     }
   }
-  await client.assertMainlineAncestor(releaseSha);
+  invariant(
+    (await client.resolveTagCommit('desktop-staging')) === previous.tagSha,
+    'Staging release changed during publication.'
+  );
   await client.updateTagCommit('desktop-staging', releaseSha);
   try {
     release = await client.updateReleaseMetadata({
@@ -1032,6 +1079,21 @@ export async function uploadAndPublish({
   let release = await client.releaseOrDraftByTag(tag);
   const localBuffers = await readLocalBuffers(dist, environment, version);
   if (environment === 'staging') {
+    let previous = null;
+    if (!release.draft) {
+      previous = {
+        tagSha: await client.resolveTagCommit('desktop-staging'),
+        targetCommitish: release.target_commitish,
+        version: release.name,
+      };
+      invariant(
+        SHA_PATTERN.test(previous.tagSha) &&
+          previous.targetCommitish === previous.tagSha &&
+          STAGING_SEMVER_PATTERN.test(previous.version),
+        'Staging release identity has malformed provenance.'
+      );
+      await client.assertCommitDescendant(previous.tagSha, releaseSha);
+    }
     release = await removeStagingStarterAssets(client, release);
     validateRollingStagingRelease(release);
     assertStagingCandidate({
@@ -1044,6 +1106,7 @@ export async function uploadAndPublish({
         client,
         localBuffers,
         output,
+        previous,
         release,
         releaseSha,
         version,

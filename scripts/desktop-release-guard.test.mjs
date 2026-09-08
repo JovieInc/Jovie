@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
+  assertCommitDescendantCompare,
   assertMainlineAncestorCompare,
   assertStagingVersionTransition,
   expectedDesktopAssetNames,
@@ -893,4 +894,25 @@ test('staging mainline proof permits main advancement but rejects stale or diver
       /not a trusted ancestor/
     );
   }
+});
+
+test('staging publication proof rejects a candidate behind the published source', () => {
+  const publishedSha = 'b'.repeat(40);
+  const candidateSha = 'a'.repeat(40);
+  assert.throws(
+    () =>
+      assertCommitDescendantCompare({
+        ancestorSha: publishedSha,
+        comparison: {
+          status: 'behind',
+          ahead_by: 0,
+          behind_by: 1,
+          base_commit: { sha: candidateSha },
+          commits: [],
+          merge_base_commit: { sha: candidateSha },
+        },
+        descendantSha: candidateSha,
+      }),
+    /move backward or leave its published lineage/
+  );
 });
