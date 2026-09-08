@@ -215,6 +215,7 @@ describe('merge-group admission evidence', () => {
     const summaryPath = join(directory, 'summary.md');
     await writeFile(eventPath, JSON.stringify(event()), 'utf8');
     const requests = [];
+    /** @type {import('vitest').MockInstance<() => number> | undefined} */
     let clock;
     const fetchImpl = vi.fn(async (url, init) => {
       requests.push({ url, init });
