@@ -331,6 +331,7 @@ describe('merge-group admission evidence', () => {
   it.each([
     'verified',
     'controller-repair',
+    'source-qualified',
   ])('requires canonical Jovie Bot admission with an exact %s checkpoint receipt', checkpoint => {
     expect(
       classifyCanonicalAdmissionProvenance({
@@ -613,9 +614,11 @@ describe('merge-group admission evidence', () => {
   });
 
   it.each([
-    'behind',
-    'diverged',
-  ])('rejects a %s preserved checkpoint lineage', status => {
+    ['verified', 'behind'],
+    ['verified', 'diverged'],
+    ['source-qualified', 'behind'],
+    ['source-qualified', 'diverged'],
+  ])('rejects a %s receipt with %s lineage at the required merge-group gate', (checkpoint, status) => {
     const checkpointMainSha = '9'.repeat(40);
     expect(() =>
       classifyCanonicalAdmissionProvenance({
@@ -639,7 +642,7 @@ describe('merge-group admission evidence', () => {
           sha: SOURCE_HEAD,
           statuses: [
             admissionStatus({
-              description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
+              description: `checkpoint=${checkpoint};main=${checkpointMainSha};pr=123`,
             }),
           ],
         },

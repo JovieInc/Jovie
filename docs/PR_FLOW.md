@@ -98,6 +98,13 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
+- **Admission is independent of prior production deployment.** A pending, missing,
+  or failed release checkpoint does not block an otherwise qualified source PR.
+  Exact-head source checks, explicit scoped incident holds, and required native
+  merge-group correctness, provenance, and ancestry checks remain enforced.
+  Admission receipts say `source-qualified`; they never certify production.
+  The production controller owns deployment serialization and exact runtime
+  certification. An existing incident hold is cleared only by its own evidence.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
