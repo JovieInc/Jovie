@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
+  assertMainlineAncestorCompare,
   assertStagingVersionTransition,
   expectedDesktopAssetNames,
   validateReleaseAssets,
@@ -683,7 +684,10 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /retention-days: 7/,
   ]);
   assertPatterns(stagingPublish, [
-    /commits\/main/,
+    /compare\/\$RELEASE_SHA\.\.\.\$current_main_sha/,
+    /\.merge_base_commit\.sha == \$release/,
+    /\.commits[\s\S]*\.\[-1\]\.sha == \$current/,
+    /\.behind_by == 0/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /--environment staging/,
     /--version "\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
@@ -815,5 +819,59 @@ test('staging release versions advance beyond installed and current-feed version
     },
   ]) {
     assert.throws(() => assertStagingVersionTransition(input), message);
+  }
+});
+
+test('staging mainline proof permits main advancement but rejects stale or diverged source', () => {
+  const releaseSha = 'a'.repeat(40);
+  const currentSha = 'b'.repeat(40);
+  const mainline = {
+    status: 'ahead',
+    ahead_by: 4,
+    behind_by: 0,
+    base_commit: { sha: releaseSha },
+    commits: [{ sha: 'c'.repeat(40) }, { sha: currentSha }],
+    merge_base_commit: { sha: releaseSha },
+  };
+
+  assert.doesNotThrow(() =>
+    assertMainlineAncestorCompare({
+      comparison: mainline,
+      currentMainSha: currentSha,
+      releaseSha,
+    })
+  );
+  assert.doesNotThrow(() =>
+    assertMainlineAncestorCompare({
+      comparison: {
+        ...mainline,
+        status: 'identical',
+        ahead_by: 0,
+        commits: [],
+      },
+      currentMainSha: releaseSha,
+      releaseSha,
+    })
+  );
+
+  for (const comparison of [
+    { ...mainline, status: 'behind', behind_by: 1 },
+    {
+      ...mainline,
+      status: 'diverged',
+      merge_base_commit: { sha: 'c'.repeat(40) },
+    },
+    { ...mainline, base_commit: { sha: 'c'.repeat(40) } },
+    { ...mainline, commits: [{ sha: 'c'.repeat(40) }] },
+  ]) {
+    assert.throws(
+      () =>
+        assertMainlineAncestorCompare({
+          comparison,
+          currentMainSha: currentSha,
+          releaseSha,
+        }),
+      /not a trusted ancestor/
+    );
   }
 });

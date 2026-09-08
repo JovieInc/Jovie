@@ -116,6 +116,37 @@ export function assertStagingVersionTransition({
   }
 }
 
+export function assertMainlineAncestorCompare({
+  comparison,
+  currentMainSha,
+  releaseSha,
+}) {
+  invariant(SHA_PATTERN.test(releaseSha), 'Release SHA is malformed.');
+  invariant(SHA_PATTERN.test(currentMainSha), 'Current main SHA is malformed.');
+  const identical =
+    currentMainSha === releaseSha &&
+    comparison?.status === 'identical' &&
+    comparison.ahead_by === 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.length === 0;
+  const advanced =
+    currentMainSha !== releaseSha &&
+    comparison?.status === 'ahead' &&
+    Number.isInteger(comparison.ahead_by) &&
+    comparison.ahead_by > 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.at(-1)?.sha === currentMainSha;
+  invariant(
+    comparison &&
+      (identical || advanced) &&
+      comparison.base_commit?.sha === releaseSha &&
+      comparison.merge_base_commit?.sha === releaseSha &&
+      Number.isInteger(comparison.behind_by) &&
+      comparison.behind_by === 0,
+    'Desktop generation is not a trusted ancestor of current main.'
+  );
+}
+
 export function parseLatestMacYaml(contents) {
   invariant(typeof contents === 'string', 'Updater metadata must be text.');
   const metadata = { files: [] };
@@ -534,6 +565,18 @@ class GitHubClient {
     return commit.sha;
   }
 
+  async assertMainlineAncestor(releaseSha) {
+    const currentMainSha = await this.currentMainSha();
+    const comparison = await this.request(
+      `/repos/${this.repository}/compare/${releaseSha}...${currentMainSha}`
+    );
+    assertMainlineAncestorCompare({
+      comparison,
+      currentMainSha,
+      releaseSha,
+    });
+  }
+
   async uploadAsset(release, name, buffer) {
     const uploadUrl = release.upload_url?.replace(/\{\?.*$/, '');
     invariant(
@@ -869,10 +912,7 @@ async function rollPublishedStaging({
       await uploadOrVerifyAsset(client, release, name, buffer);
     }
   }
-  invariant(
-    (await client.currentMainSha()) === releaseSha,
-    'Desktop generation was superseded before release publication.'
-  );
+  await client.assertMainlineAncestor(releaseSha);
   await client.updateTagCommit('desktop-staging', releaseSha);
   try {
     release = await client.updateReleaseMetadata({
@@ -969,10 +1009,7 @@ async function rollPublishedStaging({
     (await client.resolveTagCommit('desktop-staging')) === releaseSha,
     'Published staging release tag does not target the authorized commit.'
   );
-  invariant(
-    (await client.currentMainSha()) === releaseSha,
-    'Desktop generation was superseded before release receipt.'
-  );
+  await client.assertMainlineAncestor(releaseSha);
   await writeOutputs(output, {
     asset_count: release.assets.length,
     release_id: release.id,
@@ -1055,10 +1092,14 @@ export async function uploadAndPublish({
     version,
     draft: true,
   });
-  invariant(
-    (await client.currentMainSha()) === releaseSha,
-    'Desktop generation was superseded before release publication.'
-  );
+  if (environment === 'staging') {
+    await client.assertMainlineAncestor(releaseSha);
+  } else {
+    invariant(
+      (await client.currentMainSha()) === releaseSha,
+      'Desktop generation was superseded before release publication.'
+    );
+  }
 
   release = await client.publishRelease(release.id, environment, version);
   validateReleaseAssets({
@@ -1074,10 +1115,7 @@ export async function uploadAndPublish({
     'Published release tag does not target the authorized commit.'
   );
   if (environment === 'staging') {
-    invariant(
-      (await client.currentMainSha()) === releaseSha,
-      'Desktop generation was superseded before release receipt.'
-    );
+    await client.assertMainlineAncestor(releaseSha);
   }
 
   await writeOutputs(output, {
