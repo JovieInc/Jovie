@@ -10,6 +10,7 @@ import pathlib
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -328,6 +329,40 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         receipt["alreadyAdmittedCohort"]["newIntakeAllowed"] = True
         with self.assertRaisesRegex(PROJECT.AdmissionProjectionError, "bypasses closure intake"):
             PROJECT.project_fleet_admission_receipt(receipt)
+
+    def assert_hold_intake_rejected(self, receipt):
+        encoded = json.dumps(receipt)
+        for command in (
+            [sys.executable, str(PROJECTOR)],
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+        ):
+            with self.subTest(consumer=command[0]):
+                rejected = subprocess.run(
+                    command, input=encoded, capture_output=True, text=True, check=False,
+                )
+                self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+
+    def test_hold_intake_consumers_reject_unknown_or_missing_reason(self):
+        for reasons in ([{"code": "queue-controller-unknown", "layer": "controller",
+                          "severity": "hold", "detail": "unknown observation"}], []):
+            receipt = evaluate_receipt(controller={"status": "failed"})
+            receipt["reasons"] = reasons
+            self.assert_hold_intake_rejected(receipt)
+
+    def test_hold_intake_consumers_reject_active_or_malformed_integrity(self):
+        for integrity in ({"status": "active"}, {"status": "invalid"}, {}, None):
+            receipt = evaluate_receipt(controller={"status": "failed"})
+            receipt["signals"]["integrity"] = integrity
+            self.assert_hold_intake_rejected(receipt)
+
+    def test_hold_intake_consumers_require_allowed_exact_main_review(self):
+        for field, value in (("allowed", False), ("headSha", "b" * 40),
+                             ("authority", "untrusted"), ("reviewer", "untrusted"),
+                             ("scope", "other"), ("required", False),
+                             ("reviewId", None), ("observedAt", None)):
+            receipt = evaluate_receipt(controller={"status": "failed"})
+            receipt["reviewAdmission"][field] = value
+            self.assert_hold_intake_rejected(receipt)
 
     def test_controller_repair_projection_binds_provenance_and_rejects_forgery(self):
         receipt = legacy_controller_repair_receipt()

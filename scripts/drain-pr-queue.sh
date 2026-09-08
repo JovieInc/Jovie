@@ -298,6 +298,20 @@ case "$DRAIN_PROMOTION_MODE" in
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
       elif $mode == "hold-intake" then
+        (.reasons | type == "array" and length > 0) and
+        all(.reasons[]; .code | IN("controller-failure", "production-deployment-unbound")) and
+        (.signals.integrity.status | IN("clear", "resolved")) and
+        (.signals.controller.status | IN("green", "failed")) and
+        .reviewAdmission.allowed == true and
+        .reviewAdmission.required == true and
+        .reviewAdmission.authority == "Gem" and
+        .reviewAdmission.scope == "exact-main-head" and
+        .reviewAdmission.reviewer == "Gem" and
+        .reviewAdmission.reason == "fresh-exact-head-independent-review" and
+        (.reviewAdmission.reviewId | type == "string" and length > 0) and
+        (.reviewAdmission.observedAt | type == "string" and length > 0) and
+        (.signals.main.sha | test("^[0-9a-f]{40}$")) and
+        .reviewAdmission.headSha == .signals.main.sha and
         .state == "AMBER" and
         .signals.main.status == "green" and
         .signals.production.status == "green" and

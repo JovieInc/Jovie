@@ -82,6 +82,19 @@ def _summer_closure_admission(
     }
 
 
+def _hold_intake_evidence() -> dict[str, object]:
+    return {
+        "reasons": [{"code": "production-deployment-unbound"}],
+        "reviewAdmission": {
+            "allowed": True, "required": True, "authority": "Gem",
+            "scope": "exact-main-head", "headSha": "a" * 40,
+            "reviewer": "Gem", "reason": "fresh-exact-head-independent-review",
+            "reviewId": "test-exact-main-review",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+
+
 def _production_unbound_hold_receipt(
     *, closure_status: str = "healthy", intake_allowed: bool = True
 ) -> dict[str, object]:
@@ -89,6 +102,7 @@ def _production_unbound_hold_receipt(
         "schema": "jovie-fleet-gate/v1",
         "state": "AMBER",
         "promotionMode": "hold-intake",
+        **_hold_intake_evidence(),
         "observedAt": datetime.now(timezone.utc).isoformat(),
         "closureAdmission": _summer_closure_admission(
             intake_allowed=intake_allowed, status=closure_status
@@ -2985,6 +2999,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3074,6 +3089,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3163,6 +3179,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3252,6 +3269,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3811,6 +3829,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3905,6 +3924,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -4054,6 +4074,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            **_hold_intake_evidence(),
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
