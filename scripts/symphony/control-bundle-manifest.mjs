@@ -76,6 +76,7 @@ function requireNonemptyString(value, name) {
   }
 }
 
+/** @param {ControlBundleManifest} manifest @param {string} [expectedSourceSha] */
 function validateManifestPolicy(manifest, expectedSourceSha) {
   if (manifest?.schema !== CONTROL_BUNDLE_SCHEMA) {
     throw new Error('unsupported control bundle manifest schema');
@@ -146,6 +147,54 @@ function validateManifestPolicy(manifest, expectedSourceSha) {
   }
 }
 
+/**
+ * @typedef {{ path: string, sha256: string }} ControlBundleSubject
+ * @typedef {{
+ *   verified: boolean,
+ *   repository: string,
+ *   signerWorkflow: string,
+ *   predicateType: string,
+ *   sourceSha: string,
+ *   subjects: ControlBundleSubject[],
+ * }} ControlBundleAttestationEvidence
+ * @typedef {{
+ *   schema?: string,
+ *   repository?: string,
+ *   sourceSha?: string,
+ *   version?: string,
+ *   artifact?: { path?: string, sha256?: string },
+ *   components?: { path?: string, sha256?: string }[],
+ *   toolchain?: { node?: string, pnpm?: string },
+ *   tests?: { status?: string, command?: string, runId?: string | number },
+ *   signature?: { type?: string, identity?: string },
+ *   compatibility?: { workflow?: string, runtime?: string },
+ * }} ControlBundleManifest
+ * @typedef {{
+ *   artifactPath?: string,
+ *   manifestPath?: string,
+ *   attestationBundlePath?: string,
+ *   sourceSha?: string,
+ *   root?: string,
+ *   attestationVerifier?: (input: {
+ *     artifactPath: string,
+ *     manifestPath: string,
+ *     attestationBundlePath?: string,
+ *     sourceSha: string,
+ *     subjects: ControlBundleSubject[],
+ *   }) => Promise<ControlBundleAttestationEvidence>,
+ * }} VerifyManifestOptions
+ */
+
+/**
+ * @param {{
+ *   artifactPath: string,
+ *   manifestPath: string,
+ *   attestationBundlePath?: string,
+ *   sourceSha: string,
+ *   subjects: ControlBundleSubject[],
+ * }} input
+ * @returns {Promise<ControlBundleAttestationEvidence>}
+ */
 async function verifyGithubAttestations({
   artifactPath,
   manifestPath,
@@ -196,6 +245,22 @@ async function verifyGithubAttestations({
   };
 }
 
+/**
+ * @param {{
+ *   repository: string,
+ *   sourceSha: string,
+ *   version: string,
+ *   artifactPath: string,
+ *   artifactName?: string,
+ *   componentPaths?: string[],
+ *   testReceipt?: { status?: string, command?: string, runId?: string | number },
+ *   toolchain?: { node?: string, pnpm?: string },
+ *   signature?: { type?: string, identity?: string },
+ *   compatibility?: { workflow?: string, runtime?: string },
+ *   root?: string,
+ * }} options
+ * @returns {Promise<ControlBundleManifest>}
+ */
 export async function buildManifest({
   repository,
   sourceSha,
@@ -237,6 +302,10 @@ export async function buildManifest({
   return manifest;
 }
 
+/**
+ * @param {ControlBundleManifest} manifest
+ * @param {VerifyManifestOptions} [options]
+ */
 export async function verifyManifest(
   manifest,
   {
@@ -251,7 +320,7 @@ export async function verifyManifest(
   validateManifestPolicy(manifest, sourceSha);
   requireNonemptyString(manifestPath, 'manifest path');
   const storedManifest = JSON.parse(
-    await readFile(resolve(root, manifestPath))
+    await readFile(resolve(root, manifestPath), 'utf8')
   );
   if (!isDeepStrictEqual(storedManifest, manifest)) {
     throw new Error('manifest input does not match the attested manifest file');

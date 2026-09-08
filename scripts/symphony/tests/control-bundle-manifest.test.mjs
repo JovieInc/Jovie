@@ -144,28 +144,44 @@ test('rejects source mismatch and altered artifact or component', async t => {
   );
 });
 
-for (const [name, patch, pattern] of [
-  ['invalid schema', { schema: 'forged' }, /schema/],
-  ['failed test receipt', { tests: { status: 'FAIL' } }, /test receipt/],
-  ['absent toolchain', { toolchain: {} }, /toolchain/],
-  [
-    'incompatible runtime',
-    { compatibility: { workflow: 'wrong/v999', runtime: 'unrelated/runtime' } },
-    /compatibility/,
-  ],
-  [
-    'forged attestation identity',
-    { signature: { type: 'unsigned', identity: 'attacker' } },
-    /signature identity/,
-  ],
-  ['absent component bindings', { components: [] }, /component bindings/],
-  ['missing repository identity', { repository: '' }, /repository/],
-  [
-    'nonportable artifact path',
-    { artifact: { path: '../bundle.tar.gz', sha256: 'a'.repeat(64) } },
-    /artifact binding/,
-  ],
-]) {
+/** @type {Array<{ name: string, patch: Record<string, unknown>, pattern: RegExp }>} */
+const POLICY_REJECTIONS = [
+  { name: 'invalid schema', patch: { schema: 'forged' }, pattern: /schema/ },
+  {
+    name: 'failed test receipt',
+    patch: { tests: { status: 'FAIL' } },
+    pattern: /test receipt/,
+  },
+  { name: 'absent toolchain', patch: { toolchain: {} }, pattern: /toolchain/ },
+  {
+    name: 'incompatible runtime',
+    patch: {
+      compatibility: { workflow: 'wrong/v999', runtime: 'unrelated/runtime' },
+    },
+    pattern: /compatibility/,
+  },
+  {
+    name: 'forged attestation identity',
+    patch: { signature: { type: 'unsigned', identity: 'attacker' } },
+    pattern: /signature identity/,
+  },
+  {
+    name: 'absent component bindings',
+    patch: { components: [] },
+    pattern: /component bindings/,
+  },
+  {
+    name: 'missing repository identity',
+    patch: { repository: '' },
+    pattern: /repository/,
+  },
+  {
+    name: 'nonportable artifact path',
+    patch: { artifact: { path: '../bundle.tar.gz', sha256: 'a'.repeat(64) } },
+    pattern: /artifact binding/,
+  },
+];
+for (const { name, patch, pattern } of POLICY_REJECTIONS) {
   test(`rejects ${name}`, async t => {
     const { root, manifest } = await fixture(t);
     await assert.rejects(
