@@ -700,6 +700,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+        'scripts/lib/__tests__/merge-queue-backend.test.mjs',
         'scripts/lib/__tests__/pre-land-changelog.test.mjs',
         'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',

@@ -385,6 +385,14 @@ class FallbackTests(unittest.TestCase):
         self.root = pathlib.Path(self.tmp.name)
         self.home = self.root / "home"
         self.home.mkdir()
+        for path in (
+            self.home / ".cursor/cli-config.json",
+            self.home / ".grok/auth.json",
+            self.home / ".kimi-code/credentials/kimi-code.json",
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"opaque":"test-auth-pool"}\n')
+            path.chmod(0o600)
         self.bin = self.root / "bin"
         self.bin.mkdir()
         python = self.bin / "python3"
@@ -504,10 +512,11 @@ class FallbackTests(unittest.TestCase):
                   done
                   /usr/bin/python3 - "$number" <<'PY'
 import json
+import os
 import sys
 
 number = int(sys.argv[1])
-head = "b" * 40
+head = os.environ.get("GEM_TEST_PROMOTION_HEAD", "b" * 40)
 gate_ids = (
     "exact-head",
     "writer",
@@ -3523,7 +3532,7 @@ PY
             'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
             '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
             'case "$*" in\n'
-            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse HEAD") [ ! -f "$GROK_CREATED" ] && printf "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n" || printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
             '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
             '  *"merge-base HEAD origin/main") exit 0;;\n'
             '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
@@ -3544,23 +3553,38 @@ PY
                 },
             },
         }
-        result = subprocess.run(
-            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+        runtime = self.install_runtime()
+        run_env = {
+            "GEM_EVENTS": self.events,
+            "GROK_CREATED": created,
+            "GROK_SHIP_WS_ROOT": self.root / "workspaces",
+            "GROK_SHIP_LOG_DIR": self.root / "logs",
+            "LINEAR_API_KEY": "linear-secret",
+            "LINEAR_API_URL": self.grok_linear_url(),
+            "SYMPHONY_OPEN_PR_INDEX": "live",
+            "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(
+                json.dumps(selection).encode()
+            ).decode(),
+        }
+        external_push = subprocess.run(
+            [runtime / GROK_SHIP.name, "JOV-7"],
             capture_output=True,
             text=True,
-            env=self.env(
-                GEM_EVENTS=self.events,
-                GROK_CREATED=created,
-                GROK_SHIP_WS_ROOT=self.root / "workspaces",
-                GROK_SHIP_LOG_DIR=self.root / "logs",
-                LINEAR_API_KEY="linear-secret",
-                LINEAR_API_URL=self.grok_linear_url(),
-                SYMPHONY_OPEN_PR_INDEX="live",
-                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
-                    json.dumps(selection).encode()
-                ).decode(),
-            ),
+            env=self.env(**run_env, GEM_TEST_PROMOTION_HEAD="c" * 40),
             check=False,
+        )
+        self.assertEqual(external_push.returncode, 0, external_push.stderr + external_push.stdout)
+        completion_dir = self.root / "fallback-receipts/completions"
+        self.assertEqual(list(completion_dir.glob("*.json")), [])
+
+        for stale in ("workspaces", "logs", "fallback-leases", "fallback-receipts"):
+            shutil.rmtree(self.root / stale, ignore_errors=True)
+        for stale in (created, self.events):
+            stale.unlink(missing_ok=True)
+
+        result = subprocess.run(
+            [runtime / GROK_SHIP.name, "JOV-7"], capture_output=True, text=True,
+            env=self.env(**run_env), check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         log = (self.root / "logs/JOV-7.log").read_text()
@@ -3570,6 +3594,31 @@ PY
         self.assertIn("--model cursor-grok-4.6-high-fast", events)
         self.assertEqual(events.count("cursor shared lease held"), 2)
         self.assertTrue(created.exists())
+        receipt_path = self.root / "fallback-receipts/JOV-7.json"
+        receipt = json.loads(receipt_path.read_text())
+        self.assertEqual(receipt_path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(receipt["repository"], "JovieInc/Jovie")
+        self.assertEqual(receipt["executorPath"], str((self.bin / "cursor-agent").resolve()))
+        self.assertRegex(receipt["executorSha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(receipt["profile"], r"^[0-9a-f]{64}$")
+        self.assertEqual(receipt["authStatePath"], str((self.home / ".cursor/cli-config.json").resolve()))
+        self.assertRegex(receipt["authStateSha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(receipt["authPoolIdentity"], receipt["profile"])
+        self.assertRegex(receipt["leaseIdentity"], r"^[0-9a-f]{64}$")
+        result_path = self.root / "fallback-receipts/completions" / f"JOV-7-{'b' * 40}.json"
+        completion = json.loads(result_path.read_text())
+        self.assertEqual(result_path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(completion["schema"], "symphony-fallback-result/v1")
+        self.assertEqual(completion["executionBaseHead"], "a" * 40)
+        self.assertEqual(completion["executionFinalHead"], "b" * 40)
+        self.assertEqual(completion["headSha"], "b" * 40)
+        self.assertEqual(completion["prNumber"], 1)
+        self.assertEqual(completion["provider"], "cursor")
+        self.assertEqual(completion["model"], "cursor-grok-4.6-high-fast")
+        self.assertEqual(completion["selectedModel"], "grok-4.6")
+        self.assertEqual(completion["authPoolIdentity"], completion["profile"])
+        self.assertEqual(completion["leaseReceiptSha256"], hashlib.sha256(receipt_path.read_bytes()).hexdigest())
+        self.assertFalse((self.root / "provider-capacity.json").exists())
 
     def test_grok_ship_one_changelog_strip_failure_still_invokes_grok(self):
         """A missing main-stage CHANGELOG degrades to bounded Grok remediation."""

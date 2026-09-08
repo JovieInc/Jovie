@@ -283,7 +283,14 @@ function classifyMarkerEntry(entry, context) {
   }
   const artifact = entry.artifact;
   const attempt = positiveInteger(entry.payload?.controllerAttempt);
-  const expectedName = markerNameForAttempt(context.sha, attempt);
+  // ponytail: upload naming follows marker_recovery, not GitHub's run_attempt.
+  // A full retry before the first marker exists still publishes the normal name.
+  const normalRerun =
+    attempt === 2 &&
+    artifact?.name === `production-generation-verified-${context.sha}`;
+  const expectedName = normalRerun
+    ? artifact.name
+    : markerNameForAttempt(context.sha, attempt);
   if (
     !expectedName ||
     !validateArtifact(artifact, expectedName) ||
@@ -324,11 +331,19 @@ function classifyMarkerEntry(entry, context) {
       controllerRun,
       deploymentId: entry.payload.deploymentId,
       markerContext,
+      normalRerun,
     };
   }
   if (ACTIVE_STATUSES.has(status)) {
-    return { kind: 'active', attempt, controllerRun, markerContext };
+    return {
+      kind: 'active',
+      attempt,
+      controllerRun,
+      markerContext,
+      normalRerun,
+    };
   }
+  if (normalRerun) return { error: 'normal_rerun_not_verified' };
   if (status === 'completed' && INTERRUPTED_CONCLUSIONS.has(conclusion)) {
     return {
       kind: 'interrupted',
@@ -385,11 +400,13 @@ export function classifyProductionMarkerEvidence(evidence) {
     if (new Set(attempts).size !== attempts.length) {
       return manual('duplicate_marker_attempt');
     }
-    const primary =
-      classified.find(entry => entry.attempt === 1) ??
-      classified.find(entry => entry.recovered);
+    const primaryCandidates = classified.filter(
+      entry => entry.attempt === 1 || entry.normalRerun || entry.recovered
+    );
+    if (primaryCandidates.length > 1) return manual('duplicate_primary_marker');
+    const primary = primaryCandidates[0];
     const recovery = classified.find(
-      entry => entry.attempt === 2 && !entry.recovered
+      entry => entry.attempt === 2 && !entry.recovered && !entry.normalRerun
     );
     const recoveryName = `production-generation-recovery-${sha}`;
     const recoveryArtifacts = evidence.recoveryArtifacts;
@@ -430,7 +447,7 @@ export function classifyProductionMarkerEvidence(evidence) {
         state: 'pending',
         reason: 'primary_marker_attempt_active',
         controllerRun: primary.controllerRun,
-        controllerAttempt: 1,
+        controllerAttempt: primary.attempt,
       };
     }
     if (primary.kind !== 'interrupted') {

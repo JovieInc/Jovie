@@ -46,6 +46,46 @@ function isClerkRedirect(url: string): boolean {
   );
 }
 
+async function openHomepageForScreenshot(
+  page: import('@playwright/test').Page
+) {
+  const response = await page.goto('/', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+  expect(response?.status(), 'homepage document must succeed').toBe(200);
+  expect(new URL(page.url()).pathname).toBe('/');
+  await expect(page.getByTestId('homepage-hero-shell')).toBeVisible();
+  await expect(page.locator('h1').first()).toBeVisible();
+  // Visual readiness belongs to the viewport, not unrelated network traffic.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const pending = document.fonts.status === 'loaded' ? [] : ['fonts'];
+          for (const [index, image] of [...document.images].entries()) {
+            const box = image.getBoundingClientRect();
+            const visible =
+              box.width > 0 &&
+              box.height > 0 &&
+              box.top < innerHeight &&
+              box.bottom > 0 &&
+              box.left < innerWidth &&
+              box.right > 0;
+            if (visible && (!image.complete || image.naturalWidth === 0)) {
+              pending.push(`viewport-image-${index}`);
+            }
+          }
+          return pending;
+        }),
+      {
+        timeout: 15_000,
+        message: 'homepage fonts and viewport images must load',
+      }
+    )
+    .toEqual([]);
+}
+
 // ==========================================================================
 // 1. Homepage — 49 touches/30d, highest churn marketing page
 // ==========================================================================
@@ -53,15 +93,7 @@ test.describe('homepage visual regression', () => {
   test('desktop layout', async ({ page }) => {
     await blockAnalytics(page);
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto('/', { waitUntil: 'networkidle', timeout: 60_000 });
-
-    if (isClerkRedirect(page.url())) {
-      test.skip(true, 'Clerk handshake redirect');
-      return;
-    }
-
-    // Wait for hero content to load
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 15_000 });
+    await openHomepageForScreenshot(page);
 
     await expect(page).toHaveScreenshot('homepage-desktop.png', {
       fullPage: false,
@@ -71,14 +103,7 @@ test.describe('homepage visual regression', () => {
   test('mobile layout', async ({ page }) => {
     await blockAnalytics(page);
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/', { waitUntil: 'networkidle', timeout: 60_000 });
-
-    if (isClerkRedirect(page.url())) {
-      test.skip(true, 'Clerk handshake redirect');
-      return;
-    }
-
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 15_000 });
+    await openHomepageForScreenshot(page);
 
     await expect(page).toHaveScreenshot('homepage-mobile.png', {
       fullPage: false,
@@ -88,14 +113,7 @@ test.describe('homepage visual regression', () => {
   test('tablet layout', async ({ page }) => {
     await blockAnalytics(page);
     await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto('/', { waitUntil: 'networkidle', timeout: 60_000 });
-
-    if (isClerkRedirect(page.url())) {
-      test.skip(true, 'Clerk handshake redirect');
-      return;
-    }
-
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 15_000 });
+    await openHomepageForScreenshot(page);
 
     await expect(page).toHaveScreenshot('homepage-tablet.png', {
       fullPage: false,

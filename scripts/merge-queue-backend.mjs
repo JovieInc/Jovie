@@ -40,9 +40,11 @@ const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'UNMERGEABLE',
   'LOCKED',
 ]);
+const UTC_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
 const INVENTORY_PAGE_SIZE = 30;
-const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
+const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position enqueuedAt } autoMergeRequest { enabledAt }`;
 const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
@@ -547,11 +549,13 @@ function normalizeNativePullRequest(pr) {
     (typeof pr.mergeQueueEntry?.id !== 'string' ||
       !NATIVE_QUEUE_ENTRY_STATES.has(pr.mergeQueueEntry?.state) ||
       !Number.isInteger(pr.mergeQueueEntry?.position) ||
-      pr.mergeQueueEntry.position < 1)
+      pr.mergeQueueEntry.position < 1 ||
+      typeof pr.mergeQueueEntry?.enqueuedAt !== 'string' ||
+      !UTC_TIMESTAMP_PATTERN.test(pr.mergeQueueEntry.enqueuedAt))
   ) {
     throw backendError(
       'incomplete_queue_state',
-      'Native mergeQueueEntry is missing its id, recognized state, or positive position'
+      'Native mergeQueueEntry is missing its id, recognized state, positive position, or enqueuedAt timestamp'
     );
   }
   const hasAuthoritativeQueueEntry = Boolean(
@@ -723,6 +727,22 @@ export function canAcceptExactHeadQueueReceipt(state, expectedHeadOid) {
 
 export function enrollmentPostcondition(state, expectedHeadOid) {
   return canAcceptExactHeadQueueReceipt(state, expectedHeadOid);
+}
+
+// ponytail: GitHub retains pending intent until required checks pass. It is
+// never queue membership and needs no compensating disable/re-enroll loop.
+function hasPendingAutoMergeIntent(state, expectedHeadOid) {
+  return Boolean(
+    state?.backend === 'native' &&
+      state.state === 'OPEN' &&
+      state.isDraft === false &&
+      state.headRefOid?.toLowerCase() === expectedHeadOid &&
+      hardHoldLabels(state).length === 0 &&
+      state.isInMergeQueue === false &&
+      state.mergeQueueEntry === null &&
+      UTC_TIMESTAMP_PATTERN.test(state.autoMergeRequest?.enabledAt ?? '') &&
+      Number.isFinite(Date.parse(state.autoMergeRequest.enabledAt))
+  );
 }
 
 /**
@@ -1098,6 +1118,15 @@ export async function enrollPullRequest({
       state: before,
     };
   }
+  if (hasPendingAutoMergeIntent(before, expectedHead)) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      disposition: 'auto-merge-pending',
+      mutationActor,
+      state: before,
+    };
+  }
 
   let mutationError = null;
   try {
@@ -1123,6 +1152,16 @@ export async function enrollPullRequest({
       changed: true,
       mutationActor,
       postconditionAttempts: observation.attempts,
+      reconciledAfterCommandError: Boolean(mutationError),
+      state: observation.state,
+    };
+  }
+  if (hasPendingAutoMergeIntent(observation.state, expectedHead)) {
+    return {
+      backend: resolvedBackend,
+      changed: true,
+      disposition: 'auto-merge-pending',
+      mutationActor,
       reconciledAfterCommandError: Boolean(mutationError),
       state: observation.state,
     };
@@ -1156,6 +1195,7 @@ async function runGraphqlMutation(runner, query, variables, description) {
  *   backend?: string,
  *   repository?: string,
  *   number?: string | number,
+ *   expectedHeadOid?: string,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  * }} [input]
@@ -1164,11 +1204,14 @@ export async function dequeuePullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
   number,
+  expectedHeadOid,
   runner = createGhRunner(),
   mutationRunner = runner,
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
+  const expectedHead =
+    expectedHeadOid == null ? null : parseExpectedHeadOid(expectedHeadOid);
   const mutationActor =
     await assertCanonicalNativeMutationActor(mutationRunner);
   const stateOptions = {
@@ -1178,6 +1221,19 @@ export async function dequeuePullRequest({
     runner,
   };
   const before = await readPullRequestQueueState(stateOptions);
+  if (
+    expectedHead !== null &&
+    String(before.headRefOid ?? '').toLowerCase() !== expectedHead
+  ) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+      mutationActor,
+      state: before,
+    };
+  }
   if (dequeuePostcondition(before)) {
     return {
       backend: resolvedBackend,
@@ -1187,14 +1243,66 @@ export async function dequeuePullRequest({
     };
   }
 
+  let mutationBefore = before;
+  let guardedQueueEntry = null;
+  if (expectedHead !== null) {
+    if (!before.queued || before.mergeQueueEntry === null) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'queue-entry-changed',
+        mutationActor,
+        state: before,
+      };
+    }
+    guardedQueueEntry = {
+      id: before.mergeQueueEntry.id,
+      enqueuedAt: before.mergeQueueEntry.enqueuedAt,
+    };
+    mutationBefore = await readPullRequestQueueState(stateOptions);
+    if (
+      String(mutationBefore.headRefOid ?? '').toLowerCase() !== expectedHead
+    ) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'head-changed',
+        mutationActor,
+        guardedQueueEntry,
+        state: mutationBefore,
+      };
+    }
+    if (
+      !mutationBefore.queued ||
+      mutationBefore.mergeQueueEntry?.id !== guardedQueueEntry.id ||
+      mutationBefore.mergeQueueEntry?.enqueuedAt !==
+        guardedQueueEntry.enqueuedAt
+    ) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'queue-entry-changed',
+        mutationActor,
+        guardedQueueEntry,
+        state: mutationBefore,
+      };
+    }
+  }
+
   const mutationErrors = [];
-  if (before.isInMergeQueue || before.mergeQueueEntry !== null) {
+  if (
+    mutationBefore.isInMergeQueue ||
+    mutationBefore.mergeQueueEntry !== null
+  ) {
     try {
       // GitHub's DequeuePullRequestInput.id is the PullRequest node ID.
       await runGraphqlMutation(
         mutationRunner,
         DEQUEUE_PULL_REQUEST_MUTATION,
-        { id: before.id },
+        { id: mutationBefore.id },
         `dequeuing native PR #${parsedNumber}`
       );
     } catch (error) {
@@ -1203,6 +1311,16 @@ export async function dequeuePullRequest({
   }
 
   let current = await readPullRequestQueueState(stateOptions);
+  if (
+    expectedHead !== null &&
+    String(current.headRefOid ?? '').toLowerCase() !== expectedHead
+  ) {
+    throw backendError(
+      'dequeue_head_raced',
+      `PR #${parsedNumber} head changed during expected-head dequeue`,
+      { expectedHeadOid: expectedHead, guardedQueueEntry, state: current }
+    );
+  }
   if (current.autoMergeRequest !== null) {
     try {
       await runGraphqlMutation(
@@ -1217,11 +1335,23 @@ export async function dequeuePullRequest({
     current = await readPullRequestQueueState(stateOptions);
   }
 
+  if (
+    expectedHead !== null &&
+    String(current.headRefOid ?? '').toLowerCase() !== expectedHead
+  ) {
+    throw backendError(
+      'dequeue_head_raced',
+      `PR #${parsedNumber} head changed during expected-head dequeue`,
+      { expectedHeadOid: expectedHead, guardedQueueEntry, state: current }
+    );
+  }
+
   if (dequeuePostcondition(current)) {
     return {
       backend: resolvedBackend,
       changed: true,
       mutationActor,
+      ...(guardedQueueEntry === null ? {} : { guardedQueueEntry }),
       reconciledAfterCommandError: mutationErrors.length > 0,
       state: current,
     };
@@ -1313,6 +1443,13 @@ export async function runCli(
         number: args[0],
         mutationRunner: resolvedMutationRunner,
       }),
+    'dequeue-ineligible': () =>
+      dequeuePullRequest({
+        ...options,
+        number: args[0],
+        expectedHeadOid: args[1],
+        mutationRunner: resolvedMutationRunner,
+      }),
   };
   const usage = {
     preflight: [0, 'preflight takes no arguments'],
@@ -1324,11 +1461,15 @@ export async function runCli(
     'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
     enroll: [2, 'enroll requires <number> <headSha>'],
     dequeue: [1, 'dequeue requires <number>'],
+    'dequeue-ineligible': [
+      2,
+      'dequeue-ineligible requires <number> <expectedHeadSha>',
+    ],
   };
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue|dequeue-ineligible>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];
@@ -1340,7 +1481,9 @@ export async function runCli(
     throw backendError('usage', usageMessage);
   }
   if (
-    (command === 'enroll' || command === 'dequeue') &&
+    (command === 'enroll' ||
+      command === 'dequeue' ||
+      command === 'dequeue-ineligible') &&
     backend === 'native' &&
     !NATIVE_MUTATION_AUTHORIZATIONS.has(env.MERGE_QUEUE_NATIVE_AUTHORIZATION)
   ) {
