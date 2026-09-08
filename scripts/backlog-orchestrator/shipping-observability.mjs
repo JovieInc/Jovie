@@ -76,13 +76,31 @@ function shippingEvidence(receipt) {
     : null;
 }
 
+/**
+ * @returns {{status: typeof UNKNOWN, reason: string, owner: string, action: string, value?: never, evidence?: never}}
+ */
 function unknown(reason, owner, action) {
   return { status: UNKNOWN, reason, owner, action };
 }
 
+/**
+ * @template T
+ * @param {T} value
+ * @param {unknown} evidence
+ * @returns {MeasuredMetric<T>}
+ */
 function measured(value, evidence) {
   return { status: 'measured', value, evidence };
 }
+
+/**
+ * @template T
+ * @typedef {{status: 'measured', value: T, evidence: unknown, reason?: never, owner?: never, action?: never}} MeasuredMetric
+ */
+/**
+ * @template T
+ * @typedef {ReturnType<typeof unknown> | MeasuredMetric<T>} ShippingMetric
+ */
 
 function actorEvidence(value, expectedRole) {
   if (!value || value.role !== expectedRole) return null;
@@ -91,6 +109,7 @@ function actorEvidence(value, expectedRole) {
   return id && evidence ? { id, evidence } : null;
 }
 
+/** @returns {(Record<string, string> & {state: string}) | null} */
 function executionEvidence(value) {
   if (!value || !EXECUTION_STATES.has(value.state)) return null;
   const fields = ['provider', 'model', 'harness', 'taskId', 'attemptId'];
@@ -222,6 +241,7 @@ export function projectShippingChain(
   const ordered = chain.ordered;
   const first = ordered[0];
   const last = ordered.at(-1);
+  /** @type {Record<string, ShippingMetric<string>>} */
   const actors = Object.fromEntries(
     REQUIRED_ROLES.map(role => [
       role,
@@ -232,16 +252,19 @@ export function projectShippingChain(
       ),
     ])
   );
+  /** @type {ShippingMetric<NonNullable<ReturnType<typeof executionEvidence>>>} */
   let execution = unknown(
     'execution-evidence-missing',
     'Symphony',
     'record-provider-model-harness-task-attempt'
   );
+  /** @type {ShippingMetric<NonNullable<ReturnType<typeof valueEvidence>>>} */
   let value = unknown(
     'value-justification-missing',
     'Summer',
     'record-founder-request-or-summer-priority'
   );
+  /** @type {ShippingMetric<NonNullable<ReturnType<typeof referenceEvidence>>>} */
   let refs = unknown(
     'source-pr-run-evidence-missing',
     'Gem',
@@ -344,6 +367,10 @@ export function projectShippingChain(
   };
 }
 
+/**
+ * @param {unknown} chains
+ * @param {{now?: string, windowMs?: number, staleAfterMs?: number}} [options]
+ */
 export function projectShippingPortfolio(
   chains,
   {
