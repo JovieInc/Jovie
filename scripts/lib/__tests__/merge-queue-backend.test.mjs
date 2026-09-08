@@ -362,14 +362,24 @@ function executeAdmissionScope({
   }
 }
 
+/**
+ * @param {{
+ *   state?: string,
+ *   reason?: string,
+ *   mainSha?: string,
+ *   workflowId?: string | number,
+ *   readerExit?: number,
+ *   markerOutput?: string,
+ * }} [options]
+ */
 function executeReleaseCheckpoint({
-  state,
-  reason,
+  state = 'none',
+  reason = 'no_marker',
   mainSha = HEAD,
   workflowId = 12345,
   readerExit = 0,
   markerOutput = JSON.stringify({ state, reason }),
-}) {
+} = {}) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(
     workflow,
