@@ -6,7 +6,7 @@ const CANONICAL_ADMISSION_ACTOR = 'jovie-bot';
 const CANONICAL_ADMISSION_ENQUEUER = 'jovie-bot[bot]';
 const ADMISSION_RECEIPT_CONTEXT = 'jovie-queue-admission/v2';
 const ADMISSION_RECEIPT_PATTERN =
-  /^checkpoint=(verified|controller-repair|deploy-hold);main=([0-9a-f]{40});pr=([1-9][0-9]*)$/;
+  /^checkpoint=(verified|controller-repair);main=([0-9a-f]{40});pr=([1-9][0-9]*)$/;
 const ADMISSION_RECEIPT_MAX_DELAY_MS = 5 * 60_000;
 const ADMISSION_WORKFLOW_NAME = 'Merge Queue Auto-Enroll';
 const ADMISSION_WORKFLOW_PATH = '.github/workflows/merge-queue-autoenroll.yml';

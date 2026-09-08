@@ -122,7 +122,7 @@ Interpret the blast radius:
 |---|---|
 | `normal` | Queue should admit eligible clean PRs. |
 | `isolated-only` | Only one semantically isolated UI/docs PR may be promoted. |
-| `hold-intake` | Production unbound is a deploy hold (`prod-unbound-is-deploy-hold-v1`); CLEAN enroll and leases continue. |
+| `hold-intake` | Already admitted cohort is preserved; no new issue leases. |
 | `draft-only` | No merge-queue admissions; only safe draft work. |
 | `blocked` | No new intake, no promotion, no merge-queue admissions. |
 

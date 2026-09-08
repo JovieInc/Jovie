@@ -331,7 +331,6 @@ describe('merge-group admission evidence', () => {
   it.each([
     'verified',
     'controller-repair',
-    'deploy-hold',
   ])('requires canonical Jovie Bot admission with an exact %s checkpoint receipt', checkpoint => {
     expect(
       classifyCanonicalAdmissionProvenance({

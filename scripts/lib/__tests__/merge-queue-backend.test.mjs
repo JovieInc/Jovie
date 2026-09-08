@@ -1013,7 +1013,6 @@ describe('queue workflow mutation safety', () => {
     );
     const scope = workflowStep(workflow, 'Resolve exact admission scope');
     const enroll = workflowStep(workflow, 'Enroll clean PRs');
-    const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
     expect(workflow).toContain('actions: read');
     expect(checkpoint).toContain('.github/scripts/production-marker-state.mjs');
@@ -1025,9 +1024,6 @@ describe('queue workflow mutation safety', () => {
     expect(checkpoint).toContain('existing queue entries continue');
     expect(scope).toContain(
       '"${FLEET_PROMOTION_MODE:-blocked}" != \'controller-repair-only\''
-    );
-    expect(scope).toContain(
-      '"${FLEET_PROMOTION_MODE:-blocked}" != \'hold-intake\''
     );
     expect(scope).toContain("admission_disposition='neutral'");
     expect(scope).toContain('production-release-checkpoint-');
@@ -1092,33 +1088,6 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain(
       'preserving one attested controller-repair-only candidate'
     );
-
-    const unboundDeployHold = executeAdmissionScope({
-      productionAdmissionAllowed: false,
-      fleetPromotionMode: 'hold-intake',
-      pullRequestEvent: {
-        action: 'labeled',
-        label: { name: 'ready-to-merge' },
-        sender: { login: 'jovie-bot[bot]' },
-        pull_request: {
-          number: 16546,
-          base: { ref: 'main' },
-          head: { sha: HEAD },
-        },
-      },
-    });
-    expect(unboundDeployHold).toEqual(
-      expect.objectContaining({
-        disposition: 'candidate',
-        reason: 'pull-request-exact-head',
-        pr_number: '16546',
-        head_sha: HEAD,
-      })
-    );
-    expect(scope).toContain(
-      'Production unbound is a deploy hold; CLEAN enroll and leases continue'
-    );
-    expect(drain).toContain('checkpoint="deploy-hold"');
     expect(enroll).toContain('DRAIN_PROMOTION_MODE:');
     expect(enroll).toContain('needs.fleet-policy.outputs.mode');
 
