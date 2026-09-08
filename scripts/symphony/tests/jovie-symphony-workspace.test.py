@@ -56,6 +56,29 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         )
         self.assertNotEqual(rejected.returncode, 0)
 
+    def test_actual_5492_path_selects_elixir_namespace_without_accepting_escapes(self) -> None:
+        prefix = HELPER.read_text().split("\nrequire_root\ninit_state\n", 1)[0]
+        cases = {
+            "/home/timwhite/symphony-elixir-workspaces/JOV-5492": True,
+            "/srv/worktrees/jovie/JOV-5492": True,
+            "/home/timwhite/symphony-elixir-workspaces-other/JOV-5492": False,
+            "/home/timwhite/symphony-elixir-workspaces/../JOV-5492": False,
+            "/home/timwhite/symphony-elixir-workspaces/JOV-5492/child": False,
+            "/home/timwhite/symphony-elixir-workspaces/not-an-issue": False,
+            "/tmp/JOV-5492": False,
+        }
+        for logical, accepted in cases.items():
+            with self.subTest(logical=logical):
+                result = subprocess.run(
+                    ["bash", "-c", prefix + '\nselect_namespace_for_logical "$1"; '
+                     'issue_from_logical "$1"; printf "%s\\n" "$namespace"', "test", logical],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                if accepted:
+                    expected_namespace = "elixir" if logical.startswith("/home/") else "legacy"
+                    self.assertEqual(result.stdout.splitlines(), ["JOV-5492", expected_namespace])
+
     def test_reclaimer_scans_actual_and_legacy_logical_roots(self) -> None:
         service = RECLAIMER_SERVICE.read_text()
         self.assertIn('%h/symphony-elixir-workspaces', service)
