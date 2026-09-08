@@ -586,7 +586,18 @@ describe('ci-fast bounded parallel workflow', () => {
   it('keeps workflow contracts in the bounded CI control suite', () => {
     const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
 
-    expect(controlTest).toBe('node scripts/run-affected-tests.mjs --control');
+    expect(controlTest).toContain(
+      'scripts/symphony/tests/control-bundle-manifest.test.mjs'
+    );
+    expect(controlTest).toContain(
+      '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs'
+    );
+    expect(controlTest).toContain('--test-coverage-lines=90');
+    expect(controlTest).toContain('--test-coverage-branches=75');
+    expect(controlTest).toContain('--test-coverage-functions=90');
+    expect(controlTest).toContain(
+      '&& node scripts/run-affected-tests.mjs --control'
+    );
   });
 
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
@@ -932,6 +943,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_symphony_ui_pilot_runtime.py',
       'scripts/tests/test_symphony_reconciler_runtime.py',
       'scripts/symphony/closure_health.py',
+      'scripts/symphony/control-bundle-manifest.mjs',
       'scripts/symphony/config/gem-repo-registry.json',
       'scripts/symphony/config/model-registry.json',
       'scripts/symphony/evaluate-fleet-gate.sh',
@@ -952,6 +964,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/systemd/gem-pr-drain.service',
       'scripts/symphony/systemd/gem-pr-drain.timer',
       'scripts/symphony/tests/closure-health.test.py',
+      'scripts/symphony/tests/control-bundle-manifest.test.mjs',
       'scripts/symphony/tests/gem-pr-drain.test.py',
       'scripts/symphony/tests/gem-ops-hud.test.py',
       'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
