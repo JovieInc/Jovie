@@ -278,7 +278,7 @@ export interface RecordFounderCertificationDecisionInput {
     'decidedAt' | 'subjectId' | 'evidenceDigest'
   > & {
     readonly decidedAt?: string;
-    readonly evidenceDigest?: string;
+    readonly evidenceDigest: string;
   };
   readonly decidedAt?: string;
 }
@@ -1069,10 +1069,7 @@ export function recordFounderCertificationDecision(
     };
   }
 
-  if (
-    decision.evidenceDigest &&
-    decision.evidenceDigest !== admission.decisionEvidenceDigest
-  ) {
+  if (decision.evidenceDigest !== admission.decisionEvidenceDigest) {
     return {
       admission,
       blockers: [

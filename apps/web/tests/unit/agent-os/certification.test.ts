@@ -84,6 +84,7 @@ function approve(packet: CertificationReviewPacket) {
     decision: {
       decision: 'approved',
       id: 'decision-1',
+      evidenceDigest: buildCertificationDecisionDigest(packet),
       notes: null,
       reviewer: 'founder',
     },
@@ -94,6 +95,53 @@ function approve(packet: CertificationReviewPacket) {
   return recorded.decision;
 }
 describe('certification admission kernel', () => {
+  it.each([
+    undefined,
+    '',
+    'sha256:stale-review',
+  ])('rejects founder approval without the exact reviewed digest (%s)', evidenceDigest => {
+    const packet = reviewPacket();
+    const result = recordFounderCertificationDecision({
+      packet,
+      decision: {
+        decision: 'approved',
+        id: 'unbound-decision',
+        notes: null,
+        reviewer: 'founder',
+        evidenceDigest: evidenceDigest as string,
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unbound approval must fail');
+    expect(result.reason).toBe('decision_digest_mismatch');
+    expect(result.admission.state).toBe('review_ready');
+  });
+  it('rejects a previously displayed digest when the evidence packet changes', () => {
+    const displayed = reviewPacket();
+    const evidenceDigest = buildCertificationDecisionDigest(displayed);
+    const packet = reviewPacket({
+      testsCoverage: [
+        {
+          ...receipt('tests_coverage', 'changed-coverage'),
+          summary: 'Updated test outcome',
+        },
+      ],
+    });
+    const result = recordFounderCertificationDecision({
+      packet,
+      decision: {
+        decision: 'approved',
+        id: 'stale-review',
+        notes: null,
+        reviewer: 'founder',
+        evidenceDigest,
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('stale review must fail');
+    expect(result.reason).toBe('decision_digest_mismatch');
+  });
+
   it.each([
     '',
     'not-a-commit',
@@ -317,6 +365,7 @@ describe('certification admission kernel', () => {
       decision: {
         decision: 'approved',
         id: 'decision-2',
+        evidenceDigest: buildCertificationDecisionDigest(packet),
         notes: null,
         reviewer: 'founder',
       },
@@ -429,6 +478,7 @@ describe('certification admission kernel', () => {
       decision: {
         decision: 'changes_requested',
         id: 'decision-feedback',
+        evidenceDigest: buildCertificationDecisionDigest(reviewPacket()),
         notes: 'Tighten item-specific media.',
         reviewer: 'founder',
       },
@@ -441,20 +491,22 @@ describe('certification admission kernel', () => {
     expect(feedback.admission.auditHistory.map(event => event.type)).toContain(
       'founder_feedback_returned'
     );
+    const rejectionPacket = reviewPacket({
+      subject: {
+        id: 'another-feature',
+        kind: 'ovie-registry-projection',
+        title: 'Another feature',
+      },
+    });
     const rejection = recordFounderCertificationDecision({
       decision: {
         decision: 'rejected',
         id: 'decision-reject',
+        evidenceDigest: buildCertificationDecisionDigest(rejectionPacket),
         notes: 'Wrong source behavior.',
         reviewer: 'founder',
       },
-      packet: reviewPacket({
-        subject: {
-          id: 'another-feature',
-          kind: 'ovie-registry-projection',
-          title: 'Another feature',
-        },
-      }),
+      packet: rejectionPacket,
     });
     expect(rejection.ok).toBe(true);
     if (!rejection.ok) throw new Error('expected rejection to record');

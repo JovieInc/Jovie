@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CERTIFICATION_KERNEL_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
   selectLanes,
@@ -61,14 +62,26 @@ describe('ci-fast bounded parallel workflow', () => {
         CI_FAST_SOURCE.indexOf('const webParts = [')
       )
     );
-    expect(webParts).toContain(
+    expect(CERTIFICATION_KERNEL_COMMAND).toContain(
       'tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts'
     );
-    expect(webParts).toContain(
+    expect(CERTIFICATION_KERNEL_COMMAND).toContain(
       '--coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96'
     );
     expect(webParts).not.toContain('--passWithNoTests');
-    expect(WORKFLOW).toContain('apps/web/lib/agent-os/certification\\.ts$|');
+    expect(webParts).toContain('CERTIFICATION_KERNEL_COMMAND');
+    expect(LANE_COMMANDS.structural).toContain(CERTIFICATION_KERNEL_COMMAND);
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeDefined();
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'apps/web/lib/agent-os/certification.ts\n',
+      }).status
+    ).toBe(0);
   });
 
   it('covers every lane exactly once across the explicit hosted groups', () => {
@@ -454,7 +467,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+        ' && ' +
+        CERTIFICATION_KERNEL_COMMAND,
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
