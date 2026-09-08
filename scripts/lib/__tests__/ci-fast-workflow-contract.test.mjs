@@ -56,6 +56,65 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it.each([
+    { ci: 'true', available: false, suiteExit: 0, expected: 1 },
+    { ci: '', available: false, suiteExit: 0, expected: 0 },
+    { ci: 'true', available: true, suiteExit: 0, expected: 0 },
+    { ci: 'true', available: true, suiteExit: 37, expected: 37 },
+  ])('executes structural Python dependency policy %j', scenario => {
+    const command = CI_FAST_SOURCE.match(
+      /'(if python3 -c "import coverage, pytest"[^'\n]+)'/
+    )?.[1];
+    expect(command).toBeTruthy();
+    if (!command) throw new Error('missing structural Python command');
+    const root = mkdtempSync(join(tmpdir(), 'structural-python-policy-'));
+    const calls = join(root, 'calls');
+    try {
+      const shim = join(root, 'python3');
+      writeFileSync(
+        shim,
+        [
+          '#!/bin/sh',
+          'printf "%s\\n" "$*" >> "$POLICY_CALLS"',
+          'if [ "$1" = "-c" ]; then exit "$POLICY_IMPORT_EXIT"; fi',
+          'if [ "$1" = "-m" ] && [ "$2" = "pytest" ]; then exit "$POLICY_SUITE_EXIT"; fi',
+          'exit 0',
+          '',
+        ].join('\n')
+      );
+      chmodSync(shim, 0o755);
+      const result = spawnSync('/bin/sh', ['-c', command], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CI: scenario.ci,
+          PATH: `${root}:${process.env.PATH}`,
+          POLICY_CALLS: calls,
+          POLICY_IMPORT_EXIT: scenario.available ? '0' : '1',
+          POLICY_SUITE_EXIT: String(scenario.suiteExit),
+        },
+      });
+      expect(result.status, result.stderr).toBe(scenario.expected);
+      const invoked = readFileSync(calls, 'utf8');
+      if (scenario.available) {
+        expect(invoked).toContain('-m coverage run --branch');
+        expect(invoked).toContain('-m pytest scripts/tests/test_gh_retry.py');
+        expect(invoked).toContain(
+          'scripts/tests/test_symphony_reconciler_runtime.py -v'
+        );
+      } else {
+        expect(invoked.trim()).toBe('-c import coverage, pytest');
+        if (scenario.ci === 'true') {
+          expect(result.stderr).toContain('::error::pytest/coverage missing');
+        } else {
+          expect(result.stdout).toContain('skip local structural regressions');
+        }
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs desktop release regressions with measured coverage for mac changes', () => {
     expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
       '--test-coverage-include=scripts/desktop-release-assets.mjs'
