@@ -729,6 +729,22 @@ export function enrollmentPostcondition(state, expectedHeadOid) {
   return canAcceptExactHeadQueueReceipt(state, expectedHeadOid);
 }
 
+// ponytail: GitHub retains pending intent until required checks pass. It is
+// never queue membership and needs no compensating disable/re-enroll loop.
+function hasPendingAutoMergeIntent(state, expectedHeadOid) {
+  return Boolean(
+    state?.backend === 'native' &&
+      state.state === 'OPEN' &&
+      state.isDraft === false &&
+      state.headRefOid?.toLowerCase() === expectedHeadOid &&
+      hardHoldLabels(state).length === 0 &&
+      state.isInMergeQueue === false &&
+      state.mergeQueueEntry === null &&
+      UTC_TIMESTAMP_PATTERN.test(state.autoMergeRequest?.enabledAt ?? '') &&
+      Number.isFinite(Date.parse(state.autoMergeRequest.enabledAt))
+  );
+}
+
 /**
  * Deterministic reason a native exact-head read is not an authoritative receipt.
  *
@@ -1102,6 +1118,15 @@ export async function enrollPullRequest({
       state: before,
     };
   }
+  if (hasPendingAutoMergeIntent(before, expectedHead)) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      disposition: 'auto-merge-pending',
+      mutationActor,
+      state: before,
+    };
+  }
 
   let mutationError = null;
   try {
@@ -1127,6 +1152,16 @@ export async function enrollPullRequest({
       changed: true,
       mutationActor,
       postconditionAttempts: observation.attempts,
+      reconciledAfterCommandError: Boolean(mutationError),
+      state: observation.state,
+    };
+  }
+  if (hasPendingAutoMergeIntent(observation.state, expectedHead)) {
+    return {
+      backend: resolvedBackend,
+      changed: true,
+      disposition: 'auto-merge-pending',
+      mutationActor,
       reconciledAfterCommandError: Boolean(mutationError),
       state: observation.state,
     };

@@ -284,6 +284,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
@@ -2282,6 +2283,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       ...['--config', 'vitest.config.mts'],
       'run',
       ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
+      '--coverage',
+      '--coverage.include=merge-queue-backend.mjs',
+      '--coverage.include=lib/merge-group-admission.mjs',
+      '--coverage.thresholds.perFile=true',
+      '--coverage.thresholds.lines=85',
+      '--coverage.thresholds.branches=75',
+      '--coverage.thresholds.functions=82',
     ]);
   }
   const base = argValue(args, '--base', 'origin/main');

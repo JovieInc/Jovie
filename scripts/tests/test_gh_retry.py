@@ -1942,6 +1942,8 @@ class TestDrainPrQueueWiring:
             ("failure", "failure", "verified", 1, "1"),
             ("valid", "success", "verified", 0, "0"),
             ("valid", "success", "unavailable", 1, "1"),
+            ("pending", "success", "verified", 0, "0"),
+            ("malformed-pending", "success", "verified", 1, "1"),
         ],
     )
     def test_native_enrollment_requires_receipt_and_compensates_once(
@@ -1974,6 +1976,14 @@ class TestDrainPrQueueWiring:
                     fi
                     if [[ "${{FAKE_ENROLL_MODE:?}}" == "valid" ]]; then
                       echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":3}}}}}}'
+                      exit 0
+                    fi
+                    if [[ "${{FAKE_ENROLL_MODE:?}}" == "pending" ]]; then
+                      echo '{{"disposition":"auto-merge-pending","state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":{{"enabledAt":"2026-09-08T16:00:00Z"}}}}}}'
+                      exit 0
+                    fi
+                    if [[ "${{FAKE_ENROLL_MODE:?}}" == "malformed-pending" ]]; then
+                      echo '{{"disposition":"auto-merge-pending","state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":null}}}}'
                       exit 0
                     fi
                     echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":null}}}}'
@@ -2058,6 +2068,10 @@ class TestDrainPrQueueWiring:
         if enroll_mode == "valid" and checkpoint_state == "verified":
             assert "+native-queue on #101" in result.stdout
             assert "state AWAITING_CHECKS, position 3" in result.stdout
+        elif enroll_mode == "pending":
+            assert "+auto-merge intent on #101" in result.stdout
+            assert "+native-queue on #101" not in result.stdout
+            assert status_posts.read_text(encoding="utf-8") == ""
         else:
             assert "native enrollment" in result.stderr
         if dequeue_mode == "failure":

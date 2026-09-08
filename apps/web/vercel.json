@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
-  "installCommand": "corepack enable && corepack pnpm install",
-  "buildCommand": "corepack pnpm run build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm run build",
   "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;if [[ $R == main || $R == production ]]; then exit 1; fi;exit 0'",
   "github": {
     "autoAlias": false
