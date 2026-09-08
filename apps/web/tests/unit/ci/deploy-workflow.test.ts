@@ -1688,6 +1688,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const runtimeKeys = [
       'BETTER_AUTH_URL',
       'NEXT_PUBLIC_BETTER_AUTH_URL',
+      'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       'BETTER_AUTH_SECRET',
       'DATABASE_URL',
       'SESSION_SECRET',
@@ -4302,6 +4303,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(canaryIndex).toBeGreaterThan(inspectIndex);
     expect(stageStep).toContain('scripts/reconcile-vercel-build-env.ts');
     expect(stageStep).toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('NEXT_PUBLIC_GOOGLE_CLIENT_ID');
     expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
     expect(stageStep).toContain('--meta "githubCommitSha=${EXPECTED_SHA}"');
