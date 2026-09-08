@@ -195,7 +195,19 @@ describe('merge-group admission evidence', () => {
     ).toBe(ADMISSION_CONTRACT_VERSION);
   });
 
-  it('runs the paginated GitHub adapter and writes exact action outputs', async () => {
+  it.each([
+    ['single page', null],
+    ['later receipt', null],
+    ['numeric repository link', null],
+    ['invalid url', /pagination is malformed/],
+    ['malformed page', /receipt page is malformed/],
+    ['malformed link', /pagination is malformed/],
+    ['foreign link', /pagination is malformed/],
+    ['repeated page', /pagination is malformed/],
+    ['duplicate ids', /repeated status ids/],
+    ['exhausted pages', /pagination limit exhausted/],
+    ['deadline', /API deadline expired/],
+  ])('runs the GitHub adapter: %s', async (scenario, failure) => {
     const checkpointMainSha = '9'.repeat(40);
     const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));
     const eventPath = join(directory, 'event.json');
@@ -203,6 +215,8 @@ describe('merge-group admission evidence', () => {
     const summaryPath = join(directory, 'summary.md');
     await writeFile(eventPath, JSON.stringify(event()), 'utf8');
     const requests = [];
+    /** @type {import('vitest').MockInstance<() => number> | undefined} */
+    let clock;
     const fetchImpl = vi.fn(async (url, init) => {
       requests.push({ url, init });
       if (url.endsWith('/graphql')) {
@@ -222,11 +236,45 @@ describe('merge-group admission evidence', () => {
       }
       if (url.includes('/git/ref/')) return Response.json(queueRef());
       if (url.includes('/statuses?')) {
-        return Response.json([
-          admissionStatus({
-            description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
-          }),
-        ]);
+        const page = Number(new URL(url).searchParams.get('page'));
+        const receipt = admissionStatus({
+          description: `checkpoint=verified;main=${checkpointMainSha};pr=123`,
+        });
+        if (scenario === 'single page') return Response.json([receipt]);
+        if (scenario === 'malformed page' && page === 2) {
+          return Response.json({ statuses: [receipt] });
+        }
+        const statuses = Array.from(
+          { length: page === 3 && scenario !== 'exhausted pages' ? 55 : 100 },
+          (_, index) => ({
+            id: 1000 + (page - 1) * 100 + index,
+            context: 'unrelated-check',
+          })
+        );
+        if (scenario === 'duplicate ids' && page === 2) statuses[0].id = 1000;
+        if (page === 3 && scenario !== 'exhausted pages') {
+          statuses[54] = receipt;
+          return Response.json(statuses);
+        }
+        if (scenario === 'deadline') {
+          clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600_000);
+        }
+        const next = new URL(url);
+        next.searchParams.set(
+          'page',
+          String(scenario === 'repeated page' ? page : page + 1)
+        );
+        if (scenario === 'foreign link') next.hostname = 'untrusted.example';
+        if (scenario === 'numeric repository link')
+          next.pathname = `/repositories/1030964787/statuses/${SOURCE_HEAD}`;
+        return Response.json(statuses, {
+          headers: {
+            link:
+              scenario === 'malformed link'
+                ? 'not-a-link'
+                : `<${scenario === 'invalid url' ? 'bad-url' : next}>; rel="next"`,
+          },
+        });
       }
       if (url.includes('/actions/runs/123456789')) {
         return Response.json(
@@ -257,9 +305,25 @@ describe('merge-group admission evidence', () => {
     };
 
     try {
+      if (failure) {
+        await expect(runAdmissionFromEnv(env, { fetchImpl })).rejects.toThrow(
+          failure
+        );
+        expect(
+          requests.filter(request => request.url.includes('/statuses?')).length
+        ).toBeLessThanOrEqual(10);
+        expect(
+          requests.some(request => request.url.includes('/actions/runs/'))
+        ).toBe(false);
+        await expect(readFile(outputPath, 'utf8')).rejects.toThrow(/ENOENT/);
+        return;
+      }
       await expect(
         runAdmissionFromEnv(env, { fetchImpl })
       ).resolves.toMatchObject({ admitted: true, pr: 123, syntheticSha: HEAD });
+      expect(
+        requests.filter(request => request.url.includes('/statuses?'))
+      ).toHaveLength(scenario === 'single page' ? 2 : 6);
       expect(
         requests.filter(request => request.url.endsWith('/graphql'))
       ).toHaveLength(6);
@@ -295,6 +359,7 @@ describe('merge-group admission evidence', () => {
         })
       ).rejects.toThrow(/GitHub API 403/);
     } finally {
+      clock?.mockRestore();
       await rm(directory, { force: true, recursive: true });
     }
   });
