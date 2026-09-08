@@ -649,6 +649,28 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("JOV-B5 ·", plain)
         self.assertIn("… and 2 more blocked", plain)
 
+    def test_stale_blocked_rows_are_not_presented_as_current_failures(self):
+        plain = strip(
+            paint(
+                symphony={
+                    "ok": False,
+                    "stale": True,
+                    "running": None,
+                    "retrying": None,
+                    "blocked": None,
+                    "cap": 1,
+                    "rows": [{"kind": "blocked", "id": "JOV-STALE", "error": "old failure", "stale": True}],
+                    "generated_at": NOW.isoformat(),
+                },
+                width=430,
+                height=90,
+            )
+        )
+        self.assertIn("BLOCKED: UNKNOWN", plain)
+        self.assertIn("Blocked source UNKNOWN", plain)
+        self.assertNotIn("JOV-STALE", plain)
+        self.assertNotIn("old failure", plain)
+
     def test_rendered_table_exposes_failure_message_and_execution_identity(self):
         symphony = {
             "ok": True,

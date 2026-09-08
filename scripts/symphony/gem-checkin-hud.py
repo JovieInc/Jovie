@@ -2975,7 +2975,11 @@ def render(
         blocks.append([_rgb(PURPLE, "└" + ("─" * max(0, cols - 2)) + "┘")])
         blocks.append([""])
 
-        blocked_rows = [row for row in (symphony.get("rows") or []) if isinstance(row, dict) and row.get("kind") == "blocked"]
+        blocked_rows = [
+            row
+            for row in (symphony.get("rows") or [])
+            if isinstance(row, dict) and row.get("kind") == "blocked" and not row.get("stale")
+        ]
         blocked_count = symphony.get("blocked") if symphony.get("ok") and not symphony.get("stale") and isinstance(symphony.get("blocked"), int) else UNKNOWN
         retrying_count = symphony.get("retrying") if symphony.get("ok") and not symphony.get("stale") and isinstance(symphony.get("retrying"), int) else UNKNOWN
         blocks.append([_rgb(RED, clip(f"┌─ BLOCKED: {blocked_count} · RETRYING: {retrying_count} · retained until resolved or state changes", cols), bold=True)])
