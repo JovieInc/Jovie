@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
@@ -44,7 +44,18 @@ describe('Vercel source contract', () => {
     assert.equal(config.framework, 'nextjs');
     assert.equal(config.buildCommand, 'corepack pnpm run build');
     assert.equal(config.outputDirectory, '.next');
-    assert.match(config.ignoreCommand, /@jovie\/docs/);
+    // The current native Vercel policy builds release branches and skips PRs.
+    for (const [branch, status] of [
+      ['main', 1],
+      ['production', 1],
+      ['codex/test', 0],
+    ]) {
+      const result = spawnSync('bash', ['-c', config.ignoreCommand], {
+        env: { ...process.env, VERCEL_GIT_COMMIT_REF: branch },
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, status, result.stderr);
+    }
     assert.doesNotMatch(config.buildCommand, /@jovie\/web/);
   });
 });

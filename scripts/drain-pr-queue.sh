@@ -1397,8 +1397,13 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       .state.state == "OPEN"
       and (.state.isDraft | not)
       and ((.state.headRefOid // "") | ascii_downcase) == $expected_head
-      and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
-      and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
+      and (
+        ((.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
+          and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0))
+        or (.disposition == "auto-merge-pending"
+          and .state.isInMergeQueue == false and .state.mergeQueueEntry == null
+          and (.state.autoMergeRequest.enabledAt | type == "string" and length > 0))
+      )
     ' <<<"$enrollment_receipt" >/dev/null; then
       echo "    !! native enrollment returned no exact-head positioned queue receipt for #$n" >&2
       if ! dequeue_strict "$n"; then
@@ -1493,6 +1498,14 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         fi
         return 2
       fi
+    fi
+
+    # ponytail: pending native intent is not a failed enqueue. All exact-head,
+    # hold and scoped-evidence rereads above still apply. Do not mint a queue
+    # receipt before GitHub creates membership; its enqueued event continues.
+    if jq -e '.disposition == "auto-merge-pending"' <<<"$enrollment_receipt" >/dev/null; then
+      echo "    +auto-merge intent on #$n at $expected_head (pending required checks; no queue admission receipt)"
+      return 0
     fi
 
     # Retain a typed exact-head record before treating the native queue

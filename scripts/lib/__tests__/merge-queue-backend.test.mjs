@@ -2297,7 +2297,7 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(true);
   });
 
-  it('rejects auto-merge success without an authoritative native queue entry', async () => {
+  it('preserves existing native intent across discovery without claiming queue membership', async () => {
     const runner = createNativeRunner({
       states: [
         prState({ autoMergeRequest: AUTO_MERGE }),
@@ -2306,17 +2306,16 @@ describe('native enrollment', () => {
     });
     await expect(
       enroll(runner, { postconditionAttempts: 1 })
-    ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
-      details: {
-        state: {
-          autoMergeEnabled: true,
-          mergeQueueEntry: null,
-          queued: false,
-        },
+    ).resolves.toMatchObject({
+      changed: false,
+      disposition: 'auto-merge-pending',
+      state: {
+        autoMergeEnabled: true,
+        mergeQueueEntry: null,
+        queued: false,
       },
     });
-    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedNativeMutation(runner)).toBe(false);
   });
 
   it('no-ops only after GraphQL proves queue state and position', async () => {
@@ -2420,11 +2419,11 @@ describe('native enrollment', () => {
     });
   });
 
-  it('does not accept a success-only auto-merge request without a queue entry', async () => {
+  it('preserves new native intent pending checks after bounded membership reads', async () => {
     const wait = vi.fn(async () => {});
     const successOnly = prState({ autoMergeRequest: AUTO_MERGE });
     const runner = createNativeRunner({
-      states: [successOnly, successOnly, successOnly],
+      states: [prState(), successOnly, successOnly],
     });
 
     await expect(
@@ -2433,17 +2432,64 @@ describe('native enrollment', () => {
         postconditionDelayMs: 2_000,
         wait,
       })
-    ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
-      details: {
-        postconditionAttempts: 2,
-        state: {
-          autoMergeRequest: AUTO_MERGE,
-          mergeQueueEntry: null,
-        },
+    ).resolves.toMatchObject({
+      changed: true,
+      disposition: 'auto-merge-pending',
+      state: {
+        autoMergeRequest: AUTO_MERGE,
+        mergeQueueEntry: null,
+        queued: false,
       },
     });
     expect(invokedEnrollment(runner)).toBe(true);
+    expect(wait).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {},
+    { enabledAt: 'invalid' },
+    { enabledAt: null },
+  ])('rejects malformed native intent %j without claiming membership', async autoMergeRequest => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ autoMergeRequest })],
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({ code: 'enrollment_postcondition_failed' });
+  });
+
+  it.each([
+    'hold',
+    'gated',
+    'incident',
+    'queue-deferred',
+  ])('rejects pending intent when %s appears after the mutation', async label => {
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({
+          autoMergeRequest: AUTO_MERGE,
+          labels: { nodes: [{ name: label }] },
+        }),
+      ],
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({ code: 'held_pull_request' });
+  });
+
+  it('reconciles a transport error only when exact native intent is observed', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ autoMergeRequest: AUTO_MERGE })],
+      enableResult: ok({ errors: [{ message: 'request interrupted' }] }),
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).resolves.toMatchObject({
+      disposition: 'auto-merge-pending',
+      reconciledAfterCommandError: true,
+      state: { queued: false },
+    });
   });
 });
 
