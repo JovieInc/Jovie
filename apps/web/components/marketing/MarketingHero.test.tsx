@@ -20,6 +20,7 @@ describe('MarketingHero source-backed default story', () => {
 
     const heroRoots = container.querySelectorAll('section.marketing-hero');
     expect(heroRoots).toHaveLength(1);
+    expect(heroRoots[0]).not.toHaveAttribute('data-marketing-variant');
     expect(heroRoots[0]).toHaveAttribute(
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.section.hero
@@ -123,6 +124,7 @@ describe('MarketingHero source-backed default story', () => {
     render(
       <MarketingHero
         variant='centered'
+        sectionVariant='centered-none'
         headingId='centered-heading'
         testId='centered-hero'
       >
@@ -131,6 +133,7 @@ describe('MarketingHero source-backed default story', () => {
     );
 
     const shell = screen.getByTestId('centered-hero');
+    expect(shell.dataset.marketingVariant).toBe('centered-none');
     expect(shell).toHaveAttribute(
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.section.hero

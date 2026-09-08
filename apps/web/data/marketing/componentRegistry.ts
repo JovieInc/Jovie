@@ -258,7 +258,6 @@ const SECTION_RESOLUTIONS = {
         variantId: 'centered-none',
         componentPath: 'apps/web/components/homepage/HomepageEditorialHero.tsx',
         rootBinding: "data-testid='marketing-section-hero'",
-        delegatedProofs: [],
       },
       {
         variantId: 'left-none',
@@ -374,7 +373,6 @@ const SECTION_RESOLUTIONS = {
         componentPath:
           'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         rootBinding: "data-testid='marketing-section-feature-split'",
-        delegatedProofs: [],
       },
     ],
   },
