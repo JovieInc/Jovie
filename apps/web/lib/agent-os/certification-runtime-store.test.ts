@@ -51,7 +51,7 @@ it('constructs one Postgres registry store and forwards runtime operations', asy
     '2026-09-05T07:59:00.000Z'
   );
 
-  const projection = { existingEntryId: 'badge' };
+  const projection = { assuranceProfiles: [], existingEntryId: 'badge' };
   await expect(projectMarketingReviewReady(projection)).resolves.toBe(
     'projected'
   );

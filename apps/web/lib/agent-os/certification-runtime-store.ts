@@ -28,6 +28,9 @@ export async function ingestMarketingCertificationPacket(
 export async function projectMarketingReviewReady(input: {
   readonly existingEntryId: string | null;
   readonly evaluatedAt?: string;
+  readonly assuranceProfiles: Parameters<
+    MarketingCertificationStore['projectReviewReady']
+  >[0]['assuranceProfiles'];
 }): Promise<MarketingReviewReadyProjection> {
   return getMarketingCertificationStore().projectReviewReady(input);
 }

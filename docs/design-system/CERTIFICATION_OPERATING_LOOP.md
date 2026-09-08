@@ -65,6 +65,48 @@ the existing certification kernel and Review Ready boundary.
   and authorize packet ingestion and founder decisions; caller-supplied reviewer
   text is an audit field, not proof of founder identity.
 
+### Per-identity assurance requirements
+
+Kernel tiers remain the shared evidence envelope; they are not the denominator
+of every feature-specific check. Before Review Ready projection or a founder
+decision, the adapter therefore requires an assurance profile for that exact
+marketing registry identity. The profile names the expected receipt id, tier,
+immutable reference, and real selector for each applicable requirement. Its own
+version and exact content digest must be present as a `canonical_references`
+receipt, so a profile change alters the founder-reviewed packet rather than
+becoming hidden policy outside the decision digest.
+
+Security, integrity, accessibility, and correctness each require exactly one
+explicit disposition. Applicable requirements need one passed, same-source,
+exact-reference receipt; a genuinely inapplicable dimension needs a written
+rationale. Additional relevant prerequisites may name written invariants, skill
+versions, prior feedback or PR dispositions, landed coverage/enforcement, an
+exact-build render, independent review, and authenticated Pro-review custody.
+Browser-selected mode, screenshots, copied transcripts, and normalized review
+summaries do not establish service-observed per-response identity or a signed
+custody chain. Missing mappings, missing receipts, failed receipts, ambiguous
+duplicate receipts, stale source bindings, and reference mismatches make only
+that identity `unqualified`. Another qualified identity can continue; this is
+not a global release freeze.
+
+For public pages, the required quality floor is 97. A 100-point parity target is
+optional and separate. Optional parity metadata must include expected ROI,
+total ownership cost, confidence, displaced work, and a measured trigger, but
+that metadata is only an advisory prioritization record and cannot prove the
+outcome or block an otherwise qualified identity. Optional economics also do
+not authorize a reusable risk-preapproval envelope; an unavoidable fragility
+increase still needs Tim's explicit approval for the exact candidate and
+residual risk.
+
+This adapter evaluation is shared check substrate and evidence projection, not
+a queue or release admission authority. The complete readiness contract belongs
+in visible required checks: missing, stale, failed, or producer-unavailable
+evidence must make the affected required check visibly fail. Once those checks
+are green and native auto-merge is enabled, no hidden adapter/controller veto is
+introduced here. Source green, screenshots, coordination inventories, and local
+Pro-review provenance remain inputs only until their exact named receipts and
+required-check enforcement are proven.
+
 ## Adapter reference
 
 | Module | Surface | Responsibility |
