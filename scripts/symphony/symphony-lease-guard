@@ -403,7 +403,7 @@ def check(identifier: str) -> int:
     # Slow tracker I/O must not serialize independent issue checks. Re-read the
     # ledger after it completes so stale responses see every committed fence.
     issue = _fetch_issue(identifier)
-    active_states = _active_states()
+    active_states = _active_states() - {"in review"}
     repair = _existing_repair_preflight(identifier, issue)
     try:
         with _state_transaction():

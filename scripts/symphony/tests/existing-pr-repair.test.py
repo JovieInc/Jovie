@@ -292,8 +292,11 @@ class RepairTests(unittest.TestCase):
         normalized = {"identifier": IDENT, "state": "In Review", "updatedAt": REVISION, "updatedAtEpoch": 100.0}
         with mock.patch.dict(os.environ, {"SYMPHONY_LEASE_GUARD_STATE_DIR": str(state_dir)}), \
              mock.patch.object(guard, "_fetch_issue", return_value=normalized), \
+             mock.patch.object(guard, "_active_states", return_value=frozenset({"todo", "in review"})), \
              mock.patch.object(guard, "_existing_repair_preflight", return_value=True):
             self.assertEqual(guard.initialize(), 0)
+            with mock.patch.object(guard, "_existing_repair_preflight", return_value=False):
+                self.assertEqual(guard.check(IDENT), 1)
             self.assertEqual(guard.check(IDENT), 0)
             state = guard._load_state()
             key = guard._tombstone_key(IDENT, guard._repository_for_identifier(IDENT))
