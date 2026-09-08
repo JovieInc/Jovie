@@ -322,6 +322,7 @@ test('weekly stewardship caller rejects authority escalation and duplicate intak
   const result = validateStewardshipAudit(audit, { now: GROWTH_NOW });
   assert.equal(result.ok, false);
   assert.equal(result.growthLearning.status, 'invalid');
+  assert.equal(result.findings.length, 12);
   assert.match(
     result.errors.join('\n'),
     /JOV-INV-028: growth-learning-duplicate-dedupe-key/
@@ -336,4 +337,13 @@ test('weekly stewardship caller rejects authority escalation and duplicate intak
   const projection = projectStewardshipAudit(audit, result);
   assert.equal(projection.growthLearning.status, 'invalid');
   assert.equal(projection.growthLearning.results[0].eligible, false);
+  assert.equal(projection.summary.actionableExceptions, 12);
+
+  const expiredAudit = clone(loadStewardshipAudit());
+  const expired = validateStewardshipAudit(expiredAudit, {
+    now: new Date('2026-10-04T00:00:00.000Z'),
+  });
+  assert.equal(expired.ok, false);
+  assert.equal(expired.findings.length, 12);
+  assert.match(expired.errors.join('\n'), /proposal-expired/);
 });

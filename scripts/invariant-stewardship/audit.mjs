@@ -412,6 +412,7 @@ export function validateStewardshipAudit(audit, { now = new Date() } = {}) {
   if (!Array.isArray(audit?.founderQueue)) {
     errors.push('founderQueue must be an array');
   }
+  const coreErrors = errors.length;
   const growthLearning = validateGrowthLearningIntake(
     audit?.growthLearningIntake,
     { now }
@@ -419,7 +420,7 @@ export function validateStewardshipAudit(audit, { now = new Date() } = {}) {
   for (const error of growthLearning.errors) {
     errors.push(`${GROWTH_LEARNING_INVARIANT_ID}: ${error}`);
   }
-  if (errors.length > 0) {
+  if (coreErrors > 0) {
     return { ok: false, errors, findings: [], growthLearning };
   }
 
