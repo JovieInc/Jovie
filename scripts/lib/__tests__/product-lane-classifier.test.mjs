@@ -37,6 +37,19 @@ describe('product lane classifier', () => {
     ).toThrow(ProductLaneClassificationError);
   });
 
+  it('selects the web contract lane for release communications extraction', () => {
+    const receipt = classifyProductLanes([
+      'packages/release-communications/index.ts',
+      'packages/release-communications/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['web', 'cross-product']);
+    expect(
+      receipt.classifications.every(
+        item => item.rule === 'shared-release-communications'
+      )
+    ).toBe(true);
+  });
+
   it('keeps the allowlisted invariant addition operations-only', () => {
     const before = 'node scripts/invariants/validate.mjs';
     const receipt = pkg(
