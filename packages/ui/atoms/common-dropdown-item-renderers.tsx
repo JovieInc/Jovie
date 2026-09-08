@@ -97,7 +97,10 @@ function renderBadge(
       data-slot='common-dropdown-badge'
       style={
         badge.color
-          ? { backgroundColor: badge.color, color: 'white' }
+          ? {
+              backgroundColor: badge.color,
+              color: 'var(--color-badge-text)',
+            }
           : undefined
       }
     >
