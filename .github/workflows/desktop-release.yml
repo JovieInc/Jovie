@@ -1263,7 +1263,7 @@ jobs:
         if: env.ENVIRONMENT == 'staging'
         env:
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
-          JOVIE_STAGING_RELEASE: 'true'
+          JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           # Apple notarization via App Store Connect API key. All three are
           # required by @electron/notarize when notarize: true is set; if any
@@ -1397,6 +1397,8 @@ jobs:
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production'
         env:
+          JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
+          JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -1404,6 +1406,36 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
         run: pnpm --filter @jovie/desktop package:production
+
+      - name: Verify production desktop artifact set
+        if: env.ENVIRONMENT == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::VERSION is not a valid desktop semver."
+            exit 1
+          }
+
+          production_app="apps/desktop/dist/mac-universal/Jovie.app"
+          [ -d "$production_app" ] || {
+            echo "::error::Packaged production app bundle is missing."
+            exit 1
+          }
+          codesign --verify --deep --strict "$production_app"
+          spctl --assess --type execute --verbose=2 "$production_app"
+          xcrun stapler validate "$production_app"
+
+          production_dmg="apps/desktop/dist/Jovie-${release_version}-universal.dmg"
+          [ -f "$production_dmg" ] || {
+            echo "::error::Packaged production disk image is missing."
+            exit 1
+          }
+          codesign --verify --verbose=2 "$production_dmg"
+          xcrun stapler validate "$production_dmg"
+          spctl --assess --type open --context context:primary-signature \
+            --verbose=2 "$production_dmg"
 
       - name: Publish production desktop release
         id: publish-production

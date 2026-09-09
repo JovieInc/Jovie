@@ -28,8 +28,12 @@ import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
 );
-const { notarizeStagingDmg } = desktopRequire(
-  './scripts/notarize-staging-dmg.cjs'
+const { notarizeReleaseDmg } = desktopRequire(
+  './scripts/notarize-release-dmg.cjs'
+);
+const desktopProductionBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.yml', import.meta.url),
+  'utf8'
 );
 const desktopStagingBuilder = readFileSync(
   new URL('../apps/desktop/electron-builder.staging.yml', import.meta.url),
@@ -216,10 +220,10 @@ test('desktop builder can parse Electron macOS property lists', () => {
   assert.deepEqual(parsed, { CFBundleName: 'Jovie' });
 });
 
-test('staging DMG notarization finalizes blockmap and updater metadata after stapling', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'jovie-staging-dmg-'));
+test('release DMG finalization signs, notarizes, staples, and refreshes updater metadata', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'jovie-release-dmg-'));
   t.after(() => rm(dir, { force: true, recursive: true }));
-  const dmg = join(dir, 'Jovie-Staging-26.8.3-staging.1.1-universal.dmg');
+  const dmg = join(dir, 'Jovie-26.9.0-universal.dmg');
   const blockmap = `${dmg}.blockmap`;
   await writeFile(dmg, Buffer.from('pre-staple-dmg'));
   await writeFile(blockmap, Buffer.from('stale-blockmap'));
@@ -232,13 +236,13 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
   };
   const calls = [];
 
-  await notarizeStagingDmg(event, {
+  await notarizeReleaseDmg(event, {
     environment: {
       APPLE_API_ISSUER: 'issuer',
       APPLE_API_KEY: '/tmp/private-key.p8',
       APPLE_API_KEY_ID: 'key-id',
       JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
-      JOVIE_STAGING_RELEASE: 'true',
+      JOVIE_RELEASE_DMG: 'true',
     },
     executeCodesign: async args => {
       calls.push(['codesign', ...args]);
@@ -285,7 +289,7 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
   assert.notEqual(await readFile(blockmap, 'utf8'), 'stale-blockmap');
 });
 
-test('staging DMG notarization fails closed before publishing incoherent artifacts', async t => {
+test('release DMG finalization fails closed before publishing incoherent artifacts', async t => {
   const dmg = '/tmp/Jovie-Staging-26.8.3-staging.1.1-universal.dmg';
   const accepted = async () => ({
     stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
@@ -296,11 +300,11 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
     APPLE_API_KEY: '/tmp/private-key.p8',
     APPLE_API_KEY_ID: 'key-id',
     JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
-    JOVIE_STAGING_RELEASE: 'true',
+    JOVIE_RELEASE_DMG: 'true',
   };
 
   await t.test('ignores non-DMG artifacts', async () => {
-    await notarizeStagingDmg(
+    await notarizeReleaseDmg(
       { file: `${dmg}.blockmap`, updateInfo: {} },
       {
         buildBlockMap: () => assert.fail('must not build'),
@@ -312,7 +316,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
   });
   await t.test('keeps ordinary CI packaging credential-free', async () => {
     const updateInfo = { sha512: 'unchanged', size: 1 };
-    await notarizeStagingDmg(
+    await notarizeReleaseDmg(
       { file: dmg, updateInfo },
       {
         buildBlockMap: () => assert.fail('must not build'),
@@ -325,7 +329,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
   });
   await t.test('requires builder update metadata', async () => {
     await assert.rejects(
-      notarizeStagingDmg(
+      notarizeReleaseDmg(
         { file: dmg },
         { buildBlockMap: assert.fail, environment, executeXcrun: accepted }
       ),
@@ -338,7 +342,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
       ['signingIdentity', { ...environment, JOVIE_MAC_SIGNING_IDENTITY: '' }],
     ]) {
       await assert.rejects(
-        notarizeStagingDmg(
+        notarizeReleaseDmg(
           { file: dmg, updateInfo: {} },
           {
             buildBlockMap: assert.fail,
@@ -358,7 +362,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
       JSON.stringify({ id: '', status: 'Accepted' }),
     ]) {
       await assert.rejects(
-        notarizeStagingDmg(
+        notarizeReleaseDmg(
           { file: dmg, updateInfo: {} },
           {
             buildBlockMap: assert.fail,
@@ -373,7 +377,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
   });
   await t.test('stops before notarization when DMG signing fails', async () => {
     await assert.rejects(
-      notarizeStagingDmg(
+      notarizeReleaseDmg(
         { file: dmg, updateInfo: {} },
         {
           buildBlockMap: assert.fail,
@@ -389,7 +393,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
   });
   await t.test('requires final metadata for the stapled bytes', async () => {
     await assert.rejects(
-      notarizeStagingDmg(
+      notarizeReleaseDmg(
         { file: dmg, updateInfo: {} },
         {
           buildBlockMap: async () => ({ sha512: '', size: 0 }),
@@ -1044,7 +1048,13 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     'Cross-prove exact production evidence'
   );
   const build = job(desktopWorkflow, 'build');
+  const productionPackage = step(build, 'Package production desktop app');
+  const productionVerify = step(
+    build,
+    'Verify production desktop artifact set'
+  );
   const publish = step(build, 'Publish production desktop release');
+  const stagingPackage = step(build, 'Package staging desktop app');
   const stagingPublish = step(build, 'Publish staging desktop prerelease');
   const stagingVerify = step(build, 'Verify staging desktop artifact set');
   const stagingUpload = step(build, 'Upload staging desktop package');
@@ -1061,7 +1071,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
-    /JOVIE_STAGING_RELEASE: 'true'/,
+    /JOVIE_RELEASE_DMG: 'true'/,
     /package:production/,
     /sync-version\.mjs[\s\S]*--staging-version/,
     /Validate rolling staging prerelease/,
@@ -1076,6 +1086,24 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /desktop-release-assets\.mjs upload-and-publish/,
     /--dist "apps\/desktop\/dist"/,
   ]);
+  assertPatterns(stagingPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+  ]);
+  assertPatterns(productionPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+    /package:production/,
+  ]);
+  assertPatterns(productionVerify, [
+    /if: env\.ENVIRONMENT == 'production'/,
+    /codesign --verify --deep --strict "\$production_app"/,
+    /spctl --assess --type execute --verbose=2 "\$production_app"/,
+    /xcrun stapler validate "\$production_app"/,
+    /codesign --verify --verbose=2 "\$production_dmg"/,
+    /xcrun stapler validate "\$production_dmg"/,
+    /spctl --assess --type open --context context:primary-signature/,
+  ]);
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
@@ -1084,7 +1112,11 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   ]);
   assert.match(
     desktopStagingBuilder,
-    /^artifactBuildCompleted: scripts\/notarize-staging-dmg\.cjs$/m
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
+  );
+  assert.match(
+    desktopProductionBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
   );
   assert.doesNotMatch(
     build,
@@ -1119,6 +1151,14 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   assert.ok(
     build.indexOf('Prepare private production draft') <
       build.indexOf('Package production desktop app')
+  );
+  assert.ok(
+    build.indexOf('- name: Package production desktop app') <
+      build.indexOf('- name: Verify production desktop artifact set')
+  );
+  assert.ok(
+    build.indexOf('- name: Verify production desktop artifact set') <
+      build.indexOf('- name: Publish production desktop release')
   );
   assert.ok(
     build.indexOf('Validate rolling staging prerelease') <
