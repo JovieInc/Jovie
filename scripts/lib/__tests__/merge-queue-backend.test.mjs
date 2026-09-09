@@ -2261,7 +2261,52 @@ describe('native mutation actor boundary', () => {
   });
 });
 
+function ghTransportFixtureError(error, stderr, environment) {
+  let safeStderr = String(stderr ?? '');
+  // Never print inherited credentials, the command/argv, or process.env.
+  const secrets = Object.entries(environment)
+    .filter(
+      ([key, value]) =>
+        /token|secret|password|credential|api.?key/i.test(key) && value
+    )
+    .map(([, value]) => String(value))
+    .sort((a, b) => b.length - a.length);
+  for (const secret of secrets)
+    safeStderr = safeStderr.split(secret).join('[redacted]');
+  return new Error(
+    `gh HTTP transport fixture failed: ${JSON.stringify({
+      code: error.code ?? null,
+      killed: error.killed === true,
+      signal: error.signal ?? null,
+      stderr: safeStderr.slice(0, 1500),
+    })}`
+  );
+}
+
 describe('canonical admission membership binding', () => {
+  it('preserves process failure fields while redacting and bounding gh fixture stderr', () => {
+    const environment = {
+      GH_TOKEN: 'fixture-gh-token',
+      GITHUB_TOKEN: 'inherited-github-token',
+      OTHER_SECRET: 'other-private-value',
+    };
+    const error = ghTransportFixtureError(
+      { code: 'ETIMEDOUT', killed: true, signal: 'SIGTERM' },
+      `failed ${Object.values(environment).join(' ')} ${'x'.repeat(2000)}`,
+      environment
+    );
+    expect(error.message).toContain('ETIMEDOUT');
+    expect(error.message).toContain('"killed":true');
+    expect(error.message).toContain('SIGTERM');
+    expect(error.message).toContain('[redacted]');
+    for (const secret of Object.values(environment)) {
+      expect(error.message).not.toContain(secret);
+    }
+    expect(error.message.length).toBeLessThan(1800);
+    expect(ghTransportFixtureError({ code: 1 }, '', {}).message).toContain(
+      '"code":1,"killed":false,"signal":null'
+    );
+  });
   it('encodes the GraphQL Int through the real gh HTTP transport', async () => {
     const config = mkdtempSync(join(tmpdir(), 'membership-gh-'));
     /** @type {Array<Record<string, unknown>>} */
@@ -2302,9 +2347,15 @@ describe('canonical admission membership binding', () => {
       const result = await proveCanonicalMembership({
         ...nativeOptions(
           args =>
-            new Promise(resolve => {
+            new Promise((resolve, reject) => {
               // Only redirect the endpoint. gh itself converts the production
               // argument flags to JSON; no live account or GitHub request is involved.
+              const environment = {
+                ...process.env,
+                GH_CONFIG_DIR: config,
+                GH_TOKEN: 'fixture',
+                GH_ENTERPRISE_TOKEN: 'fixture',
+              };
               execFile(
                 'gh',
                 [
@@ -2313,16 +2364,16 @@ describe('canonical admission membership binding', () => {
                   ...args.slice(2),
                 ],
                 {
-                  env: {
-                    ...process.env,
-                    GH_CONFIG_DIR: config,
-                    GH_TOKEN: 'fixture',
-                    GH_ENTERPRISE_TOKEN: 'fixture',
-                  },
+                  env: environment,
                   timeout: 3000,
                 },
-                (error, stdout, stderr) =>
-                  resolve({ code: error ? 1 : 0, stdout, stderr })
+                (error, stdout, stderr) => {
+                  if (error) {
+                    reject(ghTransportFixtureError(error, stderr, environment));
+                    return;
+                  }
+                  resolve({ code: 0, stdout, stderr });
+                }
               );
             })
         ),
