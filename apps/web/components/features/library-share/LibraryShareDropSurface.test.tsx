@@ -68,16 +68,25 @@ describe('web-171 library share drop source contract', () => {
       />
     );
 
-    expect(screen.getByRole('link', { name: 'Open smart link' })).toHaveClass(
-      'h-7',
-      'before:h-11',
-      'before:min-w-11'
-    );
-    expect(screen.getByRole('link', { name: 'Download preview' })).toHaveClass(
-      'h-7',
-      'before:h-11',
-      'before:min-w-11'
-    );
+    for (const label of ['Open smart link', 'Download preview']) {
+      const action = screen.getByRole('link', { name: label });
+      expect(action).toHaveClass(
+        'h-auto',
+        'min-h-7',
+        'before:h-full',
+        'before:min-h-11',
+        'before:min-w-11'
+      );
+      for (const fixedHeight of [
+        'h-7',
+        'h-11',
+        'h-11!',
+        'h-12',
+        'before:h-11',
+      ]) {
+        expect(action).not.toHaveClass(fixedHeight);
+      }
+    }
   });
 
   it('keeps token lookup and passphrase access in the server route', () => {
