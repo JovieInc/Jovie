@@ -461,3 +461,68 @@ test.describe('desktop header shares the traffic-light row', () => {
     );
   });
 });
+
+test.describe('central runtime notifications', () => {
+  test('desktop update stays pending and is actionable in Inbox', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const fixture = window as unknown as {
+        available?: () => void;
+        downloaded?: () => void;
+        installs: number;
+        electronAPI: unknown;
+      };
+      fixture.installs = 0;
+      fixture.electronAPI = {
+        platform: 'darwin',
+        electronVersion: 'fixture',
+        onUpdateAvailable: (cb: () => void) => {
+          fixture.available = cb;
+          return () => {};
+        },
+        onUpdateDownloaded: (cb: () => void) => {
+          fixture.downloaded = cb;
+          return () => {};
+        },
+        installUpdateAndRestart: () => {
+          fixture.installs++;
+        },
+      };
+    });
+    await openStory(page, 'shell-sidebarinboxbutton--runtime-update', 'light');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => typeof (window as unknown as { available?: unknown }).available
+        )
+      )
+      .toBe('function');
+    await page.evaluate(() =>
+      (window as unknown as { available: () => void }).available()
+    );
+    await expect(
+      page.getByRole('button', { name: 'Downloading Jovie Update…' })
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('link', { name: 'Inbox — App Update Available' })
+    ).toHaveAttribute('href', '/app');
+    await page.evaluate(() =>
+      (window as unknown as { downloaded: () => void }).downloaded()
+    );
+    await expect(
+      page.getByRole('button', { name: 'Restart Jovie To Update' })
+    ).toBeEnabled();
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { installs: number }).installs
+      )
+    ).toBe(0);
+    await page.getByRole('button', { name: 'Restart Jovie To Update' }).click();
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { installs: number }).installs
+      )
+    ).toBe(1);
+  });
+});

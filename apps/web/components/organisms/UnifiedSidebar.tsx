@@ -6,13 +6,12 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
@@ -28,9 +27,7 @@ import {
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
-import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import { InstallBanner } from '@/components/shell/InstallBanner';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -46,16 +43,9 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
-import {
-  isElectronRuntime,
-  useIsElectronRuntime,
-} from '@/lib/desktop/electron-bridge';
-import { env } from '@/lib/env-client';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
-import {
-  useVersionMonitor,
-  type VersionMismatchInfo,
-} from '@/lib/hooks/useVersionMonitor';
+
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -71,9 +61,6 @@ export interface UnifiedSidebarProps {
   /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
   readonly variant?: BrandVariant;
 }
-
-const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
-const VERSION_NOTIFICATION_DELAY_MS = 10_000;
 
 /** Render a group of nav items */
 function SettingsNavGroup({
@@ -342,83 +329,6 @@ function SidebarHeaderNav({
   );
 }
 
-function ShellSidebarInstallBanner() {
-  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
-  const [versionUpdate, setVersionUpdate] =
-    useState<VersionMismatchInfo | null>(null);
-  const [showVersionBanner, setShowVersionBanner] = useState(false);
-  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-
-  const handleVersionMismatch = useCallback((info: VersionMismatchInfo) => {
-    try {
-      if (sessionStorage.getItem(VERSION_DISMISSAL_KEY)) return;
-    } catch {
-      // Session storage may be unavailable in restricted browsers.
-    }
-
-    setVersionUpdate(info);
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-    }
-    notificationTimeoutRef.current = setTimeout(() => {
-      setShowVersionBanner(true);
-    }, VERSION_NOTIFICATION_DELAY_MS);
-  }, []);
-
-  useVersionMonitor({
-    onVersionMismatch: handleVersionMismatch,
-    enabled: !isPassiveRuntime,
-  });
-
-  useEffect(() => {
-    return () => {
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const dismissVersionUpdate = useCallback(() => {
-    try {
-      sessionStorage.setItem(VERSION_DISMISSAL_KEY, 'true');
-    } catch {
-      // Session storage may be unavailable in restricted browsers.
-    }
-    setShowVersionBanner(false);
-    setVersionUpdate(null);
-  }, []);
-
-  const reload = useCallback(() => {
-    globalThis.location.reload();
-  }, []);
-
-  if (isPassiveRuntime) {
-    return null;
-  }
-
-  if (!showVersionBanner || !versionUpdate) {
-    return null;
-  }
-
-  const title = getVersionUpdateTitle(versionUpdate.newVersion);
-
-  return (
-    <InstallBanner
-      open
-      icon={RefreshCw}
-      title={title}
-      description='A new version is available. Reload to update.'
-      ctaLabel='Reload'
-      ctaIcon={RefreshCw}
-      onCta={reload}
-      onDismiss={dismissVersionUpdate}
-      className='group-data-[collapsible=icon]:hidden'
-    />
-  );
-}
-
 function OperatorSessionControls() {
   const { signOut } = useAuthSafe();
   const handleSignOut = useCallback(async () => {
@@ -462,7 +372,6 @@ export function UnifiedSidebar({
   // Read the bridge synchronously so the desktop update listener mounts on
   // the first committed sidebar render. Electron emits update events once;
   // waiting for the effect-backed runtime hook would miss a boot-time event.
-  const isDesktop = isElectronRuntime();
 
   const { profileHref } = useProfileData(section !== 'ov');
 
@@ -517,19 +426,6 @@ export function UnifiedSidebar({
             )}
           </SidebarGroupContent>
         </SidebarGroup>
-        <div
-          data-sidebar='notifications'
-          data-testid='sidebar-notifications'
-          className='shrink-0 group-data-[collapsible=icon]:hidden'
-        >
-          {isDesktop ? (
-            <div className='flex px-2 pb-1.5'>
-              <UpdateAvailablePill />
-            </div>
-          ) : (
-            <ShellSidebarInstallBanner />
-          )}
-        </div>
       </SidebarContent>
 
       {section === 'ov' ? (
