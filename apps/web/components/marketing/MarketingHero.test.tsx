@@ -9,6 +9,7 @@ import marketingHeroMeta, {
   MARKETING_HERO_SOURCE_SHA,
   SourceBackedDefault,
 } from './MarketingHero.stories';
+import { MarketingHeroDeveloperCommand } from './MarketingHeroDeveloperCommand';
 
 vi.mock('@/components/features/home/HomeTrustSection', () => ({
   HomeTrustSection: () => <div data-testid='home-trust-section' />,
@@ -188,6 +189,23 @@ describe('MarketingHero source-backed default story', () => {
       ).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent('Copied command');
     });
+  });
+
+  it('covers the developer command leaf directly with its canonical copy contract', () => {
+    render(
+      <MarketingHeroDeveloperCommand
+        command='jovie --help'
+        copyLabel='Copy command'
+        copiedLabel='Copied command'
+        errorLabel='Copy failed'
+        availabilityNote='Available now.'
+      />
+    );
+
+    expect(screen.getByText('jovie --help')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Copy command' })
+    ).toHaveAttribute('type', 'button');
   });
 
   it('keeps the public heading override uncapped in the global stylesheet', () => {
