@@ -434,9 +434,7 @@ export function UnifiedSidebar({
               <DashboardNav headerOwnsInbox={!isDemoRoute}>
                 {isDemoRoute ? (
                   <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
-                ) : (
-                  <HeaderSearchSurfaceFromContext calm />
-                )}
+                ) : null}
               </DashboardNav>
             )}
           </SidebarGroupContent>
