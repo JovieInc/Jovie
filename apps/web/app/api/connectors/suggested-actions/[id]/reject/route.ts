@@ -1,3 +1,4 @@
+import { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
 /**
  * POST /api/connectors/suggested-actions/[id]/reject
  *
@@ -8,7 +9,7 @@
  * Does NOT insert a workflow_runs row — rejection requires no follow-up work.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
@@ -97,7 +98,8 @@ export async function POST(request: Request, { params }: RouteParams) {
         and(
           eq(suggestedActions.id, id),
           eq(suggestedActions.userId, userId),
-          eq(suggestedActions.status, 'pending')
+          eq(suggestedActions.status, 'pending'),
+          ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
         )
       )
       .returning({ id: suggestedActions.id, kind: suggestedActions.kind });
@@ -107,7 +109,11 @@ export async function POST(request: Request, { params }: RouteParams) {
         .select({ status: suggestedActions.status })
         .from(suggestedActions)
         .where(
-          and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+          and(
+            eq(suggestedActions.id, id),
+            eq(suggestedActions.userId, userId),
+            ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
+          )
         )
         .limit(1);
       if (existing?.status === 'rejected') {
