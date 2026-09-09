@@ -269,3 +269,79 @@ test.describe('sidebar account and tooltip regressions', () => {
     }
   }
 });
+
+test.describe('unified composer palette and dictation feedback', () => {
+  test.use({ reducedMotion: 'reduce' });
+  for (const theme of THEMES) {
+    for (const width of [1200, 390]) {
+      test(`shared entries and microphone recovery [${theme}, ${width}]`, async ({
+        page,
+      }, testInfo) => {
+        await page.setViewportSize({ width, height: 760 });
+        await page.addInitScript(() => {
+          class DeniedRecognition {
+            onerror: ((event: { error: string }) => void) | null = null;
+            start() {
+              queueMicrotask(() => this.onerror?.({ error: 'not-allowed' }));
+            }
+            stop() {}
+            abort() {}
+          }
+          Object.defineProperty(window, 'SpeechRecognition', {
+            configurable: true,
+            value: DeniedRecognition,
+          });
+        });
+        await openStory(page, 'jovie-components-chatinput--docked', theme);
+        const textarea = page.getByLabel('Chat Message Input');
+        const surface = page.getByTestId('chat-composer-surface');
+        await expect(textarea).toBeVisible();
+        await page.getByRole('button', { name: 'Attachment options' }).click();
+        await expect(page.getByRole('listbox')).toBeVisible();
+        const plusItems = await page.getByRole('option').allTextContents();
+        expect(plusItems[0]).toContain('Attach Files');
+        const filter = page.getByLabel('Filter Commands And References');
+        await expect(filter).toBeFocused();
+        await testInfo.attach(`plus-${theme}-${width}`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+        await filter.fill('audio');
+        await expect(
+          page.getByRole('option', { name: /Upload audio/ })
+        ).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(textarea).toBeFocused();
+        await expect(textarea).toHaveValue('');
+        await textarea.fill('/');
+        await expect(page.getByRole('listbox')).toBeVisible();
+        expect(await page.getByRole('option').allTextContents()).toEqual(
+          plusItems
+        );
+        await textarea.fill('/audio');
+        await expect(
+          page.getByRole('option', { name: /Upload audio/ })
+        ).toBeVisible();
+        await page.keyboard.press('Escape');
+        await textarea.fill('');
+        await expect(surface).toHaveCSS('transform', 'none');
+        const initial = await surface.boundingBox();
+        await page.getByTestId('dictation-toggle').click();
+        const alert = page.getByRole('alert');
+        await expect(alert).toContainText('Microphone access was denied');
+        expect(await surface.boundingBox()).toEqual(initial);
+        const alertBox = (await alert.boundingBox())!;
+        expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(initial!.y);
+        expect(alertBox.x).toBeGreaterThanOrEqual(0);
+        expect(alertBox.x + alertBox.width).toBeLessThanOrEqual(width);
+        await testInfo.attach(`microphone-error-${theme}-${width}`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+        await page.getByRole('button', { name: 'Dismiss' }).click();
+        await expect(alert).not.toBeVisible();
+        expect(await surface.boundingBox()).toEqual(initial);
+      });
+    }
+  }
+});

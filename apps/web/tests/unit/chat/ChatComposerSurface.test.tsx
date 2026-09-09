@@ -192,10 +192,10 @@ describe('ChatComposerSurface accessibility states', () => {
 
     const attach = screen.getByRole('button', { name: 'Attachment options' });
     expect(attach).toBeEnabled();
-    expect(attach).toHaveAttribute('aria-haspopup', 'menu');
+    expect(attach).toHaveAttribute('aria-haspopup', 'listbox');
     await user.hover(attach);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'Attach files'
+      'Add files, skills or references'
     );
 
     const dictate = screen.getByRole('button', {
@@ -262,7 +262,7 @@ describe('ChatComposerSurface accessibility states', () => {
     expect(dictate).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('offers an upload-song action from the new-chat composer', async () => {
+  it('offers an upload-audio action from the new-chat composer', async () => {
     const user = userEvent.setup();
     const onAudioAttach = vi.fn();
     renderComposer({ onAudioAttach });
@@ -270,7 +270,9 @@ describe('ChatComposerSurface accessibility states', () => {
     await user.click(
       screen.getByRole('button', { name: 'Attachment options' })
     );
-    await user.click(await screen.findByTestId('chat-composer-upload-song'));
+    await user.click(
+      await screen.findByRole('option', { name: /Upload audio/ })
+    );
     expect(onAudioAttach).toHaveBeenCalledOnce();
   });
 
