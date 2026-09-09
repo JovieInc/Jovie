@@ -181,7 +181,7 @@ Defined primarily in `apps/web/styles/linear-tokens.css` and consumed through cl
 
 #### Existing marketing/layout size tokens
 
-- `--linear-container-max: 1298px`
+- `--linear-container-max: 1298px` — RETIRED (JOV-5464); use `--ds-public-content-max` (1298px) instead
 - `--linear-content-max: 1200px`
 - `--linear-hero-section-max: 1024px`
 - `--linear-prose-max: 624px`
