@@ -24,7 +24,6 @@ export function HomepageNoScriptContent() {
     >
       <h2 id='homepage-no-script-heading'>{hero.headline}</h2>
       <p>{hero.subhead}</p>
-      <p>{certified.proof.statement}</p>
 
       {certified.sections.map(section => (
         <div key={section.id}>

@@ -60,9 +60,7 @@ describe('HomepageCertifiedSections', () => {
         'apps/web/components/homepage/HomepageCertifiedSections.tsx'
       );
     }
-    expect(proof).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.proof.statement
-    );
+    expect(proof).not.toHaveTextContent("Proof is earned. We don't borrow it.");
     expect(proof).toHaveTextContent("BUILT BY PEOPLE WHO'VE CREATED FOR");
     expect(
       proof.querySelector('[data-testid="homepage-trust"]')

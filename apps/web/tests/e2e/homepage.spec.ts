@@ -304,10 +304,12 @@ test.describe('Homepage', () => {
       Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
     ).toBeLessThanOrEqual(1);
 
-    // Section 2 is the earned-proof statement plus verified logos on the page
+    // Section 2 retains verified logos on the page
     // background, never a frosted card.
     const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(proof).toHaveText("Proof is earned. We don't borrow it.");
+    await expect(
+      page.getByText("Proof is earned. We don't borrow it.", { exact: true })
+    ).toHaveCount(0);
     await expect(
       proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
     ).toBeVisible();

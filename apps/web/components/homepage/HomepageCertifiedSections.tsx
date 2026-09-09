@@ -69,7 +69,7 @@ function sectionMedia(
 /**
  * Sections 2-8 of the certified homepage. Copy is locked in
  * HOMEPAGE_LAUNCH_COPY.certified; this component only owns rhythm: one quiet
- * proof statement with verified logos on the page background, then six
+ * verified logos on the page background, then six
  * top-ruled editorial sections on the shared content column, alternating
  * sides, with real product exports where they exist and nothing where they do
  * not.
@@ -77,7 +77,7 @@ function sectionMedia(
 export function HomepageCertifiedSections({
   previews,
 }: HomepageCertifiedSectionsProps) {
-  const { proof, sections } = HOMEPAGE_LAUNCH_COPY.certified;
+  const { sections } = HOMEPAGE_LAUNCH_COPY.certified;
 
   return (
     <>
@@ -89,7 +89,6 @@ export function HomepageCertifiedSections({
         data-marketing-variant='inline-strip'
         aria-label='Proof'
       >
-        <p className='homepage-certified-proof__statement'>{proof.statement}</p>
         <div className='homepage-certified-proof__logos system-b-mounted-home-trust-strip-shell'>
           <HomeTrustSection
             ariaLabel='People and teams who have created with Jovie'
