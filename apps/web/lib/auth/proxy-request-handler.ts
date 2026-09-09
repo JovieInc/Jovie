@@ -16,7 +16,6 @@ import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import { isCentralAuthPassThroughRoute } from '@/lib/auth/central-auth-routing';
 import { buildFinalResponse } from '@/lib/auth/final-response';
 import { captureError } from '@/lib/error-tracking';
-import { PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE } from '@/lib/profile/public-profile-indexing-policy';
 import { resolveLegacyRootPathRedirect } from '@/lib/routing/legacy-root-path-redirects';
 import {
   analyzeHost,
@@ -136,26 +135,6 @@ export async function handleProxyRequest(
     const pathInfo = categorizePath(pathname);
     const hostInfo = analyzeHost(hostname);
     const isNavigationMethod = req.method === 'GET' || req.method === 'HEAD';
-
-    // The admission fixture is a public, monitored route rather than a real
-    // creator identity. Redirect it in the proxy before the dynamic profile
-    // route can turn the reserved fixture into a cached 404. Keep the config
-    // redirect as a build-time defense, but enforce the contract here because
-    // the proxy runs on the deployed request path before App Router matching.
-    const profileAdmissionSuffix =
-      pathname === '/unfazed'
-        ? ''
-        : pathname.startsWith('/unfazed/')
-          ? pathname.slice('/unfazed'.length)
-          : null;
-    if (isNavigationMethod && profileAdmissionSuffix !== null) {
-      const targetUrl = new URL(
-        `/${PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE}${profileAdmissionSuffix}`,
-        req.url
-      );
-      targetUrl.search = req.nextUrl.search;
-      return NextResponse.redirect(targetUrl, 307);
-    }
 
     // ========================================================================
     // Generate CSP nonce early and set on request headers

@@ -1,18 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanner';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { QueryProvider } from '@/components/providers/QueryProvider';
-import {
-  HOMEPAGE_PROFILE_PREVIEW_ARTIST,
-  HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
-  HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES,
-  HOMEPAGE_PROFILE_PREVIEW_RELEASES,
-  HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
-  HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
-} from '@/features/home/homepage-profile-preview-fixture';
-import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
+import { PublicProfileFixture } from '@/features/profile/PublicProfileFixture';
 import { MarketingStateRenderClient } from '../[state]/MarketingStateRenderClient';
 
 function DeliberateRedDesktopHybrid() {
@@ -48,54 +39,6 @@ function DeliberateRedDesktopHybrid() {
         </nav>
       </div>
     </div>
-  );
-}
-
-function PublicProfileFixture({
-  longName,
-  preview = false,
-  state = 'unclaimed',
-}: Readonly<{ longName: boolean; preview?: boolean; state?: string }>) {
-  const artist = {
-    ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    name: longName ? 'The Extraordinary Midnight Radio Orchestra' : 'Unfazed',
-    handle: 'unfazed',
-  };
-
-  return (
-    <ProfileCompactTemplate
-      mode='profile'
-      artist={artist}
-      socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
-      contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
-      allowFanCapture={false}
-      latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
-      profileSettings={{ showOldReleases: true }}
-      genres={artist.genres ?? []}
-      photoDownloadSizes={[]}
-      pressPhotos={[]}
-      allowPhotoDownloads={false}
-      tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
-      releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
-      profileBanner={
-        <PublicClaimBanner
-          profileHandle={artist.handle}
-          displayName={artist.name}
-          directClaimSupported
-          claimRequiresVerification
-          isClaimed={state === 'claimed' || state === 'owner'}
-          visitorState={
-            state === 'owner'
-              ? 'owner'
-              : state === 'claimed'
-                ? 'claimed_public'
-                : 'organic_unclaimed'
-          }
-        />
-      }
-      embeddedPreview={preview}
-    />
   );
 }
 
