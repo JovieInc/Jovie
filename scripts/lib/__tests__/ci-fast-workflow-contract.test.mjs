@@ -63,6 +63,9 @@ describe('ci-fast bounded parallel workflow', () => {
       '--test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65'
     );
     expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      '--test-coverage-include=apps/desktop/scripts/notarize-staging-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50'
+    );
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
       'scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs'
     );
     expect(LANE_COMMANDS.structural).toContain(
@@ -81,6 +84,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/desktop-release-assets.mjs',
       'scripts/desktop-release-guard.test.mjs',
       'scripts/desktop-release-publisher.test.mjs',
+      'apps/desktop/scripts/notarize-staging-dmg.cjs',
     ]) {
       expect(
         spawnSync('grep', ['-qE', pattern], {

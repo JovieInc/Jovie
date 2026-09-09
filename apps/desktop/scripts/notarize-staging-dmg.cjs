@@ -31,11 +31,29 @@ function runXcrun(args) {
   });
 }
 
+function runCodesign(args) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'codesign',
+      args,
+      { encoding: 'utf8', maxBuffer: 1024 * 1024 },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve({ stderr, stdout });
+      }
+    );
+  });
+}
+
 async function notarizeStagingDmg(
   event,
   {
     buildBlockMap = loadBlockMapBuilder(),
     environment = process.env,
+    executeCodesign = runCodesign,
     executeXcrun = runXcrun,
   } = {}
 ) {
@@ -51,6 +69,7 @@ async function notarizeStagingDmg(
     issuer: environment.APPLE_API_ISSUER,
     key: environment.APPLE_API_KEY,
     keyId: environment.APPLE_API_KEY_ID,
+    signingIdentity: environment.JOVIE_MAC_SIGNING_IDENTITY,
   };
   for (const [name, value] of Object.entries(credentials)) {
     if (!value) {
@@ -59,6 +78,15 @@ async function notarizeStagingDmg(
       );
     }
   }
+
+  await executeCodesign([
+    '--force',
+    '--timestamp',
+    '--sign',
+    credentials.signingIdentity,
+    event.file,
+  ]);
+  await executeCodesign(['--verify', '--verbose=2', event.file]);
 
   const result = await executeXcrun([
     'notarytool',
