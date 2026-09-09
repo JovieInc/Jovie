@@ -135,11 +135,11 @@ for (const kind of [
     const f = fixture(t);
     const good = f.link(
       '.vercel/output/static/a-good',
-      f.put('apps/web/.next/asset.txt')
+      f.put('apps/web/.next/static/asset.txt')
     );
     let target;
     if (kind === 'escape') target = tmpdir();
-    if (kind === 'directory') target = resolve(f.root, 'apps/web/.next');
+    if (kind === 'directory') target = resolve(f.root, 'apps/web/.next/static');
     if (kind === 'cycle') target = 'z-bad';
     if (kind === 'missing') target = 'absent';
     if (kind === 'mismatch') {
@@ -147,7 +147,7 @@ for (const kind of [
         'apps/web/public/z-bad',
         f.put('apps/web/screenshot-catalog/current/image.png')
       );
-      target = f.put('apps/web/.next/other.png');
+      target = f.put('apps/web/.next/static/other.png');
     }
     if (kind === 'broken-source') {
       f.link('apps/web/public/z-bad', '../../missing');
@@ -163,13 +163,14 @@ for (const kind of [
 for (const [name, canonical] of [
   ['.vercel/.env.production.local', false],
   ['config/private.json', false],
+  ['apps/web/.next/server/private.js', false],
   ['.vercel/.env.production.local', true],
 ]) {
   test(`refuses non-public target ${name}, canonical export=${canonical}`, t => {
     const f = fixture(t);
     const good = f.link(
       '.vercel/output/static/a-good',
-      f.put('apps/web/.next/chunk.js')
+      f.put('apps/web/.next/static/chunk.js')
     );
     const secret = f.put(name, 'SENTINEL_PRIVATE_VALUE');
     const bad = f.link('.vercel/output/static/z-secret', secret);
@@ -184,7 +185,7 @@ test('refuses an interrupted-copy orphan inside deployable output before any wri
   const f = fixture(t);
   const good = f.link(
     '.vercel/output/static/a-good',
-    f.put('apps/web/.next/chunk.js')
+    f.put('apps/web/.next/static/chunk.js')
   );
   f.put(
     '.vercel/output/static/nested/.jovie-materialize-orphan',
@@ -199,7 +200,7 @@ test('interrupted staging copy outside output cannot enter the deployment snapsh
   f.put('.vercel/.jovie-materialize-orphan', 'PARTIAL_COPY');
   f.link(
     '.vercel/output/static/chunk.js',
-    f.put('apps/web/.next/chunk.js', 'complete bytes')
+    f.put('apps/web/.next/static/chunk.js', 'complete bytes')
   );
   assert.equal(materializeStatic(f.root), 1);
   assert.equal(materializeStatic(f.root), 0);
@@ -222,7 +223,10 @@ test('refuses a symlinked static root without modifying its target', t => {
 
 test('CLI materializes the build before artifact hashing in both release targets', t => {
   const f = fixture(t);
-  f.link('.vercel/output/static/chunk.js', f.put('apps/web/.next/built.js'));
+  f.link(
+    '.vercel/output/static/chunk.js',
+    f.put('apps/web/.next/static/built.js')
+  );
   const stdout = execFileSync(
     process.execPath,
     [resolve(repo, '.github/scripts/materialize-vercel-static.mjs')],
