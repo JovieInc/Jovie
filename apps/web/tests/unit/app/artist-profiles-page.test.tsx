@@ -9,6 +9,7 @@ import {
   ARTIST_PROFILE_SECTION_ORDER,
   ARTIST_PROFILE_SECTION_TEST_IDS,
 } from '@/data/artistProfilePageOrder';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 
 interface ChildrenProps {
@@ -35,8 +36,24 @@ vi.mock('@/components/marketing', () => ({
   MarketingContainer: ({ children }: ChildrenProps) => (
     <div data-testid='marketing-container'>{children}</div>
   ),
-  MarketingPageShell: ({ children }: ChildrenProps) => (
-    <main data-testid='marketing-page-shell'>{children}</main>
+}));
+
+vi.mock('@/components/marketing/MarketingPageShell', () => ({
+  MarketingPageShell: ({
+    children,
+    className,
+    penContractId,
+  }: ChildrenProps & {
+    className?: string;
+    penContractId?: string;
+  }) => (
+    <main
+      data-testid='marketing-page-shell'
+      className={className}
+      data-pen-contract={penContractId}
+    >
+      {children}
+    </main>
   ),
 }));
 
@@ -269,6 +286,13 @@ describe('ArtistProfilesPage', () => {
     render(<ArtistProfilesPage />);
 
     expect(screen.getByTestId('marketing-page-shell')).toBeInTheDocument();
+    expect(screen.getByTestId('marketing-page-shell')).toHaveClass(
+      'artist-profiles-home-system'
+    );
+    expect(screen.getByTestId('marketing-page-shell')).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.recipe.artistLp
+    );
     expect(
       screen.getByRole('heading', { name: ARTIST_PROFILE_COPY.hero.headline })
     ).toBeInTheDocument();
