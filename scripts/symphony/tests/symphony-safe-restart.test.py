@@ -153,6 +153,39 @@ raise SystemExit(99)
             self.assertFalse(self.guard.exists())
 
 class ActivationAuthorityTests(unittest.TestCase):
+    def test_candidate_startup_uses_real_closure_validator_before_mutation(self):
+        import datetime as dt
+        import textwrap
+        workflow = (ROOT / '.github/workflows/gem-delivery-controller-activation.yml').read_text()
+        step = workflow.split('- name: Check candidate closure startup compatibility\n', 1)[1].split('\n      - name:', 1)[0]
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        self.assertLess(workflow.index('- name: Check candidate closure startup compatibility'), workflow.index('- name: Establish lingering user-systemd session'))
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            receipt = home / 'gem-workspace/state/gem-priority-gate/latest.json'
+            receipt.parent.mkdir(parents=True)
+            now = dt.datetime.now(dt.timezone.utc)
+            for status, intake, observed, expected in [
+                ('healthy', True, now, 0),
+                ('red', False, now, 76),
+                ('healthy', True, now - dt.timedelta(hours=1), 76),
+                ('healthy', True, now + dt.timedelta(hours=1), 76),
+                ('healthy', False, now, 76),
+                (None, False, now, 76),
+            ]:
+                with self.subTest(status=status, intake=intake, observed=observed):
+                    if status is None:
+                        receipt.unlink(missing_ok=True)
+                    else:
+                        closure = dict(schema='jovie-closure-health/v1', status=status, authority='Summer', newIssueIntakeAllowed=intake, promotionContinues=True, remediationContinues=True, reasons=[])
+                        admission = dict(allowed=intake, newIssueIntakeAllowed=intake, newImplementationAllowed=intake, fallbackPrGenerationAllowed=intake, authority='Summer', status=status, promotionContinues=True, remediationContinues=True)
+                        receipt.write_text(json.dumps(dict(schema='jovie-fleet-gate/v1', observedAt=observed.isoformat(), state='GREEN' if status == 'healthy' else 'AMBER', signals=dict(closureHealth=closure), closureAdmission=admission)))
+                    before = receipt.read_bytes() if receipt.exists() else None
+                    result = subprocess.run(['bash', '-c', script], cwd=ROOT, env={**os.environ, 'HOME': str(home)}, capture_output=True, text=True, timeout=5)
+                    self.assertEqual(result.returncode, expected, result.stderr + result.stdout)
+                    self.assertEqual(receipt.read_bytes() if receipt.exists() else None, before)
+                    self.assertFalse((home / '.local').exists())
+
     def test_exact_workflow_step_refuses_unverified_or_different_producer(self):
         import textwrap
         workflow=(ROOT/'.github/workflows/gem-delivery-controller-activation.yml').read_text()

@@ -75,6 +75,20 @@ jobs:
             echo "::error::Activation requires this exact producer attempt's verified production marker."
             exit 1
           }
+      - name: Check candidate closure startup compatibility
+        run: |
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "scripts/symphony")
+          from symphony_official_runtime import ClosureStopLine, _read_stop_line
+          # The enforcing wrapper waits before spawning its child on a hold.
+          # Refuse before changing any installed files instead of replacing a
+          # live listener with a process that cannot yet expose its API.
+          verdict = _read_stop_line(ClosureStopLine())
+          if verdict["hold"]:
+              print("::error::Candidate startup is held by the existing closure validator: " + verdict["reason"])
+              raise SystemExit(76)
+          PY
       - name: Establish lingering user-systemd session
         run: |
           set -euo pipefail
