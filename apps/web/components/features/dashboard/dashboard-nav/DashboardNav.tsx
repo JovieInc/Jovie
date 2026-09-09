@@ -96,7 +96,10 @@ function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
-export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
+export function DashboardNav({
+  children: searchSurface,
+  headerOwnsInbox = false,
+}: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const runtimeUpdate = useRuntimeUpdate();
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
@@ -124,6 +127,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     [isElectron, isMobile]
   );
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
+
   const threadsVisible =
     !isDemo &&
     !isInSettings &&
@@ -422,6 +426,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
             >
               {searchSurface}
               <span aria-hidden='true' className='h-4 w-px bg-subtle' />
+              {headerOwnsInbox ? null : (
               <Link
                 href={APP_ROUTES.DASHBOARD}
                 onClick={event => handleCommandClick(event, inboxNavItem)}
@@ -462,6 +467,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                   />
                 ) : null}
               </Link>
+              )}
               <Link
                 href={APP_ROUTES.CHAT}
                 onClick={event => handleCommandClick(event, chatNavItem)}
