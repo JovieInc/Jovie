@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
+
 import {
   ContextMenu,
   ContextMenuContent,

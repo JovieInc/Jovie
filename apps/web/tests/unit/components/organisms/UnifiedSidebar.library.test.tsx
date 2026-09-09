@@ -224,10 +224,22 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
-    expect(panel).toHaveTextContent('jov.ie/timwhite');
+    expect(
+      within(panel).getByRole('link', { name: /Public Profile/i })
+    ).toHaveAccessibleName('Public Profile jov.ie/timwhite');
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
 
+    const row = screen
+      .getByRole('link', { name: /Inbox —/ })
+      .closest('[data-sidebar-brand-row]');
+    expect(row).toContainElement(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    );
+    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+      'href',
+      '/app'
+    );
     const update = screen.getByTestId('update-available-pill');
     expect(screen.getByTestId('sidebar-notifications')).toContainElement(
       update
