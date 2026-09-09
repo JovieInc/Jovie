@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
 import { waitForHydration } from '../utils/smoke-test-utils';
@@ -16,8 +16,77 @@ test.describe('Public profile CTA and identity evidence', () => {
   for (const viewport of viewports) {
     test(`${viewport.id} preserves its profile identity and Events contract`, async ({
       page,
+      browserName,
     }, testInfo) => {
+      await mkdir(testInfo.outputPath('profile-cta-public'), {
+        recursive: true,
+      });
       const capture = async (name: string) => {
+        // Reuse the root Inter contract: observe readiness and the actual label's
+        // computed binding, not just whether some font has loaded elsewhere.
+        const fontBinding = await page.evaluate(async () => {
+          await document.fonts.ready;
+          const firstFamily = (value: string) =>
+            value
+              .split(',')[0]
+              .trim()
+              .replace(/^['"]|['"]$/g, '');
+          const rootInter = firstFamily(
+            getComputedStyle(document.documentElement).getPropertyValue(
+              '--font-inter'
+            )
+          );
+          const desktop =
+            document
+              .querySelector('[data-testid="public-profile-layout-shell"]')
+              ?.getAttribute('data-layout') === 'desktop';
+          const target = desktop
+            ? document.querySelector(
+                '[data-testid="profile-desktop-surface"] [data-testid="profile-header"] span'
+              )
+            : (document.querySelector(
+                '[data-testid="profile-primary-tab-events-empty"] [data-testid="profile-inline-notifications-trigger"] span'
+              ) ??
+              document.querySelector(
+                '[data-testid="profile-identity-link"] span'
+              ));
+          if (!target) throw new Error('Profile font evidence target missing');
+          const style = getComputedStyle(target);
+          return {
+            rootInter,
+            requestedFamily: firstFamily(style.fontFamily),
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            fontStatus: document.fonts.status,
+            matchingFaces: Array.from(document.fonts)
+              .filter(face => firstFamily(face.family) === rootInter)
+              .map(face => ({
+                family: firstFamily(face.family),
+                status: face.status,
+                weight: face.weight,
+                display: face.display,
+              })),
+            evidenceKind:
+              'computed-binding-and-loaded-face-not-platform-glyph-proof',
+          };
+        });
+        const fontPath = testInfo.outputPath(
+          'profile-cta-public',
+          `${name}-font-binding.json`
+        );
+        await writeFile(fontPath, JSON.stringify(fontBinding));
+        await testInfo.attach(`${name}-font-binding.json`, {
+          path: fontPath,
+          contentType: 'application/json',
+        });
+        expect(fontBinding.rootInter).not.toBe('');
+        expect(fontBinding.requestedFamily).toBe(fontBinding.rootInter);
+        expect(fontBinding.fontStatus).toBe('loaded');
+        expect(
+          fontBinding.matchingFaces.some(
+            face => face.status === 'loaded' && face.display === 'swap'
+          )
+        ).toBe(true);
         const screenshotPath = testInfo.outputPath('profile-cta-public', name);
         await page.screenshot({ path: screenshotPath, fullPage: false });
         await testInfo.attach(name, {
@@ -54,8 +123,10 @@ test.describe('Public profile CTA and identity evidence', () => {
           surface.getByRole('navigation', { name: 'Profile Navigation' })
         ).toBeVisible();
         await expect(
-          surface.getByRole('button', { name: 'Events', exact: true })
-        ).toBeVisible();
+          surface
+            .getByRole('navigation', { name: 'Profile Navigation' })
+            .getByRole('button', { name: 'Profile', exact: true })
+        ).toHaveAttribute('aria-current', 'page');
       } else {
         const identity = page.getByTestId('profile-hero-identity-content');
         const name = page.getByTestId('profile-identity-link');
@@ -131,17 +202,25 @@ test.describe('Public profile CTA and identity evidence', () => {
           name: 'Profile Navigation',
         });
         await expect(navigation).toBeVisible();
-        const eventsTab = navigation.getByRole('button', {
-          name: 'Events',
-          exact: true,
+        await expect(
+          navigation.getByRole('button', {
+            name: 'Events',
+            exact: true,
+          })
+        ).toHaveCount(0);
+        await expect(
+          navigation.getByRole('button', {
+            name: 'Profile',
+            exact: true,
+          })
+        ).toHaveAttribute('aria-current', 'page');
+        // With no tour dates, desktop omits Events navigation and keeps its
+        // empty Events card in the Profile overview. The alert CTA is compact-only.
+        const overview = surface.getByTestId('profile-desktop-home-overview');
+        await expect(overview).toBeVisible();
+        const events = overview.locator('section').filter({
+          has: page.getByRole('heading', { name: 'Events', exact: true }),
         });
-        await eventsTab.click();
-        await expect(eventsTab).toHaveAttribute('aria-current', 'page');
-        // Desktop owns a separate Events card with no alert action. Do not
-        // pretend the compact CTA geometry contract applies to absent content.
-        const events = surface.locator(
-          'section[data-testid="profile-primary-tab-tour"]'
-        );
         await expect(events).toBeVisible();
         await expect(
           events.getByRole('heading', { name: 'Events', exact: true })
@@ -159,7 +238,10 @@ test.describe('Public profile CTA and identity evidence', () => {
       await expect(page.getByTestId('profile-identity-link')).toHaveText(
         'Edge Case Empty'
       );
-      await page.getByRole('button', { name: 'Events', exact: true }).click();
+      const eventsNav = page
+        .getByTestId('profile-bottom-nav')
+        .getByRole('button', { name: 'Events', exact: true });
+      await eventsNav.click();
       const emptyEvents = page.getByTestId('profile-primary-tab-events-empty');
       await expect(emptyEvents).toBeVisible();
       await expect(
@@ -297,6 +379,57 @@ test.describe('Public profile CTA and identity evidence', () => {
         }
       };
       await assertCta();
+      if (browserName === 'chromium') {
+        // One actual-glyph sample complements per-state computed/loaded binding.
+        // Query only the text span: SVG icon fonts are outside this proof.
+        const session = await page.context().newCDPSession(page);
+        try {
+          await page.evaluate(() => document.fonts.ready.then(() => undefined));
+          await session.send('DOM.enable');
+          await session.send('CSS.enable');
+          const { root } = await session.send('DOM.getDocument');
+          const { nodeId } = await session.send('DOM.querySelector', {
+            nodeId: root.nodeId,
+            selector:
+              '[data-testid="profile-primary-tab-events-empty"] [data-testid="profile-inline-notifications-trigger"] > span',
+          });
+          expect(nodeId).toBeGreaterThan(0);
+          const { fonts } = await session.send('CSS.getPlatformFontsForNode', {
+            nodeId,
+          });
+          const glyphFonts = fonts
+            .filter(font => font.glyphCount > 0)
+            .map(font => ({
+              familyName: font.familyName,
+              postScriptName: font.postScriptName,
+              isCustomFont: font.isCustomFont,
+              glyphCount: font.glyphCount,
+            }));
+          const glyphPath = testInfo.outputPath(
+            'profile-cta-public',
+            `${viewport.id}-events-glyph-font.json`
+          );
+          await writeFile(
+            glyphPath,
+            JSON.stringify({
+              browser: 'chromium',
+              state: 'mobile-events-normal-label',
+              glyphFonts,
+            })
+          );
+          await testInfo.attach('events-glyph-font.json', {
+            path: glyphPath,
+            contentType: 'application/json',
+          });
+          expect(glyphFonts.length).toBeGreaterThan(0);
+          for (const font of glyphFonts) {
+            expect(font.isCustomFont).toBe(true);
+            expect(font.familyName).toBe('Inter');
+          }
+        } finally {
+          await session.detach();
+        }
+      }
       await capture(`${viewport.id}-events.png`);
 
       // Observe real Tab reachability in the Events panel without forcing focus.
@@ -334,10 +467,35 @@ test.describe('Public profile CTA and identity evidence', () => {
         return state.active.target;
       };
       try {
-        await recordFocus('before-tab');
+        await recordFocus('before-reverse-preconditions');
+        await expect(eventsNav).toBeFocused();
+        const navHandle = await eventsNav.elementHandle();
+        expect(navHandle).not.toBeNull();
+        try {
+          const targetPrecedesNav = await canonicalCta.evaluate(
+            (element, nav) =>
+              nav !== null &&
+              nav.isConnected &&
+              element.isConnected &&
+              nav.ownerDocument === element.ownerDocument &&
+              !!(
+                element.compareDocumentPosition(nav) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+              ),
+            navHandle
+          );
+          focusTrace.push({
+            phase: 'preconditions',
+            eventsNavFocused: true,
+            targetPrecedesNav,
+          });
+          expect(targetPrecedesNav).toBe(true);
+        } finally {
+          await navHandle?.dispose();
+        }
         for (let tab = 0; tab < 40; tab += 1) {
-          await page.keyboard.press('Tab');
-          const immediate = await recordFocus(`tab-${tab}-immediate`);
+          await page.keyboard.press('Shift+Tab');
+          const immediate = await recordFocus(`reverse-tab-${tab}-immediate`);
           await page.evaluate(
             () =>
               new Promise<void>(resolve =>
@@ -346,9 +504,38 @@ test.describe('Public profile CTA and identity evidence', () => {
                 )
               )
           );
-          const settled = await recordFocus(`tab-${tab}-settled`);
+          const settled = await recordFocus(`reverse-tab-${tab}-settled`);
           if (immediate && settled) break;
         }
+        await expect(canonicalCta).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await recordFocus('preceding-control-immediate');
+        await settleCta();
+        await recordFocus('preceding-control-settled');
+        const precedingControl = await canonicalCta.evaluate(element => {
+          const active = document.activeElement;
+          return (
+            active instanceof HTMLElement &&
+            active !== document.body &&
+            active !== element &&
+            active.isConnected &&
+            active.tabIndex >= 0 &&
+            !!(
+              active.compareDocumentPosition(element) &
+              Node.DOCUMENT_POSITION_FOLLOWING
+            )
+          );
+        });
+        focusTrace.push({
+          phase: 'preceding-control-precondition',
+          precedingControl,
+        });
+        expect(precedingControl).toBe(true);
+        await page.keyboard.press('Tab');
+        await recordFocus('forward-return-immediate');
+        await settleCta();
+        await recordFocus('forward-return-settled');
+        await expect(canonicalCta).toBeFocused();
       } finally {
         await focusIds.dispose();
         const tracePath = testInfo.outputPath(
