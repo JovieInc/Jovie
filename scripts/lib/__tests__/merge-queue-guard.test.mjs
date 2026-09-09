@@ -1,5 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { remediateBlockedPrs } from '../../drain-pr-remediate.mjs';
 import {
@@ -2456,7 +2457,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     ).toBe('allow');
   });
 
-  it('skips every pre-land CHANGELOG.md candidate', () => {
+  it('skips implementation changelogs and serializes colliding stamps', () => {
     expect(CHANGELOG_COLLISION_PATH).toBe('CHANGELOG.md');
     expect(
       changelogGroupCollisionDecision({
@@ -2478,7 +2479,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       })
     ).toMatchObject({
       action: 'skip',
-      reason: 'preland-changelog-prohibited',
+      reason: 'changelog-collision',
       collidingPrs: [16352],
     });
     expect(
@@ -2501,6 +2502,157 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         candidateFiles: ['CHANGELOG.md'],
       })
     ).toMatchObject({ action: 'skip', reason: 'pre-land-changelog' });
+  });
+
+  const stampBranch = 'cursor/stable-desktop-publish-12b203f938c1';
+  const stampCases = [
+    {
+      name: 'empty queue',
+      members: [],
+      expected: { action: 'allow', reason: 'no-changelog-collision' },
+    },
+    {
+      name: 'queued member without changelog',
+      members: [{ prNumber: 17464, files: ['package.json'] }],
+      expected: { action: 'allow', reason: 'no-changelog-collision' },
+    },
+    {
+      name: 'queued changelog member',
+      members: [{ prNumber: 17464, files: ['CHANGELOG.md'] }],
+      expected: {
+        action: 'skip',
+        reason: 'changelog-collision',
+        collidingPrs: [17464],
+      },
+    },
+    {
+      name: 'unavailable queued member files',
+      members: [{ prNumber: 17464, files: null }],
+      expected: { action: 'unknown', reason: 'changelog-evidence-unavailable' },
+    },
+  ];
+
+  it.each(stampCases)('evaluates a recognized stamp with $name', ({
+    members,
+    expected,
+  }) => {
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md', 'package.json'],
+        queuedMemberFiles: members,
+        branch: stampBranch,
+      })
+    ).toEqual(expected);
+  });
+
+  it('does not claim a clear queue from missing or malformed stamp evidence', () => {
+    for (const members of [
+      undefined,
+      null,
+      {},
+      [null],
+      [{ prNumber: 0, files: [] }],
+      [{ prNumber: 17464, files: [null] }],
+    ]) {
+      expect(
+        changelogGroupCollisionDecision({
+          candidateFiles: ['CHANGELOG.md'],
+          branch: stampBranch,
+          queuedMemberFiles: members,
+        })
+      ).toEqual({
+        action: 'unknown',
+        reason: 'changelog-evidence-unavailable',
+      });
+    }
+  });
+
+  // Execute the production shell functions and real CLI, replacing only the
+  // external GitHub read. This catches lost branch context or policy drift
+  // between source admission and the canonical drain callpath.
+  function runDrainChangelogDecision({
+    branch = stampBranch,
+    members = [],
+    candidateFiles = ['CHANGELOG.md'],
+  } = {}) {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    const functions = drain.slice(
+      drain.indexOf('pr_changed_paths_json() {'),
+      drain.indexOf('deferred_state_is_releasable() {')
+    );
+    const snapshot = [
+      { n: 17463, head: branch, q: false },
+      ...members.map(member => ({
+        n: member.prNumber,
+        head: 'cursor/other-stamp',
+        q: true,
+      })),
+    ];
+    const files = Object.fromEntries([
+      ['17463', candidateFiles],
+      ...members.map(member => [String(member.prNumber), member.files]),
+    ]);
+    return JSON.parse(
+      execFileSync(
+        'bash',
+        [
+          '-c',
+          `
+      set -euo pipefail
+      REPO=fixture/repo
+      SNAP="$STAMP_SNAPSHOT"
+      gh_retry() {
+        node -e '
+          const files = JSON.parse(process.env.STAMP_FILES)[process.argv[1]];
+          if (files === null) process.exit(1);
+          console.log(JSON.stringify(files));
+        ' "$3"
+      }
+      ${functions}
+      changelog_collision_decision_for_pr 17463
+    `,
+        ],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dirname(process.execPath)}:${process.env.PATH}`,
+            STAMP_SNAPSHOT: JSON.stringify(snapshot),
+            STAMP_FILES: JSON.stringify(files),
+          },
+        }
+      )
+    );
+  }
+
+  it.each(
+    stampCases
+  )('runs the canonical shell and CLI for a stamp with $name', ({
+    members,
+    expected,
+  }) => {
+    expect(runDrainChangelogDecision({ members })).toEqual(expected);
+  });
+
+  it('keeps implementation rejection and unavailable candidate evidence through the real drain caller', () => {
+    expect(
+      runDrainChangelogDecision({ branch: 'codex/implementation' })
+    ).toEqual({
+      action: 'skip',
+      reason: 'pre-land-changelog',
+    });
+    expect(runDrainChangelogDecision({ branch: '' })).toEqual({
+      action: 'skip',
+      reason: 'pre-land-changelog',
+    });
+    expect(runDrainChangelogDecision({ candidateFiles: null })).toEqual({
+      action: 'unknown',
+      reason: 'changelog-evidence-unavailable',
+    });
   });
 
   it('skips a superseded Production Controller generation and promotes only exact main', () => {
