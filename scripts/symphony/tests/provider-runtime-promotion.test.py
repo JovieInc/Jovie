@@ -368,9 +368,10 @@ class PromotionTests(unittest.TestCase):
         account_state = self.home / ".codex-accounts/state.json"
         account_state.parent.mkdir()
         account_state.write_text("{}\n")
-        guard, exhausted, rotate = [self.root / name for name in ["guard", "exhausted.py", "rotate"]]
+        guard, rotate = [self.root / name for name in ["guard", "rotate"]]
+        exhausted = self.bin / "symphony-codex-exhausted.py"
+        admission_calls = self.root / "admission-calls"
         self.write(guard, "#!/bin/sh\nexit 0\n")
-        self.write(exhausted, 'import sys\nassert sys.argv[1:] == ["pickup-check", "JOV-5954"]\n')
         self.write(rotate, '#!/bin/sh\nprintf "MODEL_FREE_CODEX_HANDOFF %s\\n" "$*"\n')
         env = {**os.environ, "SYMPHONY_ELIXIR_HOME": str(self.home), "SYMPHONY_HOME": str(self.home),
                "SYMPHONY_WORKSPACE": str(workspace), "SYMPHONY_ISSUE_IDENTIFIER": "JOV-5954",
@@ -383,7 +384,17 @@ class PromotionTests(unittest.TestCase):
         install = subprocess.run(["bash", str(self.updater), "--provider-runtime-only"], env=env, capture_output=True, text=True)
         self.assertEqual(install.returncode, 0, install.stderr)
         result = subprocess.run([str(self.bin / "symphony-codex-entry"), "app-server"], cwd=workspace, env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 75, result.stderr)
+        self.assertNotIn('MODEL_FREE_CODEX_HANDOFF', result.stdout)
+        self.assertFalse(admission_calls.exists())
+        # The provider-generation fixture supplies admission separately, as the
+        # managed-controller installer does. Never make a missing helper optional.
+        self.write(exhausted, 'import sys\n'
+                   'assert sys.argv[1:] in (["native-preflight", "JOV-5954"], ["pickup-check", "JOV-5954"])\n'
+                   f'with open({str(admission_calls)!r}, "a") as calls: calls.write(sys.argv[1] + "\\n")\n')
+        result = subprocess.run([str(self.bin / "symphony-codex-entry"), "app-server"], cwd=workspace, env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(admission_calls.read_text().splitlines(), ['native-preflight', 'pickup-check'])
         self.assertIn('MODEL_FREE_CODEX_HANDOFF --config shell_environment_policy.inherit=all --config model="gpt-5.6-sol" app-server', result.stdout)
         self.assertEqual((workspace / "scripts/symphony/symphony-codex-router").read_bytes(),
                          (ROOT / "scripts/symphony/symphony-codex-router").read_bytes())
