@@ -75,7 +75,11 @@ export type SummerSession = {
 
 export class SummerSessionError extends Error {
   constructor(
-    readonly code: 'identity-drift' | 'session-fork' | 'duplicate-turn',
+    readonly code:
+      | 'identity-drift'
+      | 'session-fork'
+      | 'duplicate-turn'
+      | 'write-conflict',
     message: string
   ) {
     super(message);
@@ -142,7 +146,7 @@ export function assertSummerIdentity(
 export async function loadCurrentSummerSession(
   store: OperatingStore
 ): Promise<SummerSession | null> {
-  const row = await store.getDecision(SUMMER_SESSION_DECISION_ID);
+  const row = await store.getDecisionForUpdate(SUMMER_SESSION_DECISION_ID);
   if (!row?.decided) return null;
   try {
     const value = JSON.parse(row.decided) as {
@@ -160,8 +164,11 @@ export async function loadCurrentSummerSession(
           'identity-drift',
           'Cannot migrate invalid Summer history'
         );
-      await store.putDecision(toDecision(migrated, new Date().toISOString()));
-      return migrated;
+      const migratedDecision = toDecision(migrated, new Date().toISOString());
+      if (await store.putDecisionIfUnchanged(migratedDecision, row)) {
+        return migrated;
+      }
+      return loadCurrentSummerSession(store);
     }
     const parsed = parseSession(value);
     if (!parsed)
@@ -187,8 +194,15 @@ export async function openCurrentSummerSession(
   const existing = await loadCurrentSummerSession(store);
   if (existing) return existing;
   const session = emptySession();
-  await store.putDecision(toDecision(session, now));
-  return session;
+  if (await store.putDecisionIfUnchanged(toDecision(session, now), undefined)) {
+    return session;
+  }
+  const raced = await loadCurrentSummerSession(store);
+  if (raced) return raced;
+  throw new SummerSessionError(
+    'write-conflict',
+    'Summer session was created concurrently but could not be read'
+  );
 }
 
 export function findTurnByClientId(
@@ -204,25 +218,82 @@ export async function appendSummerTurn(
   turn: Omit<SummerPersistedTurn, 'turnIndex'>,
   now: string = new Date().toISOString()
 ): Promise<SummerSession> {
-  const session = await openCurrentSummerSession(store, now);
-  assertSummerIdentity(session.identity);
-  const duplicate = findTurnByClientId(session, turn.clientTurnId);
-  if (duplicate && !shouldReplaceSummerTurn(duplicate, turn)) {
-    return session;
+  return (await appendSummerTurnWithOutcome(store, turn, now)).session;
+}
+
+export type AppendSummerTurnOutcome = {
+  readonly session: SummerSession;
+  readonly persisted: 'created' | 'existing' | 'replaced';
+};
+
+export async function appendSummerTurnWithOutcome(
+  store: OperatingStore,
+  turn: Omit<SummerPersistedTurn, 'turnIndex'>,
+  now: string = new Date().toISOString()
+): Promise<AppendSummerTurnOutcome> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const currentRecord = await store.getDecisionForUpdate(
+      SUMMER_SESSION_DECISION_ID
+    );
+    const session = currentRecord
+      ? sessionFromDecision(currentRecord)
+      : emptySession();
+    assertSummerIdentity(session.identity);
+    const duplicate =
+      findTurnByClientId(session, turn.clientTurnId) ??
+      (turn.eveReceipt
+        ? session.turns.find(
+            existing =>
+              existing.eveReceipt?.eventId === turn.eveReceipt?.eventId
+          )
+        : undefined);
+    if (duplicate && !shouldReplaceSummerTurn(duplicate, turn)) {
+      return { session, persisted: 'existing' };
+    }
+    const persisted: SummerPersistedTurn = duplicate
+      ? { ...turn, turnIndex: duplicate.turnIndex }
+      : { ...turn, turnIndex: session.turns.length + 1 };
+    const next: SummerSession = {
+      identity: session.identity,
+      turns: duplicate
+        ? session.turns.map(existing =>
+            existing.turnIndex === duplicate.turnIndex ? persisted : existing
+          )
+        : [...session.turns, persisted],
+    };
+    const updated = await store.putDecisionIfUnchanged(
+      toDecision(next, now),
+      currentRecord
+    );
+    if (updated) {
+      return { session: next, persisted: duplicate ? 'replaced' : 'created' };
+    }
   }
-  const persisted: SummerPersistedTurn = duplicate
-    ? { ...turn, turnIndex: duplicate.turnIndex }
-    : { ...turn, turnIndex: session.turns.length + 1 };
-  const next: SummerSession = {
-    identity: session.identity,
-    turns: duplicate
-      ? session.turns.map(existing =>
-          existing.clientTurnId === turn.clientTurnId ? persisted : existing
-        )
-      : [...session.turns, persisted],
-  };
-  await store.putDecision(toDecision(next, now));
-  return next;
+  throw new SummerSessionError(
+    'write-conflict',
+    'Summer session changed too frequently to append without losing history'
+  );
+}
+
+function sessionFromDecision(record: OvieDecision): SummerSession {
+  try {
+    const value = JSON.parse(record.decided) as {
+      identity?: Record<string, unknown>;
+      turns?: unknown;
+    };
+    const candidate =
+      value.identity?.runtime === 'mac'
+        ? { ...value, identity: { ...value.identity, runtime: 'eve' } }
+        : value;
+    const parsed = parseSession(candidate);
+    if (!parsed) throw new Error('invalid_session');
+    return parsed;
+  } catch {
+    throw new SummerSessionError(
+      'identity-drift',
+      'Cannot read or migrate stored Summer history'
+    );
+  }
 }
 
 function shouldReplaceSummerTurn(

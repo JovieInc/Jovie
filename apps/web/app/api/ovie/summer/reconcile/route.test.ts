@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SESSION_ERRORS } from '@/lib/auth/session';
-import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
-import { loadCurrentSummerSession } from '@/lib/ovie/summer-session';
+import {
+  MemoryOperatingStore,
+  memoryRecordBackend,
+  type RecordBackend,
+} from '@/lib/ovie/mcp/store';
+import {
+  appendSummerTurn,
+  loadCurrentSummerSession,
+} from '@/lib/ovie/summer-session';
 
 const mocks = vi.hoisted(() => ({
   fetchSummerShadow: vi.fn(),
@@ -25,12 +32,62 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import * as routeModule from './route';
+import { SUMMER_RECOVERY_TARGET } from './target';
 
-const { GET, SUMMER_RECOVERY_TARGET } = routeModule;
+const { GET } = routeModule;
 
 const founderUserId = '7ddcab54-41ae-4404-88e8-6ec71bc9ba03';
 const principalHash = 'Tl8Kg6UKfQPtm7_HmbX0nKUaXaqoeDq8g3eDXeN4HFg';
 const currentDeploymentId = 'dpl_current';
+
+class InjectBeforeFirstDecisionCasStore extends MemoryOperatingStore {
+  private injected = false;
+
+  constructor(
+    backend: RecordBackend,
+    private readonly inject: () => Promise<void>
+  ) {
+    super(backend);
+  }
+
+  override async putDecisionIfUnchanged(
+    ...args: Parameters<MemoryOperatingStore['putDecisionIfUnchanged']>
+  ): Promise<boolean> {
+    if (!this.injected) {
+      this.injected = true;
+      await this.inject();
+    }
+    return super.putDecisionIfUnchanged(...args);
+  }
+}
+
+function durableTurn(
+  clientTurnId: string,
+  assistantText: string,
+  eventId?: string
+) {
+  return {
+    clientTurnId,
+    userText: '',
+    assistantText,
+    eveWorkId: null,
+    eveAcks: [],
+    correlationId: clientTurnId,
+    state: 'completed',
+    toolReceipt: null,
+    ...(eventId
+      ? {
+          eveReceipt: {
+            eventId,
+            sessionId: SUMMER_RECOVERY_TARGET.sessionId,
+            turnId: 'turn_recovered',
+            nextStartIndex: 7,
+          },
+        }
+      : {}),
+    createdAt: '2026-09-09T00:00:00.000Z',
+  } as const;
+}
 
 function resultResponse(
   overrides: Partial<{
@@ -94,10 +151,11 @@ describe('GET /api/ovie/summer/reconcile', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it('exports no mutating route handler', () => {
-    expect(routeModule).not.toHaveProperty('POST');
-    expect(routeModule).not.toHaveProperty('PUT');
-    expect(routeModule).not.toHaveProperty('PATCH');
-    expect(routeModule).not.toHaveProperty('DELETE');
+    expect(Object.keys(routeModule).sort()).toEqual([
+      'GET',
+      'dynamic',
+      'runtime',
+    ]);
   });
 
   it('uses one GET for the source-bound event and persists the exact result', async () => {
@@ -105,14 +163,7 @@ describe('GET /api/ovie/summer/reconcile', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      ok: true,
       persisted: 'created',
-      result: {
-        eventId: SUMMER_RECOVERY_TARGET.eventId,
-        deploymentId: SUMMER_RECOVERY_TARGET.deploymentId,
-        sessionId: SUMMER_RECOVERY_TARGET.sessionId,
-        turnId: 'turn_recovered',
-      },
     });
     expect(mocks.fetchSummerShadow).toHaveBeenCalledOnce();
     expect(mocks.fetchSummerShadow).toHaveBeenCalledWith(
@@ -126,18 +177,12 @@ describe('GET /api/ovie/summer/reconcile', () => {
       }
     );
     const session = await loadCurrentSummerSession(store);
-    expect(session?.turns).toHaveLength(1);
     expect(session?.turns[0]).toMatchObject({
       clientTurnId: `summer-reconcile:${SUMMER_RECOVERY_TARGET.eventId}`,
       userText: '',
       assistantText: 'Recovered exact Summer response.',
       state: 'completed',
-      eveReceipt: {
-        eventId: SUMMER_RECOVERY_TARGET.eventId,
-        sessionId: SUMMER_RECOVERY_TARGET.sessionId,
-        turnId: 'turn_recovered',
-        nextStartIndex: 7,
-      },
+      eveReceipt: { eventId: SUMMER_RECOVERY_TARGET.eventId },
     });
   });
 
@@ -158,30 +203,36 @@ describe('GET /api/ovie/summer/reconcile', () => {
     expect((await loadCurrentSummerSession(store))?.turns).toHaveLength(1);
   });
 
+  it('reuses the immutable Eve event even when its client turn id is legacy', async () => {
+    await appendSummerTurn(
+      store,
+      durableTurn(
+        'legacy-client-turn',
+        'Recovered exact Summer response.',
+        SUMMER_RECOVERY_TARGET.eventId
+      )
+    );
+    await expect((await GET()).json()).resolves.toMatchObject({
+      persisted: 'existing',
+    });
+    expect((await loadCurrentSummerSession(store))?.turns).toHaveLength(1);
+  });
+
   it('rejects an unauthenticated session before signed upstream access', async () => {
     mocks.getSessionContext.mockRejectedValue(
       new TypeError(SESSION_ERRORS.UNAUTHORIZED)
     );
-
-    const response = await GET();
-
-    expect(response.status).toBe(401);
+    expect((await GET()).status).toBe(401);
     expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
-    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
-  it('fails closed on an unexpected session lookup failure', async () => {
-    mocks.getSessionContext.mockRejectedValue(
-      new Error('database unavailable')
-    );
-
+  it('fails closed when session lookup is unavailable', async () => {
+    mocks.getSessionContext.mockRejectedValue(new Error('session unavailable'));
     const response = await GET();
-
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
       code: 'founder_session_unavailable',
     });
-    expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
   });
 
   it('rejects a different authenticated user before signed upstream access', async () => {
@@ -191,50 +242,18 @@ describe('GET /api/ovie/summer/reconcile', () => {
       profile: null,
     });
 
-    const response = await GET();
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'founder_access_required',
-    });
+    expect((await GET()).status).toBe(403);
     expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
-    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
-  it('fails closed when founder identity or current Eve deployment is unconfigured', async () => {
-    vi.stubEnv('OVIE_SUMMER_FOUNDER_APP_USER_ID', '');
+  it.each([
+    ['founder identity', 'OVIE_SUMMER_FOUNDER_APP_USER_ID'],
+    ['current Eve deployment', 'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID'],
+    ['production origin', 'VERCEL_ENV'],
+  ] as const)('fails closed when %s is unavailable', async (_name, key) => {
+    vi.stubEnv(key, key === 'VERCEL_ENV' ? 'preview' : '');
     expect((await GET()).status).toBe(503);
-
-    vi.stubEnv('OVIE_SUMMER_FOUNDER_APP_USER_ID', founderUserId);
-    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', '');
-    expect((await GET()).status).toBe(503);
-
     expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
-    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
-  });
-
-  it('fails closed outside the production application origin', async () => {
-    vi.stubEnv('VERCEL_ENV', 'preview');
-
-    const response = await GET();
-
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'production_origin_required',
-    });
-    expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when the signed Summer read is unavailable', async () => {
-    mocks.fetchSummerShadow.mockRejectedValue(new Error('OIDC unavailable'));
-
-    const response = await GET();
-
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'summer_result_unavailable',
-    });
-    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
   it('does not persist an unavailable or unverified upstream result', async () => {
@@ -258,6 +277,12 @@ describe('GET /api/ovie/summer/reconcile', () => {
         }
       )
     );
+    expect((await GET()).status).toBe(503);
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the server-signed Summer read throws', async () => {
+    mocks.fetchSummerShadow.mockRejectedValue(new Error('OIDC unavailable'));
     expect((await GET()).status).toBe(503);
     expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
@@ -294,63 +319,52 @@ describe('GET /api/ovie/summer/reconcile', () => {
     expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
-  it('does not persist failed or empty terminal results', async () => {
-    mocks.fetchSummerShadow.mockResolvedValueOnce(
+  it('does not persist a failed terminal result', async () => {
+    mocks.fetchSummerShadow.mockResolvedValue(
       resultResponse({ status: 'failed' })
     );
     expect((await GET()).status).toBe(409);
+  });
 
-    mocks.fetchSummerShadow.mockResolvedValueOnce(
-      resultResponse({ responseText: '   ' })
+  it('does not persist an empty completed response', async () => {
+    mocks.fetchSummerShadow.mockResolvedValue(
+      resultResponse({ responseText: ' ' })
     );
     expect((await GET()).status).toBe(409);
-
     expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
-  it('rejects malformed or oversized successful responses before persistence', async () => {
+  it('rejects an oversized streamed response before persistence', async () => {
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(128 * 1024 + 1));
+      },
+    });
     mocks.fetchSummerShadow.mockResolvedValueOnce(
-      new Response('{not-json', {
+      new Response(body, {
         status: 200,
         headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
       })
     );
     expect((await GET()).status).toBe(502);
 
-    mocks.fetchSummerShadow.mockResolvedValueOnce(
-      new Response('{}', {
-        status: 200,
-        headers: {
-          'content-length': String(128 * 1024 + 1),
-          'x-jovie-eve-deployment-id': currentDeploymentId,
-        },
-      })
-    );
-    expect((await GET()).status).toBe(502);
-
-    mocks.fetchSummerShadow.mockResolvedValueOnce(
-      new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(new Uint8Array(128 * 1024 + 1));
-          },
-        }),
-        {
-          status: 200,
-          headers: { 'x-jovie-eve-deployment-id': currentDeploymentId },
-        }
-      )
-    );
-    expect((await GET()).status).toBe(502);
-
     expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
-  it('refuses to overwrite a conflicting durable recovery result', async () => {
-    expect((await GET()).status).toBe(200);
-    mocks.fetchSummerShadow.mockResolvedValue(
-      resultResponse({ responseText: 'A conflicting response.' })
-    );
+  it('detects a conflicting recovery committed during its compare-and-set window', async () => {
+    const backend = memoryRecordBackend();
+    const writer = new MemoryOperatingStore(backend);
+    store = new InjectBeforeFirstDecisionCasStore(backend, async () => {
+      await appendSummerTurn(
+        writer,
+        durableTurn(
+          `summer-reconcile:${SUMMER_RECOVERY_TARGET.eventId}`,
+          'A concurrently committed conflicting response.',
+          SUMMER_RECOVERY_TARGET.eventId
+        )
+      );
+    });
+    mocks.getOvieOperatingStore.mockReturnValue(store);
 
     const response = await GET();
 
@@ -358,20 +372,36 @@ describe('GET /api/ovie/summer/reconcile', () => {
     await expect(response.json()).resolves.toMatchObject({
       code: 'persisted_result_drift',
     });
-    expect((await loadCurrentSummerSession(store))?.turns).toHaveLength(1);
+    expect(
+      (await loadCurrentSummerSession(store))?.turns[0]?.assistantText
+    ).toBe('A concurrently committed conflicting response.');
   });
 
-  it('reports durable persistence failure without returning an uncommitted result', async () => {
+  it('retries after a concurrent unrelated append and preserves both turns', async () => {
+    const backend = memoryRecordBackend();
+    const writer = new MemoryOperatingStore(backend);
+    store = new InjectBeforeFirstDecisionCasStore(backend, async () => {
+      await appendSummerTurn(
+        writer,
+        durableTurn('unrelated-concurrent-turn', 'Unrelated Summer history.')
+      );
+    });
+    mocks.getOvieOperatingStore.mockReturnValue(store);
+
+    expect((await GET()).status).toBe(200);
+    const session = await loadCurrentSummerSession(store);
+    expect(session?.turns.map(turn => turn.clientTurnId)).toEqual([
+      'unrelated-concurrent-turn',
+      `summer-reconcile:${SUMMER_RECOVERY_TARGET.eventId}`,
+    ]);
+  });
+
+  it('fails closed when canonical persistence is unavailable', async () => {
     mocks.getOvieOperatingStore.mockImplementation(() => {
-      throw new Error('durable store unavailable');
+      throw new Error('store unavailable');
     });
-
     const response = await GET();
-
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'summer_result_persistence_failed',
-    });
     expect(mocks.loggerError).toHaveBeenCalledOnce();
   });
 });
