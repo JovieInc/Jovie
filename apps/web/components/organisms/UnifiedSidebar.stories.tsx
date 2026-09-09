@@ -1,9 +1,11 @@
+import '../../styles/system-b-app.css';
 import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
@@ -67,11 +69,13 @@ const meta: Meta<typeof UnifiedSidebar> = {
           <DashboardDataProvider value={dashboardData}>
             <TooltipProvider>
               <SidebarProvider>
-                <ShellSidebarOverrideProvider>
-                  <div className='h-screen w-(--app-shell-sidebar-width)'>
-                    <Story />
-                  </div>
-                </ShellSidebarOverrideProvider>
+                <HeaderActionsProvider>
+                  <ShellSidebarOverrideProvider>
+                    <div className='h-screen w-(--app-shell-sidebar-width)'>
+                      <Story />
+                    </div>
+                  </ShellSidebarOverrideProvider>
+                </HeaderActionsProvider>
               </SidebarProvider>
             </TooltipProvider>
           </DashboardDataProvider>

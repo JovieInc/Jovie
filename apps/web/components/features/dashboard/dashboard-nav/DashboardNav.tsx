@@ -95,7 +95,10 @@ function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
-export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
+export function DashboardNav({
+  children: searchSurface,
+  headerOwnsInbox = false,
+}: DashboardNavProps) {
   const { creatorProfiles, selectedProfile } = useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -124,7 +127,13 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   // Inbox is the shell's single attention center. Keep the destination stable
   // even when it is caught up; attention state belongs inside the route, not in
   // whether the route exists.
-  const eligiblePrimaryNavigation = primaryNavigation;
+  const eligiblePrimaryNavigation = useMemo(
+    () =>
+      headerOwnsInbox
+        ? primaryNavigation.filter(item => item.id !== 'inbox')
+        : primaryNavigation,
+    [headerOwnsInbox]
+  );
   const activePrimaryItemId = useMemo(() => {
     const active = eligiblePrimaryNavigation.find(item => {
       if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {
