@@ -147,11 +147,18 @@ describe('production marker attempt state', () => {
 
   it.each([
     'success',
+    'pending',
     'api-unavailable',
     'wrong-archive',
     'incomplete-jobs',
   ])('executes the production reader CLI with %s retry evidence', async failureMode => {
     const marker = normalRerunMarker();
+    if (failureMode === 'pending') {
+      marker.attemptRun.status = 'in_progress';
+      marker.attemptRun.conclusion = null;
+      marker.attemptJobs[0].status = 'in_progress';
+      marker.attemptJobs[0].conclusion = null;
+    }
     const calls: string[] = [];
     processRunner.mockImplementation((command: string, args: string[]) => {
       const endpoint = args[1];
@@ -216,10 +223,19 @@ describe('production marker attempt state', () => {
       );
       const result = JSON.parse(String(output.mock.calls.at(-1)?.[0]));
       expect(result).toMatchObject(
-        failureMode === 'success'
-          ? { state: 'verified', controllerAttempt: 2, controllerRun }
+        failureMode === 'success' || failureMode === 'pending'
+          ? {
+              state: failureMode === 'success' ? 'verified' : 'pending',
+              controllerAttempt: 2,
+              controllerRun,
+            }
           : { state: 'manual', reason: 'evidence_api_error' }
       );
+      if (failureMode === 'success' || failureMode === 'pending') {
+        expect(calls.filter(call => call.includes('/artifacts?'))).toHaveLength(
+          6
+        );
+      }
       expect(
         calls.every(
           call => call.startsWith('gh api repos/') || call.startsWith('unzip ')
@@ -622,6 +638,30 @@ describe('production marker attempt state', () => {
 });
 
 describe('recovered production marker state', () => {
+  it('binds the post-write exception to exactly one live recovery workflow step', () => {
+    const source = readFileSync(
+      resolve(
+        testDir,
+        '../../../../../.github/scripts/production-marker-state.mjs'
+      ),
+      'utf8'
+    );
+    const dispatchName = source.match(/const dispatchName = '([^']+)'/)?.[1];
+    const workflow = readFileSync(
+      resolve(
+        testDir,
+        '../../../../../.github/workflows/production-marker-recovery.yml'
+      ),
+      'utf8'
+    );
+    expect(dispatchName).toBeTruthy();
+    expect(
+      [...workflow.matchAll(/^\s+- name: (.+)$/gm)].filter(
+        match => match[1] === dispatchName
+      )
+    ).toHaveLength(1);
+  });
+
   const recoveryRunId = 789;
 
   function markerRecoveryRun(
@@ -765,9 +805,19 @@ describe('recovered production marker state', () => {
     ).toBe('manual');
   });
 
-  it('downloads and validates both same-name artifacts through the real CLI reader', async () => {
+  it.each([
+    'stable',
+    'reordered',
+    'new-marker',
+    'new-recovery-marker',
+    'new-lease',
+    'expired',
+    'removed',
+    'changed-run',
+  ])('validates final artifact snapshot through the real CLI reader: %s', async change => {
     const { recovered, retry } = convergedMarkers();
     const markers = [recovered, retry];
+    const listingReads = new Map<string, number>();
     let downloaded: { payload: unknown } = retry;
     const calls: string[] = [];
     processRunner.mockImplementation((command: string, args: string[]) => {
@@ -785,17 +835,48 @@ describe('recovered production marker state', () => {
         )!;
         output = Buffer.from('archive');
       } else if (endpoint.includes('/artifacts?')) {
-        const listing = endpoint.includes(
+        const read = (listingReads.get(endpoint) ?? 0) + 1;
+        listingReads.set(endpoint, read);
+        const normalName = endpoint.includes(
           `name=production-generation-verified-${sha}&`
-        )
-          ? markers
+        );
+        const listing = normalName
+          ? markers.map(m => ({
+              ...m.artifact,
+              workflow_run: { id: m.artifact.workflowRunId },
+            }))
           : [];
+        if (read > 1 && normalName) {
+          if (change === 'reordered') listing.reverse();
+          if (change === 'new-marker') listing.push({ ...listing[0], id: 900 });
+          if (change === 'expired') listing[0].expired = true;
+          if (change === 'removed') listing.pop();
+          if (change === 'changed-run') listing[0].workflow_run.id = 999;
+        }
+        if (
+          read > 1 &&
+          change === 'new-recovery-marker' &&
+          endpoint.includes(
+            `name=production-generation-verified-recovery-${sha}&`
+          )
+        ) {
+          const artifact = recoveryMarker('completed', 'success').artifact;
+          listing.push({
+            ...artifact,
+            workflow_run: { id: artifact.workflowRunId },
+          });
+        }
+        if (
+          read > 1 &&
+          change === 'new-lease' &&
+          endpoint.includes(`name=production-generation-recovery-${sha}&`)
+        ) {
+          const lease = recoveryLease().artifact;
+          listing.push({ ...lease, workflow_run: { id: lease.workflowRunId } });
+        }
         output = JSON.stringify({
           total_count: listing.length,
-          artifacts: listing.map(m => ({
-            ...m.artifact,
-            workflow_run: { id: m.artifact.workflowRunId },
-          })),
+          artifacts: listing,
         });
       } else {
         const original = endpoint.includes(`/${controllerRun}/attempts/1`);
@@ -839,12 +920,16 @@ describe('recovered production marker state', () => {
       await import(
         '../../../../../.github/scripts/production-marker-state.mjs'
       );
-      expect(JSON.parse(String(output.mock.calls.at(-1)?.[0]))).toMatchObject({
-        state: 'verified',
-        reason: 'exact_recovery_and_retry_verified',
-        controllerRun,
-        controllerAttempt: 2,
-      });
+      expect(JSON.parse(String(output.mock.calls.at(-1)?.[0]))).toMatchObject(
+        change === 'stable' || change === 'reordered'
+          ? {
+              state: 'verified',
+              reason: 'exact_recovery_and_retry_verified',
+              controllerRun,
+              controllerAttempt: 2,
+            }
+          : { state: 'manual', reason: 'artifact_snapshot_changed' }
+      );
       expect(calls.filter(c => c.endsWith('/zip'))).toHaveLength(2);
       expect(calls.some(c => /--method| -X |enqueue|\/statuses/.test(c))).toBe(
         false
@@ -981,7 +1066,7 @@ describe('recovered production marker state', () => {
           })),
           {
             number: successfulSteps.length + 1,
-            name: 'Dispatch fresh fleet reconciliation',
+            name: 'Dispatch fresh fleet and desktop reconciliation',
             status: 'completed',
             conclusion: 'failure',
           },

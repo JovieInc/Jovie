@@ -153,7 +153,7 @@ function validatePostWriteRefreshFailure(jobs, context, attempt) {
     'Upload recovered verified-generation marker',
     'Confirm uploaded recovered marker bytes',
   ];
-  const dispatchName = 'Dispatch fresh fleet reconciliation';
+  const dispatchName = 'Dispatch fresh fleet and desktop reconciliation';
   const requiredSteps = [...requiredSuccessfulSteps, dispatchName].map(name =>
     job.steps.filter(step => step?.name === name)
   );
@@ -840,7 +840,35 @@ function inspectOnline(args) {
       );
     }
   }
-  return classifyProductionMarkerEvidence(evidence);
+  const result = classifyProductionMarkerEvidence(evidence);
+  if (result.state === 'verified' || result.state === 'pending') {
+    // Evidence can arrive while archive/run/job reads are in flight. Require
+    // the same immutable artifact identities and expiry states at the return
+    // boundary; never authorize from a stale partial listing.
+    const snapshot = artifacts =>
+      JSON.stringify([...artifacts].sort((left, right) => left.id - right.id));
+    for (const name of [
+      `production-generation-verified-${sha}`,
+      `production-generation-verified-recovery-${sha}`,
+      recoveryName,
+    ]) {
+      const before =
+        name === recoveryName
+          ? evidence.recoveryArtifacts
+          : evidence.markers
+              .map(marker => marker.artifact)
+              .filter(artifact => artifact.name === name);
+      const after = normalizeArtifacts(
+        ghJson(
+          `repos/${repo}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`
+        ),
+        name
+      );
+      if (snapshot(before) !== snapshot(after))
+        return manual('artifact_snapshot_changed');
+    }
+  }
+  return result;
 }
 
 function main() {
