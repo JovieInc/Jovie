@@ -323,6 +323,30 @@ function variantSelections(
 }
 
 describe('canonical marketing component registry', () => {
+  it('imports the artist profile shell directly without cycling through its exporting barrel', () => {
+    const file = path.join(
+      repoRoot,
+      'apps/web/components/marketing/artist-profile/ArtistProfileLandingRoute.tsx'
+    );
+    const source = parseTsx(file, fs.readFileSync(file, 'utf8'));
+    const imports = source.statements.filter(ts.isImportDeclaration);
+    const shellImport = imports.find(statement => {
+      const bindings = statement.importClause?.namedBindings;
+      return (
+        bindings &&
+        ts.isNamedImports(bindings) &&
+        bindings.elements.some(
+          element => element.name.text === 'MarketingPageShell'
+        )
+      );
+    });
+    expect(shellImport?.moduleSpecifier.getText(source)).toBe(
+      "'@/components/marketing/MarketingPageShell'"
+    );
+    expect(
+      imports.map(statement => statement.moduleSpecifier.getText(source))
+    ).not.toContain("'@/components/marketing'");
+  });
   it('projects normative sections, variants, defaults, and stories once', () => {
     expect(MARKETING_SECTION_REGISTRY).toHaveLength(
       MARKETING_SECTION_IDS.length
