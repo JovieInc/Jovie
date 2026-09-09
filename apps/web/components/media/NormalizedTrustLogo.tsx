@@ -13,7 +13,11 @@ export function NormalizedTrustLogo({
   const asset = getTrustLogoAsset(id);
   const Logo = asset.component;
   return (
-    <NormalizedLogoAsset asset={asset.normalization} className={className}>
+    <NormalizedLogoAsset
+      asset={asset.normalization}
+      fit='contain'
+      className={className}
+    >
       <Logo aria-label={asset.label} />
     </NormalizedLogoAsset>
   );

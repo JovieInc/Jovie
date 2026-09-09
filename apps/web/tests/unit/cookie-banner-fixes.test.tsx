@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockMobile = vi.hoisted(() => ({ value: false }));
+
 const mockSaveConsent = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/cookies/consent', () => ({
@@ -16,7 +18,7 @@ vi.mock('@/lib/tracking/consent', async importOriginal => {
 });
 
 vi.mock('@/hooks/useMediaQuery', () => ({
-  useMediaQuery: () => false,
+  useMediaQuery: () => mockMobile.value,
 }));
 
 function setCookie(value: string) {
@@ -278,12 +280,14 @@ describe('CookieModal loads saved preferences', () => {
       expect(control.className).toContain('before:h-12');
       expect(control.className).toContain('before:w-12');
     }
-    expect(screen.getByRole('button', { name: /cancel/i }).className).toContain(
-      'min-h-12'
-    );
-    expect(
-      screen.getByRole('button', { name: /save preferences/i }).className
-    ).toContain('min-h-12');
+    for (const name of [/cancel/i, /save preferences/i]) {
+      const action = screen.getByRole('button', { name });
+      expect(action).toHaveAttribute('data-size', 'marketing');
+      expect(action.className.split(' ')).toContain('min-h-7');
+      expect(action.className.split(' ')).toContain('h-auto');
+      expect(action.className.split(' ')).toContain('my-2');
+      expect(action.className.split(' ')).not.toContain('min-h-12');
+    }
     expect(
       screen.getByRole('link', { name: /cookie policy/i }).className
     ).toContain('min-h-12');
@@ -293,6 +297,37 @@ describe('CookieModal loads saved preferences', () => {
     expect(close.className).toContain('before:h-11');
     expect(close.className).toContain('before:w-11');
     expect(close.className).not.toContain('size-12');
+  });
+
+  it.each([
+    false,
+    true,
+  ])('cancels unsaved preferences without persisting (mobile=%s)', async mobile => {
+    mockMobile.value = mobile;
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const beforeSaveCalls = mockSaveConsent.mock.calls.length;
+    const { CookieModal } = await import('@/components/organisms/CookieModal');
+    const { unmount } = render(
+      <CookieModal open onClose={onClose} onSave={onSave} />
+    );
+    try {
+      for (const name of [/cancel/i, /save preferences/i]) {
+        const action = screen.getByRole('button', { name });
+        expect(action).toHaveAttribute('data-size', 'marketing');
+        expect(action.className.split(' ')).toContain('my-2');
+        expect(action.className.split(' ')).not.toContain('min-h-12');
+      }
+      fireEvent.click(screen.getByRole('switch', { name: /analytics/i }));
+      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+      expect(onClose).toHaveBeenCalledOnce();
+      expect(onSave).not.toHaveBeenCalled();
+      expect(mockSaveConsent.mock.calls.length).toBe(beforeSaveCalls);
+      expect(localStorage.getItem('jv_cc')).toBeNull();
+    } finally {
+      unmount();
+      mockMobile.value = false;
+    }
   });
 
   it('calls onSave and onClose when Save Preferences succeeds', async () => {

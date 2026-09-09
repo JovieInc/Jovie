@@ -16,7 +16,7 @@
  * @smoke
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /** The cookie name the middleware uses to flag consent-required regions */
@@ -28,6 +28,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 async function openHomepageWithBanner(
   page: import('@playwright/test').Page
 ): Promise<void> {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
 
   // Remove stored consent so the banner renders even on repeat runs
@@ -84,6 +85,85 @@ function boxesOverlap(
   );
 }
 
+/** Verify the visible face separately from actual pointer ownership outside it. */
+async function assertConsentActions(
+  page: Page,
+  actions: Locator[],
+  enlarged = false
+) {
+  const targets = [];
+  for (const action of actions) {
+    await expect(action).toBeVisible();
+    // Finish finite entrance transforms on the modal and its ancestors first.
+    await action.evaluate(async element => {
+      const pending: Promise<unknown>[] = [];
+      for (
+        let node: Element | null = element;
+        node;
+        node = node.parentElement
+      ) {
+        for (const animation of node.getAnimations()) {
+          if (
+            animation.playState === 'running' &&
+            Number.isFinite(
+              Number(animation.effect?.getComputedTiming().endTime)
+            )
+          ) {
+            pending.push(animation.finished);
+          }
+        }
+      }
+      await Promise.all(pending);
+    });
+    const geometry = await action.evaluate(element => {
+      const face = element.getBoundingClientRect();
+      const pseudo = getComputedStyle(element, '::before');
+      const width = Math.max(face.width, Number.parseFloat(pseudo.width));
+      const height = Math.max(face.height, Number.parseFloat(pseudo.height));
+      const x = face.x + (face.width - width) / 2;
+      const y = face.y + (face.height - height) / 2;
+      const points = [
+        [x + width / 2, y + 2],
+        [x + width / 2, y + height - 2],
+        [x + 2, y + height / 2],
+        [x + width - 2, y + height / 2],
+      ];
+      return {
+        x,
+        y,
+        width,
+        height,
+        faceHeight: face.height,
+        owned: points.every(([px, py]) => {
+          const hit = document.elementFromPoint(px, py);
+          return hit === element || (hit !== null && element.contains(hit));
+        }),
+      };
+    });
+    if (enlarged) expect(geometry.faceHeight).toBeGreaterThan(28);
+    else expect(geometry.faceHeight).toBeCloseTo(28, 0);
+    expect(geometry.width).toBeGreaterThanOrEqual(44);
+    expect(geometry.height).toBeGreaterThanOrEqual(44);
+    expect(geometry.owned, 'target edges must hit their own action').toBe(true);
+    targets.push(geometry);
+    await page.keyboard.press('Tab');
+    await action.focus();
+    await expect(action).toBeFocused();
+    await expect
+      .poll(() =>
+        action.evaluate(element => getComputedStyle(element).boxShadow)
+      )
+      .toContain('rgb(37, 99, 255)');
+  }
+  for (let i = 0; i < targets.length; i += 1) {
+    for (const other of targets.slice(i + 1)) {
+      expect(boxesOverlap(targets[i], other), 'consent targets overlap').toBe(
+        false
+      );
+    }
+  }
+}
+
 test.describe('Cookie banner @smoke', () => {
   test('cookie banner appears for new visitors', async ({ page }) => {
     test.setTimeout(90_000);
@@ -103,20 +183,12 @@ test.describe('Cookie banner @smoke', () => {
     expect(box!.width, 'Cookie banner has zero width').toBeGreaterThan(0);
     expect(box!.height, 'Cookie banner has zero height').toBeGreaterThan(0);
 
-    for (const actionName of ['Reject all', 'Customize', 'Accept all']) {
-      const actionBox = await banner
-        .getByRole('button', { name: actionName, exact: true })
-        .boundingBox();
-      expect(actionBox, `${actionName} has no bounding box`).not.toBeNull();
-      expect(
-        actionBox!.width,
-        `${actionName} misses the 44px touch width`
-      ).toBeGreaterThanOrEqual(44);
-      expect(
-        actionBox!.height,
-        `${actionName} misses the 44px touch height`
-      ).toBeGreaterThanOrEqual(44);
-    }
+    await assertConsentActions(
+      page,
+      ['Reject all', 'Customize', 'Accept all'].map(name =>
+        banner.getByRole('button', { name, exact: true })
+      )
+    );
   });
 
   for (const viewport of [
@@ -177,16 +249,7 @@ test.describe('Cookie banner @smoke', () => {
       '"Accept all" button not found in cookie banner'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    const box = await acceptBtn.boundingBox();
-    expect(box, '"Accept all" button has no bounding box').not.toBeNull();
-    expect(
-      box!.width,
-      '"Accept all" button misses 44px touch width'
-    ).toBeGreaterThanOrEqual(44);
-    expect(
-      box!.height,
-      '"Accept all" button misses 44px touch height'
-    ).toBeGreaterThanOrEqual(44);
+    await assertConsentActions(page, [acceptBtn]);
 
     await acceptBtn.click();
     await expect(banner).toBeHidden({ timeout: 5_000 });
@@ -249,85 +312,65 @@ test.describe('Cookie banner @smoke', () => {
       });
   });
 
-  test('Customize button opens modal with Save Preferences button', async ({
-    page,
-  }) => {
-    test.setTimeout(90_000);
+  for (const width of [1280, 390]) {
+    test(`Customize opens canonical modal actions at ${width}px`, async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
 
-    await openHomepageWithBanner(page);
+      await page.setViewportSize({ width, height: 844 });
+      await openHomepageWithBanner(page);
 
-    const banner = page.locator('[data-testid="cookie-banner"]');
-    await expect(banner).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      const banner = page.locator('[data-testid="cookie-banner"]');
+      await expect(banner).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    const customizeBtn = banner.getByRole('button', { name: 'Customize' });
-    await expect(
-      customizeBtn,
-      '"Customize" button not found in cookie banner'
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      const customizeBtn = banner.getByRole('button', { name: 'Customize' });
+      await expect(
+        customizeBtn,
+        '"Customize" button not found in cookie banner'
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    const custBox = await customizeBtn.boundingBox();
-    expect(custBox, '"Customize" button has no bounding box').not.toBeNull();
-    expect(
-      custBox!.width,
-      '"Customize" button misses 44px touch width'
-    ).toBeGreaterThanOrEqual(44);
-    expect(
-      custBox!.height,
-      '"Customize" button misses 44px touch height'
-    ).toBeGreaterThanOrEqual(44);
+      await assertConsentActions(page, [customizeBtn]);
 
-    // Open the cookie modal
-    await customizeBtn.click();
+      // Open the cookie modal
+      await customizeBtn.click();
 
-    // The modal should surface a "Save Preferences" button
-    // (CookieModal renders a save/confirm action)
-    const saveBtn = page
-      .getByRole('button', { name: /save preferences|save/i })
-      .first();
-    await expect(
-      saveBtn,
-      '"Save Preferences" button did not appear after clicking Customize'
-    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      // The modal should surface a "Save Preferences" button
+      // (CookieModal renders a save/confirm action)
+      const saveBtn = page
+        .getByRole('button', { name: /save preferences|save/i })
+        .first();
+      await expect(
+        saveBtn,
+        '"Save Preferences" button did not appear after clicking Customize'
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    // Dialog scale-in briefly transforms the visual box below its settled CSS
-    // size. Evaluate the stable interaction state, not an animation frame.
-    await expect
-      .poll(async () => (await saveBtn.boundingBox())?.height ?? 0)
-      .toBeGreaterThanOrEqual(44);
+      const cancelBtn = page.getByRole('button', {
+        name: 'Cancel',
+        exact: true,
+      });
+      await assertConsentActions(page, [cancelBtn, saveBtn]);
 
-    const saveBox = await saveBtn.boundingBox();
-    expect(
-      saveBox,
-      '"Save Preferences" button has no bounding box'
-    ).not.toBeNull();
-    expect(
-      saveBox!.width,
-      '"Save Preferences" button misses 44px touch width'
-    ).toBeGreaterThanOrEqual(44);
-    expect(
-      saveBox!.height,
-      '"Save Preferences" button misses 44px touch height'
-    ).toBeGreaterThanOrEqual(44);
+      const analyticsSwitch = page.getByRole('switch', { name: /analytics/i });
+      const switchHitArea = await analyticsSwitch.evaluate(control => {
+        const pseudo = getComputedStyle(control, '::before');
+        return {
+          width: Number.parseFloat(pseudo.width),
+          height: Number.parseFloat(pseudo.height),
+        };
+      });
+      expect(switchHitArea.width).toBeGreaterThanOrEqual(44);
+      expect(switchHitArea.height).toBeGreaterThanOrEqual(44);
 
-    const cancelBtn = page.getByRole('button', { name: 'Cancel', exact: true });
-    const cancelBox = await cancelBtn.boundingBox();
-    expect(cancelBox, '"Cancel" button has no bounding box').not.toBeNull();
-    expect(cancelBox!.width).toBeGreaterThanOrEqual(44);
-    expect(cancelBox!.height).toBeGreaterThanOrEqual(44);
-
-    const analyticsSwitch = page.getByRole('switch', { name: /analytics/i });
-    const switchHitArea = await analyticsSwitch.evaluate(control => {
-      const pseudo = getComputedStyle(control, '::before');
-      return {
-        width: Number.parseFloat(pseudo.width),
-        height: Number.parseFloat(pseudo.height),
-      };
+      await analyticsSwitch.focus();
+      await page.keyboard.press('Space');
+      await expect(analyticsSwitch).toBeChecked();
+      for (const action of [cancelBtn, saveBtn]) {
+        await action.evaluate(element => {
+          element.style.fontSize = '24px';
+        });
+      }
+      await assertConsentActions(page, [cancelBtn, saveBtn], true);
     });
-    expect(switchHitArea.width).toBeGreaterThanOrEqual(44);
-    expect(switchHitArea.height).toBeGreaterThanOrEqual(44);
-
-    await analyticsSwitch.focus();
-    await page.keyboard.press('Space');
-    await expect(analyticsSwitch).toBeChecked();
-  });
+  }
 });

@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/cookie-banner.test.tsx
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { CSSProperties } from 'react';
 
 export interface CookieActionsProps {
@@ -22,7 +23,7 @@ const customizeButtonStyle: CSSProperties = {
   fontWeight: 'var(--linear-font-weight-medium)',
   padding: '6px 10px',
   whiteSpace: 'nowrap',
-  height: '28px',
+  lineHeight: 1,
 };
 
 /** Shared by Accept all and Reject all so neither choice is visually stronger. */
@@ -35,7 +36,7 @@ const choiceButtonStyle: CSSProperties = {
   fontWeight: 'var(--linear-font-weight-medium)',
   padding: '6px 12px',
   whiteSpace: 'nowrap',
-  height: '28px',
+  lineHeight: 1,
 };
 
 export function CookieActions({
@@ -56,7 +57,6 @@ export function CookieActions({
         ...customizeButtonStyle,
         fontSize: '12px',
         padding: '6px',
-        height: '44px',
       }
     : customizeButtonStyle;
   const choiceStyle: CSSProperties = compact
@@ -64,12 +64,13 @@ export function CookieActions({
         ...choiceButtonStyle,
         fontSize: '12px',
         padding: '6px 8px',
-        height: '44px',
       }
     : choiceButtonStyle;
 
+  // Reserve the invisible target above/below each face, including wrapped rows.
+  // Intrinsic width lets enlarged native text wrap the row instead of clipping.
   const btnBase =
-    'min-w-0 flex-1 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent sm:flex-none';
+    'my-2 min-w-max flex-1 shadow-none transition-opacity hover:opacity-80 sm:flex-none';
 
   return (
     <div
@@ -77,7 +78,9 @@ export function CookieActions({
       style={{ gap: containerGap }}
       data-testid='cookie-actions'
     >
-      <button
+      <Button
+        size='marketing'
+        variant='primary'
         type='button'
         onClick={onRejectAll}
         disabled={disabled}
@@ -85,9 +88,12 @@ export function CookieActions({
         style={choiceStyle}
         data-testid='cookie-action-reject-all'
       >
+        {/* ui-casing-allow: preserve existing consent copy under founder taste lock */}
         Reject all
-      </button>
-      <button
+      </Button>
+      <Button
+        size='marketing'
+        variant='primary'
         type='button'
         onClick={onAcceptAll}
         disabled={disabled}
@@ -95,9 +101,12 @@ export function CookieActions({
         style={choiceStyle}
         data-testid='cookie-action-accept-all'
       >
+        {/* ui-casing-allow: preserve existing consent copy under founder taste lock */}
         Accept all
-      </button>
-      <button
+      </Button>
+      <Button
+        size='marketing'
+        variant='primary'
         type='button'
         onClick={onCustomize}
         disabled={disabled}
@@ -106,7 +115,7 @@ export function CookieActions({
         data-testid='cookie-action-customize'
       >
         Customize
-      </button>
+      </Button>
     </div>
   );
 }
