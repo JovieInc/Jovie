@@ -399,7 +399,11 @@ export function classifyProductionMarkerEvidence(evidence) {
     );
     const invalid = classified.find(entry => entry.error);
     if (invalid) return manual(invalid.error);
-    const attempts = classified.map(entry => entry.attempt);
+    // Attempts are scoped to their producer run: recovery and controller runs
+    // may independently reach attempt 2 without duplicating either receipt.
+    const attempts = classified.map(
+      entry => `${entry.controllerRun}:${entry.attempt}`
+    );
     if (new Set(attempts).size !== attempts.length) {
       return manual('duplicate_marker_attempt');
     }

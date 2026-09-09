@@ -686,10 +686,14 @@ describe('recovered production marker state', () => {
   }
 
   it.each([
-    false,
-    true,
-  ])('accepts independently verified recovery and retry in either listing order (%s)', reverse => {
+    [1, false],
+    [1, true],
+    [2, false],
+    [2, true],
+  ] as const)('accepts independently verified recovery attempt %s and retry (reverse=%s)', (recoveryAttempt, reverse) => {
     const { recovered, retry } = convergedMarkers();
+    recovered.payload.controllerAttempt = String(recoveryAttempt);
+    recovered.attemptRun.run_attempt = recoveryAttempt;
     const markers = reverse ? [retry, recovered] : [recovered, retry];
     expect(
       classifyProductionMarkerEvidence(evidence({ markers }))
