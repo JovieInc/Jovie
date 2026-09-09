@@ -41,27 +41,31 @@ export function materializeStatic(root) {
       if (stat.isDirectory()) {
         walk(path);
       } else if (stat.isSymbolicLink()) {
-        let target;
+        const publicFile = resolve(
+          root,
+          'apps/web/public',
+          relative(resolve(output, 'static'), path)
+        );
+        let publicStat;
         try {
-          target = realpathSync(path);
+          publicStat = lstatSync(publicFile);
         } catch (error) {
           if (error.code !== 'ENOENT') throw error;
-          const publicFile = resolve(
-            root,
-            'apps/web/public',
-            relative(resolve(output, 'static'), path)
-          );
-          // Never repair an arbitrary dangling artifact from a similarly named
-          // file. It must be the exact relocated canonical source symlink.
-          if (
-            !lstatSync(publicFile).isSymbolicLink() ||
-            readlinkSync(publicFile) !== readlinkSync(path)
-          ) {
-            throw new Error(
-              'Dangling static link does not match public export'
-            );
-          }
+        }
+        let target;
+        if (publicStat?.isSymbolicLink()) {
+          // The source export is authoritative even if its relocated relative
+          // link happens to resolve to different bytes in the output namespace.
           target = realpathSync(publicFile);
+          if (
+            readlinkSync(publicFile) !== readlinkSync(path) &&
+            realpathSync(path) !== target
+          ) {
+            throw new Error('Static link does not match public export');
+          }
+        } else {
+          // Arbitrary missing targets are never repaired by filename alone.
+          target = realpathSync(path);
         }
         inside(root, target);
         if (!lstatSync(target).isFile())

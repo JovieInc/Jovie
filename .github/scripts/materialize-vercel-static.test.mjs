@@ -83,6 +83,29 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
   assert.deepEqual(artifactSnapshot(f.root), receipt);
 });
 
+for (const alteredLink of [false, true]) {
+  test(`canonical export wins relocated namespace collision; altered link=${alteredLink}`, t => {
+    const f = fixture(t);
+    f.put('apps/web/catalog/image.png', 'canonical image');
+    f.link('apps/web/public/images/image.png', '../../catalog/image.png');
+    const decoy = f.put(
+      '.vercel/output/catalog/image.png',
+      'unrelated artifact'
+    );
+    const output = f.link(
+      '.vercel/output/static/images/image.png',
+      alteredLink ? decoy : '../../catalog/image.png'
+    );
+    if (alteredLink) {
+      assert.throws(() => materializeStatic(f.root), /match public export/);
+      assert.equal(lstatSync(output).isSymbolicLink(), true);
+    } else {
+      assert.equal(materializeStatic(f.root), 1);
+      assert.equal(readFileSync(output, 'utf8'), 'canonical image');
+    }
+  });
+}
+
 test('materializes valid build links and preserves regular files; later drift changes provenance', t => {
   const f = fixture(t);
   const source = f.put('apps/web/.next/static/chunk.js', 'built chunk');
