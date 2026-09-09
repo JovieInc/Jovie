@@ -1029,10 +1029,14 @@ export async function proveCanonicalMembership({
   const payload = assertGraphqlResponse(
     await runGhJson(
       runner,
-      graphqlArgs(CANONICAL_MEMBERSHIP_QUERY, {
-        ...parseRepositorySlug(repository),
-        number: parsePullRequestNumber(number),
-      }),
+      graphqlArgs(
+        CANONICAL_MEMBERSHIP_QUERY,
+        {
+          ...parseRepositorySlug(repository),
+          number: parsePullRequestNumber(number),
+        },
+        { typed: ['number'] }
+      ),
       'verifying canonical queue membership'
     ),
     'verifying canonical queue membership'
