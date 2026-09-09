@@ -20,6 +20,7 @@ export function YoutubeThumbnailsLanding() {
       <main>
         <MarketingHero
           variant='left'
+          sectionVariant='left-none'
           headingId='youtube-thumbnails-hero-heading'
           testId='marketing-section-hero'
         >
@@ -45,6 +46,8 @@ export function YoutubeThumbnailsLanding() {
           aria-labelledby='approval-loop-heading'
           className='border-t border-subtle py-16 sm:py-20'
           data-testid='marketing-section-how-it-works'
+          data-marketing-owner='apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
+          data-marketing-variant='3-step-strip'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl text-center'>
@@ -84,6 +87,8 @@ export function YoutubeThumbnailsLanding() {
           aria-labelledby='thumbnail-safeguards-heading'
           className='bg-panel py-16 sm:py-20'
           data-testid='marketing-section-feature-grid'
+          data-marketing-owner='apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
+          data-marketing-variant='two-column-text'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl'>
@@ -105,6 +110,7 @@ export function YoutubeThumbnailsLanding() {
           aria-labelledby='youtube-thumbnails-included-heading'
           className='py-16 sm:py-20'
           data-testid='marketing-section-cta'
+          data-marketing-owner='apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl text-center'>

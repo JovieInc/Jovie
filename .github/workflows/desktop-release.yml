@@ -208,14 +208,29 @@ jobs:
             echo "::error::Could not resolve exact current main for desktop authorization."
             exit 1
           }
-          if [ "$current_main_sha" != "$release_sha" ]; then
+          if [ "$environment" = "staging" ] && [ "$current_main_sha" != "$release_sha" ]; then
+            mainline_compare="$(gh api \
+              "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
+            jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $release_sha is not a trusted ancestor of current main $current_main_sha."
+              exit 1
+            }
+          elif [ "$current_main_sha" != "$release_sha" ]; then
             echo "::notice::Desktop generation $release_sha was superseded by $current_main_sha."
             exit 0
           fi
 
-          # Staging publishes only an exact current-main generation whose main
-          # CI run is already green. The release job revalidates current main
-          # again immediately before packaging and publication.
+          # Staging publishes an immutable mainline generation whose exact push
+          # CI run is already green. Later main advancement does not invalidate
+          # that certified source; ancestry and monotonic feed versioning do.
           if [ "$environment" = "staging" ]; then
             ci_workflow="$(gh api \
               "repos/$REPOSITORY/actions/workflows/ci.yml")"
@@ -1075,17 +1090,32 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Revalidate exact current main before packaging
+      - name: Revalidate authorized mainline source before packaging
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
+          if [ "$ENVIRONMENT" = "staging" ] && [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(gh api \
+              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main $current_main_sha before packaging."
+              exit 1
+            }
+          elif [ "$current_main_sha" != "$RELEASE_SHA" ]; then
             echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before packaging."
             exit 1
-          }
+          fi
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -1327,10 +1357,22 @@ jobs:
         run: |
           set -euo pipefail
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
-            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before staging publication."
-            exit 1
-          }
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(gh api \
+              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main before staging publication."
+              exit 1
+            }
+          fi
           node scripts/desktop-release-assets.mjs upload-and-publish \
             --environment staging \
             --sha "$RELEASE_SHA" \

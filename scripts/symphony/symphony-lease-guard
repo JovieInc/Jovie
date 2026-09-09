@@ -32,6 +32,7 @@ import os
 import pathlib
 import re
 import sys
+import subprocess
 import tempfile
 import time
 import urllib.error
@@ -333,6 +334,7 @@ def _fetch_issue(identifier: str) -> dict | None:
         "identifier": identifier,
         "state": state["name"],
         "updatedAtEpoch": updated_epoch,
+        "updatedAt": issue.get("updatedAt"),
     }
 
 
@@ -379,6 +381,21 @@ def lease_decision(
     )
 
 
+def _existing_repair_preflight(identifier: str, issue: dict | None) -> bool:
+    """Read-only preliminary check; the router must later acquire the actual FD9."""
+    if not issue or issue.get("state", "").strip().lower() != "in review" or not issue.get("updatedAt"):
+        return False
+    controller = pathlib.Path.home() / ".local/bin/symphony-codex-exhausted.py"
+    try:
+        result = subprocess.run(
+            [str(controller), "repair-preflight", identifier, "--issue-revision", issue["updatedAt"]],
+            capture_output=True, text=True, timeout=45, check=False,
+        )
+        return result.returncode == 0 and result.stdout.strip() == f"REPAIR_PREFLIGHT_ADMITTED identifier={identifier}"
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def check(identifier: str) -> int:
     if not IDENTIFIER.fullmatch(identifier):
         print(f"LEASE_CHECK_INVALID identifier={identifier!r}", file=sys.stderr)
@@ -386,7 +403,8 @@ def check(identifier: str) -> int:
     # Slow tracker I/O must not serialize independent issue checks. Re-read the
     # ledger after it completes so stale responses see every committed fence.
     issue = _fetch_issue(identifier)
-    active_states = _active_states()
+    active_states = _active_states() - {"in review"}
+    repair = _existing_repair_preflight(identifier, issue)
     try:
         with _state_transaction():
             state = _load_state()
@@ -397,6 +415,17 @@ def check(identifier: str) -> int:
             decision, reason, tombstone, clear = lease_decision(
                 identifier, issue, state["tombstones"].get(key), active_states, time.time()
             )
+            # Repair does not erase a terminal fence or manufacture a reopen.
+            previous = state["tombstones"].get(key)
+            if (previous is not None and previous.get("state", "").strip().lower()
+                    in {"done", "closed", "canceled", "cancelled", "duplicate"}
+                    and issue is not None and issue.get("state", "").strip().lower() == "in review"):
+                # Repeated In Review reads cannot replace a deliberate terminal
+                # fence; only the existing explicit active-state reopen can.
+                tombstone = previous
+            if (repair and decision == "suppress" and reason.startswith("non_active")
+                    and (previous is None or previous.get("state", "").strip().lower() == "in review")):
+                decision, reason = "admit", "existing_pr_repair"
             if tombstone is not None:
                 tombstone = {
                     **tombstone,
@@ -410,6 +439,7 @@ def check(identifier: str) -> int:
             counter_key = {
                 ("suppress", "indeterminate"): "indeterminate",
                 ("admit", "active"): "admitted",
+                ("admit", "existing_pr_repair"): "admitted",
                 ("admit", "reopened"): "reopened",
             }.get((decision, reason))
             if counter_key is None:

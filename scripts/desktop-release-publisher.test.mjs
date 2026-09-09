@@ -58,7 +58,13 @@ function releaseFixture(environment, version, releaseSha, draft = true) {
   };
 }
 
-function fakeClient({ mainSha, release = null, seedBuffers = new Map() }) {
+function fakeClient({
+  mainSha,
+  mainlineAncestor = true,
+  release = null,
+  seedBuffers = new Map(),
+  stagingAncestor = true,
+}) {
   const client = {
     buffers: new Map(),
     events: [],
@@ -68,11 +74,13 @@ function fakeClient({ mainSha, release = null, seedBuffers = new Map() }) {
     failTagUpdateAt: 0,
     failUploadsRemaining: new Map(),
     mainSha,
+    mainlineAncestor,
     metadataUpdateCalls: 0,
     nextAssetId: 1,
     release,
     tagSha: release?.target_commitish || null,
     tagUpdateCalls: 0,
+    stagingAncestor,
   };
   client.seedAsset = (name, buffer = null) => {
     const asset = {
@@ -168,6 +176,21 @@ function fakeClient({ mainSha, release = null, seedBuffers = new Map() }) {
   };
   client.currentMainSha = async () =>
     Array.isArray(client.mainSha) ? client.mainSha.shift() : client.mainSha;
+  client.assertMainlineAncestor = async () => {
+    await client.currentMainSha();
+    if (!client.mainlineAncestor) {
+      throw new Error(
+        'Desktop generation is not a trusted ancestor of current main.'
+      );
+    }
+  };
+  client.assertCommitDescendant = async () => {
+    if (!client.stagingAncestor) {
+      throw new Error(
+        'Desktop staging source would move backward or leave its published lineage.'
+      );
+    }
+  };
   client.publishRelease = async (_id, environment) => {
     Object.assign(client.release, {
       draft: false,
@@ -203,12 +226,16 @@ const STALE_VERSION = '26.8.2-staging.17823456788.1';
 function stagingClient({
   draft = false,
   mainSha = NEXT_SHA,
+  mainlineAncestor = true,
   releaseSha = OLD_SHA,
+  stagingAncestor = true,
 } = {}) {
   return fakeClient({
     mainSha,
+    mainlineAncestor,
     release: releaseFixture('staging', OLD_VERSION, releaseSha, draft),
     seedBuffers: artifactBuffers('staging', OLD_VERSION),
+    stagingAncestor,
   });
 }
 
@@ -293,16 +320,14 @@ test('staging draft creation removes an owned starter and resumes', async t => {
   assert.equal(client.release.assets.length, 5);
 });
 
-test('first staging publication emits no receipt after main advances', async t => {
+test('first staging publication remains valid when main advances', async t => {
   const client = fakeClient({ mainSha: [OLD_SHA, SUPER_SHA] });
   const local = await localRelease(t, 'staging', OLD_VERSION);
   const input = stagingInput(client, local, OLD_SHA, OLD_VERSION);
   await prepare(input);
-  await assert.rejects(
-    uploadAndPublish(input),
-    /superseded before release receipt/
-  );
-  await assert.rejects(readFile(local.output), { code: 'ENOENT' });
+  await uploadAndPublish(input);
+  assert.deepEqual(identity(client), [OLD_SHA, OLD_VERSION, OLD_SHA]);
+  assert.match(await readFile(local.output, 'utf8'), /release_sha=a{40}/);
 });
 
 test('staging prepare safely clears and retargets a prior-generation draft', async () => {
@@ -407,14 +432,29 @@ test('published staging rolls binaries first, feed last, retains one rollback ge
   await assertPublished(client, local, NEXT_VERSION, NEXT_SHA);
 });
 
-test('staging emits no receipt when main advances during publication', async t => {
-  const { input, local } = await rollFixture(t, {
+test('published staging remains valid when main advances during publication', async t => {
+  const { client, input, local } = await rollFixture(t, {
     mainSha: [NEXT_SHA, 'c'.repeat(40)],
   });
+  await uploadAndPublish(input);
+  await assertPublished(client, local, NEXT_VERSION, NEXT_SHA);
+  assert.match(await readFile(local.output, 'utf8'), /release_sha=b{40}/);
+});
+
+test('published staging rejects stale source before any release mutation', async t => {
+  const client = fakeClient({
+    mainSha: SUPER_SHA,
+    release: releaseFixture('staging', NEXT_VERSION, NEXT_SHA, false),
+    seedBuffers: artifactBuffers('staging', NEXT_VERSION),
+    stagingAncestor: false,
+  });
+  const local = await localRelease(t, 'staging', SUPER_VERSION);
   await assert.rejects(
-    uploadAndPublish(input),
-    /superseded before release receipt/
+    uploadAndPublish(stagingInput(client, local, OLD_SHA, SUPER_VERSION)),
+    /move backward or leave its published lineage/
   );
+  assert.deepEqual(client.events, []);
+  assert.deepEqual(identity(client), [NEXT_SHA, NEXT_VERSION, NEXT_SHA]);
   await assert.rejects(readFile(local.output), { code: 'ENOENT' });
 });
 
@@ -444,9 +484,9 @@ test('published roll failures remain safe and rerunnable', async t => {
     },
     {
       label: 'metadata update',
-      failures: { failMetadataUpdateAt: 1, tagSha: SUPER_SHA },
+      failures: { failMetadataUpdateAt: 1 },
       error: /injected release metadata/,
-      terminal: 'mirror',
+      terminal: 'old',
     },
     {
       label: 'metadata and tag rollback',
@@ -528,11 +568,9 @@ test('published roll failures remain safe and rerunnable', async t => {
         identity(client),
         terminal === 'old'
           ? [OLD_SHA, OLD_VERSION, OLD_SHA]
-          : terminal === 'mirror'
-            ? [SUPER_SHA, OLD_VERSION, OLD_SHA]
-            : terminal.startsWith('split')
-              ? [NEXT_SHA, OLD_VERSION, OLD_SHA]
-              : [NEXT_SHA, NEXT_VERSION, NEXT_SHA]
+          : terminal.startsWith('split')
+            ? [NEXT_SHA, OLD_VERSION, OLD_SHA]
+            : [NEXT_SHA, NEXT_VERSION, NEXT_SHA]
       );
       if (label === 'feed upload') {
         assert.equal(
@@ -542,7 +580,16 @@ test('published roll failures remain safe and rerunnable', async t => {
         );
       }
       let retry = { input, local, sha: NEXT_SHA, version: NEXT_VERSION };
-      if (terminal.endsWith('newer')) {
+      if (terminal.startsWith('split')) {
+        const before = [identity(client), names(client), client.events.length];
+        await assert.rejects(uploadAndPublish(input), /malformed provenance/);
+        assert.deepEqual(
+          [identity(client), names(client), client.events.length],
+          before
+        );
+        client.tagSha = client.release.target_commitish;
+      }
+      if (terminal === 'newer') {
         const before = [identity(client), names(client), client.events.length];
         const older = await localRelease(t, 'staging', OLD_VERSION);
         await assert.rejects(

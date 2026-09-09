@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CERTIFICATION_KERNEL_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
   selectLanes,
@@ -76,6 +77,36 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       "'python3 scripts/symphony/tests/run-runtime-proof-gate.py'"
     );
+  });
+
+  it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
+    const webParts = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const webParts = ['),
+      CI_FAST_SOURCE.indexOf(
+        'const parts = [',
+        CI_FAST_SOURCE.indexOf('const webParts = [')
+      )
+    );
+    expect(CERTIFICATION_KERNEL_COMMAND).toContain(
+      'tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts'
+    );
+    expect(CERTIFICATION_KERNEL_COMMAND).toContain(
+      '--coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96'
+    );
+    expect(webParts).not.toContain('--passWithNoTests');
+    expect(webParts).toContain('CERTIFICATION_KERNEL_COMMAND');
+    expect(LANE_COMMANDS.structural).toContain(CERTIFICATION_KERNEL_COMMAND);
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeDefined();
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'apps/web/lib/agent-os/certification.ts\n',
+      }).status
+    ).toBe(0);
   });
 
   it('covers every lane exactly once across the explicit hosted groups', () => {
@@ -461,7 +492,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+        ' && ' +
+        CERTIFICATION_KERNEL_COMMAND,
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
@@ -578,7 +611,18 @@ describe('ci-fast bounded parallel workflow', () => {
   it('keeps workflow contracts in the bounded CI control suite', () => {
     const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
 
-    expect(controlTest).toBe('node scripts/run-affected-tests.mjs --control');
+    expect(controlTest).toContain(
+      'scripts/symphony/tests/control-bundle-manifest.test.mjs'
+    );
+    expect(controlTest).toContain(
+      '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs'
+    );
+    expect(controlTest).toContain('--test-coverage-lines=90');
+    expect(controlTest).toContain('--test-coverage-branches=75');
+    expect(controlTest).toContain('--test-coverage-functions=90');
+    expect(controlTest).toContain(
+      '&& node scripts/run-affected-tests.mjs --control'
+    );
   });
 
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
@@ -924,6 +968,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_symphony_ui_pilot_runtime.py',
       'scripts/tests/test_symphony_reconciler_runtime.py',
       'scripts/symphony/closure_health.py',
+      'scripts/symphony/control-bundle-manifest.mjs',
       'scripts/symphony/config/gem-repo-registry.json',
       'scripts/symphony/config/model-registry.json',
       'scripts/symphony/evaluate-fleet-gate.sh',
@@ -944,6 +989,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/systemd/gem-pr-drain.service',
       'scripts/symphony/systemd/gem-pr-drain.timer',
       'scripts/symphony/tests/closure-health.test.py',
+      'scripts/symphony/tests/control-bundle-manifest.test.mjs',
       'scripts/symphony/tests/gem-pr-drain.test.py',
       'scripts/symphony/tests/gem-ops-hud.test.py',
       'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',

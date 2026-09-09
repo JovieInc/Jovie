@@ -12,7 +12,10 @@ import types
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/symphony-codex-auth-fallback.test.py"
 TARGETS = {
-    "symphony-codex-exhausted.py": {"_fallback_lock_count", "_inherited_issue_lease_held", "expire_fallback_lock_decision", "gc_fallback_locks"},
+    "symphony-codex-exhausted.py": {"_fallback_lock_count", "_inherited_issue_lease_held", "expire_fallback_lock_decision", "gc_fallback_locks",
+        "_repair_module", "_repair_assignments", "_validated_existing_pr_repair", "repair_preflight_command",
+        "repair_assign_command", "pickup_refuse_reason", "pickup_check_command"},
+    "existing_pr_repair.py": set(),
 }
 
 
@@ -38,6 +41,12 @@ try:
     tracer.runfunc(runpy.run_path, str(provider_suite), run_name="__main__")
 except SystemExit as exc:
     status = status or int(exc.code or 0)
+repair_suite = SUITE.parent / "existing-pr-repair.test.py"
+sys.argv = [str(repair_suite)]
+try:
+    tracer.runfunc(runpy.run_path, str(repair_suite), run_name="__main__")
+except SystemExit as exc:
+    status = status or int(exc.code or 0)
 counts = tracer.results().counts
 report = {}
 for name, selected in TARGETS.items():
@@ -61,5 +70,6 @@ for name, selected in TARGETS.items():
     report[name] = {"percent": round(percent, 2), "executed": len(executable) - len(missing), "statements": len(executable), "missing": missing}
     if percent < 95:
         status = 1
-print(json.dumps({"selector": str(SUITE.relative_to(ROOT)), "coverage": report}, indent=2))
+print(json.dumps({"selectors": [str(SUITE.relative_to(ROOT)) + " FallbackLockGcTests",
+                              str(provider_suite.relative_to(ROOT)), str(repair_suite.relative_to(ROOT))], "coverage": report}, indent=2))
 raise SystemExit(status)

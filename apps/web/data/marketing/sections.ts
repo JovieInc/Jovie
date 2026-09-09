@@ -110,6 +110,10 @@ export interface MarketingVariant {
   readonly id: string; // derived kebab id; regex-asserted unique per section
   readonly layout: VariantLayout;
   readonly media: VariantMedia;
+  /** Only the explicit source-owned editorial variant permits absent media. */
+  readonly mediaOptional?: boolean;
+  /** Variant-specific requirements replace section defaults only when declared. */
+  readonly requiredInputs?: readonly string[];
   readonly mediaPosition?: VariantMediaPosition; // required iff layout='split'
   readonly columns?: VariantColumns; // required iff section uses grid family
   readonly density?: VariantDensity; // optional refinement of columns
@@ -424,6 +428,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['secondaryCta', 'media', 'logos', 'handleClaimBar'],
     variants: [
       {
+        id: 'left-none',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'left',
+        chooseWhen:
+          'explicit YouTube paste-first source binding only; no automatic selection',
+        exemplar: { route: '/youtube-thumbnails', section: 'hero' },
+        status: 'active',
+      },
+      {
         id: 'centered-handle-claim',
         layout: 'centered',
         media: 'phone',
@@ -613,6 +627,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
       {
+        id: 'two-column-text',
+        layout: 'contained',
+        media: 'none',
+        columns: 2,
+        alignment: 'left',
+        chooseWhen:
+          'explicit YouTube safeguards source binding only; no automatic selection',
+        exemplar: { route: '/youtube-thumbnails', section: 'feature-grid' },
+        status: 'active',
+      },
+      {
         id: '4-ledger',
         layout: 'contained',
         media: 'none',
@@ -732,6 +757,18 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     requiredInputs: ['headline', 'body', 'media'],
     optionalInputs: ['eyebrow', 'cta', 'bullets'],
     variants: [
+      {
+        id: 'editorial',
+        layout: 'contained',
+        media: 'phone',
+        mediaOptional: true,
+        alignment: 'left',
+        requiredInputs: ['headline', 'body'],
+        chooseWhen:
+          'explicit homepage editorial rows; source owns alternating placement and optional phone exports',
+        exemplar: { route: '/', section: 'connected' },
+        status: 'active',
+      },
       {
         id: 'phone-right',
         layout: 'split',
@@ -1955,4 +1992,19 @@ export function getVariant(
   return (
     getMarketingSection(section).variants.find(v => v.id === variantId) ?? null
   );
+}
+
+/** Input contract for an explicitly selected active variant. */
+export function getRequiredVariantInputs(
+  sectionId: MarketingSectionId,
+  variantId: string
+): readonly string[] {
+  const section = getMarketingSection(sectionId);
+  const variant = getVariant(sectionId, variantId);
+  if (!variant || variant.status !== 'active') {
+    throw new Error(
+      `Unknown or inactive marketing variant ${sectionId}/${variantId}`
+    );
+  }
+  return variant.requiredInputs ?? section.requiredInputs;
 }
