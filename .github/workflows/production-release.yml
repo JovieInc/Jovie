@@ -892,6 +892,11 @@ jobs:
             fail_stage "Production signup configuration is incomplete." production_artifact_failed
           fi
 
+          provenance_dir="$RUNNER_TEMP/production-input-provenance"
+          mkdir "$provenance_dir"
+          node .github/scripts/production-input-provenance.mjs inputs \
+            "$provenance_dir/inputs.json"
+
           if ! env -u TURBO_REMOTE_ONLY \
             VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
             NEXT_PUBLIC_BUILD_SHA="$expected" \
@@ -943,6 +948,12 @@ jobs:
             echo "- save eligible (<= ${PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES} bytes): $next_cache_save_eligible"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          provenance_digests="$(node .github/scripts/production-input-provenance.mjs artifact \
+            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json")"
+          read -r input_receipt_digest artifact_digest <<< "$provenance_digests"
+          [[ "$input_receipt_digest" =~ ^[0-9a-f]{64}$ && "$artifact_digest" =~ ^[0-9a-f]{64}$ ]] || \
+            fail_stage "Production input receipt digest is invalid." production_artifact_failed
+
           deploy_json=""
           export VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"
           export NEXT_PUBLIC_BUILD_SHA="$expected"
@@ -952,6 +963,8 @@ jobs:
             --env NEXT_PUBLIC_BUILD_SHA \
             "${runtime_env_args[@]}" \
             --meta "githubCommitSha=${EXPECTED_SHA}" \
+            --meta "jovieInputReceipt=${input_receipt_digest}" \
+            --meta "jovieArtifactDigest=${artifact_digest}" \
             "${scope_args[@]}")"; then
             fail_stage "Production prebuilt deployment failed." production_artifact_failed
           fi
@@ -1003,6 +1016,12 @@ jobs:
             fail_stage "Staged production URL does not match the exact project-scoped Vercel inspection." staged_production_not_ready
           fi
 
+          if ! node .github/scripts/production-input-provenance.mjs bind \
+            "$provenance_dir/deployment.json" "$provenance_dir/artifact.json" \
+            <<< "$production_deploy_json"; then
+            fail_stage "Production input/artifact/deployment binding failed." production_artifact_failed
+          fi
+
           if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
             fail_stage "Production bypass credential is required for the staged deployment canary." missing_creds
           fi
@@ -1027,6 +1046,15 @@ jobs:
           doppler run --project jovie-web --config prd \
             --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,NEXT_PUBLIC_GOOGLE_CLIENT_ID,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,AUTH_GOOGLE_CLIENT_ID,AUTH_GOOGLE_CLIENT_SECRET,SENTRY_AUTH_TOKEN \
             --no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage
+
+      - name: Preserve production input and artifact provenance
+        if: ${{ always() && steps.mutation-head.outputs.is_current == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-input-provenance-${{ inputs.expected_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-input-provenance/*.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Setup Playwright for exact-build performance gate
         if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
