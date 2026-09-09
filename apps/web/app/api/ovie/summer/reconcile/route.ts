@@ -177,7 +177,9 @@ export async function GET(): Promise<NextResponse> {
       createdAt: new Date().toISOString(),
     });
     const committed = appended.session.turns.find(
-      turn => turn.clientTurnId === recoveryClientTurnId
+      turn =>
+        turn.clientTurnId === recoveryClientTurnId ||
+        turn.eveReceipt?.eventId === result.eventId
     );
     if (!committed) {
       throw new Error('committed_recovery_turn_missing');

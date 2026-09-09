@@ -146,7 +146,7 @@ export function assertSummerIdentity(
 export async function loadCurrentSummerSession(
   store: OperatingStore
 ): Promise<SummerSession | null> {
-  const row = await store.getDecision(SUMMER_SESSION_DECISION_ID);
+  const row = await store.getDecisionForUpdate(SUMMER_SESSION_DECISION_ID);
   if (!row?.decided) return null;
   try {
     const value = JSON.parse(row.decided) as {
@@ -232,12 +232,21 @@ export async function appendSummerTurnWithOutcome(
   now: string = new Date().toISOString()
 ): Promise<AppendSummerTurnOutcome> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const currentRecord = await store.getDecision(SUMMER_SESSION_DECISION_ID);
+    const currentRecord = await store.getDecisionForUpdate(
+      SUMMER_SESSION_DECISION_ID
+    );
     const session = currentRecord
       ? sessionFromDecision(currentRecord)
       : emptySession();
     assertSummerIdentity(session.identity);
-    const duplicate = findTurnByClientId(session, turn.clientTurnId);
+    const duplicate =
+      findTurnByClientId(session, turn.clientTurnId) ??
+      (turn.eveReceipt
+        ? session.turns.find(
+            existing =>
+              existing.eveReceipt?.eventId === turn.eveReceipt?.eventId
+          )
+        : undefined);
     if (duplicate && !shouldReplaceSummerTurn(duplicate, turn)) {
       return { session, persisted: 'existing' };
     }
@@ -248,7 +257,7 @@ export async function appendSummerTurnWithOutcome(
       identity: session.identity,
       turns: duplicate
         ? session.turns.map(existing =>
-            existing.clientTurnId === turn.clientTurnId ? persisted : existing
+            existing.turnIndex === duplicate.turnIndex ? persisted : existing
           )
         : [...session.turns, persisted],
     };

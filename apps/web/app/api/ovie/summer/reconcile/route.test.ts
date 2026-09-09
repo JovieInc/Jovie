@@ -203,12 +203,36 @@ describe('GET /api/ovie/summer/reconcile', () => {
     expect((await loadCurrentSummerSession(store))?.turns).toHaveLength(1);
   });
 
+  it('reuses the immutable Eve event even when its client turn id is legacy', async () => {
+    await appendSummerTurn(
+      store,
+      durableTurn(
+        'legacy-client-turn',
+        'Recovered exact Summer response.',
+        SUMMER_RECOVERY_TARGET.eventId
+      )
+    );
+    await expect((await GET()).json()).resolves.toMatchObject({
+      persisted: 'existing',
+    });
+    expect((await loadCurrentSummerSession(store))?.turns).toHaveLength(1);
+  });
+
   it('rejects an unauthenticated session before signed upstream access', async () => {
     mocks.getSessionContext.mockRejectedValue(
       new TypeError(SESSION_ERRORS.UNAUTHORIZED)
     );
     expect((await GET()).status).toBe(401);
     expect(mocks.fetchSummerShadow).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when session lookup is unavailable', async () => {
+    mocks.getSessionContext.mockRejectedValue(new Error('session unavailable'));
+    const response = await GET();
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'founder_session_unavailable',
+    });
   });
 
   it('rejects a different authenticated user before signed upstream access', async () => {
@@ -257,6 +281,12 @@ describe('GET /api/ovie/summer/reconcile', () => {
     expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the server-signed Summer read throws', async () => {
+    mocks.fetchSummerShadow.mockRejectedValue(new Error('OIDC unavailable'));
+    expect((await GET()).status).toBe(503);
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['eventId', { eventId: `sum_${'z'.repeat(24)}` }],
     ['principalHash', { principalHash: 'b'.repeat(43) }],
@@ -294,6 +324,14 @@ describe('GET /api/ovie/summer/reconcile', () => {
       resultResponse({ status: 'failed' })
     );
     expect((await GET()).status).toBe(409);
+  });
+
+  it('does not persist an empty completed response', async () => {
+    mocks.fetchSummerShadow.mockResolvedValue(
+      resultResponse({ responseText: ' ' })
+    );
+    expect((await GET()).status).toBe(409);
+    expect(mocks.getOvieOperatingStore).not.toHaveBeenCalled();
   });
 
   it('rejects an oversized streamed response before persistence', async () => {
@@ -356,5 +394,14 @@ describe('GET /api/ovie/summer/reconcile', () => {
       'unrelated-concurrent-turn',
       `summer-reconcile:${SUMMER_RECOVERY_TARGET.eventId}`,
     ]);
+  });
+
+  it('fails closed when canonical persistence is unavailable', async () => {
+    mocks.getOvieOperatingStore.mockImplementation(() => {
+      throw new Error('store unavailable');
+    });
+    const response = await GET();
+    expect(response.status).toBe(503);
+    expect(mocks.loggerError).toHaveBeenCalledOnce();
   });
 });

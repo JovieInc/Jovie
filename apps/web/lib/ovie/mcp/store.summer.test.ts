@@ -49,10 +49,11 @@ describe('durable Ovie Summer turn store', () => {
     await expect(reader.listSummerTurns()).resolves.toHaveLength(1);
   });
 
-  it('compare-and-sets a failover-only decision and warms recovered primary', async () => {
+  it('keeps Postgres authoritative when an older Redis cache write is delayed', async () => {
     const primary = new DurableOperatingStore(memoryRecordBackend());
     const fallback = new DurableOperatingStore(memoryRecordBackend());
-    const original = decision('{"turns":["fallback"]}');
+    const original = decision('{"turns":[]}');
+    await primary.putDecision(original);
     await fallback.putDecision(original);
     const store = new FailoverOperatingStore({
       primary,
@@ -60,13 +61,66 @@ describe('durable Ovie Summer turn store', () => {
       isPrimaryFailure: () => false,
       writeThrough: true,
     });
-    const next = decision('{"turns":["fallback","next"]}');
+    const first = decision('{"turns":["first"]}');
+    const second = decision('{"turns":["first","second"]}');
+    const realPrimaryCas = primary.putDecisionIfUnchanged.bind(primary);
+    let releaseFirstCache!: () => void;
+    const firstCacheBlocked = new Promise<void>(resolve => {
+      releaseFirstCache = resolve;
+    });
+    let markFirstCacheEntered!: () => void;
+    const firstCacheEntered = new Promise<void>(resolve => {
+      markFirstCacheEntered = resolve;
+    });
+    vi.spyOn(primary, 'putDecisionIfUnchanged')
+      .mockImplementationOnce(async (...args) => {
+        markFirstCacheEntered();
+        await firstCacheBlocked;
+        return realPrimaryCas(...args);
+      })
+      .mockImplementation(realPrimaryCas);
 
-    await expect(store.putDecisionIfUnchanged(next, original)).resolves.toBe(
+    const firstWrite = store.putDecisionIfUnchanged(first, original);
+    await firstCacheEntered;
+    await expect(store.putDecisionIfUnchanged(second, first)).resolves.toBe(
       true
     );
-    await expect(primary.getDecision(original.id)).resolves.toEqual(next);
-    await expect(fallback.getDecision(original.id)).resolves.toEqual(next);
+    releaseFirstCache();
+    await expect(firstWrite).resolves.toBe(true);
+
+    await expect(store.getDecisionForUpdate(original.id)).resolves.toEqual(
+      second
+    );
+    await expect(primary.getDecision(original.id)).resolves.toEqual(second);
+    await expect(fallback.getDecision(original.id)).resolves.toEqual(second);
+  });
+
+  it('commits through primary failure and heals Redis after recovery', async () => {
+    const primary = new DurableOperatingStore(memoryRecordBackend());
+    const fallback = new DurableOperatingStore(memoryRecordBackend());
+    const original = decision('{"turns":[]}');
+    await primary.putDecision(original);
+    await fallback.putDecision(original);
+    const store = new FailoverOperatingStore({
+      primary,
+      fallback,
+      isPrimaryFailure: () => true,
+    });
+    const first = decision('{"turns":["first"]}');
+    const second = decision('{"turns":["first","second"]}');
+    vi.spyOn(primary, 'getDecisionForUpdate').mockRejectedValueOnce(
+      new Error('Redis unavailable')
+    );
+
+    await expect(store.putDecisionIfUnchanged(first, original)).resolves.toBe(
+      true
+    );
+    await expect(primary.getDecision(original.id)).resolves.toEqual(original);
+    await expect(store.putDecisionIfUnchanged(second, first)).resolves.toBe(
+      true
+    );
+    await expect(primary.getDecision(original.id)).resolves.toEqual(second);
+    await expect(fallback.getDecision(original.id)).resolves.toEqual(second);
   });
 
   it('recovers an expired claim while fencing its stale completion', async () => {

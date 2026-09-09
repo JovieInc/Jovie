@@ -16,6 +16,7 @@ export type OperatingStore = {
     record: OvieDecision,
     expected: OvieDecision | undefined
   ): Promise<boolean>;
+  getDecisionForUpdate(id: string): Promise<OvieDecision | undefined>;
   getDecision(id: string): Promise<OvieDecision | undefined>;
   listDecisions(): Promise<readonly OvieDecision[]>;
   putInitiative(record: OvieInitiative): Promise<void>;
@@ -155,6 +156,10 @@ export class DurableOperatingStore implements OperatingStore {
 
   async getDecision(id: string): Promise<OvieDecision | undefined> {
     return asDecision(await this.backend.get(decisionKey(id)));
+  }
+
+  getDecisionForUpdate(id: string): Promise<OvieDecision | undefined> {
+    return this.getDecision(id);
   }
 
   async listDecisions(): Promise<readonly OvieDecision[]> {
@@ -360,34 +365,17 @@ export class FailoverOperatingStore implements OperatingStore {
     record: OvieDecision,
     expected: OvieDecision | undefined
   ): Promise<boolean> {
-    const { primary, fallback, writeThrough } = this.options;
-    try {
-      const updated = await primary.putDecisionIfUnchanged(record, expected);
-      if (updated) {
-        if (writeThrough) {
-          await fallback.putDecision(record).catch(() => undefined);
-        }
-        return true;
-      }
-      // A failover-only record can legitimately be absent from the recovered
-      // primary. Preserve its compare-and-set authority, then warm primary.
-      if (await primary.getDecision(record.id)) return false;
-      const fallbackUpdated = await fallback.putDecisionIfUnchanged(
-        record,
-        expected
-      );
-      if (fallbackUpdated) {
-        await primary.putDecision(record).catch(error => {
-          this.noteFailure(error);
-          if (!this.options.isPrimaryFailure(error)) throw error;
-        });
-      }
-      return fallbackUpdated;
-    } catch (error) {
-      this.noteFailure(error);
-      if (!this.options.isPrimaryFailure(error)) throw error;
-      return fallback.putDecisionIfUnchanged(record, expected);
-    }
+    const updated = await this.options.fallback.putDecisionIfUnchanged(
+      record,
+      expected
+    );
+    if (!updated) return false;
+    await this.syncDecisionCache(record.id);
+    return true;
+  }
+
+  getDecisionForUpdate(id: string): Promise<OvieDecision | undefined> {
+    return this.options.fallback.getDecisionForUpdate(id);
   }
 
   getDecision(id: string): Promise<OvieDecision | undefined> {
@@ -523,6 +511,23 @@ export class FailoverOperatingStore implements OperatingStore {
 
   private noteFailure(error: unknown): void {
     this.options.onPrimaryFailure?.(error);
+  }
+
+  private async syncDecisionCache(id: string): Promise<void> {
+    const { primary, fallback } = this.options;
+    try {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const authoritative = await fallback.getDecisionForUpdate(id);
+        if (!authoritative) return;
+        const cached = await primary.getDecisionForUpdate(id);
+        if (cached?.decided === authoritative.decided) return;
+        if (await primary.putDecisionIfUnchanged(authoritative, cached)) return;
+      }
+    } catch (error) {
+      // The Postgres mutation already committed. Redis is only a cache here;
+      // a later canonical mutation retries synchronization.
+      this.noteFailure(error);
+    }
   }
 }
 
