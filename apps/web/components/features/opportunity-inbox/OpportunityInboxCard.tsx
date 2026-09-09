@@ -14,6 +14,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useId, useState } from 'react';
+import { OpportunityCard } from '@/components/organisms/opportunity-card/OpportunityCard';
 import type { OpportunitySignalType } from '@/lib/connectors/opportunity-inbox-signal-type';
 import { formatOpportunityInboxRelativeTime } from '@/lib/connectors/opportunity-inbox-time';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
@@ -97,37 +98,38 @@ export function OpportunityInboxCard({
   };
 
   return (
-    <article
-      className={cn('system-b-opportunity-inbox-card', className)}
-      data-testid={`opportunity-inbox-card-${card.id}`}
+    <OpportunityCard
+      format='editorial'
+      title={card.title}
+      description={card.why}
+      icon={<SignalTypeIcon signalType={card.signalType} />}
+      className={className}
+      dataTestId={`opportunity-inbox-card-${card.id}`}
+      metadata={
+        <>
+          <span
+            className={cn(
+              'system-b-opportunity-inbox-card-type',
+              SIGNAL_TYPE_VISUALS[card.signalType].accentClassName
+            )}
+          >
+            {card.typeLabel}
+          </span>
+          <span
+            aria-hidden='true'
+            className='system-b-opportunity-inbox-card-dot'
+          >
+            ·
+          </span>
+          <time
+            className='system-b-opportunity-inbox-card-time'
+            dateTime={card.createdAt}
+          >
+            {relativeTime}
+          </time>
+        </>
+      }
     >
-      <header className='system-b-opportunity-inbox-card-meta'>
-        <SignalTypeIcon signalType={card.signalType} />
-        <span
-          className={cn(
-            'system-b-opportunity-inbox-card-type',
-            SIGNAL_TYPE_VISUALS[card.signalType].accentClassName
-          )}
-        >
-          {card.typeLabel}
-        </span>
-        <span
-          aria-hidden='true'
-          className='system-b-opportunity-inbox-card-dot'
-        >
-          ·
-        </span>
-        <time
-          className='system-b-opportunity-inbox-card-time'
-          dateTime={card.createdAt}
-        >
-          {relativeTime}
-        </time>
-      </header>
-
-      <h2 className='system-b-opportunity-inbox-card-title'>{card.title}</h2>
-      <p className='system-b-opportunity-inbox-card-why'>{card.why}</p>
-
       <div className='system-b-opportunity-inbox-card-feedback'>
         <Button
           type='button'
@@ -224,6 +226,6 @@ export function OpportunityInboxCard({
           <ArrowRight className='system-b-opportunity-inbox-primary-icon' />
         </button>
       </div>
-    </article>
+    </OpportunityCard>
   );
 }
