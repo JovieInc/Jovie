@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import ts from 'typescript';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -514,26 +515,6 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
-  assert.match(
-    preloadSource,
-    /import \{ BAKED_DESKTOP_BUILD_IDENTITY \} from '\.\/build-identity\.generated';/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY\.channel/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY\.version/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopSourceRevision =\s*BAKED_DESKTOP_BUILD_IDENTITY\.sourceRevision/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopBuiltAt = BAKED_DESKTOP_BUILD_IDENTITY\.builtAt/
-  );
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
@@ -547,6 +528,29 @@ test('preload marks the hosted app as Electron after the document root is ready'
     mainSource,
     /ipcMain\.handle\(\s*LAUNCH_OPERATOR_CONTROL_CHANNEL/
   );
+});
+
+test('compiled sandbox preload has no unsupported local module dependency', async () => {
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
+  const compiledPreload = ts.transpileModule(preloadSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const requiredModules = [
+    ...compiledPreload.matchAll(/require\(["']([^"']+)["']\)/g),
+  ].map(match => match[1]);
+
+  assert.deepEqual(requiredModules, ['electron']);
+  assert.match(compiledPreload, /contextBridge\.exposeInMainWorld/);
+
+  const unsafeFixture = 'require("./build-identity.generated")';
+  assert.match(unsafeFixture, /require\(["']\.[/\\\\]/);
+  assert.doesNotMatch(compiledPreload, /require\(["']\.[/\\\\]/);
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {
