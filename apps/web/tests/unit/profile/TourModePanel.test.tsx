@@ -154,13 +154,18 @@ describe('TourModePanel', () => {
       'events_empty_state'
     );
     const notificationsCta = screen.getByTestId('mock-notifications-cta');
-    expect(notificationsCta).toHaveClass('h-7');
-    expect(notificationsCta.className).toContain('before:h-11');
-    expect(notificationsCta.className).toContain('before:min-w-11');
-    expect(notificationsCta).not.toHaveClass('h-11!', 'h-12');
+    expect(notificationsCta).toHaveClass('h-auto', 'min-h-7');
+    expect(notificationsCta).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(notificationsCta).not.toHaveClass(fixedHeight);
+    }
   });
 
-  it('keeps the preview empty-state action at 28px inside a 44px target', () => {
+  it('keeps the preview empty-state action growable with 28px and 44px minima', () => {
     render(
       <TourDrawerContent artist={artist} tourDates={[]} renderMode='preview' />
     );
@@ -168,9 +173,15 @@ describe('TourModePanel', () => {
     const previewCta = screen.getByRole('button', {
       name: 'Turn On Event Alerts',
     });
-    expect(previewCta).toHaveClass('h-7');
-    expect(previewCta.className).toContain('before:h-11');
-    expect(previewCta.className).toContain('before:min-w-11');
+    expect(previewCta).toHaveClass('h-auto', 'min-h-7');
+    expect(previewCta).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(previewCta).not.toHaveClass(fixedHeight);
+    }
   });
 
   it('renders a cardless full-plane events empty state without music leakage', () => {
