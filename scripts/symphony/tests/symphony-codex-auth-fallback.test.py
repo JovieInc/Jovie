@@ -2433,6 +2433,37 @@ PY
         self.assertIn("Summer closure stop-line blocks new fallback work", result.stderr)
         self.assertFalse(self.events.exists())
 
+    def test_lyb_new_work_is_not_frozen_by_jovie_mq_closure_stop_line(self):
+        self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
+        self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "GREEN",
+            "closureAdmission": {
+                "newIssueIntakeAllowed": False,
+                "status": "red",
+                "reasons": ["native-queue-unmergeable"],
+            },
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "LYB-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+
+        self.assertNotIn("Summer closure stop-line blocks new fallback work", result.stderr)
+        self.assertNotIn("fleet gate blocks isolated work", result.stderr)
+
     def test_revision_scoped_unit_names_prevent_same_revision_duplicates(self):
         module = self.load_controller_module()
         first = module._fallback_unit("JOV-1", "revision-a")
@@ -2745,6 +2776,48 @@ PY
         self.assertEqual(len(launched), 1)
         self.assertTrue(
             any("JOV-4894" in arg for command in launches for arg in command), launches
+        )
+        self.assertFalse(
+            any("JOV-5003" in arg for command in launches for arg in command), launches
+        )
+
+    def test_lyb_new_work_launches_while_jovie_closure_stop_line_is_red(self):
+        module = self.load_controller_module()
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "closureAdmission": {
+                "newIssueIntakeAllowed": False,
+                "status": "red",
+                "reasons": ["native-queue-empty-with-eligible-over-15m"],
+            },
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+        launches: list[list[str]] = []
+        lyb_issue = self._admitted_issue("LYB-5003", "In Progress")
+        jov_issue = self._admitted_issue("JOV-5003", "In Progress")
+        issues = {"LYB-5003": lyb_issue, "JOV-5003": jov_issue}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(
+                module, "_fetch_single_issue", side_effect=lambda ident: issues.get(ident)
+            ),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5003", "LYB-5003"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertGreaterEqual(used, 1)
+        self.assertTrue(
+            any("LYB-5003" in arg for command in launches for arg in command), launches
         )
         self.assertFalse(
             any("JOV-5003" in arg for command in launches for arg in command), launches

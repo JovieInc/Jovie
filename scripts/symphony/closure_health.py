@@ -23,6 +23,34 @@ from typing import Any
 
 SCHEMA = "jovie-closure-health/v1"
 AUTHORITY = "Summer"
+JOVIE_PRODUCT_ID = "jovie"
+# Jovie-local PR/MQ reasons (issue-blocked). These must not freeze other
+# gem-repo-registry products' newIssueIntakeAllowed. Missing/malformed shared
+# receipts stay systems-down and fail closed for every product.
+# throughput-fasttrack-v1 / systems-down-vs-issue-blocked, 2026-09-09.
+ISSUE_BLOCKED_REASONS = frozenset(
+    {
+        "native-queue-empty-with-eligible-over-15m",
+        "native-queue-unmergeable",
+        "unclassified-open-pr-over-15m",
+        "no-merge-progress-over-1h",
+        "duplicate-issue-lanes-unresolved",
+        "expired-held-prs",
+        "draft-stack-policy-violation",
+        "draft-stack-repair-action-unavailable",
+        "internally-repairable-prs-open",
+        "closure-actions-pending",
+        "queue-controller-red-over-10m",
+        "lifecycle-action-inventory-incomplete",
+        "closure-observation-unknown",
+    }
+)
+SYSTEMS_DOWN_REASONS = frozenset(
+    {
+        "closure-health-receipt-missing-or-malformed",
+        "gate-evaluation-failed",
+    }
+)
 CONTROLLER_RED_AFTER = timedelta(minutes=10)
 EMPTY_QUEUE_RED_AFTER = timedelta(minutes=15)
 UNCLASSIFIED_RED_AFTER = timedelta(minutes=15)
@@ -1946,6 +1974,206 @@ def _previous_for_repository(
     return previous if previous.get("repository") == repository else None
 
 
+def product_id_for_repository(repository: str | None) -> str | None:
+    """Map owner/name to a gem-repo-registry id. Unknown slugs stay None."""
+    if not isinstance(repository, str) or not repository:
+        return None
+    try:
+        from gem_repo_registry import product_id_for_github
+    except ImportError:
+        product_id_for_github = None  # type: ignore[assignment]
+    if product_id_for_github is not None:
+        mapped = product_id_for_github(repository)
+        if mapped:
+            return mapped
+    fallback = {
+        "jovieinc/jovie": JOVIE_PRODUCT_ID,
+        "jovieinc/logyourbody": "logyourbody",
+        "jovieinc/ovie": "ovie",
+    }
+    return fallback.get(repository.casefold())
+
+
+def _closure_reason_set(closure: dict[str, Any] | None) -> set[str]:
+    if not isinstance(closure, dict):
+        return set()
+    reasons = closure.get("reasons")
+    if not isinstance(reasons, list):
+        return set()
+    return {reason for reason in reasons if isinstance(reason, str)}
+
+
+def closure_is_systems_down(closure: dict[str, Any] | None) -> bool:
+    """True when the shared receipt cannot be trusted as product evidence."""
+    if not isinstance(closure, dict):
+        return True
+    status = closure.get("status")
+    if status not in {"healthy", "grace", "red"}:
+        return True
+    reasons = _closure_reason_set(closure)
+    return bool(reasons & SYSTEMS_DOWN_REASONS)
+
+
+def scoped_peer_product_closure(
+    product_id: str,
+    repository: str,
+    shared: dict[str, Any] | None,
+    *,
+    observed_at: str | None = None,
+) -> dict[str, Any]:
+    """Build a peer-product receipt that ignores Jovie issue-blocked MQ reasons."""
+    systems_down = closure_is_systems_down(shared)
+    status = "red" if systems_down else "healthy"
+    reasons = (
+        sorted(_closure_reason_set(shared) & SYSTEMS_DOWN_REASONS)
+        if systems_down
+        else []
+    )
+    if systems_down and not reasons:
+        reasons = ["closure-observation-unknown"]
+    observed = observed_at
+    if not observed and isinstance(shared, dict) and isinstance(shared.get("observedAt"), str):
+        observed = shared["observedAt"]
+    return {
+        "schema": SCHEMA,
+        "productId": product_id,
+        "repository": repository,
+        "status": status,
+        "authority": AUTHORITY,
+        "observedAt": observed,
+        "newIssueIntakeAllowed": status == "healthy",
+        "promotionContinues": True,
+        "remediationContinues": True,
+        "blockedActivities": (
+            ["new-issue-lease", "new-implementation", "fallback-pr-generation"]
+            if status != "healthy"
+            else []
+        ),
+        "reasons": reasons,
+        "scope": "product",
+        "sharedClosureScope": (
+            "systems-down" if systems_down else "issue-blocked-excluded"
+        ),
+    }
+
+
+def _issue_intake_product_rows() -> list[tuple[str, str]]:
+    try:
+        from gem_repo_registry import issue_intake_repos
+    except ImportError:
+        return [
+            (JOVIE_PRODUCT_ID, "JovieInc/Jovie"),
+            ("logyourbody", "JovieInc/LogYourBody"),
+            ("ovie", "JovieInc/ovie"),
+        ]
+    try:
+        return [(repo.id, repo.github) for repo in issue_intake_repos()]
+    except (RuntimeError, OSError, ValueError, json.JSONDecodeError):
+        return [
+            (JOVIE_PRODUCT_ID, "JovieInc/Jovie"),
+            ("logyourbody", "JovieInc/LogYourBody"),
+            ("ovie", "JovieInc/ovie"),
+        ]
+
+
+def build_product_closure_health(
+    shared: dict[str, Any],
+    provided: object = None,
+) -> dict[str, dict[str, Any]]:
+    """Per-product closureHealth keyed by gem-repo-registry id.
+
+    The live/shared signal stays authoritative for its own product (usually
+    Jovie). Other issue-intake products inherit only systems-down holds.
+    """
+    provided_map = provided if isinstance(provided, dict) else {}
+    shared_repository = shared.get("repository") if isinstance(shared, dict) else None
+    shared_product = (
+        shared.get("productId")
+        if isinstance(shared, dict) and isinstance(shared.get("productId"), str)
+        else product_id_for_repository(
+            shared_repository if isinstance(shared_repository, str) else None
+        )
+    ) or JOVIE_PRODUCT_ID
+    products: dict[str, dict[str, Any]] = {}
+    for product_id, github in _issue_intake_product_rows():
+        candidate = provided_map.get(product_id)
+        if isinstance(candidate, dict) and candidate.get("schema") == SCHEMA:
+            row = dict(candidate)
+            row["productId"] = product_id
+            row.setdefault("repository", github)
+            row["promotionContinues"] = True
+            row["remediationContinues"] = True
+            products[product_id] = row
+            continue
+        if product_id == shared_product:
+            row = dict(shared)
+            row["productId"] = product_id
+            row.setdefault("repository", github)
+            row["promotionContinues"] = True
+            row["remediationContinues"] = True
+            products[product_id] = row
+            continue
+        products[product_id] = scoped_peer_product_closure(
+            product_id, github, shared if isinstance(shared, dict) else None
+        )
+    return products
+
+
+def product_intake_allowed(
+    shared: dict[str, Any] | None,
+    product_id: str,
+    *,
+    products: object = None,
+) -> bool:
+    """Return newIssueIntakeAllowed for one registry product.
+
+    Jovie MQ empty/UNMERGEABLE never freezes LYB/Ovie. Systems-down shared
+    evidence still fails closed for every product.
+    """
+    needle = str(product_id or "").strip() or JOVIE_PRODUCT_ID
+    product_map = products if isinstance(products, dict) else {}
+    row = product_map.get(needle)
+    if isinstance(row, dict) and isinstance(row.get("newIssueIntakeAllowed"), bool):
+        return row["newIssueIntakeAllowed"] is True
+    if not isinstance(shared, dict):
+        return False
+    shared_product = (
+        shared.get("productId")
+        if isinstance(shared.get("productId"), str)
+        else product_id_for_repository(
+            shared.get("repository") if isinstance(shared.get("repository"), str) else None
+        )
+    ) or JOVIE_PRODUCT_ID
+    if needle == shared_product:
+        return shared.get("newIssueIntakeAllowed") is True
+    if closure_is_systems_down(shared):
+        return False
+    return True
+
+
+def project_product_admission(
+    products: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Bounded per-product closureAdmission projection."""
+    projected: dict[str, dict[str, Any]] = {}
+    for product_id, row in products.items():
+        status = row.get("status")
+        intake = row.get("newIssueIntakeAllowed") is True
+        projected[product_id] = {
+            "productId": product_id,
+            "status": status if status in {"healthy", "grace", "red"} else "red",
+            "newIssueIntakeAllowed": intake,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": [
+                reason
+                for reason in (row.get("reasons") or [])
+                if isinstance(reason, str)
+            ],
+        }
+    return projected
+
+
 def _active_episode(
     previous: dict[str, Any] | None,
     key: str,
@@ -2130,8 +2358,12 @@ def evaluate_closure_health(
 
     grace_active = any(active.values())
     status = "red" if reasons else "grace" if grace_active else "healthy"
+    product_id = (
+        product_id_for_repository(repository) if repository_valid else None
+    )
     return {
         "schema": SCHEMA,
+        "productId": product_id,
         "repository": repository if repository_valid else None,
         "status": status,
         "authority": AUTHORITY,
@@ -2386,6 +2618,7 @@ def observe_closure_health(
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         return {
             "schema": SCHEMA,
+            "productId": product_id_for_repository(repo),
             "repository": repo,
             "status": "red",
             "authority": AUTHORITY,

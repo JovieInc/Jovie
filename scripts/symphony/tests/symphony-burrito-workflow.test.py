@@ -863,6 +863,39 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(receipt["receiptPath"], str(closure_gate))
             self.assertFalse(receipt["newIssueIntakeAllowed"])
 
+    def test_lyb_and_ovie_stop_line_independent_of_jovie_mq_red(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            payload = _fleet_gate_payload(status="red", intake=False)
+            payload["signals"]["closureHealth"]["reasons"] = [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ]
+            payload["closureAdmission"]["reasons"] = [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ]
+            closure_gate.write_text(json.dumps(payload), encoding="utf-8")
+
+            jovie = helper.read_closure_stop_line(closure_gate, product_id="jovie")
+            lyb = helper.read_closure_stop_line(closure_gate, product_id="logyourbody")
+            ovie = helper.read_closure_stop_line(closure_gate, product_id="ovie")
+
+            self.assertTrue(jovie["hold"])
+            self.assertEqual(jovie["reason"], "closure-health-not-green")
+            self.assertFalse(lyb["hold"])
+            self.assertEqual(lyb["reason"], "closure-health-product-independent")
+            self.assertTrue(lyb["newIssueIntakeAllowed"])
+            self.assertFalse(ovie["hold"])
+            self.assertTrue(ovie["newIssueIntakeAllowed"])
+
+            missing = helper.read_closure_stop_line(
+                pathlib.Path(tmp) / "absent.json", product_id="logyourbody"
+            )
+            self.assertTrue(missing["hold"])
+            self.assertEqual(missing["reason"], "fleet-gate-receipt-missing")
+
     def test_closure_stop_line_green_receipt_admits(self):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:

@@ -61,6 +61,9 @@ DEFAULT_RATE_LIMIT_GATE = (
 # Gem fleet gate receipt is the admission stop-line for new Symphony work.
 # "healthy" is the green admission state; grace/red, a missing receipt, a stale
 # receipt, or any schema/authority/consistency violation all fail closed.
+# Per-product intake is scoped by gem-repo-registry id. Jovie MQ
+# empty/UNMERGEABLE is issue-blocked and does not freeze LYB/Ovie leases.
+# Missing/malformed shared receipts remain systems-down for every product.
 FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 CLOSURE_HEALTH_AUTHORITY = "Summer"
@@ -154,6 +157,7 @@ class ClosureStopLine:
     hold_receipt_path: pathlib.Path = DEFAULT_CLOSURE_HOLD_RECEIPT
     dead_letter_dir: pathlib.Path = DEFAULT_DEAD_LETTER_DIR
     max_receipt_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS
+    product_id: str = "jovie"
 
 
 def _iso(value: dt.datetime) -> str:
@@ -859,12 +863,15 @@ def read_closure_stop_line(
     now: dt.datetime | None = None,
     *,
     max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+    product_id: str = "jovie",
 ) -> dict[str, Any]:
     """Fail-closed admission verdict from the freshest Gem fleet gate receipt.
 
     New issue admission is allowed only while Summer's closure health signal is
-    healthy (the green admission state). A missing, unreadable, stale,
-    future-dated, or internally inconsistent receipt holds new admission.
+    healthy for the requested gem-repo-registry product. A missing, unreadable,
+    stale, future-dated, or internally inconsistent receipt is systems-down and
+    holds every product. Jovie MQ empty/UNMERGEABLE is issue-blocked and does
+    not hold LYB/Ovie.
     """
     observed_at = now or _now()
 
@@ -926,6 +933,37 @@ def read_closure_stop_line(
     ):
         return hold("closure-admission-disagrees", **details)
     details["newIssueIntakeAllowed"] = intake
+    details["productId"] = str(product_id or "jovie")
+    if str(product_id or "jovie") != "jovie":
+        HERMES_DIR = pathlib.Path(__file__).resolve().parent
+        if str(HERMES_DIR) not in sys.path:
+            sys.path.insert(0, str(HERMES_DIR))
+        from closure_health import product_intake_allowed
+
+        product_intake = product_intake_allowed(
+            closure,
+            str(product_id or "jovie"),
+            products=(
+                admission.get("products")
+                if isinstance(admission, dict)
+                else None
+            )
+            or (
+                signals.get("productClosureHealth")
+                if isinstance(signals, dict)
+                else None
+            ),
+        )
+        details["newIssueIntakeAllowed"] = product_intake
+        details["sharedNewIssueIntakeAllowed"] = intake
+        if product_intake is True:
+            return {
+                "hold": False,
+                "reason": "closure-health-product-independent",
+                "path": str(path),
+                **details,
+            }
+        return hold("closure-health-not-green", **details)
     if status != CLOSURE_HEALTHY_STATUS or intake is not True:
         return hold("closure-health-not-green", **details)
     return {
@@ -934,6 +972,18 @@ def read_closure_stop_line(
         "path": str(path),
         **details,
     }
+
+
+def _read_stop_line(
+    stop_line: ClosureStopLine,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    return read_closure_stop_line(
+        stop_line.receipt_path,
+        now=now,
+        max_age_seconds=stop_line.max_receipt_age_seconds,
+        product_id=stop_line.product_id,
+    )
 
 
 def write_closure_hold_receipt(
@@ -1023,9 +1073,7 @@ def _closure_hold_wait(
         if chunk <= 0:
             break
         sleep_used += _sleep_closure_hold(verdict, chunk)
-        verdict = read_closure_stop_line(
-            stop_line.receipt_path, max_age_seconds=stop_line.max_receipt_age_seconds
-        )
+        verdict = _read_stop_line(stop_line)
     return sleep_used, verdict
 
 
@@ -1297,9 +1345,7 @@ def run_official_binary_once(
                     and monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS
                 ):
                     last_closure_check = monotonic_now
-                    verdict = read_closure_stop_line(
-                        closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-                    )
+                    verdict = _read_stop_line(closure)
                     if verdict["hold"]:
                         _pause_child_for_closure_hold(
                             process, closure, verdict, max_gate_sleep_seconds
@@ -1335,9 +1381,7 @@ def run_official_binary(
     gate_sleep_used = 0
     closure_sleep_used = 0
     while True:
-        verdict = read_closure_stop_line(
-            closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-        )
+        verdict = _read_stop_line(closure)
         if verdict["hold"] and not closure_observe_only:
             # The closure stop-line holds NEW admission only. Already-running
             # work belongs to a live scheduler process (or none has started
@@ -1561,6 +1605,11 @@ def main(argv: list[str] | None = None) -> int:
         help="observe closure health without pausing the scheduler",
     )
     run_parser.add_argument(
+        "--closure-product-id",
+        default="jovie",
+        help="gem-repo-registry id for per-product stop-line scoping",
+    )
+    run_parser.add_argument(
         "--closure-gate-max-age-seconds",
         type=int,
         default=FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
@@ -1655,6 +1704,7 @@ def main(argv: list[str] | None = None) -> int:
                 hold_receipt_path=args.closure_hold_receipt,
                 dead_letter_dir=args.dead_letter_dir,
                 max_receipt_age_seconds=args.closure_gate_max_age_seconds,
+                product_id=args.closure_product_id,
             ),
             closure_observe_only=args.closure_observe_only,
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,

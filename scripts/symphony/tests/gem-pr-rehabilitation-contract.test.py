@@ -152,6 +152,15 @@ class RegistryContractTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
         self.assertTrue(all(repo.local_path for repo in repositories))
 
+    def test_issue_intake_products_map_from_registry_ids(self):
+        by_id = {repo.id: repo.github for repo in REGISTRY.issue_intake_repos()}
+        self.assertEqual(by_id["jovie"], "JovieInc/Jovie")
+        self.assertEqual(by_id["logyourbody"], "JovieInc/LogYourBody")
+        self.assertEqual(by_id["ovie"], "JovieInc/ovie")
+        self.assertEqual(REGISTRY.product_id_for_issue("JOV-12"), "jovie")
+        self.assertEqual(REGISTRY.product_id_for_issue("LYB-9"), "logyourbody")
+        self.assertEqual(REGISTRY.product_id_for_github("JovieInc/ovie"), "ovie")
+
 
 class DeploymentContractTests(unittest.TestCase):
     def test_versioned_service_uses_versioned_cycle_registry_and_model_router(self):

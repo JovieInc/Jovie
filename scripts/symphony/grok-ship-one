@@ -159,6 +159,7 @@ fi
 
 GEM_FLEET_GATE_RECEIPT="${GEM_FLEET_GATE_RECEIPT:-$HOME/gem-workspace/state/gem-priority-gate/latest.json}" \
 REMOUNT="$REMOUNT" \
+GROK_SHIP_ID="$ID" \
 python3 - <<'PY'
 import json, os, pathlib
 try:
@@ -183,7 +184,26 @@ if os.environ.get("REMOUNT") == "1":
         raise SystemExit("fleet gate blocks fallback PR remediation")
 else:
     closure = receipt.get("closureAdmission")
-    if (
+    identifier = os.environ.get("GROK_SHIP_ID") or ""
+    product = "logyourbody" if identifier.startswith("LYB-") else "jovie"
+    if product != "jovie":
+        products = closure.get("products") if isinstance(closure, dict) else None
+        row = products.get(product) if isinstance(products, dict) else None
+        if isinstance(row, dict):
+            allowed = row.get("newIssueIntakeAllowed") is True
+        else:
+            reasons = closure.get("reasons") if isinstance(closure, dict) else None
+            systems = {
+                "closure-health-receipt-missing-or-malformed",
+                "gate-evaluation-failed",
+            }
+            allowed = not (
+                isinstance(reasons, list)
+                and any(reason in systems for reason in reasons)
+            )
+        if not allowed:
+            raise SystemExit("Summer closure stop-line blocks new fallback work")
+    elif (
         not isinstance(closure, dict)
         or closure.get("newIssueIntakeAllowed") is not True
         or admission.get("newIssueLeaseAllowed") is not True

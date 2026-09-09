@@ -1522,6 +1522,107 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["status"], "red")
         self.assertIn("unclassified-open-pr-over-15m", result["reasons"])
 
+    def test_lyb_closure_receipt_independent_of_jovie_mq_empty_or_unmergeable(self):
+        jovie_empty = MODULE.evaluate_closure_health(
+            snapshot(nativeQueueCount=0, greenReadyPrs=1, eligiblePrs=1),
+            previous=None,
+            now=NOW,
+        )
+        jovie_empty_red = MODULE.evaluate_closure_health(
+            snapshot(nativeQueueCount=0, greenReadyPrs=1, eligiblePrs=1),
+            previous=jovie_empty,
+            now=NOW + timedelta(minutes=16),
+        )
+        jovie_unmergeable = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(
+                            7,
+                            title="fix: repair JOV-707",
+                            queued=True,
+                            queue_state="UNMERGEABLE",
+                        )
+                    ],
+                    NOW,
+                ),
+            ),
+            previous=None,
+            now=NOW,
+        )
+        jovie_unmergeable_red = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(
+                            7,
+                            title="fix: repair JOV-707",
+                            queued=True,
+                            queue_state="UNMERGEABLE",
+                        )
+                    ],
+                    NOW,
+                ),
+            ),
+            previous=jovie_unmergeable,
+            now=NOW + timedelta(minutes=16),
+        )
+        lyb = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/LogYourBody",
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(1, title="feat: ship LYB-1", queued=True),
+                        pr(2, title="feat: ship LYB-2"),
+                    ],
+                    NOW,
+                    repository="JovieInc/LogYourBody",
+                ),
+            ),
+            previous=None,
+            now=NOW,
+        )
+
+        self.assertEqual(jovie_empty_red["productId"], "jovie")
+        self.assertFalse(jovie_empty_red["newIssueIntakeAllowed"])
+        self.assertIn("native-queue-empty-with-eligible-over-15m", jovie_empty_red["reasons"])
+        self.assertEqual(jovie_unmergeable_red["productId"], "jovie")
+        self.assertFalse(jovie_unmergeable_red["newIssueIntakeAllowed"])
+        self.assertIn("native-queue-unmergeable", jovie_unmergeable_red["reasons"])
+        self.assertEqual(lyb["productId"], "logyourbody")
+        self.assertEqual(lyb["repository"], "JovieInc/LogYourBody")
+        self.assertEqual(lyb["status"], "healthy")
+        self.assertTrue(lyb["newIssueIntakeAllowed"])
+        self.assertTrue(lyb["remediationContinues"])
+        self.assertTrue(
+            MODULE.product_intake_allowed(jovie_empty_red, "logyourbody")
+        )
+        self.assertTrue(MODULE.product_intake_allowed(jovie_unmergeable_red, "ovie"))
+        self.assertFalse(MODULE.product_intake_allowed(jovie_empty_red, "jovie"))
+
+        products = MODULE.build_product_closure_health(jovie_empty_red)
+        self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["logyourbody"]["remediationContinues"])
+
+        systems_down = {
+            **jovie_empty_red,
+            "reasons": ["gate-evaluation-failed"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+        }
+        self.assertFalse(MODULE.product_intake_allowed(systems_down, "logyourbody"))
+        self.assertFalse(
+            MODULE.build_product_closure_health(systems_down)["ovie"]["newIssueIntakeAllowed"]
+        )
+
     def test_previous_closure_history_is_scoped_to_repository(self):
         previous = MODULE.evaluate_closure_health(
             snapshot(
