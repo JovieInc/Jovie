@@ -84,6 +84,16 @@ jobs:
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          PROFILE_CTA_TEST_FILTER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter || '' }}
+          PROFILE_CTA_NEON_BRANCH_ID: ${{ steps.neon-branch.outputs.branch_id }}
+          PROFILE_CTA_NEON_CONNECTION_FILE: ${{ steps.neon-branch.outputs.connection_file }}
+          PROFILE_CTA_BROWSER: ${{ matrix.browser }}
+          # One brace glob retains diagnostics even when preflight fails before captures.
+          # Auth-setup images are excluded; only this spec's explicit public directory qualifies.
+          PLAYWRIGHT_ARTIFACT_PATHS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' && 'apps/web/test-results/{.last-run.json,**/*.json,**/*.jsonl,**/profile-cta-public/*.png}' || '' }}
+          # Retain decoded public review captures only for this exact filtered run.
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
           NODE_ENV: test
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -99,13 +109,15 @@ jobs:
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
 
-      - name: Upload Test Results on Failure
-        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+      - name: Upload failure results or filtered public review captures
+        if: ${{ always() && (failure() || (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts')) && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
           path: apps/web/test-results/
           retention-days: 7
+          allow-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
+          public-images: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts' }}
 
       - name: Cleanup Clerk E2E test users
         if: always()
