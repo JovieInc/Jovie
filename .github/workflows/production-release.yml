@@ -11,6 +11,9 @@ on:
       released:
         description: Whether this SHA reached and passed production rollback gates.
         value: ${{ jobs.release-result.outputs.released }}
+      superseded_before_promotion:
+        description: Whether this SHA was intentionally superseded before production mutation.
+        value: ${{ jobs.release-result.outputs.superseded_before_promotion }}
       production_deployment_id:
         description: Exact Vercel production deployment ID.
         value: ${{ jobs.release-result.outputs.production_deployment_id }}
@@ -1243,6 +1246,7 @@ jobs:
     outputs:
       deployed: ${{ steps.receipt.outputs.deployed }}
       deployment_id: ${{ steps.receipt.outputs.deployment_id }}
+      staging_refresh_outcome: ${{ steps.receipt.outputs.staging_refresh_outcome || steps.reassert.outputs.staging_refresh_outcome }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1250,9 +1254,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Reassert the exact preview after production settles
+        id: reassert
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          PROMOTION_RESULT: ${{ needs.promote-production.result }}
+          PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
+          ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -1260,8 +1268,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "staging_refresh_outcome=current" >> "$GITHUB_OUTPUT"
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            if [ "$PROMOTION_RESULT" = "success" ] &&
+              [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced to $current_main after exact production promotion; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_after_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "::error::Refusing to reassert stale staging preview $EXPECTED_COMMIT_SHA; current main is $current_main."
             exit 1
           fi
@@ -1274,6 +1290,7 @@ jobs:
             --scope "$VERCEL_ORG_ID"
 
       - name: Prove exact staging identity, privacy, and representative routes
+        if: ${{ steps.reassert.outputs.staging_refresh_outcome == 'current' }}
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -1394,6 +1411,7 @@ jobs:
 
       - name: Write typed staging deployment receipt
         id: receipt
+        if: ${{ steps.reassert.outputs.staging_refresh_outcome == 'current' }}
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -1401,6 +1419,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PROMOTION_RESULT: ${{ needs.promote-production.result }}
+          PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
           ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
           SOURCE_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           SOURCE_CI_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -1409,6 +1428,13 @@ jobs:
           set -euo pipefail
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            if [ "$PROMOTION_RESULT" = "success" ] &&
+              [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced to $current_main before the staging receipt boundary; omitting a falsely current receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_after_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "::error::Refusing a stale staging receipt for $EXPECTED_COMMIT_SHA; current main is $current_main."
             exit 1
           fi
@@ -1449,10 +1475,14 @@ jobs:
               privacy: "robots-block-all-and-http-noindex",
               observedAt: $observedAt
             }' > "$RUNNER_TEMP/staging-deployment-receipt.json"
-          echo "deployed=true" >> "$GITHUB_OUTPUT"
-          echo "deployment_id=$EXPECTED_DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo "staging_refresh_outcome=current_receipt"
+            echo "deployed=true"
+            echo "deployment_id=$EXPECTED_DEPLOYMENT_ID"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload exact staging deployment receipt
+        if: ${{ steps.receipt.outputs.deployed == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: staging-deployment-${{ inputs.expected_sha }}
@@ -1917,6 +1947,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       released: ${{ steps.result.outputs.released }}
+      superseded_before_promotion: ${{ steps.result.outputs.superseded_before_promotion }}
       production_deployment_id: ${{ steps.result.outputs.production_deployment_id }}
       production_deployment_url_b64: ${{ steps.result.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.result.outputs.previous_production_deployment_id }}
@@ -1939,6 +1970,7 @@ jobs:
           set -euo pipefail
           {
             echo "released=false"
+            echo "superseded_before_promotion=false"
             echo "production_deployment_id=$PRODUCTION_DEPLOYMENT_ID"
             echo "production_deployment_url_b64=$PRODUCTION_DEPLOYMENT_URL_B64"
             echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
@@ -1953,21 +1985,49 @@ jobs:
             exit 1
           fi
           if [ "${{ needs.release-head.outputs.is_current }}" != "true" ]; then
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded before release work; neutral."
             exit 0
           fi
           if [ "${{ needs.staging-head.result }}" = "success" ] &&
             [ "${{ needs.staging-head.outputs.is_current }}" != "true" ]; then
+            if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ]; then
+              echo "::error::Pre-staging-alias supersession cannot mask failed build, attestation, or canary work."
+              exit 1
+            fi
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded before staging alias; neutral."
             exit 0
           fi
           if [ "${{ needs.alias-staging.result }}" = "success" ] &&
             [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ]; then
+            if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ]; then
+              echo "::error::Staging-alias supersession cannot mask failed exact staging work."
+              exit 1
+            fi
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded at staging alias; neutral."
             exit 0
           fi
           if [ "${{ needs.production-head.result }}" = "success" ] &&
             [ "${{ needs.production-head.outputs.is_current }}" != "true" ]; then
+            if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.alias-staging.result }}" != "success" ] ||
+              [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ]; then
+              echo "::error::Pre-production supersession cannot mask failed exact staging work."
+              exit 1
+            fi
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded before production mutation; neutral."
             exit 0
           fi
@@ -1977,6 +2037,20 @@ jobs:
               exit 1
             }
             if [ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]; then
+              if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+                [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+                [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+                [ "${{ needs.staging-head.result }}" != "success" ] ||
+                [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
+                [ "${{ needs.alias-staging.result }}" != "success" ] ||
+                [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ] ||
+                [ "${{ needs.production-head.result }}" != "success" ] ||
+                [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
+                [ "${{ needs.migrate-production.result }}" != "success" ]; then
+                echo "::error::Production-mutation supersession cannot mask failed release work."
+                exit 1
+              fi
+              echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
               echo "Superseded at production mutation by $PROMOTION_SHA; neutral."
               exit 0
             fi
@@ -2009,6 +2083,36 @@ jobs:
             exit 1
           fi
 
+          staging_refresh_outcome="${{ needs.staging-deployment-receipt.outputs.staging_refresh_outcome }}"
+          if [ "$staging_refresh_outcome" = "superseded_after_promotion" ]; then
+            if [ "${{ needs.staging-deployment-receipt.result }}" != "success" ] ||
+              [ "${{ needs.staging-deployment-receipt.outputs.deployed }}" = "true" ] ||
+              [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.alias-staging.result }}" != "success" ] ||
+              [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.production-head.result }}" != "success" ] ||
+              [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.promote-production.result }}" != "success" ] ||
+              [ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]; then
+              echo "::error::Superseded staging refresh lacked exact pre-promotion staging gates or exact production promotion evidence."
+              exit 1
+            fi
+            echo "Main advanced after exact production promotion; no current staging receipt was emitted."
+          elif [ "$staging_refresh_outcome" = "current_receipt" ]; then
+            if [ "${{ needs.staging-deployment-receipt.result }}" != "success" ] ||
+              [ "${{ needs.staging-deployment-receipt.outputs.deployed }}" != "true" ]; then
+              echo "::error::Current staging refresh lacked an exact deployed receipt."
+              exit 1
+            fi
+          else
+            echo "::error::Staging refresh omitted a recognized terminal outcome."
+            exit 1
+          fi
+
           for gate in \
             "migrate-production:${{ needs.migrate-production.result }}" \
             "deploy-staging:${{ needs.deploy-staging.result }}" \
@@ -2016,7 +2120,6 @@ jobs:
             "canary-health-gate:${{ needs.canary-health-gate.result }}" \
             "staging-head:${{ needs.staging-head.result }}" \
             "alias-staging:${{ needs.alias-staging.result }}" \
-            "staging-deployment-receipt:${{ needs.staging-deployment-receipt.result }}" \
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
             "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \
@@ -2043,15 +2146,15 @@ jobs:
             exit 1
           fi
 
-          # Do not spend the sole production lease on deep probes for a SHA
-          # that main already superseded while release gates soaked.
+          # Exact promotion identity and all release gates have passed. A newer
+          # main generation must not erase that completed older-generation fact;
+          # controller probes remain bound to this immutable deployment and SHA.
           boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main at the release-result boundary."
             exit 1
           }
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
-            echo "Release $EXPECTED_SHA was superseded by $boundary_sha before post-deploy fanout; neutral."
-            exit 0
+            echo "::notice::Main advanced to $boundary_sha after exact promotion and release gates; preserving released=true only for immutable generation $EXPECTED_SHA."
           fi
           echo "released=true" >> "$GITHUB_OUTPUT"
