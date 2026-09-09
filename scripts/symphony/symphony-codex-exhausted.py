@@ -531,14 +531,18 @@ def _fleet_gate_allows_isolated() -> tuple[bool, str]:
     return True, f"fleet_gate_{state.lower()}"
 
 
-def _closure_intake_allowed() -> bool:
-    """Mirror grok-ship-one's new-work gate: closureAdmission.newIssueIntakeAllowed.
+def _product_id_for_identifier(identifier: str | None) -> str:
+    if isinstance(identifier, str) and identifier.startswith("LYB-"):
+        return "logyourbody"
+    return "jovie"
 
-    The sidecar must not lease NEW fallback work while the Summer closure
-    stop-line is closed — the leased worker would only die on grok-ship-one's
-    own stop-line check, burning a lease, Linear calls, and a unit launch for
-    nothing (live 2026-09-03: JOV-3583 exit 1 churn). Fail-closed when the
-    receipt is unreadable, matching grok-ship-one.
+
+def _closure_intake_allowed(identifier: str | None = None) -> bool:
+    """Mirror grok-ship-one's new-work gate, scoped by gem-repo-registry id.
+
+    Jovie MQ red (issue-blocked) must not freeze LYB/Ovie new leases.
+    Missing or unreadable receipts stay systems-down and fail closed.
+    Remounts skip this helper entirely.
     """
     path = pathlib.Path(
         os.path.expanduser(
@@ -553,7 +557,33 @@ def _closure_intake_allowed() -> bool:
     except (OSError, TypeError, ValueError):
         return False
     closure = receipt.get("closureAdmission")
-    return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+    signals = receipt.get("signals") if isinstance(receipt.get("signals"), dict) else {}
+    shared = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if not isinstance(shared, dict) and isinstance(closure, dict):
+        shared = closure
+    products = None
+    if isinstance(closure, dict) and isinstance(closure.get("products"), dict):
+        products = closure["products"]
+    elif isinstance(signals, dict) and isinstance(signals.get("productClosureHealth"), dict):
+        products = signals["productClosureHealth"]
+    product_id = _product_id_for_identifier(identifier)
+    helper_dir = pathlib.Path(__file__).resolve().parent
+    if str(helper_dir) not in sys.path:
+        sys.path.insert(0, str(helper_dir))
+    try:
+        from closure_health import product_intake_allowed
+    except ImportError:
+        if product_id == "jovie":
+            return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+        reasons = closure.get("reasons") if isinstance(closure, dict) else None
+        systems = {
+            "closure-health-receipt-missing-or-malformed",
+            "gate-evaluation-failed",
+        }
+        return not (
+            isinstance(reasons, list) and any(reason in systems for reason in reasons)
+        )
+    return product_intake_allowed(shared, product_id, products=products)
 
 
 def _grok_units_after_survival_window() -> list[str] | None:
@@ -2321,8 +2351,8 @@ def _launch_fallback_workers(
     first_lease: str | None = None
     # Mirror grok-ship-one's new-work stop-line so the sidecar never leases
     # fresh work it would only launch into a refusal. Remounts of existing
-    # open PRs are continuation and stay exempt.
-    closure_intake_open = _closure_intake_allowed()
+    # open PRs are continuation and stay exempt. Intake is per-product: Jovie
+    # MQ red does not freeze LYB/Ovie.
     for identifier in identifiers:
         if len(launched_units) >= max(0, limit) or (
             not any(value > 0 for value in remaining.values())
@@ -2346,7 +2376,7 @@ def _launch_fallback_workers(
             _emit_pickup("skip", reason="existing_pr_repair_reserved", identifier=identifier,
                          lock_count=_fallback_lock_count(), next_issue="")
             continue
-        if verdict != "remount" and not closure_intake_open:
+        if verdict != "remount" and not _closure_intake_allowed(identifier):
             _emit_pickup(
                 "refuse",
                 reason="closure_stop_line",

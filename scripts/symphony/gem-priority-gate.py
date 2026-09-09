@@ -34,10 +34,12 @@ from closure_health import (  # noqa: E402 - sibling executable module
     AUTHORITY as CLOSURE_HEALTH_AUTHORITY,
     STACK_MAX_DEPTH,
     bounded_stack_health,
+    build_product_closure_health,
     empty_stack_health,
+    observe_closure_health,
+    project_product_admission,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
-from closure_health import observe_closure_health  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
     V2_PROOF_SCHEMA,
     validate_capacity_receipt as validate_legacy_capacity_receipt,
@@ -190,6 +192,9 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             if isinstance(repair_actions, list)
             else stack_health["repairActions"]
         )
+        product_id = result.get("productId")
+        if isinstance(product_id, str) and product_id:
+            result["productId"] = product_id
         return result
     return {
         "schema": CLOSURE_HEALTH_SCHEMA,
@@ -1161,6 +1166,13 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     queue_value = signals.get("queue")
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
     closure_health = validate_closure_health(signals.get("closureHealth"))
+    product_closures = build_product_closure_health(
+        closure_health, signals.get("productClosureHealth")
+    )
+    product_closures = {
+        product_id: validate_closure_health(row)
+        for product_id, row in product_closures.items()
+    }
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
     concurrency_evidence_value = signals.get("concurrencyEvidence")
     capacity_now = parse_time(observed_at) or utc_now()
@@ -1180,6 +1192,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     normalized_signals = {
         **signals,
         "closureHealth": closure_health,
+        "productClosureHealth": product_closures,
         "concurrencyEvidence": concurrency_evidence,
     }
     review = validate_independent_review(
@@ -1540,12 +1553,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "reasons": closure_health["reasons"],
             "promotionContinues": True,
             "remediationContinues": True,
+            "products": project_product_admission(product_closures),
         },
         "workAdmission": {
             "allowed": state != "RED",
             "activities": work_activities,
             "newIssueLeaseAllowed": "approved-issue-lease" in work_activities,
             "newImplementationAllowed": "approved-issue-lease" in work_activities,
+            "productNewIssueLeaseAllowed": {
+                product_id: (
+                    state != "RED"
+                    and row.get("newIssueIntakeAllowed") is True
+                )
+                for product_id, row in product_closures.items()
+            },
         },
         "promotionAdmission": {
             "allowed": state == "GREEN" and review_allowed,
@@ -1748,6 +1769,26 @@ def failed_evaluation_receipt(
     """
     promotion_mode = "blocked"
     observed = observed_at or isoformat(utc_now())
+    blocked_closure = {
+        "schema": CLOSURE_HEALTH_SCHEMA,
+        "productId": "jovie",
+        "repository": "JovieInc/Jovie",
+        "status": "red",
+        "authority": CLOSURE_HEALTH_AUTHORITY,
+        "observedAt": observed,
+        "newIssueIntakeAllowed": False,
+        "promotionContinues": True,
+        "remediationContinues": True,
+        "blockedActivities": [
+            "new-issue-lease",
+            "new-implementation",
+            "fallback-pr-generation",
+        ],
+        "reasons": ["gate-evaluation-failed"],
+        "stackHealth": empty_stack_health(),
+        "repairActions": [],
+    }
+    product_closures = build_product_closure_health(blocked_closure)
     return {
         "schema": SCHEMA,
         "observedAt": observed,
@@ -1760,23 +1801,8 @@ def failed_evaluation_receipt(
             "controller": {"status": "unknown"},
             "integrity": {"status": "invalid", "detail": str(error)},
             "queue": {"status": "unknown", "eligiblePrs": None, "target": 0},
-            "closureHealth": {
-                "schema": CLOSURE_HEALTH_SCHEMA,
-                "status": "red",
-                "authority": CLOSURE_HEALTH_AUTHORITY,
-                "observedAt": observed,
-                "newIssueIntakeAllowed": False,
-                "promotionContinues": True,
-                "remediationContinues": True,
-                "blockedActivities": [
-                    "new-issue-lease",
-                    "new-implementation",
-                    "fallback-pr-generation",
-                ],
-                "reasons": ["gate-evaluation-failed"],
-                "stackHealth": empty_stack_health(),
-                "repairActions": [],
-            },
+            "closureHealth": blocked_closure,
+            "productClosureHealth": product_closures,
             "independentReview": {
                 "schema": INDEPENDENT_REVIEW_SCHEMA,
                 "status": "unknown",
@@ -1818,11 +1844,15 @@ def failed_evaluation_receipt(
             "reasons": ["gate-evaluation-failed"],
             "promotionContinues": True,
             "remediationContinues": True,
+            "products": project_product_admission(product_closures),
         },
         "workAdmission": {
             "allowed": False,
             "activities": [],
             "newIssueLeaseAllowed": False,
+            "productNewIssueLeaseAllowed": {
+                product_id: False for product_id in product_closures
+            },
             "newImplementationAllowed": False,
         },
         "promotionAdmission": {"allowed": False, "activities": []},

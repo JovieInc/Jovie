@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,11 +81,26 @@ def load_registry(path: Path = REGISTRY) -> list[Repo]:
     return repos
 
 
+ISSUE_PRODUCT_PREFIXES = {
+    "JOV": "jovie",
+    "LYB": "logyourbody",
+}
+ISSUE_IDENTIFIER = re.compile(r"^([A-Z][A-Z0-9]*)-(\d+)$")
+
+
 def by_github(github: str) -> Repo:
     for repo in load_registry():
         if repo.github.casefold() == github.casefold():
             return repo
     raise ValueError(f"repo is not in Gem allowlist: {github}")
+
+
+def by_id(product_id: str) -> Repo:
+    needle = str(product_id or "").strip()
+    for repo in load_registry():
+        if repo.id == needle:
+            return repo
+    raise ValueError(f"product is not in Gem allowlist: {product_id}")
 
 
 def pr_drain_repos() -> list[Repo]:
@@ -93,3 +109,29 @@ def pr_drain_repos() -> list[Repo]:
 
 def health_repos() -> list[Repo]:
     return [repo for repo in load_registry() if repo.health]
+
+
+def issue_intake_repos() -> list[Repo]:
+    return [repo for repo in load_registry() if repo.issue_intake]
+
+
+def product_id_for_github(github: str) -> str | None:
+    needle = str(github or "").strip()
+    if not needle:
+        return None
+    try:
+        return by_github(needle).id
+    except (ValueError, RuntimeError, OSError, json.JSONDecodeError):
+        fallback = {
+            "jovieinc/jovie": "jovie",
+            "jovieinc/logyourbody": "logyourbody",
+            "jovieinc/ovie": "ovie",
+        }
+        return fallback.get(needle.casefold())
+
+
+def product_id_for_issue(identifier: str) -> str | None:
+    match = ISSUE_IDENTIFIER.fullmatch(str(identifier or "").strip())
+    if match is None:
+        return None
+    return ISSUE_PRODUCT_PREFIXES.get(match.group(1))
