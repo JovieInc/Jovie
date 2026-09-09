@@ -505,8 +505,10 @@ jobs:
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
           echo "authorized=true" >> "$GITHUB_OUTPUT"
 
-          # Manual production may rebuild, but cannot bypass verification.
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          # Explicit staging/force rebuilds may skip deduplication, but a
+          # production reconciliation must load the last proven publication.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] &&
+            { [ "$environment" = "staging" ] || [ "$MANUAL_FORCE_REBUILD" = "true" ]; }; then
             exit 0
           fi
 
@@ -770,6 +772,14 @@ jobs:
 
           if [ "$publish_marker_presence_count" -gt 0 ] && [ -z "$baseline_sha" ]; then
             echo "::error::$publish_marker_presence_count desktop publish marker(s) existed, but none fully proved a release."
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] &&
+            [ "$environment" = "production" ] &&
+            [ "$MANUAL_FORCE_REBUILD" != "true" ] &&
+            [ -z "$baseline_sha" ]; then
+            echo "::error::Production desktop reconciliation requires a proven desktop publish baseline."
             exit 1
           fi
 
