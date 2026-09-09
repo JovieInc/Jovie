@@ -68,6 +68,29 @@ Use upstream/open-source projects when they compound our work and reduce mainten
 
 ## Agent Engineering Rules
 
+### Qualify delivery gates in shadow before enforcement
+
+EVENT: Founder direction, 2026-09-09. Across every company product and
+repository, a new or changed CI/delivery requirement that could stop shipping
+must first run alongside existing delivery as a nonblocking qualification. Keep
+existing required gates enforced. A new diagnostic evaluator reporting red must
+not freeze otherwise qualified shipping.
+
+Before promotion, record a representative cohort of multiple actual ships,
+correctness and qualification pass rate, p95 qualification duration, throughput,
+runner/cost impact, and failure isolation. Pass rate and p95 duration are separate
+measurements. Propose explicit workload-specific thresholds and sample sizes;
+do not claim the founder supplied a numeric threshold where none was specified.
+Promote in bounded stages with an accountable owner and tested rollback. Restore
+the prior qualified behavior if a novel gate collapses throughput. Queue tuning
+also runs without delaying eligible shipping and must be supported by measured
+headroom and reversible trials, not a guessed permanent optimum.
+
+This is global policy, recorded here in the existing engineering canon. A Jovie
+documentation change does not establish technical enforcement in other repos.
+Each delivery owner must supply its own shadow and promotion receipts; existing
+canonical review and governance paths apply this rule without a new control plane.
+
 AI agents should:
 
 1. Observe the bottleneck.
