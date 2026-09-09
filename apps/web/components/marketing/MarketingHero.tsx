@@ -226,7 +226,7 @@ function MarketingHeroTitle({
   id?: string;
   testId?: string;
   className: string;
-  maxLines?: 2 | 3;
+  maxLines?: 2 | 3 | null;
   children: ReactNode;
 }>) {
   return (
@@ -234,7 +234,11 @@ function MarketingHeroTitle({
       id={id}
       data-testid={testId}
       className={cn(
-        maxLines === 3 ? 'line-clamp-3' : 'line-clamp-2',
+        maxLines === 3
+          ? 'line-clamp-3'
+          : maxLines === 2
+            ? 'line-clamp-2'
+            : null,
         className
       )}
       style={
@@ -512,11 +516,19 @@ function MarketingHeroPublic({
   linkComponent = Link,
   headingId,
   testId,
+  className,
   ...variantProps
 }: MarketingHeroPublicProps) {
+  const layoutVariant =
+    variant === 'desktop' || variant === 'mobile' ? 'split' : 'centered';
   return (
     <MarketingHeroFrame
-      className={cn('marketing-hero', `marketing-hero--${variant}`, 'relative')}
+      className={cn(
+        'marketing-hero',
+        `marketing-hero--${layoutVariant}`,
+        'relative',
+        className
+      )}
       headingId={headingId}
       testId={testId}
     >
@@ -525,7 +537,8 @@ function MarketingHeroPublic({
           <div className='marketing-hero-copy'>
             <MarketingHeroTitle
               id={headingId}
-              className='marketing-hero-headline marketing-h1-max-two-lines'
+              className='marketing-hero-headline'
+              maxLines={null}
             >
               {headline}
             </MarketingHeroTitle>
