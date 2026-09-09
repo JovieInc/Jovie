@@ -114,6 +114,10 @@ const queryText = args => args.find(arg => arg.startsWith('query=')) ?? '';
 function canonicalMembership(state) {
   return nativeStatePayload({
     ...state,
+    mergeQueueEntry: {
+      ...state.mergeQueueEntry,
+      enqueuer: { __typename: 'Bot', login: 'jovie-bot' },
+    },
     timelineItems: {
       nodes: [
         {
@@ -2257,6 +2261,64 @@ describe('native mutation actor boundary', () => {
 
 describe('canonical admission membership binding', () => {
   it.each([
+    '2026-07-14T23:59:59Z',
+    '2026-07-15T00:00:00Z',
+  ])('reuses same-run status only since this entry (%s)', updatedAt => {
+    const source = readRepoFile('scripts/drain-pr-queue.sh');
+    const start = source.indexOf('queue_reentry_receipt_is_recoverable() {');
+    const end =
+      source.indexOf(
+        '\n}\n',
+        source.indexOf('record_queue_reentry_receipt() {')
+      ) + 2;
+    const target = 'https://github.com/JovieInc/Jovie/actions/runs/1';
+    const status = {
+      id: 1,
+      context: 'jovie-queue-admission/v2',
+      state: 'success',
+      description: `checkpoint=source-qualified;main=${HEAD};pr=14359`,
+      target_url: target,
+      updated_at: updatedAt,
+      creator: { type: 'Bot', login: CANONICAL_NATIVE_MUTATION_ACTOR },
+    };
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        `${source.slice(start, end)}
+fleet_hold_target_url() { echo "$TARGET"; }
+gh_retry() { printf '%s' "$STATUSES"; }
+node() { return 0; }
+gh_mutate_retry() { echo STATUS_WRITE >&2; }
+record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-15T00:00:00Z"
+`,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          DRY_RUN: '0',
+          DRAIN_PROMOTION_MODE: 'normal',
+          FLEET_POLICY_MAIN_SHA: HEAD,
+          EXPECTED_HEAD: HEAD,
+          EXPECTED_ENTRY: ENTRY_ID,
+          REPO: REPOSITORY,
+          QUEUE_REENTRY_CONTEXT: 'jovie-queue-admission/v2',
+          FLEET_HOLD_APP_USER: CANONICAL_NATIVE_MUTATION_ACTOR,
+          TARGET: target,
+          STATUSES: JSON.stringify([[status]]),
+        },
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stderr.includes('STATUS_WRITE')).toBe(
+      updatedAt < QUEUE_ENTRY.enqueuedAt
+    );
+    expect(result.stdout.includes('already recorded')).toBe(
+      updatedAt === QUEUE_ENTRY.enqueuedAt
+    );
+  });
+  it.each([
     false,
     true,
   ])('never publishes or reuses a receipt after failed membership proof (reuse=%s)', reuse => {
@@ -2269,10 +2331,10 @@ describe('canonical admission membership binding', () => {
         '-c',
         `${source.slice(start, end)}
 fleet_hold_target_url() { echo https://github.com/JovieInc/Jovie/actions/runs/1; }
-queue_reentry_receipt_is_recoverable() { echo REUSE_ATTEMPT; return ${reuse ? 0 : 1}; }
-node() { printf '%s\\n' "$*" >&2; return 1; }
+queue_reentry_receipt_is_recoverable() { lookup_finished=1; return ${reuse ? 0 : 1}; }
+node() { [[ "$lookup_finished" == 1 ]] || return 0; printf '%s\\n' "$*" >&2; return 1; }
 gh_mutate_retry() { echo STATUS_WRITE; }
-record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY"
+record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-15T00:00:00Z"
 `,
       ],
       {
@@ -2291,7 +2353,7 @@ record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY"
     expect(result.stderr).toContain(
       `prove-admission 14359 ${HEAD} ${ENTRY_ID}`
     );
-    expect(result.stdout).not.toMatch(/STATUS_WRITE|REUSE_ATTEMPT/);
+    expect(result.stdout).not.toMatch(/STATUS_WRITE|already recorded/);
   });
   const queued = () =>
     prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
@@ -2316,6 +2378,7 @@ record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY"
   it.each([
     'head',
     'entry',
+    'entry-actor',
     'event-time',
     'event-missing',
     'removed',
@@ -2324,6 +2387,11 @@ record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY"
   ])('refuses changed or uncertain %s before publication', async change => {
     const payload = canonicalMembership(queued());
     const pr = payload.data.repository.pullRequest;
+    if (change === 'entry-actor')
+      pr.mergeQueueEntry.enqueuer = {
+        __typename: 'User',
+        login: 'itstimwhite',
+      };
     if (change === 'head') pr.headRefOid = OTHER_HEAD;
     if (change === 'entry')
       pr.mergeQueueEntry = { ...QUEUE_ENTRY, id: 'replacement-entry' };

@@ -74,7 +74,7 @@ const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
 ]);
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 // Event enqueuer uses the app's [bot] login; actor/entry enqueuer use Bot.login.
-const CANONICAL_MEMBERSHIP_QUERY = `query MergeQueueCanonicalMembership($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS} timelineItems(last:1,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{id createdAt actor{__typename login} enqueuer{login}}} pageInfo{hasNextPage}}}}}`;
+const CANONICAL_MEMBERSHIP_QUERY = `query MergeQueueCanonicalMembership($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS} mergeQueueEntry{enqueuer{__typename login}} timelineItems(last:1,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{id createdAt actor{__typename login} enqueuer{login}}} pageInfo{hasNextPage}}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
@@ -1059,6 +1059,8 @@ export async function proveCanonicalMembership({
     event?.__typename !== 'AddedToMergeQueueEvent' ||
     typeof event.id !== 'string' ||
     event.id.length === 0 ||
+    state.mergeQueueEntry.enqueuer?.__typename !== 'Bot' ||
+    state.mergeQueueEntry.enqueuer?.login !== 'jovie-bot' ||
     event.actor?.__typename !== 'Bot' ||
     event.actor?.login !== 'jovie-bot' ||
     event.enqueuer?.login !== CANONICAL_NATIVE_MUTATION_ACTOR ||
