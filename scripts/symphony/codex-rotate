@@ -52,6 +52,7 @@ account_order() {
   ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" python3 - <<'PY'
 import json
 import os
+import re
 import time
 import fcntl
 from pathlib import Path
@@ -90,29 +91,48 @@ with open(str(state_path) + ".lock", "a+") as lock:
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         print("__CODEX_ROTATE_CAPACITY__:account_state_invalid")
         raise SystemExit
-accounts = sorted(
-    path.name
-    for path in root.iterdir()
-    if path.is_dir() and codex_account(path)
-)
-eligible_cooldowns = {}
-for name in accounts:
-    value = cooldowns.get(name, 0)
-    if isinstance(value, bool) or not isinstance(value, int):
-        print("__CODEX_ROTATE_CAPACITY__:account_state_invalid")
-        raise SystemExit
-    eligible_cooldowns[name] = value
+def account_groups(root):
+    """Aliases of one ChatGPT account share cooldown and existing lease files."""
+    groups = {}
+    for path in sorted(root.iterdir()):
+        if not path.is_dir() or not codex_account(path):
+            continue
+        if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", path.name)
+                or path.is_symlink()
+                or (path / "auth.json").is_symlink()
+                or (path / "config.toml").is_symlink()):
+            raise ValueError("unsafe account path")
+        auth = json.loads((path / "auth.json").read_text())
+        tokens = auth.get("tokens")
+        identity = tokens.get("account_id") if isinstance(tokens, dict) else None
+        if not isinstance(identity, str) or not identity.strip():
+            raise ValueError("missing canonical account identity")
+        # IDs remain private: only validated local alias names leave this process.
+        groups.setdefault(identity, []).append(path.name)
+    return list(groups.values())
+
+try:
+    groups = account_groups(root)
+    cooldown_by_group = {}
+    for aliases in groups:
+        values = [cooldowns.get(name, 0) for name in aliases]
+        if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
+            raise ValueError("invalid cooldown")
+        cooldown_by_group[aliases[0]] = max(values)
+except (OSError, ValueError, TypeError):
+    print("__CODEX_ROTATE_CAPACITY__:account_state_invalid")
+    raise SystemExit
 now = int(time.time())
-ready = [name for name in accounts if eligible_cooldowns[name] <= now]
-if not ready and accounts:
-    earliest_retry = min(eligible_cooldowns.values())
+ready = [aliases for aliases in groups if cooldown_by_group[aliases[0]] <= now]
+if not ready and groups:
+    earliest_retry = min(cooldown_by_group.values())
     print(f"__CODEX_ROTATE_CAPACITY__:account_cooldown:{earliest_retry}")
     raise SystemExit
 active = state.get("active")
-if active in ready:
-    ready.remove(active)
-    ready.insert(0, active)
-print("\n".join(ready))
+ready.sort(key=lambda aliases: active not in aliases)
+for aliases in ready:
+    selected = active if active in aliases else aliases[0]
+    print(selected + "\t" + " ".join(aliases))
 PY
 }
 
@@ -356,11 +376,11 @@ PY
 started_at=$(date +%s)
 last_heartbeat=$started_at
 account=""
-account_lock_fd=""
+account_lock_fds=()
 capacity_reason=""
 capacity_retry_at=""
 while [[ -z "$account" ]]; do
-  while IFS= read -r candidate; do
+  while IFS=$'\t' read -r candidate alias_group; do
     [[ -n "$candidate" ]] || continue
     if [[ "$candidate" == "__CODEX_ROTATE_CAPACITY__:account_cooldown:"* ]]; then
       capacity_reason="account_cooldown"
@@ -371,13 +391,34 @@ while [[ -z "$account" ]]; do
       capacity_reason="account_state_invalid"
       break
     fi
-    exec {candidate_fd}>"$LOCKS_DIR/$candidate.lock"
-    if flock -n "$candidate_fd"; then
-      account="$candidate"
-      account_lock_fd="$candidate_fd"
-      break
+    # Retain every existing alias lock, so old launchers, probes and reconnects
+    # cannot use a second name for this account during an incremental rollout.
+    candidate_fds=()
+    group_locked=1
+    read -r -a aliases <<< "$alias_group"
+    for alias in "${aliases[@]}"; do
+      exec {candidate_fd}>"$LOCKS_DIR/$alias.lock"
+      candidate_fds+=("$candidate_fd")
+      if ! flock -n "$candidate_fd"; then
+        group_locked=0
+        break
+      fi
+    done
+    if (( group_locked == 1 )); then
+      # Recheck identity/group and cooldown after acquiring the existing locks.
+      # Legitimate credential writers use those same locks.
+      while IFS=$'\t' read -r current_candidate current_group; do
+        if [[ "$current_candidate" == "$candidate" && "$current_group" == "$alias_group" ]]; then
+          account="$candidate"
+          account_lock_fds=("${candidate_fds[@]}")
+          break
+        fi
+      done < <(account_order)
     fi
-    exec {candidate_fd}>&-
+    [[ -z "$account" ]] || break
+    for candidate_fd in "${candidate_fds[@]}"; do
+      exec {candidate_fd}>&-
+    done
   done < <(account_order)
 
   if [[ -n "$capacity_reason" ]]; then
@@ -426,7 +467,7 @@ fi
 
 set_active "$account"
 export CODEX_HOME="$home"
-log "START account=$account lease_fd=$account_lock_fd args=$*"
+log "START account=$account lease_fds=${account_lock_fds[*]} args=$*"
 
 tmp_out=$(mktemp)
 tmp_err=$(mktemp)

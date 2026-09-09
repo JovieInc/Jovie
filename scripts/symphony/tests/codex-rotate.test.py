@@ -58,6 +58,44 @@ class CodexAccountEligibilityTests(unittest.TestCase):
             self.assertFalse(eligible(account))
 
 
+    def test_canonical_groups_preserve_private_identity_and_validate_paths(self):
+        import contextlib
+        import io
+        from unittest import mock
+        source = LAUNCHER.read_text().split("python3 - <<'PY'\n", 1)[1].split("\nPY", 1)[0]
+        namespace = {"__name__": "account_order", "__file__": str(LAUNCHER) + ":account_order"}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            state = root / "state.json"
+            state.write_text('{}')
+            output = io.StringIO()
+            with mock.patch.dict(os.environ, ACCOUNTS_ROOT=str(root), STATE_FILE=str(state)), contextlib.redirect_stdout(output):
+                exec(compile(source, str(LAUNCHER) + ":account_order", "exec"), namespace)
+            group = namespace["account_groups"]
+            for name, identity in (("alpha", "private-shared"), ("beta", "private-shared"), ("gamma", "private-other")):
+                home = root / name
+                home.mkdir()
+                (home / "auth.json").write_text(json.dumps({"auth_mode": "chatgpt", "tokens": {"account_id": identity}}))
+                (home / "config.toml").write_text('model = "test"')
+            self.assertEqual(group(root), [["alpha", "beta"], ["gamma"]])
+            (root / "beta/config.toml").write_text('model_provider = "openrouter"')
+            self.assertEqual(group(root), [["alpha"], ["gamma"]])
+            for tokens in (None, {}, {"account_id": ""}, {"account_id": True}):
+                (root / "alpha/auth.json").write_text(json.dumps({"auth_mode": "chatgpt", "tokens": tokens}))
+                with self.assertRaises(ValueError):
+                    group(root)
+            (root / "alpha/auth.json").write_bytes((root / "gamma/auth.json").read_bytes())
+            alias = root / "alias"
+            alias.symlink_to(root / "alpha", target_is_directory=True)
+            with self.assertRaises(ValueError):
+                group(root)
+            alias.unlink()
+            (root / "alpha").rename(root / "unsafe alias")
+            with self.assertRaises(ValueError):
+                group(root)
+            self.assertNotIn("private-", output.getvalue())
+
+
 @unittest.skipUnless(shutil.which("flock"), "requires util-linux flock")
 class CodexRotateTests(unittest.TestCase):
     def setUp(self):
@@ -68,7 +106,7 @@ class CodexRotateTests(unittest.TestCase):
         for name in ("account-a", "account-b"):
             account = self.accounts / name
             account.mkdir()
-            (account / "auth.json").write_text('{"auth_mode":"chatgpt"}\n')
+            (account / "auth.json").write_text(json.dumps({"auth_mode": "chatgpt", "tokens": {"account_id": name}}))
             (account / "config.toml").write_text('model = "test"\n')
         (self.accounts / "state.json").write_text(
             json.dumps({"active": "account-a", "cooldowns": {}, "last_error": {}})
@@ -124,6 +162,72 @@ class CodexRotateTests(unittest.TestCase):
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         self.addCleanup(os.close, descriptor)
         return descriptor
+
+    def duplicate_account(self):
+        (self.accounts / "account-b/auth.json").write_bytes(
+            (self.accounts / "account-a/auth.json").read_bytes()
+        )
+
+    def run_now(self):
+        return subprocess.run(
+            [str(LAUNCHER), "exec", "test"], capture_output=True,
+            env=self.env(CODEX_ACCOUNT_WAIT_SECONDS=0, FAKE_CODEX_SLEEP=0), timeout=5,
+        )
+
+    def test_duplicate_identity_respects_existing_other_alias_lease(self):
+        self.duplicate_account()
+        self.hold_account_lock("account-b")
+        before = (self.accounts / "state.json").read_bytes()
+        result = self.run_now()
+        self.assertEqual(result.returncode, 75)
+        self.assertEqual(list(self.events.iterdir()), [])
+        self.assertEqual((self.accounts / "state.json").read_bytes(), before)
+        # A failed group acquisition must release the first alias too.
+        self.hold_account_lock("account-a")
+
+    def test_duplicate_identity_cannot_run_a_second_concurrent_job(self):
+        self.duplicate_account()
+        first = self.start(FAKE_CODEX_SLEEP=2)
+        try:
+            deadline = time.monotonic() + 3
+            while not (self.events / "account-a.started").exists() and time.monotonic() < deadline:
+                time.sleep(0.02)
+            self.assertTrue((self.events / "account-a.started").exists())
+            result = self.run_now()
+            self.assertEqual(result.returncode, 75)
+            self.assertFalse((self.events / "account-b.started").exists())
+            self.assertEqual(first.wait(timeout=5), 0)
+            # Normal release permits the next job, with the same account identity.
+            self.assertEqual(self.run_now().returncode, 0)
+        finally:
+            if first.poll() is None:
+                first.terminate()
+                first.wait(timeout=5)
+
+    def test_duplicate_identity_uses_latest_alias_cooldown(self):
+        self.duplicate_account()
+        until = int(time.time()) + 600
+        state = self.accounts / "state.json"
+        state.write_text(json.dumps({"active": "account-a", "cooldowns": {"account-b": until}}))
+        before = state.read_bytes()
+        result = self.run_now()
+        self.assertEqual(result.returncode, 75)
+        self.assertIn(f"retryAt={until}".encode(), result.stderr)
+        self.assertEqual(list(self.events.iterdir()), [])
+        self.assertEqual(state.read_bytes(), before)
+
+    def test_missing_canonical_identity_never_launches(self):
+        for value in (None, "", "  ", True, [], {}):
+            with self.subTest(identity=value):
+                for name in ("account-a", "account-b"):
+                    (self.accounts / name / "auth.json").write_text(json.dumps(
+                        {"auth_mode": "chatgpt", "tokens": {"account_id": value}}
+                    ))
+                before = (self.accounts / "state.json").read_bytes()
+                result = self.run_now()
+                self.assertEqual(result.returncode, 75)
+                self.assertEqual(list(self.events.iterdir()), [])
+                self.assertEqual((self.accounts / "state.json").read_bytes(), before)
 
     def test_active_openrouter_profile_is_never_launched(self):
         (self.accounts / "account-a/config.toml").write_text('model_provider = "openrouter"\n')
