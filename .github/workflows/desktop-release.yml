@@ -1249,6 +1249,7 @@ jobs:
         if: env.ENVIRONMENT == 'staging'
         env:
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
+          JOVIE_STAGING_RELEASE: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           # Apple notarization via App Store Connect API key. All three are
           # required by @electron/notarize when notarize: true is set; if any

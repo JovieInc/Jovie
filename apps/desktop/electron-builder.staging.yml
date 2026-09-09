@@ -5,6 +5,7 @@ artifactName: Jovie-Staging-${version}-${arch}.${ext}
 directories:
   output: dist
 afterPack: scripts/apply-electron-fuses.cjs
+artifactBuildCompleted: scripts/notarize-staging-dmg.cjs
 files:
   - dist-electron/**
   - assets/icon.png
