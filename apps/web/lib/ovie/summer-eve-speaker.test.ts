@@ -299,6 +299,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
     const blockingResult = {
       ...result,
       eventId: blockingEventId,
+      sessionId: 'wrun_41M1T54S1W0GK7DWT5YNZKMSDZ',
       turnId: 'turn_blocking',
       responseText: 'Earlier turn completed.',
     };
@@ -345,6 +346,35 @@ describe('Ovie speaks through durable Eve Summer', () => {
     expect(fetchShadow.mock.calls[2]?.[1]?.body).toBe(
       fetchShadow.mock.calls[0]?.[1]?.body
     );
+  });
+  it('rejects an unsupported blocking-result session identity without redispatch', async () => {
+    const blockingEventId = 'sum_000000000000000000000099';
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(
+        eveResponse(
+          {
+            code: 'conversation_busy',
+            blockingEvent: {
+              eventId: blockingEventId,
+              deploymentId: 'dpl_test',
+            },
+          },
+          { status: 409 }
+        )
+      )
+      .mockResolvedValueOnce(
+        eveResponse({
+          result: {
+            ...result,
+            eventId: blockingEventId,
+            sessionId: 'run_unknown',
+          },
+        })
+      );
+
+    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(fetchShadow).toHaveBeenCalledTimes(2);
   });
   it('surfaces a terminal notice without redispatch while the canonical blocker is pending', async () => {
     const blockingEventId = 'sum_000000000000000000000099';
