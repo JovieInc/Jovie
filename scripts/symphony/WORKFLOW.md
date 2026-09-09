@@ -27,6 +27,9 @@ hooks:
   after_create: |
     export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
     exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"
+  before_run: |
+    export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
+    exec python3 "$HOME/.local/bin/symphony-codex-exhausted.py" native-preflight "${PWD##*/}" --before-run
   before_remove: |
     export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
     cache_status=0

@@ -53,11 +53,6 @@ done
 # lease before it starts grok/cursor/kimi. If that lock is held, refuse Codex.
 # Pickup-check GCs stale leftover locks and refuses In Review / Done / open PR
 # with a typed reason so a leftover file cannot keep running=0 forever.
-EXHAUSTED="${SYMPHONY_CODEX_EXHAUSTED:-$SCRIPT_DIR/symphony-codex-exhausted.py}"
-if [ -f "$EXHAUSTED" ]; then
-  # Preserve retryable pickup failures (75) separately from permanent refusals (78).
-  python3 "$EXHAUSTED" pickup-check "$issue" || exit "$?"
-fi
 LEASE_DIR="${SYMPHONY_FALLBACK_LEASE_DIR:-$HOME/.local/state/symphony-fallback/leases}"
 mkdir -p "$LEASE_DIR"
 LOCK_FILE="$LEASE_DIR/$issue.lock"
@@ -79,6 +74,14 @@ then
   exit 75
 fi
 export SYMPHONY_ISSUE_LEASE_FD=9
+
+# Final fresh admission consumes an exact repair assignment once, holding FD9.
+EXHAUSTED="${SYMPHONY_CODEX_EXHAUSTED:-$HOME/.local/bin/symphony-codex-exhausted.py}"
+if [ ! -f "$EXHAUSTED" ]; then
+  echo 'SYMPHONY_LAUNCHER_FAILURE class=admission-unavailable retryable=true reason="pickup controller missing"' >&2
+  exit 75
+fi
+python3 "$EXHAUSTED" pickup-check "$issue" >/dev/null || exit "$?"
 
 if [ "${SYMPHONY_ROUTING_USE_MATERIALIZED:-0}" = "1" ]; then
   model="$(node - "$workspace/.symphony-routing.json" "$SCRIPT_DIR/config/model-registry.json" "$issue" <<'JS'

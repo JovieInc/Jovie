@@ -382,14 +382,18 @@ def lease_decision(
 
 
 def _existing_repair_preflight(identifier: str, issue: dict | None) -> bool:
-    """Read-only preliminary check; the router must later acquire the actual FD9."""
+    """Read-only check before acquisition or with the router's verified FD9."""
     if not issue or issue.get("state", "").strip().lower() != "in review" or not issue.get("updatedAt"):
         return False
     controller = pathlib.Path.home() / ".local/bin/symphony-codex-exhausted.py"
     try:
+        inherited = ()
+        if os.environ.get("SYMPHONY_ISSUE_LEASE_FD") == "9":
+            os.fstat(9)  # The controller rechecks the actual lease inode and flock.
+            inherited = (9,)
         result = subprocess.run(
             [str(controller), "repair-preflight", identifier, "--issue-revision", issue["updatedAt"]],
-            capture_output=True, text=True, timeout=45, check=False,
+            capture_output=True, text=True, timeout=45, check=False, pass_fds=inherited,
         )
         return result.returncode == 0 and result.stdout.strip() == f"REPAIR_PREFLIGHT_ADMITTED identifier={identifier}"
     except (OSError, subprocess.SubprocessError):
