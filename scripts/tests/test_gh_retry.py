@@ -1863,7 +1863,7 @@ class TestDrainPrQueueWiring:
                   preflight) exit 0 ;;
                   prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
                   list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
-                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","enqueuedAt":"2026-08-15T12:00:00Z","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -2000,7 +2000,7 @@ class TestDrainPrQueueWiring:
                       exit 1
                     fi
                     if [[ "${{FAKE_ENROLL_MODE:?}}" == "valid" ]]; then
-                      echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":3}}}}}}'
+                      echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","enqueuedAt":"2026-08-15T12:00:00Z","state":"AWAITING_CHECKS","position":3}}}}}}'
                       exit 0
                     fi
                     if [[ "${{FAKE_ENROLL_MODE:?}}" == "pending" ]]; then
@@ -2138,7 +2138,7 @@ class TestDrainPrQueueWiring:
                   enroll)
                     echo "${{3:?}}" >>"{enrolled}"
                     head_var="${{4:?}}"
-                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"enqueuedAt\\":\\"2026-08-15T12:00:00Z\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
@@ -2291,7 +2291,7 @@ JSON
                       exit 91
                     fi
                     echo "$number" >>"{enrolled}"
-                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_$number\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_$number\\",\\"enqueuedAt\\":\\"2026-08-15T12:00:00Z\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
