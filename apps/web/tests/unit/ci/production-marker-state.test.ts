@@ -676,6 +676,182 @@ describe('recovered production marker state', () => {
     };
   }
 
+  function convergedMarkers() {
+    const recovered = recoveredMarker();
+    recovered.attemptRun.event = 'workflow_run';
+    const retry = recoveryMarker('completed', 'success');
+    retry.artifact.name = recovered.artifact.name;
+    retry.payload.deploymentId = recovered.payload.deploymentId;
+    return { recovered, retry };
+  }
+
+  it.each([
+    false,
+    true,
+  ])('accepts independently verified recovery and retry in either listing order (%s)', reverse => {
+    const { recovered, retry } = convergedMarkers();
+    const markers = reverse ? [retry, recovered] : [recovered, retry];
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers }))
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovery_and_retry_verified',
+      controllerRun,
+      controllerAttempt: 2,
+      deploymentId: recovered.payload.deploymentId,
+    });
+  });
+
+  it.each([
+    'deployment',
+    'source-run',
+    'source-attempt',
+    'successful-source',
+    'expired',
+    'rollback',
+    'active-retry',
+    'failed-retry',
+    'missing-verified-job',
+    'wrong-sha',
+    'foreign-recovery',
+    'duplicate-retry',
+    'duplicate-recovery',
+    'lease',
+    'third-marker',
+    'artifact-id',
+  ])('refuses contradictory converged marker evidence: %s', fault => {
+    const { recovered, retry } = convergedMarkers();
+    let markers = [recovered, retry];
+    if (fault === 'deployment') retry.payload.deploymentId = 'dpl_other';
+    if (fault === 'source-run') {
+      recovered.payload.recoveredFromControllerRun = '999';
+      recovered.originalRun.id = 999;
+      recovered.originalJobs[0].run_id = 999;
+    }
+    if (fault === 'source-attempt') {
+      recovered.payload.recoveredFromControllerAttempt = '2';
+      recovered.originalRun.run_attempt = 2;
+      recovered.originalJobs[0].run_attempt = 2;
+    }
+    if (fault === 'successful-source')
+      recovered.originalRun.conclusion = 'success';
+    if (fault === 'expired') recovered.artifact.expired = true;
+    if (fault === 'rollback') recovered.originalJobs[0].conclusion = 'success';
+    if (fault === 'active-retry') {
+      retry.attemptRun.status = 'in_progress';
+      retry.attemptRun.conclusion = null;
+    }
+    if (fault === 'failed-retry') retry.attemptRun.conclusion = 'failure';
+    if (fault === 'missing-verified-job') retry.attemptJobs = [];
+    if (fault === 'wrong-sha') retry.payload.sha = 'f'.repeat(40);
+    if (fault === 'foreign-recovery')
+      recovered.attemptRun.head_repository.full_name = 'foreign/repo';
+    if (fault === 'duplicate-retry') markers = [retry, retry];
+    if (fault === 'duplicate-recovery') markers = [recovered, recovered];
+    if (fault === 'third-marker') markers.push(retry);
+    if (fault === 'artifact-id') retry.artifact.id = recovered.artifact.id;
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers,
+          recoveryArtifacts:
+            fault === 'lease' ? [recoveryLease().artifact] : [],
+        })
+      ).state
+    ).toBe('manual');
+  });
+
+  it('downloads and validates both same-name artifacts through the real CLI reader', async () => {
+    const { recovered, retry } = convergedMarkers();
+    const markers = [recovered, retry];
+    let downloaded: { payload: unknown } = retry;
+    const calls: string[] = [];
+    processRunner.mockImplementation((command: string, args: string[]) => {
+      const endpoint = args[1];
+      calls.push(`${command} ${args.join(' ')}`);
+      let output: string | Buffer;
+      if (command === 'unzip')
+        output =
+          args[0] === '-Z1'
+            ? 'production-generation-verified.json\n'
+            : JSON.stringify(downloaded.payload);
+      else if (endpoint.endsWith('/zip')) {
+        downloaded = markers.find(m =>
+          endpoint.includes(`/artifacts/${m.artifact.id}/`)
+        )!;
+        output = Buffer.from('archive');
+      } else if (endpoint.includes('/artifacts?')) {
+        const listing = endpoint.includes(
+          `name=production-generation-verified-${sha}&`
+        )
+          ? markers
+          : [];
+        output = JSON.stringify({
+          total_count: listing.length,
+          artifacts: listing.map(m => ({
+            ...m.artifact,
+            workflow_run: { id: m.artifact.workflowRunId },
+          })),
+        });
+      } else {
+        const original = endpoint.includes(`/${controllerRun}/attempts/1`);
+        const marker = endpoint.includes(`/${recoveryRunId}/`)
+          ? recovered
+          : retry;
+        output = JSON.stringify(
+          endpoint.includes('/jobs?')
+            ? {
+                total_count: original
+                  ? recovered.originalJobs.length
+                  : marker.attemptJobs.length,
+                jobs: original ? recovered.originalJobs : marker.attemptJobs,
+              }
+            : original
+              ? recovered.originalRun
+              : marker.attemptRun
+        );
+      }
+      return { status: 0, stdout: output, stderr: '' };
+    });
+    const argv = process.argv;
+    const output = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    try {
+      process.argv = [
+        process.execPath,
+        resolve(
+          testDir,
+          '../../../../../.github/scripts/production-marker-state.mjs'
+        ),
+        '--sha',
+        sha,
+        '--repo',
+        repo,
+        '--controller-workflow-id',
+        String(workflowId),
+      ];
+      vi.resetModules();
+      await import(
+        '../../../../../.github/scripts/production-marker-state.mjs'
+      );
+      expect(JSON.parse(String(output.mock.calls.at(-1)?.[0]))).toMatchObject({
+        state: 'verified',
+        reason: 'exact_recovery_and_retry_verified',
+        controllerRun,
+        controllerAttempt: 2,
+      });
+      expect(calls.filter(c => c.endsWith('/zip'))).toHaveLength(2);
+      expect(calls.some(c => /--method| -X |enqueue|\/statuses/.test(c))).toBe(
+        false
+      );
+    } finally {
+      process.argv = argv;
+      output.mockRestore();
+      processRunner.mockReset();
+    }
+  });
+
   it('verifies a bounded recovered marker with exact source evidence', () => {
     const result = classifyProductionMarkerEvidence(
       evidence({ markers: [recoveredMarker()], latestRun: undefined })
