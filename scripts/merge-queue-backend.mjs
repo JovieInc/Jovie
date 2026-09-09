@@ -73,6 +73,8 @@ const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
   'draft-only',
 ]);
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
+// Event enqueuer uses the app's [bot] login; actor/entry enqueuer use Bot.login.
+const CANONICAL_MEMBERSHIP_QUERY = `query MergeQueueCanonicalMembership($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS} timelineItems(last:1,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{id createdAt actor{__typename login} enqueuer{login}}} pageInfo{hasNextPage}}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
@@ -1007,6 +1009,70 @@ export async function proveExactHeadQueueReceipt({
   };
 }
 
+/** Re-read the observed entry and its event together before certifying admission. */
+export async function proveCanonicalMembership({
+  backend,
+  repository = DEFAULT_REPOSITORY,
+  number,
+  expectedHeadOid,
+  expectedEntryId,
+  runner = createGhRunner(),
+}) {
+  requireNativeBackend(backend);
+  const expectedHead = parseExpectedHeadOid(expectedHeadOid);
+  if (typeof expectedEntryId !== 'string' || expectedEntryId.length === 0) {
+    throw backendError(
+      'invalid_queue_entry',
+      'An observed queue entry ID is required'
+    );
+  }
+  const payload = assertGraphqlResponse(
+    await runGhJson(
+      runner,
+      graphqlArgs(CANONICAL_MEMBERSHIP_QUERY, {
+        ...parseRepositorySlug(repository),
+        number: parsePullRequestNumber(number),
+      }),
+      'verifying canonical queue membership'
+    ),
+    'verifying canonical queue membership'
+  );
+  const pr = payload?.data?.repository?.pullRequest;
+  const state = normalizeNativePullRequest(pr ?? {});
+  if (
+    !canAcceptExactHeadQueueReceipt(state, expectedHead) ||
+    state.mergeQueueEntry.id !== expectedEntryId
+  ) {
+    throw backendError(
+      'queue_membership_changed',
+      'Queue entry or eligible source head changed before admission receipt'
+    );
+  }
+  const timeline = pr.timelineItems;
+  const event = timeline?.nodes?.[0];
+  // Matching timestamps bind the latest event to this entry, not an older bot
+  // admission. The entry ID and source head were pinned by the preceding read.
+  if (
+    timeline?.pageInfo?.hasNextPage !== false ||
+    !Array.isArray(timeline.nodes) ||
+    timeline.nodes.length !== 1 ||
+    event?.__typename !== 'AddedToMergeQueueEvent' ||
+    typeof event.id !== 'string' ||
+    event.id.length === 0 ||
+    event.actor?.__typename !== 'Bot' ||
+    event.actor?.login !== 'jovie-bot' ||
+    event.enqueuer?.login !== CANONICAL_NATIVE_MUTATION_ACTOR ||
+    !UTC_TIMESTAMP_PATTERN.test(event.createdAt ?? '') ||
+    Date.parse(event.createdAt) !== Date.parse(state.mergeQueueEntry.enqueuedAt)
+  ) {
+    throw backendError(
+      'noncanonical_queue_membership',
+      'Queue entry lacks a matching Jovie Bot admission event'
+    );
+  }
+  return { state, eventId: event.id, entryId: expectedEntryId };
+}
+
 export function dequeuePostcondition(state) {
   return Boolean(
     state?.backend === 'native' &&
@@ -1115,6 +1181,11 @@ export async function enrollPullRequest({
   const before = await readPullRequestQueueState(stateOptions);
   assertEnrollCandidate(before, expectedHead);
   if (enrollmentPostcondition(before, expectedHead)) {
+    await proveCanonicalMembership({
+      ...stateOptions,
+      expectedHeadOid: expectedHead,
+      expectedEntryId: before.mergeQueueEntry.id,
+    });
     return {
       backend: resolvedBackend,
       changed: false,
@@ -1151,6 +1222,11 @@ export async function enrollPullRequest({
     wait,
   });
   if (enrollmentPostcondition(observation.state, expectedHead)) {
+    await proveCanonicalMembership({
+      ...stateOptions,
+      expectedHeadOid: expectedHead,
+      expectedEntryId: observation.state.mergeQueueEntry.id,
+    });
     return {
       backend: resolvedBackend,
       changed: true,
@@ -1428,6 +1504,13 @@ export async function runCli(
         promotionMode: args[2],
         enrollSlots: Number.parseInt(String(args[3]), 10),
       }),
+    'prove-admission': () =>
+      proveCanonicalMembership({
+        ...options,
+        number: args[0],
+        expectedHeadOid: args[1],
+        expectedEntryId: args[2],
+      }),
     'prove-receipt': () =>
       proveExactHeadQueueReceipt({
         ...options,
@@ -1462,6 +1545,10 @@ export async function runCli(
       4,
       'explain-selector requires <number> <headSha> <promotionMode> <enrollSlots>',
     ],
+    'prove-admission': [
+      3,
+      'prove-admission requires <number> <headSha> <entryId>',
+    ],
     'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
     enroll: [2, 'enroll requires <number> <headSha>'],
     dequeue: [1, 'dequeue requires <number>'],
@@ -1473,7 +1560,7 @@ export async function runCli(
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue|dequeue-ineligible>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|prove-admission|enroll|dequeue|dequeue-ineligible>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];

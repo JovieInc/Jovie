@@ -23,6 +23,7 @@ import {
   hasAuthoritativeExactHeadQueueReceipt,
   listPullRequestQueueStates,
   preflightMergeQueue,
+  proveCanonicalMembership,
   proveExactHeadQueueReceipt,
   resolveMergeQueueBackend,
   runCli,
@@ -110,6 +111,23 @@ const ok = (/** @type {unknown} */ stdout = '') => ({
   stderr: '',
 });
 const queryText = args => args.find(arg => arg.startsWith('query=')) ?? '';
+function canonicalMembership(state) {
+  return nativeStatePayload({
+    ...state,
+    timelineItems: {
+      nodes: [
+        {
+          __typename: 'AddedToMergeQueueEvent',
+          id: 'event-current',
+          createdAt: QUEUE_ENTRY.enqueuedAt,
+          actor: { __typename: 'Bot', login: 'jovie-bot' },
+          enqueuer: { login: CANONICAL_NATIVE_MUTATION_ACTOR },
+        },
+      ],
+      pageInfo: { hasNextPage: false },
+    },
+  });
+}
 function createNativeRunner({
   ruleset = VALID_RULESET,
   repository = VALID_REPOSITORY,
@@ -117,6 +135,7 @@ function createNativeRunner({
   branchProtectionRef = VALID_BRANCH_PROTECTION_REF,
   liveQueueConfiguration = VALID_LIVE_QUEUE_CONFIGURATION,
   states = [],
+  membershipPayload = null,
   listPages = null,
   enableResult = ok({ data: {} }),
   viewerPayload = /** @type {unknown} */ ({
@@ -124,6 +143,7 @@ function createNativeRunner({
   }),
 } = {}) {
   const stateQueue = [...states];
+  let lastState;
   const restResponses = new Map([
     [`repos/${REPOSITORY}/rulesets/${RULESET_ID}`, ruleset],
     [`repos/${REPOSITORY}`, repository],
@@ -170,9 +190,13 @@ function createNativeRunner({
         ]
       );
     }
+    if (query.includes('MergeQueueCanonicalMembership')) {
+      return ok(membershipPayload ?? canonicalMembership(lastState));
+    }
     if (query.includes('MergeQueuePullRequestState')) {
       const state = stateQueue.shift();
       if (!state) throw new Error('Test runner exhausted PR states');
+      lastState = state;
       return ok(nativeStatePayload(state));
     }
     if (query.includes('enablePullRequestAutoMerge')) return enableResult;
@@ -2228,6 +2252,130 @@ describe('native mutation actor boundary', () => {
     ).resolves.toMatchObject({ 99: { backend: 'native' } });
     expect(invokedMutationActorCheck(preflightRunner)).toBe(false);
     expect(invokedMutationActorCheck(listRunner)).toBe(false);
+  });
+});
+
+describe('canonical admission membership binding', () => {
+  it.each([
+    false,
+    true,
+  ])('never publishes or reuses a receipt after failed membership proof (reuse=%s)', reuse => {
+    const source = readRepoFile('scripts/drain-pr-queue.sh');
+    const start = source.indexOf('record_queue_reentry_receipt() {');
+    const end = source.indexOf('\n}\n', start) + 2;
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        `${source.slice(start, end)}
+fleet_hold_target_url() { echo https://github.com/JovieInc/Jovie/actions/runs/1; }
+queue_reentry_receipt_is_recoverable() { echo REUSE_ATTEMPT; return ${reuse ? 0 : 1}; }
+node() { printf '%s\\n' "$*" >&2; return 1; }
+gh_mutate_retry() { echo STATUS_WRITE; }
+record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY"
+`,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          DRY_RUN: '0',
+          DRAIN_PROMOTION_MODE: 'normal',
+          FLEET_POLICY_MAIN_SHA: HEAD,
+          EXPECTED_HEAD: HEAD,
+          EXPECTED_ENTRY: ENTRY_ID,
+        },
+      }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      `prove-admission 14359 ${HEAD} ${ENTRY_ID}`
+    );
+    expect(result.stdout).not.toMatch(/STATUS_WRITE|REUSE_ATTEMPT/);
+  });
+  const queued = () =>
+    prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
+  it.each([
+    'existing',
+    'racing',
+  ])('rejects %s human membership despite an authenticated bot caller', async phase => {
+    const payload = canonicalMembership(queued());
+    Object.assign(payload.data.repository.pullRequest.timelineItems.nodes[0], {
+      actor: { __typename: 'User', login: 'itstimwhite' },
+      enqueuer: { login: 'itstimwhite' },
+    });
+    const runner = createNativeRunner({
+      states: phase === 'existing' ? [queued()] : [prState(), queued()],
+      membershipPayload: payload,
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'noncanonical_queue_membership',
+    });
+    expect(invokedEnrollment(runner)).toBe(phase === 'racing');
+  });
+  it.each([
+    'head',
+    'entry',
+    'event-time',
+    'event-missing',
+    'removed',
+    'malformed',
+    'api-error',
+  ])('refuses changed or uncertain %s before publication', async change => {
+    const payload = canonicalMembership(queued());
+    const pr = payload.data.repository.pullRequest;
+    if (change === 'head') pr.headRefOid = OTHER_HEAD;
+    if (change === 'entry')
+      pr.mergeQueueEntry = { ...QUEUE_ENTRY, id: 'replacement-entry' };
+    if (change === 'event-time')
+      pr.timelineItems.nodes[0].createdAt = '2026-07-14T00:00:00Z';
+    if (change === 'event-missing') pr.timelineItems.nodes = [];
+    if (change === 'removed')
+      pr.timelineItems.nodes[0].__typename = 'RemovedFromMergeQueueEvent';
+    if (change === 'malformed') pr.timelineItems.pageInfo.hasNextPage = true;
+    const runner = createNativeRunner({
+      membershipPayload:
+        change === 'api-error'
+          ? { errors: [{ message: 'unavailable' }] }
+          : payload,
+    });
+    const write = vi.fn();
+    await expect(
+      runCli(['prove-admission', '14359', HEAD, ENTRY_ID], {
+        runner,
+        env: {},
+        write,
+      })
+    ).rejects.toThrow();
+    expect(write).not.toHaveBeenCalled();
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+  it('certifies the fresh matching bot entry through the publication CLI', async () => {
+    const runner = createNativeRunner({
+      membershipPayload: canonicalMembership(queued()),
+    });
+    const write = vi.fn();
+    await runCli(['prove-admission', '14359', HEAD, ENTRY_ID], {
+      runner,
+      env: {},
+      write,
+    });
+    expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({
+      entryId: ENTRY_ID,
+      eventId: 'event-current',
+      state: { headRefOid: HEAD },
+    });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+  it('requires an observed entry identity', async () => {
+    await expect(
+      proveCanonicalMembership({
+        backend: 'native',
+        number: 14359,
+        expectedHeadOid: HEAD,
+        expectedEntryId: '',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_queue_entry' });
   });
 });
 
