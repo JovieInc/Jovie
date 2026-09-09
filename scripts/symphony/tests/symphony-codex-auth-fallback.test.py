@@ -626,7 +626,17 @@ PY
         destination = destination or self.home / ".local/bin"
         result = self.run_install(destination, controller=controller)
         self.assertEqual(result.returncode, 0, result.stderr)
-        return pathlib.Path(destination)
+        installed = pathlib.Path(destination)
+        # grok-ship-one prepends $HOME/.local/bin and /usr/local/bin before
+        # PATH. Host gh on this runner would otherwise shadow the hermetic
+        # mocks and exit 75 (open_pr_inventory_unknown) before the stop-line.
+        for name in ("gh", "git", "flock", "grok"):
+            source = self.bin / name
+            if source.is_file() and name not in LAUNCHER_NAMES:
+                target = installed / name
+                shutil.copy2(source, target)
+                target.chmod(0o755)
+        return installed
 
     def assert_complete_install(self, destination, source_dir=SOURCE_DIR):
         current = destination / ".symphony-codex-auth-fallback/current"
@@ -2461,6 +2471,7 @@ PY
             check=False,
         )
 
+        self.assertNotEqual(result.returncode, 75, result.stderr)
         self.assertNotIn("Summer closure stop-line blocks new fallback work", result.stderr)
         self.assertNotIn("fleet gate blocks isolated work", result.stderr)
 
