@@ -1,0 +1,4 @@
+{
+  "count": 91,
+  "note": "Live callsites in apps/web/{components,app} that still select a deprecated Button variant alias (accent | outline | destructive | frosted | frosted-ghost | frosted-outline | whitePill) instead of the canonical variant it normalizes to in packages/ui/atoms/button-contract.ts. Growth fails; conversions lower it. Measured 91 on 2026-09-09 at main bf9947c3 (JOV-5601): outline 49, destructive 38, whitePill 3, frosted 1. Lower this in the SAME PR when you retire aliases so the floor follows the work down."
+}
