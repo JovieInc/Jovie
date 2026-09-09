@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -12,14 +13,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const adapters = vi.hoisted(() => ({
   head: vi.fn(),
+  spawn: vi.fn(() => {
+    throw new Error('Unexpected child process in receipt guard test');
+  }),
   neon: vi.fn(),
   sql: vi.fn(),
 }));
 vi.mock('node:child_process', () => ({
-  default: { execFileSync: adapters.head },
+  default: { execFileSync: adapters.head, spawnSync: adapters.spawn },
   execFileSync: adapters.head,
+  spawnSync: adapters.spawn,
 }));
 vi.mock('@neondatabase/serverless', () => ({ neon: adapters.neon }));
+
+import { guardPlaywrightArtifacts } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
 
 import {
   runProfileCtaPreflight,
@@ -199,7 +206,9 @@ describe('runProfileCtaPreflight adapter and receipt', () => {
     'apps/web/lib/tim-white.ts',
   ];
   function fixture() {
-    const root = mkdtempSync(path.join(tmpdir(), 'profile-cta-preflight-'));
+    const root = realpathSync(
+      mkdtempSync(path.join(tmpdir(), 'profile-cta-preflight-'))
+    );
     roots.push(root);
     for (const file of sourcePaths) {
       const destination = path.join(root, file);
@@ -259,7 +268,7 @@ describe('runProfileCtaPreflight adapter and receipt', () => {
         ])
       )
     );
-    expect(proof.connection).toEqual({
+    expect(proof.ownedBranch).toEqual({
       branchId: connection.branch_id,
       branchName: connection.branch_name,
       parent: 'UNKNOWN',
@@ -288,6 +297,30 @@ describe('runProfileCtaPreflight adapter and receipt', () => {
     expect(serialized).not.toContain(env.DATABASE_URL);
     expect(serialized).not.toContain('db_url');
     expect(serialized).not.toContain('source fixture:');
+    expect(
+      guardPlaywrightArtifacts(
+        [f.output],
+        { NODE_ENV: 'test' },
+        { workspace: f.root }
+      )
+    ).toEqual([]);
+    expect(adapters.spawn).not.toHaveBeenCalled();
+  });
+  it.each([
+    { connection: { branchId: 'br-owned-fixture' } },
+    { DATABASE_URL: 'postgresql://private.invalid/db' },
+  ])('the unchanged guard rejects forbidden fields injected into the emitted receipt: %j', async forbidden => {
+    const f = fixture();
+    await runProfileCtaPreflight(f.env, f.webRoot, f.seed);
+    writeFileSync(f.output, JSON.stringify({ ...f.readProof(), ...forbidden }));
+    expect(
+      guardPlaywrightArtifacts(
+        [f.output],
+        { NODE_ENV: 'test' },
+        { workspace: f.root }
+      )
+    ).not.toEqual([]);
+    expect(adapters.spawn).not.toHaveBeenCalled();
   });
   it('fails wrong HEAD before seeding or opening the database and retains sanitized evidence', async () => {
     const f = fixture();

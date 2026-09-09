@@ -172,7 +172,7 @@ export async function runProfileCtaPreflight(
     const connection = JSON.parse(
       readFileSync(env.PROFILE_CTA_NEON_CONNECTION_FILE ?? '', 'utf8')
     );
-    proof.connection = validateProfileCtaConnection(env, connection);
+    proof.ownedBranch = validateProfileCtaConnection(env, connection);
     stage = 'fixtures';
     const { neon } = await import('@neondatabase/serverless');
     const sql = neon(env.DATABASE_URL!);

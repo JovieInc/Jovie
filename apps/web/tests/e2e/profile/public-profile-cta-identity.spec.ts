@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
 import { waitForHydration } from '../utils/smoke-test-utils';
@@ -13,7 +14,7 @@ test.describe('Public profile CTA and identity evidence', () => {
   test.setTimeout(120_000);
 
   for (const viewport of viewports) {
-    test(`${viewport.id} keeps compact identity rhythm`, async ({
+    test(`${viewport.id} preserves its profile identity and Events contract`, async ({
       page,
     }, testInfo) => {
       const capture = async (name: string) => {
@@ -35,51 +36,76 @@ test.describe('Public profile CTA and identity evidence', () => {
       expect(response?.status()).toBe(200);
       await waitForHydration(page);
 
-      const identity = page.getByTestId('profile-hero-identity-content');
-      const name = page.getByTestId('profile-identity-link');
-      const metadata = page.getByTestId('profile-hero-metadata-row');
-      await expect(identity).toBeVisible();
-      await expect(name).toBeVisible();
-      await expect(metadata).toBeVisible();
+      const desktop = viewport.width === 1440;
+      const layout = page.getByTestId('public-profile-layout-shell');
+      await expect(layout).toHaveAttribute(
+        'data-layout',
+        desktop ? 'desktop' : 'compact'
+      );
+      if (desktop) {
+        const surface = page.getByTestId('profile-desktop-surface');
+        await expect(surface).toBeVisible();
+        await expect(surface).toHaveAttribute('data-interactive-ready', 'true');
+        const name = surface.getByTestId('profile-header');
+        await expect(name).toBeVisible();
+        await expect(name).toHaveText('Tim White');
+        await expect(name).toHaveAttribute('href', '/tim');
+        await expect(
+          surface.getByRole('navigation', { name: 'Profile Navigation' })
+        ).toBeVisible();
+        await expect(
+          surface.getByRole('button', { name: 'Events', exact: true })
+        ).toBeVisible();
+      } else {
+        const identity = page.getByTestId('profile-hero-identity-content');
+        const name = page.getByTestId('profile-identity-link');
+        const metadata = page.getByTestId('profile-hero-metadata-row');
+        await expect(identity).toBeVisible();
+        await expect(name).toBeVisible();
+        await expect(name).toHaveText('Tim White');
+        await expect(metadata).toBeVisible();
 
-      const metrics = await identity.evaluate(element => {
-        const nameElement = element.querySelector<HTMLElement>(
-          '[data-testid="profile-identity-link"]'
-        );
-        const metadataElement = element.querySelector<HTMLElement>(
-          '[data-testid="profile-hero-metadata-row"]'
-        );
-        if (!nameElement || !metadataElement) return null;
+        const metrics = await identity.evaluate(element => {
+          const nameElement = element.querySelector<HTMLElement>(
+            '[data-testid="profile-identity-link"]'
+          );
+          const metadataElement = element.querySelector<HTMLElement>(
+            '[data-testid="profile-hero-metadata-row"]'
+          );
+          if (!nameElement || !metadataElement) return null;
 
-        const identityStyle = window.getComputedStyle(element);
-        const nameRect = nameElement.getBoundingClientRect();
-        const metadataRect = metadataElement.getBoundingClientRect();
-        const headingElement = nameElement.parentElement;
-        const headingRect = headingElement?.getBoundingClientRect();
-        const headingStyle = headingElement
-          ? window.getComputedStyle(headingElement)
-          : null;
-        return {
-          rowGap: Number.parseFloat(identityStyle.rowGap),
-          nameTargetHeight: nameRect.height,
-          metadataHeight: metadataRect.height,
-          renderedGap: metadataRect.top - nameRect.bottom,
-          headingHeight: headingRect?.height ?? 0,
-          headingMarginBottom: Number.parseFloat(
-            headingStyle?.marginBottom ?? '0'
-          ),
-          headingDisplay: headingStyle?.display ?? '',
-        };
-      });
+          const identityStyle = window.getComputedStyle(element);
+          const nameRect = nameElement.getBoundingClientRect();
+          const metadataRect = metadataElement.getBoundingClientRect();
+          const headingElement = nameElement.parentElement;
+          const headingRect = headingElement?.getBoundingClientRect();
+          const headingStyle = headingElement
+            ? window.getComputedStyle(headingElement)
+            : null;
+          return {
+            rowGap: Number.parseFloat(identityStyle.rowGap),
+            nameTargetHeight: nameRect.height,
+            metadataHeight: metadataRect.height,
+            renderedGap: metadataRect.top - nameRect.bottom,
+            headingHeight: headingRect?.height ?? 0,
+            headingMarginBottom: Number.parseFloat(
+              headingStyle?.marginBottom ?? '0'
+            ),
+            headingDisplay: headingStyle?.display ?? '',
+          };
+        });
 
-      expect(metrics).not.toBeNull();
-      expect(metrics?.rowGap).toBe(4);
-      expect(metrics?.nameTargetHeight).toBeGreaterThanOrEqual(44);
-      expect(metrics?.metadataHeight).toBeLessThanOrEqual(20);
-      const metricsReceipt = JSON.stringify(metrics);
-      expect(metrics?.renderedGap, metricsReceipt).toBeGreaterThanOrEqual(0);
-      expect(metrics?.renderedGap, metricsReceipt).toBeLessThanOrEqual(4);
-
+        expect(metrics).not.toBeNull();
+        expect(metrics?.rowGap).toBe(4);
+        expect(metrics?.nameTargetHeight).toBeGreaterThanOrEqual(44);
+        expect(metrics?.metadataHeight).toBeLessThanOrEqual(20);
+        const metricsReceipt = JSON.stringify(metrics);
+        expect(metrics?.renderedGap, metricsReceipt).toBeGreaterThanOrEqual(0);
+        expect(metrics?.renderedGap, metricsReceipt).toBeLessThanOrEqual(4);
+        await expect(
+          page.getByRole('button', { name: 'Events', exact: true })
+        ).toBeVisible();
+      }
       await capture(`${viewport.id}-identity.png`);
 
       // Keep founder identity checks above on /tim; exercise the empty Events
@@ -89,10 +115,51 @@ test.describe('Public profile CTA and identity evidence', () => {
       });
       expect(fixtureResponse?.status()).toBe(200);
       await waitForHydration(page);
+      await expect(layout).toHaveAttribute(
+        'data-layout',
+        desktop ? 'desktop' : 'compact'
+      );
+      if (desktop) {
+        const surface = page.getByTestId('profile-desktop-surface');
+        await expect(surface).toBeVisible();
+        await expect(surface).toHaveAttribute('data-interactive-ready', 'true');
+        const name = surface.getByTestId('profile-header');
+        await expect(name).toBeVisible();
+        await expect(name).toHaveText('Edge Case Empty');
+        await expect(name).toHaveAttribute('href', '/edgecase-empty');
+        const navigation = surface.getByRole('navigation', {
+          name: 'Profile Navigation',
+        });
+        await expect(navigation).toBeVisible();
+        const eventsTab = navigation.getByRole('button', {
+          name: 'Events',
+          exact: true,
+        });
+        await eventsTab.click();
+        await expect(eventsTab).toHaveAttribute('aria-current', 'page');
+        // Desktop owns a separate Events card with no alert action. Do not
+        // pretend the compact CTA geometry contract applies to absent content.
+        const events = surface.locator(
+          'section[data-testid="profile-primary-tab-tour"]'
+        );
+        await expect(events).toBeVisible();
+        await expect(
+          events.getByRole('heading', { name: 'Events', exact: true })
+        ).toBeVisible();
+        await expect(
+          events.getByText('No upcoming shows.', { exact: true })
+        ).toBeVisible();
+        await expect(
+          events.getByRole('button', { name: 'Turn On Event Alerts' })
+        ).toHaveCount(0);
+        await capture(`${viewport.id}-events.png`);
+        return;
+      }
+      await expect(page.getByTestId('profile-identity-link')).toBeVisible();
       await expect(page.getByTestId('profile-identity-link')).toHaveText(
         'Edge Case Empty'
       );
-      await page.getByRole('button', { name: 'Events' }).click();
+      await page.getByRole('button', { name: 'Events', exact: true }).click();
       const emptyEvents = page.getByTestId('profile-primary-tab-events-empty');
       await expect(emptyEvents).toBeVisible();
       await expect(
@@ -232,15 +299,70 @@ test.describe('Public profile CTA and identity evidence', () => {
       await assertCta();
       await capture(`${viewport.id}-events.png`);
 
-      // Reach the actual trigger through keyboard navigation in the open drawer.
-      for (let tab = 0; tab < 40; tab += 1) {
-        await page.keyboard.press('Tab');
-        if (
-          await canonicalCta.evaluate(
-            element => document.activeElement === element
-          )
-        )
-          break;
+      // Observe real Tab reachability in the Events panel without forcing focus.
+      const focusTrace: unknown[] = [];
+      const focusIds = await page.evaluateHandle(() => ({
+        ids: new WeakMap<Element, number>(),
+        next: 0,
+      }));
+      const recordFocus = async (phase: string) => {
+        const state = await canonicalCta.evaluate((element, registry) => {
+          const describe = (node: Element | null) => {
+            if (node && !registry.ids.has(node))
+              registry.ids.set(node, registry.next++);
+            return {
+              ordinal: node ? registry.ids.get(node) : null,
+              tag: node?.tagName ?? null,
+              target: node === element,
+              body: node === document.body,
+              tabIndex: node instanceof HTMLElement ? node.tabIndex : null,
+              inDialog: !!node?.closest('[role="dialog"], [aria-modal="true"]'),
+              inert: !!node?.closest('[inert]'),
+            };
+          };
+          return {
+            active: describe(document.activeElement),
+            target: describe(element),
+            documentFocused: document.hasFocus(),
+            focusVisible: element.matches(':focus-visible'),
+            dialogs: Array.from(
+              document.querySelectorAll('[role="dialog"], [aria-modal="true"]')
+            ).filter(node => node.getClientRects().length > 0).length,
+          };
+        }, focusIds);
+        focusTrace.push({ phase, ...state });
+        return state.active.target;
+      };
+      try {
+        await recordFocus('before-tab');
+        for (let tab = 0; tab < 40; tab += 1) {
+          await page.keyboard.press('Tab');
+          const immediate = await recordFocus(`tab-${tab}-immediate`);
+          await page.evaluate(
+            () =>
+              new Promise<void>(resolve =>
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => resolve())
+                )
+              )
+          );
+          const settled = await recordFocus(`tab-${tab}-settled`);
+          if (immediate && settled) break;
+        }
+      } finally {
+        await focusIds.dispose();
+        const tracePath = testInfo.outputPath(
+          'profile-cta-public',
+          `${viewport.id}-keyboard-traversal.json`
+        );
+        await writeFile(
+          tracePath,
+          JSON.stringify({ viewport: viewport.id, focusTrace })
+        );
+        await testInfo.attach('profile-keyboard-traversal.json', {
+          path: tracePath,
+          contentType: 'application/json',
+        });
       }
       await expect(canonicalCta).toBeFocused();
       await settleCta();
