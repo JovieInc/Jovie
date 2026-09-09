@@ -1,4 +1,9 @@
 name: Activate Gem Delivery Controller
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# Runtime owner task: 01a070af-20da-7c33-b1ec-0cf4d5ddd564; this workflow is the sole installer.
+# necessary-trust-boundary: Hosted production proof authorizes the exact source revision; only the fixed Gem runner can install and attest its local user-systemd runtime.
+# removal-trigger: Remove this handoff when the production owner can perform the same exact-revision Gem installation and runtime attestation within its existing trusted job.
 
 # A production receipt is the only authority to replace Gem's local controller
 # configuration. The installer refuses a dirty or mismatched source revision,
@@ -11,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: gem-delivery-controller-activation
@@ -42,6 +48,52 @@ jobs:
           # A later main commit cannot invalidate this immutable successful
           # Production Controller receipt. The exact checkout and installer
           # revision fence remain the activation authority.
+      - name: Set up Node for the existing production marker verifier
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.2'
+      - name: Authorize exact production marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
+          PRODUCTION_CONTROLLER_RUN: ${{ github.event.workflow_run.id }}
+          PRODUCTION_CONTROLLER_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          workflow_json="$(gh api "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          workflow_id="$(jq -er '
+            select(.name == "Production Controller" and
+              .path == ".github/workflows/production-controller.yml" and .state == "active") |
+            .id | select(type == "number" and . > 0)
+          ' <<< "$workflow_json")"
+          marker_json="$(node .github/scripts/production-marker-state.mjs \
+            --sha "$PRODUCTION_SHA" --repo "$REPOSITORY" \
+            --controller-workflow-id "$workflow_id")"
+          jq -e --argjson run "$PRODUCTION_CONTROLLER_RUN" \
+            --argjson attempt "$PRODUCTION_CONTROLLER_ATTEMPT" '
+            .state == "verified" and
+            (.controllerRun | tonumber) == $run and
+            (.controllerAttempt | tonumber) == $attempt
+          ' <<< "$marker_json" >/dev/null || {
+            echo "::error::Activation requires this exact producer attempt's verified production marker."
+            exit 1
+          }
+      - name: Check candidate closure startup compatibility
+        run: |
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "scripts/symphony")
+          from symphony_official_runtime import ClosureStopLine, _read_stop_line
+          # The enforcing wrapper waits before spawning its child on a hold.
+          # Refuse before changing any installed files instead of replacing a
+          # live listener with a process that cannot yet expose its API.
+          verdict = _read_stop_line(ClosureStopLine())
+          if verdict["hold"]:
+              print("::error::Candidate startup is held by the existing closure validator: " + verdict["reason"])
+              raise SystemExit(76)
+          PY
       - name: Establish lingering user-systemd session
         run: |
           set -euo pipefail
@@ -67,6 +119,7 @@ jobs:
           # Preserve the managed provider generation boundary. The next installer
           # owns the exact workflow/service-unit overlay, and the explicit installs
           # below own the adaptive controller; provider-only is not the whole activation.
+          bash scripts/symphony/symphony-elixir-safe-restart --prepare-stop-guard
           bash scripts/symphony/update-symphony-burrito.sh --provider-runtime-only
           bash scripts/symphony/update-symphony-burrito.sh --managed-controller-only
           bash scripts/symphony/install-gem-fleet-controller.sh
