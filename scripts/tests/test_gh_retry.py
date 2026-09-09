@@ -379,7 +379,7 @@ def _write_null_creator_receipt_drain(
         enroll_case = (
             f'enroll) printf \'%s\\n\' "${{3:-}}" >>\'{logs["enroll"]}\'; '
             f'echo \'{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}",'
-            f'"mergeQueueEntry":{{"id":"MQE_{pr}","state":"AWAITING_CHECKS","position":1}}}}}}\' ;;'
+            f'"mergeQueueEntry":{{"id":"MQE_{pr}","enqueuedAt":"2026-08-28T14:20:00Z","state":"AWAITING_CHECKS","position":1}}}}}}\' ;;'
         )
     else:
         enroll_case = (
@@ -409,6 +409,7 @@ def _write_null_creator_receipt_drain(
             set -euo pipefail
             case "${{2:-}}" in
               preflight) exit 0 ;;
+              prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
               list-state) echo '{list_state}' ;;
               explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":{queued_json},"eligible":true,"reason":"eligible"}}' ;;
               prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
@@ -1860,6 +1861,7 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
+                  prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
                   list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
@@ -1990,6 +1992,7 @@ class TestDrainPrQueueWiring:
                 command_name="${{2:-}}"
                 case "$command_name" in
                   preflight) exit 0 ;;
+                  prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
                   list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll)
                     echo enroll >>"{enroll_calls}"
@@ -2128,6 +2131,7 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
+                  prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
                   list-state)
                     echo '{{"1001":{{"headRefOid":"{heads["1001"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}'
                     ;;
@@ -2267,6 +2271,7 @@ JSON
                 }}
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
+                  prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
                   list-state) queue_state ;;
                   explain-selector)
                     cat >/dev/null
