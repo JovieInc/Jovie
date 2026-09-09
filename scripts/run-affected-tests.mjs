@@ -279,6 +279,7 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
 const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
+  'scripts/lib/__tests__/native-queue-eval.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
@@ -2291,6 +2292,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '--coverage.include=lib/merge-queue-guard.mjs',
       '--coverage.include=lib/native-queue-group-evidence.mjs',
       '--coverage.include=lib/native-queue-policy-evidence.mjs',
+      '--coverage.include=lib/native-queue-eval.mjs',
       '--coverage.thresholds.perFile=true',
       '--coverage.thresholds.lines=85',
       '--coverage.thresholds.branches=75',
