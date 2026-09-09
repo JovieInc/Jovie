@@ -16,6 +16,7 @@ import {
   conversationPath,
   createConversationIngress,
   readConversationResult,
+  summerDeploymentIdSchema,
   verifyFounderPrincipal,
 } from '../lib/summer-web-conversation';
 import {
@@ -144,7 +145,7 @@ export default defineChannel<SummerShadowChannelState>({
           !principalHash ||
           !deploymentId ||
           !verifyFounderPrincipal(principalHash) ||
-          deploymentId !== process.env.VERCEL_DEPLOYMENT_ID?.trim()
+          !summerDeploymentIdSchema.safeParse(deploymentId).success
         )
           return Response.json(
             { ok: false, code: 'invalid_conversation_binding' },
