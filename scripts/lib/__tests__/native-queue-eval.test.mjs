@@ -110,6 +110,7 @@ function passingFixture() {
         position: number === 16237 ? 1 : 2,
         state: 'AWAITING_CHECKS',
         enqueuedAt: at,
+        enqueuer: { login: 'jovie-bot' },
         headCommit: { oid: head },
         baseCommit: { oid: base },
       },
@@ -254,6 +255,21 @@ function passingFixture() {
 }
 
 describe('complete evidence and deliberate negative controls', () => {
+  it('corroborates current Bot ownership without inventing timestamp equality', () => {
+    const b = passingFixture();
+    b.merges[0].timeline.nodes[0].createdAt = later(1);
+    expect(evaluate(b, evaluationTime).status).toBe('PASS');
+    b.merges[0].timeline.nodes[0].createdAt = later(-1);
+    expect(evaluate(b, evaluationTime).blocked).toContain(
+      '16237:native-events'
+    );
+    b.merges[0].timeline.nodes[0].createdAt = at;
+    for (const s of b.snapshots)
+      s.prs[0].mergeQueueEntry.enqueuer.login = 'human';
+    expect(evaluate(b, evaluationTime).blocked).toContain(
+      '16237:native-events'
+    );
+  });
   it.each([
     null,
     {},

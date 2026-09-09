@@ -168,11 +168,11 @@ export function evaluate(bundle, now = Date.now()) {
       if (!ok) errors.push(`${m.number}:${reason}`);
     };
     const events = m.timeline?.nodes;
-    const added = events?.find(
-      e =>
-        e.__typename === 'AddedToMergeQueueEvent' &&
-        e.createdAt === pr.mergeQueueEntry.enqueuedAt
-    );
+    // Current entry ownership is authoritative; event time corroborates it.
+    // GitHub does not guarantee event.createdAt === entry.enqueuedAt.
+    const added = events
+      ?.filter(e => e.__typename === 'AddedToMergeQueueEvent')
+      .at(-1);
     const merged = events?.find(
       e => e.__typename === 'MergedEvent' && e.commit?.oid === m.commit
     );
@@ -215,6 +215,9 @@ export function evaluate(bundle, now = Date.now()) {
         Date.parse(events?.[0]?.createdAt) < Date.parse(added?.createdAt)) &&
         added?.actor?.login === 'jovie-bot' &&
         added?.enqueuer?.login === 'jovie-bot[bot]' &&
+        pr.mergeQueueEntry.enqueuer?.login === 'jovie-bot' &&
+        Date.parse(added.createdAt) >=
+          Date.parse(pr.mergeQueueEntry.enqueuedAt) &&
         merged?.mergeRefName === 'main' &&
         merged?.actor?.login === 'jovie-bot',
       'native-events'

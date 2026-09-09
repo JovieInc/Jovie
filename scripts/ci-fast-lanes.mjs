@@ -846,7 +846,10 @@ function main() {
       }
 
       console.log(`[ci-fast] ${lane.id}: ${status}`);
-      if (logExcerpt && status !== 'success') {
+      if (lane.id === 'structural' && status === 'success') {
+        // Keep exact suite/coverage receipts available in GitHub's job log.
+        console.log(outcome.output);
+      } else if (logExcerpt && status !== 'success') {
         console.log(logExcerpt);
       }
 
