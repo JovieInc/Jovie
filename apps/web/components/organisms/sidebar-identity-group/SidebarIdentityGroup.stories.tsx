@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
 import { SidebarIdentitySplitLayoutFixture } from './fixtures/split-layout';
 import { SidebarIdentityGroup } from './SidebarIdentityGroup';
 
@@ -33,6 +34,13 @@ const meta: Meta<typeof SidebarIdentityGroup> = {
       uncoveredProps: [],
     },
   },
+  decorators: [
+    Story => (
+      <JovieAuthValuesProvider>
+        <Story />
+      </JovieAuthValuesProvider>
+    ),
+  ],
   args: {
     profileHref: '/timwhite',
   },
@@ -108,4 +116,9 @@ export const SidebarAndProfileSweep: Story = {
       </div>
     </div>
   ),
+};
+
+export const WithoutPublicProfile: Story = {
+  ...Expanded,
+  args: { profileHref: undefined },
 };
