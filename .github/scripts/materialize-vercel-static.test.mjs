@@ -86,15 +86,18 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
 for (const alteredLink of [false, true]) {
   test(`canonical export wins relocated namespace collision; altered link=${alteredLink}`, t => {
     const f = fixture(t);
-    f.put('apps/web/catalog/image.png', 'canonical image');
-    f.link('apps/web/public/images/image.png', '../../catalog/image.png');
+    f.put('apps/web/screenshot-catalog/current/image.png', 'canonical image');
+    f.link(
+      'apps/web/public/images/image.png',
+      '../../screenshot-catalog/current/image.png'
+    );
     const decoy = f.put(
-      '.vercel/output/catalog/image.png',
+      '.vercel/output/screenshot-catalog/current/image.png',
       'unrelated artifact'
     );
     const output = f.link(
       '.vercel/output/static/images/image.png',
-      alteredLink ? decoy : '../../catalog/image.png'
+      alteredLink ? decoy : '../../screenshot-catalog/current/image.png'
     );
     if (alteredLink) {
       assert.throws(() => materializeStatic(f.root), /match public export/);
@@ -130,20 +133,50 @@ for (const kind of [
 ]) {
   test(`refuses ${kind} before materializing any valid link`, t => {
     const f = fixture(t);
-    const good = f.link('.vercel/output/static/a-good', f.put('asset.txt'));
+    const good = f.link(
+      '.vercel/output/static/a-good',
+      f.put('apps/web/.next/asset.txt')
+    );
     let target;
     if (kind === 'escape') target = tmpdir();
-    if (kind === 'directory') target = resolve(f.root, 'apps');
+    if (kind === 'directory') target = resolve(f.root, 'apps/web/.next');
     if (kind === 'cycle') target = 'z-bad';
     if (kind === 'missing') target = 'absent';
-    if (kind === 'mismatch' || kind === 'broken-source') {
+    if (kind === 'mismatch') {
+      f.link(
+        'apps/web/public/z-bad',
+        f.put('apps/web/screenshot-catalog/current/image.png')
+      );
+      target = f.put('apps/web/.next/other.png');
+    }
+    if (kind === 'broken-source') {
       f.link('apps/web/public/z-bad', '../../missing');
-      target = kind === 'mismatch' ? '../different' : '../../missing';
+      target = '../../missing';
     }
     mkdirSync(resolve(f.root, 'apps'), { recursive: true });
     f.link('.vercel/output/static/z-bad', target);
     assert.throws(() => materializeStatic(f.root));
     assert.equal(lstatSync(good).isSymbolicLink(), true);
+  });
+}
+
+for (const [name, canonical] of [
+  ['.vercel/.env.production.local', false],
+  ['config/private.json', false],
+  ['.vercel/.env.production.local', true],
+]) {
+  test(`refuses non-public target ${name}, canonical export=${canonical}`, t => {
+    const f = fixture(t);
+    const good = f.link(
+      '.vercel/output/static/a-good',
+      f.put('apps/web/.next/chunk.js')
+    );
+    const secret = f.put(name, 'SENTINEL_PRIVATE_VALUE');
+    const bad = f.link('.vercel/output/static/z-secret', secret);
+    if (canonical) f.link('apps/web/public/z-secret', secret);
+    assert.throws(() => materializeStatic(f.root), /approved asset root/);
+    assert.equal(lstatSync(good).isSymbolicLink(), true);
+    assert.equal(lstatSync(bad).isSymbolicLink(), true);
   });
 }
 
@@ -157,7 +190,7 @@ test('refuses a symlinked static root without modifying its target', t => {
 
 test('CLI materializes the build before artifact hashing in both release targets', t => {
   const f = fixture(t);
-  f.link('.vercel/output/static/chunk.js', f.put('built.js'));
+  f.link('.vercel/output/static/chunk.js', f.put('apps/web/.next/built.js'));
   const stdout = execFileSync(
     process.execPath,
     [resolve(repo, '.github/scripts/materialize-vercel-static.mjs')],

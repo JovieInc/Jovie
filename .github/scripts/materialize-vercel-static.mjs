@@ -68,6 +68,16 @@ export function materializeStatic(root) {
           target = realpathSync(path);
         }
         inside(root, target);
+        const allowedRoots = publicStat?.isSymbolicLink()
+          ? ['apps/web/public', 'apps/web/screenshot-catalog/current']
+          : ['apps/web/public', 'apps/web/.next', '.vercel/output/static'];
+        if (
+          !allowedRoots.some(name =>
+            target.startsWith(`${resolve(root, name)}${sep}`)
+          )
+        ) {
+          throw new Error('Static target is outside an approved asset root');
+        }
         if (!lstatSync(target).isFile())
           throw new Error('Static symlink target must be a file');
         pending.push({ path, target });
