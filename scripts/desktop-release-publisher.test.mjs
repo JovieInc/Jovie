@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
   expectedDesktopAssetNames,
   prepare,
+  releaseMetadataUpdate,
   uploadAndPublish,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
@@ -108,6 +109,7 @@ function fakeClient({
     if (allowNotFound) return null;
     throw new Error(`Release not found: ${tag}`);
   };
+  client.recoverableStagingDraft = async () => null;
   client.createDraft = async ({ environment, releaseSha, version }) => {
     client.release = {
       ...releaseFixture(environment, version, releaseSha),
@@ -150,16 +152,20 @@ function fakeClient({
     client.events.push(`upload:${name}`);
     return client.seedAsset(name, buffer);
   };
-  client.updateReleaseMetadata = async ({ releaseSha, version }) => {
+  client.updateReleaseMetadata = async ({
+    environment,
+    releaseSha,
+    version,
+  }) => {
     client.metadataUpdateCalls += 1;
     if (client.metadataUpdateCalls === client.failMetadataUpdateAt) {
       throw new Error('injected release metadata failure');
     }
     client.events.push(`retarget:${version}:${releaseSha}`);
-    Object.assign(client.release, {
-      name: version,
-      target_commitish: releaseSha,
-    });
+    Object.assign(
+      client.release,
+      releaseMetadataUpdate({ environment, releaseSha, version })
+    );
     return client.release;
   };
   client.retargetEmptyDraft = async (_id, releaseSha) => {
