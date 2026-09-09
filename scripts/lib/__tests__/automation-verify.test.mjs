@@ -693,6 +693,7 @@ describe('automation-verify affected scope', () => {
       selectedTests: [],
       pythonUnittestTests: ['scripts/symphony/tests/gem-priority-gate.test.py'],
       scriptVitestTests: [
+        'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
