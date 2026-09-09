@@ -58,8 +58,15 @@ describe('HomepageEditorialHero', () => {
     expect(submit).toHaveTextContent('Find me');
     expect(submit).toHaveAttribute('data-size', 'marketing');
     expect(submit).toHaveAttribute('data-variant', 'primary');
-    expect(submit).toHaveClass('h-7', 'rounded-full');
-    expect(submit).toHaveClass('before:h-11', 'before:min-w-11');
+    expect(submit).toHaveClass('h-auto', 'min-h-7', 'rounded-full');
+    expect(submit).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(submit).not.toHaveClass(fixedHeight);
+    }
     expect(submit).toBeEnabled();
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);

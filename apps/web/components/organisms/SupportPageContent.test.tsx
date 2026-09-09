@@ -59,8 +59,15 @@ describe('SupportPageContent', () => {
       )) {
       // Canonical 28px marketing Button atom; it owns the 44px touch target.
       expect(action).toHaveAttribute('data-size', 'marketing');
-      expect(action).toHaveClass('h-7', 'rounded-full');
-      expect(action).toHaveClass('before:h-11', 'before:min-w-11');
+      expect(action).toHaveClass('h-auto', 'min-h-7', 'rounded-full');
+      expect(action).toHaveClass(
+        'before:h-full',
+        'before:min-h-11',
+        'before:min-w-11'
+      );
+      for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+        expect(action).not.toHaveClass(fixedHeight);
+      }
       expect(action).not.toHaveClass('public-action-inline');
     }
     expect(

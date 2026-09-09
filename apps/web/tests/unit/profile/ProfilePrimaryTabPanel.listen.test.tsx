@@ -168,8 +168,11 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     const alertsCta = screen.getByRole('button', {
       name: 'Turn On Music Alerts',
     });
-    expect(alertsCta).toHaveClass('h-7');
-    expect(alertsCta.className).toContain('before:h-11');
-    expect(alertsCta.className).toContain('before:min-w-11');
+    expect(alertsCta).toHaveClass('h-auto', 'min-h-7');
+    expect(alertsCta).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
   });
 });
