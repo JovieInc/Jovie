@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   assertCommitDescendantCompare,
@@ -20,6 +23,13 @@ import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
+);
+const { notarizeStagingDmg } = desktopRequire(
+  './scripts/notarize-staging-dmg.cjs'
+);
+const desktopStagingBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.staging.yml', import.meta.url),
+  'utf8'
 );
 const desktopWorkflow = readFileSync(
   new URL('../.github/workflows/desktop-release.yml', import.meta.url),
@@ -200,6 +210,177 @@ test('desktop builder can parse Electron macOS property lists', () => {
   );
 
   assert.deepEqual(parsed, { CFBundleName: 'Jovie' });
+});
+
+test('staging DMG notarization finalizes blockmap and updater metadata after stapling', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'jovie-staging-dmg-'));
+  t.after(() => rm(dir, { force: true, recursive: true }));
+  const dmg = join(dir, 'Jovie-Staging-26.8.3-staging.1.1-universal.dmg');
+  const blockmap = `${dmg}.blockmap`;
+  await writeFile(dmg, Buffer.from('pre-staple-dmg'));
+  await writeFile(blockmap, Buffer.from('stale-blockmap'));
+  const event = {
+    file: dmg,
+    updateInfo: {
+      sha512: hash(Buffer.from('pre-staple-dmg'), 'sha512', 'base64'),
+      size: Buffer.byteLength('pre-staple-dmg'),
+    },
+  };
+  const calls = [];
+
+  await notarizeStagingDmg(event, {
+    environment: {
+      APPLE_API_ISSUER: 'issuer',
+      APPLE_API_KEY: '/tmp/private-key.p8',
+      APPLE_API_KEY_ID: 'key-id',
+      JOVIE_STAGING_RELEASE: 'true',
+    },
+    executeXcrun: async args => {
+      calls.push(args);
+      if (args[0] === 'notarytool') {
+        return {
+          stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
+        };
+      }
+      if (args[1] === 'staple') await appendFile(dmg, '-ticket');
+      return { stdout: '' };
+    },
+  });
+
+  const finalBytes = await readFile(dmg);
+  assert.deepEqual(calls, [
+    [
+      'notarytool',
+      'submit',
+      dmg,
+      '--key',
+      '/tmp/private-key.p8',
+      '--key-id',
+      'key-id',
+      '--issuer',
+      'issuer',
+      '--wait',
+      '--timeout',
+      '20m',
+      '--output-format',
+      'json',
+    ],
+    ['stapler', 'staple', dmg],
+    ['stapler', 'validate', dmg],
+  ]);
+  assert.equal(event.updateInfo.size, finalBytes.length);
+  assert.equal(event.updateInfo.sha512, hash(finalBytes, 'sha512', 'base64'));
+  assert.notEqual(await readFile(blockmap, 'utf8'), 'stale-blockmap');
+});
+
+test('staging DMG notarization fails closed before publishing incoherent artifacts', async t => {
+  const dmg = '/tmp/Jovie-Staging-26.8.3-staging.1.1-universal.dmg';
+  const accepted = async () => ({
+    stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
+  });
+  const environment = {
+    APPLE_API_ISSUER: 'issuer',
+    APPLE_API_KEY: '/tmp/private-key.p8',
+    APPLE_API_KEY_ID: 'key-id',
+    JOVIE_STAGING_RELEASE: 'true',
+  };
+
+  await t.test('ignores non-DMG artifacts', async () => {
+    await notarizeStagingDmg(
+      { file: `${dmg}.blockmap`, updateInfo: {} },
+      {
+        buildBlockMap: () => assert.fail('must not build'),
+        environment: {},
+        executeXcrun: () => assert.fail('must not execute'),
+      }
+    );
+  });
+  await t.test('keeps ordinary CI packaging credential-free', async () => {
+    const updateInfo = { sha512: 'unchanged', size: 1 };
+    await notarizeStagingDmg(
+      { file: dmg, updateInfo },
+      {
+        buildBlockMap: () => assert.fail('must not build'),
+        environment: {},
+        executeXcrun: () => assert.fail('must not execute'),
+      }
+    );
+    assert.deepEqual(updateInfo, { sha512: 'unchanged', size: 1 });
+  });
+  await t.test('requires builder update metadata', async () => {
+    await assert.rejects(
+      notarizeStagingDmg(
+        { file: dmg },
+        { buildBlockMap: assert.fail, environment, executeXcrun: accepted }
+      ),
+      /update metadata is missing/
+    );
+  });
+  await t.test('requires every notarization credential', async () => {
+    await assert.rejects(
+      notarizeStagingDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: assert.fail,
+          environment: { ...environment, APPLE_API_ISSUER: '' },
+          executeXcrun: accepted,
+        }
+      ),
+      /credential is missing: issuer/
+    );
+  });
+  await t.test('requires an accepted structured Apple response', async () => {
+    for (const stdout of [
+      'not-json',
+      JSON.stringify({ id: 'submission', status: 'Invalid' }),
+      JSON.stringify({ id: '', status: 'Accepted' }),
+    ]) {
+      await assert.rejects(
+        notarizeStagingDmg(
+          { file: dmg, updateInfo: {} },
+          {
+            buildBlockMap: assert.fail,
+            environment,
+            executeXcrun: async () => ({ stdout }),
+          }
+        ),
+        /not valid JSON|did not accept/
+      );
+    }
+  });
+  await t.test('requires final metadata for the stapled bytes', async () => {
+    await assert.rejects(
+      notarizeStagingDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: async () => ({ sha512: '', size: 0 }),
+          environment,
+          executeXcrun: accepted,
+        }
+      ),
+      /update metadata is malformed/
+    );
+  });
+});
+
+test('release validation rejects a DMG mutated after updater metadata creation', () => {
+  const fixture = desktopReleaseFixture('staging');
+  const dmgName = fixture.release.assets.find(asset =>
+    asset.name.endsWith('.dmg')
+  ).name;
+  const finalDmg = Buffer.concat([
+    fixture.buffers.get(dmgName),
+    Buffer.from('-stapled-ticket'),
+  ]);
+  fixture.buffers.set(dmgName, finalDmg);
+  const asset = fixture.release.assets.find(item => item.name === dmgName);
+  asset.size = finalDmg.length;
+  asset.digest = `sha256:${hash(finalDmg, 'sha256', 'hex')}`;
+
+  assert.throws(
+    () => validateReleaseAssets({ ...fixture, draft: true }),
+    /Updater size does not match/
+  );
 });
 
 test('passes when no desktop files changed', () => {
@@ -665,6 +846,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
+    /JOVIE_STAGING_RELEASE: 'true'/,
     /package:production/,
     /sync-version\.mjs[\s\S]*--staging-version/,
     /Validate rolling staging prerelease/,
@@ -684,6 +866,14 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /staging-mac\.yml/,
     /retention-days: 7/,
   ]);
+  assert.match(
+    desktopStagingBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-staging-dmg\.cjs$/m
+  );
+  assert.doesNotMatch(
+    build,
+    /- name: Notarize and staple staging desktop image/
+  );
   assertPatterns(stagingPublish, [
     /compare\/\$RELEASE_SHA\.\.\.\$current_main_sha/,
     /\.merge_base_commit\.sha == \$release/,
