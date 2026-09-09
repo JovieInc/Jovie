@@ -122,6 +122,28 @@ describe('HomepageCertifiedSections', () => {
   it('closes with the locked lines and the name search as the only control', () => {
     render(<HomepageClose />);
 
+    const section = screen.getByRole('region', {
+      name: HOMEPAGE_LAUNCH_COPY.certified.close.headline,
+    });
+    expect(section.tagName).toBe('SECTION');
+    expect(section).toBe(screen.getByTestId('marketing-section-cta'));
+    expect(section).toHaveAttribute(
+      'data-marketing-variant',
+      'editorial-search'
+    );
+    expect(section).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/homepage/HomepageClose.tsx'
+    );
+    expect(section).toHaveAttribute('data-homepage-testid', 'homepage-close');
+    expect(section.querySelector('section')).toBeNull();
+    expect(within(section).getByRole('combobox')).toBe(
+      screen.getByRole('combobox')
+    );
+    expect(within(section).getByRole('button')).toBe(
+      screen.getByTestId('homepage-close-cta')
+    );
+
     expect(
       screen.getByRole('heading', {
         level: 2,
