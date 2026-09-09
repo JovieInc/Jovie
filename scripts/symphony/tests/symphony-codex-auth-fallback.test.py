@@ -3994,6 +3994,9 @@ class FallbackLockGcTests(unittest.TestCase):
         assert spec is not None and spec.loader is not None
         self.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.module)
+        prerequisite = mock.patch.object(self.module, "_native_dispatch_prerequisite", return_value=None)
+        prerequisite.start()
+        self.addCleanup(prerequisite.stop)
         self.env = mock.patch.dict(
             os.environ,
             {

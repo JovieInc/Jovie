@@ -7,6 +7,39 @@ set -euo pipefail
 home="${SYMPHONY_HOME:-$HOME}"
 workspace="${SYMPHONY_WORKSPACE:-$PWD}"
 issue="${SYMPHONY_ISSUE_IDENTIFIER:-$(basename "$workspace")}"
+# Keep the existing app-server initialize stream alive during native admission.
+preflight_heartbeat_pid=""
+stop_preflight_heartbeat() {
+  if [ -n "$preflight_heartbeat_pid" ]; then
+    kill "$preflight_heartbeat_pid" 2>/dev/null || true
+    wait "$preflight_heartbeat_pid" 2>/dev/null || true
+    preflight_heartbeat_pid=""
+  fi
+}
+for arg in "$@"; do
+  if [ "$arg" = "app-server" ]; then
+    heartbeat_seconds="${SYMPHONY_ROUTER_HEARTBEAT_SECONDS:-2}"
+    if [ "$heartbeat_seconds" -gt 0 ] 2>/dev/null; then
+      parent_pid="$$"
+      (
+        trap 'exit 0' TERM INT
+        trap 'kill -TERM "$parent_pid" 2>/dev/null || true; exit 0' PIPE
+        started_at="$(date +%s)"
+        while sleep "$heartbeat_seconds"; do
+          printf '{"jsonrpc":"2.0","method":"symphony-router/preflight","params":{"elapsedSeconds":%d}}\n' \
+            "$(( $(date +%s) - started_at ))" || {
+              kill -TERM "$parent_pid" 2>/dev/null || true
+              exit 0
+            }
+        done
+      ) &
+      preflight_heartbeat_pid="$!"
+      trap stop_preflight_heartbeat EXIT TERM INT
+    fi
+    break
+  fi
+done
+
 # Every provider shares the same issue claim, before any capacity probe. Keep
 # descriptor 9 inherited through exec; never unlink its stable pathname.
 export SYMPHONY_FALLBACK_LEASE_DIR="${SYMPHONY_FALLBACK_LEASE_DIR:-$home/.local/state/symphony-fallback/leases}"
@@ -30,6 +63,13 @@ then
   exit 75
 fi
 export SYMPHONY_ISSUE_LEASE_FD=9
+# Mandatory, non-consuming admission before even authenticated recovery probes.
+controller="$home/.local/bin/symphony-codex-exhausted.py"
+if [ ! -f "$controller" ]; then
+  echo 'SYMPHONY_LAUNCHER_FAILURE class=admission-unavailable retryable=true reason="native admission controller missing"' >&2
+  exit 75
+fi
+python3 "$controller" native-preflight "$issue" >/dev/null || exit "$?"
 guard="${SYMPHONY_CAPACITY_GUARD:-$home/.local/bin/symphony-capacity-guard.py}"
 codex_probe="${SYMPHONY_CODEX_ACCOUNT_PROBE:-$home/.local/bin/codex-account-probe}"
 auto_route="${SYMPHONY_AUTO_ROUTE:-$home/.local/bin/symphony-auto-route.mjs}"
@@ -89,6 +129,8 @@ launch_codex() {
   if [ "${SYMPHONY_CODEX_DISABLE_APPS:-0}" = "1" ]; then
     set -- --disable apps "$@"
   fi
+  stop_preflight_heartbeat
+  trap - EXIT TERM INT
   exec "$workspace/scripts/symphony/symphony-codex-router" "$@"
 }
 

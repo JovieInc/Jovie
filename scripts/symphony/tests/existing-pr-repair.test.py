@@ -48,7 +48,7 @@ class RepairTests(unittest.TestCase):
         for name, value in (("ROOT", self.root), ("LEASE_ROOT", self.leases), ("GUARD", SOURCE / "symphony-lease-guard")):
             self.stack.enter_context(mock.patch.object(repair, name, value))
         self.stack.enter_context(mock.patch.object(controller, "_repair_module", return_value=repair))
-        self.stack.enter_context(mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "", "SYMPHONY_ISSUE_LEASE_FD": "9"}))
+        self.stack.enter_context(mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "", "SYMPHONY_ISSUE_LEASE_FD": ""}))
         original_read = Path.read_text
         self.cgroup = "0::/user.slice/user@1000.service/app.slice/symphony-elixir.service\n"
         self.stack.enter_context(mock.patch.object(Path, "read_text", autospec=True,
@@ -77,6 +77,7 @@ class RepairTests(unittest.TestCase):
                      "issuedAt": time.time() - 1, "expiresAt": time.time() + 300, "newIssueIntakeAllowed": False}
         self.stack.enter_context(mock.patch.object(controller, "_complete_open_prs", side_effect=lambda repo: [self.pr]))
         self.stack.enter_context(mock.patch.object(controller, "_fetch_single_issue", side_effect=lambda ident: self.issue))
+        self.stack.enter_context(mock.patch.object(controller, "_native_dispatch_prerequisite", return_value=None))
         self.stack.enter_context(mock.patch.object(controller, "gc_fallback_locks"))
         self.stack.enter_context(mock.patch.object(controller, "_fallback_lock_count", return_value=1))
         self.stack.enter_context(mock.patch.object(controller, "_fallback_lease_dir", return_value=self.leases))
@@ -84,10 +85,29 @@ class RepairTests(unittest.TestCase):
         self.stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
         self.stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
 
+    def test_early_preflight_never_consumes_assignment_and_final_gate_is_fresh(self):
+        self.authorize()
+        self.assertEqual(controller.pickup_check_command(IDENT, preflight=True, inherited=False), 0)
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        self.writer()
+        for _ in range(2):
+            self.assertEqual(controller.pickup_check_command(IDENT, preflight=True), 0)
+            self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        with mock.patch.object(controller, "_native_dispatch_prerequisite", return_value="dispatch_gate_closed"):
+            self.assertEqual(controller.pickup_check_command(IDENT), 75)
+            self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        with mock.patch.object(controller, "_native_dispatch_prerequisite", side_effect=[None, "dispatch_gate_closed"]):
+            self.assertEqual(controller.pickup_check_command(IDENT), 75)
+            self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        self.assertEqual(controller.pickup_check_command(IDENT), 0)
+        self.assertTrue((self.root / f"{IDENT}.claim").is_file())
+        self.assertNotEqual(controller.pickup_check_command(IDENT), 0)
+
     def authorize(self):
         return repair.authorize(self.spec, controller.__file__, self.issue, [self.pr])
 
     def writer(self):
+        self.stack.enter_context(mock.patch.dict(os.environ, SYMPHONY_ISSUE_LEASE_FD="9"))
         try:
             saved = os.dup(9)
         except OSError:
@@ -222,7 +242,13 @@ class RepairTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "lease-missing"):
                 repair.check_writer(payload, inherited=True)
         self.writer()
+        # The same inherited writer is valid; an independent hook still sees busy.
+        self.assertEqual(controller.repair_preflight_command(IDENT, REVISION), 0)
+        with mock.patch.dict(os.environ, SYMPHONY_ISSUE_LEASE_FD=""):
+            self.assertEqual(controller.repair_preflight_command(IDENT, REVISION), 78)
+        fcntl.flock(9, fcntl.LOCK_UN)
         self.assertEqual(controller.repair_preflight_command(IDENT, REVISION), 78)
+        fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
         path = self.leases / f"{IDENT}.lock"
         path.rename(path.with_suffix(".old"))
         path.touch()

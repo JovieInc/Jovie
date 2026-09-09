@@ -14,8 +14,9 @@ SUITE = ROOT / "scripts/symphony/tests/symphony-codex-auth-fallback.test.py"
 TARGETS = {
     "symphony-codex-exhausted.py": {"_fallback_lock_count", "_inherited_issue_lease_held", "expire_fallback_lock_decision", "gc_fallback_locks",
         "_repair_module", "_repair_assignments", "_validated_existing_pr_repair", "repair_preflight_command",
-        "repair_assign_command", "pickup_refuse_reason", "pickup_check_command"},
+        "repair_assign_command", "pickup_refuse_reason", "pickup_check_command", "_native_dispatch_prerequisite"},
     "existing_pr_repair.py": set(),
+    "symphony-lease-guard": {"_existing_repair_preflight"},
 }
 
 
@@ -47,6 +48,12 @@ try:
     tracer.runfunc(runpy.run_path, str(repair_suite), run_name="__main__")
 except SystemExit as exc:
     status = status or int(exc.code or 0)
+native_suite = SUITE.parent / "native-admission-consumers.test.py"
+sys.argv = [str(native_suite)]
+try:
+    tracer.runfunc(runpy.run_path, str(native_suite), run_name="__main__")
+except SystemExit as exc:
+    status = status or int(exc.code or 0)
 counts = tracer.results().counts
 report = {}
 for name, selected in TARGETS.items():
@@ -71,5 +78,5 @@ for name, selected in TARGETS.items():
     if percent < 95:
         status = 1
 print(json.dumps({"selectors": [str(SUITE.relative_to(ROOT)) + " FallbackLockGcTests",
-                              str(provider_suite.relative_to(ROOT)), str(repair_suite.relative_to(ROOT))], "coverage": report}, indent=2))
+                              str(provider_suite.relative_to(ROOT)), str(repair_suite.relative_to(ROOT)), str(native_suite.relative_to(ROOT))], "coverage": report}, indent=2))
 raise SystemExit(status)
