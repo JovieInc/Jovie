@@ -304,7 +304,11 @@ const nextConfig = {
     // Redirect before the dynamic /[username] route so the canonical profile
     // admission fixture remains backed by the monitored production canary.
     const profileAdmissionRedirects = [
-      { source: '/unfazed', destination: '/authqaprod', permanent: false },
+      {
+        source: '/unfazed/:path*',
+        destination: '/authqaprod/:path*',
+        permanent: false,
+      },
     ];
 
     // VIP username aliases (case-insensitive handling)

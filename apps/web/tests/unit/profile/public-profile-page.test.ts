@@ -871,8 +871,8 @@ describe('profile mode route redirects', () => {
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
 
     expect(redirects).toContainEqual({
-      source: '/unfazed',
-      destination: '/authqaprod',
+      source: '/unfazed/:path*',
+      destination: '/authqaprod/:path*',
       permanent: false,
     });
   });

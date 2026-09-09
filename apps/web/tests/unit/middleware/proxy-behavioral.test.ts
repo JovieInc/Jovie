@@ -388,6 +388,24 @@ describe('proxy.ts middleware', () => {
       expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
     });
 
+    it('preserves canonical profile admission subroutes on the monitored canary', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/unfazed/listen',
+        searchParams: { source: 'profile-admission', campaign: 'desktop' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(307);
+      const location = new URL(
+        res.headers.get('location') ?? '',
+        'https://localhost'
+      );
+      expect(location.pathname).toBe('/authqaprod/listen');
+      expect(location.searchParams.get('source')).toBe('profile-admission');
+      expect(location.searchParams.get('campaign')).toBe('desktop');
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+
     it('redirects /login to /signin without touching the audience block', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/login' });
       const res = await callMiddleware(req);

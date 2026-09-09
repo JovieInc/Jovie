@@ -142,9 +142,15 @@ export async function handleProxyRequest(
     // route can turn the reserved fixture into a cached 404. Keep the config
     // redirect as a build-time defense, but enforce the contract here because
     // the proxy runs on the deployed request path before App Router matching.
-    if (isNavigationMethod && pathname === '/unfazed') {
+    const profileAdmissionSuffix =
+      pathname === '/unfazed'
+        ? ''
+        : pathname.startsWith('/unfazed/')
+          ? pathname.slice('/unfazed'.length)
+          : null;
+    if (isNavigationMethod && profileAdmissionSuffix !== null) {
       const targetUrl = new URL(
-        `/${PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE}`,
+        `/${PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE}${profileAdmissionSuffix}`,
         req.url
       );
       targetUrl.search = req.nextUrl.search;
