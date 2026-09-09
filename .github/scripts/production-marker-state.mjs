@@ -153,7 +153,7 @@ function validatePostWriteRefreshFailure(jobs, context, attempt) {
     'Upload recovered verified-generation marker',
     'Confirm uploaded recovered marker bytes',
   ];
-  const dispatchName = 'Dispatch fresh fleet reconciliation';
+  const dispatchName = 'Dispatch fresh fleet and desktop reconciliation';
   const requiredSteps = [...requiredSuccessfulSteps, dispatchName].map(name =>
     job.steps.filter(step => step?.name === name)
   );
@@ -268,6 +268,9 @@ function classifyRecoveredMarkerEntry(entry, context) {
     deploymentId: payload.deploymentId,
     markerContext,
     recovered: true,
+    sourceRun,
+    sourceAttempt,
+    sourceConclusion: entry.originalRun.conclusion,
   };
 }
 
@@ -396,14 +399,35 @@ export function classifyProductionMarkerEvidence(evidence) {
     );
     const invalid = classified.find(entry => entry.error);
     if (invalid) return manual(invalid.error);
-    const attempts = classified.map(entry => entry.attempt);
+    // Attempts are scoped to their producer run: recovery and controller runs
+    // may independently reach attempt 2 without duplicating either receipt.
+    const attempts = classified.map(
+      entry => `${entry.controllerRun}:${entry.attempt}`
+    );
     if (new Set(attempts).size !== attempts.length) {
       return manual('duplicate_marker_attempt');
     }
+    // Automatic marker recovery can finish while the original controller's
+    // failed-job retry is still running. Preserve both immutable receipts, but
+    // accept their convergence only when each chain independently verifies the
+    // same deployment and recovery names the retry's interrupted first attempt.
+    const recovered = classified.find(entry => entry.recovered);
+    const retry = classified.find(entry => entry.normalRerun);
+    const converged =
+      classified.length === 2 &&
+      recovered?.kind === 'verified' &&
+      retry?.kind === 'verified' &&
+      recovered.sourceRun === retry.controllerRun &&
+      recovered.sourceAttempt === 1 &&
+      INTERRUPTED_CONCLUSIONS.has(recovered.sourceConclusion) &&
+      recovered.deploymentId === retry.deploymentId &&
+      evidence.markers[0].artifact.id !== evidence.markers[1].artifact.id;
     const primaryCandidates = classified.filter(
       entry => entry.attempt === 1 || entry.normalRerun || entry.recovered
     );
-    if (primaryCandidates.length > 1) return manual('duplicate_primary_marker');
+    if (primaryCandidates.length > 1 && !converged) {
+      return manual('duplicate_primary_marker');
+    }
     const primary = primaryCandidates[0];
     const recovery = classified.find(
       entry => entry.attempt === 2 && !entry.recovered && !entry.normalRerun
@@ -424,6 +448,18 @@ export function classifyProductionMarkerEvidence(evidence) {
       return manual('expired_recovery_lease');
     }
     if (recoveryArtifacts.length > 1) return manual('multiple_recovery_leases');
+    if (converged) {
+      if (recoveryArtifacts.length > 0) {
+        return manual('recovery_evidence_after_verified_primary');
+      }
+      return {
+        state: 'verified',
+        reason: 'exact_recovery_and_retry_verified',
+        controllerRun: retry.controllerRun,
+        controllerAttempt: retry.attempt,
+        deploymentId: retry.deploymentId,
+      };
+    }
     if (!primary) return manual('recovery_marker_without_primary');
     if (primary.kind === 'verified') {
       if (recovery || recoveryArtifacts.length > 0) {
@@ -706,11 +742,14 @@ function inspectOnline(args) {
       ),
       markerName
     );
-    if (artifacts.length > 1) return manual('duplicate_marker_name');
-    if (artifacts[0]?.expired) return manual('expired_marker');
-    if (artifacts.length === 1) {
-      evidence.markers.push({ artifact: artifacts[0] });
-    }
+    // Two normal-name artifacts may be the bounded recovery/retry race. Do
+    // not pick the newest: download and classify both complete evidence chains.
+    const limit =
+      markerName === `production-generation-verified-${sha}` ? 2 : 1;
+    if (artifacts.length > limit) return manual('duplicate_marker_name');
+    if (artifacts.some(artifact => artifact.expired))
+      return manual('expired_marker');
+    for (const artifact of artifacts) evidence.markers.push({ artifact });
   }
   // Download every marker payload before selecting or querying any attempt.
   for (const marker of evidence.markers) {
@@ -801,7 +840,35 @@ function inspectOnline(args) {
       );
     }
   }
-  return classifyProductionMarkerEvidence(evidence);
+  const result = classifyProductionMarkerEvidence(evidence);
+  if (result.state === 'verified' || result.state === 'pending') {
+    // Evidence can arrive while archive/run/job reads are in flight. Require
+    // the same immutable artifact identities and expiry states at the return
+    // boundary; never authorize from a stale partial listing.
+    const snapshot = artifacts =>
+      JSON.stringify([...artifacts].sort((left, right) => left.id - right.id));
+    for (const name of [
+      `production-generation-verified-${sha}`,
+      `production-generation-verified-recovery-${sha}`,
+      recoveryName,
+    ]) {
+      const before =
+        name === recoveryName
+          ? evidence.recoveryArtifacts
+          : evidence.markers
+              .map(marker => marker.artifact)
+              .filter(artifact => artifact.name === name);
+      const after = normalizeArtifacts(
+        ghJson(
+          `repos/${repo}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`
+        ),
+        name
+      );
+      if (snapshot(before) !== snapshot(after))
+        return manual('artifact_snapshot_changed');
+    }
+  }
+  return result;
 }
 
 function main() {
