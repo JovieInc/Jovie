@@ -1,3 +1,4 @@
+import { EXPERIMENT_REPORT_KIND } from '@/lib/connectors/suggested-action-kinds';
 /**
  * POST /api/connectors/suggested-actions/[id]/next-step
  *
@@ -115,7 +116,8 @@ export async function POST(_request: Request, { params }: RouteParams) {
         and(
           eq(suggestedActions.id, id),
           eq(suggestedActions.userId, userId),
-          eq(suggestedActions.status, 'pending')
+          eq(suggestedActions.status, 'pending'),
+          eq(suggestedActions.kind, EXPERIMENT_REPORT_KIND)
         )
       )
       .returning({
@@ -139,7 +141,11 @@ export async function POST(_request: Request, { params }: RouteParams) {
         })
         .from(suggestedActions)
         .where(
-          and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+          and(
+            eq(suggestedActions.id, id),
+            eq(suggestedActions.userId, userId),
+            eq(suggestedActions.kind, EXPERIMENT_REPORT_KIND)
+          )
         )
         .limit(1);
 
