@@ -12,6 +12,7 @@ import {
   assertMainlineAncestorCompare,
   assertStagingVersionTransition,
   expectedDesktopAssetNames,
+  fetchRecoverableStagingDraft,
   prepare,
   releaseMetadataUpdate,
   selectRecoverableStagingDraft,
@@ -466,6 +467,49 @@ test('rejects ambiguous or unsafe staging orphan drafts', () => {
         }),
       ]),
     /version is malformed/
+  );
+});
+
+test('rejects staging orphan ambiguity beyond the first release page', async () => {
+  const first = recoverableStagingDraft();
+  const second = recoverableStagingDraft({ id: 385137640 });
+  const unrelated = index => ({
+    id: index,
+    name: `release-${index}`,
+    tag_name: `v1.0.${index}`,
+  });
+  const pages = [
+    [first, ...Array.from({ length: 99 }, (_, index) => unrelated(index + 1))],
+    [second],
+  ];
+  const requested = [];
+
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async path => {
+        requested.push(path);
+        const page = Number(new URLSearchParams(path.slice(1)).get('page'));
+        return pages[page - 1] || [];
+      },
+      { maxPages: 3 }
+    ),
+    /Multiple recoverable staging drafts/
+  );
+  assert.deepEqual(requested, ['?per_page=100&page=1', '?per_page=100&page=2']);
+});
+
+test('fails closed when the bounded release inventory never completes', async () => {
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async () =>
+        Array.from({ length: 100 }, (_, index) => ({
+          id: index + 1,
+          name: `release-${index}`,
+          tag_name: `v1.0.${index}`,
+        })),
+      { maxPages: 2 }
+    ),
+    /inventory exceeds the 2-page safety bound/
   );
 });
 

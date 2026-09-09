@@ -12,6 +12,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   CERTIFICATION_KERNEL_COMMAND,
+  DESKTOP_RELEASE_COVERAGE_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
   selectLanes,
@@ -54,6 +55,46 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('runs desktop release regressions with measured coverage for mac changes', () => {
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      '--test-coverage-include=scripts/desktop-release-assets.mjs'
+    );
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      '--test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65'
+    );
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      'scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs'
+    );
+    expect(LANE_COMMANDS.structural).toContain(
+      DESKTOP_RELEASE_COVERAGE_COMMAND
+    );
+
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /STRUCTURAL_DESKTOP_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/desktop-release-assets.mjs',
+      'scripts/desktop-release-guard.test.mjs',
+      'scripts/desktop-release-publisher.test.mjs',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "...(selected.has('mac') ? macParts : [])"
+    );
+  });
+
   it('selects the enforced shutdown proof for runtime-only PRs', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -494,7 +535,9 @@ describe('ci-fast bounded parallel workflow', () => {
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
-        CERTIFICATION_KERNEL_COMMAND,
+        CERTIFICATION_KERNEL_COMMAND +
+        ' && ' +
+        DESKTOP_RELEASE_COVERAGE_COMMAND,
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
@@ -586,7 +629,7 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(structuralDecision).toContain(requiredPath);
     }
     expect(structuralDecision).toContain(
-      'grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN"'
+      'grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN|$STRUCTURAL_DESKTOP_PATTERN"'
     );
     expect(remaining).toMatch(/timeout-minutes:\s*40/);
     expect(remaining).toContain('uses: ./.github/actions/setup-playwright');

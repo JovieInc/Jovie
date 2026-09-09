@@ -14,6 +14,8 @@ const STAGING_ASSET_PATTERN =
   /^Jovie-Staging-([0-9]+\.[0-9]+\.[0-9]+-staging\.[1-9][0-9]*\.[1-9][0-9]*)-universal\.(?:dmg|zip)(?:\.blockmap)?$/;
 const STAGING_DRAFT_NAME_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+-staging\./;
 const UNTAGGED_RELEASE_PATTERN = /^untagged-[0-9a-f]{20}$/;
+const RELEASE_PAGE_SIZE = 100;
+const MAX_RELEASE_PAGES = 20;
 const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
 
@@ -113,6 +115,37 @@ export function selectRecoverableStagingDraft(releases) {
     'Recoverable staging draft must be empty.'
   );
   return release;
+}
+
+export async function fetchRecoverableStagingDraft(
+  request,
+  { maxPages = MAX_RELEASE_PAGES, pageSize = RELEASE_PAGE_SIZE } = {}
+) {
+  invariant(typeof request === 'function', 'GitHub request is missing.');
+  invariant(
+    Number.isInteger(maxPages) && maxPages > 0,
+    'GitHub release page limit is invalid.'
+  );
+  invariant(
+    Number.isInteger(pageSize) && pageSize > 0 && pageSize <= 100,
+    'GitHub release page size is invalid.'
+  );
+  const releases = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    const batch = await request(`?per_page=${pageSize}&page=${page}`);
+    invariant(Array.isArray(batch), 'GitHub releases are malformed.');
+    invariant(
+      batch.length <= pageSize,
+      'GitHub release page exceeds the requested size.'
+    );
+    releases.push(...batch);
+    if (batch.length < pageSize) {
+      return selectRecoverableStagingDraft(releases);
+    }
+  }
+  throw new Error(
+    `GitHub release inventory exceeds the ${maxPages}-page safety bound.`
+  );
 }
 
 export function expectedDesktopAssetNames(version, environment = 'production') {
@@ -622,10 +655,9 @@ class GitHubClient {
   }
 
   async recoverableStagingDraft() {
-    const releases = await this.request(
-      `/repos/${this.repository}/releases?per_page=100`
+    return fetchRecoverableStagingDraft(path =>
+      this.request(`/repos/${this.repository}/releases${path}`)
     );
-    return selectRecoverableStagingDraft(releases);
   }
 
   async releaseById(releaseId) {
