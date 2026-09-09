@@ -18,7 +18,7 @@ export const YOUTUBE_THUMBNAILS_GET_STARTED_HREF = `${APP_ROUTES.START}?source=y
 export function YoutubeThumbnailsLanding() {
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
-      <main>
+      <div>
         <MarketingHero
           variant='left'
           sectionVariant='left-none'
@@ -141,7 +141,7 @@ export function YoutubeThumbnailsLanding() {
             </div>
           </MarketingContainer>
         </MarketingCtaSection>
-      </main>
+      </div>
     </MarketingPageShell>
   );
 }
