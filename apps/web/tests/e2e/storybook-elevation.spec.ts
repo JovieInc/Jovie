@@ -345,3 +345,55 @@ test.describe('unified composer palette and dictation feedback', () => {
     }
   }
 });
+
+test.describe('two opportunity formats near the composer', () => {
+  for (const theme of THEMES) {
+    for (const width of [1200, 390]) {
+      test(`compact suggestions dock and yield to picker [${theme}, ${width}]`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 760 });
+        await openStory(
+          page,
+          'organisms-opportunitycard--above-composer',
+          theme
+        );
+        const suggestion = page.getByRole('button', {
+          name: 'Review your release checklist',
+        });
+        const surface = page.getByTestId('chat-composer-surface');
+        await expect(suggestion).toBeVisible();
+        const row = (await suggestion.boundingBox())!;
+        const composer = (await surface.boundingBox())!;
+        expect(row.height).toBeLessThanOrEqual(32);
+        expect(composer.y - row.y - row.height).toBeGreaterThanOrEqual(0);
+        expect(composer.y - row.y - row.height).toBeLessThanOrEqual(40);
+        await page.getByRole('button', { name: 'Attachment options' }).click();
+        await expect(page.getByRole('listbox')).toBeVisible();
+        await expect(suggestion).toBeHidden();
+        await page.keyboard.press('Escape');
+        await expect(suggestion).toBeVisible();
+        await suggestion.click();
+        await expect(page.getByLabel('Chat Message Input')).toHaveValue(
+          'Review your release checklist'
+        );
+      });
+    }
+    test(`editorial retains full context [${theme}]`, async ({ page }) => {
+      await openStory(page, 'organisms-opportunitycard--editorial', theme);
+      await expect(page.getByRole('article')).toHaveAttribute(
+        'data-opportunity-format',
+        'editorial'
+      );
+      await expect(
+        page.getByRole('heading', { name: 'Review your release checklist' })
+      ).toBeVisible();
+      await expect(
+        page.getByText('Check artwork, credits and links before the release.')
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Review Release' })
+      ).toBeVisible();
+    });
+  }
+});

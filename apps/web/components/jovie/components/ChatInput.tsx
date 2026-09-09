@@ -971,6 +971,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               the composer surface height and cause layout shift when it opens. */}
           {showInlinePicker || showDictationBanner ? (
             <div
+              data-chat-composer-overlay='true'
               className={cn(
                 reserveInlinePickerSpace
                   ? 'relative z-[80] flex w-full flex-col items-center gap-2'

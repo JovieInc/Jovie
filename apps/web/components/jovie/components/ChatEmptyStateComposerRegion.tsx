@@ -94,7 +94,7 @@ export function ChatEmptyStateWelcome({
  * Empty-chat scaffold.
  *
  * - Welcome (no `above`): Just ask + sample conversation + composer.
- * - Task/scaffold (`above`): cards scroll in the upper region; the composer
+ * - Task/scaffold (`above`): cards sit above the composer and scroll when needed; the composer
  *   (and any quick-action rail passed as children) docks to the bottom of the
  *   usable area so the first card is never clipped by mid-viewport absolute
  *   positioning and chips stay reachable without overlapping the dock.
@@ -138,21 +138,28 @@ export function ChatEmptyStateComposerRegion({
         data-grid-anchor={DESKTOP_CONTENT_GRID_ANCHOR}
         data-testid='chat-empty-state-composer-region'
         data-layout='docked'
+        data-empty-chat-region='true'
         data-top-spacing-owner={ownsTopSpacing ? 'none' : undefined}
       >
-        {/* Scrollable card stack — first item starts at top, never absolute-clipped */}
+        {/* Intrinsic-height inner stack keeps short suggestions near the composer. */}
         <div
-          className='min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-3'
+          className='flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3'
           data-testid='chat-empty-state-above-scroll'
         >
-          {above ??
-            (showDockedWelcome && !hideWelcomeHeader ? (
-              <div className='flex min-h-full flex-col items-center justify-center text-center'>
-                {welcome}
-              </div>
-            ) : (
-              <div className='h-full' aria-hidden='true' />
-            ))}
+          {above ? (
+            <div
+              className='mt-auto flex shrink-0 flex-col'
+              data-empty-chat-suggestions='true'
+            >
+              {above}
+            </div>
+          ) : showDockedWelcome && !hideWelcomeHeader ? (
+            <div className='flex min-h-full flex-col items-center justify-center text-center'>
+              {welcome}
+            </div>
+          ) : (
+            <div className='h-full' aria-hidden='true' />
+          )}
         </div>
         {/* Bottom-docked composer + quick-action chips (passed as children) */}
         <div
