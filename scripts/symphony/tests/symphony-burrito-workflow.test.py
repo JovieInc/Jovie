@@ -118,6 +118,154 @@ def _runtime_command(args, *, established_clock=False):
     return [sys.executable, "-c", launcher, *args]
 
 
+class DispatchAdmissionTests(unittest.TestCase):
+    def setUp(self):
+        self.helper = _load_helper()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = pathlib.Path(self.tmp.name) / "gate.json"
+
+    def payload(self, status="healthy"):
+        payload = _fleet_gate_payload(status, status == "healthy")
+        payload.update(
+            workAdmission={"allowed": True, "newIssueLeaseAllowed": status == "healthy",
+                           "newImplementationAllowed": status == "healthy"},
+            remediationAdmission={"allowed": True, "localAllowed": True,
+                "authority": "single-pr-writer-exact-head", "activities": ["isolated-pr-repair"],
+                "pushAllowed": False, "maxConcurrent": 1},
+            concurrency={"gem": {"maxConcurrent": 1, "evidenceAccepted": True,
+                                  "newMutationAllowed": True, "runtimeFloor": 1}},
+        )
+        return payload
+
+    def check(self, payload, mode="new-work", product="jovie"):
+        self.path.write_text(json.dumps(payload))
+        before = self.path.read_bytes()
+        result = self.helper.read_dispatch_admission(self.path, mode=mode, product_id=product)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(set(pathlib.Path(self.tmp.name).iterdir()), {self.path})
+        return result
+
+    def test_fresh_gate_is_only_non_consuming_prerequisite(self):
+        for mode in ("new-work", "existing-pr-repair"):
+            self.assertTrue(self.check(self.payload(), mode)["allowed"])
+        red = self.payload("red")
+        self.assertFalse(self.check(red)["allowed"])
+        self.assertTrue(self.check(red, "existing-pr-repair")["allowed"])
+        self.assertTrue(self.check(red, "existing-pr-repair")["allowed"])
+        self.assertNotIn("pushAllowed", self.check(red, "existing-pr-repair"))
+
+    def test_real_producer_controller_hold_overrides_closure_projection(self):
+        import copy
+        import runpy
+        scope = runpy.run_path(str(ROOT / "scripts/symphony/tests/gem-priority-gate.test.py"))
+        producer = scope["MODULE"]
+        signals = copy.deepcopy(scope["GREEN_SIGNALS"])
+        signals["controller"] = {"status": "failed", "error": "observation failed"}
+        now = producer.isoformat(producer.utc_now())
+        signals["independentReview"]["observedAt"] = now
+        signals["concurrencyEvidence"] = scope["capacity_evidence"](1, now)
+        receipt = producer.evaluate(signals, now)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["jovie"])
+        self.assertTrue(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
+        self.assertFalse(self.check(receipt)["allowed"])
+
+    def test_floor_and_local_permission_never_replace_capacity(self):
+        for maximum, accepted, mutation in [(0, False, False), (True, True, True),
+                                           (-1, True, True), (1, False, True),
+                                           (1, True, False), ("1", True, True)]:
+            with self.subTest(maximum=maximum, accepted=accepted, mutation=mutation):
+                payload = self.payload("red")
+                payload["concurrency"]["gem"].update(maxConcurrent=maximum,
+                    evidenceAccepted=accepted, newMutationAllowed=mutation)
+                self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+        for capacity in (None, {}, {"gem": []}):
+            payload = self.payload()
+            payload["concurrency"] = capacity
+            self.assertFalse(self.check(payload)["allowed"])
+        payload = self.payload()
+        payload["state"] = "RED"
+        self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+
+    def test_typed_remediation_and_work_fields_fail_closed(self):
+        for key, value in [("allowed", False), ("localAllowed", False),
+                           ("authority", "someone"), ("activities", []),
+                           ("activities", ["isolated-pr-repair", 1]),
+                           ("activities", "isolated-pr-repair"),
+                           ("pushAllowed", 0), ("maxConcurrent", True),
+                           ("maxConcurrent", 2)]:
+            payload = self.payload("red")
+            payload["remediationAdmission"][key] = value
+            self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+        for key in ("workAdmission", "remediationAdmission"):
+            payload = self.payload()
+            payload[key] = None
+            self.assertFalse(self.check(payload, "new-work" if key == "workAdmission" else "existing-pr-repair")["allowed"])
+        payload = self.payload()
+        payload["workAdmission"]["allowed"] = False
+        self.assertFalse(self.check(payload)["allowed"])
+
+    def test_product_projection_does_not_open_jovie(self):
+        payload = self.payload("red")
+        payload["closureAdmission"]["products"] = {
+            "ovie": {"newIssueIntakeAllowed": True},
+            "jovie": {"newIssueIntakeAllowed": False},
+        }
+        payload["workAdmission"]["productNewIssueLeaseAllowed"] = {"ovie": True, "jovie": False}
+        self.assertFalse(self.check(payload, product="ovie")["allowed"])
+        payload["workAdmission"].update(newIssueLeaseAllowed=True, newImplementationAllowed=True)
+        self.assertTrue(self.check(payload, product="ovie")["allowed"])
+        self.assertFalse(self.check(payload)["allowed"])
+        payload["workAdmission"]["productNewIssueLeaseAllowed"]["ovie"] = False
+        self.assertFalse(self.check(payload, product="ovie")["allowed"])
+        self.assertFalse(self.check(payload, product="unbound")["allowed"])
+        self.assertFalse(self.check(payload, mode="anything")["allowed"])
+
+    def test_stale_future_malformed_and_naive_dates_refuse_every_mode(self):
+        now = dt.datetime.now(dt.timezone.utc)
+        for date in ((now - dt.timedelta(hours=1)).isoformat(),
+                     (now + dt.timedelta(hours=1)).isoformat(),
+                     now.replace(tzinfo=None).isoformat(), "invalid"):
+            for mode in ("new-work", "existing-pr-repair"):
+                payload = self.payload()
+                payload["observedAt"] = date
+                self.assertFalse(self.check(payload, mode)["allowed"])
+        for bad_state in ([], {}, False):
+            payload = self.payload()
+            payload["state"] = bad_state
+            self.assertFalse(self.check(payload)["allowed"])
+        self.assertFalse(self.check(self.payload(), mode=[])["allowed"])
+        self.assertFalse(self.check(self.payload(), product={})["allowed"])
+        for bad_products in (None, [], True):
+            payload = self.payload()
+            payload["workAdmission"]["productNewIssueLeaseAllowed"] = bad_products
+            self.assertFalse(self.check(payload)["allowed"])
+        for malformed in ([], {}, {"schema": "wrong"}):
+            self.assertFalse(self.check(malformed)["allowed"])
+        self.path.write_text("{")
+        self.assertFalse(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+        self.path.unlink()
+        self.assertFalse(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+
+    def test_snapshot_read_once_and_installed_cli_contract(self):
+        payload = self.payload()
+        with mock.patch.object(pathlib.Path, "read_text", return_value=json.dumps(payload)) as read:
+            self.assertTrue(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+            self.assertEqual(read.call_count, 1)
+        for status, code in (("healthy", 0), ("red", 75)):
+            self.path.write_text(json.dumps(self.payload(status)))
+            command = _runtime_command(["dispatch-preflight", "--gate-file", str(self.path),
+                                        "--mode", "new-work", "--product-id", "jovie"])
+            result = subprocess.run(command, text=True, capture_output=True, timeout=5)
+            self.assertEqual(result.returncode, code, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["allowed"], code == 0)
+
+
 class OfficialSymphonyContractTests(unittest.TestCase):
     def test_shutdown_drains_child_output_for_parent_and_group_signals(self):
         for signum, group, paused in (

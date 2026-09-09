@@ -886,6 +886,21 @@ def read_closure_stop_line(
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         return hold(f"fleet-gate-receipt-invalid:{type(exc).__name__}")
+    return _closure_snapshot_verdict(payload, path, now=observed_at,
+                                     max_age_seconds=max_age_seconds, product_id=product_id)
+
+
+def _closure_snapshot_verdict(
+    payload: Any, path: pathlib.Path, *, now: dt.datetime,
+    max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+    product_id: str = "jovie",
+) -> dict[str, Any]:
+    """Evaluate the same parsed snapshot used for execution authority."""
+    observed_at = now
+
+    def hold(reason: str, **extra: Any) -> dict[str, Any]:
+        return {"hold": True, "reason": reason, "path": str(path), **extra}
+
     if not isinstance(payload, dict) or payload.get("schema") != FLEET_GATE_SCHEMA:
         return hold("fleet-gate-receipt-schema-mismatch")
     receipt_observed_raw = payload.get("observedAt")
@@ -897,7 +912,7 @@ def read_closure_stop_line(
         )
     except ValueError:
         receipt_observed = None
-    if receipt_observed is None:
+    if receipt_observed is None or receipt_observed.tzinfo is None:
         return hold("fleet-gate-receipt-observed-at-missing")
     age_seconds = math.ceil((observed_at - receipt_observed).total_seconds())
     details: dict[str, Any] = {
@@ -974,6 +989,69 @@ def read_closure_stop_line(
         "path": str(path),
         **details,
     }
+
+
+def read_dispatch_admission(
+    path: pathlib.Path, *, mode: str, product_id: str, now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Non-consuming gate prerequisite; never validates an issue or reserves a seat.
+
+    The controller must separately verify tracker/repository identity, exact
+    repair assignment and writer lease, and recheck before its one-use claim.
+    """
+    result = {"allowed": False, "reason": "dispatch-gate-invalid", "maxConcurrent": 0,
+              "mode": mode, "productId": product_id}
+    if (not isinstance(mode, str) or not isinstance(product_id, str)
+            or mode not in {"new-work", "existing-pr-repair"}
+            or product_id not in {"jovie", "ovie", "logyourbody"}):
+        return result
+    try:
+        # One read: closure and capacity must never come from different versions.
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        verdict = _closure_snapshot_verdict(payload, path, now=now or _now(), product_id=product_id)
+    except (OSError, ValueError, TypeError, ImportError):
+        return result
+    result["reason"] = verdict["reason"]
+    valid_reasons = {"closure-health-green", "closure-health-product-independent", "closure-health-not-green"}
+    if verdict["reason"] not in valid_reasons:
+        return result
+    result["observedAt"] = verdict["receiptObservedAt"]
+    concurrency = payload.get("concurrency")
+    gem = concurrency.get("gem") if isinstance(concurrency, dict) else None
+    maximum = gem.get("maxConcurrent") if isinstance(gem, dict) else None
+    if (not isinstance(payload.get("state"), str)
+            or payload["state"] not in {"GREEN", "AMBER"} or not isinstance(gem, dict)
+            or gem.get("evidenceAccepted") is not True or gem.get("newMutationAllowed") is not True
+            or type(maximum) is not int or maximum <= 0):
+        result["reason"] = "dispatch-capacity-unproven"
+        return result
+    if mode == "new-work":
+        work = payload.get("workAdmission")
+        products = work.get("productNewIssueLeaseAllowed") if isinstance(work, dict) else None
+        # The product map projects closure only. It cannot override an
+        # explicit execution hold from controller/repository/capacity policy.
+        product_ok = (products.get(product_id) is True if isinstance(products, dict)
+                      else isinstance(work, dict) and "productNewIssueLeaseAllowed" not in work)
+        if (verdict["hold"] or not isinstance(work, dict) or work.get("allowed") is not True
+                or work.get("newIssueLeaseAllowed") is not True
+                or work.get("newImplementationAllowed") is not True or not product_ok):
+            result["reason"] = "new-work-admission-closed"
+            return result
+    else:
+        repair = payload.get("remediationAdmission")
+        activities = repair.get("activities") if isinstance(repair, dict) else None
+        repair_max = repair.get("maxConcurrent") if isinstance(repair, dict) else None
+        if (not isinstance(repair, dict) or repair.get("allowed") is not True
+                or repair.get("localAllowed") is not True
+                or repair.get("authority") != "single-pr-writer-exact-head"
+                or not isinstance(activities, list) or "isolated-pr-repair" not in activities
+                or any(not isinstance(value, str) for value in activities)
+                or type(repair.get("pushAllowed")) is not bool
+                or type(repair_max) is not int or repair_max != maximum):
+            result["reason"] = "existing-pr-remediation-closed"
+            return result
+    result.update(allowed=True, reason="dispatch-gate-prerequisite-passed", maxConcurrent=maximum)
+    return result
 
 
 def _read_stop_line(
@@ -1558,6 +1636,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     budget_parser.add_argument("--json", action="store_true")
 
+    dispatch_parser = sub.add_parser("dispatch-preflight")
+    dispatch_parser.add_argument("--gate-file", type=pathlib.Path, default=DEFAULT_FLEET_GATE_RECEIPT)
+    dispatch_parser.add_argument("--mode", choices=("new-work", "existing-pr-repair"), required=True)
+    dispatch_parser.add_argument("--product-id", choices=("jovie", "ovie", "logyourbody"), required=True)
+
     validate_parser = sub.add_parser("validate-source")
     validate_parser.add_argument("--repo-root", type=pathlib.Path, required=True)
     validate_parser.add_argument("--workflow", type=pathlib.Path, required=True)
@@ -1651,6 +1734,11 @@ def main(argv: list[str] | None = None) -> int:
                 + f"headroom={budget['headroomRequestsPerHour']}"
             )
         return 0 if budget["withinBudget"] else 1
+
+    if args.command == "dispatch-preflight":
+        result = read_dispatch_admission(args.gate_file, mode=args.mode, product_id=args.product_id)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["allowed"] else 75
 
     if args.command == "validate-source":
         result = validate_source(
