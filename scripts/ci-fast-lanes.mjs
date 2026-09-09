@@ -883,7 +883,7 @@ function main() {
     process.exit(1);
   }
   console.log('[ci-fast] all lanes passed');
-  process.exit(0);
+  process.exitCode = 0;
 }
 
 if (

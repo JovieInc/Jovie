@@ -818,7 +818,7 @@ describe('ci-fast bounded parallel workflow', () => {
       writeFileSync(
         executable,
         '#!/bin/sh\nprintf "%s\\n" "CONTROL_EVIDENCE_BEGIN" "' +
-          'x'.repeat(1500) +
+          'x'.repeat(150_000) +
           '"\n'
       );
       chmodSync(executable, 0o700);
@@ -828,6 +828,7 @@ describe('ci-fast bounded parallel workflow', () => {
         {
           cwd: repo,
           encoding: 'utf8',
+          maxBuffer: 8 * 1024 * 1024,
           env: {
             ...process.env,
             PATH: repo,
@@ -843,6 +844,7 @@ describe('ci-fast bounded parallel workflow', () => {
       );
       expect(result.status, result.stderr).toBe(0);
       expect(result.stdout).toContain('CONTROL_EVIDENCE_BEGIN');
+      expect(result.stdout.endsWith('[ci-fast] all lanes passed\n')).toBe(true);
       const receipts = readdirSync(coverage).flatMap(
         name => JSON.parse(readFileSync(join(coverage, name), 'utf8')).result
       );

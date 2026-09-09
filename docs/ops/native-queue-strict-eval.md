@@ -1,11 +1,8 @@
 # Native merge-when-ready acceptance
 
-The existing native GitHub queue is the maintained substrate. Extend its current
-backend and CI control test path; do not create another queue or mutation owner.
-The differentiating requirement is an independent, revision-bound acceptance
-report spanning inventory, admission, combined checks, merges and recurrence.
+Extend the existing GitHub queue and CI control tests with independent revision-bound
+evidence for inventory, admission, combined checks, merges and recurrence.
 
-Collect baseline evidence before further controller repair:
 ```sh
 node scripts/native-queue-eval.mjs collect .context/native-queue-eval/acceptance.json <evaluator-source-sha>
 node scripts/native-queue-eval.mjs evaluate .context/native-queue-eval/acceptance.json
