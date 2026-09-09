@@ -1017,6 +1017,8 @@ export async function proveCanonicalMembership({
   expectedHeadOid,
   expectedEntryId,
   runner = createGhRunner(),
+  now = Date.now,
+  observe = evidence => process.stderr.write(`${JSON.stringify(evidence)}\n`),
 }) {
   requireNativeBackend(backend);
   const expectedHead = parseExpectedHeadOid(expectedHeadOid);
@@ -1041,40 +1043,111 @@ export async function proveCanonicalMembership({
     ),
     'verifying canonical queue membership'
   );
+  const observedAt = now();
   const pr = payload?.data?.repository?.pullRequest;
   const state = normalizeNativePullRequest(pr ?? {});
-  if (
-    !canAcceptExactHeadQueueReceipt(state, expectedHead) ||
-    state.mergeQueueEntry.id !== expectedEntryId
-  ) {
-    throw backendError(
-      'queue_membership_changed',
-      'Queue entry or eligible source head changed before admission receipt'
-    );
-  }
   const timeline = pr.timelineItems;
   const event = timeline?.nodes?.[0];
-  // Matching timestamps bind the latest event to this entry, not an older bot
-  // admission. The entry ID and source head were pinned by the preceding read.
-  if (
-    timeline?.pageInfo?.hasNextPage !== false ||
-    !Array.isArray(timeline.nodes) ||
-    timeline.nodes.length !== 1 ||
-    event?.__typename !== 'AddedToMergeQueueEvent' ||
-    typeof event.id !== 'string' ||
-    event.id.length === 0 ||
-    state.mergeQueueEntry.enqueuer?.__typename !== 'Bot' ||
-    state.mergeQueueEntry.enqueuer?.login !== 'jovie-bot' ||
-    event.actor?.__typename !== 'Bot' ||
-    event.actor?.login !== 'jovie-bot' ||
-    event.enqueuer?.login !== CANONICAL_NATIVE_MUTATION_ACTOR ||
-    !UTC_TIMESTAMP_PATTERN.test(event.createdAt ?? '') ||
-    Date.parse(event.createdAt) !== Date.parse(state.mergeQueueEntry.enqueuedAt)
-  ) {
+  const entryTime = Date.parse(state.mergeQueueEntry?.enqueuedAt ?? '');
+  const eventTime = Date.parse(event?.createdAt ?? '');
+  // Ownership comes from the pinned current entry's native Bot identity.
+  // The latest lifecycle event corroborates it; GitHub timestamps identify
+  // distinct object creations, not a unique enqueue-operation join key.
+  // Reject timestamps predating the current entry.
+  // Same-second or delayed old-event ambiguity cannot be resolved by this
+  // schema: ordering corroborates ownership, never a unique operation join.
+  const predicates = {
+    eligibleHead: canAcceptExactHeadQueueReceipt(state, expectedHead),
+    currentEntry: state.mergeQueueEntry?.id === expectedEntryId,
+    terminalPage: timeline?.pageInfo?.hasNextPage === false,
+    singleEvent: Array.isArray(timeline?.nodes) && timeline.nodes.length === 1,
+    addedEvent: event?.__typename === 'AddedToMergeQueueEvent',
+    eventId: typeof event?.id === 'string' && event.id.length > 0,
+    entryBotType: state.mergeQueueEntry?.enqueuer?.__typename === 'Bot',
+    entryBotLogin: state.mergeQueueEntry?.enqueuer?.login === 'jovie-bot',
+    eventBotType: event?.actor?.__typename === 'Bot',
+    eventBotLogin: event?.actor?.login === 'jovie-bot',
+    eventEnqueuer: event?.enqueuer?.login === CANONICAL_NATIVE_MUTATION_ACTOR,
+    entryTimestamp: Number.isFinite(entryTime),
+    eventTimestamp:
+      UTC_TIMESTAMP_PATTERN.test(event?.createdAt ?? '') &&
+      Number.isFinite(eventTime),
+    eventNotBeforeEntry: eventTime >= entryTime,
+  };
+  // New clock-based constraints qualify observationally over real admissions
+  // before enforcement. Host clock skew must not create a new delivery veto.
+  const observations = {
+    observedTimestamp: Number.isFinite(observedAt),
+    entryNotFuture: Number.isFinite(observedAt) && entryTime <= observedAt,
+    eventNotFuture: Number.isFinite(observedAt) && eventTime <= observedAt,
+  };
+  const observationIssues = Object.entries(observations)
+    .filter(([, passes]) => !passes)
+    .map(([name]) => name);
+  const failedPredicates = Object.entries(predicates)
+    .filter(([, passes]) => !passes)
+    .map(([name]) => name);
+  // Explicit scalar allowlist: never include PR body/title, tokens, raw API
+  // errors or unbounded objects in a CLI failure receipt.
+  const scalar = value =>
+    typeof value === 'string'
+      ? value.slice(0, 256)
+      : typeof value === 'boolean' ||
+          (typeof value === 'number' && Number.isFinite(value))
+        ? value
+        : null;
+  const evidence = {
+    schema:
+      failedPredicates.length > 0
+        ? 'jovie-canonical-membership-failure/v1'
+        : 'jovie-canonical-membership-observation/v1',
+    observedAt: scalar(observedAt),
+    failedPredicates,
+    predicates,
+    observations,
+    observationIssues,
+    expectedHead: scalar(expectedHead),
+    expectedEntryId: scalar(expectedEntryId),
+    head: scalar(pr.headRefOid),
+    pullRequestState: scalar(state.state),
+    isDraft: scalar(state.isDraft),
+    isInMergeQueue: scalar(state.isInMergeQueue),
+    hardHolds: hardHoldLabels(state),
+    entryState: scalar(state.mergeQueueEntry?.state),
+    entryPosition: scalar(state.mergeQueueEntry?.position),
+    entryId: scalar(state.mergeQueueEntry?.id),
+    enqueuedAt: scalar(state.mergeQueueEntry?.enqueuedAt),
+    entryActorType: scalar(state.mergeQueueEntry?.enqueuer?.__typename),
+    entryActorLogin: scalar(state.mergeQueueEntry?.enqueuer?.login),
+    eventId: scalar(event?.id),
+    eventType: scalar(event?.__typename),
+    createdAt: scalar(event?.createdAt),
+    eventActorType: scalar(event?.actor?.__typename),
+    eventActorLogin: scalar(event?.actor?.login),
+    eventEnqueuerLogin: scalar(event?.enqueuer?.login),
+    hasNextPage: scalar(timeline?.pageInfo?.hasNextPage),
+    eventCount: Array.isArray(timeline?.nodes) ? timeline.nodes.length : null,
+  };
+  if (failedPredicates.length > 0) {
+    const membershipChanged =
+      !predicates.eligibleHead || !predicates.currentEntry;
     throw backendError(
-      'noncanonical_queue_membership',
-      'Queue entry lacks a matching Jovie Bot admission event'
+      membershipChanged
+        ? 'queue_membership_changed'
+        : 'noncanonical_queue_membership',
+      membershipChanged
+        ? 'Queue entry or eligible source head changed before admission receipt'
+        : 'Queue entry lacks a matching Jovie Bot admission event',
+      { membershipEvidence: evidence }
     );
+  }
+  if (observationIssues.length > 0) {
+    // Observation delivery itself must remain nonblocking.
+    try {
+      observe(evidence);
+    } catch {
+      /* No new admission gate. */
+    }
   }
   return { state, eventId: event.id, entryId: expectedEntryId };
 }
@@ -1595,12 +1668,22 @@ export async function runCli(
   return result;
 }
 
+export function formatBackendFailure(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const evidence = error?.details?.membershipEvidence;
+  return (
+    `merge-queue-backend: ${message}\n` +
+    (evidence?.schema === 'jovie-canonical-membership-failure/v1'
+      ? `${JSON.stringify(evidence)}\n`
+      : '')
+  );
+}
+
 const isMain =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   runCli(process.argv.slice(2)).catch(error => {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`merge-queue-backend: ${message}\n`);
+    process.stderr.write(formatBackendFailure(error));
     process.exitCode = 1;
   });
 }

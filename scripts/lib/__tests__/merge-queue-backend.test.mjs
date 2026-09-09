@@ -20,6 +20,7 @@ import {
   enrollPullRequest,
   explainExactHeadAdmissionSelector,
   explainExactHeadQueueReceipt,
+  formatBackendFailure,
   HARD_HOLD_LABELS,
   hasAuthoritativeExactHeadQueueReceipt,
   listPullRequestQueueStates,
@@ -3507,4 +3508,247 @@ describe('authoritative native state listing', () => {
       queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))
     ).toBe(false);
   });
+});
+
+describe('canonical current-entry ownership and event ordering', () => {
+  const observedAt = Date.parse('2026-07-15T00:00:02Z');
+  const payload = () =>
+    canonicalMembership(
+      prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })
+    );
+  const prove = (value, now = () => observedAt) =>
+    proveCanonicalMembership({
+      ...nativeOptions(() => Promise.resolve(ok(value))),
+      expectedHeadOid: HEAD,
+      expectedEntryId: ENTRY_ID,
+      now,
+    });
+
+  it.each([
+    '2026-07-15T00:00:00Z',
+    '2026-07-15T00:00:01Z',
+    '2026-07-15T00:00:02Z',
+  ])('accepts canonical current ownership with independently created event %s', async createdAt => {
+    const value = payload();
+    value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
+      createdAt;
+    await expect(prove(value)).resolves.toMatchObject({
+      entryId: ENTRY_ID,
+      eventId: 'event-current',
+    });
+  });
+
+  it('captures observation time after the read completes', async () => {
+    let completed = false;
+    const value = payload();
+    value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
+      '2026-07-15T00:00:01Z';
+    await expect(
+      proveCanonicalMembership({
+        ...nativeOptions(async () => {
+          completed = true;
+          return ok(value);
+        }),
+        expectedHeadOid: HEAD,
+        expectedEntryId: ENTRY_ID,
+        now: () => {
+          expect(completed).toBe(true);
+          return observedAt;
+        },
+      })
+    ).resolves.toMatchObject({ entryId: ENTRY_ID });
+  });
+
+  it.each([
+    ['old-episode', 'eventNotBeforeEntry'],
+    ['malformed-event', 'eventTimestamp'],
+    ['wrong-owner', 'entryBotLogin'],
+    ['wrong-owner-type', 'entryBotType'],
+    ['wrong-event-actor', 'eventBotLogin'],
+    ['wrong-event-type', 'eventBotType'],
+    ['wrong-enqueuer', 'eventEnqueuer'],
+    ['removed', 'addedEvent'],
+    ['missing', 'singleEvent'],
+    ['replacement', 'currentEntry'],
+    ['head', 'eligibleHead'],
+  ])('rejects %s with exact failed predicate %s', async (change, predicate) => {
+    const value = payload();
+    const pr = value.data.repository.pullRequest;
+    const event = pr.timelineItems.nodes[0];
+    // Each actor/entry counterexample also has a valid +1s event timestamp.
+    event.createdAt = '2026-07-15T00:00:01Z';
+    if (change === 'old-episode') event.createdAt = '2026-07-14T23:59:59Z';
+    if (change === 'future-event') event.createdAt = '2026-07-15T00:00:03Z';
+    if (change === 'malformed-event') event.createdAt = 'not-a-time';
+    if (change === 'future-entry')
+      pr.mergeQueueEntry.enqueuedAt = '2026-07-15T00:00:03Z';
+    if (change === 'wrong-owner')
+      pr.mergeQueueEntry.enqueuer.login = 'other-bot';
+    if (change === 'wrong-owner-type')
+      pr.mergeQueueEntry.enqueuer.__typename = 'User';
+    if (change === 'wrong-event-actor') event.actor.login = 'other-bot';
+    if (change === 'wrong-event-type') event.actor.__typename = 'User';
+    if (change === 'wrong-enqueuer') event.enqueuer.login = 'itstimwhite';
+    if (change === 'removed') event.__typename = 'RemovedFromMergeQueueEvent';
+    if (change === 'missing') pr.timelineItems.nodes = [];
+    if (change === 'replacement') pr.mergeQueueEntry.id = 'replacement-entry';
+    if (change === 'head') pr.headRefOid = OTHER_HEAD;
+    await expect(
+      prove(value, () => (change === 'invalid-observation' ? NaN : observedAt))
+    ).rejects.toMatchObject({
+      details: {
+        membershipEvidence: {
+          failedPredicates: expect.arrayContaining([predicate]),
+        },
+      },
+    });
+  });
+
+  it.each([
+    0, 1000,
+  ])('observes future timestamps without adding a delivery veto (offset=%s)', async offset => {
+    const value = payload();
+    value.data.repository.pullRequest.mergeQueueEntry.enqueuedAt =
+      '2026-07-15T00:00:03Z';
+    value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
+      new Date(observedAt + 1000 + offset).toISOString();
+    const observe = vi.fn();
+    await expect(
+      proveCanonicalMembership({
+        ...nativeOptions(async () => ok(value)),
+        expectedHeadOid: HEAD,
+        expectedEntryId: ENTRY_ID,
+        now: () => observedAt,
+        observe,
+      })
+    ).resolves.toMatchObject({ entryId: ENTRY_ID });
+    expect(observe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schema: 'jovie-canonical-membership-observation/v1',
+        failedPredicates: [],
+        observationIssues: ['entryNotFuture', 'eventNotFuture'],
+      })
+    );
+  });
+  it('invalid observation clock and failed observation sink cannot veto admission', async () => {
+    const observe = vi.fn(() => {
+      throw new Error('sink unavailable');
+    });
+    await expect(
+      proveCanonicalMembership({
+        ...nativeOptions(async () => ok(payload())),
+        expectedHeadOid: HEAD,
+        expectedEntryId: ENTRY_ID,
+        now: () => NaN,
+        observe,
+      })
+    ).resolves.toMatchObject({ entryId: ENTRY_ID });
+    expect(observe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failedPredicates: [],
+        observedAt: null,
+        observationIssues: expect.arrayContaining(['observedTimestamp']),
+      })
+    );
+  });
+
+  it('does not treat equal-second timestamps as proof of a particular operation', async () => {
+    const value = payload();
+    value.data.repository.pullRequest.timelineItems.nodes[0].id =
+      'opaque-event-not-an-entry-id';
+    // API has no event-to-entry key; direct current entry identity is authority.
+    await expect(prove(value)).resolves.toMatchObject({ entryId: ENTRY_ID });
+    value.data.repository.pullRequest.mergeQueueEntry.id =
+      'different-current-entry';
+    await expect(prove(value)).rejects.toMatchObject({
+      code: 'queue_membership_changed',
+    });
+  });
+
+  it('formats bounded raw predicate fields without body, credentials or API payload', async () => {
+    const value = payload();
+    Object.assign(value.data.repository.pullRequest, {
+      body: 'BODY_SECRET',
+      title: 'TITLE_SECRET',
+      token: 'TOKEN_SECRET',
+    });
+    value.data.repository.pullRequest.timelineItems.nodes[0].actor.login =
+      'x'.repeat(1000);
+    let failure;
+    try {
+      await prove(value);
+    } catch (error) {
+      failure = error;
+    }
+    const output = formatBackendFailure(failure);
+    expect(output).toContain('eventBotLogin');
+    expect(output).toContain('jovie-canonical-membership-failure/v1');
+    expect(output).not.toMatch(/BODY_SECRET|TITLE_SECRET|TOKEN_SECRET/);
+    const receipt = JSON.parse(output.trim().split('\n')[1]);
+    expect(receipt.eventActorLogin).toHaveLength(256);
+    expect(receipt).toMatchObject({
+      expectedHead: HEAD,
+      expectedEntryId: ENTRY_ID,
+      entryId: ENTRY_ID,
+      enqueuedAt: QUEUE_ENTRY.enqueuedAt,
+      createdAt: QUEUE_ENTRY.enqueuedAt,
+      observedAt,
+    });
+    expect(
+      formatBackendFailure(
+        Object.assign(new Error('ordinary failure'), {
+          details: { token: 'TOKEN_SECRET' },
+        })
+      )
+    ).toBe('merge-queue-backend: ordinary failure\n');
+  });
+});
+
+it('real prove-admission CLI emits only the sanitized failed-predicate receipt', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'membership-failure-cli-'));
+  const value = canonicalMembership(
+    prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY })
+  );
+  value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
+    '2026-07-14T23:59:59Z';
+  Object.assign(value.data.repository.pullRequest, {
+    body: 'BODY_SECRET',
+    token: 'TOKEN_SECRET',
+  });
+  writeFileSync(join(directory, 'payload.json'), JSON.stringify(value));
+  writeFileSync(
+    join(directory, 'gh'),
+    '#!/bin/sh\ncat "$MEMBERSHIP_TEST_PAYLOAD"\n'
+  );
+  chmodSync(join(directory, 'gh'), 0o755);
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        resolve(REPO_ROOT, 'scripts/merge-queue-backend.mjs'),
+        'prove-admission',
+        '14359',
+        HEAD,
+        ENTRY_ID,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${directory}:${process.env.PATH}`,
+          MEMBERSHIP_TEST_PAYLOAD: join(directory, 'payload.json'),
+          MERGE_QUEUE_BACKEND: 'native',
+          REPO: REPOSITORY,
+        },
+      }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    const receipt = JSON.parse(result.stderr.trim().split('\n')[1]);
+    expect(receipt.failedPredicates).toEqual(['eventNotBeforeEntry']);
+    expect(receipt.predicates.currentEntry).toBe(true);
+    expect(result.stderr).not.toMatch(/BODY_SECRET|TOKEN_SECRET/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
