@@ -1,6 +1,6 @@
 {
   "name": "@jovie/auth-routing",
-  "version": "26.8.2",
+  "version": "26.9.0",
   "private": true,
   "type": "module",
   "main": "./index.ts",
