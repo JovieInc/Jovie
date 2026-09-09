@@ -57,7 +57,12 @@ jobs:
           GIT_BRANCH: e2e-weekly
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      - name: Setup Playwright (Chromium)
+        if: matrix.browser == 'chromium'
+        uses: ./.github/actions/setup-playwright
+
       - name: Cache Playwright Browsers
+        if: matrix.browser == 'firefox'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
@@ -66,12 +71,8 @@ jobs:
             ${{ runner.os }}-playwright-${{ matrix.browser }}-
 
       - name: Install Playwright (${{ matrix.browser }})
-        run: |
-          if [ "${{ matrix.browser }}" = "chromium" ]; then
-            pnpm --filter=@jovie/web exec playwright install chromium --with-deps
-          else
-            pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps
-          fi
+        if: matrix.browser == 'firefox'
+        run: pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps
 
       - name: Run E2E tests (${{ matrix.browser }})
         run: |
