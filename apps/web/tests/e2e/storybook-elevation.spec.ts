@@ -451,6 +451,72 @@ test.describe('desktop header shares the traffic-light row', () => {
       }
     });
   }
+  test('headerless media routes retain a window-control safe area', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 760 });
+    await page.addInitScript(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.documentElement.dataset.desktopRuntime = 'electron';
+      });
+    });
+    await openStory(
+      page,
+      'organisms-appshellframe--route-owned-header',
+      'light'
+    );
+    const control = (await page
+      .getByTestId('electron-sidebar-toggle')
+      .boundingBox())!;
+    const action = (await page
+      .getByRole('button', { name: 'Route header action' })
+      .boundingBox())!;
+    expect(action.y).toBeGreaterThanOrEqual(control.y + control.height);
+  });
+  for (const width of [1200, 390]) {
+    test(`Settings title shares native band at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 760 });
+      await page.addInitScript(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.documentElement.dataset.desktopRuntime = 'electron';
+        });
+      });
+      await openStory(
+        page,
+        'organisms-appshellframe--settings-header-alignment',
+        'light'
+      );
+      const toggle = page.getByTestId('electron-sidebar-toggle');
+      const heading = page.getByRole('heading', {
+        name: 'Account',
+        exact: true,
+      });
+      await expect(heading).toHaveCount(1);
+      const verify = async () => {
+        const title = (await heading.boundingBox())!;
+        const control = (await toggle.boundingBox())!;
+        expect(
+          Math.abs(title.y + title.height / 2 - control.y - control.height / 2)
+        ).toBeLessThanOrEqual(2);
+        expect(title.x).toBeGreaterThanOrEqual(200);
+        expect(
+          await heading.evaluate(el => el.scrollWidth <= el.clientWidth)
+        ).toBe(true);
+        await expect(
+          page.getByText('Security, theme, and notifications.')
+        ).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+      };
+      await verify();
+      if (width > 1024) {
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-label', 'Expand sidebar');
+        await verify();
+      }
+    });
+  }
   test('browser retains its normal page header', async ({ page }) => {
     await openStory(page, 'organisms-appshellframe--header-alignment', 'light');
     await expect(page.getByTestId('electron-titlebar-row')).toBeHidden();
@@ -462,7 +528,31 @@ test.describe('desktop header shares the traffic-light row', () => {
   });
 });
 
-test.describe('central runtime notifications', () => {
+test.describe('one sidebar Inbox and notification destination', () => {
+  for (const theme of THEMES) {
+    test(`brand bell and search share one row [${theme}]`, async ({ page }) => {
+      await openStory(page, 'organisms-unifiedsidebar--dashboard', theme);
+      const row = page.locator('[data-sidebar-brand-row]');
+      const inbox = page.getByRole('link', { name: /Inbox —/ });
+      const search = page.getByRole('button', { name: 'Search Jovie' });
+      await expect(inbox).toHaveAttribute('href', '/app');
+      await expect(search).toHaveCount(1);
+      await expect(row).toContainText('Jovie');
+      const bellBox = (await inbox.boundingBox())!;
+      const searchBox = (await search.boundingBox())!;
+      expect(Math.abs(bellBox.y - searchBox.y)).toBeLessThanOrEqual(1);
+      expect(searchBox.x).toBeGreaterThan(bellBox.x);
+      await expect(
+        page.getByRole('link', { name: 'Inbox', exact: true })
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole('link', { name: 'Calendar', exact: true })
+      ).toBeVisible();
+      await expect(page.locator('[data-sidebar="notifications"]')).toHaveCount(
+        0
+      );
+    });
+  }
   test('desktop update stays pending and is actionable in Inbox', async ({
     page,
   }) => {

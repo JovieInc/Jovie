@@ -111,6 +111,21 @@ html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
   padding-top: var(--electron-titlebar-height);
 }
 
+/* Headerless media routes retain a safe area below window controls. */
+html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]:not(
+    :has([data-top-spacing-owner="shell-header"])
+  )
+  [data-app-shell-content-column="true"] {
+  padding-top: var(--electron-titlebar-height);
+}
+
+/* Settings now supplies the shared desktop header inside its route panel. */
+html[data-desktop-runtime="electron"] [data-testid="settings-shell-content"]
+  > div {
+  padding-top: 0;
+  padding-inline: 0;
+}
+
 html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
   > div {
