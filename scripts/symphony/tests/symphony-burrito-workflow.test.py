@@ -306,6 +306,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("symphony-elixir-logs", UNIT)
         self.assertIn("symphony-official-runtime run", UNIT)
         self.assertIn("--max-gate-sleep-seconds 3900", UNIT)
+        self.assertNotIn("--closure-observe-only", UNIT)
         self.assertNotIn("ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate", UNIT)
         self.assertIn(
             "--i-understand-that-this-will-be-running-without-the-usual-guardrails",
@@ -818,6 +819,27 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
             self.assertFalse(result["ok"])
             self.assertIn("unit_missing_closure_stop_line_gate", result["errors"])
+
+            observe_only = pathlib.Path(tmp) / "observe-only.service"
+            observe_only.write_text(
+                UNIT.replace(
+                    f"{flag} ",
+                    f"{flag} --closure-observe-only ",
+                ),
+                encoding="utf-8",
+            )
+            observe_result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=observe_only,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(observe_result["ok"])
+            self.assertIn(
+                "unit_closure_stop_line_observe_only",
+                observe_result["errors"],
+            )
 
     def test_closure_stop_line_red_receipt_holds_new_admission(self):
         helper = _load_helper()

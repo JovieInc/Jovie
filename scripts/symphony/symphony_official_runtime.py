@@ -570,6 +570,8 @@ def validate_source(
             errors.append("unit_missing_rate_limit_sleep_bound")
         if "--closure-gate-file" not in unit:
             errors.append("unit_missing_closure_stop_line_gate")
+        if "--closure-observe-only" in unit:
+            errors.append("unit_closure_stop_line_observe_only")
         if "ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate" in unit:
             errors.append("unit_uses_tight_restart_rate_limit_gate")
         if (
