@@ -255,7 +255,7 @@
     "@tiptap/extension-placeholder": "3.30.4",
     "@tiptap/pm": "3.30.4",
     "@tiptap/react": "3.31.3",
-    "@tiptap/starter-kit": "3.30.4",
+    "@tiptap/starter-kit": "3.31.3",
     "@types/ws": "^8.18.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.3",
