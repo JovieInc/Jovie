@@ -992,8 +992,10 @@ jobs:
           ./node_modules/.bin/vercel inspect "$production_deploy_id" \
             --wait --timeout 15m "${scope_args[@]}" ||
             inspect_wait_status=$?
-          if ! production_deploy_json="$(./node_modules/.bin/vercel inspect \
-            "$production_deploy_id" --format=json \
+          # inspect --format=json omits meta in Vercel 56.3.2. Read the full
+          # authenticated deployment record for the unchanged provenance checks.
+          if ! production_deploy_json="$(./node_modules/.bin/vercel api \
+            "/v13/deployments/$production_deploy_id" --method GET --raw \
             "${scope_args[@]}")" ||
             ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$production_deploy_json"; then
             fail_stage "Unable to inspect the staged production deployment." staged_production_not_ready

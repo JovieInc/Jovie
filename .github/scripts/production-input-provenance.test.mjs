@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -20,6 +21,88 @@ import {
   compareSources,
   sourceSnapshot,
 } from './production-input-provenance.mjs';
+
+test('workflow reads deployment API metadata before binding rather than the inspect display projection', t => {
+  const f = fixture(t);
+  const workflow = readFileSync(
+    new URL('../workflows/production-release.yml', import.meta.url),
+    'utf8'
+  );
+  const start = workflow.indexOf('          if ! production_deploy_json=');
+  const end = workflow.indexOf('          inspected_id=', start);
+  assert.ok(start >= 0 && end > start);
+  const readDeployment = workflow.slice(start, end);
+  const bin = resolve(f.root, 'node_modules/.bin');
+  mkdirSync(bin, { recursive: true });
+  const cli = resolve(bin, 'vercel');
+  const argvPath = resolve(f.base, 'argv.json');
+  const responsePath = resolve(f.base, 'api-response.json');
+  // Vercel 56.3.2 inspect --format=json is a display projection with no meta.
+  // The authenticated GET returns the actual metadata-bearing deployment.
+  writeFileSync(
+    cli,
+    `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.writeFileSync(${JSON.stringify(argvPath)}, JSON.stringify(args));
+const deployment = JSON.parse(fs.readFileSync(${JSON.stringify(responsePath)}, 'utf8'));
+if (args[0] === 'inspect') delete deployment.meta;
+else if (JSON.stringify(args) !== JSON.stringify(['api', '/v13/deployments/dpl_fixture123', '--method', 'GET', '--raw', '--scope', 'fixture-team'])) process.exit(2);
+process.stdout.write(JSON.stringify(deployment));
+`
+  );
+  chmodSync(cli, 0o755);
+  captureInputs(f.root, f.sha, f.input);
+  f.makeOutput();
+  const receipt = captureArtifact(f.root, f.sha, f.input, f.artifact);
+  const deployment = f.ready(receipt);
+  writeFileSync(responsePath, JSON.stringify(deployment));
+  const inspected = JSON.parse(
+    execFileSync(
+      'bash',
+      [
+        '-c',
+        `
+set -euo pipefail
+production_deploy_id=dpl_fixture123
+scope_args=(--scope fixture-team)
+fail_stage() { exit 1; }
+${readDeployment}
+printf '%s' "$production_deploy_json"
+`,
+      ],
+      { cwd: f.root, encoding: 'utf8' }
+    )
+  );
+  const bound = bindDeployment(f.root, f.sha, f.artifact, inspected, f.bound);
+  assert.equal(bound.deployment.id, deployment.id);
+  assert.equal(bound.artifactReceiptDigest, receipt.digest);
+  assert.deepEqual(JSON.parse(readFileSync(argvPath, 'utf8')), [
+    'api',
+    '/v13/deployments/dpl_fixture123',
+    '--method',
+    'GET',
+    '--raw',
+    '--scope',
+    'fixture-team',
+  ]);
+  for (const meta of [
+    undefined,
+    { ...deployment.meta, jovieInputReceipt: '0'.repeat(64) },
+  ]) {
+    assert.throws(
+      () =>
+        bindDeployment(
+          f.root,
+          f.sha,
+          f.artifact,
+          { ...inspected, meta },
+          f.bound
+        ),
+      /Deployment provenance mismatch/
+    );
+  }
+});
 
 function fixture(t) {
   const base = mkdtempSync(resolve(tmpdir(), 'jovie-input-proof-'));
