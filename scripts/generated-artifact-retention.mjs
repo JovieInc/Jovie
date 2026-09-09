@@ -21,6 +21,7 @@ const PROFILE_RUN_ROOTS = [
   {
     completionJson: {
       expectedValue: true,
+      failedValues: [false],
       property: 'passed',
       relativePath: 'summary.json',
     },
@@ -239,16 +240,16 @@ async function inspectTree(root) {
 async function planTechDebtReports(repoRoot) {
   const root = path.join(repoRoot, '.tech-debt');
   const rootStats = await lstatOrNull(root);
-  if (!rootStats) return { candidates: [], eligible: 0, retained: 0 };
+  if (!rootStats) return { candidates: [], debt: [], eligible: 0, retained: 0 };
   if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
     console.warn('  Preserved .tech-debt because it is not a real directory');
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const rootRealPath = await realpath(root);
   if (!isDescendant(repoRoot, rootRealPath)) {
     console.warn('  Preserved .tech-debt because it resolves outside the repo');
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const reports = [];
@@ -271,6 +272,7 @@ async function planTechDebtReports(repoRoot) {
   reports.sort((left, right) => right.name.localeCompare(left.name));
   return {
     candidates: reports.slice(TECH_DEBT_REPORT_LIMIT),
+    debt: [],
     eligible: reports.length,
     retained: Math.min(reports.length, TECH_DEBT_REPORT_LIMIT),
   };
@@ -291,7 +293,15 @@ async function inspectCompletionEvidence(target, config) {
       ) {
         return 'complete';
       }
-      return config.completionJson.nonMatchingState ?? 'failed';
+      if (
+        config.completionJson.failedValues?.includes(
+          parsed?.[config.completionJson.property]
+        )
+      ) {
+        return 'failed';
+      }
+      // A parseable marker with an unknown/running value is not a failed run.
+      return 'absent';
     }
   }
 
@@ -350,12 +360,12 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
   } = config;
   const root = path.join(repoRoot, relativeRoot);
   const rootStats = await lstatOrNull(root);
-  if (!rootStats) return { candidates: [], eligible: 0, retained: 0 };
+  if (!rootStats) return { candidates: [], debt: [], eligible: 0, retained: 0 };
   if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
     console.warn(
       `  Preserved ${relativeRoot} because it is not a real directory`
     );
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const rootRealPath = await realpath(root);
@@ -363,7 +373,7 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
     console.warn(
       `  Preserved ${relativeRoot} because it resolves outside the repo`
     );
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   let currentPaths;
@@ -373,7 +383,7 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
     console.warn(
       `  Preserved ${relativeRoot} after current-pointer error: ${error.message}`
     );
-    return { candidates: [], eligible: 0, retained: 0 };
+    return { candidates: [], debt: [], eligible: 0, retained: 0 };
   }
 
   const completed = [];
@@ -469,12 +479,9 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
       right.name.localeCompare(left.name)
   );
   return {
-    candidates: [
-      ...completed.slice(limit),
-      ...failed.slice(failedLimit),
-      ...staleIncomplete,
-    ],
-    eligible: completed.length + failed.length + staleIncomplete.length,
+    candidates: [...completed.slice(limit), ...failed.slice(failedLimit)],
+    debt: staleIncomplete,
+    eligible: completed.length + failed.length,
     retained:
       Math.min(completed.length, limit) + Math.min(failed.length, failedLimit),
   };
@@ -482,6 +489,14 @@ export async function planCompletedRuns(repoRoot, config, nowMs) {
 
 export async function validateApplyCandidates(candidates, nowMs) {
   for (const candidate of candidates) {
+    if (
+      candidate.kind === 'directory' &&
+      !['complete', 'failed'].includes(candidate.completionState)
+    ) {
+      throw new Error(
+        `Refusing run without terminal completion evidence: ${candidate.path}`
+      );
+    }
     const currentStats = await lstat(candidate.path);
     if (
       currentStats.isSymbolicLink() ||
@@ -557,7 +572,12 @@ async function main() {
   const candidates = plans.flatMap(plan => plan.candidates);
   for (const plan of plans) {
     console.log(
-      `  ${plan.label}: eligible=${plan.eligible} retained=${plan.retained} ${mode === 'apply' ? 'remove' : 'would-remove'}=${plan.candidates.length}`
+      `  ${plan.label}: eligible=${plan.eligible} retained=${plan.retained} debt=${plan.debt?.length ?? 0} ${mode === 'apply' ? 'remove' : 'would-remove'}=${plan.candidates.length}`
+    );
+  }
+  for (const debt of plans.flatMap(plan => plan.debt ?? [])) {
+    console.log(
+      `  Cleanup debt ${path.relative(repoRealPath, debt.path)} (${debt.bytes} bytes): missing terminal completion evidence, preserved`
     );
   }
   for (const candidate of candidates) {

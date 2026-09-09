@@ -62,8 +62,23 @@ const SUMMER_SHADOW_PACK: EvePilotPack = {
   canReadGbrain: false,
   canGovernorAdmit: true,
   canGovernorRoute: true,
-  canGovernorEnforce: true,
+  canGovernorEnforce: false,
 };
+
+export function summerGovernorEnforceEnabled(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  return environment.SUMMER_GOVERNOR_ENFORCE_ENABLED?.trim() === 'true';
+}
+
+function buildSummerShadowPack(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): EvePilotPack {
+  return {
+    ...SUMMER_SHADOW_PACK,
+    canGovernorEnforce: summerGovernorEnforceEnabled(environment),
+  };
+}
 
 function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
   switch (capability) {
@@ -86,8 +101,12 @@ function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
   }
 }
 
-export function bindEvePilotIdentity(id: EvePilotIdentityId) {
-  const pack = id === 'summer' ? SUMMER_SHADOW_PACK : JOVIE_PACK;
+export function bindEvePilotIdentity(
+  id: EvePilotIdentityId,
+  environment: Readonly<Record<string, string | undefined>> = process.env
+) {
+  const pack =
+    id === 'summer' ? buildSummerShadowPack(environment) : JOVIE_PACK;
   const instructionPath = resolve(root, 'identities', id, 'instructions.md');
   const instructions = existsSync(instructionPath)
     ? readFileSync(instructionPath, 'utf8')

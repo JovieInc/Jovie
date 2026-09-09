@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import {
   buildNativeQueuePolicyReadback,
   isPendingNativeCohortCutoverField,
+  isSupportedNativeBuildConcurrency,
   mergeNativeQueuePolicyObservations,
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
@@ -40,9 +41,11 @@ const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'UNMERGEABLE',
   'LOCKED',
 ]);
+const UTC_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
 const INVENTORY_PAGE_SIZE = 30;
-const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
+const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position enqueuedAt } autoMergeRequest { enabledAt }`;
 const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
@@ -70,6 +73,8 @@ const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
   'draft-only',
 ]);
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
+// Event enqueuer uses the app's [bot] login; actor/entry enqueuer use Bot.login.
+const CANONICAL_MEMBERSHIP_QUERY = `query MergeQueueCanonicalMembership($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS} mergeQueueEntry{enqueuer{__typename login}} timelineItems(last:1,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{id createdAt actor{__typename login} enqueuer{login}}} pageInfo{hasNextPage}}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
@@ -343,6 +348,7 @@ export function validateNativePreflightEvidence({
       Object.entries(NATIVE_QUEUE_POLICY).map(([field, expected]) => [
         `merge_queue ${field} must be ${expected}`,
         mergeQueue[field] === expected ||
+          isSupportedNativeBuildConcurrency(field, mergeQueue[field]) ||
           isPendingNativeCohortCutoverField(field),
       ])
     ),
@@ -373,7 +379,9 @@ export function validateNativePreflightEvidence({
   }
   const policyReadback = buildNativeQueuePolicyReadback(mergeQueue);
   const blockingDrift = policyReadback.drift.filter(
-    field => !isPendingNativeCohortCutoverField(field)
+    field =>
+      !isPendingNativeCohortCutoverField(field) &&
+      !isSupportedNativeBuildConcurrency(field, mergeQueue[field])
   );
   if (blockingDrift.length > 0) {
     errors.push(
@@ -547,11 +555,13 @@ function normalizeNativePullRequest(pr) {
     (typeof pr.mergeQueueEntry?.id !== 'string' ||
       !NATIVE_QUEUE_ENTRY_STATES.has(pr.mergeQueueEntry?.state) ||
       !Number.isInteger(pr.mergeQueueEntry?.position) ||
-      pr.mergeQueueEntry.position < 1)
+      pr.mergeQueueEntry.position < 1 ||
+      typeof pr.mergeQueueEntry?.enqueuedAt !== 'string' ||
+      !UTC_TIMESTAMP_PATTERN.test(pr.mergeQueueEntry.enqueuedAt))
   ) {
     throw backendError(
       'incomplete_queue_state',
-      'Native mergeQueueEntry is missing its id, recognized state, or positive position'
+      'Native mergeQueueEntry is missing its id, recognized state, positive position, or enqueuedAt timestamp'
     );
   }
   const hasAuthoritativeQueueEntry = Boolean(
@@ -723,6 +733,22 @@ export function canAcceptExactHeadQueueReceipt(state, expectedHeadOid) {
 
 export function enrollmentPostcondition(state, expectedHeadOid) {
   return canAcceptExactHeadQueueReceipt(state, expectedHeadOid);
+}
+
+// ponytail: GitHub retains pending intent until required checks pass. It is
+// never queue membership and needs no compensating disable/re-enroll loop.
+function hasPendingAutoMergeIntent(state, expectedHeadOid) {
+  return Boolean(
+    state?.backend === 'native' &&
+      state.state === 'OPEN' &&
+      state.isDraft === false &&
+      state.headRefOid?.toLowerCase() === expectedHeadOid &&
+      hardHoldLabels(state).length === 0 &&
+      state.isInMergeQueue === false &&
+      state.mergeQueueEntry === null &&
+      UTC_TIMESTAMP_PATTERN.test(state.autoMergeRequest?.enabledAt ?? '') &&
+      Number.isFinite(Date.parse(state.autoMergeRequest.enabledAt))
+  );
 }
 
 /**
@@ -983,6 +1009,149 @@ export async function proveExactHeadQueueReceipt({
   };
 }
 
+/** Re-read the observed entry and its event together before certifying admission. */
+export async function proveCanonicalMembership({
+  backend,
+  repository = DEFAULT_REPOSITORY,
+  number,
+  expectedHeadOid,
+  expectedEntryId,
+  runner = createGhRunner(),
+  now = Date.now,
+  observe = evidence => process.stderr.write(`${JSON.stringify(evidence)}\n`),
+}) {
+  requireNativeBackend(backend);
+  const expectedHead = parseExpectedHeadOid(expectedHeadOid);
+  if (typeof expectedEntryId !== 'string' || expectedEntryId.length === 0) {
+    throw backendError(
+      'invalid_queue_entry',
+      'An observed queue entry ID is required'
+    );
+  }
+  const payload = assertGraphqlResponse(
+    await runGhJson(
+      runner,
+      graphqlArgs(
+        CANONICAL_MEMBERSHIP_QUERY,
+        {
+          ...parseRepositorySlug(repository),
+          number: parsePullRequestNumber(number),
+        },
+        { typed: ['number'] }
+      ),
+      'verifying canonical queue membership'
+    ),
+    'verifying canonical queue membership'
+  );
+  const observedAt = now();
+  const pr = payload?.data?.repository?.pullRequest;
+  const state = normalizeNativePullRequest(pr ?? {});
+  const timeline = pr.timelineItems;
+  const event = timeline?.nodes?.[0];
+  const entryTime = Date.parse(state.mergeQueueEntry?.enqueuedAt ?? '');
+  const eventTime = Date.parse(event?.createdAt ?? '');
+  // Ownership comes from the pinned current entry's native Bot identity.
+  // The latest lifecycle event corroborates it; GitHub timestamps identify
+  // distinct object creations, not a unique enqueue-operation join key.
+  // Reject timestamps predating the current entry.
+  // Same-second or delayed old-event ambiguity cannot be resolved by this
+  // schema: ordering corroborates ownership, never a unique operation join.
+  const predicates = {
+    eligibleHead: canAcceptExactHeadQueueReceipt(state, expectedHead),
+    currentEntry: state.mergeQueueEntry?.id === expectedEntryId,
+    terminalPage: timeline?.pageInfo?.hasNextPage === false,
+    singleEvent: Array.isArray(timeline?.nodes) && timeline.nodes.length === 1,
+    addedEvent: event?.__typename === 'AddedToMergeQueueEvent',
+    eventId: typeof event?.id === 'string' && event.id.length > 0,
+    entryBotType: state.mergeQueueEntry?.enqueuer?.__typename === 'Bot',
+    entryBotLogin: state.mergeQueueEntry?.enqueuer?.login === 'jovie-bot',
+    eventBotType: event?.actor?.__typename === 'Bot',
+    eventBotLogin: event?.actor?.login === 'jovie-bot',
+    eventEnqueuer: event?.enqueuer?.login === CANONICAL_NATIVE_MUTATION_ACTOR,
+    entryTimestamp: Number.isFinite(entryTime),
+    eventTimestamp:
+      UTC_TIMESTAMP_PATTERN.test(event?.createdAt ?? '') &&
+      Number.isFinite(eventTime),
+    eventNotBeforeEntry: eventTime >= entryTime,
+  };
+  // New clock-based constraints qualify observationally over real admissions
+  // before enforcement. Host clock skew must not create a new delivery veto.
+  const observations = {
+    observedTimestamp: Number.isFinite(observedAt),
+    entryNotFuture: Number.isFinite(observedAt) && entryTime <= observedAt,
+    eventNotFuture: Number.isFinite(observedAt) && eventTime <= observedAt,
+  };
+  const observationIssues = Object.entries(observations)
+    .filter(([, passes]) => !passes)
+    .map(([name]) => name);
+  const failedPredicates = Object.entries(predicates)
+    .filter(([, passes]) => !passes)
+    .map(([name]) => name);
+  // Explicit scalar allowlist: never include PR body/title, tokens, raw API
+  // errors or unbounded objects in a CLI failure receipt.
+  const scalar = value =>
+    typeof value === 'string'
+      ? value.slice(0, 256)
+      : typeof value === 'boolean' ||
+          (typeof value === 'number' && Number.isFinite(value))
+        ? value
+        : null;
+  const evidence = {
+    schema:
+      failedPredicates.length > 0
+        ? 'jovie-canonical-membership-failure/v1'
+        : 'jovie-canonical-membership-observation/v1',
+    observedAt: scalar(observedAt),
+    failedPredicates,
+    predicates,
+    observations,
+    observationIssues,
+    expectedHead: scalar(expectedHead),
+    expectedEntryId: scalar(expectedEntryId),
+    head: scalar(pr.headRefOid),
+    pullRequestState: scalar(state.state),
+    isDraft: scalar(state.isDraft),
+    isInMergeQueue: scalar(state.isInMergeQueue),
+    hardHolds: hardHoldLabels(state),
+    entryState: scalar(state.mergeQueueEntry?.state),
+    entryPosition: scalar(state.mergeQueueEntry?.position),
+    entryId: scalar(state.mergeQueueEntry?.id),
+    enqueuedAt: scalar(state.mergeQueueEntry?.enqueuedAt),
+    entryActorType: scalar(state.mergeQueueEntry?.enqueuer?.__typename),
+    entryActorLogin: scalar(state.mergeQueueEntry?.enqueuer?.login),
+    eventId: scalar(event?.id),
+    eventType: scalar(event?.__typename),
+    createdAt: scalar(event?.createdAt),
+    eventActorType: scalar(event?.actor?.__typename),
+    eventActorLogin: scalar(event?.actor?.login),
+    eventEnqueuerLogin: scalar(event?.enqueuer?.login),
+    hasNextPage: scalar(timeline?.pageInfo?.hasNextPage),
+    eventCount: Array.isArray(timeline?.nodes) ? timeline.nodes.length : null,
+  };
+  if (failedPredicates.length > 0) {
+    const membershipChanged =
+      !predicates.eligibleHead || !predicates.currentEntry;
+    throw backendError(
+      membershipChanged
+        ? 'queue_membership_changed'
+        : 'noncanonical_queue_membership',
+      membershipChanged
+        ? 'Queue entry or eligible source head changed before admission receipt'
+        : 'Queue entry lacks a matching Jovie Bot admission event',
+      { membershipEvidence: evidence }
+    );
+  }
+  if (observationIssues.length > 0) {
+    // Observation delivery itself must remain nonblocking.
+    try {
+      observe(evidence);
+    } catch {
+      /* No new admission gate. */
+    }
+  }
+  return { state, eventId: event.id, entryId: expectedEntryId };
+}
+
 export function dequeuePostcondition(state) {
   return Boolean(
     state?.backend === 'native' &&
@@ -1091,9 +1260,23 @@ export async function enrollPullRequest({
   const before = await readPullRequestQueueState(stateOptions);
   assertEnrollCandidate(before, expectedHead);
   if (enrollmentPostcondition(before, expectedHead)) {
+    await proveCanonicalMembership({
+      ...stateOptions,
+      expectedHeadOid: expectedHead,
+      expectedEntryId: before.mergeQueueEntry.id,
+    });
     return {
       backend: resolvedBackend,
       changed: false,
+      mutationActor,
+      state: before,
+    };
+  }
+  if (hasPendingAutoMergeIntent(before, expectedHead)) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      disposition: 'auto-merge-pending',
       mutationActor,
       state: before,
     };
@@ -1118,11 +1301,26 @@ export async function enrollPullRequest({
     wait,
   });
   if (enrollmentPostcondition(observation.state, expectedHead)) {
+    await proveCanonicalMembership({
+      ...stateOptions,
+      expectedHeadOid: expectedHead,
+      expectedEntryId: observation.state.mergeQueueEntry.id,
+    });
     return {
       backend: resolvedBackend,
       changed: true,
       mutationActor,
       postconditionAttempts: observation.attempts,
+      reconciledAfterCommandError: Boolean(mutationError),
+      state: observation.state,
+    };
+  }
+  if (hasPendingAutoMergeIntent(observation.state, expectedHead)) {
+    return {
+      backend: resolvedBackend,
+      changed: true,
+      disposition: 'auto-merge-pending',
+      mutationActor,
       reconciledAfterCommandError: Boolean(mutationError),
       state: observation.state,
     };
@@ -1156,6 +1354,7 @@ async function runGraphqlMutation(runner, query, variables, description) {
  *   backend?: string,
  *   repository?: string,
  *   number?: string | number,
+ *   expectedHeadOid?: string,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  * }} [input]
@@ -1164,11 +1363,14 @@ export async function dequeuePullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
   number,
+  expectedHeadOid,
   runner = createGhRunner(),
   mutationRunner = runner,
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
+  const expectedHead =
+    expectedHeadOid == null ? null : parseExpectedHeadOid(expectedHeadOid);
   const mutationActor =
     await assertCanonicalNativeMutationActor(mutationRunner);
   const stateOptions = {
@@ -1178,6 +1380,19 @@ export async function dequeuePullRequest({
     runner,
   };
   const before = await readPullRequestQueueState(stateOptions);
+  if (
+    expectedHead !== null &&
+    String(before.headRefOid ?? '').toLowerCase() !== expectedHead
+  ) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+      mutationActor,
+      state: before,
+    };
+  }
   if (dequeuePostcondition(before)) {
     return {
       backend: resolvedBackend,
@@ -1187,14 +1402,66 @@ export async function dequeuePullRequest({
     };
   }
 
+  let mutationBefore = before;
+  let guardedQueueEntry = null;
+  if (expectedHead !== null) {
+    if (!before.queued || before.mergeQueueEntry === null) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'queue-entry-changed',
+        mutationActor,
+        state: before,
+      };
+    }
+    guardedQueueEntry = {
+      id: before.mergeQueueEntry.id,
+      enqueuedAt: before.mergeQueueEntry.enqueuedAt,
+    };
+    mutationBefore = await readPullRequestQueueState(stateOptions);
+    if (
+      String(mutationBefore.headRefOid ?? '').toLowerCase() !== expectedHead
+    ) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'head-changed',
+        mutationActor,
+        guardedQueueEntry,
+        state: mutationBefore,
+      };
+    }
+    if (
+      !mutationBefore.queued ||
+      mutationBefore.mergeQueueEntry?.id !== guardedQueueEntry.id ||
+      mutationBefore.mergeQueueEntry?.enqueuedAt !==
+        guardedQueueEntry.enqueuedAt
+    ) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'queue-entry-changed',
+        mutationActor,
+        guardedQueueEntry,
+        state: mutationBefore,
+      };
+    }
+  }
+
   const mutationErrors = [];
-  if (before.isInMergeQueue || before.mergeQueueEntry !== null) {
+  if (
+    mutationBefore.isInMergeQueue ||
+    mutationBefore.mergeQueueEntry !== null
+  ) {
     try {
       // GitHub's DequeuePullRequestInput.id is the PullRequest node ID.
       await runGraphqlMutation(
         mutationRunner,
         DEQUEUE_PULL_REQUEST_MUTATION,
-        { id: before.id },
+        { id: mutationBefore.id },
         `dequeuing native PR #${parsedNumber}`
       );
     } catch (error) {
@@ -1203,6 +1470,16 @@ export async function dequeuePullRequest({
   }
 
   let current = await readPullRequestQueueState(stateOptions);
+  if (
+    expectedHead !== null &&
+    String(current.headRefOid ?? '').toLowerCase() !== expectedHead
+  ) {
+    throw backendError(
+      'dequeue_head_raced',
+      `PR #${parsedNumber} head changed during expected-head dequeue`,
+      { expectedHeadOid: expectedHead, guardedQueueEntry, state: current }
+    );
+  }
   if (current.autoMergeRequest !== null) {
     try {
       await runGraphqlMutation(
@@ -1217,11 +1494,23 @@ export async function dequeuePullRequest({
     current = await readPullRequestQueueState(stateOptions);
   }
 
+  if (
+    expectedHead !== null &&
+    String(current.headRefOid ?? '').toLowerCase() !== expectedHead
+  ) {
+    throw backendError(
+      'dequeue_head_raced',
+      `PR #${parsedNumber} head changed during expected-head dequeue`,
+      { expectedHeadOid: expectedHead, guardedQueueEntry, state: current }
+    );
+  }
+
   if (dequeuePostcondition(current)) {
     return {
       backend: resolvedBackend,
       changed: true,
       mutationActor,
+      ...(guardedQueueEntry === null ? {} : { guardedQueueEntry }),
       reconciledAfterCommandError: mutationErrors.length > 0,
       state: current,
     };
@@ -1294,6 +1583,13 @@ export async function runCli(
         promotionMode: args[2],
         enrollSlots: Number.parseInt(String(args[3]), 10),
       }),
+    'prove-admission': () =>
+      proveCanonicalMembership({
+        ...options,
+        number: args[0],
+        expectedHeadOid: args[1],
+        expectedEntryId: args[2],
+      }),
     'prove-receipt': () =>
       proveExactHeadQueueReceipt({
         ...options,
@@ -1313,6 +1609,13 @@ export async function runCli(
         number: args[0],
         mutationRunner: resolvedMutationRunner,
       }),
+    'dequeue-ineligible': () =>
+      dequeuePullRequest({
+        ...options,
+        number: args[0],
+        expectedHeadOid: args[1],
+        mutationRunner: resolvedMutationRunner,
+      }),
   };
   const usage = {
     preflight: [0, 'preflight takes no arguments'],
@@ -1321,14 +1624,22 @@ export async function runCli(
       4,
       'explain-selector requires <number> <headSha> <promotionMode> <enrollSlots>',
     ],
+    'prove-admission': [
+      3,
+      'prove-admission requires <number> <headSha> <entryId>',
+    ],
     'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
     enroll: [2, 'enroll requires <number> <headSha>'],
     dequeue: [1, 'dequeue requires <number>'],
+    'dequeue-ineligible': [
+      2,
+      'dequeue-ineligible requires <number> <expectedHeadSha>',
+    ],
   };
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|prove-admission|enroll|dequeue|dequeue-ineligible>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];
@@ -1340,7 +1651,9 @@ export async function runCli(
     throw backendError('usage', usageMessage);
   }
   if (
-    (command === 'enroll' || command === 'dequeue') &&
+    (command === 'enroll' ||
+      command === 'dequeue' ||
+      command === 'dequeue-ineligible') &&
     backend === 'native' &&
     !NATIVE_MUTATION_AUTHORIZATIONS.has(env.MERGE_QUEUE_NATIVE_AUTHORIZATION)
   ) {
@@ -1355,12 +1668,22 @@ export async function runCli(
   return result;
 }
 
+export function formatBackendFailure(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const evidence = error?.details?.membershipEvidence;
+  return (
+    `merge-queue-backend: ${message}\n` +
+    (evidence?.schema === 'jovie-canonical-membership-failure/v1'
+      ? `${JSON.stringify(evidence)}\n`
+      : '')
+  );
+}
+
 const isMain =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   runCli(process.argv.slice(2)).catch(error => {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`merge-queue-backend: ${message}\n`);
+    process.stderr.write(formatBackendFailure(error));
     process.exitCode = 1;
   });
 }

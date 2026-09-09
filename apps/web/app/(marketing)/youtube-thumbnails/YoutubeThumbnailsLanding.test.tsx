@@ -31,6 +31,37 @@ describe('YoutubeThumbnailsLanding (JOV-5862 lock)', () => {
     expect(primary).toHaveAttribute('data-primary-action', 'true');
     expect(screen.getByTestId('youtube-thumbnails-paste-form')).toBeVisible();
     const hero = screen.getByTestId('marketing-section-hero');
+    expect(hero.tagName).toBe('SECTION');
+    expect(hero).toHaveAttribute('data-marketing-variant', 'left-none');
+    expect(hero).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/marketing/MarketingHero.tsx'
+    );
+    const workflow = screen.getByTestId('marketing-section-how-it-works');
+    const safeguards = screen.getByTestId('marketing-section-feature-grid');
+    for (const section of [workflow, safeguards]) {
+      expect(section.tagName).toBe('SECTION');
+      expect(section).toHaveAttribute(
+        'data-marketing-owner',
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
+      );
+    }
+    expect(workflow).toHaveAttribute('data-marketing-variant', '3-step-strip');
+    expect(workflow.querySelectorAll('article')).toHaveLength(3);
+    expect(safeguards).toHaveAttribute(
+      'data-marketing-variant',
+      'two-column-text'
+    );
+    const included = screen.getByTestId('marketing-section-cta');
+    expect(included.tagName).toBe('SECTION');
+    expect(included).toHaveAttribute(
+      'data-marketing-variant',
+      'included-single'
+    );
+    expect(included).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
+    );
     expect(hero.querySelectorAll('a[href*="/signup"]')).toHaveLength(0);
     expect(screen.queryByText('$29')).toBeNull();
     expect(screen.queryByTestId('marketing-section-pricing')).toBeNull();

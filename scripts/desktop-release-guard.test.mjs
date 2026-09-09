@@ -2,11 +2,20 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
+  assertCommitDescendantCompare,
+  assertMainlineAncestorCompare,
   assertStagingVersionTransition,
   expectedDesktopAssetNames,
+  fetchRecoverableStagingDraft,
+  prepare,
+  releaseMetadataUpdate,
+  selectRecoverableStagingDraft,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
 import {
@@ -18,6 +27,17 @@ import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
+);
+const { notarizeReleaseDmg } = desktopRequire(
+  './scripts/notarize-release-dmg.cjs'
+);
+const desktopProductionBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.yml', import.meta.url),
+  'utf8'
+);
+const desktopStagingBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.staging.yml', import.meta.url),
+  'utf8'
 );
 const desktopWorkflow = readFileSync(
   new URL('../.github/workflows/desktop-release.yml', import.meta.url),
@@ -198,6 +218,388 @@ test('desktop builder can parse Electron macOS property lists', () => {
   );
 
   assert.deepEqual(parsed, { CFBundleName: 'Jovie' });
+});
+
+test('release DMG finalization signs, notarizes, staples, and refreshes updater metadata', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'jovie-release-dmg-'));
+  t.after(() => rm(dir, { force: true, recursive: true }));
+  const dmg = join(dir, 'Jovie-26.9.0-universal.dmg');
+  const blockmap = `${dmg}.blockmap`;
+  await writeFile(dmg, Buffer.from('pre-staple-dmg'));
+  await writeFile(blockmap, Buffer.from('stale-blockmap'));
+  const event = {
+    file: dmg,
+    updateInfo: {
+      sha512: hash(Buffer.from('pre-staple-dmg'), 'sha512', 'base64'),
+      size: Buffer.byteLength('pre-staple-dmg'),
+    },
+  };
+  const calls = [];
+
+  await notarizeReleaseDmg(event, {
+    environment: {
+      APPLE_API_ISSUER: 'issuer',
+      APPLE_API_KEY: '/tmp/private-key.p8',
+      APPLE_API_KEY_ID: 'key-id',
+      JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
+      JOVIE_RELEASE_DMG: 'true',
+    },
+    executeCodesign: async args => {
+      calls.push(['codesign', ...args]);
+      return { stdout: '' };
+    },
+    executeXcrun: async args => {
+      calls.push(['xcrun', ...args]);
+      if (args[0] === 'notarytool') {
+        return {
+          stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
+        };
+      }
+      if (args[1] === 'staple') await appendFile(dmg, '-ticket');
+      return { stdout: '' };
+    },
+  });
+
+  const finalBytes = await readFile(dmg);
+  assert.deepEqual(calls, [
+    ['codesign', '--force', '--timestamp', '--sign', 'developer-id-hash', dmg],
+    ['codesign', '--verify', '--verbose=2', dmg],
+    [
+      'xcrun',
+      'notarytool',
+      'submit',
+      dmg,
+      '--key',
+      '/tmp/private-key.p8',
+      '--key-id',
+      'key-id',
+      '--issuer',
+      'issuer',
+      '--wait',
+      '--timeout',
+      '20m',
+      '--output-format',
+      'json',
+    ],
+    ['xcrun', 'stapler', 'staple', dmg],
+    ['xcrun', 'stapler', 'validate', dmg],
+  ]);
+  assert.equal(event.updateInfo.size, finalBytes.length);
+  assert.equal(event.updateInfo.sha512, hash(finalBytes, 'sha512', 'base64'));
+  assert.notEqual(await readFile(blockmap, 'utf8'), 'stale-blockmap');
+});
+
+test('release DMG finalization fails closed before publishing incoherent artifacts', async t => {
+  const dmg = '/tmp/Jovie-Staging-26.8.3-staging.1.1-universal.dmg';
+  const accepted = async () => ({
+    stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
+  });
+  const codesignAccepted = async () => ({ stdout: '' });
+  const environment = {
+    APPLE_API_ISSUER: 'issuer',
+    APPLE_API_KEY: '/tmp/private-key.p8',
+    APPLE_API_KEY_ID: 'key-id',
+    JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
+    JOVIE_RELEASE_DMG: 'true',
+  };
+
+  await t.test('ignores non-DMG artifacts', async () => {
+    await notarizeReleaseDmg(
+      { file: `${dmg}.blockmap`, updateInfo: {} },
+      {
+        buildBlockMap: () => assert.fail('must not build'),
+        environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
+        executeXcrun: () => assert.fail('must not execute'),
+      }
+    );
+  });
+  await t.test('keeps ordinary CI packaging credential-free', async () => {
+    const updateInfo = { sha512: 'unchanged', size: 1 };
+    await notarizeReleaseDmg(
+      { file: dmg, updateInfo },
+      {
+        buildBlockMap: () => assert.fail('must not build'),
+        environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
+        executeXcrun: () => assert.fail('must not execute'),
+      }
+    );
+    assert.deepEqual(updateInfo, { sha512: 'unchanged', size: 1 });
+  });
+  await t.test('requires builder update metadata', async () => {
+    await assert.rejects(
+      notarizeReleaseDmg(
+        { file: dmg },
+        { buildBlockMap: assert.fail, environment, executeXcrun: accepted }
+      ),
+      /update metadata is missing/
+    );
+  });
+  await t.test('requires every notarization credential', async () => {
+    for (const [name, missingEnvironment] of [
+      ['issuer', { ...environment, APPLE_API_ISSUER: '' }],
+      ['signingIdentity', { ...environment, JOVIE_MAC_SIGNING_IDENTITY: '' }],
+    ]) {
+      await assert.rejects(
+        notarizeReleaseDmg(
+          { file: dmg, updateInfo: {} },
+          {
+            buildBlockMap: assert.fail,
+            environment: missingEnvironment,
+            executeCodesign: assert.fail,
+            executeXcrun: accepted,
+          }
+        ),
+        new RegExp(`credential is missing: ${name}`)
+      );
+    }
+  });
+  await t.test('requires an accepted structured Apple response', async () => {
+    for (const stdout of [
+      'not-json',
+      JSON.stringify({ id: 'submission', status: 'Invalid' }),
+      JSON.stringify({ id: '', status: 'Accepted' }),
+    ]) {
+      await assert.rejects(
+        notarizeReleaseDmg(
+          { file: dmg, updateInfo: {} },
+          {
+            buildBlockMap: assert.fail,
+            environment,
+            executeCodesign: codesignAccepted,
+            executeXcrun: async () => ({ stdout }),
+          }
+        ),
+        /not valid JSON|did not accept/
+      );
+    }
+  });
+  await t.test('stops before notarization when DMG signing fails', async () => {
+    await assert.rejects(
+      notarizeReleaseDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: assert.fail,
+          environment,
+          executeCodesign: async () => {
+            throw new Error('signing failed');
+          },
+          executeXcrun: assert.fail,
+        }
+      ),
+      /signing failed/
+    );
+  });
+  await t.test('requires final metadata for the stapled bytes', async () => {
+    await assert.rejects(
+      notarizeReleaseDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: async () => ({ sha512: '', size: 0 }),
+          environment,
+          executeCodesign: codesignAccepted,
+          executeXcrun: accepted,
+        }
+      ),
+      /update metadata is malformed/
+    );
+  });
+});
+
+test('release validation rejects a DMG mutated after updater metadata creation', () => {
+  const fixture = desktopReleaseFixture('staging');
+  const dmgName = fixture.release.assets.find(asset =>
+    asset.name.endsWith('.dmg')
+  ).name;
+  const finalDmg = Buffer.concat([
+    fixture.buffers.get(dmgName),
+    Buffer.from('-stapled-ticket'),
+  ]);
+  fixture.buffers.set(dmgName, finalDmg);
+  const asset = fixture.release.assets.find(item => item.name === dmgName);
+  asset.size = finalDmg.length;
+  asset.digest = `sha256:${hash(finalDmg, 'sha256', 'hex')}`;
+
+  assert.throws(
+    () => validateReleaseAssets({ ...fixture, draft: true }),
+    /Updater size does not match/
+  );
+});
+
+test('staging release metadata update restores the canonical rolling tag', () => {
+  const version = '26.8.3-staging.34302621597.1';
+  const releaseSha = 'a'.repeat(40);
+
+  assert.deepEqual(
+    releaseMetadataUpdate({
+      environment: 'staging',
+      releaseSha,
+      version,
+    }),
+    {
+      name: version,
+      prerelease: true,
+      tag_name: 'desktop-staging',
+      target_commitish: releaseSha,
+    }
+  );
+});
+
+function recoverableStagingDraft(overrides = {}) {
+  return {
+    assets: [],
+    draft: true,
+    id: 385137639,
+    name: '26.8.3-staging.34302621597.1',
+    prerelease: true,
+    published_at: null,
+    tag_name: 'untagged-84c451c95b383b6899b7',
+    target_commitish: 'a'.repeat(40),
+    ...overrides,
+  };
+}
+
+test('selects only a unique private empty staging-shaped orphan draft', () => {
+  const candidate = recoverableStagingDraft();
+  assert.equal(
+    selectRecoverableStagingDraft([
+      { ...candidate, id: 1, name: 'unrelated', tag_name: 'v1.0.0' },
+      candidate,
+    ]),
+    candidate
+  );
+  assert.equal(selectRecoverableStagingDraft([]), null);
+});
+
+test('rejects ambiguous or unsafe staging orphan drafts', () => {
+  const candidate = recoverableStagingDraft();
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        candidate,
+        recoverableStagingDraft({ id: 385137640 }),
+      ]),
+    /Multiple recoverable staging drafts/
+  );
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        recoverableStagingDraft({ assets: [{ id: 1 }] }),
+      ]),
+    /must be empty/
+  );
+  for (const unsafe of [
+    { draft: false, published_at: '2026-09-09T00:00:00Z' },
+    { prerelease: false },
+    { published_at: '2026-09-09T00:00:00Z' },
+  ]) {
+    assert.throws(
+      () => selectRecoverableStagingDraft([recoverableStagingDraft(unsafe)]),
+      /private prerelease draft/
+    );
+  }
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        recoverableStagingDraft({
+          name: '26.8.3-staging.not-a-run.1',
+        }),
+      ]),
+    /version is malformed/
+  );
+});
+
+test('rejects staging orphan ambiguity beyond the first release page', async () => {
+  const first = recoverableStagingDraft();
+  const second = recoverableStagingDraft({ id: 385137640 });
+  const unrelated = index => ({
+    id: index,
+    name: `release-${index}`,
+    tag_name: `v1.0.${index}`,
+  });
+  const pages = [
+    [first, ...Array.from({ length: 99 }, (_, index) => unrelated(index + 1))],
+    [second],
+  ];
+  const requested = [];
+
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async path => {
+        requested.push(path);
+        const page = Number(new URLSearchParams(path.slice(1)).get('page'));
+        return pages[page - 1] || [];
+      },
+      { maxPages: 3 }
+    ),
+    /Multiple recoverable staging drafts/
+  );
+  assert.deepEqual(requested, ['?per_page=100&page=1', '?per_page=100&page=2']);
+});
+
+test('fails closed when the bounded release inventory never completes', async () => {
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async () =>
+        Array.from({ length: 100 }, (_, index) => ({
+          id: index + 1,
+          name: `release-${index}`,
+          tag_name: `v1.0.${index}`,
+        })),
+      { maxPages: 2 }
+    ),
+    /inventory exceeds the 2-page safety bound/
+  );
+});
+
+test('prepare repairs an orphan staging draft before validating it', async () => {
+  const version = '26.8.3-staging.34302621597.1';
+  const releaseSha = 'b'.repeat(40);
+  const orphan = recoverableStagingDraft();
+  const repaired = {
+    ...orphan,
+    name: version,
+    tag_name: 'desktop-staging',
+    target_commitish: releaseSha,
+  };
+  const calls = [];
+  const client = {
+    recoverableStagingDraft: async () => {
+      calls.push('recover');
+      return orphan;
+    },
+    releaseById: async id => {
+      calls.push(`read:${id}`);
+      return repaired;
+    },
+    releaseOrDraftByTag: async () => null,
+    updateReleaseMetadata: async metadata => {
+      calls.push({ update: metadata });
+      return repaired;
+    },
+  };
+
+  await prepare({
+    client,
+    environment: 'staging',
+    installedVersion: '26.8.2',
+    releaseSha,
+    version,
+  });
+
+  assert.deepEqual(calls, [
+    'recover',
+    {
+      update: {
+        environment: 'staging',
+        releaseId: orphan.id,
+        releaseSha,
+        version,
+      },
+    },
+    `read:${orphan.id}`,
+  ]);
 });
 
 test('passes when no desktop files changed', () => {
@@ -646,7 +1048,13 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     'Cross-prove exact production evidence'
   );
   const build = job(desktopWorkflow, 'build');
+  const productionPackage = step(build, 'Package production desktop app');
+  const productionVerify = step(
+    build,
+    'Verify production desktop artifact set'
+  );
   const publish = step(build, 'Publish production desktop release');
+  const stagingPackage = step(build, 'Package staging desktop app');
   const stagingPublish = step(build, 'Publish staging desktop prerelease');
   const stagingVerify = step(build, 'Verify staging desktop artifact set');
   const stagingUpload = step(build, 'Upload staging desktop package');
@@ -663,10 +1071,12 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
+    /JOVIE_RELEASE_DMG: 'true'/,
     /package:production/,
     /sync-version\.mjs[\s\S]*--staging-version/,
     /Validate rolling staging prerelease/,
     /Require staging signing and notarization credentials/,
+    /JOVIE_MAC_SIGNING_IDENTITY=/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
     /dist\/staging-mac\.yml/,
@@ -676,14 +1086,47 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /desktop-release-assets\.mjs upload-and-publish/,
     /--dist "apps\/desktop\/dist"/,
   ]);
+  assertPatterns(stagingPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+  ]);
+  assertPatterns(productionPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+    /package:production/,
+  ]);
+  assertPatterns(productionVerify, [
+    /if: env\.ENVIRONMENT == 'production'/,
+    /codesign --verify --deep --strict "\$production_app"/,
+    /spctl --assess --type execute --verbose=2 "\$production_app"/,
+    /xcrun stapler validate "\$production_app"/,
+    /codesign --verify --verbose=2 "\$production_dmg"/,
+    /xcrun stapler validate "\$production_dmg"/,
+    /spctl --assess --type open --context context:primary-signature/,
+  ]);
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
     /staging-mac\.yml/,
     /retention-days: 7/,
   ]);
+  assert.match(
+    desktopStagingBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
+  );
+  assert.match(
+    desktopProductionBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
+  );
+  assert.doesNotMatch(
+    build,
+    /- name: Notarize and staple staging desktop image/
+  );
   assertPatterns(stagingPublish, [
-    /commits\/main/,
+    /compare\/\$RELEASE_SHA\.\.\.\$current_main_sha/,
+    /\.merge_base_commit\.sha == \$release/,
+    /\.commits[\s\S]*\.\[-1\]\.sha == \$current/,
+    /\.behind_by == 0/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /--environment staging/,
     /--version "\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
@@ -708,6 +1151,14 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   assert.ok(
     build.indexOf('Prepare private production draft') <
       build.indexOf('Package production desktop app')
+  );
+  assert.ok(
+    build.indexOf('- name: Package production desktop app') <
+      build.indexOf('- name: Verify production desktop artifact set')
+  );
+  assert.ok(
+    build.indexOf('- name: Verify production desktop artifact set') <
+      build.indexOf('- name: Publish production desktop release')
   );
   assert.ok(
     build.indexOf('Validate rolling staging prerelease') <
@@ -816,4 +1267,98 @@ test('staging release versions advance beyond installed and current-feed version
   ]) {
     assert.throws(() => assertStagingVersionTransition(input), message);
   }
+});
+
+test('staging mainline proof permits main advancement but rejects stale or diverged source', () => {
+  const releaseSha = 'a'.repeat(40);
+  const currentSha = 'b'.repeat(40);
+  const mainline = {
+    status: 'ahead',
+    ahead_by: 4,
+    behind_by: 0,
+    base_commit: { sha: releaseSha },
+    commits: [{ sha: 'c'.repeat(40) }, { sha: currentSha }],
+    merge_base_commit: { sha: releaseSha },
+  };
+
+  assert.doesNotThrow(() =>
+    assertMainlineAncestorCompare({
+      comparison: mainline,
+      currentMainSha: currentSha,
+      releaseSha,
+    })
+  );
+  assert.doesNotThrow(() =>
+    assertMainlineAncestorCompare({
+      comparison: {
+        ...mainline,
+        status: 'identical',
+        ahead_by: 0,
+        commits: [],
+      },
+      currentMainSha: releaseSha,
+      releaseSha,
+    })
+  );
+
+  assert.throws(
+    () =>
+      assertMainlineAncestorCompare({
+        comparison: mainline,
+        currentMainSha: currentSha,
+        releaseSha: 'short',
+      }),
+    /Release SHA is malformed/
+  );
+  assert.throws(
+    () =>
+      assertMainlineAncestorCompare({
+        comparison: mainline,
+        currentMainSha: 'short',
+        releaseSha,
+      }),
+    /Current main SHA is malformed/
+  );
+
+  for (const comparison of [
+    { ...mainline, status: 'behind', behind_by: 1 },
+    {
+      ...mainline,
+      status: 'diverged',
+      merge_base_commit: { sha: 'c'.repeat(40) },
+    },
+    { ...mainline, base_commit: { sha: 'c'.repeat(40) } },
+    { ...mainline, commits: [{ sha: 'c'.repeat(40) }] },
+  ]) {
+    assert.throws(
+      () =>
+        assertMainlineAncestorCompare({
+          comparison,
+          currentMainSha: currentSha,
+          releaseSha,
+        }),
+      /not a trusted ancestor/
+    );
+  }
+});
+
+test('staging publication proof rejects a candidate behind the published source', () => {
+  const publishedSha = 'b'.repeat(40);
+  const candidateSha = 'a'.repeat(40);
+  assert.throws(
+    () =>
+      assertCommitDescendantCompare({
+        ancestorSha: publishedSha,
+        comparison: {
+          status: 'behind',
+          ahead_by: 0,
+          behind_by: 1,
+          base_commit: { sha: candidateSha },
+          commits: [],
+          merge_base_commit: { sha: candidateSha },
+        },
+        descendantSha: candidateSha,
+      }),
+    /move backward or leave its published lineage/
+  );
 });

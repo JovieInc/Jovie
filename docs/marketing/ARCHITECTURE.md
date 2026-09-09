@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.2.0
+spec-version: 1.3.0
 doc-freshness: docs/marketing/ARCHITECTURE.md
 -->
 # Marketing Architecture
@@ -11,7 +11,7 @@ doc-freshness: docs/marketing/ARCHITECTURE.md
 > strategy. Agents: start at [`AGENT_GUIDE.md`](./AGENT_GUIDE.md) — it is the
 > marketing-domain entrypoint (≤400 lines), after `DESIGN.md`. This file is reference.
 
-spec-version: 1.2.0 · registry: `apps/web/data/marketing/index.ts` ·
+spec-version: 1.3.0 · registry: `apps/web/data/marketing/index.ts` ·
 historical charter: `.context/marketing-architecture/GOAL.md` (provenance only) ·
 reviews: CEO + Eng + Design + DX (all CLEAR, final gate A, 2026-07-06).
 

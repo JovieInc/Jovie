@@ -693,6 +693,9 @@ describe('automation-verify affected scope', () => {
       selectedTests: [],
       pythonUnittestTests: ['scripts/symphony/tests/gem-priority-gate.test.py'],
       scriptVitestTests: [
+        'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
+        'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
+        'scripts/lib/__tests__/native-queue-eval.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
@@ -700,6 +703,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+        'scripts/lib/__tests__/merge-queue-backend.test.mjs',
         'scripts/lib/__tests__/pre-land-changelog.test.mjs',
         'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',

@@ -709,5 +709,12 @@
       "tag": "0100_hesitant_demogoblin",
       "breakpoints": true
     }
+    ,{
+      "idx": 101,
+      "version": "7",
+      "when": 1788415600002,
+      "tag": "0101_canonical_release_communications",
+      "breakpoints": true
+    }
   ]
 }

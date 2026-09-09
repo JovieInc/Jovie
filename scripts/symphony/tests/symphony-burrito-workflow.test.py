@@ -8,10 +8,12 @@ import io
 import os
 import pathlib
 import re
+import signal
 import socket
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 import importlib.util
 import json
@@ -89,7 +91,166 @@ def _closure_run_args(tmp):
     ]
 
 
+def _runtime_command(args, *, established_clock=False):
+    directory = os.environ.get("SYMPHONY_RUNTIME_COVERAGE_DIR")
+    if not directory and not established_clock:
+        return [sys.executable, str(HELPER_PATH), *args]
+    # Same executable and selector; merge real child execution into the CI trace.
+    launcher = (
+        "import json, os, pathlib, runpy, sys, time, trace\n"
+        f"sys.argv = [{str(HELPER_PATH)!r}] + sys.argv[1:]\n"
+    )
+    if established_clock:
+        # Older macOS Python starts monotonic at zero; model an established host
+        # clock so this fixture enters the first periodic closure check immediately.
+        launcher += "clock = time.monotonic\ntime.monotonic = lambda: clock() + 60\n"
+    if not directory:
+        launcher += f"runpy.run_path({str(HELPER_PATH)!r}, run_name='__main__')\n"
+        return [sys.executable, "-c", launcher, *args]
+    launcher += (
+        "tracer = trace.Trace(count=True, trace=False)\n"
+        "try:\n"
+        f" tracer.runfunc(runpy.run_path, {str(HELPER_PATH)!r}, run_name='__main__')\n"
+        "finally:\n"
+        " rows = [[file, line, count] for (file, line), count in tracer.results().counts.items()]\n"
+        f" pathlib.Path({directory!r}, str(os.getpid()) + '.json').write_text(json.dumps(rows))\n"
+    )
+    return [sys.executable, "-c", launcher, *args]
+
+
 class OfficialSymphonyContractTests(unittest.TestCase):
+    def test_shutdown_drains_child_output_for_parent_and_group_signals(self):
+        for signum, group, paused in (
+            (signal.SIGTERM, False, False),
+            (signal.SIGTERM, True, False),
+            (signal.SIGINT, False, False),
+            (signal.SIGTERM, False, True),
+        ):
+            with self.subTest(signal=signum, group=group, paused=paused):
+                with tempfile.TemporaryDirectory() as tmp:
+                    ready = pathlib.Path(tmp) / "ready"
+                    completed = pathlib.Path(tmp) / "completed"
+                    log = pathlib.Path(tmp) / "output"
+                    child = (
+                        "import os, pathlib, signal, sys, time\n"
+                        "def stop(sig, frame):\n"
+                        " signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                        " signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+                        " sys.stdout.write('x' * 262144 + '\\nshutdown-drained\\n')\n"
+                        " sys.stdout.flush()\n"
+                        f" pathlib.Path({str(completed)!r}).write_text('complete')\n"
+                        " raise SystemExit(0)\n"
+                        "signal.signal(signal.SIGTERM, stop)\n"
+                        "signal.signal(signal.SIGINT, stop)\n"
+                        f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid()))\n"
+                        "while True: time.sleep(1)\n"
+                    )
+                    with log.open("w") as output:
+                        process = subprocess.Popen(
+                            _runtime_command(["run",
+                             "--gate-file", str(pathlib.Path(tmp) / "rate.json"),
+                             *_closure_run_args(tmp), "--", sys.executable, "-c", child]),
+                            stdout=output, stderr=subprocess.STDOUT,
+                            start_new_session=True,
+                        )
+                        try:
+                            deadline = time.monotonic() + 5
+                            while not ready.exists() and time.monotonic() < deadline:
+                                self.assertIsNone(process.poll())
+                                time.sleep(0.01)
+                            self.assertTrue(ready.exists(), log.read_text())
+                            if paused:
+                                os.kill(int(ready.read_text()), signal.SIGSTOP)
+                            if group:
+                                os.killpg(process.pid, signum)
+                            else:
+                                process.send_signal(signum)
+                            self.assertEqual(process.wait(timeout=5), 0, log.read_text()[-1000:])
+                            self.assertEqual(completed.read_text(), "complete")
+                            self.assertIn("shutdown-drained", log.read_text())
+                            # Check before any harness cleanup: the runtime reaped its child.
+                            with self.assertRaises(ProcessLookupError):
+                                os.kill(int(ready.read_text()), 0)
+                        finally:
+                            try:
+                                os.killpg(process.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            process.wait(timeout=5)
+
+    def test_shutdown_interrupts_rate_limit_sleep_without_relaunch(self):
+        self._assert_shutdown_interrupts_gate("rate_limit")
+
+    def test_shutdown_interrupts_closure_hold_without_relaunch(self):
+        self._assert_shutdown_interrupts_gate("closure")
+
+    def _assert_shutdown_interrupts_gate(self, kind):
+        with tempfile.TemporaryDirectory() as tmp:
+            ready = pathlib.Path(tmp) / "ready"
+            draining = pathlib.Path(tmp) / "draining"
+            release = pathlib.Path(tmp) / "release"
+            gate = pathlib.Path(tmp) / "rate.json"
+            log = pathlib.Path(tmp) / "output"
+            closure_args = _closure_run_args(tmp)
+            gate_event = "rate_limit_gate_wait" if kind == "rate_limit" else "closure_hold_wait"
+            announcement = "print('status=429 retry-after: 3600 RATELIMITED', flush=True)\n"
+            if kind == "closure":
+                gate = pathlib.Path(tmp) / "fleet-gate.json"
+                announcement = (
+                    f"pathlib.Path({str(gate)!r}).write_text({json.dumps(_fleet_gate_payload(status='red', intake=False))!r})\n"
+                    "print('scheduler-tick', flush=True)\n"
+                )
+            child = (
+                "import os, pathlib, signal, sys, time\n"
+                "def stop(sig, frame):\n"
+                " signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                " signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+                f" pathlib.Path({str(draining)!r}).touch()\n"
+                f" while not pathlib.Path({str(release)!r}).exists(): time.sleep(0.01)\n"
+                " print('x' * 262144 + '\\nshutdown-drained', flush=True)\n"
+                " raise SystemExit(75)\n"
+                "signal.signal(signal.SIGTERM, stop)\n"
+                f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid()))\n"
+                + announcement +
+                "while True: time.sleep(1)\n"
+            )
+            with log.open("w") as output:
+                process = subprocess.Popen(
+                    _runtime_command(["run", "--gate-file", str(pathlib.Path(tmp) / "rate.json"),
+                                      *closure_args, "--", sys.executable, "-c", child],
+                                     established_clock=kind == "closure"),
+                    stdout=output, stderr=subprocess.STDOUT, start_new_session=True,
+                )
+                try:
+                    deadline = time.monotonic() + 5
+                    while time.monotonic() < deadline:
+                        self.assertIsNone(process.poll())
+                        if ready.exists() and gate_event in log.read_text():
+                            break
+                        time.sleep(0.01)
+                    self.assertTrue(gate.exists(), log.read_text())
+                    self.assertIn(gate_event, log.read_text())
+                    process.send_signal(signal.SIGTERM)
+                    deadline = time.monotonic() + 5
+                    while not draining.exists() and time.monotonic() < deadline:
+                        self.assertIsNone(process.poll())
+                        time.sleep(0.01)
+                    self.assertTrue(draining.exists(), log.read_text())
+                    process.send_signal(signal.SIGINT)
+                    release.touch()
+                    self.assertEqual(process.wait(timeout=5), 128 + signal.SIGTERM)
+                    self.assertIn("shutdown-drained", log.read_text())
+                    marker = "status=429" if kind == "rate_limit" else "scheduler-tick"
+                    self.assertEqual(log.read_text().count(marker), 1)
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(int(ready.read_text()), 0)
+                finally:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.wait(timeout=5)
+
     def test_live_queue_budget_and_no_root_workflow(self):
         """Official runtime is ~/.config/symphony/WORKFLOW.md; product clone is not a Symphony config."""
         helper = _load_helper()
@@ -113,7 +274,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
-            re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
+            re.compile(r"^\s+command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
         )
         authority_map = AUTHORITY_MAP_PATH.read_text(encoding="utf-8")
         self.assertIn("`symphony-agent-router` | active", authority_map)
@@ -140,6 +301,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("- Rework", WORKFLOW)
         self.assertNotIn("team:JOV", WORKFLOW)
         self.assertIsNone(TOKEN_RE.search(WORKFLOW))
+
         self.assertIn("--port 4041", UNIT)
         self.assertIn("symphony-elixir-logs", UNIT)
         self.assertIn("symphony-official-runtime run", UNIT)
@@ -181,6 +343,27 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertFalse(missing_count["ok"], missing_count)
         self.assertIn("linear_active_issue_count_missing", missing_count["errors"])
+
+    def test_agent_command_survives_symphony_exec_prefix(self):
+        command = re.search(r"^\s+command:\s+(.+)$", WORKFLOW, re.M)
+        self.assertIsNotNone(command)
+        with tempfile.TemporaryDirectory() as tmp:
+            router = pathlib.Path(tmp) / "symphony-agent-router"
+            router.write_text(
+                "#!/bin/sh\n"
+                '[ "$SYMPHONY_CODEX_DISABLE_APPS" = "1" ] || exit 91\n'
+                '[ "$1" = "app-server" ] || exit 92\n',
+                encoding="utf-8",
+            )
+            router.chmod(0o755)
+            result = subprocess.run(
+                ["/bin/bash", "-lc", f"exec {command.group(1)}"],
+                cwd=tmp,
+                env={**os.environ, "PATH": f"{tmp}:{os.environ.get('PATH', '')}"},
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
     def test_budget_fails_for_five_second_polling_or_unbounded_concurrency(self):
         helper = _load_helper()
@@ -297,10 +480,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             gate = pathlib.Path(tmp) / "linear-rate-limit.json"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(gate),
                     *_closure_run_args(tmp),
@@ -310,7 +490,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     f"print({line!r})",
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -565,10 +745,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             gate = pathlib.Path(tmp) / "linear-rate-limit.json"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(gate),
                     *_closure_run_args(tmp),
@@ -578,7 +755,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     script,
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -656,10 +833,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(verdict["reason"], "closure-health-not-green")
             self.assertEqual(verdict["closureStatus"], "red")
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     "--closure-gate-file",
@@ -674,7 +848,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     "print('must-not-run')",
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -693,10 +867,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     *_closure_run_args(tmp),
@@ -706,7 +877,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     "print('closure-green-child-ran')",
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -1009,10 +1180,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
         with tempfile.TemporaryDirectory() as tmp:
             dead = pathlib.Path(tmp) / "dead-letters"
-            command = [
-                "python3",
-                str(HELPER_PATH),
-                "run",
+            command = _runtime_command(["run",
                 "--gate-file",
                 str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                 *_closure_run_args(tmp),
@@ -1022,7 +1190,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 "python3",
                 "-c",
                 script,
-            ]
+            ])
             result = subprocess.run(
                 command, cwd=ROOT, capture_output=True, text=True
             )
@@ -1144,10 +1312,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dead = pathlib.Path(tmp) / "dead-letters"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     *_closure_run_args(tmp),
@@ -1157,7 +1322,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     script,
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -1176,10 +1341,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dead = pathlib.Path(tmp) / "dead-letters"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     *_closure_run_args(tmp),
@@ -1189,7 +1351,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     script,
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -1200,7 +1362,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_linear_eligible_count_override_is_dependency_free_and_validated(self):
         result = subprocess.run(
-            ["python3", str(HELPER_PATH), "linear-eligible-count"],
+            _runtime_command(["linear-eligible-count"]),
             cwd=ROOT,
             env={**os.environ, "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110"},
             capture_output=True,
@@ -1209,7 +1371,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "110")
         invalid = subprocess.run(
-            ["python3", str(HELPER_PATH), "linear-eligible-count"],
+            _runtime_command(["linear-eligible-count"]),
             cwd=ROOT,
             env={**os.environ, "SYMPHONY_LINEAR_ACTIVE_ISSUES": "not-a-number"},
             capture_output=True,
@@ -1307,6 +1469,23 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 (ROOT / "scripts/symphony/codex-account-probe.sh").read_bytes(),
             )
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
+            unmanaged_controller = subprocess.run(
+                [
+                    "bash",
+                    str(updater),
+                    "--managed-controller-only",
+                    "--no-restart",
+                ],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(unmanaged_controller.returncode, 10)
+            self.assertIn(
+                "requires a managed provider generation",
+                unmanaged_controller.stderr,
+            )
             existing.write_text(
                 existing.read_text().replace(
                     "max_concurrent_agents: 8", "max_concurrent_agents: 4"
@@ -1362,7 +1541,16 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 managed_readback.stdout + managed_readback.stderr,
             )
             self.assertIn("PROVIDER_OK", managed_readback.stdout)
+            provider_current = (
+                target_home / ".local/state/symphony-elixir/provider-generations/current"
+            )
+            provider_before = provider_current.resolve(strict=True)
+            provider_alias_before = agent_router.resolve(strict=True)
             helper.write_text("drifted non-provider helper\n")
+            frozen_transition = (
+                target_home / ".local/bin/symphony-frozen-generation-transition"
+            )
+            frozen_transition.unlink()
             helper_drift = subprocess.run(
                 ["bash", str(updater), "--check", "--no-restart"],
                 cwd=ROOT,
@@ -1372,9 +1560,40 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
             self.assertEqual(helper_drift.returncode, 1)
             self.assertIn(f"DRIFT {helper}", helper_drift.stdout)
-            helper.write_bytes(
-                (ROOT / "scripts/symphony/symphony_official_runtime.py").read_bytes()
+            self.assertIn(f"MISSING {frozen_transition}", helper_drift.stdout)
+            repaired = subprocess.run(
+                [
+                    "bash",
+                    str(updater),
+                    "--managed-controller-only",
+                    "--no-restart",
+                ],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
             )
+            self.assertEqual(repaired.returncode, 0, repaired.stdout + repaired.stderr)
+            self.assertEqual(provider_current.resolve(strict=True), provider_before)
+            self.assertEqual(agent_router.resolve(strict=True), provider_alias_before)
+            self.assertEqual(helper.read_bytes(), HELPER_PATH.read_bytes())
+            self.assertEqual(
+                frozen_transition.read_bytes(),
+                (ROOT / "scripts/symphony/symphony-frozen-generation-transition").read_bytes(),
+            )
+            managed_repaired_readback = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                managed_repaired_readback.returncode,
+                0,
+                managed_repaired_readback.stdout + managed_repaired_readback.stderr,
+            )
+            self.assertIn("PROVIDER_OK", managed_repaired_readback.stdout)
             existing.write_text(
                 existing.read_text().replace("interval_ms: 30000", "interval_ms: 31000")
             )
@@ -1387,6 +1606,21 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
             self.assertEqual(drift.returncode, 1, drift.stdout + drift.stderr)
             self.assertIn(f"DRIFT {existing}", drift.stdout)
+
+    def test_provider_and_managed_controller_promotions_are_separate(self):
+        result = subprocess.run(
+            [
+                "bash",
+                str(ROOT / "scripts/symphony/update-symphony-burrito.sh"),
+                "--provider-runtime-only",
+                "--managed-controller-only",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("separate operations", result.stderr)
 
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
         account_guard = UPDATER.index("assert_account_environment_ready\n")
@@ -1522,10 +1756,14 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         provider = activation.index(
             "update-symphony-burrito.sh --provider-runtime-only"
         )
+        managed_controller = activation.index(
+            "update-symphony-burrito.sh --managed-controller-only"
+        )
         controller = activation.index("install-gem-fleet-controller.sh")
         adaptive = activation.index("symphony-concurrency-controller.py")
         provider_check = activation.index("update-symphony-burrito.sh --check")
-        self.assertLess(provider, controller)
+        self.assertLess(provider, managed_controller)
+        self.assertLess(managed_controller, controller)
         self.assertLess(controller, adaptive)
         self.assertLess(adaptive, provider_check)
         self.assertNotIn("update-symphony-burrito.sh --skip-binary", activation)

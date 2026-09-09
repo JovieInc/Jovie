@@ -11,6 +11,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CERTIFICATION_KERNEL_COMMAND,
+  DESKTOP_RELEASE_COVERAGE_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
   selectLanes,
@@ -53,6 +55,107 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('runs desktop release regressions with measured coverage for mac changes', () => {
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      '--test-coverage-include=scripts/desktop-release-assets.mjs'
+    );
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      '--test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65'
+    );
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      '--test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50'
+    );
+    expect(DESKTOP_RELEASE_COVERAGE_COMMAND).toContain(
+      'scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs'
+    );
+    expect(LANE_COMMANDS.structural).toContain(
+      DESKTOP_RELEASE_COVERAGE_COMMAND
+    );
+
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /STRUCTURAL_DESKTOP_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/desktop-release-assets.mjs',
+      'scripts/desktop-release-guard.test.mjs',
+      'scripts/desktop-release-publisher.test.mjs',
+      'apps/desktop/electron-builder.yml',
+      'apps/desktop/electron-builder.staging.yml',
+      'apps/desktop/scripts/notarize-release-dmg.cjs',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "...(selected.has('mac') ? macParts : [])"
+    );
+  });
+
+  it('selects the enforced shutdown proof for runtime-only PRs', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/symphony_official_runtime.py',
+      'scripts/symphony/tests/run-runtime-proof-gate.py',
+      'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+    ]) {
+      const match = spawnSync('grep', ['-Eq', pattern], {
+        input: `${path}\n`,
+        encoding: 'utf8',
+      });
+      expect(match.status, path).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/symphony/tests/run-runtime-proof-gate.py'"
+    );
+  });
+
+  it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
+    const webParts = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const webParts = ['),
+      CI_FAST_SOURCE.indexOf(
+        'const parts = [',
+        CI_FAST_SOURCE.indexOf('const webParts = [')
+      )
+    );
+    expect(CERTIFICATION_KERNEL_COMMAND).toContain(
+      'tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts'
+    );
+    expect(CERTIFICATION_KERNEL_COMMAND).toContain(
+      '--coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96'
+    );
+    expect(webParts).not.toContain('--passWithNoTests');
+    expect(webParts).toContain('CERTIFICATION_KERNEL_COMMAND');
+    expect(LANE_COMMANDS.structural).toContain(CERTIFICATION_KERNEL_COMMAND);
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeDefined();
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'apps/web/lib/agent-os/certification.ts\n',
+      }).status
+    ).toBe(0);
+  });
+
   it('covers every lane exactly once across the explicit hosted groups', () => {
     const laneIds = Object.values(LANE_GROUPS).flat();
 
@@ -436,7 +539,11 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+        ' && ' +
+        CERTIFICATION_KERNEL_COMMAND +
+        ' && ' +
+        DESKTOP_RELEASE_COVERAGE_COMMAND,
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
@@ -528,7 +635,7 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(structuralDecision).toContain(requiredPath);
     }
     expect(structuralDecision).toContain(
-      'grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN"'
+      'grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN|$STRUCTURAL_DESKTOP_PATTERN"'
     );
     expect(remaining).toMatch(/timeout-minutes:\s*40/);
     expect(remaining).toContain('uses: ./.github/actions/setup-playwright');
@@ -553,7 +660,18 @@ describe('ci-fast bounded parallel workflow', () => {
   it('keeps workflow contracts in the bounded CI control suite', () => {
     const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
 
-    expect(controlTest).toBe('node scripts/run-affected-tests.mjs --control');
+    expect(controlTest).toContain(
+      'scripts/symphony/tests/control-bundle-manifest.test.mjs'
+    );
+    expect(controlTest).toContain(
+      '--test-coverage-include=scripts/symphony/control-bundle-manifest.mjs'
+    );
+    expect(controlTest).toContain('--test-coverage-lines=90');
+    expect(controlTest).toContain('--test-coverage-branches=75');
+    expect(controlTest).toContain('--test-coverage-functions=90');
+    expect(controlTest).toContain(
+      '&& node scripts/run-affected-tests.mjs --control'
+    );
   });
 
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
@@ -577,6 +695,12 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).toContain('_gem_workspace_migrate)\\.py$');
     expect(remaining).toContain('summer_bottleneck_producer\\.py$');
     expect(remaining).toContain('summer-bottleneck-producer\\.test\\.py$');
+    expect(remaining).toContain(
+      'summer-symphony-outbox-(consumer(?:\\.test)?|contract\\.test)\\.mjs$'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi'
+    );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
     );
@@ -596,7 +720,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
       'python3 scripts/symphony/tests/gem-pr-drain.test.py',
       'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-      'python3 scripts/symphony/tests/gem-priority-gate.test.py',
+      'python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py',
+      'coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
+      'python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py',
+      'coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
       'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
       'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
       'python3 scripts/symphony/tests/test-model-router.py',
@@ -890,6 +1017,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_symphony_ui_pilot_runtime.py',
       'scripts/tests/test_symphony_reconciler_runtime.py',
       'scripts/symphony/closure_health.py',
+      'scripts/symphony/control-bundle-manifest.mjs',
       'scripts/symphony/config/gem-repo-registry.json',
       'scripts/symphony/config/model-registry.json',
       'scripts/symphony/evaluate-fleet-gate.sh',
@@ -903,11 +1031,14 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/model-router.py',
       'scripts/symphony/symphony-nvme-package-cache.sh',
       'scripts/symphony/symphony-reconciler.py',
+      'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+      'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
       'scripts/symphony/systemd/gem-disk-reclaim.service',
       'scripts/symphony/systemd/gem-disk-reclaim.timer',
       'scripts/symphony/systemd/gem-pr-drain.service',
       'scripts/symphony/systemd/gem-pr-drain.timer',
       'scripts/symphony/tests/closure-health.test.py',
+      'scripts/symphony/tests/control-bundle-manifest.test.mjs',
       'scripts/symphony/tests/gem-pr-drain.test.py',
       'scripts/symphony/tests/gem-ops-hud.test.py',
       'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',

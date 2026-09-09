@@ -98,6 +98,19 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
+- **Admission is independent of prior production deployment.** A pending, missing,
+  or failed release checkpoint does not block an otherwise qualified source PR.
+  Exact-head source checks, explicit scoped incident holds, and required native
+  merge-group correctness, provenance, and ancestry checks remain enforced.
+  Admission receipts say `source-qualified`; they never certify production.
+  The production controller owns deployment serialization and exact runtime
+  certification. When main and production are healthy, exact-main review is
+  current, and integrity is clear, controller containment and production SHA
+  lag select `hold-intake`: qualified PRs continue through the native queue,
+  while controller containment still holds new implementation and deployment.
+  Capacity-dependent mutation requires its own accepted evidence. Unknown
+  source/review/integrity evidence still blocks admission. An
+  existing incident hold is cleared only by its own evidence.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
@@ -156,6 +169,36 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 - **Don't bypass the queue as a habit.** The reversible admin bootstrap (ruleset →
   `evaluate` → merge → `active`) exists only to land a fix that repairs the queue
   itself, when the queue can't yet land it. It is not the normal path.
+
+### Native build capacity (JOV-6107)
+
+**Ship now:** use two concurrent native speculative groups after this policy
+lands. The 2026-09-08 Team-plan readback and
+[GitHub's published limits](https://docs.github.com/en/actions/reference/limits)
+give 60 standard hosted jobs and five macOS jobs across the organization.
+CI run 34282800645 peaked at 19 hosted jobs for one combined head; the
+22:00:25 UTC organization snapshot observed at least seven other hosted jobs.
+Two groups plus that background need 45 jobs; three would need 64. A group
+selecting both iOS and Mac needs two macOS jobs, leaving one reserve at two
+groups. The five self-hosted Linux runners do not provide capacity for these
+hosted product lanes.
+
+Source preflight accepts integer build counts from one through the reviewed
+ceiling of two and records the actual count and any difference from the target.
+This permits source-first rollout and a one-field rollback without blocking
+normal admission. Apply only `max_entries_to_build: 1 → 2` to live ruleset
+10512119 after the source lands; preserve the live 20-minute budget, ALLGREEN,
+all required checks, empty bypass actors, min/max merge 1/5 and wait zero.
+The separate pending source cohort minimum/wait values are not part of this
+apply. Roll back only the build count to one if runner waits or speculative
+invalidation outweigh the measured throughput gain.
+
+**Re-evaluate when:** a complete simultaneous-group window supplies job waits,
+peak fanout, Mac usage, invalidations and actual merges/hour, or verified account
+limits change. **Then:** raise the source ceiling only when measured total and
+Mac demand fit with background headroom. This is a capacity ceiling, not a
+permanent preference for two. Required tests run on every synthetic head;
+GitHub's merge batch limit does not combine their builds or reuse stale results.
 
 ### Native queue reconciliation
 

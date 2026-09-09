@@ -45,10 +45,22 @@ describe('HomepageCertifiedSections', () => {
   it('renders proof logos and sections 2-8 with the locked copy, in order', () => {
     render(<HomepageCertifiedSections previews={PREVIEWS} />);
 
-    const proof = screen.getByTestId('homepage-proof');
-    expect(proof).toHaveTextContent(
-      HOMEPAGE_LAUNCH_COPY.certified.proof.statement
-    );
+    const proof = screen.getByTestId('marketing-section-logo-cloud');
+    expect(proof).toHaveAttribute('data-homepage-testid', 'homepage-proof');
+    expect(proof).toHaveAttribute('data-marketing-variant', 'inline-strip');
+    expect(
+      screen.getAllByTestId('marketing-section-feature-split')
+    ).toHaveLength(HOMEPAGE_LAUNCH_COPY.certified.sections.length);
+    for (const row of screen.getAllByTestId(
+      'marketing-section-feature-split'
+    )) {
+      expect(row).toHaveAttribute('data-marketing-variant', 'editorial');
+      expect(row).toHaveAttribute(
+        'data-marketing-owner',
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx'
+      );
+    }
+    expect(proof).not.toHaveTextContent("Proof is earned. We don't borrow it.");
     expect(proof).toHaveTextContent("BUILT BY PEOPLE WHO'VE CREATED FOR");
     expect(
       proof.querySelector('[data-testid="homepage-trust"]')
@@ -65,8 +77,11 @@ describe('HomepageCertifiedSections', () => {
       HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.headline)
     );
     for (const section of HOMEPAGE_LAUNCH_COPY.certified.sections) {
-      const region = screen.getByTestId(`homepage-section-${section.id}`);
+      const region = document.querySelector<HTMLElement>(
+        `[data-homepage-testid="homepage-section-${section.id}"]`
+      )!;
       expect(region).toHaveTextContent(section.body);
+      expect(region).toHaveAttribute('data-marketing-occurrence', section.id);
       expect(region).toHaveAttribute(
         'aria-labelledby',
         `homepage-section-${section.id}-heading`
@@ -75,20 +90,26 @@ describe('HomepageCertifiedSections', () => {
 
     // Real product exports only where the copy talks about the profile.
     expect(
-      within(screen.getByTestId('homepage-section-connected')).getAllByRole(
-        'img'
-      )
+      within(
+        document.querySelector<HTMLElement>(
+          '[data-homepage-testid="homepage-section-connected"]'
+        )!
+      ).getAllByRole('img')
     ).toHaveLength(1);
     expect(
-      within(screen.getByTestId('homepage-section-relationships')).getAllByRole(
-        'img'
-      )
+      within(
+        document.querySelector<HTMLElement>(
+          '[data-homepage-testid="homepage-section-relationships"]'
+        )!
+      ).getAllByRole('img')
     ).toHaveLength(3);
     for (const id of ['found', 'know', 'smarter', 'built']) {
       expect(
-        within(screen.getByTestId(`homepage-section-${id}`)).queryAllByRole(
-          'img'
-        )
+        within(
+          document.querySelector<HTMLElement>(
+            `[data-homepage-testid="homepage-section-${id}"]`
+          )!
+        ).queryAllByRole('img')
       ).toHaveLength(0);
     }
 
@@ -98,6 +119,28 @@ describe('HomepageCertifiedSections', () => {
 
   it('closes with the locked lines and the name search as the only control', () => {
     render(<HomepageClose />);
+
+    const section = screen.getByRole('region', {
+      name: HOMEPAGE_LAUNCH_COPY.certified.close.headline,
+    });
+    expect(section.tagName).toBe('SECTION');
+    expect(section).toBe(screen.getByTestId('marketing-section-cta'));
+    expect(section).toHaveAttribute(
+      'data-marketing-variant',
+      'editorial-search'
+    );
+    expect(section).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/homepage/HomepageClose.tsx'
+    );
+    expect(section).toHaveAttribute('data-homepage-testid', 'homepage-close');
+    expect(section.querySelector('section')).toBeNull();
+    expect(within(section).getByRole('combobox')).toBe(
+      screen.getByRole('combobox')
+    );
+    expect(within(section).getByRole('button')).toBe(
+      screen.getByTestId('homepage-close-cta')
+    );
 
     expect(
       screen.getByRole('heading', {

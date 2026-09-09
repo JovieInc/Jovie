@@ -20,6 +20,10 @@ describe('self-hosted runner setup action', () => {
     resolve(repoRoot, '.github/actions/setup-node-pnpm/action.yml'),
     'utf8'
   );
+  const ciWorkflow = readFileSync(
+    resolve(repoRoot, '.github/workflows/ci.yml'),
+    'utf8'
+  );
 
   it('never saves pnpm stores from fixed or ephemeral self-hosted runners', () => {
     expect(action).not.toContain('uses: actions/cache@');
@@ -79,11 +83,47 @@ describe('self-hosted runner setup action', () => {
     expect(setupNodeStep).toContain('uses: actions/setup-node@');
     expect(setupNodeStep).toContain("node-version-file: '.nvmrc'");
     expect(setupNodeStep).toContain(
-      "cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}"
+      "runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
     );
     expect(setupNodeStep).toContain(
       "cache-dependency-path: '**/pnpm-lock.yaml'"
     );
+  });
+
+  it('disables cache teardown only for the exact Mac product lane', () => {
+    expect(action).toMatch(
+      /package_cache:\n\s+description:[^\n]+\n\s+required: false\n\s+default: 'true'/
+    );
+
+    const macStart = ciWorkflow.indexOf('  ci-macos:');
+    const crossProductStart = ciWorkflow.indexOf(
+      '  ci-cross-product-integration:',
+      macStart
+    );
+    const laneReceiptStart = ciWorkflow.indexOf(
+      '  ci-product-lane-receipt:',
+      crossProductStart
+    );
+    const laneReceiptEnd = ciWorkflow.indexOf(
+      '\n  ci-build-public:',
+      laneReceiptStart
+    );
+    const macJob = ciWorkflow.slice(macStart, crossProductStart);
+    const crossProductJob = ciWorkflow.slice(
+      crossProductStart,
+      laneReceiptStart
+    );
+    const laneReceiptJob = ciWorkflow.slice(laneReceiptStart, laneReceiptEnd);
+
+    expect(macJob).toMatch(
+      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+[^\n]*\n\s+[^\n]*\n\s+[^\n]*\n\s+with:\n\s+package_cache: 'false'/
+    );
+    expect(macJob).toContain('Test and package exact Mac head');
+    expect(macJob).toContain('Upload exact Mac staging package');
+    expect(crossProductJob).toContain('ci-macos');
+    expect(crossProductJob).toContain('[ "$MAC_RESULT" = \'success\' ]');
+    expect(laneReceiptJob).toContain('ci-cross-product-integration');
+    expect(laneReceiptJob).toContain('needs.ci-macos.result');
   });
 
   it('skips non-bundled onnxruntime downloads in both CI install phases', () => {

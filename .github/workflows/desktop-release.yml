@@ -208,14 +208,29 @@ jobs:
             echo "::error::Could not resolve exact current main for desktop authorization."
             exit 1
           }
-          if [ "$current_main_sha" != "$release_sha" ]; then
+          if [ "$environment" = "staging" ] && [ "$current_main_sha" != "$release_sha" ]; then
+            mainline_compare="$(gh api \
+              "repos/$REPOSITORY/compare/$release_sha...$current_main_sha")"
+            jq -e --arg release "$release_sha" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $release_sha is not a trusted ancestor of current main $current_main_sha."
+              exit 1
+            }
+          elif [ "$current_main_sha" != "$release_sha" ]; then
             echo "::notice::Desktop generation $release_sha was superseded by $current_main_sha."
             exit 0
           fi
 
-          # Staging publishes only an exact current-main generation whose main
-          # CI run is already green. The release job revalidates current main
-          # again immediately before packaging and publication.
+          # Staging publishes an immutable mainline generation whose exact push
+          # CI run is already green. Later main advancement does not invalidate
+          # that certified source; ancestry and monotonic feed versioning do.
           if [ "$environment" = "staging" ]; then
             ci_workflow="$(gh api \
               "repos/$REPOSITORY/actions/workflows/ci.yml")"
@@ -1075,17 +1090,32 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Revalidate exact current main before packaging
+      - name: Revalidate authorized mainline source before packaging
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
+          if [ "$ENVIRONMENT" = "staging" ] && [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(gh api \
+              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main $current_main_sha before packaging."
+              exit 1
+            }
+          elif [ "$current_main_sha" != "$RELEASE_SHA" ]; then
             echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before packaging."
             exit 1
-          }
+          fi
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -1186,8 +1216,22 @@ jobs:
           # Echo identity for build-log breadcrumb (no secret in output).
           security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
 
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              awk '/"Developer ID Application:/{print $2}'
+          )"
+          SIGNING_IDENTITY_COUNT="$(
+            printf '%s\n' "$SIGNING_IDENTITY" |
+              awk 'NF { count++ } END { print count + 0 }'
+          )"
+          [ "$SIGNING_IDENTITY_COUNT" -eq 1 ] || {
+            echo "::error::Expected exactly one Developer ID Application identity."
+            exit 1
+          }
+
           rm -f "$CERT_PATH"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "JOVIE_MAC_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
 
       # Notarization uses App Store Connect API keys instead of an Apple ID +
       # app-specific password. @electron/notarize (which electron-builder
@@ -1219,6 +1263,7 @@ jobs:
         if: env.ENVIRONMENT == 'staging'
         env:
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
+          JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           # Apple notarization via App Store Connect API key. All three are
           # required by @electron/notarize when notarize: true is set; if any
@@ -1327,10 +1372,22 @@ jobs:
         run: |
           set -euo pipefail
           current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
-          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
-            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before staging publication."
-            exit 1
-          }
+          if [ "$current_main_sha" != "$RELEASE_SHA" ]; then
+            mainline_compare="$(gh api \
+              "repos/${{ github.repository }}/compare/$RELEASE_SHA...$current_main_sha")"
+            jq -e --arg release "$RELEASE_SHA" --arg current "$current_main_sha" '
+              type == "object" and
+              .status == "ahead" and
+              .base_commit.sha == $release and
+              .merge_base_commit.sha == $release and
+              (.ahead_by | type == "number" and . > 0 and floor == .) and
+              (.commits | type == "array" and length > 0 and .[-1].sha == $current) and
+              .behind_by == 0
+            ' >/dev/null <<<"$mainline_compare" || {
+              echo "::error::Desktop generation $RELEASE_SHA is not a trusted ancestor of current main before staging publication."
+              exit 1
+            }
+          fi
           node scripts/desktop-release-assets.mjs upload-and-publish \
             --environment staging \
             --sha "$RELEASE_SHA" \
@@ -1340,6 +1397,8 @@ jobs:
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production'
         env:
+          JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
+          JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -1347,6 +1406,36 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
         run: pnpm --filter @jovie/desktop package:production
+
+      - name: Verify production desktop artifact set
+        if: env.ENVIRONMENT == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::VERSION is not a valid desktop semver."
+            exit 1
+          }
+
+          production_app="apps/desktop/dist/mac-universal/Jovie.app"
+          [ -d "$production_app" ] || {
+            echo "::error::Packaged production app bundle is missing."
+            exit 1
+          }
+          codesign --verify --deep --strict "$production_app"
+          spctl --assess --type execute --verbose=2 "$production_app"
+          xcrun stapler validate "$production_app"
+
+          production_dmg="apps/desktop/dist/Jovie-${release_version}-universal.dmg"
+          [ -f "$production_dmg" ] || {
+            echo "::error::Packaged production disk image is missing."
+            exit 1
+          }
+          codesign --verify --verbose=2 "$production_dmg"
+          xcrun stapler validate "$production_dmg"
+          spctl --assess --type open --context context:primary-signature \
+            --verbose=2 "$production_dmg"
 
       - name: Publish production desktop release
         id: publish-production

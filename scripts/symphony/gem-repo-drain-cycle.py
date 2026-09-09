@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gem_repo_registry import pr_drain_repos
+import symphony_accepted_completion
 
 JOVIE_REPOSITORY = "JovieInc/Jovie"
 
@@ -52,7 +53,31 @@ def run_summer_bottleneck_producer() -> int:
     return producer.returncode
 
 
+def run_summer_symphony_consumer() -> int:
+    """Consume at most one verified Summer task on the existing timer cadence."""
+    consumer = subprocess.run(
+        [
+            "node",
+            str(Path(__file__).with_name("summer-symphony-outbox-consumer.mjs")),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return consumer.returncode
+
+
 def main() -> int:
+    # Completion acceptance is independent of remediationAdmission. Running it
+    # first lets a previously merged provider result restore measured capacity
+    # when the prior receipt correctly failed closed at zero.
+    try:
+        symphony_accepted_completion.reconcile(
+            symphony_accepted_completion.parser().parse_args([])
+        )
+        completion_returncode = 0
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        completion_returncode = 78
     results: list[tuple[str, int]] = []
     for repo in pr_drain_repos():
         environment = os.environ.copy()
@@ -71,10 +96,18 @@ def main() -> int:
         summer_returncode = run_summer_bottleneck_producer()
     except (OSError, subprocess.SubprocessError):
         summer_returncode = 1
+    # Consumer failure is separately observable and cannot suppress repository
+    # drains or the next producer refresh.
+    try:
+        consumer_returncode = run_summer_symphony_consumer()
+    except (OSError, subprocess.SubprocessError):
+        consumer_returncode = 1
     print("Gem PR rehabilitation cycle:")
+    print(f"Accepted completion reconciliation: rc={completion_returncode}")
     for repo, returncode in results:
         print(f"  {repo}: rc={returncode}")
     print(f"Summer Jovie bottleneck snapshot: rc={summer_returncode}")
+    print(f"Summer Symphony outbox consumer: rc={consumer_returncode}")
     return 0 if all(returncode == 0 for _, returncode in results) else 1
 
 

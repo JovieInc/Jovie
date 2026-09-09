@@ -37,6 +37,11 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 
+export const CERTIFICATION_KERNEL_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
+export const DESKTOP_RELEASE_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
+
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
   new Set(
@@ -113,7 +118,11 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+      ' && ' +
+      CERTIFICATION_KERNEL_COMMAND +
+      ' && ' +
+      DESKTOP_RELEASE_COVERAGE_COMMAND,
     run: runStructural,
   },
 ];
@@ -420,6 +429,8 @@ function runGuardrails() {
     ...(selected.has('operations')
       ? [
           'node scripts/design-authority-guard.mjs',
+          // Exercise retention executables and subprocess coverage before other guards.
+          'node --test --test-timeout=45000 --experimental-test-coverage --test-coverage-include="scripts/*retention.mjs" --test-coverage-lines=75 --test-coverage-functions=70 --test-coverage-branches=75 scripts/local-runtime-retention.test.mjs scripts/generated-artifact-retention.test.mjs scripts/cleanup-safety.test.mjs scripts/setup-cache-cleanup.test.mjs',
           'pnpm design:logo-assets:check',
           'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs',
         ]
@@ -615,6 +626,7 @@ function runStructural() {
     'pnpm ci:incident-contract:validate',
     'node --test scripts/ci-release-trigger-contract.test.mjs',
     'pnpm ci:control:test',
+    "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
@@ -625,15 +637,18 @@ function runStructural() {
     // The Gem contract is embedded in the broader Symphony controller suite.
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
     'python3 scripts/symphony/tests/run-hud-proof-gate.py',
+    'python3 scripts/symphony/tests/run-runtime-proof-gate.py',
     'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
     'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
     'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
     'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/gbrain-runtime-assets.test.mjs && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage combine "${RUNNER_TEMP:-/tmp}" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gbrain-proxy.coverage" python3 -m coverage report --include="*/scripts/symphony/gbrain-runtime/gbrain-mcp-http-proxy.py" --show-missing --precision=2 --fail-under=78; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local GBrain proxy coverage"; fi',
     'python3 scripts/symphony/tests/gem-pr-drain.test.py',
     'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
-    'python3 scripts/symphony/tests/gem-priority-gate.test.py',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
     'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
     'if python3 -c "import coverage" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage run --branch scripts/symphony/tests/summer-bottleneck-producer.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage report --include="*/scripts/symphony/summer_bottleneck_producer.py" --show-missing --precision=2 --fail-under=80; elif [ "${CI:-}" = "true" ]; then echo "::error::coverage.py missing from hosted structural lane" >&2; exit 1; else echo "coverage.py not installed - skip local Summer bottleneck producer coverage"; fi',
+    'if [ -f scripts/symphony/summer-symphony-outbox-consumer.test.mjs ]; then node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=95 scripts/symphony/summer-symphony-outbox-consumer.test.mjs scripts/symphony/summer-symphony-outbox-contract.test.mjs; else node --test --experimental-test-coverage --test-coverage-include=scripts/symphony/summer-symphony-outbox-consumer.mjs --test-coverage-lines=78 --test-coverage-branches=54 --test-coverage-functions=90 scripts/symphony/summer-symphony-outbox-contract.test.mjs; fi',
     'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
     'python3 scripts/symphony/tests/test-model-router.py',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage report --include="*/scripts/symphony/astra/astra_readiness.py" --show-missing --precision=2 --fail-under=90',
@@ -652,6 +667,9 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:seo',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     'pnpm design:shared-ui-visual-arbitrary:check',
+    // JOV-6103: execute the certification kernel and its negative-path tests.
+    // A missing selector or dependency must fail, never count as proof.
+    CERTIFICATION_KERNEL_COMMAND,
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
     // JOV-5454: live Storybook certification evaluator + lifecycle.
@@ -662,7 +680,7 @@ function runStructural() {
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails
     // closed when the file cannot be resolved or contains no tests.
-    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts tests/unit/ci/setup-doppler-action.test.ts',
     // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
     // JOV-5951, gbrain ops/reviewed-invariants/blocking-ui-invariants-v1),
     // governed by certify-only-working-v1: unproven is hidden, not green.
@@ -672,9 +690,11 @@ function runStructural() {
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts tests/unit/design-system/single-column-one-width-v1.test.ts tests/unit/design-system/one-chrome-layer-v1.test.ts tests/unit/design-system/one-notification-v1.test.ts tests/unit/design-system/one-modal-layer-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
+  const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
   const parts = [
     ...(selected.has('operations') ? operationsParts : []),
     ...(selected.has('web') ? webParts : []),
+    ...(selected.has('mac') ? macParts : []),
   ];
   if (parts.length === 0) {
     return {
