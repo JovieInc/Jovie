@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: gem-delivery-controller-activation
@@ -42,6 +43,38 @@ jobs:
           # A later main commit cannot invalidate this immutable successful
           # Production Controller receipt. The exact checkout and installer
           # revision fence remain the activation authority.
+      - name: Set up Node for the existing production marker verifier
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.2'
+      - name: Authorize exact production marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
+          PRODUCTION_CONTROLLER_RUN: ${{ github.event.workflow_run.id }}
+          PRODUCTION_CONTROLLER_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          workflow_json="$(gh api "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          workflow_id="$(jq -er '
+            select(.name == "Production Controller" and
+              .path == ".github/workflows/production-controller.yml" and .state == "active") |
+            .id | select(type == "number" and . > 0)
+          ' <<< "$workflow_json")"
+          marker_json="$(node .github/scripts/production-marker-state.mjs \
+            --sha "$PRODUCTION_SHA" --repo "$REPOSITORY" \
+            --controller-workflow-id "$workflow_id")"
+          jq -e --argjson run "$PRODUCTION_CONTROLLER_RUN" \
+            --argjson attempt "$PRODUCTION_CONTROLLER_ATTEMPT" '
+            .state == "verified" and
+            (.controllerRun | tonumber) == $run and
+            (.controllerAttempt | tonumber) == $attempt
+          ' <<< "$marker_json" >/dev/null || {
+            echo "::error::Activation requires this exact producer attempt's verified production marker."
+            exit 1
+          }
       - name: Establish lingering user-systemd session
         run: |
           set -euo pipefail
@@ -67,6 +100,7 @@ jobs:
           # Preserve the managed provider generation boundary. The next installer
           # owns the exact workflow/service-unit overlay, and the explicit installs
           # below own the adaptive controller; provider-only is not the whole activation.
+          bash scripts/symphony/symphony-elixir-safe-restart --prepare-stop-guard
           bash scripts/symphony/update-symphony-burrito.sh --provider-runtime-only
           bash scripts/symphony/update-symphony-burrito.sh --managed-controller-only
           bash scripts/symphony/install-gem-fleet-controller.sh
