@@ -169,9 +169,9 @@ describe('MarketingHero source-backed default story', () => {
     );
 
     const copyButton = screen.getByRole('button', { name: 'Copy command' });
-    expect(
-      screen.getByRole('heading', { name: 'Developer hero' })
-    ).not.toHaveClass('line-clamp-2');
+    expect(screen.getByRole('heading', { name: 'Developer hero' })).toHaveClass(
+      'marketing-hero-public-heading'
+    );
     expect(screen.getByTestId('developer-hero')).toHaveClass(
       'marketing-hero--center',
       'custom-developer-hero'

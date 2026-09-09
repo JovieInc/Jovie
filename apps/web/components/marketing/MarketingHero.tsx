@@ -511,7 +511,7 @@ function MarketingHeroPublic({
           <div className='marketing-hero-copy'>
             <MarketingHeroTitle
               id={headingId}
-              className='marketing-hero-headline'
+              className='marketing-hero-headline marketing-hero-public-heading'
               clamp={false}
             >
               {headline}
