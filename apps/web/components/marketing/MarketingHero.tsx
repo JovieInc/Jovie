@@ -520,7 +520,7 @@ function MarketingHeroPublic({
   ...variantProps
 }: MarketingHeroPublicProps) {
   const layoutVariant =
-    variant === 'desktop' || variant === 'mobile' ? 'split' : 'centered';
+    variant === 'desktop' || variant === 'mobile' ? 'split' : 'center';
   return (
     <MarketingHeroFrame
       className={cn(

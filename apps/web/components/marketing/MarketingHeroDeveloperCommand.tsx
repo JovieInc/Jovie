@@ -20,7 +20,7 @@ export function MarketingHeroDeveloperCommand({
   availabilityNote,
 }: MarketingHeroDeveloperCommandProps) {
   const { copy, isSuccess, isError } = useClipboard();
-  const label = isSuccess ? copiedLabel : isError ? errorLabel : copyLabel;
+  const statusLabel = isSuccess ? copiedLabel : isError ? errorLabel : '';
 
   return (
     <div className='mt-6 flex flex-wrap items-center gap-3'>
@@ -32,13 +32,13 @@ export function MarketingHeroDeveloperCommand({
         size='sm'
         variant='secondary'
         onClick={() => void copy(command)}
-        aria-label={label}
+        aria-label={copyLabel}
       >
         {isSuccess ? <Check aria-hidden='true' /> : <Copy aria-hidden='true' />}
-        {label}
+        {copyLabel}
       </Button>
       <span role='status' aria-live='polite' className='sr-only'>
-        {isSuccess || isError ? label : ''}
+        {statusLabel}
       </span>
       <span className='text-xs text-tertiary-token'>{availabilityNote}</span>
     </div>
