@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
@@ -186,6 +188,20 @@ describe('MarketingHero source-backed default story', () => {
       ).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent('Copied command');
     });
+  });
+
+  it('keeps the public heading override uncapped in the global stylesheet', () => {
+    const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8');
+    const rule = css.match(
+      /\.marketing-hero-public-heading\s*\{([^}]+)\}/u
+    )?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).toContain('display: block');
+    expect(rule).toContain('max-block-size: none');
+    expect(rule).toContain('overflow: visible');
+    expect(rule).toContain('-webkit-line-clamp: unset');
+    expect(rule).toContain('line-clamp: none');
   });
 
   it('reports clipboard rejection through the developer command leaf', async () => {
