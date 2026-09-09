@@ -659,6 +659,29 @@ const SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS = new Set([
   'scripts/symphony/symphony-codex-exhausted.py',
   'scripts/symphony/tests/symphony-additive-router.test.py',
 ]);
+const SYMPHONY_NATIVE_ADMISSION_ANCHOR =
+  'scripts/symphony/tests/native-admission-consumers.test.py';
+const SYMPHONY_NATIVE_ADMISSION_GATES = [
+  'scripts/symphony/tests/run-issue-lease-gate.py',
+  'scripts/symphony/tests/run-lease-gate.py',
+  'scripts/symphony/tests/run-provider-promotion-gate.py',
+  'scripts/symphony/tests/run-runtime-proof-gate.py',
+];
+const SYMPHONY_NATIVE_ADMISSION_LANE = new Set([
+  SYMPHONY_NATIVE_ADMISSION_ANCHOR,
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/symphony-agent-router',
+  'scripts/symphony/symphony-codex-exhausted.py',
+  'scripts/symphony/symphony-codex-router',
+  'scripts/symphony/symphony-lease-guard',
+  'scripts/symphony/tests/existing-pr-repair.test.py',
+  'scripts/symphony/tests/symphony-agent-router.test.py',
+  'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
+  'scripts/symphony/tests/provider-runtime-promotion.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  ...SYMPHONY_NATIVE_ADMISSION_GATES,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
   ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
   'scripts/symphony/config/model-registry.json',
@@ -1187,6 +1210,31 @@ export function buildAffectedTestPlan(
       scriptVitestTests: [
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
+      nodeTests: [],
+    };
+  }
+  if (files.includes(SYMPHONY_NATIVE_ADMISSION_ANCHOR)) {
+    // Run the actual operational coverage gates, not an unrelated full web
+    // suite. This exception cannot absorb unknown peers or missing gate files.
+    if (
+      !files.every(file => SYMPHONY_NATIVE_ADMISSION_LANE.has(file)) ||
+      ![
+        SYMPHONY_NATIVE_ADMISSION_ANCHOR,
+        ...SYMPHONY_NATIVE_ADMISSION_GATES,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SYMPHONY_NATIVE_ADMISSION_GATES,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: [],
     };
   }

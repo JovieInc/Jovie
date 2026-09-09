@@ -1723,6 +1723,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             codex_entry = target_home / ".local/bin/symphony-codex-entry"
             codex_entry.write_bytes(agent_router.read_bytes())
             codex_entry.chmod(0o755)
+            # Keep this Linux package transaction offline and platform-independent,
+            # using the same strict npm fixture as the provider promotion suite.
+            from provider_cli_fixtures import install_fake_npm
+            _, npm = install_fake_npm(pathlib.Path(tmp))
+            env = {**env, "PATH": str(npm.parent) + os.pathsep + env.get("PATH", "")}
             promoted = subprocess.run(
                 ["bash", str(updater), "--provider-runtime-only"],
                 cwd=ROOT,

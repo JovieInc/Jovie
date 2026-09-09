@@ -1022,6 +1022,59 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('runs native admission coverage gates for the bounded consumer change', () => {
+    const files = [
+      'scripts/symphony/tests/native-admission-consumers.test.py',
+      'scripts/symphony/WORKFLOW.md',
+      'scripts/symphony/symphony-agent-router',
+      'scripts/symphony/symphony-codex-exhausted.py',
+      'scripts/symphony/symphony-codex-router',
+      'scripts/symphony/symphony-lease-guard',
+      'scripts/symphony/tests/existing-pr-repair.test.py',
+      'scripts/symphony/tests/run-issue-lease-gate.py',
+      'scripts/symphony/tests/symphony-agent-router.test.py',
+      'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
+      'scripts/symphony/tests/provider-runtime-promotion.test.py',
+      'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+    const gates = [
+      'scripts/symphony/tests/run-issue-lease-gate.py',
+      'scripts/symphony/tests/run-lease-gate.py',
+      'scripts/symphony/tests/run-provider-promotion-gate.py',
+      'scripts/symphony/tests/run-runtime-proof-gate.py',
+    ];
+    const plan = buildAffectedTestPlan(files);
+    expect(plan.mode).toBe('selected');
+    expect(plan.pythonUnittestTests).toEqual(gates);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '1')).toEqual(
+      expect.arrayContaining(gates.map(gate => ['python3', [gate]]))
+    );
+    for (const peer of [
+      'package.json',
+      'apps/web/lib/auth.ts',
+      'scripts/unknown.py',
+    ]) {
+      expect(buildAffectedTestPlan([...files, peer]).mode).toBe('full');
+    }
+    for (const missing of [
+      files[0],
+      ...gates,
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]) {
+      expect(
+        buildAffectedTestPlan(files, {
+          isFileAvailable: file => file !== missing,
+        }).mode
+      ).toBe('full');
+    }
+    expect(buildAffectedTestPlan(files.slice(1)).mode).toBe('full');
+  });
+
   it('routes a closure-health source-only repair to its Python regression suite', () => {
     expect(
       buildAffectedTestPlan(['scripts/symphony/closure_health.py'])
