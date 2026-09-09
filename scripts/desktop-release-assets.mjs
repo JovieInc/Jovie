@@ -12,6 +12,10 @@ const STAGING_SEMVER_PATTERN =
   /^([0-9]+)\.([0-9]+)\.([0-9]+)-staging\.([1-9][0-9]*)\.([1-9][0-9]*)$/;
 const STAGING_ASSET_PATTERN =
   /^Jovie-Staging-([0-9]+\.[0-9]+\.[0-9]+-staging\.[1-9][0-9]*\.[1-9][0-9]*)-universal\.(?:dmg|zip)(?:\.blockmap)?$/;
+const STAGING_DRAFT_NAME_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+-staging\./;
+const UNTAGGED_RELEASE_PATTERN = /^untagged-[0-9a-f]{20}$/;
+const RELEASE_PAGE_SIZE = 100;
+const MAX_RELEASE_PAGES = 20;
 const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
 
@@ -63,6 +67,85 @@ function releaseSpec(environment, version) {
     prerelease: staging,
     tag: staging ? 'desktop-staging' : `v${version}`,
   };
+}
+
+export function releaseMetadataUpdate({ environment, releaseSha, version }) {
+  const spec = releaseSpec(environment, version);
+  return {
+    name: version,
+    prerelease: spec.prerelease,
+    tag_name: spec.tag,
+    target_commitish: releaseSha,
+  };
+}
+
+export function selectRecoverableStagingDraft(releases) {
+  invariant(Array.isArray(releases), 'GitHub releases are malformed.');
+  const candidates = releases.filter(
+    release =>
+      UNTAGGED_RELEASE_PATTERN.test(release?.tag_name || '') &&
+      STAGING_DRAFT_NAME_PATTERN.test(release?.name || '')
+  );
+  invariant(
+    candidates.length <= 1,
+    'Multiple recoverable staging drafts exist.'
+  );
+  const release = candidates[0] || null;
+  if (!release) return null;
+  invariant(
+    Number.isInteger(release.id) && release.id > 0,
+    'Recoverable staging draft ID is malformed.'
+  );
+  invariant(
+    STAGING_SEMVER_PATTERN.test(release.name),
+    'Recoverable staging draft version is malformed.'
+  );
+  invariant(
+    SHA_PATTERN.test(release.target_commitish),
+    'Recoverable staging draft target is malformed.'
+  );
+  invariant(
+    release.draft === true &&
+      release.prerelease === true &&
+      release.published_at === null,
+    'Recoverable staging release must be a private prerelease draft.'
+  );
+  invariant(
+    Array.isArray(release.assets) && release.assets.length === 0,
+    'Recoverable staging draft must be empty.'
+  );
+  return release;
+}
+
+export async function fetchRecoverableStagingDraft(
+  request,
+  { maxPages = MAX_RELEASE_PAGES, pageSize = RELEASE_PAGE_SIZE } = {}
+) {
+  invariant(typeof request === 'function', 'GitHub request is missing.');
+  invariant(
+    Number.isInteger(maxPages) && maxPages > 0,
+    'GitHub release page limit is invalid.'
+  );
+  invariant(
+    Number.isInteger(pageSize) && pageSize > 0 && pageSize <= 100,
+    'GitHub release page size is invalid.'
+  );
+  const releases = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    const batch = await request(`?per_page=${pageSize}&page=${page}`);
+    invariant(Array.isArray(batch), 'GitHub releases are malformed.');
+    invariant(
+      batch.length <= pageSize,
+      'GitHub release page exceeds the requested size.'
+    );
+    releases.push(...batch);
+    if (batch.length < pageSize) {
+      return selectRecoverableStagingDraft(releases);
+    }
+  }
+  throw new Error(
+    `GitHub release inventory exceeds the ${maxPages}-page safety bound.`
+  );
 }
 
 export function expectedDesktopAssetNames(version, environment = 'production') {
@@ -571,6 +654,12 @@ class GitHubClient {
     return matches[0] || null;
   }
 
+  async recoverableStagingDraft() {
+    return fetchRecoverableStagingDraft(path =>
+      this.request(`/repos/${this.repository}/releases${path}`)
+    );
+  }
+
   async releaseById(releaseId) {
     return this.request(`/repos/${this.repository}/releases/${releaseId}`);
   }
@@ -666,14 +755,11 @@ class GitHubClient {
   }
 
   async updateReleaseMetadata({ environment, releaseId, releaseSha, version }) {
-    const spec = releaseSpec(environment, version);
     return this.request(`/repos/${this.repository}/releases/${releaseId}`, {
       method: 'PATCH',
-      body: JSON.stringify({
-        name: version,
-        prerelease: spec.prerelease,
-        target_commitish: releaseSha,
-      }),
+      body: JSON.stringify(
+        releaseMetadataUpdate({ environment, releaseSha, version })
+      ),
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -864,6 +950,23 @@ export async function prepare({
   let release = await client.releaseOrDraftByTag(spec.tag, true);
   if (environment === 'staging') {
     assertStagingVersionTransition({ installedVersion, version });
+    if (!release) {
+      const recoverable = await client.recoverableStagingDraft();
+      if (recoverable) {
+        await updateRelease(
+          client,
+          recoverable,
+          environment,
+          releaseSha,
+          version
+        );
+        release = await client.releaseById(recoverable.id);
+        invariant(
+          Array.isArray(release.assets) && release.assets.length === 0,
+          'Recovered staging draft is not empty.'
+        );
+      }
+    }
     if (release) {
       release = await removeStagingStarterAssets(client, release);
       validateRollingStagingRelease(release);

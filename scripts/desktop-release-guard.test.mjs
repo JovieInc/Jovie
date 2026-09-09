@@ -12,6 +12,10 @@ import {
   assertMainlineAncestorCompare,
   assertStagingVersionTransition,
   expectedDesktopAssetNames,
+  fetchRecoverableStagingDraft,
+  prepare,
+  releaseMetadataUpdate,
+  selectRecoverableStagingDraft,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
 import {
@@ -381,6 +385,181 @@ test('release validation rejects a DMG mutated after updater metadata creation',
     () => validateReleaseAssets({ ...fixture, draft: true }),
     /Updater size does not match/
   );
+});
+
+test('staging release metadata update restores the canonical rolling tag', () => {
+  const version = '26.8.3-staging.34302621597.1';
+  const releaseSha = 'a'.repeat(40);
+
+  assert.deepEqual(
+    releaseMetadataUpdate({
+      environment: 'staging',
+      releaseSha,
+      version,
+    }),
+    {
+      name: version,
+      prerelease: true,
+      tag_name: 'desktop-staging',
+      target_commitish: releaseSha,
+    }
+  );
+});
+
+function recoverableStagingDraft(overrides = {}) {
+  return {
+    assets: [],
+    draft: true,
+    id: 385137639,
+    name: '26.8.3-staging.34302621597.1',
+    prerelease: true,
+    published_at: null,
+    tag_name: 'untagged-84c451c95b383b6899b7',
+    target_commitish: 'a'.repeat(40),
+    ...overrides,
+  };
+}
+
+test('selects only a unique private empty staging-shaped orphan draft', () => {
+  const candidate = recoverableStagingDraft();
+  assert.equal(
+    selectRecoverableStagingDraft([
+      { ...candidate, id: 1, name: 'unrelated', tag_name: 'v1.0.0' },
+      candidate,
+    ]),
+    candidate
+  );
+  assert.equal(selectRecoverableStagingDraft([]), null);
+});
+
+test('rejects ambiguous or unsafe staging orphan drafts', () => {
+  const candidate = recoverableStagingDraft();
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        candidate,
+        recoverableStagingDraft({ id: 385137640 }),
+      ]),
+    /Multiple recoverable staging drafts/
+  );
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        recoverableStagingDraft({ assets: [{ id: 1 }] }),
+      ]),
+    /must be empty/
+  );
+  for (const unsafe of [
+    { draft: false, published_at: '2026-09-09T00:00:00Z' },
+    { prerelease: false },
+    { published_at: '2026-09-09T00:00:00Z' },
+  ]) {
+    assert.throws(
+      () => selectRecoverableStagingDraft([recoverableStagingDraft(unsafe)]),
+      /private prerelease draft/
+    );
+  }
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        recoverableStagingDraft({
+          name: '26.8.3-staging.not-a-run.1',
+        }),
+      ]),
+    /version is malformed/
+  );
+});
+
+test('rejects staging orphan ambiguity beyond the first release page', async () => {
+  const first = recoverableStagingDraft();
+  const second = recoverableStagingDraft({ id: 385137640 });
+  const unrelated = index => ({
+    id: index,
+    name: `release-${index}`,
+    tag_name: `v1.0.${index}`,
+  });
+  const pages = [
+    [first, ...Array.from({ length: 99 }, (_, index) => unrelated(index + 1))],
+    [second],
+  ];
+  const requested = [];
+
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async path => {
+        requested.push(path);
+        const page = Number(new URLSearchParams(path.slice(1)).get('page'));
+        return pages[page - 1] || [];
+      },
+      { maxPages: 3 }
+    ),
+    /Multiple recoverable staging drafts/
+  );
+  assert.deepEqual(requested, ['?per_page=100&page=1', '?per_page=100&page=2']);
+});
+
+test('fails closed when the bounded release inventory never completes', async () => {
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async () =>
+        Array.from({ length: 100 }, (_, index) => ({
+          id: index + 1,
+          name: `release-${index}`,
+          tag_name: `v1.0.${index}`,
+        })),
+      { maxPages: 2 }
+    ),
+    /inventory exceeds the 2-page safety bound/
+  );
+});
+
+test('prepare repairs an orphan staging draft before validating it', async () => {
+  const version = '26.8.3-staging.34302621597.1';
+  const releaseSha = 'b'.repeat(40);
+  const orphan = recoverableStagingDraft();
+  const repaired = {
+    ...orphan,
+    name: version,
+    tag_name: 'desktop-staging',
+    target_commitish: releaseSha,
+  };
+  const calls = [];
+  const client = {
+    recoverableStagingDraft: async () => {
+      calls.push('recover');
+      return orphan;
+    },
+    releaseById: async id => {
+      calls.push(`read:${id}`);
+      return repaired;
+    },
+    releaseOrDraftByTag: async () => null,
+    updateReleaseMetadata: async metadata => {
+      calls.push({ update: metadata });
+      return repaired;
+    },
+  };
+
+  await prepare({
+    client,
+    environment: 'staging',
+    installedVersion: '26.8.2',
+    releaseSha,
+    version,
+  });
+
+  assert.deepEqual(calls, [
+    'recover',
+    {
+      update: {
+        environment: 'staging',
+        releaseId: orphan.id,
+        releaseSha,
+        version,
+      },
+    },
+    `read:${orphan.id}`,
+  ]);
 });
 
 test('passes when no desktop files changed', () => {
