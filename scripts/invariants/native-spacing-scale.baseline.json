@@ -1,0 +1,19 @@
+{
+  "$comment": "Shrink-only floors for off-4px-grid native spacing literals (JOV-5865). conservative (>=8 and not a multiple of 4) is armed: growth fails. strict is reported only until Tim thumbs it. Lower a number when a PR removes drift; never raise one.",
+  "armed": {
+    "conservative": true,
+    "strict": false
+  },
+  "surfaces": {
+    "ios": {
+      "conservative": 12,
+      "strict": 20,
+      "files": 10
+    },
+    "desktop": {
+      "conservative": 4,
+      "strict": 4,
+      "files": 2
+    }
+  }
+}
