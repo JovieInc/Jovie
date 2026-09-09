@@ -351,11 +351,6 @@ export function unmergeableReenqueueDecision({
 }
 
 /**
- * CHANGELOG.md is post-land release state, never a PR artifact. Historical
- * PRs may predate the source-CI guard, so native admission independently
- * rejects every candidate that still touches it. Queued members are retained
- * only as diagnostic evidence while the legacy backlog drains.
- *
  * Implementation PRs that touch CHANGELOG.md are skipped at admission
  * (JOV-5378). Stamp/release heads still serialize against a queued
  * CHANGELOG member. Unknown evidence never skips.
@@ -394,11 +389,27 @@ export function changelogGroupCollisionDecision({
       Array.isArray(member.files) &&
       member.files.includes(CHANGELOG_COLLISION_PATH)
   );
-  return {
-    action: 'skip',
-    reason: 'preland-changelog-prohibited',
-    collidingPrs: colliding.map(member => member.prNumber),
-  };
+  if (colliding.length > 0) {
+    return {
+      action: 'skip',
+      reason: 'changelog-collision',
+      collidingPrs: colliding.map(member => member.prNumber),
+    };
+  }
+  // A failed member-file read is not evidence of an empty collision set.
+  // Retain the caller's existing unknown policy rather than report an allow.
+  if (
+    queuedMemberFiles.some(
+      member =>
+        !Number.isInteger(member?.prNumber) ||
+        member.prNumber <= 0 ||
+        !Array.isArray(member.files) ||
+        member.files.some(file => typeof file !== 'string')
+    )
+  ) {
+    return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
+  }
+  return { action: 'allow', reason: 'no-changelog-collision' };
 }
 
 /**
