@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -7,6 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -2260,6 +2261,84 @@ describe('native mutation actor boundary', () => {
 });
 
 describe('canonical admission membership binding', () => {
+  it('encodes the GraphQL Int through the real gh HTTP transport', async () => {
+    const config = mkdtempSync(join(tmpdir(), 'membership-gh-'));
+    /** @type {Array<Record<string, unknown>>} */
+    const received = [];
+    const server = createServer((request, response) => {
+      let body = '';
+      request.on('data', chunk => {
+        body += chunk;
+      });
+      request.on('end', () => {
+        const payload = JSON.parse(body);
+        received.push(payload);
+        const valid = typeof payload.number === 'number';
+        response.writeHead(valid ? 200 : 400, {
+          'Content-Type': 'application/json',
+        });
+        response.end(
+          JSON.stringify(
+            valid
+              ? canonicalMembership(
+                  prState({
+                    isInMergeQueue: true,
+                    mergeQueueEntry: QUEUE_ENTRY,
+                  })
+                )
+              : { errors: [{ message: 'Variable $number must be Int' }] }
+          )
+        );
+      });
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(undefined)));
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string')
+        throw new Error('Missing test port');
+      const result = await proveCanonicalMembership({
+        ...nativeOptions(
+          args =>
+            new Promise(resolve => {
+              // Only redirect the endpoint. gh itself converts the production
+              // argument flags to JSON; no live account or GitHub request is involved.
+              execFile(
+                'gh',
+                [
+                  'api',
+                  `http://127.0.0.1:${address.port}/graphql`,
+                  ...args.slice(2),
+                ],
+                {
+                  env: {
+                    ...process.env,
+                    GH_CONFIG_DIR: config,
+                    GH_TOKEN: 'fixture',
+                    GH_ENTERPRISE_TOKEN: 'fixture',
+                  },
+                  timeout: 3000,
+                },
+                (error, stdout, stderr) =>
+                  resolve({ code: error ? 1 : 0, stdout, stderr })
+              );
+            })
+        ),
+        expectedHeadOid: HEAD,
+        expectedEntryId: ENTRY_ID,
+      });
+      expect(result.entryId).toBe(ENTRY_ID);
+      expect(received).toHaveLength(1);
+      expect(received[0]).toMatchObject({
+        number: 14359,
+        owner: 'JovieInc',
+        name: 'Jovie',
+      });
+      expect(received[0].query).toContain('$number:Int!');
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+      rmSync(config, { recursive: true, force: true });
+    }
+  });
   it.each([
     '2026-07-14T23:59:59Z',
     '2026-07-15T00:00:00Z',
