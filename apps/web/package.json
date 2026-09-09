@@ -332,7 +332,7 @@
     "@types/node": "^26.2.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react-dom": "^19.2.7",
     "@typescript-eslint/parser": "^8.69.0",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/browser": "4.1.10",
