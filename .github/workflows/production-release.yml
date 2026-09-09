@@ -201,6 +201,7 @@ jobs:
               sleep 10
               if [ "$i" -eq 3 ]; then exit 1; fi
             done
+            node .github/scripts/materialize-vercel-static.mjs
             # Vercel's function trace references the generated robots response at
             # its public-file path even though the source route is app/robots.ts.
             test -f apps/web/.next/server/app/robots.txt.body
@@ -906,6 +907,9 @@ jobs:
           fi
           if [ ! -f .vercel/output/config.json ]; then
             fail_stage "Production build did not create .vercel/output/config.json." production_artifact_failed
+          fi
+          if ! node .github/scripts/materialize-vercel-static.mjs; then
+            fail_stage "Production static asset materialization failed." production_artifact_failed
           fi
 
           # Measure the exact cache subtree before a separate save action can
