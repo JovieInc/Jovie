@@ -1,6 +1,22 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { createElement } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  HeaderNav,
+  type HeaderNavProps,
+} from '@/components/organisms/HeaderNav';
+
+vi.mock('@clerk/nextjs', () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
+  useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
+  useSession: () => ({ isLoaded: true, isSignedIn: false, session: null }),
+  useClerk: () => ({ setActive: async () => {} }),
+  useSignIn: () => ({ fetchStatus: 'idle', errors: [], signIn: null }),
+  SignedIn: () => null,
+  SignedOut: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 const ROOT = process.cwd();
 const TARGET_DIRS = [
@@ -38,6 +54,43 @@ function collectFiles(dir: string, results: string[] = []): string[] {
 }
 
 describe('public CTA guard', () => {
+  afterEach(cleanup);
+
+  it('renders the glass public CTA as the canonical growing marketing Button without changing navigation', () => {
+    render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        authMode: 'public-static',
+        presentation: 'marketing-glass',
+        publicCta: { href: '/start', label: 'Find yourself' },
+      })
+    );
+    const cta = screen.getByRole('link', { name: 'Find yourself' });
+    expect(cta).toHaveAttribute('href', '/start');
+    expect(cta).toHaveAttribute('data-size', 'marketing');
+    expect(cta).toHaveAttribute('data-variant', 'primary');
+    expect(cta).toHaveClass('marketing-glass-header__cta', 'focus-ring-themed');
+    expect(cta).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11'
+    );
+    expect(cta).not.toHaveClass('h-7', 'h-8');
+    expect(screen.getAllByRole('link', { name: 'Find yourself' })).toHaveLength(
+      1
+    );
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
+    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
+      'href',
+      '/support'
+    );
+    // Native text containment and real 44px hit ownership remain browser checks
+    // in homepage.spec.ts; JSDOM cannot certify rendered dimensions.
+  });
+
   it('audits the exact public CTA owner modules', () => {
     const authActionsSource = readFileSync(
       join(ROOT, 'components/molecules/AuthActions.tsx'),
@@ -86,10 +139,9 @@ describe('public CTA guard', () => {
 
     const primaryCta = contents.slice(start, end);
 
-    // Waitlist-first Get started / Request Access uses the locked marketing
-    // ActionButton (28px visible / 44px mobile hit). HeaderPrimaryAuthLink
-    // owns the single primary-variant CTA and defaults to marketing; the
-    // minimal pill sign-in passes md explicitly.
+    // Waitlist-first Get started / Request Access uses the locked 28px minimum pill.
+    // HeaderPrimaryAuthLink owns the single primary-variant CTA and defaults
+    // to the marketing size; the minimal pill sign-in passes md explicitly.
     expect(primaryCta).toContain("size = 'marketing'");
     expect(primaryCta).toContain("variant='primary'");
     expect(primaryCta).not.toMatch(/\bsize='(?:sm|lg|xl)'/);
@@ -125,9 +177,6 @@ describe('public CTA guard', () => {
     );
     expect(headerNav).toContain('blur(var(--blur-header))');
     expect(headerNav).not.toContain('--linear-blur-header');
-    expect(headerNav).toContain("return 'max-w-public-content lg:px-0'");
-    expect(headerNav).not.toContain('max-w-linear-content');
-    expect(headerNav).not.toContain('max-w-[calc(var(--linear-content-max)');
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
     );
@@ -137,7 +186,7 @@ describe('public CTA guard', () => {
     expect(marketingNavigation).toContain("label: 'Log in'");
     expect(marketingNavigation).toContain("label: 'Find yourself'");
     expect(marketingHeader).toContain(
-      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
+      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
   });
 
