@@ -80,7 +80,7 @@ export function CookieActions({
     >
       <Button
         size='marketing'
-        variant='primary'
+        variant='secondary'
         type='button'
         onClick={onRejectAll}
         disabled={disabled}
@@ -93,7 +93,7 @@ export function CookieActions({
       </Button>
       <Button
         size='marketing'
-        variant='primary'
+        variant='secondary'
         type='button'
         onClick={onAcceptAll}
         disabled={disabled}
@@ -106,7 +106,7 @@ export function CookieActions({
       </Button>
       <Button
         size='marketing'
-        variant='primary'
+        variant='secondary'
         type='button'
         onClick={onCustomize}
         disabled={disabled}

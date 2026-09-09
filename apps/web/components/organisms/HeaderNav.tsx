@@ -161,14 +161,11 @@ function GlassAuthActions({
       >
         Log in
       </Link>
-      <Button
-        asChild
-        size='marketing'
-        variant='primary'
-        className='marketing-glass-header__cta focus-ring-themed'
-      >
-        <Link href={publicCta.href}>{publicCta.label}</Link>
-      </Button>
+      <HeaderPrimaryAuthLink
+        href={publicCta.href}
+        label={publicCta.label}
+        className='marketing-glass-header__cta'
+      />
     </div>
   );
 }

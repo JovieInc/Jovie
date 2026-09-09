@@ -54,6 +54,7 @@ describe('CookieActions', () => {
     ];
     for (const action of actions) {
       expect(action).toHaveAttribute('data-size', 'marketing');
+      expect(action).toHaveAttribute('data-variant', 'secondary');
       expect(action.style.height).toBe('');
       expect(action.className.split(' ')).toContain('my-2');
       fireEvent.click(action);
@@ -81,6 +82,11 @@ describe('CookieActions', () => {
     expect(layer).toContainElement(rejectAll);
     expect(layer).toContainElement(customize);
     expect(layer).toContainElement(acceptAll);
+    // Consent choices are neutral actions; neither acceptance nor rejection
+    // becomes the screen's preferred primary action.
+    for (const action of [rejectAll, acceptAll, customize]) {
+      expect(action).toHaveAttribute('data-variant', 'secondary');
+    }
     expect(rejectAll).toHaveTextContent('Reject all');
     expect(acceptAll).toHaveTextContent('Accept all');
     expect(customize).toHaveTextContent('Customize');
