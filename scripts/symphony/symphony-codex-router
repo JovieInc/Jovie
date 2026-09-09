@@ -55,7 +55,8 @@ done
 # with a typed reason so a leftover file cannot keep running=0 forever.
 EXHAUSTED="${SYMPHONY_CODEX_EXHAUSTED:-$SCRIPT_DIR/symphony-codex-exhausted.py}"
 if [ -f "$EXHAUSTED" ]; then
-  python3 "$EXHAUSTED" pickup-check "$issue" || exit 78
+  # Preserve retryable pickup failures (75) separately from permanent refusals (78).
+  python3 "$EXHAUSTED" pickup-check "$issue" || exit "$?"
 fi
 LEASE_DIR="${SYMPHONY_FALLBACK_LEASE_DIR:-$HOME/.local/state/symphony-fallback/leases}"
 mkdir -p "$LEASE_DIR"

@@ -224,6 +224,49 @@ with path.open("a+") as challenger:
             result.stdout,
         )
 
+    def test_actual_codex_handoff_preserves_pickup_refusal_status(self):
+        guard = self.executable("guard", "exit 0\n")
+        env = self.environment(guard)
+        self.write_route()
+        codex_router = ROOT / "scripts/symphony/symphony-codex-router"
+        traced_router = self.executable(
+            "traced-router", f'exec bash -x "{codex_router}" "$@"\n'
+        )
+        exhausted = self.root / "exhausted.py"
+        downstream = self.root / "rotate-called"
+        rotate = self.executable("rotate", f'touch "{downstream}"\n')
+        env.update({
+            "SYMPHONY_CODEX_ROUTER": str(traced_router),
+            "SYMPHONY_CODEX_EXHAUSTED": str(exhausted),
+            "SYMPHONY_CODEX_ROTATE": str(rotate),
+            "SYMPHONY_ROUTER_HEARTBEAT_SECONDS": "0",
+            "PS4": r"+${LINENO}: ",
+        })
+        pickup_line = next(
+            number
+            for number, line in enumerate(codex_router.read_text().splitlines(), 1)
+            if 'python3 "$EXHAUSTED" pickup-check "$issue"' in line
+        )
+        for status, retryable in ((75, "true"), (78, "false")):
+            with self.subTest(status=status):
+                diagnostic = (
+                    "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+                    f"class=pickup-refused retryable={retryable}"
+                )
+                exhausted.write_text(
+                    'import sys\nassert sys.argv[1:] == ["pickup-check", "JOV-5954"]\n'
+                    f"print({diagnostic!r}, file=sys.stderr)\nraise SystemExit({status})\n"
+                )
+                result = subprocess.run(
+                    [str(ROUTER), "app-server"], cwd=self.workspace, env=env,
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, status, result.stderr)
+                self.assertIn(diagnostic, result.stderr)
+                self.assertIn(f"+{pickup_line}: exit {status}", result.stderr)
+                self.assertFalse(downstream.exists(), result.stdout)
+                self.assertEqual(result.stdout, "")
+
     def test_cli_only_cursor_cannot_enter_official_app_server(self) -> None:
         calls = self.root / "cli-only-provider-called"
         guard = self.executable("guard", "exit 75\n")
