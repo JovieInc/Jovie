@@ -1,6 +1,7 @@
 name: Activate Gem Delivery Controller
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Gem canonical activation workflow; runtime owner task 01a070af-20da-7c33-b1ec-0cf4d5ddd564.
+# accountable-writer: Gem
+# Runtime owner task: 01a070af-20da-7c33-b1ec-0cf4d5ddd564; this workflow is the sole installer.
 # necessary-trust-boundary: Hosted production proof authorizes the exact source revision; only the fixed Gem runner can install and attest its local user-systemd runtime.
 # removal-trigger: Remove this handoff when the production owner can perform the same exact-revision Gem installation and runtime attestation within its existing trusted job.
 
