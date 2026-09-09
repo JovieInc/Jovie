@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
+import { withRetry } from '@/lib/db/client';
 import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { waitlistSettings } from '@/lib/db/schema/waitlist';
 import { captureWarning } from '@/lib/error-tracking';
@@ -208,64 +209,66 @@ async function ensureSettingsRow(
   dbOrTx: DbOrTransaction = db
 ): Promise<WaitlistGateSettings> {
   try {
-    // Hot path: cheap SELECT first (matches previous behavior and keeps
-    // existing test mocks working without requiring full insert chain mocks).
-    const [existing] = await dbOrTx
-      .select()
-      .from(waitlistSettings)
-      .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
-      .limit(1);
+    return await withRetry(async () => {
+      // Hot path: cheap SELECT first (matches previous behavior and keeps
+      // existing test mocks working without requiring full insert chain mocks).
+      const [existing] = await dbOrTx
+        .select()
+        .from(waitlistSettings)
+        .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
+        .limit(1);
 
-    if (existing) {
-      return existing;
-    }
+      if (existing) {
+        return existing;
+      }
 
-    const now = new Date();
+      const now = new Date();
 
-    // Miss path: single atomic upsert (INSERT ... ON CONFLICT DO UPDATE) creates
-    // the row if absent. On concurrent first callers, the loser takes the
-    // conflict path and still receives the row via RETURNING — no reload race,
-    // no throw ever.
-    const [row] = await dbOrTx
-      .insert(waitlistSettings)
-      .values({
-        id: SETTINGS_ROW_ID,
-        gateEnabled: true,
-        autoAcceptEnabled: false,
-        autoAcceptAfterDays: 7,
-        autoAcceptDailyLimit: 0,
-        autoAcceptedToday: 0,
-        autoAcceptResetsAt: getStartOfNextDayUTC(now),
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: waitlistSettings.id,
-        set: {
-          // Self-assignment is a deliberate no-op: ensures RETURNING yields the
-          // existing row on the conflict path without mutating data or timestamps.
-          updatedAt: drizzleSql`${waitlistSettings.updatedAt}`,
-        },
-      })
-      .returning();
+      // Miss path: single atomic upsert (INSERT ... ON CONFLICT DO UPDATE) creates
+      // the row if absent. On concurrent first callers, the loser takes the
+      // conflict path and still receives the row via RETURNING — no reload race,
+      // no throw ever.
+      const [row] = await dbOrTx
+        .insert(waitlistSettings)
+        .values({
+          id: SETTINGS_ROW_ID,
+          gateEnabled: true,
+          autoAcceptEnabled: false,
+          autoAcceptAfterDays: 7,
+          autoAcceptDailyLimit: 0,
+          autoAcceptedToday: 0,
+          autoAcceptResetsAt: getStartOfNextDayUTC(now),
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: waitlistSettings.id,
+          set: {
+            // Self-assignment is a deliberate no-op: ensures RETURNING yields the
+            // existing row on the conflict path without mutating data or timestamps.
+            updatedAt: drizzleSql`${waitlistSettings.updatedAt}`,
+          },
+        })
+        .returning();
 
-    if (row) {
-      return row;
-    }
+      if (row) {
+        return row;
+      }
 
-    // Defensive fallback (extremely rare). Plain select again, else safe defaults.
-    // Guarantees ensureSettingsRow (and therefore gate + auto-accept paths) never
-    // throws on reload.
-    const [reloaded] = await dbOrTx
-      .select()
-      .from(waitlistSettings)
-      .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
-      .limit(1);
+      // Defensive fallback (extremely rare). Plain select again, else safe defaults.
+      // Guarantees ensureSettingsRow (and therefore gate + auto-accept paths) never
+      // throws on reload.
+      const [reloaded] = await dbOrTx
+        .select()
+        .from(waitlistSettings)
+        .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
+        .limit(1);
 
-    if (reloaded) {
-      return reloaded;
-    }
+      if (reloaded) {
+        return reloaded;
+      }
 
-    return getDefaultWaitlistGateSettings(now);
+      return getDefaultWaitlistGateSettings(now);
+    }, 'waitlist.ensureSettingsRow');
   } catch (error) {
     // Migration drift (JOV-3353): degrade reads to the documented default
     // gate state instead of 500-ing /start and /signin. Only the missing-
