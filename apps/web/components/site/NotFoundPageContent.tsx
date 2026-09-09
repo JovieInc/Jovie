@@ -45,12 +45,14 @@ export function NotFoundPageContent({
           <Link href={APP_ROUTES.HOME} className={`${prefix}-action`}>
             Go home
           </Link>
-          <Link
-            href={APP_ROUTES.ARTIST_PROFILES}
-            className={`${prefix}-action-secondary`}
-          >
-            Search artists
-          </Link>
+          {variant === 'profile-miss' ? (
+            <Link
+              href={APP_ROUTES.ARTIST_PROFILES}
+              className={`${prefix}-action-secondary`}
+            >
+              Search artists
+            </Link>
+          ) : null}
         </div>
       </div>
     </>

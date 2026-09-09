@@ -180,11 +180,11 @@ describe('ProfileInlineNotificationsCTA', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses the canonical 32px CTA with a 44px target and accessible name', () => {
+  it('uses the canonical 28px CTA with a 44px target and accessible name', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     const trigger = screen.getByRole('button', { name: 'Get alerts' });
-    expect(trigger).toHaveClass('h-8');
+    expect(trigger).toHaveClass('h-7');
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('before:min-w-11');
     expect(trigger).not.toHaveClass('h-11', 'h-12');

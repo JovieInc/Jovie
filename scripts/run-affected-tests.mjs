@@ -277,6 +277,9 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
+  'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
+  'scripts/lib/__tests__/native-queue-eval.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
@@ -284,6 +287,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
@@ -551,6 +555,9 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/symphony/jovie-symphony-workspace',
   'scripts/symphony/jovie-symphony-workspace-create',
   'scripts/symphony/symphony-reconciler.py',
+  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
+  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
   'scripts/symphony/systemd/gem-disk-reclaim.service',
   'scripts/symphony/systemd/gem-disk-reclaim.timer',
   'scripts/symphony/systemd/gem-pr-drain.service',
@@ -589,6 +596,9 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
 ];
 const GEM_PR_REHABILITATION_PYTEST_TESTS = [
   'scripts/tests/test_symphony_ui_pilot_runtime.py',
+];
+const GEM_PR_REHABILITATION_NODE_TESTS = [
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/symphony/WORKFLOW.md',
@@ -674,6 +684,9 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/symphony/gem_repo_registry.py',
   'scripts/symphony/gem_rehabilitation_policy.py',
   'scripts/symphony/symphony-reconciler.py',
+  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
+  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
   'scripts/symphony/install-gem-fleet-controller.sh',
   'scripts/symphony/install-gem-pr-rehabilitation.sh',
   'scripts/symphony/install-symphony-ui-pilot.sh',
@@ -1218,7 +1231,11 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
-      nodeTests: [],
+      nodeTests: files.includes(
+        'scripts/symphony/summer-symphony-outbox-consumer.test.mjs'
+      )
+        ? ['scripts/symphony/summer-symphony-outbox-consumer.test.mjs']
+        : GEM_PR_REHABILITATION_NODE_TESTS,
     };
   }
   const isBoundedNoUnattendedRedChange =
@@ -2269,6 +2286,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       ...['--config', 'vitest.config.mts'],
       'run',
       ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
+      '--coverage',
+      '--coverage.include=merge-queue-backend.mjs',
+      '--coverage.include=lib/merge-group-admission.mjs',
+      '--coverage.include=lib/merge-queue-guard.mjs',
+      '--coverage.include=lib/native-queue-group-evidence.mjs',
+      '--coverage.include=lib/native-queue-policy-evidence.mjs',
+      '--coverage.include=lib/native-queue-eval.mjs',
+      '--coverage.thresholds.perFile=true',
+      '--coverage.thresholds.lines=85',
+      '--coverage.thresholds.branches=75',
+      '--coverage.thresholds.functions=82',
     ]);
   }
   const base = argValue(args, '--base', 'origin/main');

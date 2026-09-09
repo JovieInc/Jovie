@@ -392,6 +392,7 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
+| `/api/ovie/summer/reconcile` | GET | `auth` + founder UUID | Reconcile the one source-bound Summer recovery event through a server-signed Eve GET, then idempotently persist only an exact completed result. Accepts no event or deployment input and exposes no mutating handler. |
 | `/api/ovie/summer` | GET, POST | `admin` | Founder Mac lander: list/claim/complete/fail Eve-bound current-Summer turns. |
 
 ### Pixel

@@ -1,13 +1,34 @@
 # Jovie public marketing consolidation inventory
 
-Status: Stage 3 owner-aligned packets prepared; Stage 4 browser certification blocked
+Status: Stage 3 acquisition source/observer contracts prepared; Stage 4 route certification remains fail-closed
 Owner: Marketing/UI consolidation lane (source); governed certification task (founder queue)
-Source snapshot: `origin/main` at `1ae47899e7456e94db0b4717f31329966b5c5597`
+Source contract: marketing spec `1.3.0`; exact-main and deployed SHAs belong in per-run receipts, not this document
 Prepared: 2026-08-08
 
 This artifact is the saved handoff between the inventory, diagnosis, and
 implementation stages. It is intentionally source-first: route titles and
 historical screenshots are not treated as proof of current behavior.
+
+## Current acquisition certification update (2026-09-08)
+
+- The homepage and `/youtube-thumbnails` now declare the production section
+  owner, active variant, ordered occurrence, and runtime fallback expected for
+  their existing rendered compositions. This is an output-preserving source
+  contract, not a visual redesign.
+- The mounted-section observer extends the existing marketing route-health
+  gate. It requires exactly one production `main`, inventories semantic outer
+  sections through canonical identity markers, preserves repeated beats by
+  occurrence, verifies active variants and resolved registry sources, and
+  rejects missing, extra, reordered, hidden, nested, or detached claims.
+- DOM owner attributes are identity-consistency evidence only. Import/callsite
+  provenance remains a separate source gate, and route `bindingEvidence` stays
+  `unverified` until the actual route passes the exact-head observer.
+- The terminal CTA on both acquisition routes remains deliberately unresolved
+  under JOV-5356. No footer/final-shell Pen ID or metadata alias may be borrowed
+  to manufacture certification.
+- This composes the existing registry, route-health Playwright gate, visual
+  snapshots, and governed review flow. It does not add a second registry,
+  screenshot service, review UI, queue, CI lane, or design system.
 
 ## Current lane update (2026-09-02)
 
@@ -64,16 +85,18 @@ Normative design and route sources are:
 The durable design policy requires one shared Jovie vocabulary across product
 and marketing, mobile-first composition, canonical tokens/primitives, one
 page grid, real product evidence, and reduced-motion-safe interaction. The
-historical full audit in gbrain reported 37 reachable URLs; this current source
-inventory is narrower and reproducible from the checked-in manifest: 28 route
-globs, including aliases and internal/noindex surfaces.
+historical full audit in gbrain reported 37 reachable URLs. The baseline
+snapshot below recorded 28 manifest route globs, including aliases and
+internal/noindex surfaces. Current counts are generated from the checked-in
+manifest and intentionally are not copied into this prose artifact.
 
-## Current route inventory (28 manifest entries)
+## Historical route inventory (28-entry 2026-08-08 baseline)
 
-Binding status is the current manifest value. “Verified” means the manifest
-has a recipe and approved section bindings; it does not mean visual acceptance
-or deployment proof. “Exempt” is a sanctioned JOV-4063 escape hatch and is
-not silently migrated in this batch.
+This table preserves the consolidation baseline used for the first batches; it
+is not the current exhaustive route list. The generated ledger and exact public
+targets in `routeManifest.ts` are authoritative. “Verified” in this baseline
+means the manifest had a recipe and approved source bindings; it never implied
+visual acceptance, deployed behavior, or recurrence proof.
 
 ### Active recipe-bound routes
 

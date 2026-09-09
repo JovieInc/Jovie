@@ -294,6 +294,10 @@ export function buildReleaseTasksRoute(releaseId: string): string {
   return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/tasks`;
 }
 
+export function buildReleaseDownloadsRoute(releaseId: string): string {
+  return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/downloads`;
+}
+
 export function buildLibraryViewRoute(
   view?: 'releases' | 'merch' | 'images' | 'videos' | 'audio'
 ): string {

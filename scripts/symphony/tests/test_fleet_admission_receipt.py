@@ -10,6 +10,7 @@ import pathlib
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -98,6 +99,13 @@ def signals(**overrides):
         "concurrencyEvidence": capacity_evidence(),
     }
     payload.update(overrides)
+    if payload.get("controller", {}).get("status") == "failed":
+        payload["controller"] = {
+            "kind": "symphony",
+            "url": "http://127.0.0.1:4041/api/v1/state",
+            "error": "controller-observation-failed: Connection refused",
+            **payload["controller"],
+        }
     return payload
 
 
@@ -127,6 +135,25 @@ def evaluate_receipt(**overrides):
     return GATE_MODULE.evaluate(signals(**overrides), now_iso())
 
 
+def legacy_controller_repair_receipt():
+    """Preserve validation of receipts emitted before runtime/source decoupling."""
+    receipt = evaluate_receipt(controller={"status": "failed"})
+    receipt["promotionMode"] = "controller-repair-only"
+    receipt["controllerRepairAdmission"] = {
+        "allowed": True, "condition": "controller-failure",
+        "mainSha": SHA, "deployedSha": SHA,
+        "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+        "maxConcurrent": 1, "deploymentsAllowed": False,
+        "runtimeActivationAllowed": False,
+        "authority": "canonical-merge-queue-controller",
+    }
+    receipt["alreadyAdmittedCohort"] = {
+        "preserve": True, "newIntakeAllowed": False,
+        "semantics": "preserve-cohort-and-admit-one-controller-repair",
+    }
+    return receipt
+
+
 def inject_inventories(receipt: dict[str, object]) -> dict[str, object]:
     closure = dict(receipt["signals"]["closureHealth"])
     closure["classifications"] = huge_classifications()
@@ -146,8 +173,10 @@ def drain_authorization_jq() -> str:
 
 
 class FleetAdmissionReceiptTests(unittest.TestCase):
-    def project_mode(self, **overrides):
-        receipt = inject_inventories(evaluate_receipt(**overrides))
+    def project_mode(self, _receipt=None, **overrides):
+        receipt = inject_inventories(
+            evaluate_receipt(**overrides) if _receipt is None else _receipt
+        )
         source_bytes = len(json.dumps(receipt).encode())
         projection = PROJECT.project_fleet_admission_receipt(receipt)
         self.assertGreater(source_bytes, PROJECT.MAX_ADMISSION_JSON_BYTES)
@@ -170,19 +199,25 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertEqual(projection["promotionMode"], source["promotionMode"])
         self.assertEqual(projection["state"], source["state"])
 
-    def test_normal_isolated_draft_hold_and_blocked_preserve_admission_fields(self):
+    def test_all_promotion_modes_preserve_admission_fields(self):
         cases = [
             ({}, "normal"),
             ({"production": {"status": "red", "deployedSha": SHA}}, "isolated-only"),
+            ({"controller": {"status": "failed"}}, "controller-repair-only"),
             ({"main": {"status": "red", "sha": SHA}}, "draft-only"),
             ({"production": {"status": "green", "deployedSha": "b" * 40}}, "hold-intake"),
+            ({"controller": {"status": "failed"}}, "hold-intake"),
             ({"integrity": {"status": "active", "reason": "credential-compromise", "detail": "keys leaked"}}, "blocked"),
         ]
         jq = shutil.which("jq")
         self.assertIsNotNone(jq)
         for overrides, mode in cases:
             with self.subTest(mode=mode):
-                _source, projection = self.project_mode(**overrides)
+                _source, projection = self.project_mode(
+                    _receipt=legacy_controller_repair_receipt()
+                    if mode == "controller-repair-only" else None,
+                    **overrides,
+                )
                 self.assertEqual(projection["promotionMode"], mode)
                 if mode != "normal":
                     accepted = subprocess.run(
@@ -204,6 +239,10 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
                 self.assertEqual(
                     projection["productionUnboundRepairAdmission"]["allowed"],
                     _source["productionUnboundRepairAdmission"]["allowed"],
+                )
+                self.assertEqual(
+                    projection["controllerRepairAdmission"]["allowed"],
+                    _source["controllerRepairAdmission"]["allowed"],
                 )
                 self.assertEqual(
                     projection["signals"]["main"]["sha"],
@@ -263,6 +302,147 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertNotIn("stackHealth", blocked["signals"]["closureHealth"])
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
         self.assertEqual(blocked["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
+
+    def test_runtime_intake_hold_survives_projection_without_bypassing_closure(self):
+        receipt = evaluate_receipt(controller={"status": "failed"})
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(projected["promotionMode"], "hold-intake")
+        self.assertTrue(projected["alreadyAdmittedCohort"]["preserve"])
+        self.assertFalse(projected["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertFalse(projected["workAdmission"]["newIssueLeaseAllowed"])
+
+        receipt = evaluate_receipt(
+            controller={"status": "failed"},
+            closureHealth={
+                **signals()["closureHealth"], "status": "red",
+                "newIssueIntakeAllowed": False,
+                "reasons": ["closure-observation-unknown"],
+            },
+        )
+        for invalid_intake in (True, None, "false"):
+            receipt["alreadyAdmittedCohort"]["newIntakeAllowed"] = invalid_intake
+            rejected = subprocess.run(
+                [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+                input=json.dumps(receipt), capture_output=True, text=True, check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+        receipt["alreadyAdmittedCohort"]["newIntakeAllowed"] = True
+        with self.assertRaisesRegex(PROJECT.AdmissionProjectionError, "bypasses closure intake"):
+            PROJECT.project_fleet_admission_receipt(receipt)
+
+    def test_queue_empty_feed_projects_only_when_hold_intake_evidence_is_complete(self):
+        closure = {
+            **signals()["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["native-queue-empty-with-eligible-over-15m"],
+        }
+        receipt = evaluate_receipt(
+            controller={"status": "failed"},
+            closureHealth=closure,
+        )
+        projected = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(projected["promotionMode"], "hold-intake")
+        accepted = subprocess.run(
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+            input=json.dumps(projected), capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        review = dict(signals()["independentReview"])
+        review["headSha"] = "b" * 40
+        stale = evaluate_receipt(independentReview=review, closureHealth=closure)
+        self.assertNotEqual(stale["promotionMode"], "hold-intake")
+        PROJECT.project_fleet_admission_receipt(stale)
+
+    def assert_hold_intake_rejected(self, receipt):
+        encoded = json.dumps(receipt)
+        for command in (
+            [sys.executable, str(PROJECTOR)],
+            [shutil.which("jq"), "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+        ):
+            with self.subTest(consumer=command[0]):
+                rejected = subprocess.run(
+                    command, input=encoded, capture_output=True, text=True, check=False,
+                )
+                self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+
+    def test_hold_intake_consumers_reject_unknown_or_missing_reason(self):
+        for reasons in ([{"code": "queue-controller-unknown", "layer": "controller",
+                          "severity": "hold", "detail": "unknown observation"}], []):
+            receipt = evaluate_receipt(controller={"status": "failed"})
+            receipt["reasons"] = reasons
+            self.assert_hold_intake_rejected(receipt)
+
+    def test_hold_intake_consumers_reject_active_or_malformed_integrity(self):
+        for integrity in ({"status": "active"}, {"status": "invalid"}, {}, None):
+            receipt = evaluate_receipt(controller={"status": "failed"})
+            receipt["signals"]["integrity"] = integrity
+            self.assert_hold_intake_rejected(receipt)
+
+    def test_hold_intake_consumers_require_allowed_exact_main_review(self):
+        for field, value in (("allowed", False), ("headSha", "b" * 40),
+                             ("authority", "untrusted"), ("reviewer", "untrusted"),
+                             ("scope", "other"), ("required", False),
+                             ("reviewId", None), ("observedAt", None)):
+            receipt = evaluate_receipt(controller={"status": "failed"})
+            receipt["reviewAdmission"][field] = value
+            self.assert_hold_intake_rejected(receipt)
+
+    def test_controller_repair_projection_binds_provenance_and_rejects_forgery(self):
+        receipt = legacy_controller_repair_receipt()
+        self.assertEqual(receipt["promotionMode"], "controller-repair-only")
+
+        projection = PROJECT.project_fleet_admission_receipt(receipt)
+        self.assertEqual(
+            projection["signals"]["controller"],
+            {
+                "status": "failed",
+                "kind": "symphony",
+                "url": "http://127.0.0.1:4041/api/v1/state",
+                "error": "controller-observation-failed: Connection refused",
+            },
+        )
+        self.assertEqual(
+            projection["reviewAdmission"]["headSha"],
+            projection["controllerRepairAdmission"]["mainSha"],
+        )
+        self.assertEqual(projection["reviewAdmission"]["reviewer"], "Gem")
+        self.assertEqual(
+            projection["reviewAdmission"]["reason"],
+            "fresh-exact-head-independent-review",
+        )
+
+        forged = json.loads(json.dumps(receipt))
+        forged_closure = {
+            **forged["signals"]["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["closure-observation-unknown"],
+        }
+        forged["signals"]["closureHealth"] = forged_closure
+        forged["closureAdmission"] = {
+            **forged["closureAdmission"],
+            "allowed": False,
+            "newIssueIntakeAllowed": False,
+            "newImplementationAllowed": False,
+            "fallbackPrGenerationAllowed": False,
+            "status": "red",
+            "reasons": ["closure-observation-unknown"],
+        }
+        with self.assertRaisesRegex(
+            PROJECT.AdmissionProjectionError,
+            "controller repair closure evidence is unsafe",
+        ):
+            PROJECT.project_fleet_admission_receipt(forged)
+
+        wrong_review = json.loads(json.dumps(receipt))
+        wrong_review["reviewAdmission"]["headSha"] = "b" * 40
+        with self.assertRaisesRegex(
+            PROJECT.AdmissionProjectionError,
+            "controller repair requires exact-main review",
+        ):
+            PROJECT.project_fleet_admission_receipt(wrong_review)
 
     def test_unbound_repair_receipt_accepts_max_concurrent_above_one(self):
         hold = evaluate_receipt(

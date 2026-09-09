@@ -346,6 +346,7 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
     expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain('actions: read');
     expect(admission).toContain(
       "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
     );

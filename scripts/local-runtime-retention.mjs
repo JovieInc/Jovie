@@ -2,7 +2,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
-import { lstat, readdir, realpath, rm, stat, unlink } from 'node:fs/promises';
+import { lstat, readdir, realpath, stat, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -111,7 +112,10 @@ async function newestNextDevOutputMtimeMs(target) {
 }
 
 function isTestMode() {
-  return process.env.JOVIE_CLEANUP_TEST_MODE === '1';
+  return (
+    process.env.JOVIE_CLEANUP_TEST_MODE === '1' ||
+    process.env.JOVIE_SETUP_CACHE_TEST_MODE === '1'
+  );
 }
 
 let openFileSnapshot;
@@ -137,7 +141,6 @@ function pathIsActive(target, repoRoot, kind) {
   if (isTestMode()) {
     return pathIsTestActive(target);
   }
-  if (process.env.JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK === '1') return false;
 
   if (kind === 'metadata') {
     try {
@@ -244,11 +247,14 @@ async function safeRealDirectory(target, parent) {
 
 async function removeCandidate(candidate, mode, repoRoot) {
   const relative = path.relative(repoRoot, candidate.path);
+  if (candidate.kind === 'directory') {
+    console.log(
+      `  Cleanup debt ${relative} (${candidate.sizeKib} KiB; ${candidate.reason}): no verified allocation release, preserved`
+    );
+    return 0;
+  }
   if (mode === 'dry-run') {
-    const size =
-      candidate.kind === 'file'
-        ? `${candidate.sizeBytes} bytes`
-        : `${candidate.sizeKib} KiB`;
+    const size = `${candidate.sizeBytes} bytes`;
     console.log(`  Would remove ${relative} (${size}; ${candidate.reason})`);
     return 0;
   }
@@ -256,27 +262,18 @@ async function removeCandidate(candidate, mode, repoRoot) {
   const currentStats = await lstat(candidate.path);
   if (
     currentStats.isSymbolicLink() ||
-    (candidate.kind === 'file'
-      ? !currentStats.isFile()
-      : !currentStats.isDirectory()) ||
+    !currentStats.isFile() ||
     currentStats.dev !== candidate.dev ||
     currentStats.ino !== candidate.ino
   ) {
     throw new Error(`Refusing changed cleanup candidate: ${relative}`);
   }
   await candidate.revalidate();
-  if (candidate.kind === 'file') {
-    await unlink(candidate.path);
-    console.log(
-      `  Removed ${relative} (${candidate.sizeBytes} bytes; ${candidate.reason})`
-    );
-    return candidate.sizeBytes;
-  }
-  await rm(candidate.path, { recursive: true });
+  await unlink(candidate.path);
   console.log(
-    `  Removed ${relative} (${candidate.sizeKib} KiB; ${candidate.reason})`
+    `  Removed ${relative} (${candidate.sizeBytes} bytes; ${candidate.reason})`
   );
-  return candidate.sizeKib * 1024;
+  return candidate.sizeBytes;
 }
 
 async function nextDevCandidate(repoRoot, nowMs) {
@@ -508,6 +505,9 @@ async function finderMetadataCandidates(repoRoot) {
 
 async function main() {
   const parsed = parseArgs(process.argv.slice(2));
+  if (process.env.JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK === '1' && !isTestMode()) {
+    throw new Error('Owner-check bypass is not supported by retention');
+  }
   const repoStats = await lstat(parsed.repoRoot);
   if (!repoStats.isDirectory() || repoStats.isSymbolicLink()) {
     throw new Error(
@@ -515,10 +515,23 @@ async function main() {
     );
   }
   const repoRoot = await realpath(parsed.repoRoot);
+  if (isTestMode()) {
+    const tempRoot = await realpath(tmpdir());
+    if (
+      path.dirname(repoRoot) !== tempRoot ||
+      !/^jovie-(?:runtime-retention|cleanup|setup-cache)-/.test(
+        path.basename(repoRoot)
+      )
+    ) {
+      throw new Error(
+        'Cleanup test mode requires a temporary retention or cleanup fixture'
+      );
+    }
+  }
   const { mode } = parsed;
   const nowMs = Date.now();
-  // Remove file candidates first because a later directory candidate can own
-  // the same subtree (for example stale .next/dev output).
+  // Runtime directories are debt only until their task/allocation is released.
+  // Finder metadata retains the existing explicit-apply ownership checks.
   const candidates = await finderMetadataCandidates(repoRoot);
   const nextCandidate = await nextDevCandidate(repoRoot, nowMs);
   if (nextCandidate) candidates.push(nextCandidate);

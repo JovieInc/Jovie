@@ -19,10 +19,11 @@ export function HomepageNoScriptContent() {
     <section
       aria-labelledby='homepage-no-script-heading'
       className='homepage-no-script-content'
+      data-marketing-runtime-state='no-script-fallback'
+      data-marketing-owner='apps/web/components/homepage/HomepageNoScriptContent.tsx'
     >
       <h2 id='homepage-no-script-heading'>{hero.headline}</h2>
       <p>{hero.subhead}</p>
-      <p>{certified.proof.statement}</p>
 
       {certified.sections.map(section => (
         <div key={section.id}>

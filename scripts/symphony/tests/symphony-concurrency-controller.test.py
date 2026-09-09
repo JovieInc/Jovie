@@ -655,6 +655,13 @@ class SystemdActivationTests(unittest.TestCase):
 
     def test_exact_production_activation_installs_runs_and_attests_controller(self):
         text = ACTIVATION.read_text(encoding="utf-8")
+        provider = text.index("update-symphony-burrito.sh --provider-runtime-only")
+        managed_controller = text.index(
+            "update-symphony-burrito.sh --managed-controller-only"
+        )
+        fleet = text.index("bash scripts/symphony/install-gem-fleet-controller.sh")
+        self.assertLess(provider, managed_controller)
+        self.assertLess(managed_controller, fleet)
         self.assertIn(
             'install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"',
             text,
@@ -672,6 +679,7 @@ class SystemdActivationTests(unittest.TestCase):
         self.assertIn('.bounds.policy == "empirical-additive-probe"', text)
         self.assertIn('.sourceRevision == $sha', text)
         self.assertIn('symphony concurrency receipt is stale or from the future', text)
+
 
 
 if __name__ == "__main__":

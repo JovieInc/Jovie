@@ -6,6 +6,7 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY as copy } from '@/data/youtubeThumbnailsCopy';
 import { YoutubeThumbnailPasteForm } from './YoutubeThumbnailPasteForm';
@@ -17,9 +18,10 @@ export const YOUTUBE_THUMBNAILS_GET_STARTED_HREF = `${APP_ROUTES.START}?source=y
 export function YoutubeThumbnailsLanding() {
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
-      <main>
+      <div>
         <MarketingHero
           variant='left'
+          sectionVariant='left-none'
           headingId='youtube-thumbnails-hero-heading'
           testId='marketing-section-hero'
         >
@@ -45,6 +47,8 @@ export function YoutubeThumbnailsLanding() {
           aria-labelledby='approval-loop-heading'
           className='border-t border-subtle py-16 sm:py-20'
           data-testid='marketing-section-how-it-works'
+          data-marketing-owner='apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
+          data-marketing-variant='3-step-strip'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl text-center'>
@@ -84,6 +88,8 @@ export function YoutubeThumbnailsLanding() {
           aria-labelledby='thumbnail-safeguards-heading'
           className='bg-panel py-16 sm:py-20'
           data-testid='marketing-section-feature-grid'
+          data-marketing-owner='apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
+          data-marketing-variant='two-column-text'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl'>
@@ -101,10 +107,12 @@ export function YoutubeThumbnailsLanding() {
           </MarketingContainer>
         </section>
 
-        <section
+        <MarketingCtaSection
           aria-labelledby='youtube-thumbnails-included-heading'
           className='py-16 sm:py-20'
           data-testid='marketing-section-cta'
+          data-marketing-variant='included-single'
+          data-marketing-owner='apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
         >
           <MarketingContainer width='page'>
             <div className='mx-auto max-w-3xl text-center'>
@@ -132,8 +140,8 @@ export function YoutubeThumbnailsLanding() {
               </div>
             </div>
           </MarketingContainer>
-        </section>
-      </main>
+        </MarketingCtaSection>
+      </div>
     </MarketingPageShell>
   );
 }

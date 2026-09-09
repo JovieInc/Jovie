@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
+
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
@@ -8,8 +9,8 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
-const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL =
-  'open-public-profile-in-browser';
+const COPY_DESKTOP_AUTH_URL_CHANNEL = 'copy-desktop-auth-url';
+const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL = 'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
@@ -82,141 +83,150 @@ contextBridge.exposeInMainWorld('electronAPI', {
   electronVersion: process.versions.electron,
   getBuildIdentity: () => ipcRenderer.invoke(GET_BUILD_IDENTITY_CHANNEL),
 
-    /** Fires when electron-updater detects a new version is available for download. */
-    onUpdateAvailable: (cb: () => void) => {
-      return onUpdateChannel(UPDATE_AVAILABLE_CHANNEL, cb);
-    },
+  /** Fires when electron-updater detects a new version is available for download. */
+  onUpdateAvailable: (cb: () => void) => {
+    return onUpdateChannel(UPDATE_AVAILABLE_CHANNEL, cb);
+  },
 
-    /** Fires when the update has been fully downloaded and is ready to install. */
-    onUpdateDownloaded: (cb: () => void) => {
-      return onUpdateChannel(UPDATE_DOWNLOADED_CHANNEL, cb);
-    },
+  /** Fires when the update has been fully downloaded and is ready to install. */
+  onUpdateDownloaded: (cb: () => void) => {
+    return onUpdateChannel(UPDATE_DOWNLOADED_CHANNEL, cb);
+  },
 
-    /** Quits the app and installs the downloaded update. */
-    installUpdateAndRestart: () => {
-      return ipcRenderer.invoke(QUIT_AND_INSTALL_CHANNEL) as Promise<{
-        ok: boolean;
-        reason?: string;
-      }>;
-    },
+  /** Quits the app and installs the downloaded update. */
+  installUpdateAndRestart: () => {
+    return ipcRenderer.invoke(QUIT_AND_INSTALL_CHANNEL) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
 
-    /** Navigate back in the SPA history stack. */
-    goBack: () => {
-      return ipcRenderer.invoke(GO_BACK_CHANNEL);
-    },
+  /** Navigate back in the SPA history stack. */
+  goBack: () => {
+    return ipcRenderer.invoke(GO_BACK_CHANNEL);
+  },
 
-    /** Navigate forward in the SPA history stack. */
-    goForward: () => {
-      return ipcRenderer.invoke(GO_FORWARD_CHANNEL);
-    },
+  /** Navigate forward in the SPA history stack. */
+  goForward: () => {
+    return ipcRenderer.invoke(GO_FORWARD_CHANNEL);
+  },
 
-    /** Subscribe to nav-state changes (canGoBack / canGoForward). */
-    onNavStateChanged: (
-      cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
-    ): (() => void) => {
-      const listener = (
-        _: unknown,
-        state: { canGoBack: boolean; canGoForward: boolean }
-      ) => cb(state);
-      ipcRenderer.on(NAV_STATE_CHANNEL, listener);
-      return () => ipcRenderer.removeListener(NAV_STATE_CHANNEL, listener);
-    },
+  /** Subscribe to nav-state changes (canGoBack / canGoForward). */
+  onNavStateChanged: (
+    cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
+  ): (() => void) => {
+    const listener = (
+      _: unknown,
+      state: { canGoBack: boolean; canGoForward: boolean }
+    ) => cb(state);
+    ipcRenderer.on(NAV_STATE_CHANNEL, listener);
+    return () => ipcRenderer.removeListener(NAV_STATE_CHANNEL, listener);
+  },
 
-    /** Ask the main process to show the dedicated desktop auth handoff window. */
-    startDesktopAuthHandoff: (authUrl: string) => {
-      return ipcRenderer.invoke(
-        START_DESKTOP_AUTH_HANDOFF_CHANNEL,
-        authUrl
-      ) as Promise<{ ok: boolean; reason?: string }>;
-    },
+  /** Ask the main process to show the dedicated desktop auth handoff window. */
+  startDesktopAuthHandoff: (authUrl: string) => {
+    return ipcRenderer.invoke(
+      START_DESKTOP_AUTH_HANDOFF_CHANNEL,
+      authUrl
+    ) as Promise<{ ok: boolean; reason?: string }>;
+  },
 
-    /** Open auth in the system browser from the dedicated handoff page. */
-    openDesktopAuthUrl: (authUrl: string) => {
-      return ipcRenderer.invoke(
-        OPEN_DESKTOP_AUTH_URL_CHANNEL,
-        authUrl
-      ) as Promise<{
-        ok: boolean;
-        reason?: string;
-      }>;
-    },
+  /** Open auth in the system browser from the dedicated handoff page. */
+  openDesktopAuthUrl: (authUrl: string) => {
+    return ipcRenderer.invoke(
+      OPEN_DESKTOP_AUTH_URL_CHANNEL,
+      authUrl
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
 
-    /** Open this isolated public profile in the system browser. */
-    openPublicProfileInBrowser: () => {
-      return ipcRenderer.invoke(
-        OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL
-      ) as Promise<{ ok: boolean; reason?: string }>;
-    },
+  /** Copy a main-process-validated auth URL after an explicit user action. */
+  copyDesktopAuthUrl: (authUrl: string) => {
+    return ipcRenderer.invoke(
+      COPY_DESKTOP_AUTH_URL_CHANNEL,
+      authUrl
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
 
-    /** Close the dedicated handoff window without exposing window controls. */
-    closeDesktopAuthWindow: () => {
-      return ipcRenderer.invoke(
-        CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL
-      ) as Promise<{
-        ok: boolean;
-        reason?: string;
-      }>;
-    },
+  /** Open this isolated public profile in the system browser. */
+  openPublicProfileInBrowser: () => {
+    return ipcRenderer.invoke(
+      OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL
+    ) as Promise<{ ok: boolean; reason?: string }>;
+  },
 
-    /** Consume the one-time desktop auth completion payload after deep-link return. */
-    consumeDesktopAuthCompletion: () => {
-      return ipcRenderer.invoke(
-        CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL
-      ) as Promise<{
-        ok: boolean;
-        reason?: string;
-        completion?: {
-          code: string;
-          state: string;
-          codeVerifier: string;
-        };
-      }>;
-    },
+  /** Close the dedicated handoff window without exposing window controls. */
+  closeDesktopAuthWindow: () => {
+    return ipcRenderer.invoke(CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
 
-    /** Probe desktop dictation support without exposing node/native APIs. */
-    getDictationStatus: () => {
-      return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
-    },
+  /** Consume the one-time desktop auth completion payload after deep-link return. */
+  consumeDesktopAuthCompletion: () => {
+    return ipcRenderer.invoke(
+      CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL
+    ) as Promise<{
+      ok: boolean;
+      reason?: string;
+      completion?: {
+        code: string;
+        state: string;
+        codeVerifier: string;
+      };
+    }>;
+  },
 
-    /**
-     * Push the current app state to the macOS menu bar extra.
-     * No-op on non-macOS or when the main process tray is unavailable.
-     */
-    setTrayState: (payload: { state: string; unreadCount?: number }) => {
-      return ipcRenderer.invoke(TRAY_SET_STATE_CHANNEL, payload) as Promise<{
-        ok: boolean;
-        reason?: string;
-      }>;
-    },
+  /** Probe desktop dictation support without exposing node/native APIs. */
+  getDictationStatus: () => {
+    return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
+  },
 
-    /**
-     * Subscribe to tray quick-action events (e.g. "new-message") fired by the
-     * main process when the user clicks a menu bar context-menu item.
-     */
-    onTrayAction: (cb: (action: string) => void): (() => void) => {
-      if (typeof cb !== 'function') return () => undefined;
-      const listener = (_: unknown, action: string) => cb(action);
-      ipcRenderer.on(TRAY_ACTION_CHANNEL, listener);
-      return () => ipcRenderer.removeListener(TRAY_ACTION_CHANNEL, listener);
-    },
+  /**
+   * Push the current app state to the macOS menu bar extra.
+   * No-op on non-macOS or when the main process tray is unavailable.
+   */
+  setTrayState: (payload: { state: string; unreadCount?: number }) => {
+    return ipcRenderer.invoke(TRAY_SET_STATE_CHANNEL, payload) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>;
+  },
 
-    /**
-     * First successful hosted-app paint (JOV-3595). Cancels the main-process
-     * boot watchdog so a 200-but-never-interactive load surfaces recovery UI
-     * instead of a permanent black window. Fire-and-forget (send, not invoke).
-     */
-    notifyAppBooted: () => {
-      ipcRenderer.send(APP_BOOTED_CHANNEL);
-    },
+  /**
+   * Subscribe to tray quick-action events (e.g. "new-message") fired by the
+   * main process when the user clicks a menu bar context-menu item.
+   */
+  onTrayAction: (cb: (action: string) => void): (() => void) => {
+    if (typeof cb !== 'function') return () => undefined;
+    const listener = (_: unknown, action: string) => cb(action);
+    ipcRenderer.on(TRAY_ACTION_CHANNEL, listener);
+    return () => ipcRenderer.removeListener(TRAY_ACTION_CHANNEL, listener);
+  },
 
-    launchOperatorControl: (request: {
-      id: string;
-      kind: 'web' | 'ssh';
-      href?: string;
-      sshHost?: string;
-    }) =>
-      ipcRenderer.invoke(LAUNCH_OPERATOR_CONTROL_CHANNEL, request) as Promise<{
-        ok: boolean;
-        reason?: string;
-      }>,
+  /**
+   * First successful hosted-app paint (JOV-3595). Cancels the main-process
+   * boot watchdog so a 200-but-never-interactive load surfaces recovery UI
+   * instead of a permanent black window. Fire-and-forget (send, not invoke).
+   */
+  notifyAppBooted: () => {
+    ipcRenderer.send(APP_BOOTED_CHANNEL);
+  },
+
+  launchOperatorControl: (request: {
+    id: string;
+    kind: 'web' | 'ssh';
+    href?: string;
+    sshHost?: string;
+  }) =>
+    ipcRenderer.invoke(LAUNCH_OPERATOR_CONTROL_CHANNEL, request) as Promise<{
+      ok: boolean;
+      reason?: string;
+    }>,
 });

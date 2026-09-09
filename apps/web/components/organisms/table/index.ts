@@ -85,6 +85,7 @@ export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
 export type {
   ShellListRowButtonProps,
+  ShellListRowDensity,
   ShellListRowFrameProps,
   ShellListRowInteraction,
 } from './atoms/ShellListRowFrame';

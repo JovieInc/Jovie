@@ -10,6 +10,23 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 
 ## Units
 
+Operational recovery runbooks for the critical units live in
+[`scripts/symphony/runbooks/`](../runbooks/). The control-plane liveness
+watchdog runbook is
+[`control-plane-liveness-recovery.md`](../runbooks/control-plane-liveness-recovery.md);
+the delivery-liveness watchdog runbook is
+[`delivery-liveness-recovery.md`](../runbooks/delivery-liveness-recovery.md);
+the merge-queue / fleet-gate runbook is
+[`merge-queue-fleet-gate-recovery.md`](../runbooks/merge-queue-fleet-gate-recovery.md);
+the GitHub Actions production controller and release-marker recovery runbooks are
+[`production-controller-recovery.md`](../runbooks/production-controller-recovery.md)
+and
+[`release-marker-recovery.md`](../runbooks/release-marker-recovery.md);
+the backlog orchestrator / ownership inventory recovery runbook is
+[`backlog-orchestrator-ownership-inventory-recovery.md`](../runbooks/backlog-orchestrator-ownership-inventory-recovery.md);
+the Summer governor runbook for the Eve/Ovie control plane in `apps/eve-pilot` is
+[`summer-governor-recovery.md`](../runbooks/summer-governor-recovery.md).
+
 | File | Schedule | Purpose |
 |---|---|---|
 | `co.jovie.hermes.watchdog.plist.template` | every 60s | Start the Hermes gateway if `hermes gateway status` fails |
@@ -20,6 +37,7 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | load/crash recovery only | Manual fallback for the event-driven GitHub/Symphony admission lanes; never polls for work |
 | `co.jovie.hermes.delivery-liveness-watchdog.plist.template` | every 120s | Validate durable delivery receipts; retry/reassign active leases and reclaim Linear In Progress items after five minutes without a matching accepted-owner machine receipt |
+| `co.jovie.hermes.control-plane-liveness-watchdog.plist.template` | every 60s | JOV-6004 slice 1: read the Mac ship-owner lock and Gem HUD activation attestation, classify each controller as healthy or dark, and write `~/.hermes/state/controller-liveness-latest.json`. Authorizes the independent recovery lane only when a required controller is dark. |
 
 Linear active leases are accepted only from a comment containing a
 `<!-- jovie-active-lease:v1 -->` JSON envelope with `owner`, `leaseId`,

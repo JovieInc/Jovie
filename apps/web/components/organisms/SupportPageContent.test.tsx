@@ -57,9 +57,9 @@ describe('SupportPageContent', () => {
       .filter(link =>
         /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
       )) {
-      // Canonical 32px marketing Button atom; it owns the 44px touch target.
+      // Canonical 28px marketing Button atom; it owns the 44px touch target.
       expect(action).toHaveAttribute('data-size', 'marketing');
-      expect(action).toHaveClass('h-8', 'rounded-full');
+      expect(action).toHaveClass('h-7', 'rounded-full');
       expect(action).toHaveClass('before:h-11', 'before:min-w-11');
       expect(action).not.toHaveClass('public-action-inline');
     }

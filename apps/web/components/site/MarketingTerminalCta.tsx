@@ -3,6 +3,7 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
@@ -189,7 +190,7 @@ export function MarketingTerminalCta({
   );
 
   return (
-    <section
+    <MarketingCtaSection
       data-pen-contract={penContractId}
       data-testid={testId}
       className={cn(variantStyles.section, className)}
@@ -209,6 +210,6 @@ export function MarketingTerminalCta({
       ) : (
         content
       )}
-    </section>
+    </MarketingCtaSection>
   );
 }

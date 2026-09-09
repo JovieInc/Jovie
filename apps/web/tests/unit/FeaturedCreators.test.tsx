@@ -11,21 +11,18 @@ vi.mock('@/features/home/FeaturedArtists', () => ({
           <div className='hidden md:block'>
             <ul className='flex items-center gap-10 overflow-x-auto scroll-smooth pb-4'>
               <li>
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a href='/ladygaga'>
                   <div data-testid='creator-image' />
                   <span>Lady Gaga</span>
                 </a>
               </li>
               <li>
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a href='/taylorswift'>
                   <div data-testid='creator-image' />
                   <span>Taylor Swift</span>
                 </a>
               </li>
               <li>
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a href='/dualipa'>
                   <div data-testid='creator-image' />
                   <span>Dua Lipa</span>
@@ -36,21 +33,18 @@ vi.mock('@/features/home/FeaturedArtists', () => ({
           <div className='md:hidden overflow-x-auto scroll-smooth'>
             <ul className='flex items-center gap-6'>
               <li>
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a href='/ladygaga'>
                   <div data-testid='creator-image' />
                   <span>Lady Gaga</span>
                 </a>
               </li>
               <li>
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a href='/taylorswift'>
                   <div data-testid='creator-image' />
                   <span>Taylor Swift</span>
                 </a>
               </li>
               <li>
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a href='/dualipa'>
                   <div data-testid='creator-image' />
                   <span>Dua Lipa</span>

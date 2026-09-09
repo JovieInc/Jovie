@@ -1,9 +1,8 @@
-"""JOV-5921: HA remediator poke idempotency contract.
+"""JOV-5921 / JOV-6029: HA CI remediator poke Hyperagent contract.
 
-One in-flight remediator per PR + head SHA. The GitHub poke must fail closed
-on redeliveries, merged/closed PRs, and SHAs that already have a delivered
-poke, so duplicate CI failure events can never spawn duplicate Symphony
-remediator wakes (Gem burrito :4041 refresh + Grok/Kimi sidecar).
+The workflow now forwards GitHub-hosted CI failures on pull_request/merge_group
+to the Hyperagent remediator webhook (HTTP 202). It runs on ubuntu-latest with
+no checkout, no Node, empty permissions, and a 2-minute timeout.
 """
 from pathlib import Path
 
@@ -25,51 +24,21 @@ def test_same_key_runs_are_serialized_without_cancel() -> None:
     assert "cancel-in-progress: false" in workflow
 
 
-def test_gate_runs_before_the_symphony_poke() -> None:
+def test_poke_step_targets_hyperagent_webhook() -> None:
     workflow = _text()
 
-    gate = workflow.index("Gate duplicate, merged, and closed remediation keys")
-    poke = workflow.index("Poke Symphony remediator")
-    assert gate < poke
-    assert "if: steps.gate.outputs.proceed == 'true'" in workflow
+    assert "HYPERAGENT_CI_WEBHOOK_URL" in workflow
+    assert "HYPERAGENT_CI_WEBHOOK_SECRET" in workflow
+    assert "X-Hyperagent-Webhook-Signature" in workflow
+    assert "HTTP 202" in workflow or "202" in workflow
 
 
-def test_merged_or_closed_prs_are_terminal() -> None:
+def test_no_local_symphony_poke() -> None:
     workflow = _text()
 
-    assert "/pulls/$PR_NUMBER" in workflow
-    assert ".merged" in workflow
-    assert '"$state" != "open"' in workflow
-
-
-def test_prior_successful_poke_for_head_sha_blocks_duplicates() -> None:
-    workflow = _text()
-
-    assert (
-        "actions/workflows/ha-ci-remediator-poke.yml/runs?head_sha=$HEAD_SHA&status=success"
-        in workflow
-    )
-    assert "one in-flight remediator per PR+SHA" in workflow
-
-
-def test_force_dispatch_is_the_only_bounded_retry() -> None:
-    workflow = _text()
-
-    assert "force:" in workflow
-    assert "type: boolean" in workflow
-    assert 'if [ "$FORCE" != "true" ]' in workflow
-
-
-def test_symphony_poke_contract_unchanged() -> None:
-    workflow = _text()
-
-    assert "http://127.0.0.1:4041/api/v1/refresh" in workflow
-    assert "symphony-grok-sidecar.service" in workflow
-    assert "Do not restart burrito" in workflow
-    assert "Do not touch LYB :4042" in workflow
-    # Hyperagent webhook is not the remediator queue on this path.
-    assert "HYPERAGENT_CI_WEBHOOK" not in workflow
-    assert "X-Hyperagent-Webhook-Secret" not in workflow
+    assert "http://127.0.0.1:4041/api/v1/refresh" not in workflow
+    assert "symphony-grok-sidecar.service" not in workflow
+    assert "systemctl" not in workflow
 
 
 def test_pr_16419_exclusion_is_preserved() -> None:
@@ -79,18 +48,45 @@ def test_pr_16419_exclusion_is_preserved() -> None:
     assert "pull_requests[0].number != 16419" in workflow
 
 
-def test_token_permissions_are_minimal_and_read_only() -> None:
+def test_runs_on_github_hosted_ubuntu_latest() -> None:
     workflow = _text()
 
-    permissions = workflow.index("permissions:")
-    on_block_end = workflow.index("concurrency:", permissions)
-    block = workflow[permissions:on_block_end]
-    assert "actions: read" in block
-    assert "pull-requests: read" in block
-    assert "write" not in block
+    assert "runs-on: ubuntu-latest" in workflow
 
 
-def test_runs_on_self_hosted_jovie_fixed() -> None:
+def test_two_minute_timeout() -> None:
     workflow = _text()
 
-    assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in workflow
+    assert "timeout-minutes: 2" in workflow
+
+
+def test_permissions_are_empty() -> None:
+    workflow = _text()
+
+    assert "permissions: {}" in workflow
+
+
+def test_no_checkout_and_no_node() -> None:
+    workflow = _text()
+
+    assert "actions/checkout" not in workflow
+    assert "setup-node" not in workflow
+    assert "node " not in workflow
+
+
+def test_slim_json_payload_is_posted() -> None:
+    workflow = _text()
+
+    assert "Content-Type: application/json" in workflow
+    assert "jq -n" in workflow
+    assert "repository" in workflow
+    assert "head_sha" in workflow
+    assert "run_url" in workflow
+
+
+def test_only_ci_failures_on_pull_request_and_merge_group() -> None:
+    workflow = _text()
+
+    assert "workflow_run.conclusion == 'failure'" in workflow
+    assert "pull_request" in workflow
+    assert "merge_group" in workflow

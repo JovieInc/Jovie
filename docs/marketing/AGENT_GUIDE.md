@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.2.0
+spec-version: 1.3.0
 doc-freshness: docs/marketing/AGENT_GUIDE.md
 -->
 # Marketing Agent Guide
@@ -12,7 +12,7 @@ doc-freshness: docs/marketing/AGENT_GUIDE.md
 > `COMPOSITION_RULES.md`) are optional commentary. Copy generation follows the
 > typed contract below.
 
-spec-version: 1.2.0 · registry: `apps/web/data/marketing/index.ts`.
+spec-version: 1.3.0 · registry: `apps/web/data/marketing/index.ts`.
 
 ## The 4-step procedure
 
@@ -348,6 +348,24 @@ These apply to EVERY composition; the registry does not restate them:
 
 > **Note:** `ownership/control-block` is `status: 'unproven'` — first real use requires `humanOptIn` per DX2 (see §Deviating from the system). The golden fixture exercises the variant selection path; a real `/artist-profiles` deployment that uses `ownership` must add `humanOptIn: { prUrl, date }` to the route's manifest entry.
 
+## Source contract versus mounted-route certification
+
+`renderedSections` is the declared source contract: production component path,
+approved section, active variant, and optional occurrence ID in exact order.
+It is not self-certifying metadata.
+
+The existing route-health browser gate observes the mounted production route
+under exactly one `main`. It inventories semantic outer sections, ignores only
+explicitly declared and runtime-proven fallbacks, and compares the visible DOM
+to `renderedSections`. A `data-marketing-owner` value proves identity
+consistency only; import/callsite provenance must still pass the source gate.
+
+Keep `bindingEvidence.status: 'unverified'` until the actual route passes that
+observer on the exact reviewed head. A source contract, unit render, screenshot,
+human review, merge, deploy, and production recurrence are separate receipts.
+If any production beat lacks a truthful source or Pen contract, leave the route
+unverified and let the observer fail closed.
+
 ## Failure table (every manifest-gate failure message)
 
 Every failure follows the PROBLEM / CAUSE / FIX (exact two-line edit) / DOCS
@@ -370,6 +388,12 @@ template. Common failures:
 | `ARCHITECTURE.md spec-version marker drift` | Spec-doc version drift (E13) | Update the `spec-version:` marker |
 | `decision table not total for brief (...)` | RECIPE_DECISION_TABLE missing a catch-all | Add a catch-all entry |
 | `artist-lp recipe has a problem/agitation arc beat` | Creator R9 violation | Remove the problem/agitation beat |
+| `[composition-root]` | Mounted route has zero or multiple production `main` roots | Restore one layout-owned `main`; do not hide a nested root with metadata |
+| `[unverified-bindings]` | Route source ownership has not been reconciled | Resolve every production beat and update evidence truthfully; do not flip status to bypass the gate |
+| `[unregistered-section]` / `[unresolved-source]` | A mounted outer section lacks canonical registry/source ownership | Register or extract the real production owner, then bind it in the manifest |
+| `[section-order]` / `[occurrence-order]` | Mounted beat order differs from the declared contract | Fix the declaration or route using the actual intended composition; preserve repeated-beat occurrence IDs |
+| `[wrong-variant]` / `[wrong-owner]` | Mounted identity differs from the active source contract | Bind the production component and active variant; stamped paths alone are not provenance |
+| `[runtime-hidden]` / `[runtime-fallback-*]` | A production beat is hidden or fallback exclusion is not exactly declared and proven | Restore visible production output or fix the explicit runtime fallback contract |
 
 ## Deviating from the system (DX2 escape hatch)
 

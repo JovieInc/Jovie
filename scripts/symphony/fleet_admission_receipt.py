@@ -12,7 +12,14 @@ CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 # This incident-only guard is separate from provider-local adaptive capacity.
 UNBOUND_REPAIR_MAX_CONCURRENT_CEILING = 40
 PROMOTION_MODES = frozenset(
-    {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
+    {
+        "normal",
+        "isolated-only",
+        "controller-repair-only",
+        "draft-only",
+        "hold-intake",
+        "blocked",
+    }
 )
 STATES = frozenset({"GREEN", "AMBER", "RED"})
 INTEGRITY_STATUSES = frozenset({"clear", "resolved", "active", "invalid"})
@@ -145,7 +152,19 @@ def _project_signals(value: object) -> dict[str, Any]:
     }
     controller = signals.get("controller")
     if isinstance(controller, dict) and isinstance(controller.get("status"), str):
-        projected["controller"] = {"status": controller["status"]}
+        projected_controller = {"status": controller["status"]}
+        for field in ("kind", "url", "source", "observedAt", "error"):
+            candidate = controller.get(field)
+            if isinstance(candidate, str) and candidate:
+                projected_controller[field] = candidate
+        active_runs = controller.get("activeRuns")
+        if (
+            isinstance(active_runs, int)
+            and not isinstance(active_runs, bool)
+            and active_runs >= 0
+        ):
+            projected_controller["activeRuns"] = active_runs
+        projected["controller"] = projected_controller
     return projected
 
 
@@ -220,6 +239,200 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
     return projected
 
 
+def _project_controller_repair(value: object, promotion_mode: str) -> dict[str, Any]:
+    if value is None:
+        if promotion_mode == "controller-repair-only":
+            raise AdmissionProjectionError(
+                "controller-repair-only requires controllerRepairAdmission"
+            )
+        return {
+            "allowed": False,
+            "condition": None,
+            "mainSha": None,
+            "deployedSha": None,
+            "scope": None,
+            "maxConcurrent": 0,
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
+        }
+    admission = _require_mapping(value, "controllerRepairAdmission")
+    allowed = _require_bool(
+        admission.get("allowed"), "controllerRepairAdmission.allowed"
+    )
+    projected = {
+        "allowed": allowed,
+        "condition": admission.get("condition"),
+        "mainSha": admission.get("mainSha"),
+        "deployedSha": admission.get("deployedSha"),
+        "scope": admission.get("scope"),
+        "maxConcurrent": admission.get("maxConcurrent"),
+        "deploymentsAllowed": _require_bool(
+            admission.get("deploymentsAllowed"),
+            "controllerRepairAdmission.deploymentsAllowed",
+        ),
+        "runtimeActivationAllowed": _require_bool(
+            admission.get("runtimeActivationAllowed"),
+            "controllerRepairAdmission.runtimeActivationAllowed",
+        ),
+    }
+    if projected["deploymentsAllowed"] is not False or projected["runtimeActivationAllowed"] is not False:
+        raise AdmissionProjectionError("controller repair cannot authorize deployment or runtime")
+    if allowed:
+        if promotion_mode != "controller-repair-only":
+            raise AdmissionProjectionError("controller repair authority contradicts promotionMode")
+        if projected["condition"] != "controller-failure":
+            raise AdmissionProjectionError("allowed controller repair condition is invalid")
+        if projected["scope"] != "trusted-comment-exact-repository-pr-head-main-path-set":
+            raise AdmissionProjectionError("allowed controller repair scope is invalid")
+        if projected["maxConcurrent"] != 1:
+            raise AdmissionProjectionError("allowed controller repair must have maxConcurrent 1")
+        _hex_sha(projected["mainSha"], "controllerRepairAdmission.mainSha")
+        deployed = projected["deployedSha"]
+        if not isinstance(deployed, str) or len(deployed) < 7:
+            raise AdmissionProjectionError("allowed controller repair deployedSha is invalid")
+    elif promotion_mode == "controller-repair-only":
+        raise AdmissionProjectionError("controller-repair-only requires allowed repair authority")
+    elif projected["scope"] not in {
+        None,
+        "trusted-comment-exact-repository-pr-head-main-path-set",
+    }:
+        raise AdmissionProjectionError("denied controller repair scope is invalid")
+    elif any(
+        projected[field] is not None
+        for field in ("condition", "mainSha", "deployedSha")
+    ) or projected["maxConcurrent"] != 0:
+        raise AdmissionProjectionError("denied controller repair must not carry authority")
+    return projected
+
+
+def _project_review(value: object) -> dict[str, Any]:
+    admission = _require_mapping(value, "reviewAdmission")
+    projected = {
+        "allowed": _require_bool(admission.get("allowed"), "reviewAdmission.allowed"),
+        "required": _require_bool(
+            admission.get("required"), "reviewAdmission.required"
+        ),
+        "authority": admission.get("authority"),
+        "scope": admission.get("scope"),
+        "headSha": admission.get("headSha"),
+        "observedAt": admission.get("observedAt"),
+        "reviewId": admission.get("reviewId"),
+        "reviewer": admission.get("reviewer"),
+        "reason": admission.get("reason"),
+    }
+    if projected["required"] is not True:
+        raise AdmissionProjectionError("reviewAdmission.required must be true")
+    if projected["authority"] != "Gem" or projected["scope"] != "exact-main-head":
+        raise AdmissionProjectionError("reviewAdmission provenance is invalid")
+    for field in ("observedAt", "reviewId", "reviewer", "reason"):
+        value = projected[field]
+        if value is not None and (not isinstance(value, str) or not value):
+            raise AdmissionProjectionError(f"reviewAdmission.{field} is invalid")
+    head_sha = projected["headSha"]
+    if head_sha is not None:
+        _hex_sha(head_sha, "reviewAdmission.headSha")
+    if projected["allowed"] and (
+        projected["reviewer"] != "Gem"
+        or projected["reason"] != "fresh-exact-head-independent-review"
+        or projected["reviewId"] is None
+        or projected["observedAt"] is None
+        or projected["headSha"] is None
+    ):
+        raise AdmissionProjectionError("allowed reviewAdmission is untrusted")
+    return projected
+
+
+def _validate_hold_intake_projection(projected: dict[str, Any]) -> None:
+    if projected["promotionMode"] != "hold-intake":
+        return
+    signals = projected["signals"]
+    reasons = {reason["code"] for reason in projected["reasons"]}
+    if not reasons or not reasons <= {"controller-failure", "production-deployment-unbound"}:
+        raise AdmissionProjectionError("hold-intake reasons are not bounded")
+    if (
+        projected["state"] != "AMBER"
+        or signals["main"]["status"] != "green"
+        or signals["production"]["status"] != "green"
+        or signals["integrity"]["status"] not in {"clear", "resolved"}
+        or signals.get("controller", {}).get("status") not in {"green", "failed"}
+        or projected["promotionAdmission"]["allowed"]
+        or projected["isolatedPromotionAdmission"]["allowed"]
+    ):
+        raise AdmissionProjectionError("hold-intake requires healthy source and clear integrity")
+    review = projected["reviewAdmission"]
+    if not review["allowed"] or review["headSha"] != signals["main"]["sha"]:
+        raise AdmissionProjectionError("hold-intake requires allowed exact-main review")
+
+
+def _validate_controller_repair_projection(projected: dict[str, Any]) -> None:
+    repair = projected["controllerRepairAdmission"]
+    if not repair["allowed"]:
+        return
+    if projected["state"] != "AMBER":
+        raise AdmissionProjectionError("controller repair requires AMBER state")
+    if projected["promotionAdmission"]["allowed"]:
+        raise AdmissionProjectionError("controller repair cannot authorize promotion")
+    if projected["isolatedPromotionAdmission"]["allowed"]:
+        raise AdmissionProjectionError("controller repair cannot authorize isolation")
+    deployment = projected.get("deploymentAdmission")
+    if isinstance(deployment, dict) and deployment.get("allowed") is not False:
+        raise AdmissionProjectionError("controller repair cannot authorize deployment")
+
+    signals = projected["signals"]
+    controller = signals.get("controller")
+    if (
+        not isinstance(controller, dict)
+        or controller.get("status") != "failed"
+        or controller.get("kind") != "symphony"
+        or not isinstance(controller.get("url"), str)
+        or not controller["url"]
+        or not isinstance(controller.get("error"), str)
+        or not controller["error"]
+    ):
+        raise AdmissionProjectionError(
+            "controller repair requires failed Symphony observation provenance"
+        )
+    if (
+        signals["main"].get("status") != "green"
+        or signals["main"].get("sha") != repair["mainSha"]
+        or signals["production"].get("status") != "green"
+        or signals["production"].get("deployedSha") != repair["deployedSha"]
+        or signals["integrity"].get("status") not in {"clear", "resolved"}
+    ):
+        raise AdmissionProjectionError("controller repair identity is not signal-bound")
+
+    review = projected["reviewAdmission"]
+    if not review["allowed"] or review["headSha"] != repair["mainSha"]:
+        raise AdmissionProjectionError("controller repair requires exact-main review")
+
+    allowed_reason_codes = {
+        "controller-failure",
+        "production-deployment-unbound",
+    }
+    reason_codes = {reason["code"] for reason in projected["reasons"]}
+    if (
+        "controller-failure" not in reason_codes
+        or not reason_codes <= allowed_reason_codes
+    ):
+        raise AdmissionProjectionError("controller repair reasons are not bounded")
+
+    closure = signals["closureHealth"]
+    closure_admission = projected["closureAdmission"]
+    if (
+        closure.get("status") != closure_admission.get("status")
+        or closure.get("reasons", []) != closure_admission.get("reasons", [])
+    ):
+        raise AdmissionProjectionError("controller repair closure evidence disagrees")
+    closure_reasons = set(closure.get("reasons", []))
+    closure_allowed = closure.get("status") == "healthy" or (
+        closure.get("status") in {"grace", "red"}
+        and closure_reasons <= {"queue-controller-red-over-10m"}
+        and closure.get("newIssueIntakeAllowed") is False
+    )
+    if not closure_allowed:
+        raise AdmissionProjectionError("controller repair closure evidence is unsafe")
+
+
 def _project_closure_admission(value: object) -> dict[str, Any]:
     admission = _require_mapping(value, "closureAdmission")
     intake = _require_bool(
@@ -271,9 +484,11 @@ def _project_cohort(value: object, promotion_mode: str, intake: bool) -> dict[st
             raise AdmissionProjectionError(
                 "hold-intake must preserve the admitted cohort"
             )
-        if new_intake is not intake:
+        # Runtime containment may impose a stricter intake hold than closure.
+        # A receipt can narrow authority, never bypass a closure intake hold.
+        if new_intake and not intake:
             raise AdmissionProjectionError(
-                "alreadyAdmittedCohort.newIntakeAllowed contradicts closure intake"
+                "alreadyAdmittedCohort.newIntakeAllowed bypasses closure intake"
             )
     projected: dict[str, Any] = {
         "preserve": preserve,
@@ -311,6 +526,7 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
     if state not in STATES:
         raise AdmissionProjectionError("state must be GREEN, AMBER, or RED")
     closure_admission = _project_closure_admission(source.get("closureAdmission"))
+    review_admission = _project_review(source.get("reviewAdmission"))
     isolated = _project_isolated(source.get("isolatedPromotionAdmission"))
     promotion = _require_mapping(source.get("promotionAdmission"), "promotionAdmission")
     work = _require_mapping(source.get("workAdmission"), "workAdmission")
@@ -321,6 +537,7 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
         "promotionMode": promotion_mode,
         "reasons": _project_reasons(source.get("reasons")),
         "signals": _project_signals(source.get("signals")),
+        "reviewAdmission": review_admission,
         "promotionAdmission": {
             "allowed": _require_bool(
                 promotion.get("allowed"), "promotionAdmission.allowed"
@@ -329,6 +546,9 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
         "isolatedPromotionAdmission": isolated,
         "productionUnboundRepairAdmission": _project_unbound_repair(
             source.get("productionUnboundRepairAdmission"), promotion_mode
+        ),
+        "controllerRepairAdmission": _project_controller_repair(
+            source.get("controllerRepairAdmission"), promotion_mode
         ),
         "closureAdmission": closure_admission,
         "alreadyAdmittedCohort": _project_cohort(
@@ -355,6 +575,8 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
         is not closure_admission["newIssueIntakeAllowed"]
     ):
         raise AdmissionProjectionError("closure signal and admission disagree")
+    _validate_hold_intake_projection(projected)
+    _validate_controller_repair_projection(projected)
     _reject_inventories(projected, "admission")
     encoded = json.dumps(projected, separators=(",", ":"), sort_keys=True)
     if len(encoded.encode("utf-8")) > MAX_ADMISSION_JSON_BYTES:

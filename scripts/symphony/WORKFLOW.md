@@ -41,7 +41,7 @@ agent:
   max_concurrent_agents: 8
   max_turns: 20
 codex:
-  command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server
+  command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server
   approval_policy: never
   thread_sandbox: workspace-write
   turn_sandbox_policy:
@@ -70,6 +70,8 @@ The app-server command accepts only the native Codex app-server transport. It ve
 Unattended git uses git + gh CLI only. Never GitHub MCP, never Codex Apps `create_branch`, never connector `76869538009648d5b282a4bb21c3d157` (meetjovie has `[apps.connector_76869538009648d5b282a4bb21c3d157] enabled=false`).
 
 Work only in this workspace. Smallest correct fix. Never write a Linear token into the repo. Open a non-draft PR; never merge. Keep one `## Codex Workpad` comment.
+
+For an operator-assigned existing-PR repair admitted while Linear is In Review, continue only the checked-out existing PR branch and workspace verified by pickup. Do not create a new branch or PR, reset to main, or change Linear state to gain admission. The finite assignment authorizes one repair pickup; it does not waive routing, provider authentication, fleet push, review, CI, or queue gates. New-work branch-creation steps below apply only to new issues.
 
 1. Sync `origin/main` with `git` and create `symphony/{{ issue.identifier }}-fix` with `git checkout -b`.
 2. Use official skills plus git + gh CLI to implement, test, commit, push, and open a PR with `Fixes {{ issue.identifier }}`.

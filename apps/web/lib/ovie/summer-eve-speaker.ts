@@ -8,12 +8,13 @@ import {
   type SummerSpeaker,
 } from '@/lib/ovie/summer-transport';
 
+const eveSessionIdSchema = z.string().regex(/^(?:ses_|wrun_)[A-Za-z0-9_-]+$/u);
 const resultSchema = z.object({
   eventId: z.string(),
   conversationId: z.literal('summer-session-current'),
   principalHash: z.string(),
   deploymentId: z.string(),
-  sessionId: z.string().regex(/^ses_/u),
+  sessionId: eveSessionIdSchema,
   turnId: z.string(),
   responseText: z.string().max(64 * 1024),
   status: z.enum(['completed', 'failed']),

@@ -38,7 +38,7 @@ describe('HomepageEditorialHero', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(heading).toHaveTextContent('Control how the world sees you.');
-    expect(screen.getByTestId('homepage-hero-shell')).toHaveAttribute(
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'aria-labelledby',
       heading.id
     );
@@ -58,7 +58,8 @@ describe('HomepageEditorialHero', () => {
     expect(submit).toHaveTextContent('Find me');
     expect(submit).toHaveAttribute('data-size', 'marketing');
     expect(submit).toHaveAttribute('data-variant', 'primary');
-    expect(submit).toHaveClass('h-8', 'rounded-full');
+    expect(submit).toHaveClass('h-7', 'rounded-full');
+    expect(submit).toHaveClass('before:h-11', 'before:min-w-11');
     expect(submit).toBeEnabled();
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
@@ -75,7 +76,13 @@ describe('HomepageEditorialHero', () => {
       'data-hero-visual',
       'abstract-light-field'
     );
-    const hero = screen.getByTestId('homepage-hero-shell');
+    const hero = screen.getByTestId('marketing-section-hero');
+    expect(hero).toHaveAttribute('data-homepage-testid', 'homepage-hero-shell');
+    expect(hero).toHaveAttribute('data-marketing-variant', 'centered-none');
+    expect(hero).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/homepage/HomepageEditorialHero.tsx'
+    );
     expect(hero.querySelectorAll('picture, img, video, canvas')).toHaveLength(
       0
     );

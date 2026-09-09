@@ -1,38 +1,12 @@
 #!/usr/bin/env bash
-# scripts/archive.sh — Clean up build artifacts and dependencies to free disk space.
-# Run when archiving a Conductor workspace.
+# Archiving is a request, not evidence that nested worktrees or allocations were
+# released. Delegate candidate reporting; never traverse/delete workspace roots
+# or prune shared Git metadata here.
 set -euo pipefail
-
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$REPO_ROOT"
-
-echo "Archiving Jovie workspace..."
-
-# Remove web app build artifacts
-for dir in .next out dist coverage .nyc_output; do
-  if [ -d "apps/web/$dir" ]; then
-    rm -rf "apps/web/$dir"
-    echo "  Removed apps/web/$dir"
-  fi
-done
-
-# Remove turbo cache
-find . -name ".turbo" -type d -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
-echo "  Removed .turbo caches"
-
-# Remove node_modules everywhere
-find . -name "node_modules" -type d -prune -exec rm -rf {} + 2>/dev/null || true
-echo "  Removed node_modules"
-
-# Remove agent worktrees (stale subagent git worktrees)
-if [ -d ".claude/worktrees" ]; then
-  rm -rf .claude/worktrees 2>/dev/null || true
-  echo "  Removed .claude/worktrees"
+if [[ $# -gt 0 ]]; then
+  echo "Usage: $0" >&2
+  exit 2
 fi
-
-# Always prune stale Git metadata immediately. The default prune expiry
-# keeps stale entries around for months, which can break future worktree add.
-git worktree prune --expire now 2>/dev/null || true
-echo "  Pruned stale git worktree metadata"
-
-echo "Archive cleanup complete."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo "Archive cleanup deferred: verified task/allocation release is required."
+exec bash "$SCRIPT_DIR/codex-cleanup.sh" --dry-run
