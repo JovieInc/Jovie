@@ -840,8 +840,8 @@ queue_reentry_receipt_is_recoverable() {  # <pr> <head> [target-url] [checkpoint
   null_creator_receipt_has_provenance "$head" "$latest"
 }
 
-record_queue_reentry_receipt() {  # <pr> <expected-head>
-  local n="$1" expected_head="$2" current live_head target_url checkpoint description
+record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <enqueued-at>
+  local n="$1" expected_head="$2" entry_id="$3" enqueued_at="$4" live_head target_url checkpoint description reuse=0
   if [[ ! "$n" =~ ^[1-9][0-9]*$ || ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
     echo "    !! cannot record queue re-entry receipt for #$n without an exact head" >&2
     return 1
@@ -864,24 +864,22 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
     return 1
   fi
   description="checkpoint=$checkpoint;main=$FLEET_POLICY_MAIN_SHA;pr=$n"
-  # One run may observe the same immutable head more than once. Reuse only its
-  # own receipt; a later re-admission run must emit fresh evidence after the
-  # latest AddedToMergeQueueEvent.
-  if queue_reentry_receipt_is_recoverable "$n" "$expected_head" "$target_url"; then
+  # Lookup may paginate/retry. Finish it before the final membership read,
+  # and never reuse a receipt predating this particular admission.
+  if queue_reentry_receipt_is_recoverable "$n" "$expected_head" "$target_url" "" "$enqueued_at"; then
+    reuse=1
+  fi
+  # Caller token identity does not prove who created observed membership.
+  if ! node scripts/merge-queue-backend.mjs prove-admission \
+    "$n" "$expected_head" "$entry_id" >/dev/null; then
+    echo "    !! queue admission actor or entry changed before receipt for #$n" >&2
+    return 1
+  fi
+  if [[ "$reuse" == "1" ]]; then
     echo "    =$QUEUE_REENTRY_CONTEXT on #$n at $expected_head (already recorded)"
     return 0
   fi
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
-    echo "    !! could not refresh #$n before recording queue re-entry receipt" >&2
-    return 1
-  fi
-  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
-  if ! jq -e --arg head "$expected_head" '
-    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
-  ' <<<"$current" >/dev/null; then
-    echo "    ⏸ #$n head changed before queue re-entry receipt; compensating enrollment"
-    return 2
-  fi
+  live_head="$expected_head"
   if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
     -f state=success \
     -f context="$QUEUE_REENTRY_CONTEXT" \
@@ -1539,7 +1537,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     # recover a member GitHub ejects after main advances. If it cannot be
     # written, compensate the just-proven queue membership rather than leave
     # a PR that future event loss cannot safely recover.
-    if ! record_queue_reentry_receipt "$n" "$expected_head"; then
+    if ! record_queue_reentry_receipt "$n" "$expected_head" "$(jq -r '.state.mergeQueueEntry.id' <<<"$enrollment_receipt")" "$(jq -r '.state.mergeQueueEntry.enqueuedAt' <<<"$enrollment_receipt")"; then
       echo "    !! native enrollment lacks durable exact-head re-entry receipt; compensating" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate native enrollment without re-entry receipt for #$n" >&2
