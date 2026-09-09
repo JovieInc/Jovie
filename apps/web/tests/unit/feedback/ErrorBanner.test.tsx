@@ -247,11 +247,25 @@ describe('ErrorBanner semantic color and target ownership', () => {
 
     expect(retry).toHaveAttribute('data-variant', 'primary');
     expect(retry).toHaveAttribute('data-size', ERROR_BANNER_ACTION_SIZE);
-    expect(retry.className).toContain('before:h-11');
-    expect(retry.className).toContain('rounded-full');
+    expect(retry).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11',
+      'rounded-full'
+    );
+    expect(retry).not.toHaveClass('before:h-11');
     expect(secondary).toHaveAttribute('data-variant', 'secondary');
     expect(secondary).toHaveAttribute('data-size', ERROR_BANNER_ACTION_SIZE);
-    expect(secondary.className).toContain('before:h-11');
+    expect(secondary).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(secondary).not.toHaveClass('before:h-11');
     expect(dismiss).toHaveAttribute('data-size', ERROR_BANNER_DISMISS_SIZE);
     expect(dismiss.className).toContain('before:h-11');
     expect(dismiss.className).toContain('before:w-11');
@@ -279,9 +293,15 @@ describe('ErrorBanner semantic color and target ownership', () => {
       name: 'Copy Error Details To Clipboard',
     });
     expect(copy).toHaveAttribute('data-size', ERROR_BANNER_COPY_SIZE);
-    expect(copy.className).toContain('before:h-11');
-    expect(copy.className).toContain('rounded-full');
-    expect(copy.className).not.toMatch(/\bh-auto\b/);
+    expect(copy).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11',
+      'rounded-full'
+    );
+    expect(copy).not.toHaveClass('before:h-11');
     expect(copy.className).not.toMatch(/\brounded-md\b/);
   });
 
@@ -352,7 +372,14 @@ describe('ErrorBanner semantic color and target ownership', () => {
     const link = screen.getByRole('link', { name: 'Open docs' });
     expect(link).toHaveAttribute('href', 'https://jov.ie/docs');
     expect(link).toHaveAttribute('data-size', ERROR_BANNER_ACTION_SIZE);
-    expect(link.className).toContain('before:h-11');
+    expect(link).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(link).not.toHaveClass('before:h-11');
   });
 
   it('keeps an internal link with onClick on the same target contract', () => {

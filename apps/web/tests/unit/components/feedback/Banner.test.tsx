@@ -124,7 +124,14 @@ describe('Banner semantic feedback surface', () => {
     expect(onAction).toHaveBeenCalledOnce();
     expect(onDismiss).toHaveBeenCalledOnce();
     expect(action).toHaveAttribute('data-size', 'sm');
-    expect(action.className).toContain('before:h-11');
+    expect(action).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(action).not.toHaveClass('before:h-11');
     expect(dismiss).toHaveAttribute('data-size', 'icon-sm');
     expect(dismiss.className).toContain('before:h-11');
     expect(dismiss.className).toContain('before:w-11');
