@@ -237,10 +237,15 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
       APPLE_API_ISSUER: 'issuer',
       APPLE_API_KEY: '/tmp/private-key.p8',
       APPLE_API_KEY_ID: 'key-id',
+      JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
       JOVIE_STAGING_RELEASE: 'true',
     },
+    executeCodesign: async args => {
+      calls.push(['codesign', ...args]);
+      return { stdout: '' };
+    },
     executeXcrun: async args => {
-      calls.push(args);
+      calls.push(['xcrun', ...args]);
       if (args[0] === 'notarytool') {
         return {
           stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
@@ -253,7 +258,10 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
 
   const finalBytes = await readFile(dmg);
   assert.deepEqual(calls, [
+    ['codesign', '--force', '--timestamp', '--sign', 'developer-id-hash', dmg],
+    ['codesign', '--verify', '--verbose=2', dmg],
     [
+      'xcrun',
       'notarytool',
       'submit',
       dmg,
@@ -269,8 +277,8 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
       '--output-format',
       'json',
     ],
-    ['stapler', 'staple', dmg],
-    ['stapler', 'validate', dmg],
+    ['xcrun', 'stapler', 'staple', dmg],
+    ['xcrun', 'stapler', 'validate', dmg],
   ]);
   assert.equal(event.updateInfo.size, finalBytes.length);
   assert.equal(event.updateInfo.sha512, hash(finalBytes, 'sha512', 'base64'));
@@ -282,10 +290,12 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
   const accepted = async () => ({
     stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
   });
+  const codesignAccepted = async () => ({ stdout: '' });
   const environment = {
     APPLE_API_ISSUER: 'issuer',
     APPLE_API_KEY: '/tmp/private-key.p8',
     APPLE_API_KEY_ID: 'key-id',
+    JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
     JOVIE_STAGING_RELEASE: 'true',
   };
 
@@ -295,6 +305,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
       {
         buildBlockMap: () => assert.fail('must not build'),
         environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
         executeXcrun: () => assert.fail('must not execute'),
       }
     );
@@ -306,6 +317,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
       {
         buildBlockMap: () => assert.fail('must not build'),
         environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
         executeXcrun: () => assert.fail('must not execute'),
       }
     );
@@ -321,17 +333,23 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
     );
   });
   await t.test('requires every notarization credential', async () => {
-    await assert.rejects(
-      notarizeStagingDmg(
-        { file: dmg, updateInfo: {} },
-        {
-          buildBlockMap: assert.fail,
-          environment: { ...environment, APPLE_API_ISSUER: '' },
-          executeXcrun: accepted,
-        }
-      ),
-      /credential is missing: issuer/
-    );
+    for (const [name, missingEnvironment] of [
+      ['issuer', { ...environment, APPLE_API_ISSUER: '' }],
+      ['signingIdentity', { ...environment, JOVIE_MAC_SIGNING_IDENTITY: '' }],
+    ]) {
+      await assert.rejects(
+        notarizeStagingDmg(
+          { file: dmg, updateInfo: {} },
+          {
+            buildBlockMap: assert.fail,
+            environment: missingEnvironment,
+            executeCodesign: assert.fail,
+            executeXcrun: accepted,
+          }
+        ),
+        new RegExp(`credential is missing: ${name}`)
+      );
+    }
   });
   await t.test('requires an accepted structured Apple response', async () => {
     for (const stdout of [
@@ -345,12 +363,29 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
           {
             buildBlockMap: assert.fail,
             environment,
+            executeCodesign: codesignAccepted,
             executeXcrun: async () => ({ stdout }),
           }
         ),
         /not valid JSON|did not accept/
       );
     }
+  });
+  await t.test('stops before notarization when DMG signing fails', async () => {
+    await assert.rejects(
+      notarizeStagingDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: assert.fail,
+          environment,
+          executeCodesign: async () => {
+            throw new Error('signing failed');
+          },
+          executeXcrun: assert.fail,
+        }
+      ),
+      /signing failed/
+    );
   });
   await t.test('requires final metadata for the stapled bytes', async () => {
     await assert.rejects(
@@ -359,6 +394,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
         {
           buildBlockMap: async () => ({ sha512: '', size: 0 }),
           environment,
+          executeCodesign: codesignAccepted,
           executeXcrun: accepted,
         }
       ),
@@ -1030,6 +1066,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /sync-version\.mjs[\s\S]*--staging-version/,
     /Validate rolling staging prerelease/,
     /Require staging signing and notarization credentials/,
+    /JOVIE_MAC_SIGNING_IDENTITY=/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
     /dist\/staging-mac\.yml/,

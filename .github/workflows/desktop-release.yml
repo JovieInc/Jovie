@@ -1216,8 +1216,22 @@ jobs:
           # Echo identity for build-log breadcrumb (no secret in output).
           security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
 
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              awk '/"Developer ID Application:/{print $2}'
+          )"
+          SIGNING_IDENTITY_COUNT="$(
+            printf '%s\n' "$SIGNING_IDENTITY" |
+              awk 'NF { count++ } END { print count + 0 }'
+          )"
+          [ "$SIGNING_IDENTITY_COUNT" -eq 1 ] || {
+            echo "::error::Expected exactly one Developer ID Application identity."
+            exit 1
+          }
+
           rm -f "$CERT_PATH"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "JOVIE_MAC_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
 
       # Notarization uses App Store Connect API keys instead of an Apple ID +
       # app-specific password. @electron/notarize (which electron-builder
