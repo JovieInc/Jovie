@@ -30,6 +30,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { SidebarInboxButton } from '@/components/shell/SidebarInboxButton';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -242,9 +243,11 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
+  const { inboxNavigation } = useDashboardData();
 
   return (
-    <div className='flex w-full items-center'>
+    <div className='flex w-full items-center' data-sidebar-brand-row='true'>
+      <div className='min-w-0 flex-1'>
       {(() => {
         if (isRouteSidebar) {
           return (
@@ -320,6 +323,13 @@ function SidebarHeaderNav({
           </div>
         );
       })()}
+      </div>
+      {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
+        <>
+          <SidebarInboxButton availability={inboxNavigation} />
+          <HeaderSearchSurfaceFromContext compact />
+        </>
+      ) : null}
 
       {!isDesktop ? (
         <SidebarCollapseButton className='ml-auto shrink-0' />
@@ -421,8 +431,12 @@ export function UnifiedSidebar({
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (
-              <DashboardNav>
-                <HeaderSearchSurfaceFromContext calm />
+              <DashboardNav headerOwnsInbox={!isDemoRoute}>
+                {isDemoRoute ? (
+                  <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
+                ) : (
+                  <HeaderSearchSurfaceFromContext calm />
+                )}
               </DashboardNav>
             )}
           </SidebarGroupContent>
