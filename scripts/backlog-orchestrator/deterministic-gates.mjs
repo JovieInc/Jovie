@@ -102,6 +102,19 @@ function valueQualification(description) {
         match[2],
       ])
   );
+  /**
+   * String admission fields plus the structured operating-sanity block
+   * (value.sanity); Object.fromEntries only infers the string side.
+   * @type {Record<string, string | {
+   *   basis: string,
+   *   concurrency: number,
+   *   demandPerDay: number,
+   *   criticalPath: { stage: string, durationMs: number }[],
+   *   bottleneck: string,
+   *   simplification: string,
+   *   owner: string,
+   * }>}
+   */
   const value = Object.fromEntries(
     [
       'authority',
