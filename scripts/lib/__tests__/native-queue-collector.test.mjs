@@ -49,7 +49,8 @@ if(query.includes('pullRequests(')) {
   const c=result.data.repository.pullRequests, p=c.nodes[0];
   if(mode==='truncated-files') p.files.pageInfo.hasNextPage=true;
   if(mode==='missing-cursor') c.pageInfo.hasNextPage=true;
-  if(mode==='paged') { c.pageInfo={hasNextPage:!query.includes('after:'),endCursor:'next'}; if(query.includes('after:')) c.nodes=[]; }
+  if(mode==='inventory-drift' && query.includes('InventoryReadback')) p.headRefOid='b'.repeat(40);
+  if(mode==='paged' && !query.includes('InventoryReadback')) { c.pageInfo={hasNextPage:!query.includes('after:'),endCursor:'next'}; if(query.includes('after:')) c.nodes=[]; }
   if(mode==='inline-checks') p.commits.nodes[0].commit.statusCheckRollup.contexts={pageInfo:{hasNextPage:false},nodes:[{name:'PR Ready',databaseId:1,status:'COMPLETED',conclusion:'SUCCESS',startedAt:'2026-01-01T00:00:00Z',completedAt:'2026-01-01T00:00:01Z',checkSuite:{app:{databaseId:1}}},{id:'status',context:'Fork PR Gate',state:'PENDING',createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:01Z'}]};
 }
 if(mode==='validation-pending' && query.includes('ci.yml/runs?')) result.workflow_runs[0].status='in_progress';
@@ -199,6 +200,7 @@ describe('read-only native queue collector CLI', () => {
     'missing-cursor',
     'graphql-error',
     'invalid-json',
+    'inventory-drift',
   ])('persists a non-green result for %s', mode => {
     const { bundle, result } = collect(mode);
     expect(bundle.snapshots[0].complete).toBe(false);
@@ -223,7 +225,7 @@ describe('read-only native queue collector CLI', () => {
     if (mode === 'paged')
       expect(
         calls.filter(args => args.join(' ').includes('pullRequests('))
-      ).toHaveLength(2);
+      ).toHaveLength(3);
   });
   it('persists artifact transport failure instead of inventing a successful merge receipt', () => {
     const { bundle } = collect('merged-download-error');

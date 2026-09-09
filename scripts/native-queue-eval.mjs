@@ -5,7 +5,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { digest, evaluate, SCHEMA } from './lib/native-queue-eval.mjs';
+import {
+  digest,
+  evaluate,
+  inventoryIdentity,
+  SCHEMA,
+} from './lib/native-queue-eval.mjs';
 
 /**
  * @param {string[]} argv
@@ -298,6 +303,14 @@ export function main(
         bundle.merges = bundle.merges.filter(m => m.number !== number);
         bundle.merges.push(receipt);
       }
+      s.readback = connection(
+        graphql(`query InventoryReadback {repository(owner:"JovieInc",name:"Jovie") {pullRequests(first:100,states:OPEN) {
+        nodes {number headRefOid isInMergeQueue mergeQueueEntry {id headCommit {oid} baseCommit {oid}}} pageInfo {hasNextPage}}}}`)
+          .pullRequests
+      );
+      s.readbackAt = new Date().toISOString();
+      if (inventoryIdentity(s.prs) !== inventoryIdentity(s.readback))
+        throw new Error('Inventory changed during collection');
       if (bundle.evaluatorSha) {
         const run = api(
           `actions/workflows/ci.yml/runs?head_sha=${bundle.evaluatorSha}&per_page=100`

@@ -79,6 +79,8 @@ function passingFixture() {
     startedAt: later(id * 10),
     finishedAt: later(id * 10 + 1),
     complete: true,
+    readback: [],
+    readbackAt: later(id * 10 + 1),
     errors: [],
     scheduler: {
       workflow: policySource(
@@ -223,6 +225,8 @@ function passingFixture() {
       JSON.stringify(snapshot.prs[1]).replaceAll(head, secondHead)
     );
     snapshot.prs[1].mergeQueueEntry.baseCommit.oid = head;
+    snapshot.readback = structuredClone(snapshot.prs);
+    snapshot.readbackAt = snapshot.finishedAt;
   }
   return {
     schema: SCHEMA,
@@ -337,6 +341,18 @@ describe('complete evidence and deliberate negative controls', () => {
       'missing observation',
       b => {
         delete b.merges[0].observedAt;
+      },
+    ],
+    [
+      'missing inventory readback',
+      b => {
+        delete b.snapshots[0].readback;
+      },
+    ],
+    [
+      'changed inventory readback',
+      b => {
+        b.snapshots[0].readback[0].headRefOid = base;
       },
     ],
     [
@@ -457,6 +473,7 @@ describe('complete evidence and deliberate negative controls', () => {
     const b = passingFixture();
     b.snapshots[0].prs[0].isInMergeQueue = false;
     b.snapshots[0].prs[0].mergeQueueEntry = null;
+    b.snapshots[0].readback = structuredClone(b.snapshots[0].prs);
     expect(evaluate(b, evaluationTime).status).toBe('PASS');
     for (const s of b.snapshots) s.prs.push({ ...pr(), number: 123 });
     expect(evaluate(b, evaluationTime).blocked).toContain(

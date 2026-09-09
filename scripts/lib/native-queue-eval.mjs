@@ -19,6 +19,22 @@ export {
   schedulerDeadline,
 } from './native-queue-policy-evidence.mjs';
 
+export const inventoryIdentity = prs =>
+  digest(
+    prs
+      .map(p =>
+        [
+          p.number,
+          p.headRefOid,
+          p.isInMergeQueue,
+          p.mergeQueueEntry?.id,
+          p.mergeQueueEntry?.headCommit?.oid,
+          p.mergeQueueEntry?.baseCommit?.oid,
+        ].join(':')
+      )
+      .sort()
+  );
+
 export function evaluate(bundle, now = Date.now()) {
   const failures = [],
     blocked = [];
@@ -67,6 +83,13 @@ export function evaluate(bundle, now = Date.now()) {
       Array.isArray(s.prs) &&
       new Set(s.prs.map(p => p.number)).size ===
         s.prs.length, 'incomplete-inventory');
+    require(Array.isArray(s.prs) &&
+      Array.isArray(s.readback) &&
+      time(s.readbackAt) &&
+      Date.parse(s.readbackAt) >= Date.parse(s.startedAt) &&
+      Date.parse(s.readbackAt) <= Date.parse(s.finishedAt) &&
+      inventoryIdentity(s.prs) ===
+        inventoryIdentity(s.readback), 'inventory-readback-unproved');
     const p = s.policy;
     if (!p?.required || !p.review || !p.queue) {
       blocked.push('policy-unavailable');
