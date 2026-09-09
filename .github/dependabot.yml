@@ -2,7 +2,9 @@ version: 2
 updates:
   # Enable version updates for Node dependencies (npm ecosystem, pnpm-managed project)
   - package-ecosystem: 'npm'
-    directory: '/'
+    directories:
+      - '/'
+      - '/scripts/symphony/codex-cli'
     schedule:
       interval: 'daily'
       time: '09:00'
