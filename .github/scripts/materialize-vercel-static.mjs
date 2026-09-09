@@ -8,7 +8,7 @@ import {
   renameSync,
   unlinkSync,
 } from 'node:fs';
-import { dirname, relative, resolve, sep } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 function inside(root, path) {
@@ -36,6 +36,9 @@ export function materializeStatic(root) {
   const pending = [];
   function walk(directory) {
     for (const name of readdirSync(directory).sort()) {
+      if (name.startsWith('.jovie-materialize-')) {
+        throw new Error('Unexpected temporary materializer entry in output');
+      }
       const path = resolve(directory, name);
       const stat = lstatSync(path);
       if (stat.isDirectory()) {
@@ -87,11 +90,13 @@ export function materializeStatic(root) {
     }
   }
   walk(resolve(output, 'static'));
-  // Validate the complete tree before replacing any link. Copy alongside the
-  // destination and rename so an interrupted copy cannot expose partial bytes.
+  // Validate the complete tree before replacing any link. Stage outside output
+  // on the build filesystem, then rename. SIGKILL can leave a partial staging
+  // file, but it cannot become a deployable asset on a subsequent invocation.
   for (const { path, target } of pending) {
     const temporary = resolve(
-      dirname(path),
+      root,
+      '.vercel',
       `.jovie-materialize-${randomUUID()}`
     );
     let copied = false;

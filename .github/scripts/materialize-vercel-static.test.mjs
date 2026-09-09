@@ -180,6 +180,38 @@ for (const [name, canonical] of [
   });
 }
 
+test('refuses an interrupted-copy orphan inside deployable output before any write', t => {
+  const f = fixture(t);
+  const good = f.link(
+    '.vercel/output/static/a-good',
+    f.put('apps/web/.next/chunk.js')
+  );
+  f.put(
+    '.vercel/output/static/nested/.jovie-materialize-orphan',
+    'PARTIAL_COPY'
+  );
+  assert.throws(() => materializeStatic(f.root), /temporary materializer/);
+  assert.equal(lstatSync(good).isSymbolicLink(), true);
+});
+
+test('interrupted staging copy outside output cannot enter the deployment snapshot', t => {
+  const f = fixture(t);
+  f.put('.vercel/.jovie-materialize-orphan', 'PARTIAL_COPY');
+  f.link(
+    '.vercel/output/static/chunk.js',
+    f.put('apps/web/.next/chunk.js', 'complete bytes')
+  );
+  assert.equal(materializeStatic(f.root), 1);
+  assert.equal(materializeStatic(f.root), 0);
+  assert.ok(
+    !JSON.stringify(artifactSnapshot(f.root)).includes('jovie-materialize')
+  );
+  assert.equal(
+    readFileSync(resolve(f.root, '.vercel/output/static/chunk.js'), 'utf8'),
+    'complete bytes'
+  );
+});
+
 test('refuses a symlinked static root without modifying its target', t => {
   const f = fixture(t);
   rmSync(resolve(f.root, '.vercel/output/static'), { recursive: true });
