@@ -1,5 +1,6 @@
 import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { DesktopReleaseIdentity } from '@/components/atoms/DesktopTitlebar';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { VerticalDivider } from '../atoms/VerticalDivider';
@@ -99,6 +100,7 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       data-grid-anchor='desktop-content'
       data-top-spacing-owner='shell-header'
+      data-electron-drag-region='true'
       className={cn(
         'z-20',
         // Keep ordinary headers on the AppShellFrame plane. Chat explicitly
@@ -159,6 +161,7 @@ export function DashboardHeader({
               {searchSurface}
             </div>
           ) : null}
+          <DesktopReleaseIdentity />
           {/* The control must remain visually after title/search even if a
               caller's wrapper changes DOM order. Its fixed footprint prevents
               search or rail state from shifting the workspace title. */}

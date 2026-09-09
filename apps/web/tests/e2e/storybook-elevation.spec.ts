@@ -397,3 +397,67 @@ test.describe('two opportunity formats near the composer', () => {
     });
   }
 });
+
+test.describe('desktop header shares the traffic-light row', () => {
+  for (const width of [1200, 390]) {
+    test(`aligned controls and title at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 760 });
+      await page.addInitScript(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.documentElement.dataset.desktopRuntime = 'electron';
+        });
+      });
+      await openStory(
+        page,
+        'organisms-appshellframe--header-alignment',
+        'light'
+      );
+      const toggle = page.getByTestId('electron-sidebar-toggle');
+      const heading = page.getByRole('heading', { name: 'New Chat' });
+      await expect(toggle).toBeVisible();
+      await expect(heading).toBeVisible();
+      const assertGeometry = async () => {
+        const title = (await heading.boundingBox())!;
+        const control = (await toggle.boundingBox())!;
+        expect(
+          Math.abs(title.y + title.height / 2 - control.y - control.height / 2)
+        ).toBeLessThanOrEqual(2);
+        expect(title.x).toBeGreaterThanOrEqual(200);
+        expect(
+          await heading.evaluate(el => el.scrollWidth <= el.clientWidth)
+        ).toBe(true);
+        expect(title.x + title.width).toBeLessThanOrEqual(width);
+        await expect(page.getByTestId('dashboard-header')).toHaveCSS(
+          '-webkit-app-region',
+          'drag'
+        );
+        await expect(toggle).toHaveCSS('-webkit-app-region', 'no-drag');
+        await expect(page.getByRole('button', { name: 'Help' })).toHaveCSS(
+          '-webkit-app-region',
+          'no-drag'
+        );
+      };
+      await assertGeometry();
+      if (width > 1024) {
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-label', 'Expand sidebar');
+        await expect(page.locator('[data-app-shell-sidebar-mount]')).toHaveCSS(
+          'width',
+          '0px'
+        );
+        await assertGeometry();
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-label', 'Collapse sidebar');
+      }
+    });
+  }
+  test('browser retains its normal page header', async ({ page }) => {
+    await openStory(page, 'organisms-appshellframe--header-alignment', 'light');
+    await expect(page.getByTestId('electron-titlebar-row')).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'New Chat' })).toBeVisible();
+    await expect(page.getByTestId('dashboard-header')).toHaveCSS(
+      '-webkit-app-region',
+      'none'
+    );
+  });
+});

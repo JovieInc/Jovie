@@ -1,6 +1,9 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import {
+  DesktopReleaseIdentity,
+  DesktopTitlebar,
+} from '@/components/atoms/DesktopTitlebar';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 
 const electronRuntimeMock = vi.hoisted(() => ({
@@ -29,7 +32,11 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   ),
 }));
 
-function renderTitlebar() {
+function renderTitlebar(
+  overrides: Partial<
+    import('@/components/organisms/sidebar/context').SidebarContextValue
+  > = {}
+) {
   return render(
     <SidebarContext.Provider
       value={{
@@ -40,9 +47,11 @@ function renderTitlebar() {
         setOpenMobile: vi.fn(),
         isMobile: false,
         toggleSidebar: vi.fn(),
+        ...overrides,
       }}
     >
       <DesktopTitlebar />
+      <DesktopReleaseIdentity />
     </SidebarContext.Provider>
   );
 }
@@ -120,20 +129,26 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-nav-pill'));
     expect(
-      screen.getByTestId('electron-titlebar-main-cell')
-    ).not.toContainElement(screen.getByTestId('electron-nav-pill'));
+      screen.queryByTestId('electron-titlebar-main-cell')
+    ).not.toBeInTheDocument();
   });
 
-  it('main cell is a plain drag region with no rounded card chrome', () => {
-    renderTitlebar();
+  it.each([
+    { state: 'closed' as const, open: false },
+    { isMobile: true },
+  ])('reserves main-header space when the sidebar does not own a visible rail', overrides => {
+    renderTitlebar(overrides);
+    expect(screen.getByTestId('electron-titlebar-row')).toHaveAttribute(
+      'data-main-header-inset',
+      'true'
+    );
+  });
 
-    const mainCell = screen.getByTestId('electron-titlebar-main-cell');
-    const className = mainCell.className;
-    // No rounded-top, no border, no content-surface background — the main cell
-    // is a plain drag region. The elevated card lives in #main-content below.
-    expect(className).not.toMatch(/rounded-t/);
-    expect(className).not.toMatch(/\bborder\b/);
-    expect(className).not.toMatch(/linear-app-content-surface/);
+  it('keeps release identity outside the window-control row', () => {
+    renderTitlebar();
+    expect(screen.getByTestId('electron-titlebar-row')).not.toContainElement(
+      screen.getByTestId('electron-release-identity')
+    );
   });
 
   it.each([
@@ -354,6 +369,7 @@ describe('DesktopTitlebar', () => {
         }}
       >
         <DesktopTitlebar />
+        <DesktopReleaseIdentity />
       </SidebarContext.Provider>
     );
     await waitFor(() => {
@@ -414,6 +430,7 @@ describe('DesktopTitlebar', () => {
         }}
       >
         <DesktopTitlebar />
+        <DesktopReleaseIdentity />
       </SidebarContext.Provider>
     );
 
@@ -462,6 +479,7 @@ describe('DesktopTitlebar', () => {
         }}
       >
         <DesktopTitlebar />
+        <DesktopReleaseIdentity />
       </SidebarContext.Provider>
     );
     await waitFor(() => {

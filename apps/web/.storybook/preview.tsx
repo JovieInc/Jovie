@@ -87,13 +87,16 @@ function installDeterministicFixtures(): void {
   `;
   document.head.appendChild(style);
 
-  // Prefer reduced motion so components that branch on it render consistently.
+  // Keep responsive media queries real; only motion is deterministic.
+  const nativeMatchMedia = window.matchMedia.bind(window);
   try {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       configurable: true,
       value: (query: string) => {
-        const reduced = query.includes('prefers-reduced-motion');
+        if (!query.includes('prefers-reduced-motion'))
+          return nativeMatchMedia(query);
+        const reduced = true;
         return {
           matches: reduced,
           media: query,
