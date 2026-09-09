@@ -210,13 +210,17 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'editorial',
         'built'
       ),
-      approvedBinding('apps/web/components/homepage/HomepageClose.tsx', 'cta'),
+      approvedBinding(
+        'apps/web/components/homepage/HomepageClose.tsx',
+        'cta',
+        'editorial-search'
+      ),
     ],
     bindingEvidence: {
       status: 'unverified',
       source: 'source history #17063, #17185, #17353; pinned 12b203f9',
       notes:
-        'Nine scripted beats and source owners are inventoried. Editorial rows have an explicit optional-media source contract; search-close CTA ownership remains unresolved. No-script fallback is a separate runtime state. No render or visual admission.',
+        'Nine scripted beats and source owners are inventoried. Editorial rows have an explicit optional-media source contract; Search-close CTA has a source-only canonical root and editorial-search body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',
@@ -476,14 +480,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       approvedBinding(
         'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
-        'cta'
+        'cta',
+        'included-single'
       ),
     ],
     bindingEvidence: {
       status: 'unverified',
       source: 'route implementation #17076 (JOV-5862); pinned 12b203f9',
       notes:
-        'Current left/no-media hero, two-column title/body safeguards, and inline CTA are intentional source output. Hero/grid source variants are explicit; inline CTA ownership remains unresolved and no terminal variant is substituted. No render or visual admission.',
+        'Current left/no-media hero, two-column title/body safeguards, and inline CTA are intentional source output. Hero/grid source variants are explicit; inline CTA has a source-only canonical root and included-single body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',

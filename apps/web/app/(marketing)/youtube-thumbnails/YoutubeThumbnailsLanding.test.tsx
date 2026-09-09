@@ -52,9 +52,15 @@ describe('YoutubeThumbnailsLanding (JOV-5862 lock)', () => {
       'data-marketing-variant',
       'two-column-text'
     );
-    // The inline CTA is inventoried, but has no invented terminal variant.
-    expect(screen.getByTestId('marketing-section-cta')).not.toHaveAttribute(
-      'data-marketing-variant'
+    const included = screen.getByTestId('marketing-section-cta');
+    expect(included.tagName).toBe('SECTION');
+    expect(included).toHaveAttribute(
+      'data-marketing-variant',
+      'included-single'
+    );
+    expect(included).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx'
     );
     expect(hero.querySelectorAll('a[href*="/signup"]')).toHaveLength(0);
     expect(screen.queryByText('$29')).toBeNull();

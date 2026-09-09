@@ -19,6 +19,9 @@ interface MarketingPenRootResolution {
   readonly resolvedSource: string | null;
   readonly exportName: string | null;
   readonly penRootIds: readonly MarketingPenContractId[];
+  /** Explicit unknown Pen identity does not erase independently proven source ownership. */
+  readonly penRootId?: MarketingPenContractId | null;
+  readonly penIdentityReason?: string;
   readonly penVariantRoots?: Readonly<Record<string, MarketingPenContractId>>;
   readonly rootProofs: readonly MarketingPenRootProof[];
   readonly unresolvedReason?: string;
@@ -437,9 +440,50 @@ const SECTION_RESOLUTIONS = {
     MARKETING_PEN_CONTRACT_IDS.section.faq,
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.faq}'
   ),
-  cta: unresolved(
-    'A production shell root exists, but section.cta convergence is pending JOV-5356.'
-  ),
+  cta: {
+    sourceBacked: true,
+    resolvedSource: 'apps/web/components/site/MarketingCtaSection.tsx',
+    exportName: 'MarketingCtaSection',
+    penRootIds: [],
+    penRootId: null,
+    penIdentityReason:
+      'No canonical section.cta Pen identity is registered. Existing shell.finalCta/footerCta identities remain separate; production native root and delegated bodies are source-proven only.',
+    rootProofs: [
+      {
+        source: 'apps/web/components/site/MarketingCtaSection.tsx',
+        binding: '{...props}',
+        occurrences: 1,
+      },
+      {
+        source: 'apps/web/components/site/MarketingTerminalCta.tsx',
+        binding: 'data-pen-contract={penContractId}',
+        occurrences: 1,
+      },
+    ],
+    occurrenceProofs: [
+      {
+        variantId: 'final-single-claim',
+        componentPath: 'apps/web/components/site/MarketingTerminalCta.tsx',
+        rootBinding: 'data-pen-contract={penContractId}',
+      },
+      {
+        variantId: 'final-dual-path',
+        componentPath: 'apps/web/components/site/MarketingTerminalCta.tsx',
+        rootBinding: 'data-pen-contract={penContractId}',
+      },
+      {
+        variantId: 'editorial-search',
+        componentPath: 'apps/web/components/homepage/HomepageClose.tsx',
+        rootBinding: "data-marketing-variant='editorial-search'",
+      },
+      {
+        variantId: 'included-single',
+        componentPath:
+          'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        rootBinding: "data-marketing-variant='included-single'",
+      },
+    ],
+  },
   'spec-wall': sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx',
     'ArtistProfileSpecWall',
@@ -593,7 +637,8 @@ export type MarketingPenRegistryIssueCode =
   | 'duplicate-contract-id'
   | 'duplicate-pen-root'
   | 'unresolved-source-root'
-  | 'unresolved-row-has-production-root';
+  | 'unresolved-row-has-production-root'
+  | 'invalid-pen-identity';
 
 export interface MarketingPenRegistryIssue {
   readonly code: MarketingPenRegistryIssueCode;
@@ -617,10 +662,24 @@ export function validateMarketingPenRegistry(
       entry.sourceBacked &&
       (!entry.resolvedSource ||
         !entry.exportName ||
-        entry.rootProofs.length === 0 ||
-        entry.penRootIds.length !== 1)
+        entry.rootProofs.length === 0)
     ) {
       issues.push({ code: 'unresolved-source-root', id: entry.id });
+    }
+
+    const explicitUnknown =
+      entry.penRootId === null &&
+      Boolean(entry.penIdentityReason?.trim()) &&
+      entry.penRootIds.length === 0 &&
+      Object.keys(entry.penVariantRoots ?? {}).length === 0;
+    const mapped =
+      entry.penRootIds.length === 1 &&
+      entry.penRootId !== null &&
+      !entry.penIdentityReason &&
+      (entry.penRootId === undefined ||
+        entry.penRootId === entry.penRootIds[0]);
+    if (entry.sourceBacked && !explicitUnknown && !mapped) {
+      issues.push({ code: 'invalid-pen-identity', id: entry.id });
     }
 
     if (!entry.sourceBacked && entry.penRootIds.length > 0) {

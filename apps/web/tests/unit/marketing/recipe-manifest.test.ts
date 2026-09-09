@@ -1390,7 +1390,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       'centered-none',
       'inline-strip',
       ...rows.map(() => 'editorial'),
-      undefined,
+      'editorial-search',
     ]);
   });
 
@@ -1419,7 +1419,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
       'left-none',
       '3-step-strip',
       'two-column-text',
-      undefined,
+      'included-single',
     ]);
   });
 });
@@ -1446,4 +1446,19 @@ describe('source-owned editorial input contract', () => {
       getRequiredVariantInputs('feature-split', 'screenshot-right')
     ).toThrow();
   });
+});
+
+it('preserves default CTA link inputs while representing the existing search close explicitly', () => {
+  expect(getMarketingSection('cta').defaultVariant).toBe('final-single-claim');
+  expect(getRequiredVariantInputs('cta', 'editorial-search')).toEqual([
+    'headline',
+    'inputSlot',
+  ]);
+  expect(getRequiredVariantInputs('cta', 'included-single')).toContain(
+    'primaryCta'
+  );
+  expect(getRequiredVariantInputs('cta', 'final-single-claim')).toContain(
+    'primaryCta'
+  );
+  expect(getMarketingSection('cta').variants.length).toBeLessThanOrEqual(6);
 });
