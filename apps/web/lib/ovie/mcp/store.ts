@@ -12,6 +12,10 @@ const INDEX_CAP = 100;
 
 export type OperatingStore = {
   putDecision(record: OvieDecision): Promise<void>;
+  putDecisionIfUnchanged(
+    record: OvieDecision,
+    expected: OvieDecision | undefined
+  ): Promise<boolean>;
   getDecision(id: string): Promise<OvieDecision | undefined>;
   listDecisions(): Promise<readonly OvieDecision[]>;
   putInitiative(record: OvieInitiative): Promise<void>;
@@ -58,8 +62,8 @@ export type RecordBackend = {
   ): Promise<boolean>;
   compareAndSet(
     key: string,
-    expectedValue: string,
-    nextValue: string,
+    expectedValue: unknown,
+    nextValue: unknown,
     ttlSeconds: number
   ): Promise<boolean>;
   lpush(key: string, value: string): Promise<void>;
@@ -125,6 +129,28 @@ export class DurableOperatingStore implements OperatingStore {
   async putDecision(record: OvieDecision): Promise<void> {
     await this.backend.set(decisionKey(record.id), record);
     await this.backend.lpush(DECISION_INDEX, record.id);
+  }
+
+  async putDecisionIfUnchanged(
+    record: OvieDecision,
+    expected: OvieDecision | undefined
+  ): Promise<boolean> {
+    const updated = expected
+      ? await this.backend.compareAndSet(
+          decisionKey(record.id),
+          expected,
+          record,
+          TTL_SECONDS
+        )
+      : await this.backend.setIfAbsent(
+          decisionKey(record.id),
+          record,
+          TTL_SECONDS
+        );
+    if (updated && !expected) {
+      await this.backend.lpush(DECISION_INDEX, record.id);
+    }
+    return updated;
   }
 
   async getDecision(id: string): Promise<OvieDecision | undefined> {
@@ -328,6 +354,40 @@ export class FailoverOperatingStore implements OperatingStore {
 
   putDecision(record: OvieDecision): Promise<void> {
     return this.put('putDecision', record);
+  }
+
+  async putDecisionIfUnchanged(
+    record: OvieDecision,
+    expected: OvieDecision | undefined
+  ): Promise<boolean> {
+    const { primary, fallback, writeThrough } = this.options;
+    try {
+      const updated = await primary.putDecisionIfUnchanged(record, expected);
+      if (updated) {
+        if (writeThrough) {
+          await fallback.putDecision(record).catch(() => undefined);
+        }
+        return true;
+      }
+      // A failover-only record can legitimately be absent from the recovered
+      // primary. Preserve its compare-and-set authority, then warm primary.
+      if (await primary.getDecision(record.id)) return false;
+      const fallbackUpdated = await fallback.putDecisionIfUnchanged(
+        record,
+        expected
+      );
+      if (fallbackUpdated) {
+        await primary.putDecision(record).catch(error => {
+          this.noteFailure(error);
+          if (!this.options.isPrimaryFailure(error)) throw error;
+        });
+      }
+      return fallbackUpdated;
+    } catch (error) {
+      this.noteFailure(error);
+      if (!this.options.isPrimaryFailure(error)) throw error;
+      return fallback.putDecisionIfUnchanged(record, expected);
+    }
   }
 
   getDecision(id: string): Promise<OvieDecision | undefined> {

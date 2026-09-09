@@ -7,13 +7,11 @@ import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
-import {
-  appendSummerTurn,
-  loadCurrentSummerSession,
-} from '@/lib/ovie/summer-session';
+import { appendSummerTurnWithOutcome } from '@/lib/ovie/summer-session';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../../../chat/session-error-response';
+import { SUMMER_RECOVERY_TARGET } from './target';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,12 +26,6 @@ const MAX_RESPONSE_BYTES = 128 * 1024;
  * One source-reviewed recovery target. The browser cannot choose an event or
  * deployment. Summer's immutable acceptance record remains the authority.
  */
-export const SUMMER_RECOVERY_TARGET = {
-  eventId: 'sum_QYMFgF57GrOps8oualjPI5dD',
-  deploymentId: 'dpl_GxbNJxL3YeegiqgWt7c8UkaJUsxT',
-  sessionId: 'wrun_41M1T54S1W0GK7DWT5YNZKMSDZ',
-} as const;
-
 const resultEnvelopeSchema = z
   .object({
     ok: z.literal(true),
@@ -167,27 +159,7 @@ export async function GET(): Promise<NextResponse> {
   const recoveryClientTurnId = `summer-reconcile:${result.eventId}`;
   try {
     const store = getOvieOperatingStore();
-    const session = await loadCurrentSummerSession(store);
-    const existing = session?.turns.find(
-      turn =>
-        turn.clientTurnId === recoveryClientTurnId ||
-        turn.eveReceipt?.eventId === result.eventId
-    );
-    if (existing) {
-      if (
-        existing.assistantText !== result.responseText ||
-        existing.state !== 'completed' ||
-        existing.eveReceipt?.eventId !== result.eventId ||
-        existing.eveReceipt.sessionId !== result.sessionId ||
-        existing.eveReceipt.turnId !== result.turnId ||
-        existing.eveReceipt.nextStartIndex !== result.nextStartIndex
-      ) {
-        return json({ ok: false, code: 'persisted_result_drift' }, 409);
-      }
-      return json({ ok: true, persisted: 'existing', result }, 200);
-    }
-
-    await appendSummerTurn(store, {
+    const appended = await appendSummerTurnWithOutcome(store, {
       clientTurnId: recoveryClientTurnId,
       userText: '',
       assistantText: result.responseText,
@@ -204,6 +176,25 @@ export async function GET(): Promise<NextResponse> {
       },
       createdAt: new Date().toISOString(),
     });
+    const committed = appended.session.turns.find(
+      turn => turn.clientTurnId === recoveryClientTurnId
+    );
+    if (!committed) {
+      throw new Error('committed_recovery_turn_missing');
+    }
+    if (
+      committed.assistantText !== result.responseText ||
+      committed.state !== 'completed' ||
+      committed.eveReceipt?.eventId !== result.eventId ||
+      committed.eveReceipt.sessionId !== result.sessionId ||
+      committed.eveReceipt.turnId !== result.turnId ||
+      committed.eveReceipt.nextStartIndex !== result.nextStartIndex
+    ) {
+      return json({ ok: false, code: 'persisted_result_drift' }, 409);
+    }
+    if (appended.persisted === 'existing') {
+      return json({ ok: true, persisted: 'existing', result }, 200);
+    }
     return json({ ok: true, persisted: 'created', result }, 200);
   } catch (error) {
     logger.error('[summer-reconcile] Exact result persistence failed', error);

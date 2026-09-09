@@ -46,4 +46,19 @@ describe('postgresRecordBackend', () => {
     );
     expect(mocks.where).toHaveBeenCalledOnce();
   });
+
+  it('passes structured decision values through the database compare-and-set', async () => {
+    const backend = postgresRecordBackend();
+    const expected = { id: 'dec_1', decided: '{"turns":[]}' };
+    const next = { id: 'dec_1', decided: '{"turns":["next"]}' };
+
+    await expect(
+      backend.compareAndSet('decision-key', expected, next, 120)
+    ).resolves.toBe(true);
+
+    expect(mocks.set).toHaveBeenCalledWith(
+      expect.objectContaining({ value: next })
+    );
+    expect(mocks.where).toHaveBeenCalledOnce();
+  });
 });
