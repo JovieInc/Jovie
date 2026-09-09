@@ -53,6 +53,31 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('selects the enforced shutdown proof for runtime-only PRs', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/symphony_official_runtime.py',
+      'scripts/symphony/tests/run-runtime-proof-gate.py',
+      'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+    ]) {
+      const match = spawnSync('grep', ['-Eq', pattern], {
+        input: `${path}\n`,
+        encoding: 'utf8',
+      });
+      expect(match.status, path).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/symphony/tests/run-runtime-proof-gate.py'"
+    );
+  });
+
   it('covers every lane exactly once across the explicit hosted groups', () => {
     const laneIds = Object.values(LANE_GROUPS).flat();
 
