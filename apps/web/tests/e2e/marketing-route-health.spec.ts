@@ -148,7 +148,8 @@ async function assertMountedSections(
   page: Page,
   route: string,
   expected: readonly MountedSection[],
-  runtimeFallbacks: readonly RuntimeFallback[] = []
+  runtimeFallbacks: readonly RuntimeFallback[] = [],
+  resolveSection = getMarketingSectionRegistryEntry
 ) {
   const roots = page.locator(COMPOSITION_ROOT);
   if ((await roots.count()) !== 1) {
@@ -260,7 +261,7 @@ async function assertMountedSections(
     { census: SECTION_CENSUS, fallbacks: runtimeFallbacks, route }
   );
   for (const section of actual) {
-    const registered = getMarketingSectionRegistryEntry(section.sectionId);
+    const registered = resolveSection(section.sectionId);
     if (!registered)
       throw new Error(
         `[unregistered-section] ${route}: ${section.sectionId || '(unmarked child)'}`
@@ -524,8 +525,22 @@ test.describe('marketing mounted-section deliberate-red coverage', () => {
         }
       }, item.mutation);
       if (item.code) {
+        // Inject the unresolved state deterministically: CTA ownership may be
+        // repaired in production without erasing this negative regression.
+        const resolveSection: typeof getMarketingSectionRegistryEntry = id => {
+          const registered = getMarketingSectionRegistryEntry(id);
+          return item.mutation === 'unresolved' && id === 'cta' && registered
+            ? { ...registered, sourceBacked: false, resolvedSource: null }
+            : registered;
+        };
         await expect(
-          assertMountedSections(page, '/gate-fixture', expected)
+          assertMountedSections(
+            page,
+            '/gate-fixture',
+            expected,
+            [],
+            resolveSection
+          )
         ).rejects.toThrow(`[${item.code}]`);
       } else {
         await assertMountedSections(page, '/gate-fixture', expected);
