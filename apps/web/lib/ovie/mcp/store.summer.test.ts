@@ -4,7 +4,7 @@ import {
   FailoverOperatingStore,
   memoryRecordBackend,
 } from './store';
-import type { OvieSummerTurn } from './types';
+import type { OvieDecision, OvieSummerTurn } from './types';
 
 const queued = (id: string): OvieSummerTurn => ({
   id,
@@ -23,6 +23,15 @@ const liveClaim = (claimToken: string) => ({
   ttlSeconds: 120,
 });
 
+const decision = (decided: string): OvieDecision => ({
+  id: 'dec_compare_and_set',
+  kind: 'decision',
+  decided,
+  why: 'test decision compare-and-set',
+  provenance: 'test',
+  createdAt: '2026-09-09T00:00:00.000Z',
+});
+
 describe('durable Ovie Summer turn store', () => {
   afterEach(() => vi.useRealTimers());
 
@@ -38,6 +47,26 @@ describe('durable Ovie Summer turn store', () => {
       }
     );
     await expect(reader.listSummerTurns()).resolves.toHaveLength(1);
+  });
+
+  it('compare-and-sets a failover-only decision and warms recovered primary', async () => {
+    const primary = new DurableOperatingStore(memoryRecordBackend());
+    const fallback = new DurableOperatingStore(memoryRecordBackend());
+    const original = decision('{"turns":["fallback"]}');
+    await fallback.putDecision(original);
+    const store = new FailoverOperatingStore({
+      primary,
+      fallback,
+      isPrimaryFailure: () => false,
+      writeThrough: true,
+    });
+    const next = decision('{"turns":["fallback","next"]}');
+
+    await expect(store.putDecisionIfUnchanged(next, original)).resolves.toBe(
+      true
+    );
+    await expect(primary.getDecision(original.id)).resolves.toEqual(next);
+    await expect(fallback.getDecision(original.id)).resolves.toEqual(next);
   });
 
   it('recovers an expired claim while fencing its stale completion', async () => {
