@@ -173,7 +173,7 @@ describe('MarketingHero source-backed default story', () => {
       screen.getByRole('heading', { name: 'Developer hero' })
     ).not.toHaveClass('line-clamp-2');
     expect(screen.getByTestId('developer-hero')).toHaveClass(
-      'marketing-hero--centered',
+      'marketing-hero--center',
       'custom-developer-hero'
     );
     expect(copyButton).toHaveAttribute('type', 'button');
@@ -182,8 +182,9 @@ describe('MarketingHero source-backed default story', () => {
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('jovie --help');
       expect(
-        screen.getByRole('button', { name: 'Copied command' })
+        screen.getByRole('button', { name: 'Copy command' })
       ).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Copied command');
     });
   });
 
@@ -218,7 +219,9 @@ describe('MarketingHero source-backed default story', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Copy failed' })).toBeVisible();
+      expect(
+        screen.getByRole('button', { name: 'Copy command' })
+      ).toBeVisible();
       expect(screen.getByRole('status')).toHaveTextContent('Copy failed');
     });
   });
