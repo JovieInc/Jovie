@@ -48,7 +48,7 @@ function runCodesign(args) {
   });
 }
 
-async function notarizeStagingDmg(
+async function notarizeReleaseDmg(
   event,
   {
     buildBlockMap = loadBlockMapBuilder(),
@@ -58,10 +58,10 @@ async function notarizeStagingDmg(
   } = {}
 ) {
   if (!event?.file?.endsWith('.dmg')) return;
-  if (environment.JOVIE_STAGING_RELEASE !== 'true') return;
+  if (environment.JOVIE_RELEASE_DMG !== 'true') return;
   if (!event.updateInfo) {
     throw new Error(
-      'Staging DMG update metadata is missing before notarization.'
+      'Release DMG update metadata is missing before notarization.'
     );
   }
 
@@ -74,7 +74,7 @@ async function notarizeStagingDmg(
   for (const [name, value] of Object.entries(credentials)) {
     if (!value) {
       throw new Error(
-        `Staging DMG notarization credential is missing: ${name}.`
+        `Release DMG notarization credential is missing: ${name}.`
       );
     }
   }
@@ -115,7 +115,7 @@ async function notarizeStagingDmg(
     typeof notarization.id !== 'string' ||
     notarization.id.length === 0
   ) {
-    throw new Error('Apple did not accept the staging desktop image.');
+    throw new Error('Apple did not accept the release desktop image.');
   }
 
   await executeXcrun(['stapler', 'staple', event.file]);
@@ -132,10 +132,10 @@ async function notarizeStagingDmg(
     typeof updateInfo.sha512 !== 'string' ||
     updateInfo.sha512.length === 0
   ) {
-    throw new Error('Final staging DMG update metadata is malformed.');
+    throw new Error('Final release DMG update metadata is malformed.');
   }
   Object.assign(event.updateInfo, updateInfo);
 }
 
-module.exports = notarizeStagingDmg;
-module.exports.notarizeStagingDmg = notarizeStagingDmg;
+module.exports = notarizeReleaseDmg;
+module.exports.notarizeReleaseDmg = notarizeReleaseDmg;
