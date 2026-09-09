@@ -316,7 +316,7 @@
     "@chromatic-com/storybook": "^5.3.0",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.2.10",
-    "@playwright/test": "1.62.0",
+    "@playwright/test": "1.63.0",
     "@sentry/node": "^10.63.0",
     "@storybook/addon-a11y": "10.5.10",
     "@storybook/addon-docs": "10.5.10",
