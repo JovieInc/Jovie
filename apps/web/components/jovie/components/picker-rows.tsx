@@ -76,7 +76,19 @@ export interface PickerPromptItem {
   };
 }
 
+export interface PickerActionItem {
+  readonly kind: 'action';
+  readonly action: {
+    readonly id: string;
+    readonly label: string;
+    readonly description: string;
+    readonly icon: LucideIcon;
+    readonly onSelect: () => void;
+  };
+}
+
 export type PickerItem =
+  | PickerActionItem
   | PickerSkillItem
   | PickerEntityItem
   | PickerNavItem
@@ -206,6 +218,14 @@ export const RowVisual = memo(function RowVisual({
   if (variant === 'dense') return <DenseRowVisual item={item} />;
   if (item.kind === 'skill') return <SkillArt skill={item.skill} />;
   if (item.kind === 'nav') return <NavArt nav={item.nav} />;
+  if (item.kind === 'action') {
+    const Icon = item.action.icon;
+    return (
+      <div className='system-b-picker-art system-b-picker-art-icon'>
+        <Icon className='system-b-picker-art-glyph' strokeWidth={1.5} />
+      </div>
+    );
+  }
   if (item.kind === 'prompt') return <PromptArt />;
   if (item.entity.kind === 'release')
     return <ReleaseArt entity={item.entity} />;
@@ -252,19 +272,21 @@ const DenseRowVisual = memo(function DenseRowVisual({
   }
 
   const Icon =
-    item.kind === 'skill'
-      ? (ICON_MAP[item.skill.iconName] ?? Calendar)
-      : item.kind === 'nav'
-        ? (ICON_MAP[item.nav.iconName] ?? Calendar)
-        : item.kind === 'prompt'
-          ? Sparkles
-          : item.entity.kind === 'event'
-            ? Calendar
-            : item.entity.kind === 'track'
-              ? Music2
-              : item.entity.kind === 'artist'
-                ? UserCircle
-                : Music;
+    item.kind === 'action'
+      ? item.action.icon
+      : item.kind === 'skill'
+        ? (ICON_MAP[item.skill.iconName] ?? Calendar)
+        : item.kind === 'nav'
+          ? (ICON_MAP[item.nav.iconName] ?? Calendar)
+          : item.kind === 'prompt'
+            ? Sparkles
+            : item.entity.kind === 'event'
+              ? Calendar
+              : item.entity.kind === 'track'
+                ? Music2
+                : item.entity.kind === 'artist'
+                  ? UserCircle
+                  : Music;
 
   return (
     <span
@@ -308,6 +330,14 @@ export const RowBody = memo(function RowBody({
       </div>
     );
   }
+  if (item.kind === 'action') {
+    return (
+      <div className='min-w-0 flex-1'>
+        <p className='system-b-picker-row-title'>{item.action.label}</p>
+        <p className='system-b-picker-row-meta'>{item.action.description}</p>
+      </div>
+    );
+  }
   const meta = formatRowMeta(item.entity);
   return (
     <div className='min-w-0 flex-1'>
@@ -330,6 +360,8 @@ function denseRowText(item: PickerItem): {
   if (item.kind === 'prompt') {
     return { title: item.prompt.label, meta: item.prompt.description };
   }
+  if (item.kind === 'action')
+    return { title: item.action.label, meta: item.action.description };
   return { title: item.entity.label, meta: formatRowMeta(item.entity) };
 }
 
@@ -354,6 +386,7 @@ const DenseRowBody = memo(function DenseRowBody({
 export function pickerItemKey(item: PickerItem): string {
   if (item.kind === 'skill') return `skill:${item.skill.id}`;
   if (item.kind === 'nav') return `nav:${item.nav.id}`;
+  if (item.kind === 'action') return `action:${item.action.id}`;
   if (item.kind === 'prompt') return `prompt:${item.prompt.id}`;
   return `entity:${item.entity.kind}:${item.entity.id}`;
 }
