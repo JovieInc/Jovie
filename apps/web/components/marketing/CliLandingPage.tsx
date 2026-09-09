@@ -67,6 +67,7 @@ export function CliLandingPage() {
   return (
     <MarketingPageShell>
       <MarketingHero
+        variant='developer'
         headingId='cli-hero-heading'
         headline={CLI_HEADLINE}
         subtitle={CLI_SUBTITLE}
@@ -80,9 +81,14 @@ export function CliLandingPage() {
           href: APP_ROUTES.DEVELOPERS,
           testId: 'cli-hero-developers',
         }}
-        logos={false}
-        align='center'
         testId='cli-hero'
+        install={{
+          command: 'npm install --global @jovie/cli',
+          copyLabel: 'Copy install command',
+          copiedLabel: 'Copied install command',
+          errorLabel: 'Copy failed',
+          availabilityNote: 'Available after the versioned npm release.',
+        }}
       />
 
       <MarketingContainer width='prose' className='pb-20 sm:pb-28'>

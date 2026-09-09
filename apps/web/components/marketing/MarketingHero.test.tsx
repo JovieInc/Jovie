@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingHero } from './MarketingHero';
@@ -141,5 +141,74 @@ describe('MarketingHero source-backed default story', () => {
     expect(shell).toHaveClass('relative', 'w-full');
     expect(shell).toHaveClass('pt-20', 'pb-16');
     expect(shell).toHaveClass('items-center', 'text-center');
+  });
+
+  it('renders the developer variant command leaf and reports clipboard success', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(
+      <MarketingHero
+        variant='developer'
+        headingId='developer-heading'
+        headline='Developer hero'
+        subtitle='Read-only public data.'
+        install={{
+          command: 'jovie --help',
+          copyLabel: 'Copy command',
+          copiedLabel: 'Copied command',
+          errorLabel: 'Copy failed',
+          availabilityNote: 'Available now.',
+        }}
+      />
+    );
+
+    const copyButton = screen.getByRole('button', { name: 'Copy command' });
+    expect(copyButton).toHaveAttribute('type', 'button');
+    fireEvent.click(copyButton);
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('jovie --help');
+      expect(
+        screen.getByRole('button', { name: 'Copied command' })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('reports clipboard rejection through the developer command leaf', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(false),
+    });
+
+    render(
+      <MarketingHero
+        variant='developer'
+        headingId='developer-error-heading'
+        headline='Developer hero'
+        subtitle='Read-only public data.'
+        install={{
+          command: 'jovie --version',
+          copyLabel: 'Copy command',
+          copiedLabel: 'Copied command',
+          errorLabel: 'Copy failed',
+          availabilityNote: 'Available now.',
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Copy failed' })).toBeVisible();
+    });
   });
 });
