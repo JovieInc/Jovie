@@ -381,6 +381,190 @@ jobs:
             echo "deferred_release=$deferred_release"
             echo "reconcile_queue_reentry=$reconcile_queue_reentry"
           } >>"$GITHUB_OUTPUT"
+      - name: Prepare single-PR membership recovery
+        id: membership-recovery
+        # Other events for this repair PR refuse instead of using broken main.
+        # Owner: canonical membership source lane; remove after #17483 lands.
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 17483
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Existing App read authority, as in controller repair attestation.
+          GH_CHECK_TOKEN: ${{ steps.app-token.outputs.token }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'RECOVERY'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+          import { selectSeerControllerRepairReview } from './scripts/lib/controller-repair-attestation.mjs';
+          import { REQUIRED_MERGE_STATUSES } from './scripts/lib/merge-queue-guard.mjs';
+
+          // One repair only. Retire this step after #17483 lands; no PR code is loaded.
+          const repository = 'JovieInc/Jovie';
+          const number = 17483;
+          const backendPath = 'scripts/merge-queue-backend.mjs';
+          const workflowPath = '.github/workflows/merge-queue-autoenroll.yml';
+          const brokenBlob = 'df3f4295ee526d935566169bf4bdaa033d6a852a';
+          const fixedBlob = '002879871c8364d5cde784a6142cfc534aaeb67d';
+          const api = path =>
+            JSON.parse(execFileSync('gh', ['api', path], { encoding: 'utf8' }));
+          const hash = input =>
+            execFileSync('git', ['hash-object', '--stdin'], {
+              input,
+              encoding: 'utf8',
+            }).trim();
+          const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+          const head = event.pull_request?.head?.sha;
+          assert.match(process.env.FLEET_POLICY_MAIN_SHA ?? '', /^[0-9a-f]{40}$/);
+          assert.match(process.env.GITHUB_SHA ?? '', /^[0-9a-f]{40}$/);
+          assert.equal(process.env.GITHUB_EVENT_NAME, 'pull_request');
+          assert.equal(process.env.GITHUB_REPOSITORY, repository);
+          assert.equal(event.action, 'labeled');
+          assert.equal(event.label?.name, 'bug');
+          assert.equal(event.pull_request?.number, number);
+          assert.match(head ?? '', /^[0-9a-f]{40}$/);
+          assert.equal(event.pull_request?.head?.repo?.full_name, repository);
+          assert.equal(event.pull_request?.base?.repo?.full_name, repository);
+          assert.equal(event.pull_request?.base?.ref, 'main');
+          const verifyLive = () => {
+            const pr = api(`repos/${repository}/pulls/${number}`);
+            assert.equal(pr.state, 'open');
+            assert.equal(pr.draft, false);
+            assert.equal(pr.head?.sha, head);
+            assert.equal(pr.head?.repo?.full_name, repository);
+            assert.equal(pr.base?.repo?.full_name, repository);
+            assert.equal(pr.base?.ref, 'main');
+            assert.equal(
+              api(`repos/${repository}/git/ref/heads/main`).object?.sha,
+              process.env.FLEET_POLICY_MAIN_SHA
+            );
+          };
+          verifyLive();
+          assert.equal(
+            api(`repos/${repository}/contents/${backendPath}?ref=${head}`).sha,
+            fixedBlob
+          );
+          const workflowBlob = api(
+            `repos/${repository}/contents/${workflowPath}?ref=${head}`
+          ).sha;
+          assert.match(workflowBlob ?? '', /^[0-9a-f]{40}$/);
+          assert.equal(
+            api(
+              `repos/${repository}/contents/${workflowPath}?ref=${process.env.GITHUB_SHA}`
+            ).sha,
+            workflowBlob
+          );
+          const verifyChecks = () => {
+            const pages = JSON.parse(
+              execFileSync(
+                'gh',
+                [
+                  'api',
+                  '--paginate',
+                  '--slurp',
+                  `repos/${repository}/commits/${head}/check-runs?filter=latest&per_page=100`,
+                ],
+                {
+                  encoding: 'utf8',
+                  env: { ...process.env, GH_TOKEN: process.env.GH_CHECK_TOKEN },
+                }
+              )
+            );
+            const checks = pages.flatMap(page => page.check_runs);
+            // Fork PR Gate is an existing Bot commit status, not a check run.
+            const statuses = JSON.parse(
+              execFileSync(
+                'gh',
+                [
+                  'api',
+                  '--paginate',
+                  '--slurp',
+                  `repos/${repository}/commits/${head}/statuses?per_page=100`,
+                ],
+                { encoding: 'utf8' }
+              )
+            ).flat();
+            const fork = statuses.find(status => status.context === 'Fork PR Gate');
+            assert.equal(fork?.state, 'success');
+            assert.equal(fork?.creator?.login, 'jovie-bot[bot]');
+            assert.equal(fork?.creator?.type, 'Bot');
+            for (const name of REQUIRED_MERGE_STATUSES.filter(
+              name => name !== 'Fork PR Gate'
+            )) {
+              const matches = checks.filter(check => check.name === name);
+              assert.equal(
+                matches.length,
+                1,
+                `Missing or ambiguous required check: ${name}`
+              );
+              const check = matches[0];
+              assert.equal(check.head_sha, head);
+              assert.equal(check.status, 'completed');
+              assert.equal(check.conclusion, 'success');
+              assert.equal(check.app?.slug, 'github-actions');
+            }
+            const reviews = checks.filter(check => check.name === 'Seer Code Review');
+            assert.equal(
+              reviews.length,
+              1,
+              'One external exact-head Seer review is required'
+            );
+            return selectSeerControllerRepairReview(
+              {
+                checkRuns: reviews,
+                checkSuite: JSON.parse(
+                  execFileSync(
+                    'gh',
+                    [
+                      'api',
+                      `repos/${repository}/check-suites/${reviews[0].check_suite?.id}`,
+                    ],
+                    {
+                      encoding: 'utf8',
+                      env: { ...process.env, GH_TOKEN: process.env.GH_CHECK_TOKEN },
+                    }
+                  )
+                ),
+              },
+              { expectedHead: head }
+            );
+          };
+          const review = verifyChecks();
+          const original = readFileSync(backendPath, 'utf8');
+          assert.equal(
+            hash(original),
+            brokenBlob,
+            'Main backend changed; requalify recovery'
+          );
+          const before = `graphqlArgs(CANONICAL_MEMBERSHIP_QUERY, {
+                  ...parseRepositorySlug(repository),
+                  number: parsePullRequestNumber(number),
+                })`;
+          const after = `graphqlArgs(
+                  CANONICAL_MEMBERSHIP_QUERY,
+                  {
+                    ...parseRepositorySlug(repository),
+                    number: parsePullRequestNumber(number),
+                  },
+                  { typed: ['number'] }
+                )`;
+          assert.equal(original.split(before).length, 2);
+          const repaired = original.replace(before, after);
+          assert.equal(
+            hash(repaired),
+            fixedBlob,
+            'Only the reviewed numeric correction is permitted'
+          );
+          verifyLive();
+          assert.deepEqual(verifyChecks(), review, 'Review changed during preparation');
+          writeFileSync(backendPath, repaired);
+          appendFileSync(process.env.GITHUB_OUTPUT, 'enabled=true\n');
+          console.log(
+            JSON.stringify({ repository, number, head, workflowBlob, fixedBlob, review })
+          );
+          RECOVERY
       - name: Publish exact controller repair attestation
         if: >-
           needs.fleet-policy.outputs.mode == 'controller-repair-only' &&
@@ -462,6 +646,7 @@ jobs:
           fi
       - name: Enroll clean PRs
         env:
+          MEMBERSHIP_RECOVERY: ${{ steps.membership-recovery.outputs.enabled }}
           GH_TOKEN: ${{ github.token }}
           GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
@@ -533,6 +718,15 @@ jobs:
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
             exit 2
+          fi
+          if [[ "$MEMBERSHIP_RECOVERY" == 'true' ]]; then
+            # Recovery authorizes one exact target, with normal fleet policy.
+            export DRAIN_RECOVER_FLEET_HOLDS=0
+            export DRAIN_RECONCILE_QUEUE_REENTRY=0
+            export DRAIN_RECONCILE_ADMISSION_RECEIPTS=0
+            export DRAIN_RECONCILE_MISSED_ADMISSION=0
+            export DRAIN_RECOVER_MISSING_CI=0
+            export DRAIN_QUEUE_REENTRY_MAX_PER_RUN=1
           fi
           set +e
           bash scripts/drain-pr-queue.sh

@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
@@ -2291,7 +2292,9 @@ describe('canonical admission membership binding', () => {
         );
       });
     });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(undefined)));
+    await new Promise(resolve =>
+      server.listen(0, '127.0.0.1', () => resolve(undefined))
+    );
     try {
       const address = server.address();
       if (!address || typeof address === 'string')
@@ -3504,5 +3507,322 @@ describe('authoritative native state listing', () => {
     expect(
       queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))
     ).toBe(false);
+  });
+});
+
+describe('single-PR membership recovery workflow', () => {
+  function runRecovery(change = '') {
+    const directory = mkdtempSync(join(tmpdir(), 'membership-recovery-'));
+    const backendPath = join(directory, 'scripts/merge-queue-backend.mjs');
+    const original = readRepoFile('scripts/merge-queue-backend.mjs').replace(
+      `graphqlArgs(
+        CANONICAL_MEMBERSHIP_QUERY,
+        {
+          ...parseRepositorySlug(repository),
+          number: parsePullRequestNumber(number),
+        },
+        { typed: ['number'] }
+      )`,
+      `graphqlArgs(CANONICAL_MEMBERSHIP_QUERY, {
+        ...parseRepositorySlug(repository),
+        number: parsePullRequestNumber(number),
+      })`
+    );
+    const head = 'a'.repeat(40);
+    const main = 'b'.repeat(40);
+    const workflowBlob = 'c'.repeat(40);
+    const pr = {
+      number: 17483,
+      state: 'open',
+      draft: false,
+      head: { sha: head, repo: { full_name: 'JovieInc/Jovie' } },
+      base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+    };
+    const event = {
+      action: 'labeled',
+      label: { name: 'bug' },
+      pull_request: structuredClone(pr),
+    };
+    const checks = [
+      'PR Ready',
+      'Migration Guard',
+      'Fork PR Gate',
+      'PR Size Guard',
+    ].map(name => ({
+      name,
+      head_sha: head,
+      status: 'completed',
+      conclusion: 'success',
+      app: { slug: 'github-actions' },
+    }));
+    const review = {
+      id: 42,
+      name: 'Seer Code Review',
+      head_sha: head,
+      status: 'completed',
+      conclusion: 'success',
+      app: { id: 12637, slug: 'sentry' },
+      check_suite: { id: 43 },
+    };
+    const suite = {
+      id: 43,
+      head_sha: head,
+      app: { id: 12637, slug: 'sentry' },
+    };
+    const forkStatus = {
+      context: 'Fork PR Gate',
+      state: 'success',
+      creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+    };
+    const responses = {
+      [`repos/JovieInc/Jovie/pulls/17483`]: pr,
+      [`repos/JovieInc/Jovie/git/ref/heads/main`]: { object: { sha: main } },
+      [`repos/JovieInc/Jovie/contents/scripts/merge-queue-backend.mjs?ref=${head}`]:
+        { sha: '002879871c8364d5cde784a6142cfc534aaeb67d' },
+      [`repos/JovieInc/Jovie/contents/.github/workflows/merge-queue-autoenroll.yml?ref=${head}`]:
+        { sha: workflowBlob },
+      [`repos/JovieInc/Jovie/contents/.github/workflows/merge-queue-autoenroll.yml?ref=${'d'.repeat(40)}`]:
+        { sha: workflowBlob },
+      [`repos/JovieInc/Jovie/commits/${head}/check-runs?filter=latest&per_page=100`]:
+        [{ check_runs: [...checks, review] }],
+      [`repos/JovieInc/Jovie/check-suites/43`]: suite,
+      [`repos/JovieInc/Jovie/commits/${head}/statuses?per_page=100`]: [
+        [forkStatus],
+      ],
+    };
+    if (change === 'wrong-action') event.action = 'enqueued';
+    if (change === 'wrong-label') event.label.name = 'other';
+    if (change === 'skipped-review') review.conclusion = 'skipped';
+    if (change === 'other-pr') event.pull_request.number = 17484;
+    if (change === 'fork')
+      event.pull_request.head.repo.full_name = 'other/Jovie';
+    if (change === 'base') event.pull_request.base.ref = 'other';
+    if (change === 'event-head') event.pull_request.head.sha = 'e'.repeat(40);
+    if (change === 'closed') pr.state = 'closed';
+    if (change === 'draft') pr.draft = true;
+    if (change === 'failed-fork') forkStatus.state = 'failure';
+    if (change === 'human-fork') forkStatus.creator.type = 'User';
+    if (change === 'missing-review') review.name = 'other';
+    if (change === 'neutral-review') review.conclusion = 'neutral';
+    if (change === 'wrong-review-app') review.app.id = 1;
+    if (change === 'stale-review') review.head_sha = main;
+    if (change === 'wrong-suite') suite.head_sha = main;
+    if (change === 'failed-check') checks[0].conclusion = 'failure';
+    if (change === 'stale-check') checks[0].head_sha = main;
+    if (change === 'missing-check') checks[0].name = 'unrelated';
+    if (change === 'wrong-check-app') checks[0].app.slug = 'other';
+    if (change === 'wrong-backend')
+      responses[
+        `repos/JovieInc/Jovie/contents/scripts/merge-queue-backend.mjs?ref=${head}`
+      ] = { sha: main };
+    if (change === 'wrong-workflow')
+      responses[
+        `repos/JovieInc/Jovie/contents/.github/workflows/merge-queue-autoenroll.yml?ref=${'d'.repeat(40)}`
+      ] = { sha: main };
+    mkdirSync(join(directory, 'scripts'), { recursive: true });
+    symlinkSync(join(REPO_ROOT, 'scripts/lib'), join(directory, 'scripts/lib'));
+    writeFileSync(
+      backendPath,
+      original +
+        (change === 'extra-source'
+          ? '\n// unexpected executable source version\n'
+          : '')
+    );
+    writeFileSync(join(directory, 'event.json'), JSON.stringify(event));
+    writeFileSync(join(directory, 'responses.json'), JSON.stringify(responses));
+    writeFileSync(join(directory, 'output'), '');
+    writeFileSync(
+      join(directory, 'gh'),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const endpoint = process.argv.at(-1);
+if (process.env.RECOVERY_TEST_CHANGE === 'api-error') process.exit(1);
+const responses = JSON.parse(fs.readFileSync('responses.json', 'utf8'));
+if (!Object.hasOwn(responses, endpoint)) process.exit(2);
+const result = responses[endpoint];
+if (endpoint.endsWith('/pulls/17483')) {
+  if (fs.existsSync('read-once') && process.env.RECOVERY_TEST_CHANGE === 'post-head') result.head.sha = 'e'.repeat(40);
+  fs.writeFileSync('read-once', '1');
+}
+if (endpoint.endsWith('/heads/main') && process.env.RECOVERY_TEST_CHANGE === 'main-race') {
+  if (fs.existsSync('main-once')) result.object.sha = 'e'.repeat(40);
+  fs.writeFileSync('main-once', '1');
+}
+console.log(JSON.stringify(result));
+`
+    );
+    chmodSync(join(directory, 'gh'), 0o755);
+    try {
+      const workflow = readRepoFile(
+        '.github/workflows/merge-queue-autoenroll.yml'
+      );
+      const result = spawnSync(
+        'bash',
+        [
+          '-e',
+          '-o',
+          'pipefail',
+          '-c',
+          workflowRunScript(workflow, 'Prepare single-PR membership recovery'),
+        ],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            GITHUB_EVENT_NAME:
+              change === 'manual' ? 'workflow_dispatch' : 'pull_request',
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            GITHUB_SHA: 'd'.repeat(40),
+            GITHUB_EVENT_PATH: join(directory, 'event.json'),
+            GITHUB_OUTPUT: join(directory, 'output'),
+            FLEET_POLICY_MAIN_SHA: main,
+            RECOVERY_TEST_CHANGE: change,
+          },
+        }
+      );
+      return {
+        code: result.status,
+        stderr: result.stderr,
+        output: readFileSync(join(directory, 'output'), 'utf8'),
+        modified:
+          readFileSync(backendPath, 'utf8') !==
+          original +
+            (change === 'extra-source'
+              ? '\n// unexpected executable source version\n'
+              : ''),
+      };
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+
+  it('executes the actual workflow guard and installs only the reviewed typed-number blob', () => {
+    expect(runRecovery()).toMatchObject({
+      code: 0,
+      output: 'enabled=true\n',
+      modified: true,
+    });
+  });
+  it.each([
+    'failed-fork',
+    'human-fork',
+    'missing-review',
+    'main-race',
+    'wrong-action',
+    'wrong-label',
+    'skipped-review',
+    'other-pr',
+    'fork',
+    'base',
+    'event-head',
+    'closed',
+    'draft',
+    'neutral-review',
+    'wrong-review-app',
+    'stale-review',
+    'wrong-suite',
+    'failed-check',
+    'stale-check',
+    'missing-check',
+    'wrong-check-app',
+    'wrong-backend',
+    'wrong-workflow',
+    'extra-source',
+    'post-head',
+    'api-error',
+    'manual',
+  ])('rejects %s before writing source or enabling mutation', change => {
+    const result = runRecovery(change);
+    expect(result.code).not.toBe(0);
+    expect(result).toMatchObject({ output: '', modified: false });
+  });
+  it('keeps ordinary admission on main and disables other recovery mutations', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    expect(
+      workflowStep(workflow, 'Prepare single-PR membership recovery')
+    ).toContain(
+      "if: github.event_name == 'pull_request' && github.event.pull_request.number == 17483"
+    );
+    const enroll = workflowRunScript(workflow, 'Enroll clean PRs');
+    for (const flag of [
+      'DRAIN_RECOVER_FLEET_HOLDS',
+      'DRAIN_RECONCILE_QUEUE_REENTRY',
+      'DRAIN_RECONCILE_ADMISSION_RECEIPTS',
+      'DRAIN_RECONCILE_MISSED_ADMISSION',
+      'DRAIN_RECOVER_MISSING_CI',
+    ])
+      expect(enroll).toContain(`export ${flag}=0`);
+    expect(workflowStep(workflow, 'Checkout main policy code')).toContain(
+      'ref: ${{ needs.fleet-policy.outputs.main_sha }}'
+    );
+  });
+});
+
+describe('membership recovery drain isolation', () => {
+  it.each([
+    'true',
+    '',
+  ])('passes only the intended flags to the real wrapper for recovery=%s', recovery => {
+    const directory = mkdtempSync(join(tmpdir(), 'recovery-wrapper-'));
+    const flags = [
+      'DRAIN_RECOVER_FLEET_HOLDS',
+      'DRAIN_RECONCILE_QUEUE_REENTRY',
+      'DRAIN_RECONCILE_ADMISSION_RECEIPTS',
+      'DRAIN_RECONCILE_MISSED_ADMISSION',
+      'DRAIN_RECOVER_MISSING_CI',
+    ];
+    mkdirSync(join(directory, 'scripts'));
+    writeFileSync(
+      join(directory, 'git'),
+      '#!/bin/sh\nprintf "%s\\n" "$FLEET_POLICY_MAIN_SHA"\n'
+    );
+    chmodSync(join(directory, 'git'), 0o755);
+    writeFileSync(
+      join(directory, 'scripts/drain-pr-queue.sh'),
+      `node -e 'require("fs").writeFileSync("observed.json", JSON.stringify(process.env))'\n`
+    );
+    try {
+      const result = spawnSync(
+        'bash',
+        [
+          '-e',
+          '-o',
+          'pipefail',
+          '-c',
+          workflowRunScript(
+            readRepoFile('.github/workflows/merge-queue-autoenroll.yml'),
+            'Enroll clean PRs'
+          ),
+        ],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            FLEET_POLICY_MAIN_SHA: 'a'.repeat(40),
+            MERGE_QUEUE_BACKEND: 'native',
+            MEMBERSHIP_RECOVERY: recovery,
+            DRAIN_ADMISSION_PR: '17483',
+            DRAIN_ADMISSION_HEAD: HEAD,
+            ...Object.fromEntries(flags.map(flag => [flag, '1'])),
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      const observed = JSON.parse(
+        readFileSync(join(directory, 'observed.json'), 'utf8')
+      );
+      for (const flag of flags)
+        expect(observed[flag]).toBe(recovery ? '0' : '1');
+      expect(observed.DRAIN_ADMISSION_PR).toBe('17483');
+      expect(observed.DRAIN_ADMISSION_HEAD).toBe(HEAD);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
