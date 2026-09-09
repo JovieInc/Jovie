@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/marketing/MarketingHero.test.tsx
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
