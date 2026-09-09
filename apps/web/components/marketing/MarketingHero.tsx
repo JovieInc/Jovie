@@ -218,15 +218,21 @@ function MarketingHeroTitle({
   id,
   testId,
   className,
+  clamp = true,
   children,
 }: Readonly<{
   id?: string;
   testId?: string;
   className: string;
+  clamp?: boolean;
   children: ReactNode;
 }>) {
   return (
-    <h1 id={id} data-testid={testId} className={cn('line-clamp-2', className)}>
+    <h1
+      id={id}
+      data-testid={testId}
+      className={cn(clamp && 'line-clamp-2', className)}
+    >
       {children}
     </h1>
   );
@@ -484,11 +490,19 @@ function MarketingHeroPublic({
   linkComponent = Link,
   headingId,
   testId,
+  className,
   ...variantProps
 }: MarketingHeroPublicProps) {
+  const layoutVariant =
+    variant === 'desktop' || variant === 'mobile' ? 'split' : 'centered';
   return (
     <MarketingHeroFrame
-      className={cn('marketing-hero', `marketing-hero--${variant}`, 'relative')}
+      className={cn(
+        'marketing-hero',
+        `marketing-hero--${layoutVariant}`,
+        'relative',
+        className
+      )}
       headingId={headingId}
       testId={testId}
     >
@@ -497,7 +511,8 @@ function MarketingHeroPublic({
           <div className='marketing-hero-copy'>
             <MarketingHeroTitle
               id={headingId}
-              className='marketing-hero-headline marketing-h1-max-two-lines'
+              className='marketing-hero-headline'
+              clamp={false}
             >
               {headline}
             </MarketingHeroTitle>

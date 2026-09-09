@@ -37,6 +37,9 @@ export function MarketingHeroDeveloperCommand({
         {isSuccess ? <Check aria-hidden='true' /> : <Copy aria-hidden='true' />}
         {label}
       </Button>
+      <span role='status' aria-live='polite' className='sr-only'>
+        {isSuccess || isError ? label : ''}
+      </span>
       <span className='text-xs text-tertiary-token'>{availabilityNote}</span>
     </div>
   );

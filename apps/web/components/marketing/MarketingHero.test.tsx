@@ -154,8 +154,10 @@ describe('MarketingHero source-backed default story', () => {
       <MarketingHero
         variant='developer'
         headingId='developer-heading'
+        testId='developer-hero'
         headline='Developer hero'
         subtitle='Read-only public data.'
+        className='custom-developer-hero'
         install={{
           command: 'jovie --help',
           copyLabel: 'Copy command',
@@ -167,6 +169,13 @@ describe('MarketingHero source-backed default story', () => {
     );
 
     const copyButton = screen.getByRole('button', { name: 'Copy command' });
+    expect(
+      screen.getByRole('heading', { name: 'Developer hero' })
+    ).not.toHaveClass('line-clamp-2');
+    expect(screen.getByTestId('developer-hero')).toHaveClass(
+      'marketing-hero--centered',
+      'custom-developer-hero'
+    );
     expect(copyButton).toHaveAttribute('type', 'button');
     fireEvent.click(copyButton);
 
@@ -193,6 +202,7 @@ describe('MarketingHero source-backed default story', () => {
       <MarketingHero
         variant='developer'
         headingId='developer-error-heading'
+        testId='developer-error-hero'
         headline='Developer hero'
         subtitle='Read-only public data.'
         install={{
@@ -209,6 +219,7 @@ describe('MarketingHero source-backed default story', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Copy failed' })).toBeVisible();
+      expect(screen.getByRole('status')).toHaveTextContent('Copy failed');
     });
   });
 });
