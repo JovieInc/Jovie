@@ -109,32 +109,25 @@ extension of the input.
 
 ## Convergence in this PR (unambiguous only)
 
-1. Product focus → ion `#1F7BF5`; retire `#2563ff` / `#11AFFF` as product focus.
+1. Product focus → ion `#1F7BF5`; retire `#2563ff` / `#11AFFF` as product
+   focus (`:root` / `:root.dark`, `--linear-border-focus`,
+   `--linear-row-selected`).
 2. Six accents to lock hexes; aqua/gold/flare become same-hex aliases.
-3. Five-surface ladder in the live emitter; panel consumers remap to card or
-   elevated by name; light surfaces take the lock hexes.
-4. Product Button `sm`/`md`/`lg` visible height 32. Weight 510 and radius 999
-   already matched. Existing 44px hit-target wrapper kept (already proven).
-5. Fail-closed tests lock the above.
+3. Five-surface ladder; `--noir-ion-panel` removed; `--linear-panel-bg`
+   remaps to card `#0F1420`.
+4. ActionButton density left unchanged (C2 KEEP).
+5. Fail-closed tests lock the token remaps above.
 
-## Tim-decision conflicts (not picked)
+## Tim KEEP conflicts (not picked)
 
-1. **Shared Button 28 vs Pen/iOS 32.** `marketing` size stays 28px + 44px hit
-   target so homepage / waitlist CTAs do not rewrite (`#17156` HOLD).
-2. **Toolbar / header action overrides** (`PageToolbarActionButton`,
-   `DashboardHeaderActionButton`) stay `h-7`. Public-profile CTAs keep
-   `size='marketing'` / `h-7` via the shared pill contract.
-3. **`[data-app-shell-frame]` carbon ladder** in `system-b-app.css` vs lock 5.
-4. **Marketing `--linear-accent-blue: #2563ff`** vs product ion (documented
-   namespace-collapse divergence).
-5. **`--color-info` after aqua→mint** — info and success both resolve to mint.
-6. **44px hit-target wrapper** on product Button — lock says drop unless
-   proven; wrapper already exists. Left in place.
-7. **`input-extension-menu-v1`** — Pen pattern with no React atom.
-8. **Orange `#FF7800` vs red `#F72A36` hue distance ~25°** vs prior 40°
-   harmony gate — lock hexes win; gate narrowed.
-9. **Light elevation “surface-1 peaks”** vs lock monotonic recede
-   (canvas lightest → floating darkest). Guard now follows the lock.
-10. **`--app-shell-control-height-sm: 28px`** vs product ActionButton 32.
-11. **Light ion-on-floating contrast ~2.84:1** vs the 3:1 non-text gate.
-    Lock hexes kept; do not invent a darker ion or a lighter floating.
+- **C1** Aug-22 palette-core-accents vs noir-ion — marketing
+  `--linear-accent-blue: #2563ff` and `.system-b-marketing.dark` /
+  `MarketingSnapRail.css` `#11afff` copies stay.
+- **C2** ActionButton 32-in-44 vs 32/510 density — shared atom stays 28px
+  in 44px hit target.
+- **C3** homepage JOV-5092 vs #17055 / `#17156` HOLD — homepage not rewritten.
+- **C4** full dual-token architecture — `linear-tokens.css` not deleted.
+  Wholesale namespace collapse is blocked on Tim.
+
+Other leftovers: shell carbon ladder; `--color-info` = mint after aqua→mint;
+light ion-on-floating ~2.84:1; `input-extension-menu-v1` not invented.

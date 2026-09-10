@@ -94,6 +94,14 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(dsDark.toLowerCase()).not.toContain('#2563ff');
     expect(dsLight.toLowerCase()).not.toContain('#2563ff');
     expect(dsLight.toLowerCase()).not.toContain('#7170ff');
+    expect(linearDark).toContain(
+      '--linear-border-focus: rgba(31, 123, 245, 0.72);'
+    );
+    expect(linearDark).toContain(
+      '--linear-row-selected: rgba(31, 123, 245, 0.1);'
+    );
+    expect(linearDark).toContain('--linear-panel-bg: #0f1420;');
+    expect(linearDark).not.toContain('--linear-panel-bg: #0a0d16;');
   });
 
   it('keeps generated-scene references separate from shipped UI anchors', () => {

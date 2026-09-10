@@ -166,11 +166,11 @@ of redefining them.
   - Raw durations and easings in route code are forbidden (enforced in Wave 4).
 - **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
   and `link`. Destructive styling is a `destructive` prop, not a variant.
-- **Canonical product ActionButton (founder-locked 2026-09-09–10):** `sm`,
-  `md`, and `lg` are 32px / weight 510 / radius 999 with the existing 44px
-  `::before` hit-target wrapper. `marketing` stays the 28px waitlist /
-  homepage / public-profile CTA (`#17156` HOLD) until Tim collapses the
-  shared atom. `icon` remains a distinct 36px square utility control.
+- **Canonical text button size (founder-approved 2026-09-05):** `sm`,
+  `marketing`, `md`, and `lg` share one 28px visible control, typography, and
+  padding inside a 44px minimum hit target across apps and marketing.
+  `icon` remains a distinct 36px square utility control with a 44px hit target.
+  ActionButton 32-in-44 vs 32/510 density is a Tim KEEP (C2).
 - **Touch targets (founder-locked 2026-08-20):** enlarge the hit **container**,
   never the visible item. Compact controls keep their visual height; the 44px
   floor is an invisible `::before`/`::after` (or wrapping hit area).
