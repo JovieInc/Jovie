@@ -3282,7 +3282,6 @@
 
 :where(.system-b-picker-row-meta) {
   overflow: hidden;
-  margin-top: var(--space-0-5);
   color: var(--color-text-tertiary-token);
   font-size: var(--text-xs);
   line-height: var(--leading-tight);
