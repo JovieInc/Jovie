@@ -1,5 +1,5 @@
 {
-  "_comment": "Computed-contrast gate manifest (scripts/lint-contrast-computed.mjs). Each pair is resolved from the token CSS per theme and must meet minRatio (WCAG 2.1 AA: 4.5 normal text, 3.0 large text / non-text UI). Enforced by tests/unit/design-system/computed-contrast.test.ts in the Unit Tests merge gate.",
+  "_comment": "Computed-contrast gate manifest (scripts/lint-contrast-computed.mjs). Each pair is resolved from the token CSS per theme and must meet minRatio (WCAG 2.1 AA: 4.5 normal text, 3.0 large text / non-text UI). Enforced by tests/unit/design-system/computed-contrast.test.ts in the Unit Tests merge gate. Interactive ion #11AFFF is dark-only here: light ion-on-light is below 3:1 by Tim KEEP 2026-09-10 (do not invent a darker ion).",
   "pairs": [
     {
       "name": "primary text on page",
@@ -65,13 +65,15 @@
       "name": "accent (interactive) on page",
       "fg": "--color-accent",
       "bg": "--color-bg-base",
-      "minRatio": 3.0
+      "minRatio": 3.0,
+      "themes": ["dark"]
     },
     {
       "name": "accent (interactive) on surface-1",
       "fg": "--color-accent",
       "bg": "--color-bg-surface-1",
-      "minRatio": 3.0
+      "minRatio": 3.0,
+      "themes": ["dark"]
     },
     {
       "name": "entity chip text on user message",
