@@ -11,6 +11,7 @@ describe('LogoLoader', () => {
 
     const mark = loader.querySelector('svg');
     expect(mark).toHaveAttribute('width', '24');
+    expect(mark?.parentElement).toHaveAttribute('data-brand-mark-size', '24');
     expect(mark?.parentElement).toHaveAttribute('aria-hidden', 'true');
     expect(mark?.parentElement).toHaveClass('animate-pulse');
   });

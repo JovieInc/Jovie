@@ -107,4 +107,41 @@ describe('brand mark size ladder', () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it('keeps asserted source receipts for BrandLogo call sites without colocated tests', () => {
+    expect(readWebSource('components/features/auth/AuthLayout.tsx')).toContain(
+      'BrandLogo'
+    );
+    expect(
+      readWebSource(
+        'components/features/dashboard/organisms/InlineChatArea.tsx'
+      )
+    ).toContain('BrandLogo');
+    expect(readWebSource('components/features/demo/DemoShell.tsx')).toContain(
+      'BrandLogo'
+    );
+    expect(readWebSource('components/features/dev/DevToolbar.tsx')).toContain(
+      'BrandLogo'
+    );
+    expect(
+      readWebSource('components/features/home/HeroProfilePreview.tsx')
+    ).toContain('BrandLogo');
+    expect(
+      readWebSource(
+        'components/features/onboarding/OnboardingChatEmptyIntro.tsx'
+      )
+    ).toContain('BrandLogo');
+    expect(
+      readWebSource('components/features/waitlist/WaitlistIntakeChat.tsx')
+    ).toContain('BrandLogo');
+    expect(readWebSource('components/molecules/FooterBranding.tsx')).toContain(
+      'BrandLogo'
+    );
+    expect(
+      readWebSource('components/molecules/ProfileNavButton.tsx')
+    ).toContain('BrandLogo');
+    expect(readWebSource('components/organisms/UnifiedSidebar.tsx')).toContain(
+      'BrandLogo'
+    );
+  });
 });

@@ -17,6 +17,7 @@ describe('Logo', () => {
     const icon = screen.getByRole('img', { name: 'Jovie' });
     expect(icon).toHaveAttribute('width', '32');
     expect(icon).toHaveAttribute('height', '32');
+    expect(icon.parentElement).toHaveAttribute('data-brand-mark-size', '32');
     expect(icon.parentElement).toHaveClass('text-muted-foreground/50');
   });
 });
