@@ -85,19 +85,19 @@
       "$type": "color"
     },
     "border.focus": {
-      "$value": "#1f7bf5",
+      "$value": "#11afff",
       "$type": "color"
     },
     "accent.ion": {
-      "$value": "#1f7bf5",
+      "$value": "#11afff",
       "$type": "color"
     },
     "accent.focusRing": {
-      "$value": "rgba(31, 123, 245, 0.72)",
+      "$value": "rgba(17, 175, 255, 0.72)",
       "$type": "color"
     },
     "accent.selected": {
-      "$value": "rgba(31, 123, 245, 0.1)",
+      "$value": "rgba(17, 175, 255, 0.1)",
       "$type": "color"
     },
     "accent.ultra": {
@@ -137,7 +137,7 @@
       "$type": "color"
     },
     "feature.analytics": {
-      "$value": "#1f7bf5",
+      "$value": "#11afff",
       "$type": "color"
     },
     "feature.conversion": {

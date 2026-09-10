@@ -222,7 +222,7 @@ describe('marketing generation pipeline', () => {
     ).toEqual([
       {
         role: 'ion',
-        ui: '#1F7BF5',
+        ui: '#11AFFF',
         scene: '#3FAFF3',
         oklch: 'oklch(72% 0.14 240)',
         corridor: { minHue: 220, maxHue: 258 },

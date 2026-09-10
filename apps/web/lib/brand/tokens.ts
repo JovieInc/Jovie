@@ -80,7 +80,7 @@ export const PALETTE = {
     { name: 'Cream', hex: '#F5F4F0', token: '--cream' },
   ],
   feature: [
-    { name: 'Ion', hex: '#1F7BF5' },
+    { name: 'Ion', hex: '#11AFFF' },
     { name: 'Ultra', hex: '#8E56F5' },
     { name: 'Pulse', hex: '#F52BB5' },
     { name: 'Mint', hex: '#3FFA8B' },

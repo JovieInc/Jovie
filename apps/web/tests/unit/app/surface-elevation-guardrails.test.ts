@@ -82,7 +82,7 @@ describe('surface elevation guardrails', () => {
 
     // Noir Ion focus ring (ion) — not a white halo or retired aqua
     expect(linearTokens).toContain(
-      '--linear-border-focus: rgba(31, 123, 245, 0.72);'
+      '--linear-border-focus: rgba(17, 175, 255, 0.72);'
     );
     expect(designSystem).toContain('--focus-ring-width: 1px;');
     expect(designSystem).toMatch(

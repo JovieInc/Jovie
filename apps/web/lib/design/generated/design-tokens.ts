@@ -25,8 +25,8 @@ export const DESIGN_TOKENS = {
     "light": {
       "gray": "#7f7f85",
       "gray-subtle": "#efeff2",
-      "blue": "#1f7bf5",
-      "blue-subtle": "rgba(31, 123, 245, 0.12)",
+      "blue": "#11afff",
+      "blue-subtle": "rgba(17, 175, 255, 0.12)",
       "purple": "#8e56f5",
       "purple-subtle": "rgba(142, 86, 245, 0.12)",
       "pink": "#f52bb5",
@@ -43,8 +43,8 @@ export const DESIGN_TOKENS = {
     "dark": {
       "gray": "#8d8d93",
       "gray-subtle": "rgb(127 127 133 / 0.18)",
-      "blue": "#1f7bf5",
-      "blue-subtle": "rgba(31, 123, 245, 0.12)",
+      "blue": "#11afff",
+      "blue-subtle": "rgba(17, 175, 255, 0.12)",
       "purple": "#8e56f5",
       "purple-subtle": "rgba(142, 86, 245, 0.12)",
       "pink": "#f52bb5",
@@ -60,13 +60,13 @@ export const DESIGN_TOKENS = {
     }
   },
   "interactive": {
-    "$description": "Interactive accent (focus, links, active). Product ion is #1F7BF5 in both modes (noir-ion-ziawi 2026-09-09–10). Marketing --linear-accent-blue stays #2563ff until namespace-collapse.",
-    "accent": "#1f7bf5",
-    "accent-hover-light": "#1f7bf5",
-    "accent-active-light": "#1f7bf5",
-    "accent-dark": "#1f7bf5",
-    "accent-hover-dark": "#1f7bf5",
-    "accent-active-dark": "#1f7bf5"
+    "$description": "Interactive accent (focus, links, active). Product ion is #11AFFF in both modes (Tim KEEP 2026-09-10). Marketing --linear-accent-blue stays #2563ff until namespace-collapse.",
+    "accent": "#11afff",
+    "accent-hover-light": "#11afff",
+    "accent-active-light": "#11afff",
+    "accent-dark": "#11afff",
+    "accent-hover-dark": "#11afff",
+    "accent-active-dark": "#11afff"
   },
   "radius": {
     "$description": "System B radius scale emitted by styles/generated/design-tokens.css.",
@@ -91,9 +91,9 @@ export const DESIGN_TOKENS = {
   "divergences": {
     "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice.",
     "accent-blue": {
-      "canonical-dark": "#1f7bf5",
+      "canonical-dark": "#11afff",
       "linear-marketing": "#2563ff",
-      "note": "--color-accent-blue is product ion #1F7BF5 (noir-ion-ziawi 2026-09-09–10). --linear-accent-blue remains marketing System A until namespace-collapse."
+      "note": "--color-accent-blue is product ion #11AFFF (Tim KEEP 2026-09-10). --linear-accent-blue remains marketing System A until namespace-collapse."
     }
   }
 } as const;

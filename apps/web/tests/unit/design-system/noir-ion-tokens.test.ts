@@ -23,6 +23,11 @@ const linearTokens = readFileSync(
   join(WEB_ROOT, 'styles', 'linear-tokens.css'),
   'utf8'
 );
+const oklchPalette = JSON.parse(
+  readFileSync(join(WEB_ROOT, 'design', 'oklch-palette.json'), 'utf8')
+) as {
+  swatches: { ion: { light: { hex: string }; dark: { hex: string } } };
+};
 
 /** Find a dark block that contains a distinctive Noir Ion marker. */
 function darkBlockContaining(css: string, marker: string): string {
@@ -83,23 +88,24 @@ describe('Noir Ion — approved dark anchors', () => {
   });
 
   it('uses ion for routine action, selection, and product focus', () => {
-    expect(dsDark).toContain('--noir-ion-ion: #1f7bf5;');
-    expect(dsDark).toContain('--color-accent-blue: #1f7bf5;');
+    expect(dsDark).toContain('--noir-ion-ion: #11afff;');
+    expect(dsDark).toContain('--color-accent-blue: #11afff;');
     expect(dsDark).toContain('--color-accent: var(--noir-ion-ion);');
-    expect(dsDark).toContain('--color-border-focus: #1f7bf5;');
+    expect(dsDark).toContain('--color-border-focus: #11afff;');
     expect(dsDark).toContain('--color-focus-ring: var(--color-border-focus);');
     expect(dsDark).toContain('--color-bg-selected: var(--noir-ion-selected);');
-    expect(dsLight).toContain('--color-border-focus: #1f7bf5;');
-    expect(dsLight).toContain('--color-accent: #1f7bf5;');
-    expect(dsDark.toLowerCase()).not.toContain('#11afff');
+    expect(dsLight).toContain('--color-border-focus: #11afff;');
+    expect(dsLight).toContain('--color-accent: #11afff;');
+    expect(dsDark.toLowerCase()).not.toContain('#1f7bf5');
+    expect(dsLight.toLowerCase()).not.toContain('#1f7bf5');
     expect(dsDark.toLowerCase()).not.toContain('#2563ff');
     expect(dsLight.toLowerCase()).not.toContain('#2563ff');
     expect(dsLight.toLowerCase()).not.toContain('#7170ff');
     expect(linearDark).toContain(
-      '--linear-border-focus: rgba(31, 123, 245, 0.72);'
+      '--linear-border-focus: rgba(17, 175, 255, 0.72);'
     );
     expect(linearDark).toContain(
-      '--linear-row-selected: rgba(31, 123, 245, 0.1);'
+      '--linear-row-selected: rgba(17, 175, 255, 0.1);'
     );
     expect(linearDark).toContain('--linear-panel-bg: #0f1420;');
     expect(linearDark).not.toContain('--linear-panel-bg: #0a0d16;');
@@ -110,7 +116,9 @@ describe('Noir Ion — approved dark anchors', () => {
       JOVIE_IMAGE_COLOR_POLICY.scenePalette.map(entry => [entry.role, entry])
     );
 
-    expect(sceneByRole.get('ion')?.uiAnchor.hex).toBe('#1F7BF5');
+    expect(oklchPalette.swatches.ion.light.hex).toBe('#11AFFF');
+    expect(oklchPalette.swatches.ion.dark.hex).toBe('#11AFFF');
+    expect(sceneByRole.get('ion')?.uiAnchor.hex).toBe('#11AFFF');
     expect(sceneByRole.get('ultra')?.uiAnchor.hex).toBe('#8E56F5');
     expect(sceneByRole.get('pulse')?.uiAnchor.hex).toBe('#F52BB5');
     expect(sceneByRole.get('ion')?.sceneReference.hex).toBe('#3FAFF3');

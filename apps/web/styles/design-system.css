@@ -965,9 +965,9 @@ html[data-profile-initial-mode]
   --noir-ion-card: #eaedf1;
   --noir-ion-elevated: #dfe3e8;
   --noir-ion-floating: #d4d9e0;
-  --noir-ion-ion: #1f7bf5;
-  --noir-ion-ion-solid: #1f7bf5;
-  --noir-ion-ion-soft: rgba(31, 123, 245, 0.12);
+  --noir-ion-ion: #11afff;
+  --noir-ion-ion-solid: #11afff;
+  --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
   --noir-ion-ultra: #8e56f5;
   --noir-ion-ultra-solid: #8e56f5;
   --noir-ion-ultra-soft: rgba(142, 86, 245, 0.12);
@@ -988,9 +988,9 @@ html[data-profile-initial-mode]
   --noir-ion-aqua: #3ffa8b;
   --noir-ion-aqua-solid: #3ffa8b;
   --noir-ion-aqua-soft: rgba(63, 250, 139, 0.12);
-  --noir-ion-selected: rgba(31, 123, 245, 0.1);
-  --noir-ion-selected-strong: rgba(31, 123, 245, 0.16);
-  --noir-ion-focus-ring: rgba(31, 123, 245, 0.72);
+  --noir-ion-selected: rgba(17, 175, 255, 0.1);
+  --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
+  --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
 
   --app-shell-content-surface: var(--noir-ion-card);
 
@@ -1028,12 +1028,12 @@ html[data-profile-initial-mode]
   --color-border-subtle: oklch(0% 0 0 / 5%);
   --color-border-default: oklch(0% 0 0 / 8%);
   --color-border-strong: oklch(0% 0 0 / 15%);
-  --color-border-focus: #1f7bf5;
+  --color-border-focus: #11afff;
 
   --color-accent-gray: #7f7f85;
   --color-accent-gray-subtle: #efeff2;
-  --color-accent-blue: #1f7bf5;
-  --color-accent-blue-subtle: rgba(31, 123, 245, 0.12);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
   --color-accent-purple: #8e56f5;
   --color-accent-purple-subtle: rgba(142, 86, 245, 0.12);
   --color-accent-pink: #f52bb5;
@@ -1047,9 +1047,9 @@ html[data-profile-initial-mode]
   --color-accent-teal: #3ffa8b;
   --color-accent-teal-subtle: rgba(63, 250, 139, 0.12);
 
-  --color-accent: #1f7bf5;
-  --color-accent-hover: #1f7bf5;
-  --color-accent-active: #1f7bf5;
+  --color-accent: #11afff;
+  --color-accent-hover: #11afff;
+  --color-accent-active: #11afff;
   --color-accent-subtle: var(--noir-ion-ion-soft);
   --color-accent-foreground: oklch(100% 0 0);
 
@@ -1244,9 +1244,9 @@ html[data-profile-initial-mode]
   --noir-ion-text-tertiary: #7d879d;
   --noir-ion-text-disabled: #525d75;
   --noir-ion-text-inverse: #020307;
-  --noir-ion-ion: #1f7bf5;
-  --noir-ion-ion-solid: #1f7bf5;
-  --noir-ion-ion-soft: rgba(31, 123, 245, 0.12);
+  --noir-ion-ion: #11afff;
+  --noir-ion-ion-solid: #11afff;
+  --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
   --noir-ion-pulse: #f52bb5;
   --noir-ion-pulse-solid: #f52bb5;
   --noir-ion-pulse-soft: rgba(245, 43, 181, 0.12);
@@ -1267,13 +1267,13 @@ html[data-profile-initial-mode]
   --noir-ion-aqua: #3ffa8b;
   --noir-ion-aqua-solid: #3ffa8b;
   --noir-ion-aqua-soft: rgba(63, 250, 139, 0.12);
-  --noir-ion-selected: rgba(31, 123, 245, 0.1);
-  --noir-ion-selected-strong: rgba(31, 123, 245, 0.16);
+  --noir-ion-selected: rgba(17, 175, 255, 0.1);
+  --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
   --noir-ion-border-subtle: rgba(168, 176, 195, 0.1);
   --noir-ion-border-default: rgba(168, 176, 195, 0.16);
   --noir-ion-border-strong: rgba(199, 237, 255, 0.26);
-  --noir-ion-border-interactive: rgba(31, 123, 245, 0.48);
-  --noir-ion-focus-ring: rgba(31, 123, 245, 0.72);
+  --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
+  --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
 
   --app-shell-content-surface: #0f1420;
   --app-shell-card-shadow: none;
@@ -1291,7 +1291,7 @@ html[data-profile-initial-mode]
   --app-shell-sidebar-foreground-rgb: 245 247 251;
   --app-shell-sidebar-border-rgb: 168 176 195 / 0.1;
   --app-shell-sidebar-accent-rgb: 168 176 195 / 0.06;
-  --app-shell-sidebar-accent-active-rgb: 31 123 245 / 0.1;
+  --app-shell-sidebar-accent-active-rgb: 17 175 255 / 0.1;
   --app-shell-sidebar-item-foreground-rgb: 215 220 232;
   --app-shell-sidebar-item-icon-rgb: 125 135 157;
   --app-shell-sidebar-muted-rgb: 125 135 157;
@@ -1338,12 +1338,12 @@ html[data-profile-initial-mode]
   --color-border-subtle: var(--noir-ion-border-subtle);
   --color-border-default: var(--noir-ion-border-default);
   --color-border-strong: var(--noir-ion-border-strong);
-  --color-border-focus: #1f7bf5;
+  --color-border-focus: #11afff;
 
   --color-accent-gray: #8d8d93;
   --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
-  --color-accent-blue: #1f7bf5;
-  --color-accent-blue-subtle: rgba(31, 123, 245, 0.12);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
   --color-accent-purple: #8e56f5;
   --color-accent-purple-subtle: rgba(142, 86, 245, 0.12);
   --color-accent-pink: #f52bb5;
@@ -1358,7 +1358,7 @@ html[data-profile-initial-mode]
   --color-accent-teal-subtle: rgba(63, 250, 139, 0.12);
 
   --color-accent: var(--noir-ion-ion);
-  --color-accent-hover: #1f7bf5;
+  --color-accent-hover: #11afff;
   --color-accent-active: var(--noir-ion-ion-solid);
   --color-accent-subtle: var(--noir-ion-ion-soft);
 

@@ -25,7 +25,7 @@
   },
   {
     "heading": "## Color System",
-    "sha256": "429c21625db84b007e2afd35ca3f70c08a5ef1f513d2e9a74c8b81ea43b4e94c"
+    "sha256": "37fbfc28b63de300e70e68aa548ab8246aa4066ed4d4f848bf064a927ff13333"
   },
   {
     "heading": "## Spacing",
@@ -33,7 +33,7 @@
   },
   {
     "heading": "## DS_FOUNDATION_V1 canonical decisions",
-    "sha256": "1c40bb27d871d8b3e2fbf1a8d9d3a059964311bcd6fa298c4b8a0c3eaa561e6f"
+    "sha256": "17a3cb65a827467d23aafc81b154022788c1e762eb98591af83e7004c57ce84a"
   },
   {
     "heading": "## Borders & Radius",
@@ -53,11 +53,11 @@
   },
   {
     "heading": "## Component Patterns",
-    "sha256": "ca4e080e2a044a4db9f12e2ec6729806b435f91282489e77399af7456955d3d0"
+    "sha256": "b940d3d28f77a1010ef2415c34d6b61b73cc0b0868ab9ee2d130a7b272f6ee32"
   },
   {
     "heading": "## Full-Screen Status Screens",
-    "sha256": "8e5f65ea490526c1cdf53511719c849a01bc4d88cb6f14593f78ebc7868b48ef"
+    "sha256": "1274db9e0de0a6ed8c51f980016b98cd02587aaff86f74663d8162c3b1baf9c6"
   },
   {
     "heading": "## Layout Shift Prevention (Visual Stability)",
@@ -77,6 +77,6 @@
   },
   {
     "heading": "## Decisions Log",
-    "sha256": "e9f5eb968f8202d1537ab4459792a43725eb825cae8ab7ea9b91cde095d45f5b"
+    "sha256": "3d72087e9dad175b6ff022462efc24177800115fb5df7ef1e25b0e065478da32"
   }
 ]

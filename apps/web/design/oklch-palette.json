@@ -36,8 +36,8 @@
       "dark": { "oklch": "oklch(97.58% 0.0057 264.53)", "hex": "#F5F7FB" }
     },
     "ion": {
-      "light": { "oklch": "oklch(60.08% 0.2010 257.83)", "hex": "#1F7BF5" },
-      "dark": { "oklch": "oklch(60.08% 0.2010 257.83)", "hex": "#1F7BF5" }
+      "light": { "oklch": "oklch(71.95% 0.1626 240.25)", "hex": "#11AFFF" },
+      "dark": { "oklch": "oklch(71.95% 0.1626 240.25)", "hex": "#11AFFF" }
     },
     "ultra": {
       "light": { "oklch": "oklch(59.95% 0.2254 294.86)", "hex": "#8E56F5" },
@@ -67,7 +67,7 @@
   "energyBands": {
     "policy": { "equalLightnessTarget": false, "pastelChromaCap": false, "chromaFloor": 0.12, "minLightnessSpread": 0.08 },
     "dark": {
-      "ion": { "hue": [250, 270], "l": [0.56, 0.66] },
+      "ion": { "hue": [220, 258], "l": [0.68, 0.76] },
       "ultra": { "hue": [285, 310], "l": [0.56, 0.66] },
       "pulse": { "hue": [325, 355], "l": [0.62, 0.70] },
       "mint": { "hue": [145, 165], "l": [0.84, 0.90] },

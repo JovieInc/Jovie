@@ -343,7 +343,7 @@
   --linear-border-subtle: rgba(168, 176, 195, 0.1);
   --linear-border-default: rgba(168, 176, 195, 0.16);
   --linear-border-strong: rgba(199, 237, 255, 0.26);
-  --linear-border-focus: rgba(31, 123, 245, 0.72);
+  --linear-border-focus: rgba(17, 175, 255, 0.72);
   /* product ion focus */
   /* Buttons — white primary on dark (restrained CTA; Ion is focus/selection) */
   --linear-btn-primary-bg: #ffffff;
@@ -379,7 +379,7 @@
   /* App-shell dark overrides retired (JOV-5466) — canonical
      --app-shell-* values live in design-system.css :root.dark. */
   --linear-row-hover: rgba(168, 176, 195, 0.06);
-  --linear-row-selected: rgba(31, 123, 245, 0.1);
+  --linear-row-selected: rgba(17, 175, 255, 0.1);
 }
 
 /* ============================================

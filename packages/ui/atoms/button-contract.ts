@@ -114,7 +114,17 @@ export function resolveButtonPenMaster({
 export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];
 
-/** Semantic CTAs share the canonical 28px control with a 44px hit target. */
+/**
+ * ActionButton / product CTA lock (Tim KEEP 2026-09-10 ~1:26 PT).
+ * Visible pill is 28px. Mobile tap target is 44px wrapping that pill.
+ * Not 32-in-44 and not density-32 on every size.
+ */
+export const ACTION_BUTTON_VISIBLE_HEIGHT_PX = 28;
+export const ACTION_BUTTON_MOBILE_HIT_TARGET_PX = 44;
+export const ACTION_BUTTON_LABEL_WEIGHT = 510;
+export const ACTION_BUTTON_RADIUS_PX = 999;
+
+/** Semantic CTAs share the canonical 28px control with a 44px mobile hit. */
 export const CTA_BUTTON_SIZE = 'marketing' as const satisfies ButtonSize;
 
 export type DeprecatedButtonVariant =

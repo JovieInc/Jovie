@@ -51,7 +51,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (266 contract tokens; 502 total in CSS)
+## Design Tokens (266 contract tokens; 503 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -84,25 +84,25 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 
 ### Semantic Colors
 
-- `--color-accent`: #7170ff
-- `--color-bg-active`: #ebecef
-- `--color-bg-base`: #f5f5f5
-- `--color-bg-button`: #e3e5e8
-- `--color-bg-elevated`: #f2f3f5
+- `--color-accent`: #11afff
+- `--color-bg-active`: var(--noir-ion-elevated)
+- `--color-bg-base`: var(--noir-ion-canvas)
+- `--color-bg-button`: var(--noir-ion-elevated)
+- `--color-bg-elevated`: var(--noir-ion-elevated)
 - `--color-bg-hover`: rgba(0, 0, 0, 0.04)
-- `--color-bg-input`: #ebecef
-- `--color-bg-page`: #f5f5f5
+- `--color-bg-input`: var(--noir-ion-card)
+- `--color-bg-page`: var(--noir-ion-canvas)
 - `--color-bg-paper`: #f7f8f8
-- `--color-bg-primary`: lch(98.94% 0.5 282)
-- `--color-bg-secondary`: lch(95.94% 0.5 282)
+- `--color-bg-primary`: var(--noir-ion-card)
+- `--color-bg-secondary`: var(--noir-ion-shell)
 - `--color-bg-selected`: var(--noir-ion-selected)
-- `--color-bg-surface-0`: #f5f5f5
-- `--color-bg-surface-1`: var(--app-shell-content-surface)
-- `--color-bg-surface-2`: #f2f3f5
-- `--color-bg-surface-3`: #ebecef
+- `--color-bg-surface-0`: var(--noir-ion-shell)
+- `--color-bg-surface-1`: var(--noir-ion-card)
+- `--color-bg-surface-2`: var(--noir-ion-elevated)
+- `--color-bg-surface-3`: var(--noir-ion-floating)
 - `--color-bg-tooltip`: #101012
 - `--color-border-default`: oklch(0% 0 0 / 8%)
-- `--color-border-focus`: #2563ff
+- `--color-border-focus`: #11afff
 - `--color-border-strong`: oklch(0% 0 0 / 15%)
 - `--color-border-subtle`: oklch(0% 0 0 / 5%)
 - `--color-btn-primary-bg`: oklch(10% 0 0)

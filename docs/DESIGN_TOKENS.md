@@ -125,9 +125,9 @@ are not described by the marketing or public-surface shell libraries.
 Shell V1 app chrome should prefer the semantic `--app-shell-*` aliases for
 shared geometry and surfaces. These aliases live in `design-system.css` and
 resolve to Linear-derived geometry with **Jovie Noir Ion** dark color anchors
-(JOV-4635 / noir-ion-ziawi 2026-09-09–10): canvas `#030407`, shell `#06080D`,
+(JOV-4635 / noir-ion-ziawi 2026-09-09–10, Tim KEEP 2026-09-10): canvas `#030407`, shell `#06080D`,
 card `#0F1420`, elevated `#151B2A`, floating `#1B2436`. Product focus is ion
-`#1F7BF5`. Panel / glass are retired. Product tokens map from `--noir-ion-*`
+`#11AFFF`. Panel / glass are retired. Product tokens map from `--noir-ion-*`
 anchors in `design-system.css` (no parallel theme provider).
 
 - `--app-shell-sidebar-width`
@@ -213,9 +213,9 @@ these, not redefine them.
     Wave 4).
 - **Canonical button variants** — `primary`, `secondary`, `tertiary`, `ghost`,
   and `link`; destructive styling is `destructive`, not a variant.
-- **Canonical button sizes** — `sm` = 28px, `marketing` = 32px visible inside a
-  44px minimum hit target, `md` = 36px, `lg` = 44px; `icon` uses the `md`
-  control height with equal width.
+- **Canonical button sizes** — `sm`, `marketing`, `md`, and `lg` share one
+  28px visible ActionButton (weight 510, radius 999) inside a 44px mobile
+  tap target. Not 32-in-44. `icon` uses the `md` control height with equal width.
 
 ### Concentric radius-by-elevation
 

@@ -215,8 +215,8 @@ export const JOVIE_IMAGE_COLOR_POLICY = {
     {
       role: 'ion',
       uiAnchor: {
-        oklch: 'oklch(60.08% 0.2010 257.83)',
-        hex: '#1F7BF5',
+        oklch: 'oklch(71.95% 0.1626 240.25)',
+        hex: '#11AFFF',
       },
       sceneReference: {
         lightness: 72,

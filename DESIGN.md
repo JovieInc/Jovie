@@ -166,11 +166,11 @@ of redefining them.
   - Raw durations and easings in route code are forbidden (enforced in Wave 4).
 - **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
   and `link`. Destructive styling is a `destructive` prop, not a variant.
-- **Canonical text button size (founder-approved 2026-09-05):** `sm`,
-  `marketing`, `md`, and `lg` share one 28px visible control, typography, and
-  padding inside a 44px minimum hit target across apps and marketing.
+- **Canonical text button size (Tim KEEP 2026-09-10):** `sm`,
+  `marketing`, `md`, and `lg` share one 28px visible ActionButton / product
+  CTA, weight 510, radius 999. Mobile wraps that 28px pill in a 44px tap
+  target. Not 32-in-44 and not density-32 on every size.
   `icon` remains a distinct 36px square utility control with a 44px hit target.
-  ActionButton 32-in-44 vs 32/510 density is a Tim KEEP (C2).
 - **Touch targets (founder-locked 2026-08-20):** enlarge the hit **container**,
   never the visible item. Compact controls keep their visual height; the 44px
   floor is an invisible `::before`/`::after` (or wrapping hit area).

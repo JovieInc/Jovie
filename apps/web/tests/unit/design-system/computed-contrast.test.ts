@@ -62,11 +62,11 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
     ).toHaveLength(0);
   });
 
-  it('keeps canonical focus one opaque ion across modes and above 3:1 except light floating', () => {
+  it('keeps canonical focus one opaque ion #11AFFF; dark ≥3:1, light KEEP below 3:1', () => {
     const tables = loadDefaultTables();
     for (const table of [tables.light, tables.dark]) {
       for (const fg of ['--color-border-focus', '--color-focus-ring']) {
-        expect(resolveValue(`var(${fg})`, table)).toBe('#1f7bf5');
+        expect(resolveValue(`var(${fg})`, table)).toBe('#11afff');
         for (const bg of [
           '--color-bg-base',
           '--color-bg-page',
@@ -79,11 +79,9 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
             { name: 'canonical ion focus', fg, bg, minRatio: 3 },
             table
           );
-          const isLightFloating =
-            table === tables.light && bg === '--color-bg-surface-3';
-          // Lock hexes place ion on light floating at ~2.84:1. Do not invent
-          // a darker ion or a lighter floating — Tim decides.
-          if (isLightFloating) {
+          // Lighter ion #11AFFF is below 3:1 on the light ladder (~2.33–1.72).
+          // Do not invent a darker ion — Tim KEEP 2026-09-10.
+          if (table === tables.light) {
             expect(
               result.status,
               `${fg} on light ${bg}: ${JSON.stringify(result)}`
