@@ -364,6 +364,58 @@ describe('merge-group admission evidence', () => {
     }
   });
 
+  it('neutralizes a vanished queue ref end to end and stays fail-closed on other statuses', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'merge-admission-'));
+    const eventPath = join(directory, 'event.json');
+    const outputPath = join(directory, 'output.txt');
+    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+    const env = {
+      GH_TOKEN: 'test-token',
+      GITHUB_API_URL: 'https://api.github.test',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_OUTPUT: outputPath,
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      GITHUB_SHA: HEAD,
+    };
+    const adapterFetch = refResponse =>
+      vi.fn(async (url, init) => {
+        if (url.endsWith('/graphql')) {
+          const body = JSON.parse(init.body);
+          if (body.query.includes('MergeGroupAdmissionLiveQueue')) {
+            return Response.json(liveQueuePayload([liveQueueNode()]));
+          }
+        }
+        if (url.includes('/git/ref/')) return refResponse;
+        throw new Error(`unexpected request ${url}`);
+      });
+
+    try {
+      const receipt = await runAdmissionFromEnv(env, {
+        fetchImpl: adapterFetch(
+          Response.json({ message: 'Not Found' }, { status: 404 })
+        ),
+      });
+      expect(receipt).toMatchObject({
+        admitted: false,
+        currentQueueState: 'VANISHED_QUEUE_REF',
+        outcome: 'obsolete',
+      });
+      await expect(readFile(outputPath, 'utf8')).resolves.toContain(
+        `admitted=false\nobsolete=true\npr_number=123\nsynthetic_head_sha=${HEAD}`
+      );
+
+      await expect(
+        runAdmissionFromEnv(env, {
+          fetchImpl: adapterFetch(
+            Response.json({ message: 'boom' }, { status: 500 })
+          ),
+        })
+      ).rejects.toThrow(/GitHub API 500/);
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
   it('requires an exact main queue event bound to the workflow head', () => {
     expect(
       validateMergeGroupAdmissionEvent(event(), {
@@ -1298,23 +1350,36 @@ describe('merge-group admission evidence', () => {
     expect(loadCheckRuns).not.toHaveBeenCalled();
   });
 
-  it('fails when the queue ref disappears and never polls checks', async () => {
+  it('neutralizes a vanished queue ref before polling checks', async () => {
     const loadCheckRuns = vi.fn();
-    await expect(
-      waitForMergeGroupAdmission({
-        event: event(),
-        loadAdmissionProvenance: verifiedProvenance,
-        loadCheckRuns,
-        loadLiveQueueEntries: async () => [liveEntry()],
-        loadQueueRef: async () => null,
-        maxWaitMs: 10,
-        pollIntervalMs: 3,
-      })
-    ).rejects.toThrow(/queue ref is missing/);
+    const statuses = [];
+
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadAdmissionProvenance: verifiedProvenance,
+      loadCheckRuns,
+      loadLiveQueueEntries: async () => [liveEntry()],
+      loadQueueRef: async () => null,
+      maxWaitMs: 10,
+      onStatus: message => statuses.push(message),
+      pollIntervalMs: 3,
+    });
+
+    expect(result).toMatchObject({
+      admitted: false,
+      receipt: {
+        admitted: false,
+        currentQueueState: 'VANISHED_QUEUE_REF',
+        obsoleteSyntheticSha: HEAD,
+        outcome: 'obsolete',
+        pr: 123,
+      },
+    });
+    expect(statuses.at(-1)).toMatch(/vanished queue ref/);
     expect(loadCheckRuns).not.toHaveBeenCalled();
   });
 
-  it('rechecks the queue ref after both external gates pass', async () => {
+  it('neutralizes when the queue ref vanishes after both external gates pass', async () => {
     const loadQueueRef = vi
       .fn()
       .mockResolvedValueOnce(queueRef())
@@ -1324,17 +1389,24 @@ describe('merge-group admission evidence', () => {
       checkPage(checkName, 'completed', 'success')
     );
 
-    await expect(
-      waitForMergeGroupAdmission({
-        event: event(),
-        loadAdmissionProvenance: verifiedProvenance,
-        loadCheckRuns,
-        loadLiveQueueEntries,
-        loadQueueRef,
-        maxWaitMs: 10,
-        pollIntervalMs: 3,
-      })
-    ).rejects.toThrow(/queue ref is missing/);
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadAdmissionProvenance: verifiedProvenance,
+      loadCheckRuns,
+      loadLiveQueueEntries,
+      loadQueueRef,
+      maxWaitMs: 10,
+      pollIntervalMs: 3,
+    });
+
+    expect(result).toMatchObject({
+      admitted: false,
+      receipt: {
+        currentQueueState: 'VANISHED_QUEUE_REF',
+        obsoleteSyntheticSha: HEAD,
+        outcome: 'obsolete',
+      },
+    });
     expect(loadLiveQueueEntries).toHaveBeenCalledTimes(1);
     expect(loadQueueRef).toHaveBeenCalledTimes(2);
   });

@@ -107,9 +107,11 @@ const REQUIRED_ENV_MESSAGE =
 export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v2';
 
 export class MergeGroupAdmissionError extends Error {
-  constructor(message) {
+  constructor(message, { path = null, status = null } = {}) {
     super(message);
     this.name = 'MergeGroupAdmissionError';
+    this.path = path;
+    this.status = status;
   }
 }
 
@@ -707,6 +709,29 @@ export async function waitForMergeGroupAdmission({
     return receipt;
   };
 
+  // GitHub deletes the exact gh-readonly-queue ref when the merge-group entry
+  // leaves the queue (merged, superseded, or removed). A ref that vanishes
+  // mid-run means this synthetic head can never merge, so the stale entry is
+  // neutralized as obsolete instead of failing the run closed.
+  const neutralizeVanishedQueueRef = liveReceipt => {
+    onStatus(
+      `Merge-group admission neutralized vanished queue ref ${evidence.headRef}: GitHub deleted the synthetic ref mid-run; the stale queue entry is not an admission defect`
+    );
+    return {
+      ...evidence,
+      admitted: false,
+      receipt: {
+        ...liveReceipt,
+        admitted: false,
+        currentQueueState: 'VANISHED_QUEUE_REF',
+        liveEntry: null,
+        obsoleteSyntheticSha: evidence.headSha,
+        outcome: 'obsolete',
+        replacementCombinedHead: null,
+      },
+    };
+  };
+
   while (true) {
     attempt += 1;
     if (attempt > 1 && now() >= deadlineMs) {
@@ -719,6 +744,9 @@ export async function waitForMergeGroupAdmission({
     }
 
     const queueRef = await loadQueueRef({ ...evidence, deadlineMs });
+    if (queueRef === null) {
+      return neutralizeVanishedQueueRef(liveReceipt);
+    }
     validateQueueRef(queueRef, evidence);
 
     const sourceHeadSha = liveReceipt.liveEntry?.sourceHeadSha;
@@ -763,6 +791,9 @@ export async function waitForMergeGroupAdmission({
       states.every(state => state.state === 'success')
     ) {
       const finalQueueRef = await loadQueueRef({ ...evidence, deadlineMs });
+      if (finalQueueRef === null) {
+        return neutralizeVanishedQueueRef(liveReceipt);
+      }
       validateQueueRef(finalQueueRef, evidence);
       const finalLiveReceipt = await readLiveReceipt();
       if (!finalLiveReceipt.admitted) {
@@ -875,7 +906,10 @@ async function githubRequest(
   }
   if (!response.ok) {
     const message = data?.message ?? 'unknown error';
-    fail(`GitHub API ${response.status} for ${path}: ${message}`);
+    throw new MergeGroupAdmissionError(
+      `GitHub API ${response.status} for ${path}: ${message}`,
+      { path, status: response.status }
+    );
   }
   return { data, link: response.headers.get('link') };
 }
@@ -1051,11 +1085,21 @@ function createGitHubAdmissionApi({
       fail(`live merge queue inventory exceeded ${MAX_LIVE_QUEUE_PAGES} pages`);
     },
     async loadQueueRef({ deadlineMs }) {
-      const result = await githubRequest(
-        `/repos/${encodedRepository}/git/ref/${encodedHeadRef}`,
-        { deadlineMs, env, fetchImpl, token }
-      );
-      return result.data;
+      try {
+        const result = await githubRequest(
+          `/repos/${encodedRepository}/git/ref/${encodedHeadRef}`,
+          { deadlineMs, env, fetchImpl, token }
+        );
+        return result.data;
+      } catch (error) {
+        // GitHub deletes the exact queue ref when the entry leaves the merge
+        // queue. A 404 here marks this run's synthetic head as stale, which is
+        // not an admission defect; every other status stays fail-closed.
+        if (error instanceof MergeGroupAdmissionError && error.status === 404) {
+          return null;
+        }
+        throw error;
+      }
     },
     loadCheckRuns({ checkName, deadlineMs, headSha }) {
       const query = new URLSearchParams({
