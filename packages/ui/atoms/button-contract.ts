@@ -69,9 +69,10 @@ export interface ButtonPenMaster {
  * Receipts (canonical active Pen file, native save + CLI readback):
  * - `button/primary/lg/idle` → master `g3IC1`, label `iqbJo`; production refs
  *   `NRxLZ` (/download) and `w0wvCh` (footer) persist with independent label
- *   overrides. This receipt covers the lg selection only: 28px semantic CTAs
- *   use the marketing size and remain unmapped until an exact Pen master is
- *   promoted. Live Pen readback shows `g3IC1` has no leading-icon descendant, so no
+ *   overrides. This receipt covers the lg selection only: product `sm`/`md`/`lg`
+ *   are 32px ActionButtons; 28px semantic CTAs use the marketing size and remain
+ *   unmapped until an exact Pen master is promoted. Live Pen readback shows
+ *   `g3IC1` has no leading-icon descendant, so no
  *   `leadingIcon` slot is declared and leading-icon overrides fail closed
  *   until the Pen lane returns a verified same-root icon descendant.
  */
@@ -114,7 +115,7 @@ export function resolveButtonPenMaster({
 export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];
 
-/** Semantic CTAs share the canonical 28px control with a 44px hit target. */
+/** Marketing / waitlist CTAs stay 28px with a 44px hit target (#17156 HOLD). */
 export const CTA_BUTTON_SIZE = 'marketing' as const satisfies ButtonSize;
 
 export type DeprecatedButtonVariant =

@@ -35,16 +35,20 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
 const ICON_HIT_TARGET_44 =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
-// Every text size name is a compatibility alias for the founder-selected
-// 28px control, with one typography/padding contract and a 44px hit target.
-const TEXT_BUTTON_CLASSES =
+// Product ActionButton (noir-ion-ziawi 2026-09-09–10): 32px visible,
+// weight 510, radius 999. Existing 44px ::before hit target stays.
+const PRODUCT_TEXT_BUTTON_CLASSES =
+  'h-8 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+
+// Marketing / waitlist CTA stays 28px (#17156 HOLD). Do not collapse.
+const MARKETING_TEXT_BUTTON_CLASSES =
   'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
 const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: TEXT_BUTTON_CLASSES,
-  marketing: TEXT_BUTTON_CLASSES,
-  md: TEXT_BUTTON_CLASSES,
-  lg: TEXT_BUTTON_CLASSES,
+  sm: PRODUCT_TEXT_BUTTON_CLASSES,
+  marketing: MARKETING_TEXT_BUTTON_CLASSES,
+  md: PRODUCT_TEXT_BUTTON_CLASSES,
+  lg: PRODUCT_TEXT_BUTTON_CLASSES,
   icon: `h-9 w-9 px-0 ${ICON_HIT_TARGET_44}`,
   'icon-xs': `h-6 w-6 px-0 ${ICON_HIT_TARGET_44}`,
   'icon-sm': `h-7 w-7 px-0 ${ICON_HIT_TARGET_44}`,

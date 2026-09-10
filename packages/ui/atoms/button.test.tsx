@@ -150,7 +150,7 @@ describe('Button', () => {
     const btn = screen.getByRole('button');
     expect(btn).toHaveAttribute('data-variant', 'primary');
     expect(btn).toHaveAttribute('data-size', 'md');
-    expect(btn.className).toContain('h-7');
+    expect(btn.className).toContain('h-8');
     expect(btn.className).toContain('text-xs');
     expect(btn.className).toContain('bg-btn-primary');
   });
@@ -163,7 +163,7 @@ describe('Button', () => {
     );
     const btn = screen.getByRole('button');
     expect(btn.className).toContain('bg-btn-secondary');
-    expect(btn.className).toContain('h-7');
+    expect(btn.className).toContain('h-8');
   });
 
   it('keeps the marketing text contract at 28px visible inside a 44px target', () => {
@@ -182,10 +182,10 @@ describe('Button', () => {
     expect(btn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
   });
 
-  it('makes every text size an equivalent control for primary and secondary', () => {
+  it('keeps product text sizes at 32px and marketing at 28px', () => {
     for (const variant of ['primary', 'secondary'] as const) {
       const { unmount } = render(
-        (['sm', 'marketing', 'md', 'lg'] as const).map(size => (
+        (['sm', 'md', 'lg'] as const).map(size => (
           <Button key={size} variant={variant} size={size}>
             {size}
           </Button>
@@ -194,7 +194,7 @@ describe('Button', () => {
       const controls = screen.getAllByRole('button');
       expect(new Set(controls.map(control => control.className)).size).toBe(1);
       for (const control of controls) {
-        expect(control.className).toContain('h-7');
+        expect(control.className).toContain('h-8');
         expect(control.className).toContain('px-2.5');
         expect(control.className).toContain('text-xs');
         expect(control.className).toContain('before:h-11');
