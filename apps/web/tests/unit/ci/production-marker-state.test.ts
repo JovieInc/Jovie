@@ -3,8 +3,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  classifyProducerCoalescence,
   classifyProductionMarkerEvidence,
   normalizeProductionJobs,
+  selectNewerSuccessfulControllerRun,
 } from '../../../../../.github/scripts/production-marker-state.mjs';
 
 const processRunner = vi.hoisted(() => vi.fn());
@@ -1126,5 +1128,334 @@ describe('recovered production marker state', () => {
       state: 'manual',
       reason: 'recovery_evidence_after_verified_primary',
     });
+  });
+});
+
+describe('producer coalescence classification', () => {
+  const coalescedJobs = () => [
+    job(
+      'Production Release / Check current main before release',
+      1,
+      'completed',
+      'success'
+    ),
+    job(
+      'Production Release / Promote to Production',
+      1,
+      'completed',
+      'skipped'
+    ),
+    job('Production Verified', 1, 'completed', 'success'),
+    job(
+      'Production Release / Centralized production rollback',
+      1,
+      'completed',
+      'skipped'
+    ),
+  ];
+
+  it('recognizes the exact intentionally-superseded producer shape', () => {
+    expect(
+      classifyProducerCoalescence(
+        run(1, 'completed', 'success'),
+        coalescedJobs()
+      )
+    ).toBe(true);
+  });
+
+  it('refuses a producer that actually promoted', () => {
+    const jobs = coalescedJobs();
+    jobs[1] = job(
+      'Production Release / Promote to Production',
+      1,
+      'completed',
+      'success'
+    );
+    expect(
+      classifyProducerCoalescence(run(1, 'completed', 'success'), jobs)
+    ).toBe(false);
+  });
+
+  it('refuses a producer whose rollback executed', () => {
+    const jobs = coalescedJobs();
+    jobs[3] = job(
+      'Production Release / Centralized production rollback',
+      1,
+      'completed',
+      'success'
+    );
+    expect(
+      classifyProducerCoalescence(run(1, 'completed', 'success'), jobs)
+    ).toBe(false);
+  });
+
+  it('refuses a failed or non-controller producer run', () => {
+    expect(
+      classifyProducerCoalescence(
+        run(1, 'completed', 'failure'),
+        coalescedJobs()
+      )
+    ).toBe(false);
+    const foreign = { ...run(1, 'completed', 'success'), path: 'other.yml' };
+    expect(classifyProducerCoalescence(foreign, coalescedJobs())).toBe(false);
+  });
+
+  it('refuses missing or duplicated verified evidence', () => {
+    expect(
+      classifyProducerCoalescence(run(1, 'completed', 'success'), [])
+    ).toBe(false);
+    const duplicated = [
+      ...coalescedJobs(),
+      job('Production Verified', 1, 'completed', 'success'),
+    ];
+    expect(
+      classifyProducerCoalescence(run(1, 'completed', 'success'), duplicated)
+    ).toBe(false);
+    expect(
+      classifyProducerCoalescence(run(1, 'completed', 'success'), null)
+    ).toBe(false);
+  });
+});
+
+describe('newer successful controller supersession', () => {
+  const context = {
+    sha,
+    repo,
+    controllerRun,
+    controllerWorkflowId: workflowId,
+  };
+  const producer = {
+    ...run(1, 'completed', 'success'),
+    created_at: '2026-09-10T02:16:03Z',
+  };
+  const candidate = (id: number, createdAt: string, overrides = {}) => ({
+    ...run(1, 'completed', 'success'),
+    id,
+    head_sha: 'b'.repeat(40),
+    created_at: createdAt,
+    ...overrides,
+  });
+
+  it('selects the newest successful main controller run after the producer', () => {
+    const newer = candidate(789, '2026-09-10T02:23:47Z');
+    const oldest = candidate(790, '2026-09-10T02:20:00Z');
+    expect(
+      selectNewerSuccessfulControllerRun(producer, [oldest, newer], context)
+    ).toEqual({
+      run: 789,
+      sha: 'b'.repeat(40),
+      createdAt: '2026-09-10T02:23:47Z',
+    });
+  });
+
+  it('returns null when nothing newer succeeded', () => {
+    expect(
+      selectNewerSuccessfulControllerRun(
+        producer,
+        [candidate(789, '2026-09-10T02:00:00Z')],
+        context
+      )
+    ).toBeNull();
+    expect(
+      selectNewerSuccessfulControllerRun(producer, [], context)
+    ).toBeNull();
+    expect(
+      selectNewerSuccessfulControllerRun(producer, null, context)
+    ).toBeNull();
+  });
+
+  it('ignores the producer itself and non-successful or foreign runs', () => {
+    expect(
+      selectNewerSuccessfulControllerRun(
+        producer,
+        [candidate(controllerRun, '2026-09-10T03:00:00Z')],
+        context
+      )
+    ).toBeNull();
+    const failed = candidate(789, '2026-09-10T03:00:00Z', {
+      conclusion: 'failure',
+    });
+    const otherBranch = candidate(790, '2026-09-10T03:00:00Z', {
+      head_branch: 'fix/x',
+    });
+    const otherWorkflow = candidate(791, '2026-09-10T03:00:00Z', {
+      path: '.github/workflows/ci.yml',
+    });
+    const malformedSha = candidate(792, '2026-09-10T03:00:00Z', {
+      head_sha: 'not-a-sha',
+    });
+    expect(
+      selectNewerSuccessfulControllerRun(
+        producer,
+        [failed, otherBranch, otherWorkflow, malformedSha],
+        context
+      )
+    ).toBeNull();
+  });
+
+  it('fails closed on malformed producer evidence', () => {
+    expect(
+      selectNewerSuccessfulControllerRun(
+        null,
+        [candidate(789, '2026-09-10T03:00:00Z')],
+        context
+      )
+    ).toBeNull();
+    const noTimestamp = { ...producer, created_at: undefined };
+    expect(
+      selectNewerSuccessfulControllerRun(
+        noTimestamp,
+        [candidate(789, '2026-09-10T03:00:00Z')],
+        context
+      )
+    ).toBeNull();
+    const foreignProducer = { ...producer, head_branch: 'fix/x' };
+    expect(
+      selectNewerSuccessfulControllerRun(
+        foreignProducer,
+        [candidate(789, '2026-09-10T03:00:00Z')],
+        context
+      )
+    ).toBeNull();
+  });
+});
+
+describe('producer activation evidence CLI', () => {
+  const producerCreatedAt = '2026-09-10T02:16:03Z';
+  const coalescedJobs = [
+    job(
+      'Production Release / Check current main before release',
+      1,
+      'completed',
+      'success'
+    ),
+    job(
+      'Production Release / Promote to Production',
+      1,
+      'completed',
+      'skipped'
+    ),
+    job('Production Verified', 1, 'completed', 'success'),
+    job(
+      'Production Release / Centralized production rollback',
+      1,
+      'completed',
+      'skipped'
+    ),
+  ];
+
+  async function runCliWithProducerEvidence(supersede: boolean) {
+    const calls: string[] = [];
+    processRunner.mockImplementation((command: string, args: string[]) => {
+      const endpoint = args[1];
+      calls.push(`${command} ${args.join(' ')}`);
+      let output: string;
+      if (command === 'gh' && args[0] === 'api') {
+        if (endpoint.includes('/artifacts?')) {
+          output = JSON.stringify({ total_count: 0, artifacts: [] });
+        } else if (
+          endpoint === `repos/${repo}/actions/runs/${controllerRun}/attempts/1`
+        ) {
+          output = JSON.stringify({
+            ...run(1, 'completed', 'success'),
+            created_at: producerCreatedAt,
+          });
+        } else if (
+          endpoint ===
+          `repos/${repo}/actions/runs/${controllerRun}/attempts/1/jobs?per_page=100`
+        ) {
+          output = JSON.stringify({
+            total_count: coalescedJobs.length,
+            jobs: coalescedJobs,
+          });
+        } else if (
+          endpoint ===
+          `repos/${repo}/actions/workflows/${workflowId}/runs?branch=main&status=success&per_page=30`
+        ) {
+          output = JSON.stringify({
+            total_count: supersede ? 1 : 0,
+            workflow_runs: supersede
+              ? [
+                  {
+                    ...run(1, 'completed', 'success'),
+                    id: 789,
+                    head_sha: 'b'.repeat(40),
+                    created_at: '2026-09-10T02:23:47Z',
+                  },
+                ]
+              : [],
+          });
+        } else {
+          throw new Error(`unexpected endpoint ${endpoint}`);
+        }
+      } else {
+        throw new Error(`unexpected command ${command}`);
+      }
+      return { status: 0, stdout: output, stderr: '' };
+    });
+    const argv = process.argv;
+    const output = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    try {
+      process.argv = [
+        process.execPath,
+        resolve(
+          testDir,
+          '../../../../../.github/scripts/production-marker-state.mjs'
+        ),
+        '--sha',
+        sha,
+        '--repo',
+        repo,
+        '--controller-workflow-id',
+        String(workflowId),
+        '--producer-run-id',
+        String(controllerRun),
+        '--producer-attempt',
+        '1',
+      ];
+      vi.resetModules();
+      await import(
+        '../../../../../.github/scripts/production-marker-state.mjs'
+      );
+      return {
+        result: JSON.parse(String(output.mock.calls.at(-1)?.[0])),
+        calls,
+      };
+    } finally {
+      process.argv = argv;
+      output.mockRestore();
+      processRunner.mockReset();
+    }
+  }
+
+  it('marks a coalesced producer superseded by a newer successful run', async () => {
+    const { result } = await runCliWithProducerEvidence(true);
+    expect(result).toMatchObject({
+      state: 'none',
+      reason: 'no_marker',
+      coalesced: true,
+      supersededBy: {
+        run: 789,
+        sha: 'b'.repeat(40),
+        createdAt: '2026-09-10T02:23:47Z',
+      },
+    });
+  });
+
+  it('marks coalescence without supersession evidence when nothing newer succeeded', async () => {
+    const { result, calls } = await runCliWithProducerEvidence(false);
+    expect(result).toMatchObject({
+      state: 'none',
+      reason: 'no_marker',
+      coalesced: true,
+    });
+    expect(result.supersededBy).toBeUndefined();
+    expect(
+      calls.every(
+        call => call.startsWith('gh api repos/') || call.startsWith('unzip ')
+      )
+    ).toBe(true);
   });
 });

@@ -214,4 +214,34 @@ class ActivationAuthorityTests(unittest.TestCase):
                     result=subprocess.run(['bash','-c',script],env=env,capture_output=True,text=True,timeout=5)
                     self.assertEqual(result.returncode==0,expected,result.stderr)
 
+    def test_activation_refreshes_canonical_receipt_before_closure_check(self):
+        workflow=(ROOT/'.github/workflows/gem-delivery-controller-activation.yml').read_text()
+        marker=workflow.index('- name: Authorize exact production marker')
+        refresh=workflow.index('- name: Refresh canonical fleet gate receipt')
+        closure=workflow.index('- name: Check candidate closure startup compatibility')
+        self.assertLess(marker,refresh)
+        self.assertLess(refresh,closure)
+        step=workflow.split('- name: Refresh canonical fleet gate receipt\n',1)[1].split('\n      - name:',1)[0]
+        self.assertIn('uses: ./.github/actions/evaluate-fleet-gate',step)
+        self.assertIn("dry-run: 'false'",step)
+        self.assertIn("if: steps.marker.outputs.superseded != 'true'",step)
+
+    def test_superseded_producer_skips_every_install_step(self):
+        workflow=(ROOT/'.github/workflows/gem-delivery-controller-activation.yml').read_text()
+        marker=workflow.split('- name: Authorize exact production marker\n',1)[1].split('\n      - name:',1)[0]
+        self.assertIn('id: marker',marker)
+        self.assertIn('--producer-run-id',marker)
+        self.assertIn('--producer-attempt',marker)
+        self.assertIn("echo \"superseded=true\"",marker)
+        for name in (
+            'Generate read-only Jovie Bot token for the canonical gate refresh',
+            'Refresh canonical fleet gate receipt',
+            'Check candidate closure startup compatibility',
+            'Establish lingering user-systemd session',
+            'Install and attest the exact controller configuration',
+            'Verify runtime identity after reload',
+        ):
+            step=workflow.split(f'- name: {name}\n',1)[1].split('\n      - name:',1)[0]
+            self.assertIn("if: steps.marker.outputs.superseded != 'true'",step,name)
+
 if __name__ == '__main__': unittest.main()

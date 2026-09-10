@@ -80,8 +80,10 @@ DEFAULT_CLOSURE_HOLD_RECEIPT = (
 DEFAULT_DEAD_LETTER_DIR = (
     pathlib.Path.home() / ".local/state/symphony-elixir/dead-letters"
 )
-# Mirrors gem-priority-gate.RECEIPT_STALE_AFTER; the receipt is regenerated
-# every minute on Gem, so a receipt older than this is a writer outage.
+# Mirrors gem-priority-gate.RECEIPT_STALE_AFTER. The canonical receipt is
+# refreshed event-driven by Fleet Gate Refresh, and the controller activation
+# installer refreshes it through the same writer path immediately before this
+# check; a receipt still older than this after that refresh is a writer outage.
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
@@ -1134,7 +1136,8 @@ def _closure_hold_wait(
 ) -> tuple[int, dict[str, Any]]:
     """Hold new admission in bounded chunks, re-reading the fleet receipt.
 
-    The fleet gate is regenerated every minute on Gem, so the hold re-reads the
+    The fleet gate is refreshed event-driven (Fleet Gate Refresh on push,
+    pull-request, and CI/controller completion), so the hold re-reads the
     receipt after every bounded chunk and releases as soon as closure health
     returns to healthy. Every hold decision rewrites the durable hold receipt.
     """
