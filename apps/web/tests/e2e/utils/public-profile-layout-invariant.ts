@@ -8,7 +8,7 @@ type PublicProfileLayoutViolationCode =
   | 'desktop_bottom_nav'
   | 'desktop_compact_shell'
   | 'desktop_empty_side_rail'
-  | 'desktop_stage_too_narrow'
+  | 'desktop_geometry_token'
   | 'horizontal_overflow'
   | 'layout_surface_count'
   | 'target_under_44'
@@ -81,14 +81,21 @@ export async function auditPublicProfileLayout(page: Page) {
     }
 
     if (isDesktopViewport) {
-      const visibleStage = desktopSurfaces[0] ?? compactSurfaces[0];
-      if (visibleStage) {
-        const stageRatio =
-          visibleStage.getBoundingClientRect().width / window.innerWidth;
-        if (stageRatio < 0.7) {
+      const frame = document.querySelector<HTMLElement>(
+        '.public-profile-layout-frame'
+      );
+      const contentMax = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          '--ds-public-content-max'
+        )
+      );
+      if (ownsDesktop && frame && Number.isFinite(contentMax)) {
+        const expectedWidth = Math.min(window.innerWidth, contentMax);
+        const actualWidth = frame.getBoundingClientRect().width;
+        if (Math.abs(actualWidth - expectedWidth) > 1) {
           violations.push({
-            code: 'desktop_stage_too_narrow',
-            detail: `desktop stage uses ${(stageRatio * 100).toFixed(1)}% of the viewport width`,
+            code: 'desktop_geometry_token',
+            detail: `desktop frame width is ${actualWidth}px; expected ${expectedWidth}px from --ds-public-content-max`,
           });
         }
       }

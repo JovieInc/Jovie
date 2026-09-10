@@ -1605,8 +1605,13 @@ jobs:
             'apps/web/lib/tracking/pac-**' \
             'apps/web/styles/design-system.css' \
             'apps/web/tests/e2e/profile-admission.spec.ts' \
+            'apps/web/tests/e2e/profile/public-profile-layout.spec.ts' \
+            'apps/web/tests/e2e/profile/responsive-shell.spec.ts' \
             ':(glob)apps/web/tests/e2e/utils/profile-admission-diagnostics*.mjs' \
-            'apps/web/tests/e2e/utils/public-surface-helpers.ts')"
+            'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts' \
+            'apps/web/tests/e2e/utils/public-surface-helpers.ts' \
+            'apps/web/tests/components/profile/ClaimBanner.test.tsx' \
+            'apps/web/tests/unit/profile/profile-shell-token-contract.test.ts')"
           if [[ -n "$CHANGED_FILES" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
