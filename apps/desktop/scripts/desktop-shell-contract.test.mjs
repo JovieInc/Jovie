@@ -164,9 +164,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /did-start-navigation/);
   assert.match(mainSource, /function attachRendererRecovery\(/);
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
+  assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
-  assert.match(mainSource, /Loading Jovie/);
-  assert.match(mainSource, /Starting the app/);
+  assert.match(mainSource, /Jovie is loading/);
   assert.match(
     mainSource,
     /renderDesktopBuildIdentitySection\(desktopBuildIdentity\)/
@@ -282,7 +282,8 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /min-height: 100vh/);
   assert.match(mainSource, /background: var\(--system-b-bg-base\)/);
   assert.match(mainSource, /border-radius: var\(--system-b-radius-pill\)/);
-  assert.match(mainSource, /opacity: 0\.035/);
+  assert.match(tokenSource, /markCream: '#F5F4F0'/);
+  assert.match(tokenSource, /splashMarkSizePx: 32/);
   assert.doesNotMatch(
     mainSource,
     /background: linear-gradient\(145deg, rgba\(15,16,17,0\.94\), rgba\(8,9,10,0\.98\)\)/
@@ -292,6 +293,33 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
   assert.match(tokenSource, /backgroundColor: '#06070a'/);
   assert.match(tokenSource, /radiusPill: '999px'/);
+});
+
+test('Mac boot splash is splash-B: 32px cream mark on an empty field', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const tokenSource = await readFile(
+    join(desktopRoot, 'src/system-b-tokens.ts'),
+    'utf8'
+  );
+  const splashFn = mainSource.match(
+    /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+
+  assert.ok(splashFn, 'buildDesktopBootSplashHtml must exist');
+  assert.match(tokenSource, /splashMarkSizePx: 32/);
+  assert.match(tokenSource, /markCream: '#F5F4F0'/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.splashMarkSizePx/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
+  assert.match(splashFn, /data-desktop-splash="splash-b"/);
+  assert.match(splashFn, /aria-label="Jovie is loading"/);
+  assert.doesNotMatch(splashFn, /180px/);
+  assert.doesNotMatch(splashFn, /opacity:\s*0\.035/);
+  assert.doesNotMatch(splashFn, /<h1>/);
+  assert.doesNotMatch(splashFn, /Loading Jovie/);
+  assert.doesNotMatch(splashFn, /Starting the app/);
+  assert.doesNotMatch(splashFn, /renderDesktopBuildIdentitySection/);
+  assert.doesNotMatch(mainSource, /width:\s*180px/);
+  assert.doesNotMatch(mainSource, /height:\s*180px/);
 });
 
 const FORBIDDEN_MAC_ENTITLEMENTS = [

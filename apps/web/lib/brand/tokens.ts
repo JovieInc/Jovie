@@ -16,6 +16,32 @@
 export const JOVIE_VIEWBOX = { width: 360, height: 360 } as const;
 
 /**
+ * Locked mark size ladder (KEEP 2026-09-10 / splash-b-everywhere-v1).
+ * Matches the existing Logo.tsx icon scale (xs/sm/md/lg) — no new mark shape.
+ * Splash is 32px only: tiny centered cream mark on an empty field.
+ * Chrome/header uses 20px. Do not pass ad-hoc pixel sizes.
+ */
+export const BRAND_MARK_SIZE = {
+  compact: 16,
+  chrome: 20,
+  control: 24,
+  splash: 32,
+} as const;
+
+export type BrandMarkSizeName = keyof typeof BRAND_MARK_SIZE;
+export type BrandMarkSizePx = (typeof BRAND_MARK_SIZE)[BrandMarkSizeName];
+export type BrandMarkSize = BrandMarkSizeName | BrandMarkSizePx;
+
+export const BRAND_MARK_CREAM = '#F5F4F0' as const;
+
+export function resolveBrandMarkSize(
+  size: BrandMarkSize = 'chrome'
+): BrandMarkSizePx {
+  if (typeof size === 'number') return size;
+  return BRAND_MARK_SIZE[size];
+}
+
+/**
  * Brand skin variants for the app shell (JOV-4083 / #13493).
  * 'jovie' is the customer product; 'ov' is the internal/admin skin.
  */
