@@ -25,7 +25,7 @@
   },
   {
     "heading": "## Color System",
-    "sha256": "1c5c5f888b38f9d49e76f1aa5a1e495b88dac531c82d72b2cedf7961e2d21cf8"
+    "sha256": "429c21625db84b007e2afd35ca3f70c08a5ef1f513d2e9a74c8b81ea43b4e94c"
   },
   {
     "heading": "## Spacing",
@@ -33,7 +33,7 @@
   },
   {
     "heading": "## DS_FOUNDATION_V1 canonical decisions",
-    "sha256": "909c14cce1e17cc4669cf7e2c51d4d567eb54b5ca3a0585c4be9034759f73398"
+    "sha256": "1c40bb27d871d8b3e2fbf1a8d9d3a059964311bcd6fa298c4b8a0c3eaa561e6f"
   },
   {
     "heading": "## Borders & Radius",
@@ -57,7 +57,7 @@
   },
   {
     "heading": "## Full-Screen Status Screens",
-    "sha256": "a57480cb3e67213a52dba1c26d5b079f060b5aece975ca3575b13a9d24710b96"
+    "sha256": "8e5f65ea490526c1cdf53511719c849a01bc4d88cb6f14593f78ebc7868b48ef"
   },
   {
     "heading": "## Layout Shift Prevention (Visual Stability)",
