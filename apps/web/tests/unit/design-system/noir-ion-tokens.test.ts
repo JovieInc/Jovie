@@ -26,7 +26,21 @@ const linearTokens = readFileSync(
 const oklchPalette = JSON.parse(
   readFileSync(join(WEB_ROOT, 'design', 'oklch-palette.json'), 'utf8')
 ) as {
+  authority: string;
+  colorSot: { schema: string; penNode: string };
   swatches: { ion: { light: { hex: string }; dark: { hex: string } } };
+};
+const ziawiColorSot = JSON.parse(
+  readFileSync(join(WEB_ROOT, 'design', 'ziawi-color-sot.json'), 'utf8')
+) as {
+  schema: string;
+  penNode: string;
+  elevations: {
+    count: number;
+    dark: Record<string, string>;
+    light: Record<string, string>;
+  };
+  accents: { hex: Record<string, string> };
 };
 
 /** Find a dark block that contains a distinctive Noir Ion marker. */
@@ -53,6 +67,18 @@ describe('Noir Ion — approved dark anchors', () => {
   const dsDark = darkBlockContaining(designSystem, '--noir-ion-canvas');
   const dsLight = lightBlockContaining(designSystem, '--noir-ion-canvas');
   const linearDark = darkBlockContaining(linearTokens, '--linear-bg-page');
+
+  it('projects Pen node ZiaWI (ziawi-color-sot-v1) and does not invent a React color root', () => {
+    expect(ziawiColorSot.schema).toBe('ziawi-color-sot-v1');
+    expect(ziawiColorSot.penNode).toBe('ZiaWI');
+    expect(ziawiColorSot.elevations.count).toBe(5);
+    expect(ziawiColorSot.accents.hex.ion).toBe('#11AFFF');
+    expect(oklchPalette.authority).toBe('ziawi-color-sot-v1');
+    expect(oklchPalette.colorSot.penNode).toBe('ZiaWI');
+    expect(oklchPalette.swatches.ion.dark.hex).toBe(
+      ziawiColorSot.accents.hex.ion
+    );
+  });
 
   it('defines exactly five Noir Ion surfaces and maps product tokens to them', () => {
     expect(dsDark).toContain('--noir-ion-canvas: #030407;');
