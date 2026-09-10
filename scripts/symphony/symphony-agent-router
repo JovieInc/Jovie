@@ -156,5 +156,7 @@ if "$guard" >/dev/null 2>&1 && prepare_codex_route; then
   launch_codex "$@"
 fi
 
-echo 'CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason="codex app-server capacity unavailable; CLI-only providers remain isolated"' >&2
+# Match the maintained native initialize-phase receiver. Unknown timing is honest:
+# the failed route has not established an authenticated recovery deadline.
+echo 'codex-rotate: CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 class=provider-capacity retryable=true reason=app_server_capacity_unavailable retryAt=unknown waitSeconds=unknown' >&2
 exit 75

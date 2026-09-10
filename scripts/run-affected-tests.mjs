@@ -682,6 +682,14 @@ const SYMPHONY_NATIVE_ADMISSION_LANE = new Set([
   ...SYMPHONY_NATIVE_ADMISSION_GATES,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const SYMPHONY_AGENT_ROUTER_INPUTS = new Set([
+  'scripts/symphony/symphony-agent-router',
+  'scripts/symphony/tests/symphony-agent-router.test.py',
+]);
+const SYMPHONY_AGENT_ROUTER_LANE = new Set([
+  ...SYMPHONY_AGENT_ROUTER_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
 const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
   ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
   'scripts/symphony/config/model-registry.json',
@@ -1234,6 +1242,30 @@ export function buildAffectedTestPlan(
       rootVitestTests: [],
       pythonTests: [],
       pythonUnittestTests: SYMPHONY_NATIVE_ADMISSION_GATES,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (files.some((file) => SYMPHONY_AGENT_ROUTER_INPUTS.has(file))) {
+    const gates = ['scripts/symphony/tests/run-issue-lease-gate.py'];
+    if (
+      !files.every((file) => SYMPHONY_AGENT_ROUTER_LANE.has(file)) ||
+      ![
+        ...SYMPHONY_AGENT_ROUTER_INPUTS,
+        ...gates,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: gates,
       scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: [],
     };

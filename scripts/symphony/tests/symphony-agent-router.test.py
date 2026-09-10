@@ -316,8 +316,11 @@ with path.open("a+") as challenger:
         )
         self.assertEqual(result.returncode, 75, result.stderr)
         self.assertEqual(result.stdout, "")
-        self.assertIn("codex app-server capacity unavailable", result.stderr)
-        self.assertIn("CLI-only providers remain isolated", result.stderr)
+        self.assertEqual(result.stderr.strip(), (
+            "codex-rotate: CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 "
+            "class=provider-capacity retryable=true reason=app_server_capacity_unavailable "
+            "retryAt=unknown waitSeconds=unknown"
+        ))
         self.assertFalse(calls.exists())
         self.assertFalse(
             (
