@@ -1,9 +1,15 @@
 {
   "schema": "jovie.oklch-palette/v1",
   "issue": "JOV-5388",
-  "authority": "founder-locked",
+  "authority": "ziawi-color-sot-v1",
+  "colorSot": {
+    "schema": "ziawi-color-sot-v1",
+    "path": "apps/web/design/ziawi-color-sot.json",
+    "penNode": "ZiaWI"
+  },
   "authoredSpace": "oklch",
   "projection": "srgb-hex",
+  "note": "OKLCH projection of Pen node ZiaWI. Hex values must match ziawi-color-sot-v1. This file is not a color root.",
   "semantics": { "success": "mint", "warning": "orange", "danger": "red" },
   "elevation": {
     "tokens": ["surface-0", "surface-1", "surface-2", "surface-3"],

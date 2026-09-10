@@ -1,7 +1,7 @@
 [
   {
     "heading": "## Authority and precedence",
-    "sha256": "bacc403143e3587606b957307b5b66f5ef0d062ed38853a5c5da66e5709ead75"
+    "sha256": "a336c34246bac56de9f23fb708dc11e3a2ea6d584320a849cdeca91486659dba"
   },
   {
     "heading": "## Surface Classification",
@@ -25,7 +25,7 @@
   },
   {
     "heading": "## Color System",
-    "sha256": "37fbfc28b63de300e70e68aa548ab8246aa4066ed4d4f848bf064a927ff13333"
+    "sha256": "aed69b189b29a8501cbb05c40d77f3c676b3f4798dba905d088c6620abf45721"
   },
   {
     "heading": "## Spacing",
@@ -73,10 +73,10 @@
   },
   {
     "heading": "## Source-of-Truth File Map",
-    "sha256": "0e6dd1dde0044b616949e5a8610863d59269e3e0c5540c4d14aa3758ea255b71"
+    "sha256": "f9ffaf9d908bdb8a980303f3d0f643296eea4431635614ffae2a7f47488e21d2"
   },
   {
     "heading": "## Decisions Log",
-    "sha256": "3d72087e9dad175b6ff022462efc24177800115fb5df7ef1e25b0e065478da32"
+    "sha256": "d5febd37c061e15f93d30f937e302282811d3adcb753687a511cbab8d3935a1e"
   }
 ]

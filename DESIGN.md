@@ -31,11 +31,17 @@ instructions, use this order:
    skills. These are implementation aids or historical evidence, never
    authority over the sources above.
 
-Pen is a review and proposal surface. A Pen component is not source-backed
-until its identity maps to the current source registry and the required
-save/readback evidence exists. Source identities do not become Pen masters by
-visual resemblance. Keep one canonical master or family per source concept;
-express supported states as variants and consume them as instances.
+Pen is a review and proposal surface, except for colors: Pen node **ZiaWI**
+(`ziawi-color-sot-v1` in `apps/web/design/ziawi-color-sot.json`) is the
+canonical color source of truth. React tokens, OKLCH projections, and CSS
+emitters must match ZiaWI (ion `#11AFFF`, ultra/pulse/mint/orange/red, exactly
+5 elevations). Do not invent a parallel React-only color root.
+
+Other Pen components are not source-backed until their identity maps to the
+current source registry and the required save/readback evidence exists. Source
+identities do not become Pen masters by visual resemblance. Keep one canonical
+master or family per source concept; express supported states as variants and
+consume them as instances.
 
 Founder-facing review surfaces contain only canonical masters and intentional
 variants. Receipts, mappings, duplicate explorations, status copy, and process
@@ -272,10 +278,11 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 
 | File | Responsibility |
 |------|----------------|
-| `apps/web/design/oklch-palette.json` | **Authored OKLCH palette** — locked light/dark semantics, elevation, and hex projections (JOV-5388) |
-| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences |
+| `apps/web/design/ziawi-color-sot.json` | **Color SoT (`ziawi-color-sot-v1`)** — Pen node ZiaWI hex lock. React projects this file. |
+| `apps/web/design/oklch-palette.json` | **OKLCH projection of ZiaWI** — not a color root; hex must match `ziawi-color-sot-v1` |
+| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences; accent hexes project ZiaWI |
 | `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
-| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match the OKLCH registry |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match ZiaWI |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |

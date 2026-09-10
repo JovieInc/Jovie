@@ -293,11 +293,11 @@ If removing an element makes the screen clearer and does not reduce comprehensio
 
 ## Color System
 
-> **Canonical source:** Authored OKLCH values live in
-> `apps/web/design/oklch-palette.json` (JOV-5388). Hex in CSS is the sRGB
-> projection of those tokens. `apps/web/styles/design-system.css` remains the
-> live emitter. When a locked color changes, update the registry, CSS
-> projection, and these tables in the same PR — do not invent values here.
+> **Canonical source:** Pen node **ZiaWI** (`ziawi-color-sot-v1` in
+> `apps/web/design/ziawi-color-sot.json`). React OKLCH and CSS project those
+> hexes. Do not invent a parallel React-only color root. When a locked color
+> changes, update the ZiaWI SoT, then the OKLCH projection, CSS emitter, and
+> these tables in the same PR.
 
 ### Theme Generation
 
@@ -333,9 +333,10 @@ Three input variables generate the entire palette:
 
 Dark mode is the authenticated product default. Neutral near-black graphite
 carries structure; bright color is sparse intent (~90% neutral / 7% soft accent
-/ 3% bright accent). Neon is seasoning. Canonical anchors live as `--noir-ion-*`
-in `apps/web/styles/design-system.css` and map into product tokens (rollback path:
-remap product tokens to prior anchors without a second theme provider).
+/ 3% bright accent). Neon is seasoning. Canonical hexes live on Pen node ZiaWI
+(`ziawi-color-sot-v1`). `--noir-ion-*` in `apps/web/styles/design-system.css`
+projects that node into product tokens (rollback path: remap product tokens to
+prior anchors without a second theme provider).
 
 | Role | Anchor | Product token(s) | Usage |
 |------|--------|------------------|-------|
@@ -1002,3 +1003,4 @@ mark intentional marketing sentence-case headlines with
 | 2026-09-03 | Public marketing H1s paint at most two visual lines | Layout contract only. Complete authored text remains accessible. Does not land superseded Quiet-hero copy or competing homepage CTAs. |
 | 2026-09-10 | Ion / product focus is `#11AFFF` (lighter blue), not `#1F7BF5` | Tim KEEP ~1:26 PT. Ultra/pulse/mint/orange/red stay noir-ion lock hexes. Exactly 5 elevations; no panel. |
 | 2026-09-10 | ActionButton / product CTAs: 28px visible, 510, radius 999; mobile 44px hit wrapping the 28px pill | Tim KEEP ~1:26 PT. Not 32-in-44 and not density-32 everywhere. Homepage not rewritten. `#17156` HOLD. `#17453` untouched. |
+| 2026-09-10 | Pen node ZiaWI is the canonical color SoT (`ziawi-color-sot-v1`) | Tim add ~1:34 PT. React tokens in #17584 must match ZiaWI. Do not invent a parallel React-only color root. |

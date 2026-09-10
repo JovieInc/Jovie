@@ -115,9 +115,10 @@ design-system.css (:root vars) → globals.css (@theme blocks) → Tailwind util
 --color-info:          var(--color-accent-teal)   /* mint after aqua→mint; Tim */
 ```
 
-Current production UI anchors are Noir Ion, not the retired Carbon/Linear
-purple-blue values. Figma translation must read `DESIGN.md` and the live CSS
-emitters before introducing colors. Jovie-owned generated brand imagery uses
+Current production UI anchors are Pen node ZiaWI (`ziawi-color-sot-v1`),
+projected into Noir Ion CSS. Figma translation must read that SoT, `DESIGN.md`,
+and the live CSS emitters before introducing colors. Do not invent a parallel
+React-only or Figma-only color root. Jovie-owned generated brand imagery uses
 Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`; do not
 apply the softened scene references to shipped UI tokens.
 

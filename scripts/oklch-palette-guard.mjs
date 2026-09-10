@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * Canonical OKLCH palette + surface-elevation guard (JOV-5388).
- * Fail-closed: syntax, gamut, contrast, harmony, energy bands, derived kinds,
- * gradient stops, and live CSS / tokens.json projections.
+ * Color hex authority is Pen node ZiaWI (ziawi-color-sot-v1).
+ * Fail-closed: SoT projection, syntax, gamut, contrast, harmony, energy bands,
+ * derived kinds, gradient stops, and live CSS / tokens.json projections.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -21,17 +22,113 @@ import {
 const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..');
 export const PALETTE_PATH = 'apps/web/design/oklch-palette.json';
+export const COLOR_SOT_PATH = 'apps/web/design/ziawi-color-sot.json';
 export const DESIGN_SYSTEM_PATH = 'apps/web/styles/design-system.css';
 export const TOKENS_JSON_PATH = 'apps/web/design/tokens.json';
 export const DESIGN_MD_PATH = 'DESIGN.md';
 export const SCHEMA = 'jovie.oklch-palette/v1';
+export const COLOR_SOT_SCHEMA = 'ziawi-color-sot-v1';
 const KINDS = new Set(['equal-step', 'symmetric-focal']);
 const THEMES = /** @type {const} */ (['light', 'dark']);
 const SURFACES = ['surface-0', 'surface-1', 'surface-2', 'surface-3'];
+const ELEVATION_ROLES = ['canvas', 'shell', 'card', 'elevated', 'floating'];
+const ACCENT_ROLES = ['ion', 'ultra', 'pulse', 'mint', 'orange', 'red'];
+const SWATCH_TO_ELEVATION = {
+  canvas: 'canvas',
+  'surface-0': 'shell',
+  'surface-1': 'card',
+  'surface-2': 'elevated',
+  'surface-3': 'floating',
+};
 
 /** @typedef {{ code: string, detail: string }} Issue */
 /** @typedef {{ l: number, c: number, h: number, alpha?: number }} Oklch */
-/** @typedef {{ css?: string, tokensJson?: unknown, designMd?: string }} PaletteSources */
+/** @typedef {{ css?: string, tokensJson?: unknown, designMd?: string, colorSot?: unknown }} PaletteSources */
+
+/**
+ * Pen node ZiaWI is the color SoT. Palette / CSS hexes must project it.
+ * @param {unknown} sot
+ * @param {Record<string, any>} swatches
+ * @param {(code: string, detail: string) => void} add
+ */
+export function bindZiawiColorSot(sot, swatches, add) {
+  if (!sot || typeof sot !== 'object' || Array.isArray(sot)) {
+    add('color-sot', 'ziawi-color-sot-v1 must be an object');
+    return;
+  }
+  const doc = /** @type {Record<string, any>} */ (sot);
+  if (doc.schema !== COLOR_SOT_SCHEMA) {
+    add('color-sot', `expected ${COLOR_SOT_SCHEMA}`);
+  }
+  if (doc.penNode !== 'ZiaWI') {
+    add('color-sot', 'penNode must be ZiaWI');
+  }
+  const elevations = doc.elevations ?? {};
+  if (elevations.count !== 5) {
+    add('color-sot', 'exactly 5 elevations');
+  }
+  if (elevations.roles?.join(',') !== ELEVATION_ROLES.join(',')) {
+    add(
+      'color-sot',
+      'elevation roles must be canvas/shell/card/elevated/floating'
+    );
+  }
+  if ((elevations.retired ?? []).includes('panel') === false) {
+    add('color-sot', 'panel must stay retired');
+  }
+  for (const theme of THEMES) {
+    for (const role of ELEVATION_ROLES) {
+      if (!elevations[theme]?.[role]) {
+        add('color-sot', `missing ${theme} ${role}`);
+      }
+    }
+  }
+  const accents = doc.accents ?? {};
+  if (accents.count !== 6 || accents.hex?.ion !== '#11AFFF') {
+    add('color-sot', 'ion must be #11AFFF');
+  }
+  if (accents.roles?.join(',') !== ACCENT_ROLES.join(',')) {
+    add('color-sot', 'accents must be ion/ultra/pulse/mint/orange/red');
+  }
+  if (!swatches || typeof swatches !== 'object') return;
+  for (const [swatch, role] of Object.entries(SWATCH_TO_ELEVATION)) {
+    for (const theme of THEMES) {
+      const expected = elevations[theme]?.[role];
+      const actual = swatches[swatch]?.[theme]?.hex;
+      if (!expected || !actual || !hexEquals(actual, expected)) {
+        add(
+          'color-sot',
+          `${swatch}.${theme} want ZiaWI ${expected} got ${actual ?? 'missing'}`
+        );
+      }
+    }
+  }
+  for (const role of ACCENT_ROLES) {
+    const expected = accents.hex?.[role];
+    for (const theme of THEMES) {
+      const actual = swatches[role]?.[theme]?.hex;
+      if (!expected || !actual || !hexEquals(actual, expected)) {
+        add(
+          'color-sot',
+          `${role}.${theme} want ZiaWI ${expected} got ${actual ?? 'missing'}`
+        );
+      }
+    }
+  }
+  for (const [alias, target] of Object.entries(accents.aliases ?? {})) {
+    if (!swatches[alias]) continue;
+    const expected = accents.hex?.[target];
+    for (const theme of THEMES) {
+      const actual = swatches[alias]?.[theme]?.hex;
+      if (!expected || !actual || !hexEquals(actual, expected)) {
+        add(
+          'color-sot',
+          `${alias}.${theme} must alias ZiaWI ${target} ${expected}`
+        );
+      }
+    }
+  }
+}
 
 function readRepo(repoRoot, relativePath) {
   return readFileSync(resolve(repoRoot, relativePath), 'utf8');
@@ -275,6 +372,19 @@ export function validateOklchPalette(
     }
   }
 
+  const colorSot =
+    sources.colorSot ?? JSON.parse(readRepo(repoRoot, COLOR_SOT_PATH));
+  if (doc.authority !== COLOR_SOT_SCHEMA) {
+    add('color-sot', `palette authority must be ${COLOR_SOT_SCHEMA}`);
+  }
+  if (
+    doc.colorSot?.penNode !== 'ZiaWI' ||
+    doc.colorSot?.schema !== COLOR_SOT_SCHEMA
+  ) {
+    add('color-sot', 'palette must declare ZiaWI ziawi-color-sot-v1');
+  }
+  bindZiawiColorSot(colorSot, swatches, add);
+
   const css = sources.css ?? readRepo(repoRoot, DESIGN_SYSTEM_PATH);
   const bindings = doc.cssBindings ?? {};
   bindHex(
@@ -345,6 +455,9 @@ export function validateOklchPalette(
   }
   if (/Flare[^\n]*danger/i.test(designMd)) {
     add('docs', 'DESIGN.md still treats Flare as danger');
+  }
+  if (!/ZiaWI/.test(designMd) || !/ziawi-color-sot-v1/.test(designMd)) {
+    add('docs', 'DESIGN.md must name Pen node ZiaWI as color SoT');
   }
   return issues;
 }

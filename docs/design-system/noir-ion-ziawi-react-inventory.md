@@ -1,16 +1,17 @@
 # React vs Pen noir-ion-ziawi lock inventory
 
 > **Lock:** Tim / Pen Design Studio, 2026-09-09–10, amended Tim KEEP
-> 2026-09-10 ~1:26 PT. Product React tokens and atoms must match this SoT.
-> Pen remains review/proposal until source-backed; this inventory compares
-> **live React emitters** to the lock.
+> 2026-09-10 ~1:26 PT and Tim add ~1:34 PT. Pen node **ZiaWI** is the
+> canonical color SoT (`ziawi-color-sot-v1`). Product React tokens must match
+> ZiaWI. Do not invent a parallel React-only color root. This inventory
+> compares **live React emitters** to that node.
 >
 > **Ad-hoc.** No Linear issue — ad-hoc. `gbrain-unavailable`. Linear MCP
 > `needsAuth`. Granola: no matching meetings 2026-09-08–10.
 > `#17453` has no in-repo identifier; `#17156` waitlist-first HOLD was not
 > touched.
 
-## Locked SoT
+## Locked SoT (Pen node ZiaWI / ziawi-color-sot-v1)
 
 **Surfaces — exactly 5 (no panel / glass)**
 
@@ -44,8 +45,9 @@ extension of the input.
 
 | Path | Role |
 |---|---|
-| `apps/web/design/oklch-palette.json` | Authored OKLCH registry (JOV-5388) |
-| `apps/web/design/tokens.json` | Machine-readable accent / interactive source |
+| `apps/web/design/ziawi-color-sot.json` | Color SoT (`ziawi-color-sot-v1`) — Pen node ZiaWI |
+| `apps/web/design/oklch-palette.json` | OKLCH projection of ZiaWI (not a color root) |
+| `apps/web/design/tokens.json` | Machine-readable accent / interactive projection of ZiaWI |
 | `apps/web/styles/design-system.css` | Live semantic emitter (`--noir-ion-*`, product tokens) |
 | `apps/web/styles/linear-tokens.css` | Marketing Linear namespace + dark product overlays |
 | `apps/web/styles/system-b-app.css` | Shell-scoped `[data-app-shell-frame]` carbon ladder |
@@ -111,16 +113,18 @@ extension of the input.
 
 ## Convergence in this PR (unambiguous only)
 
-1. Product focus → ion `#11AFFF` (Tim KEEP 2026-09-10); not `#1F7BF5`,
+1. Color SoT is Pen node ZiaWI (`ziawi-color-sot-v1`). React OKLCH / CSS /
+   `tokens.json` project it; no parallel React-only color root.
+2. Product focus → ion `#11AFFF` (Tim KEEP 2026-09-10); not `#1F7BF5`,
    not `#2563ff` (`:root` / `:root.dark`, `--linear-border-focus`,
    `--linear-row-selected`).
-2. Six accents: ion `#11AFFF`; ultra/pulse/mint/orange/red stay lock hexes;
+3. Six accents: ion `#11AFFF`; ultra/pulse/mint/orange/red stay lock hexes;
    aqua/gold/flare remain same-hex aliases.
-3. Five-surface ladder; `--noir-ion-panel` removed; `--linear-panel-bg`
+4. Five-surface ladder; `--noir-ion-panel` removed; `--linear-panel-bg`
    remaps to card `#0F1420`.
-4. ActionButton / product CTAs: 28 visible, 510, radius 999; mobile 44 hit
+5. ActionButton / product CTAs: 28 visible, 510, radius 999; mobile 44 hit
    wrapping the 28px pill.
-5. Fail-closed tests lock `#11AFFF` focus/ion and 28 visible / 44 mobile hit.
+6. Fail-closed tests lock ZiaWI `#11AFFF` focus/ion and 28 visible / 44 mobile hit.
 
 ## Tim KEEP conflicts (not picked)
 

@@ -21,7 +21,7 @@ export const DESIGN_TOKENS = {
     "$description": "Canonical 12-step gray scale documented in DESIGN.md. Previously defined only in public/pitch/colors_and_type.css, so var(--grayN) did not resolve in the app — the generated CSS fixes that."
   },
   "accent": {
-    "$description": "System B accent palette rotation. Light values from :root, dark values from .dark in styles/design-system.css. These entries are the canonical statement for divergence checks; design-system.css remains the live emitter until the namespace-collapse wave.",
+    "$description": "Accent hexes project Pen node ZiaWI (ziawi-color-sot-v1). Not a color root. design-system.css remains the live emitter until the namespace-collapse wave.",
     "light": {
       "gray": "#7f7f85",
       "gray-subtle": "#efeff2",
@@ -60,7 +60,7 @@ export const DESIGN_TOKENS = {
     }
   },
   "interactive": {
-    "$description": "Interactive accent (focus, links, active). Product ion is #11AFFF in both modes (Tim KEEP 2026-09-10). Marketing --linear-accent-blue stays #2563ff until namespace-collapse.",
+    "$description": "Interactive accent projects ZiaWI ion #11AFFF in both modes (Tim KEEP 2026-09-10). Marketing --linear-accent-blue stays #2563ff until namespace-collapse.",
     "accent": "#11afff",
     "accent-hover-light": "#11afff",
     "accent-active-light": "#11afff",
