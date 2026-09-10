@@ -157,7 +157,12 @@ export function MarketingFooter({
                 aria-label='Jovie Home'
                 className={markLinkClassName}
               >
-                <BrandLogo size='chrome' tone='white' rounded={false} aria-hidden />
+                <BrandLogo
+                  size='chrome'
+                  tone='white'
+                  rounded={false}
+                  aria-hidden
+                />
               </Link>
               <p className='mf-mark-tagline'>Built for artists. By artists.</p>
             </div>

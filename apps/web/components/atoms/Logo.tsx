@@ -33,14 +33,16 @@ export function Logo({
     xl: 'h-16 w-auto',
   };
 
-  const iconSizePx: Record<NonNullable<LogoProps['size']>, 16 | 20 | 24 | 32> =
-    {
-      xs: 16,
-      sm: 20,
-      md: 24,
-      lg: 32,
-      xl: 32,
-    };
+  const iconSizePx: Record<
+    NonNullable<LogoProps['size']>,
+    16 | 20 | 24 | 32
+  > = {
+    xs: 16,
+    sm: 20,
+    md: 24,
+    lg: 32,
+    xl: 32,
+  };
 
   const wordmarkWidthPx: Record<NonNullable<LogoProps['size']>, number> = {
     xs: 56,

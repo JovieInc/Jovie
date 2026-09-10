@@ -4,7 +4,9 @@ import { BrandLogo } from './BrandLogo';
 
 describe('BrandLogo', () => {
   it('renders the selected brand with its accessible name and size', () => {
-    render(<BrandLogo variant='ov' size='splash' tone='color' rounded={false} />);
+    render(
+      <BrandLogo variant='ov' size='splash' tone='color' rounded={false} />
+    );
 
     const mark = screen.getByRole('img', { name: 'OV' });
     expect(mark).toHaveAttribute('width', '32');
