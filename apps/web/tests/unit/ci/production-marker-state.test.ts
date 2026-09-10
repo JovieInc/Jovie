@@ -6,7 +6,7 @@ import {
   classifyProducerCoalescence,
   classifyProductionMarkerEvidence,
   normalizeProductionJobs,
-  selectNewerSuccessfulControllerRun,
+  selectNewerControllerRun,
 } from '../../../../../.github/scripts/production-marker-state.mjs';
 
 const processRunner = vi.hoisted(() => vi.fn());
@@ -1217,7 +1217,7 @@ describe('producer coalescence classification', () => {
   });
 });
 
-describe('newer successful controller supersession', () => {
+describe('newer controller supersession', () => {
   const context = {
     sha,
     repo,
@@ -1236,11 +1236,11 @@ describe('newer successful controller supersession', () => {
     ...overrides,
   });
 
-  it('selects the newest successful main controller run after the producer', () => {
+  it('selects the newest main controller run after the producer', () => {
     const newer = candidate(789, '2026-09-10T02:23:47Z');
     const oldest = candidate(790, '2026-09-10T02:20:00Z');
     expect(
-      selectNewerSuccessfulControllerRun(producer, [oldest, newer], context)
+      selectNewerControllerRun(producer, [oldest, newer], context)
     ).toEqual({
       run: 789,
       sha: 'b'.repeat(40),
@@ -1248,33 +1248,58 @@ describe('newer successful controller supersession', () => {
     });
   });
 
-  it('returns null when nothing newer succeeded', () => {
+  it('supersedes on an in-flight newer run, not only a successful one', () => {
+    const inFlight = candidate(789, '2026-09-10T02:23:47Z', {
+      status: 'in_progress',
+      conclusion: null,
+    });
     expect(
-      selectNewerSuccessfulControllerRun(
+      selectNewerControllerRun(producer, [inFlight], context)
+    ).toMatchObject({ run: 789 });
+    const failed = candidate(790, '2026-09-10T02:24:00Z', {
+      conclusion: 'failure',
+    });
+    const cancelled = candidate(791, '2026-09-10T02:25:00Z', {
+      conclusion: 'cancelled',
+    });
+    expect(
+      selectNewerControllerRun(producer, [failed, cancelled], context)
+    ).toMatchObject({ run: 791 });
+  });
+
+  it('never supersedes on a startup failure or a same-sha retry', () => {
+    const startupFailure = candidate(789, '2026-09-10T02:23:47Z', {
+      conclusion: 'startup_failure',
+    });
+    expect(
+      selectNewerControllerRun(producer, [startupFailure], context)
+    ).toBeNull();
+    const sameSha = candidate(790, '2026-09-10T02:23:47Z', {
+      head_sha: sha,
+    });
+    expect(selectNewerControllerRun(producer, [sameSha], context)).toBeNull();
+  });
+
+  it('returns null when nothing newer exists', () => {
+    expect(
+      selectNewerControllerRun(
         producer,
         [candidate(789, '2026-09-10T02:00:00Z')],
         context
       )
     ).toBeNull();
-    expect(
-      selectNewerSuccessfulControllerRun(producer, [], context)
-    ).toBeNull();
-    expect(
-      selectNewerSuccessfulControllerRun(producer, null, context)
-    ).toBeNull();
+    expect(selectNewerControllerRun(producer, [], context)).toBeNull();
+    expect(selectNewerControllerRun(producer, null, context)).toBeNull();
   });
 
-  it('ignores the producer itself and non-successful or foreign runs', () => {
+  it('ignores the producer itself and foreign runs', () => {
     expect(
-      selectNewerSuccessfulControllerRun(
+      selectNewerControllerRun(
         producer,
         [candidate(controllerRun, '2026-09-10T03:00:00Z')],
         context
       )
     ).toBeNull();
-    const failed = candidate(789, '2026-09-10T03:00:00Z', {
-      conclusion: 'failure',
-    });
     const otherBranch = candidate(790, '2026-09-10T03:00:00Z', {
       head_branch: 'fix/x',
     });
@@ -1285,9 +1310,9 @@ describe('newer successful controller supersession', () => {
       head_sha: 'not-a-sha',
     });
     expect(
-      selectNewerSuccessfulControllerRun(
+      selectNewerControllerRun(
         producer,
-        [failed, otherBranch, otherWorkflow, malformedSha],
+        [otherBranch, otherWorkflow, malformedSha],
         context
       )
     ).toBeNull();
@@ -1295,7 +1320,7 @@ describe('newer successful controller supersession', () => {
 
   it('fails closed on malformed producer evidence', () => {
     expect(
-      selectNewerSuccessfulControllerRun(
+      selectNewerControllerRun(
         null,
         [candidate(789, '2026-09-10T03:00:00Z')],
         context
@@ -1303,7 +1328,7 @@ describe('newer successful controller supersession', () => {
     ).toBeNull();
     const noTimestamp = { ...producer, created_at: undefined };
     expect(
-      selectNewerSuccessfulControllerRun(
+      selectNewerControllerRun(
         noTimestamp,
         [candidate(789, '2026-09-10T03:00:00Z')],
         context
@@ -1311,7 +1336,7 @@ describe('newer successful controller supersession', () => {
     ).toBeNull();
     const foreignProducer = { ...producer, head_branch: 'fix/x' };
     expect(
-      selectNewerSuccessfulControllerRun(
+      selectNewerControllerRun(
         foreignProducer,
         [candidate(789, '2026-09-10T03:00:00Z')],
         context
@@ -1370,14 +1395,14 @@ describe('producer activation evidence CLI', () => {
           });
         } else if (
           endpoint ===
-          `repos/${repo}/actions/workflows/${workflowId}/runs?branch=main&status=success&per_page=30`
+          `repos/${repo}/actions/workflows/${workflowId}/runs?branch=main&per_page=30`
         ) {
           output = JSON.stringify({
             total_count: supersede ? 1 : 0,
             workflow_runs: supersede
               ? [
                   {
-                    ...run(1, 'completed', 'success'),
+                    ...run(1, 'in_progress', null),
                     id: 789,
                     head_sha: 'b'.repeat(40),
                     created_at: '2026-09-10T02:23:47Z',
@@ -1430,7 +1455,7 @@ describe('producer activation evidence CLI', () => {
     }
   }
 
-  it('marks a coalesced producer superseded by a newer successful run', async () => {
+  it('marks a coalesced producer superseded by a newer in-flight run', async () => {
     const { result } = await runCliWithProducerEvidence(true);
     expect(result).toMatchObject({
       state: 'none',

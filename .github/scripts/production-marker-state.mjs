@@ -663,17 +663,16 @@ export function classifyProducerCoalescence(run, jobs) {
 }
 
 /**
- * Select the newest successful Production Controller run on main created
- * after the producer run. A newer success owns the newest production-proven
- * revision, so activating an older run whose exact marker binding failed
- * would install a superseded revision. Fail closed: any malformed evidence
- * means no supersession.
+ * Select the newest Production Controller run on main for a newer head,
+ * created after the producer run, in any state except startup failure. Its
+ * completion owns the newest revision's activation path: a successful
+ * completion fires its own activation for the newest production-proven
+ * marker, and an unsuccessful one leaves no installable revision either way.
+ * The triggering producer's missing marker is therefore a supersession
+ * no-op, not an anomaly. Fail closed: any malformed evidence means no
+ * supersession.
  */
-export function selectNewerSuccessfulControllerRun(
-  producerRun,
-  candidates,
-  context
-) {
+export function selectNewerControllerRun(producerRun, candidates, context) {
   if (
     !validateControllerRun(producerRun, context, producerRun?.run_attempt) ||
     producerRun.status !== 'completed' ||
@@ -694,9 +693,14 @@ export function selectNewerSuccessfulControllerRun(
       run.path === CONTROLLER_PATH &&
       run.head_branch === 'main' &&
       run.head_repository?.full_name === context.repo &&
-      run.status === 'completed' &&
-      run.conclusion === 'success' &&
+      // A newer main head, not a same-sha retry of the producer.
+      run.head_sha !== context.sha &&
       SHA_PATTERN.test(run.head_sha ?? '') &&
+      typeof run.status === 'string' &&
+      // A startup failure never executed and supersedes nothing; every other
+      // state (in flight, queued, completed with any conclusion) proves the
+      // newer head was picked up and owns the activation path.
+      run.conclusion !== 'startup_failure' &&
       typeof run.created_at === 'string' &&
       Date.parse(run.created_at) > producerCreatedAt
   );
@@ -727,9 +731,9 @@ function fetchProducerAttemptEvidence(repo, producerRunId, producerAttempt) {
  * Activation-facing producer evidence (opt-in via --producer-run-id and
  * --producer-attempt). When the exact verified marker binding for the
  * triggering producer attempt fails, prove whether that attempt coalesced by
- * design (no marker is ever preserved) or whether a newer successful
- * controller run owns the newest production-proven revision. Every probe
- * fails closed: ambiguity adds no fields and the caller still refuses.
+ * design (no marker is ever preserved) or whether a newer controller run for
+ * a newer main head already owns the activation path. Every probe fails
+ * closed: ambiguity adds no fields and the caller still refuses.
  */
 function withProducerActivationEvidence(args, result) {
   const producerRunId = positiveInteger(args['producer-run-id']);
@@ -772,9 +776,9 @@ function withProducerActivationEvidence(args, result) {
   }
   try {
     const listing = ghJson(
-      `repos/${context.repo}/actions/workflows/${context.controllerWorkflowId}/runs?branch=main&status=success&per_page=30`
+      `repos/${context.repo}/actions/workflows/${context.controllerWorkflowId}/runs?branch=main&per_page=30`
     );
-    const supersededBy = selectNewerSuccessfulControllerRun(
+    const supersededBy = selectNewerControllerRun(
       producer.attemptRun,
       listing?.workflow_runs,
       context
