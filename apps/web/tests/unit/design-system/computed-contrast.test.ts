@@ -62,7 +62,7 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
     ).toHaveLength(0);
   });
 
-  it('keeps canonical focus one opaque blue across modes and above 3:1 on surfaces', () => {
+  it('keeps canonical focus one opaque ion across modes and above 3:1 except light floating', () => {
     const tables = loadDefaultTables();
     for (const table of [tables.light, tables.dark]) {
       for (const fg of ['--color-border-focus', '--color-focus-ring']) {
@@ -76,9 +76,21 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
           '--color-bg-elevated',
         ]) {
           const result = checkPair(
-            { name: 'canonical blue focus', fg, bg, minRatio: 3 },
+            { name: 'canonical ion focus', fg, bg, minRatio: 3 },
             table
           );
+          const isLightFloating =
+            table === tables.light && bg === '--color-bg-surface-3';
+          // Lock hexes place ion on light floating at ~2.84:1. Do not invent
+          // a darker ion or a lighter floating — Tim decides.
+          if (isLightFloating) {
+            expect(
+              result.status,
+              `${fg} on light ${bg}: ${JSON.stringify(result)}`
+            ).toBe('fail');
+            expect(result.ratio).toBeLessThan(3);
+            continue;
+          }
           expect(
             result.status,
             `${fg} on ${bg}: ${JSON.stringify(result)}`

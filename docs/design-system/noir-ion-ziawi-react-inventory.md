@@ -134,4 +134,7 @@ extension of the input.
 8. **Orange `#FF7800` vs red `#F72A36` hue distance ~25°** vs prior 40°
    harmony gate — lock hexes win; gate narrowed.
 9. **Light elevation “surface-1 peaks”** vs lock monotonic recede
-   (canvas lightest → floating darkest).
+   (canvas lightest → floating darkest). Guard now follows the lock.
+10. **`--app-shell-control-height-sm: 28px`** vs product ActionButton 32.
+11. **Light ion-on-floating contrast ~2.84:1** vs the 3:1 non-text gate.
+    Lock hexes kept; do not invent a darker ion or a lighter floating.
