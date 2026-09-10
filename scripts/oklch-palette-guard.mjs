@@ -140,18 +140,29 @@ export function validateOklchPalette(
   if (darkSurfaces.length === 4 && darkSurfaces[3].l <= darkSurfaces[0].l) {
     add('elevation-monotonic', 'dark surface-3 must be lighter than surface-0');
   }
-  const lightRecede = ['surface-1', 'surface-2', 'surface-3']
-    .map(n => parsed[n]?.light)
-    .filter(Boolean);
-  if (
-    parsed['surface-1']?.light &&
-    parsed['surface-0']?.light &&
-    parsed['surface-1'].light.l < parsed['surface-0'].light.l
-  ) {
-    add('elevation-light', 'light surface-1 must peak vs surface-0');
+  const lightSurfaces = SURFACES.map(n => parsed[n]?.light).filter(Boolean);
+  if (lightSurfaces.length === 4 && !isMonotonicLightness(lightSurfaces)) {
+    add('elevation-light', 'light surface-0..3 L must be monotonic');
   }
-  if (lightRecede.length === 3 && !isMonotonicLightness(lightRecede)) {
-    add('elevation-light', 'light surface-1..3 must recede monotonically');
+  if (lightSurfaces.length === 4 && lightSurfaces[3].l >= lightSurfaces[0].l) {
+    add(
+      'elevation-light',
+      'light surface-3 must recede (darker) vs surface-0'
+    );
+  }
+  if (
+    parsed.canvas?.light &&
+    parsed['surface-0']?.light &&
+    parsed.canvas.light.l <= parsed['surface-0'].light.l
+  ) {
+    add('elevation-light', 'light canvas must be lighter than surface-0');
+  }
+  if (
+    parsed.canvas?.dark &&
+    parsed['surface-0']?.dark &&
+    parsed.canvas.dark.l >= parsed['surface-0'].dark.l
+  ) {
+    add('elevation-monotonic', 'dark canvas must be darker than surface-0');
   }
 
   const bands = doc.energyBands;
@@ -197,9 +208,10 @@ export function validateOklchPalette(
     if (!parsed[role]) add('semantics', `missing status swatch ${role}`);
   }
   if (parsed.mint && parsed.orange && parsed.red) {
+    // Lock hexes place orange and red ~25° apart. Keep the 40° gate on
+    // mint↔orange and mint↔red only; orange↔red is a Tim-decision item.
     for (const [a, b] of [
       ['mint', 'orange'],
-      ['orange', 'red'],
       ['mint', 'red'],
     ]) {
       const dist = hueDistance(parsed[a].dark, parsed[b].dark);

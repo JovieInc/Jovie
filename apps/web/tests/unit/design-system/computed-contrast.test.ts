@@ -66,7 +66,7 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
     const tables = loadDefaultTables();
     for (const table of [tables.light, tables.dark]) {
       for (const fg of ['--color-border-focus', '--color-focus-ring']) {
-        expect(resolveValue(`var(${fg})`, table)).toBe('#2563ff');
+        expect(resolveValue(`var(${fg})`, table)).toBe('#1f7bf5');
         for (const bg of [
           '--color-bg-base',
           '--color-bg-page',

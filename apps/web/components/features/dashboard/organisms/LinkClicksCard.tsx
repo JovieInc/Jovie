@@ -8,7 +8,7 @@ import { capitalizeFirst } from '@/lib/utils/string-utils';
 
 /** Accent color rotation from DESIGN.md */
 const ACCENT_COLORS = [
-  'var(--color-accent-blue, #2563ff)',
+  'var(--color-accent-blue, #1F7BF5)',
   'var(--color-accent-purple, #8b1eff)',
   'var(--color-accent-pink, #d61a7f)',
   'var(--color-accent-red, #f3122d)',

@@ -4,9 +4,9 @@
   "divergences": {
     "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice.",
     "accent-blue": {
-      "canonical-dark": "#11afff",
+      "canonical-dark": "#1f7bf5",
       "linear-marketing": "#2563ff",
-      "note": "--color-accent-blue dark is Noir Ion electric blue (JOV-4635). --linear-accent-blue remains marketing System A until namespace-collapse."
+      "note": "--color-accent-blue is product ion #1F7BF5 (noir-ion-ziawi 2026-09-09–10). --linear-accent-blue remains marketing System A until namespace-collapse."
     }
   },
   "tokens": [
@@ -111,98 +111,98 @@
     {
       "cssVar": "--color-accent-blue",
       "mode": "light",
-      "value": "#2563ff",
+      "value": "#1f7bf5",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-blue-subtle",
       "mode": "light",
-      "value": "#edf3ff",
+      "value": "rgba(31, 123, 245, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-purple",
       "mode": "light",
-      "value": "#8b1eff",
+      "value": "#8e56f5",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-purple-subtle",
       "mode": "light",
-      "value": "#f3ebff",
+      "value": "rgba(142, 86, 245, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-pink",
       "mode": "light",
-      "value": "#d61a7f",
+      "value": "#f52bb5",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-pink-subtle",
       "mode": "light",
-      "value": "#fde9f4",
+      "value": "rgba(245, 43, 181, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-red",
       "mode": "light",
-      "value": "#f3122d",
+      "value": "#f72a36",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-red-subtle",
       "mode": "light",
-      "value": "#ffeaee",
+      "value": "rgba(247, 42, 54, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-orange",
       "mode": "light",
-      "value": "#ff9800",
+      "value": "#ff7800",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-orange-subtle",
       "mode": "light",
-      "value": "#fff3e6",
+      "value": "rgba(255, 120, 0, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-green",
       "mode": "light",
-      "value": "#2f9e44",
+      "value": "#3ffa8b",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-green-subtle",
       "mode": "light",
-      "value": "#ecf8ee",
+      "value": "rgba(63, 250, 139, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-teal",
       "mode": "light",
-      "value": "#0f9b8e",
+      "value": "#3ffa8b",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-teal-subtle",
       "mode": "light",
-      "value": "#e8f7f5",
+      "value": "rgba(63, 250, 139, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
@@ -223,98 +223,98 @@
     {
       "cssVar": "--color-accent-blue",
       "mode": "dark",
-      "value": "#11afff",
+      "value": "#1f7bf5",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-blue-subtle",
       "mode": "dark",
-      "value": "rgba(17, 175, 255, 0.12)",
+      "value": "rgba(31, 123, 245, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-purple",
       "mode": "dark",
-      "value": "#a982ff",
+      "value": "#8e56f5",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-purple-subtle",
       "mode": "dark",
-      "value": "rgba(169, 130, 255, 0.12)",
+      "value": "rgba(142, 86, 245, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-pink",
       "mode": "dark",
-      "value": "#ff48d2",
+      "value": "#f52bb5",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-pink-subtle",
       "mode": "dark",
-      "value": "rgba(255, 72, 210, 0.12)",
+      "value": "rgba(245, 43, 181, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-red",
       "mode": "dark",
-      "value": "#ff677d",
+      "value": "#f72a36",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-red-subtle",
       "mode": "dark",
-      "value": "rgba(255, 103, 125, 0.12)",
+      "value": "rgba(247, 42, 54, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-orange",
       "mode": "dark",
-      "value": "#ffc857",
+      "value": "#ff7800",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-orange-subtle",
       "mode": "dark",
-      "value": "rgba(255, 200, 87, 0.12)",
+      "value": "rgba(255, 120, 0, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-green",
       "mode": "dark",
-      "value": "#39e58c",
+      "value": "#3ffa8b",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-green-subtle",
       "mode": "dark",
-      "value": "rgba(57, 229, 140, 0.12)",
+      "value": "rgba(63, 250, 139, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-teal",
       "mode": "dark",
-      "value": "#24f6d2",
+      "value": "#3ffa8b",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-teal-subtle",
       "mode": "dark",
-      "value": "rgba(36, 246, 210, 0.1)",
+      "value": "rgba(63, 250, 139, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },

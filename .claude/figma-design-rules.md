@@ -109,10 +109,10 @@ design-system.css (:root vars) → globals.css (@theme blocks) → Tailwind util
 ### Accent Color
 
 ```css
---color-accent:        var(--noir-ion-ion)        /* dark UI anchor #11AFFF */
---color-accent-purple: #A982FF                    /* Ultra */
---color-accent-pink:   #FF48D2                    /* Pulse */
---color-info:          var(--color-accent-teal)   /* Aqua system signal */
+--color-accent:        var(--noir-ion-ion)        /* product ion #1F7BF5 */
+--color-accent-purple: #8E56F5                    /* Ultra */
+--color-accent-pink:   #F52BB5                    /* Pulse */
+--color-info:          var(--color-accent-teal)   /* mint after aqua→mint; Tim */
 ```
 
 Current production UI anchors are Noir Ion, not the retired Carbon/Linear

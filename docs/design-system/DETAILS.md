@@ -313,11 +313,11 @@ Three input variables generate the entire palette:
 
 | Token | Value | Hex approx | Usage |
 |-------|-------|-----------|-------|
-| `--color-bg-base` | `#f5f5f5` | — | Sidebar, page background |
-| `--color-bg-surface-0` | `#f5f5f5` | — | Page background |
-| `--color-bg-surface-1` | `oklch(100% 0 0)` | `#ffffff` | Elevated surfaces, cards, panels |
-| `--color-bg-surface-2` | `#f2f3f5` | — | Hover states, secondary surfaces |
-| `--color-bg-surface-3` | `#ebecef` | — | Pressed states, inputs |
+| `--color-bg-base` | `#F8FAFD` | canvas | Page / canvas |
+| `--color-bg-surface-0` | `#F3F5F8` | shell | Sidebar / chrome |
+| `--color-bg-surface-1` | `#EAEDF1` | card | Cards / content |
+| `--color-bg-surface-2` | `#DFE3E8` | elevated | Hover / raised |
+| `--color-bg-surface-3` | `#D4D9E0` | floating | Pressed / overlays |
 | `--color-bg-primary` | `lch(98.94% 0.5 282)` | `#fcfcfd` | Primary content area |
 | `--color-bg-secondary` | `lch(95.94% 0.5 282)` | `#f3f3f5` | Secondary surfaces, sidebar |
 | Text primary | `lch(9.894% 0 282)` | `#0c0c0c` | Headings, primary text |
@@ -327,8 +327,7 @@ Three input variables generate the entire palette:
 | Border subtle | `oklch(0% 0 0 / 6%)` | — | Dividers |
 | Border default | `oklch(0% 0 0 / 10%)` | — | Borders |
 | Border strong | `oklch(0% 0 0 / 18%)` | — | Emphasis |
-| Accent | `#7170ff` | — | Focus rings, active states, links |
-| Accent hover | `#828fff` | — | Hover state |
+| Accent / focus | `#1F7BF5` | ion | Focus rings, active states, links |
 
 ### App Colors — Dark Mode (System B · **Jovie Noir Ion**, JOV-4635)
 
@@ -342,8 +341,7 @@ remap product tokens to prior anchors without a second theme provider).
 |------|--------|------------------|-------|
 | Canvas | `#030407` | `--color-bg-base`, `--color-bg-page`, `--linear-bg-page` | App page |
 | Shell | `#06080D` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
-| Panel | `#0A0D16` | `--linear-app-content-surface`, `--linear-panel-bg` | Framed main pane |
-| Card | `#0F1420` | `--linear-bg-surface-1` → `--color-bg-surface-1` | Cards |
+| Card | `#0F1420` | `--color-bg-surface-1`, `--app-shell-content-surface` | Cards / content |
 | Elevated | `#151B2A` | `--color-bg-surface-2` | Inputs, raised |
 | Floating | `#1B2436` | `--color-bg-surface-3` | Modals, tooltips |
 | Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
@@ -355,19 +353,18 @@ remap product tokens to prior anchors without a second theme provider).
 | Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |
 | Border default | `rgba(168,176,195,.16)` | `--color-border-default` | Borders |
 | Border strong | `rgba(199,237,255,.26)` | `--color-border-strong` | Emphasis |
-| Focus / selection | Ion `#11AFFF` | `--color-accent`, `--color-border-focus`, `--linear-row-selected` | Focus, links, active nav, selection |
+| Focus / selection | Ion `#1F7BF5` | `--color-accent`, `--color-border-focus` | Focus, links, active nav, selection |
 
-**Accent semantics (dark, founder-locked 2026-08-12):**
+**Accent semantics (founder-locked 2026-09-09–10, exactly six):**
 
 | Role | Hex | Soft | Meaning |
 |------|-----|------|---------|
-| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Focus, active nav, links, selection, information |
-| Ultra (violet) | `#A982FF` | `rgba(169,130,255,.12)` | Agent intelligence or ranking state only |
-| Pulse (pink) | `#FF48D2` | `rgba(255,72,210,.12)` | Launch or creative-status state only |
-| Aqua (cyan) | `#24F6D2` | `rgba(36,246,210,.10)` | System signal, sync, API/tool state (`--color-info`) |
-| Mint (green) | `#39E58C` | `rgba(57,229,140,.12)` | Success |
-| Orange | `#FFC857` | `rgba(255,200,87,.12)` | Warning |
-| Red | `#FF677D` | `rgba(255,103,125,.12)` | Danger / error |
+| Ion (blue) | `#1F7BF5` | `rgba(31,123,245,.12)` | Focus, active nav, links, selection |
+| Ultra (violet) | `#8E56F5` | `rgba(142,86,245,.12)` | Agent intelligence or ranking state only |
+| Pulse (pink) | `#F52BB5` | `rgba(245,43,181,.12)` | Launch or creative-status state only |
+| Mint (green) | `#3FFA8B` | `rgba(63,250,139,.12)` | Success. Aqua aliases this hex. |
+| Orange | `#FF7800` | `rgba(255,120,0,.12)` | Warning. Gold aliases this hex. |
+| Red | `#F72A36` | `rgba(247,42,54,.12)` | Danger / error. Flare aliases this hex. |
 
 CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
@@ -410,9 +407,9 @@ can exist as light, material, wardrobe, set dressing, and atmosphere.
 
 | Role | Current UI anchor | Scene reference | Hue corridor |
 |------|-------------------|-----------------|--------------|
-| Ion | `oklch(71.95% 0.1626 240.25)` / `#11AFFF` | `oklch(72% 0.14 240)` / `#3FAFF3` | 220-258 |
-| Ultra | `oklch(69.82% 0.1792 295.80)` / `#A982FF` | `oklch(70% 0.15 296)` / `#A789F0` | 276-314 |
-| Pulse | `oklch(70.73% 0.2552 339.69)` / `#FF48D2` | `oklch(71% 0.19 340)` / `#EB6AC6` | 322-358 |
+| Ion | `oklch(60.08% 0.2010 257.83)` / `#1F7BF5` | `oklch(72% 0.14 240)` / `#3FAFF3` | 220-258 |
+| Ultra | `oklch(59.95% 0.2254 294.86)` / `#8E56F5` | `oklch(70% 0.15 296)` / `#A789F0` | 276-314 |
+| Pulse | `oklch(66.00% 0.2586 345.13)` / `#F52BB5` | `oklch(71% 0.19 340)` / `#EB6AC6` | 322-358 |
 
 Operational source: `apps/web/data/marketing/imageColorPolicy.ts`
 (`jovie-image-color-policy/v1`). That policy owns Scene Palette v1, the
@@ -450,12 +447,12 @@ Ion (JOV-4635).
 
 | Token | Light | Dark (Noir Ion) | Feature |
 |-------|-------|-----------------|---------|
-| `--accent-analytics` | `#2563ff` | `#11AFFF` (Ion) | Analytics |
-| `--accent-conv` | `#8b1eff` | `#A982FF` (Ultra) | Conversion / agent |
-| `--accent-beauty` | `#d61a7f` | `#FF48D2` (Pulse) | Beauty/Design |
-| `--accent-links` | `#0f9b8e` | `#24F6D2` (Aqua) | Smart Links / system |
-| `--accent-speed` | `#2f9e44` | `#39E58C` (Mint) | Speed / success |
-| `--accent-pro` | `#ff9800` | `#FFC857` (Orange) | Pro Tools / warning |
+| `--accent-analytics` | `#1F7BF5` | `#1F7BF5` (Ion) | Analytics |
+| `--accent-conv` | `#8E56F5` | `#8E56F5` (Ultra) | Conversion / agent |
+| `--accent-beauty` | `#F52BB5` | `#F52BB5` (Pulse) | Beauty/Design |
+| `--accent-links` | `#3FFA8B` | `#3FFA8B` (Mint; aqua alias) | Smart Links / system |
+| `--accent-speed` | `#3FFA8B` | `#3FFA8B` (Mint) | Speed / success |
+| `--accent-pro` | `#FF7800` | `#FF7800` (Orange) | Pro Tools / warning |
 
 **Usage rules:**
 - Assign an accent only to a named semantic state or data category
@@ -899,7 +896,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 | Buttons-to-error-ID | 20px | |
 | Primary button | h-36px, px-16px, pill, bg `#e6e6e6`, text `#08090a` | Hover: `#ffffff` |
 | Secondary button | h-36px, px-16px, pill, transparent, border `white/8%` | |
-| Focus ring | 2px solid `#7170ff`, offset 2px | |
+| Focus ring | 2px solid `#1F7BF5`, offset 2px | |
 
 **Rules:**
 - Logo is a quiet identity anchor, not a hero. 32px maximum on status screens.

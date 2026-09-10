@@ -125,9 +125,10 @@ are not described by the marketing or public-surface shell libraries.
 Shell V1 app chrome should prefer the semantic `--app-shell-*` aliases for
 shared geometry and surfaces. These aliases live in `design-system.css` and
 resolve to Linear-derived geometry with **Jovie Noir Ion** dark color anchors
-(JOV-4635): canvas `#030407`, shell `#06080D`, panel `#0A0D16`, card `#0F1420`,
-Ion focus/selection `#11AFFF`. Product tokens map from `--noir-ion-*` anchors
-in `design-system.css` (no parallel theme provider).
+(JOV-4635 / noir-ion-ziawi 2026-09-09–10): canvas `#030407`, shell `#06080D`,
+card `#0F1420`, elevated `#151B2A`, floating `#1B2436`. Product focus is ion
+`#1F7BF5`. Panel / glass are retired. Product tokens map from `--noir-ion-*`
+anchors in `design-system.css` (no parallel theme provider).
 
 - `--app-shell-sidebar-width`
 - `--app-shell-header-height`

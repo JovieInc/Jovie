@@ -37,7 +37,7 @@ const OUTPUT_PATH = join(REPO_ROOT, 'design.tokens.json');
 const TOKEN_MAP = {
   'surface.canvas': '--noir-ion-canvas',
   'surface.shell': '--noir-ion-shell',
-  'surface.panel': '--noir-ion-panel',
+  'surface.panel': '--noir-ion-card',
   'surface.card': '--noir-ion-card',
   'surface.elevated': '--noir-ion-elevated',
   'surface.floating': '--noir-ion-floating',
