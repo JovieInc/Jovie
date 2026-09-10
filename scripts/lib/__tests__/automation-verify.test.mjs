@@ -1022,6 +1022,43 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('runs the operational launcher gate for sender-only changes', () => {
+    const sender = 'scripts/symphony/symphony-agent-router';
+    const test = 'scripts/symphony/tests/symphony-agent-router.test.py';
+    const gate = 'scripts/symphony/tests/run-issue-lease-gate.py';
+    const selector = 'scripts/run-affected-tests.mjs';
+    const selectorTest = 'scripts/lib/__tests__/automation-verify.test.mjs';
+    for (const changed of [
+      [sender],
+      [test],
+      [sender, test],
+      [sender, test, selector, selectorTest],
+    ]) {
+      const plan = buildAffectedTestPlan(changed);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonUnittestTests).toEqual([gate]);
+      expect(plan.scriptVitestTests).toEqual([selectorTest]);
+      expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+        'python3',
+        [gate],
+      ]);
+    }
+    for (const missing of [sender, test, gate, selectorTest]) {
+      expect(
+        buildAffectedTestPlan([sender], {
+          isFileAvailable: file => file !== missing,
+        }).mode
+      ).toBe('full');
+    }
+    for (const unrelated of [
+      'package.json',
+      'apps/web/app/page.tsx',
+      'scripts/symphony/symphony-codex-router',
+    ]) {
+      expect(buildAffectedTestPlan([sender, unrelated]).mode).toBe('full');
+    }
+  });
+
   it('runs native admission coverage gates for the bounded consumer change', () => {
     const files = [
       'scripts/symphony/tests/native-admission-consumers.test.py',
