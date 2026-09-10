@@ -74,6 +74,7 @@ class RegistryTests(unittest.TestCase):
             "GEM_GROK_EXECUTABLE": "/missing",
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
+            "GEM_HYPERAGENT_EXECUTABLE": "/missing",
             "GEM_PR_DRAIN_CODEX": "/missing",
             "GEM_MODEL_ROUTER_STATE": str(
                 pathlib.Path(self.state_directory.name) / "router-state.json"
@@ -246,6 +247,22 @@ class RegistryTests(unittest.TestCase):
             "kimi",
             "printf '%s\\n' "
             "'{\"providers\":{\"managed:kimi-code\":{}},\"models\":{\"kimi-code/k3\":{},\"kimi-code/kimi-for-coding\":{}}}'\n",
+        )
+
+    HYPERAGENT_MODELS = (
+        "z-ai/glm-5.3-flash",
+        "z-ai/glm-5.3",
+        "moonshotai/kimi-k3",
+        "deepseek/deepseek-v4",
+        "openai/gpt-6-astra",
+    )
+
+    def _hyperagent_ready(self, root, *models):
+        entries = ",".join(f'"{model}":{{}}' for model in models)
+        return self._ready(
+            root,
+            "hyperagent",
+            "printf '%s\\n' '{\"models\":{" + entries + "}}'\n",
         )
 
     def test_cursor_grok_beats_local_when_cursor_cli_is_ready(self):
@@ -587,5 +604,210 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(sol["reason"], "renew_sub_not_api")
             self.assertEqual(sol["renew_subscription"]["sub_monthly_usd"], 200)
             self.assertEqual(sol["renew_subscription"]["effective_included_usd"], 800.0)
+
+    def test_hyperagent_pool_is_gateway_budgeted_after_subscriptions(self):
+        cfg = json.loads(CONFIG.read_text())
+        hyperagent = [m for m in cfg["models"] if m["provider"] == "hyperagent"]
+        ladder = [
+            "hyperagent-glm-5.3-flash",
+            "hyperagent-glm-5.3",
+            "hyperagent-kimi-k3",
+            "hyperagent-deepseek-v4",
+            "hyperagent-astra",
+        ]
+        self.assertEqual([m["id"] for m in hyperagent], ladder)
+        by_id = {m["id"]: m for m in hyperagent}
+        for model in hyperagent:
+            self.assertEqual(model["channel"], "api")
+            self.assertEqual(model["cost_tier"], "gateway-budgeted-paid")
+            self.assertEqual(model["pool"], "hyperagent")
+            self.assertEqual(model["probe_mode"], "json-model-key")
+            self.assertEqual(model["executable_env"], "GEM_HYPERAGENT_EXECUTABLE")
+            self.assertEqual(model["agent_cwd_mode"], "process")
+        prices = [
+            (by_id[mid]["list_price_in"], by_id[mid]["list_price_out"]) for mid in ladder
+        ]
+        self.assertEqual(prices, sorted(prices))
+        deepseek_flash = next(m for m in cfg["models"] if m["id"] == "deepseek-v4-flash")
+        self.assertLess(
+            by_id["hyperagent-glm-5.3-flash"]["list_price_in"],
+            deepseek_flash["list_price_in"],
+        )
+        self.assertEqual(
+            by_id["hyperagent-astra"]["quality"],
+            max(m["quality"] for m in hyperagent),
+        )
+        for chain in cfg["route_chains"].values():
+            last_subscription = max(
+                chain.index(m["id"]) for m in cfg["models"] if m["channel"] == "subscription"
+            )
+            for mid in ladder:
+                self.assertGreater(chain.index(mid), last_subscription)
+            self.assertLess(chain.index(ladder[0]), chain.index(ladder[-1]))
+            self.assertIn("kimi-k3", chain)
+            self.assertIn("grok-4.6", chain)
+
+    def test_codex_exhaustion_prefers_included_kimi_grok_over_hyperagent(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            grok = self._grok_ready(root)
+            kimi = self._kimi_ready(root)
+            hyperagent = self._hyperagent_ready(root, *self.HYPERAGENT_MODELS)
+            state_path = root / "state.json"
+            state_path.write_text(json.dumps({
+                "pools": {
+                    "codex": {"exhausted_until": time.time() + 3600, "uses": 40},
+                }
+            }))
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_GROK_EXECUTABLE": str(grok),
+                    "GEM_KIMI_EXECUTABLE": str(kimi),
+                    "GEM_HYPERAGENT_EXECUTABLE": str(hyperagent),
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                },
+            )
+            document = json.loads(result.stdout)
+            selected = document["selected"]
+            self.assertEqual(selected["id"], "grok-4.6")
+            self.assertEqual(selected["channel"], "subscription")
+            self.assertEqual(selected["marginal_usd"], 0.0)
+            reasons = {item["id"]: item.get("reason") for item in document["candidates"]}
+            self.assertEqual(reasons["codex-sol"], "pool_exhausted")
+            self.assertEqual(reasons["hyperagent-glm-5.3-flash"], "api")
+            self.assertEqual(reasons["hyperagent-kimi-k3"], "family_sub_remaining")
+
+    EXHAUSTED_INCLUDED_POOLS = (
+        "codex",
+        "cursor-models",
+        "grok-build",
+        "kimi",
+        "cursor-other-models",
+    )
+
+    def _exhausted_included_state(self, root, name="state.json", extra=()):
+        state_path = root / name
+        pools = (*self.EXHAUSTED_INCLUDED_POOLS, *extra)
+        state_path.write_text(json.dumps({
+            "pools": {
+                pool: {"exhausted_until": time.time() + 3600, "uses": 9}
+                for pool in pools
+            }
+        }))
+        return state_path
+
+    def test_all_subscriptions_exhausted_selects_hyperagent_glm_flash(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            hyperagent = self._hyperagent_ready(root, *self.HYPERAGENT_MODELS)
+            state_path = self._exhausted_included_state(root)
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_HYPERAGENT_EXECUTABLE": str(hyperagent),
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                },
+            )
+            document = json.loads(result.stdout)
+            selected = document["selected"]
+            self.assertEqual(selected["id"], "hyperagent-glm-5.3-flash")
+            self.assertEqual(selected["channel"], "api")
+            self.assertEqual(selected["cost_tier"], "gateway-budgeted-paid")
+            self.assertEqual(selected["pool"], "hyperagent")
+            self.assertEqual(selected["marginal_usd"], 0.024)
+            reasons = {item["id"]: item.get("reason") for item in document["candidates"]}
+            self.assertEqual(reasons["kimi-k3"], "pool_exhausted")
+            self.assertEqual(reasons["grok-4.6"], "pool_exhausted")
+            self.assertEqual(reasons["codex-terra"], "pool_exhausted")
+            persisted = json.loads(state_path.read_text())
+            self.assertEqual(persisted["pools"]["hyperagent"]["uses"], 1)
+            self.assertAlmostEqual(persisted["api_spend"]["glm"], 0.024)
+
+    def test_hyperagent_paid_ladder_orders_by_list_cost(self):
+        cases = (
+            (self.HYPERAGENT_MODELS[1:], "hyperagent-glm-5.3"),
+            (self.HYPERAGENT_MODELS[2:], "hyperagent-kimi-k3"),
+            (self.HYPERAGENT_MODELS[3:], "hyperagent-deepseek-v4"),
+            (self.HYPERAGENT_MODELS[4:], "hyperagent-astra"),
+        )
+        for index, (available, expected) in enumerate(cases):
+          with self.subTest(expected=expected), tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            hyperagent = self._hyperagent_ready(root, *available)
+            state_path = self._exhausted_included_state(root)
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_HYPERAGENT_EXECUTABLE": str(hyperagent),
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                },
+            )
+            document = json.loads(result.stdout)
+            self.assertEqual(document["selected"]["id"], expected)
+            flash = next(
+                item for item in document["candidates"] if item["id"] == "hyperagent-glm-5.3-flash"
+            )
+            self.assertEqual(flash["reason"], "model_unlisted")
+
+    def test_hyperagent_entries_fail_closed_without_executable(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            probe = root / "ollama"
+            probe.write_text("#!/bin/sh\necho qwen3-coder:30b\n")
+            probe.chmod(0o755)
+            agent = root / "hermes"
+            agent.write_text("#!/bin/sh\nexit 0\n")
+            agent.chmod(0o755)
+            state_path = self._exhausted_included_state(root)
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_HYPERAGENT_EXECUTABLE": "/missing",
+                    "GEM_PR_DRAIN_QWEN": str(probe),
+                    "GEM_QWEN_AGENT_EXECUTABLE": str(agent),
+                },
+            )
+            document = json.loads(result.stdout)
+            self.assertEqual(document["selected"]["id"], "qwen-coder-local")
+            statuses = {
+                item["id"]: item["status"]
+                for item in document["candidates"]
+                if item["id"].startswith("hyperagent-")
+            }
+            self.assertEqual(len(statuses), 5)
+            self.assertTrue(all(status == "unavailable" for status in statuses.values()))
+
+    def test_forbidden_model_ids_fail_registry_validation(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            registry = json.loads(CONFIG.read_text())
+            registry["models"].append({
+                "id": "claude-opus",
+                "provider": "anthropic",
+                "model": "claude-opus-4.8",
+                "family": "claude",
+                "channel": "api",
+                "pool": "anthropic",
+                "quality": 99,
+                "list_price_in": 5.0,
+                "list_price_out": 25.0,
+                "capabilities": ["code"],
+                "cost_tier": "gateway-budgeted-paid",
+            })
+            registry_path = root / "model-registry.json"
+            registry_path.write_text(json.dumps(registry))
+            result = subprocess.run(
+                ["python3", str(ROUTER), "validate", "--config", str(registry_path)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("forbidden model id", result.stderr)
 
 if __name__ == "__main__": unittest.main()
