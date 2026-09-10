@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import type { AiCrawlerStat } from '@/types/ai-crawler-analytics';
 
 const ACCENT_COLORS = [
-  'var(--color-accent-blue, #1F7BF5)',
+  'var(--color-accent-blue, #2563ff)',
   'var(--color-accent-purple, #8b1eff)',
   'var(--color-accent-pink, #d61a7f)',
   'var(--color-accent-teal, #22b8a7)',
