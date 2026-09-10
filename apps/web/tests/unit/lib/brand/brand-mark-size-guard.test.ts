@@ -70,7 +70,9 @@ describe('brand mark size ladder', () => {
     for (const relativePath of SPLASH_B_SOURCES) {
       const source = readWebSource(relativePath);
       expect(source).toContain('BRAND_MARK_SIZE.splash');
-      expect(source).not.toMatch(/<BrandLogo\b[^>]*\bsize=\{(?:[3-9]\d|\d{3,})\}/);
+      expect(source).not.toMatch(
+        /<BrandLogo\b[^>]*\bsize=\{(?:[3-9]\d|\d{3,})\}/
+      );
       expect(source).not.toContain('size={60}');
       expect(source).not.toContain('size={56}');
       expect(source).not.toContain('size={48}');
