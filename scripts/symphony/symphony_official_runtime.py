@@ -71,6 +71,27 @@ CLOSURE_HEALTHY_STATUS = "healthy"
 CLOSURE_HEALTH_STATUSES = frozenset({"healthy", "grace", "red"})
 CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
 CLOSURE_HOLD_EXIT_CODE = 76
+# Closure stop-line purposes. "admission" (default) is the new-issue stop-line:
+# every non-healthy closure holds new work. "controller-activation" is the
+# startup check for installing the repair controller itself: a grace/red
+# product closure whose reasons are all repair-feed signals is a FEED for that
+# controller, not a stop — the installed controller is the writer that drains
+# them, so stopping its installation on them deadlocks the fleet. Every other
+# violation (missing/stale receipt, schema/authority/tamper, admission
+# disagreement, non-feed reasons) still holds in both purposes.
+CLOSURE_PURPOSE_ADMISSION = "admission"
+CLOSURE_PURPOSE_CONTROLLER_ACTIVATION = "controller-activation"
+CLOSURE_PURPOSES = frozenset(
+    {CLOSURE_PURPOSE_ADMISSION, CLOSURE_PURPOSE_CONTROLLER_ACTIVATION}
+)
+# Mirrors gem-priority-gate.REPAIR_FEED_REASONS (closure_allows_controller_repair).
+REPAIR_FEED_REASONS = frozenset(
+    {
+        "internally-repairable-prs-open",
+        "no-merge-progress-over-1h",
+        "queue-controller-red-over-10m",
+    }
+)
 DEFAULT_FLEET_GATE_RECEIPT = (
     pathlib.Path.home() / "gem-workspace/state/gem-priority-gate/latest.json"
 )
@@ -160,6 +181,7 @@ class ClosureStopLine:
     dead_letter_dir: pathlib.Path = DEFAULT_DEAD_LETTER_DIR
     max_receipt_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS
     product_id: str = "jovie"
+    purpose: str = CLOSURE_PURPOSE_ADMISSION
 
 
 def _iso(value: dt.datetime) -> str:
@@ -870,6 +892,7 @@ def read_closure_stop_line(
     *,
     max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
     product_id: str = "jovie",
+    purpose: str = CLOSURE_PURPOSE_ADMISSION,
 ) -> dict[str, Any]:
     """Fail-closed admission verdict from the freshest Gem fleet gate receipt.
 
@@ -877,7 +900,8 @@ def read_closure_stop_line(
     healthy for the requested gem-repo-registry product. A missing, unreadable,
     stale, future-dated, or internally inconsistent receipt is systems-down and
     holds every product. Jovie MQ empty/UNMERGEABLE is issue-blocked and does
-    not hold LYB/Ovie.
+    not hold LYB/Ovie. purpose="controller-activation" relaxes only repair-feed
+    closure reasons (REPAIR_FEED_REASONS) for installing the repair controller.
     """
     observed_at = now or _now()
 
@@ -891,19 +915,47 @@ def read_closure_stop_line(
     except (OSError, json.JSONDecodeError) as exc:
         return hold(f"fleet-gate-receipt-invalid:{type(exc).__name__}")
     return _closure_snapshot_verdict(payload, path, now=observed_at,
-                                     max_age_seconds=max_age_seconds, product_id=product_id)
+                                     max_age_seconds=max_age_seconds, product_id=product_id,
+                                     purpose=purpose)
+
+
+def _repair_feed_reasons(closure_row: Any, *, purpose: str) -> list[str] | None:
+    """Repair-feed reason list when a grace/red closure row is controller feed.
+
+    Returns None unless the caller is installing the controller
+    (purpose="controller-activation") and every stated reason is in
+    REPAIR_FEED_REASONS. A non-list or non-string reasons field fails closed.
+    """
+    if purpose != CLOSURE_PURPOSE_CONTROLLER_ACTIVATION:
+        return None
+    if not isinstance(closure_row, dict):
+        return None
+    if closure_row.get("status") not in {"grace", "red"}:
+        return None
+    reasons = closure_row.get("reasons")
+    if not isinstance(reasons, list) or any(
+        not isinstance(reason, str) for reason in reasons
+    ):
+        return None
+    if not set(reasons) <= REPAIR_FEED_REASONS:
+        return None
+    return sorted(set(reasons))
 
 
 def _closure_snapshot_verdict(
     payload: Any, path: pathlib.Path, *, now: dt.datetime,
     max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
     product_id: str = "jovie",
+    purpose: str = CLOSURE_PURPOSE_ADMISSION,
 ) -> dict[str, Any]:
     """Evaluate the same parsed snapshot used for execution authority."""
     observed_at = now
 
     def hold(reason: str, **extra: Any) -> dict[str, Any]:
         return {"hold": True, "reason": reason, "path": str(path), **extra}
+
+    if purpose not in CLOSURE_PURPOSES:
+        return hold("closure-purpose-unknown", closurePurpose=str(purpose))
 
     if not isinstance(payload, dict) or payload.get("schema") != FLEET_GATE_SCHEMA:
         return hold("fleet-gate-receipt-schema-mismatch")
@@ -923,6 +975,7 @@ def _closure_snapshot_verdict(
         "receiptObservedAt": _iso(receipt_observed),
         "receiptAgeSeconds": age_seconds,
         "maxReceiptAgeSeconds": max_age_seconds,
+        "closurePurpose": purpose,
     }
     if age_seconds < -FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS:
         return hold("fleet-gate-receipt-future", **details)
@@ -961,19 +1014,19 @@ def _closure_snapshot_verdict(
             sys.path.insert(0, str(HERMES_DIR))
         from closure_health import product_intake_allowed
 
+        product_rows = (
+            admission.get("products")
+            if isinstance(admission, dict)
+            else None
+        ) or (
+            signals.get("productClosureHealth")
+            if isinstance(signals, dict)
+            else None
+        )
         product_intake = product_intake_allowed(
             closure,
             str(product_id or "jovie"),
-            products=(
-                admission.get("products")
-                if isinstance(admission, dict)
-                else None
-            )
-            or (
-                signals.get("productClosureHealth")
-                if isinstance(signals, dict)
-                else None
-            ),
+            products=product_rows,
         )
         details["newIssueIntakeAllowed"] = product_intake
         details["sharedNewIssueIntakeAllowed"] = intake
@@ -984,8 +1037,33 @@ def _closure_snapshot_verdict(
                 "path": str(path),
                 **details,
             }
+        product_row = (
+            product_rows.get(str(product_id or "jovie"))
+            if isinstance(product_rows, dict)
+            else None
+        )
+        feed_reasons = _repair_feed_reasons(product_row, purpose=purpose)
+        if feed_reasons is not None:
+            return {
+                "hold": False,
+                "reason": "closure-health-repair-feed",
+                "notice": "product closure reasons are repair feed for the controller, not an activation stop",
+                "repairFeedReasons": feed_reasons,
+                "path": str(path),
+                **details,
+            }
         return hold("closure-health-not-green", **details)
     if status != CLOSURE_HEALTHY_STATUS or intake is not True:
+        feed_reasons = _repair_feed_reasons(closure, purpose=purpose)
+        if feed_reasons is not None:
+            return {
+                "hold": False,
+                "reason": "closure-health-repair-feed",
+                "notice": "closure reasons are repair feed for the controller, not an activation stop",
+                "repairFeedReasons": feed_reasons,
+                "path": str(path),
+                **details,
+            }
         return hold("closure-health-not-green", **details)
     return {
         "hold": False,
@@ -1067,6 +1145,7 @@ def _read_stop_line(
         now=now,
         max_age_seconds=stop_line.max_receipt_age_seconds,
         product_id=stop_line.product_id,
+        purpose=stop_line.purpose,
     )
 
 

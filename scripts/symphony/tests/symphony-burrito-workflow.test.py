@@ -1215,6 +1215,186 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(verdict["reason"], "closure-health-not-green")
             self.assertEqual(verdict["closureStatus"], "grace")
 
+    def test_closure_stop_line_controller_activation_feed_vs_stop(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 10, 14, 6, 0, tzinfo=dt.timezone.utc)
+        observed = "2026-09-10T14:05:00Z"
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+
+            def write_closure(status, reasons):
+                payload = _fleet_gate_payload(
+                    status=status, intake=False, observed_at=observed
+                )
+                payload["signals"]["closureHealth"]["reasons"] = reasons
+                payload["closureAdmission"]["reasons"] = reasons
+                gate.write_text(json.dumps(payload), encoding="utf-8")
+
+            # The live deadlock shape: repair-feed reasons are a subset of the
+            # feed set, so controller activation passes with a notice while new
+            # admission still holds.
+            write_closure(
+                "red", ["internally-repairable-prs-open", "no-merge-progress-over-1h"]
+            )
+            activation = helper.read_closure_stop_line(
+                gate, now=now, purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(activation["reason"], "closure-health-repair-feed")
+            self.assertEqual(activation["closureStatus"], "red")
+            self.assertEqual(activation["closurePurpose"], "controller-activation")
+            self.assertEqual(
+                activation["repairFeedReasons"],
+                ["internally-repairable-prs-open", "no-merge-progress-over-1h"],
+            )
+            self.assertIn("notice", activation)
+            admission = helper.read_closure_stop_line(gate, now=now)
+            self.assertTrue(admission["hold"])
+            self.assertEqual(admission["reason"], "closure-health-not-green")
+            self.assertEqual(admission["closurePurpose"], "admission")
+
+            # Grace carrying only the controller-outage feed reason behaves the
+            # same in both purposes.
+            write_closure("grace", ["queue-controller-red-over-10m"])
+            activation = helper.read_closure_stop_line(
+                gate, now=now, purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(
+                activation["repairFeedReasons"], ["queue-controller-red-over-10m"]
+            )
+            self.assertTrue(helper.read_closure_stop_line(gate, now=now)["hold"])
+
+            # Mixed or non-feed reasons hold in both purposes.
+            for reasons in (
+                ["internally-repairable-prs-open", "closure-observation-unknown"],
+                ["duplicate-issue-lanes-unresolved"],
+            ):
+                write_closure("red", reasons)
+                for purpose in ("admission", "controller-activation"):
+                    with self.subTest(reasons=reasons, purpose=purpose):
+                        verdict = helper.read_closure_stop_line(
+                            gate, now=now, purpose=purpose
+                        )
+                        self.assertTrue(verdict["hold"])
+                        self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+            # A non-string reasons list fails closed in both purposes.
+            write_closure("red", [{"code": "internally-repairable-prs-open"}])
+            for purpose in ("admission", "controller-activation"):
+                with self.subTest(purpose=purpose, reasons="non-string"):
+                    verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                    self.assertTrue(verdict["hold"])
+                    self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+            # A non-jovie product closure red with only feed reasons passes
+            # activation but still holds admission.
+            payload = _fleet_gate_payload(observed_at=observed)
+            payload["signals"]["productClosureHealth"] = {
+                "ovie": {
+                    "schema": "jovie-closure-health/v1",
+                    "authority": "Summer",
+                    "status": "red",
+                    "newIssueIntakeAllowed": False,
+                    "promotionContinues": True,
+                    "remediationContinues": True,
+                    "reasons": ["no-merge-progress-over-1h"],
+                }
+            }
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            activation = helper.read_closure_stop_line(
+                gate, now=now, product_id="ovie", purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(activation["reason"], "closure-health-repair-feed")
+            self.assertEqual(activation["repairFeedReasons"], ["no-merge-progress-over-1h"])
+            admission = helper.read_closure_stop_line(gate, now=now, product_id="ovie")
+            self.assertTrue(admission["hold"])
+            self.assertEqual(admission["reason"], "closure-health-not-green")
+
+    def test_closure_stop_line_controller_activation_still_fails_closed(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 10, 14, 6, 0, tzinfo=dt.timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+            feed = ["internally-repairable-prs-open"]
+
+            # Missing receipt holds in both purposes.
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "fleet-gate-receipt-missing")
+
+            # Stale receipts hold in both purposes even with feed reasons.
+            payload = _fleet_gate_payload(
+                status="red", intake=False, observed_at="2026-09-10T13:55:00Z"
+            )
+            payload["signals"]["closureHealth"]["reasons"] = feed
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "fleet-gate-receipt-stale")
+
+            # Schema/authority violations hold in both purposes.
+            payload = _fleet_gate_payload(
+                status="red", intake=False, observed_at="2026-09-10T14:05:00Z"
+            )
+            payload["signals"]["closureHealth"]["reasons"] = feed
+            payload["signals"]["closureHealth"]["authority"] = "Gem"
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+
+            # An unknown purpose fails closed rather than relaxing anything.
+            payload["signals"]["closureHealth"]["authority"] = "Summer"
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            verdict = helper.read_closure_stop_line(gate, now=now, purpose="observe")
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-purpose-unknown")
+
+            # ClosureStopLine threads its purpose through _read_stop_line.
+            stop_line = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                purpose="controller-activation",
+            )
+            verdict = helper._read_stop_line(stop_line, now=now)
+            self.assertFalse(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-repair-feed")
+            admission_line = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            verdict = helper._read_stop_line(admission_line, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+    def test_repair_feed_reasons_mirror_gem_priority_gate(self):
+        helper = _load_helper()
+        gate_spec = importlib.util.spec_from_file_location(
+            "gem_priority_gate", ROOT / "scripts/symphony/gem-priority-gate.py"
+        )
+        assert gate_spec and gate_spec.loader
+        gate = importlib.util.module_from_spec(gate_spec)
+        sys.modules[gate_spec.name] = gate
+        gate_spec.loader.exec_module(gate)
+        self.assertEqual(
+            helper.REPAIR_FEED_REASONS,
+            frozenset(
+                {
+                    "internally-repairable-prs-open",
+                    "no-merge-progress-over-1h",
+                    "queue-controller-red-over-10m",
+                }
+            ),
+        )
+        self.assertEqual(gate.REPAIR_FEED_REASONS, helper.REPAIR_FEED_REASONS)
+
     def test_closure_hold_releases_when_receipt_turns_green(self):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:

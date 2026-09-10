@@ -159,30 +159,44 @@ class ActivationAuthorityTests(unittest.TestCase):
         workflow = (ROOT / '.github/workflows/gem-delivery-controller-activation.yml').read_text()
         step = workflow.split('- name: Check candidate closure startup compatibility\n', 1)[1].split('\n      - name:', 1)[0]
         script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        # Controller installation is the repair path: the step checks closure
+        # with the controller-activation purpose so repair-feed reasons feed
+        # the installer instead of deadlocking it.
+        self.assertIn('purpose="controller-activation"', step)
         self.assertLess(workflow.index('- name: Check candidate closure startup compatibility'), workflow.index('- name: Establish lingering user-systemd session'))
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
             receipt = home / 'gem-workspace/state/gem-priority-gate/latest.json'
             receipt.parent.mkdir(parents=True)
             now = dt.datetime.now(dt.timezone.utc)
-            for status, intake, observed, expected in [
-                ('healthy', True, now, 0),
-                ('red', False, now, 76),
-                ('healthy', True, now - dt.timedelta(hours=1), 76),
-                ('healthy', True, now + dt.timedelta(hours=1), 76),
-                ('healthy', False, now, 76),
-                (None, False, now, 76),
+            for status, intake, reasons, observed, expected in [
+                ('healthy', True, [], now, 0),
+                # Repair-feed subsets feed the installer instead of stopping it.
+                ('red', False, ['internally-repairable-prs-open', 'no-merge-progress-over-1h'], now, 0),
+                ('grace', False, ['queue-controller-red-over-10m'], now, 0),
+                ('red', False, [], now, 0),
+                # Mixed or unrelated reasons still stop activation.
+                ('red', False, ['closure-observation-unknown'], now, 76),
+                ('red', False, ['internally-repairable-prs-open', 'closure-observation-unknown'], now, 76),
+                ('healthy', True, [], now - dt.timedelta(hours=1), 76),
+                ('healthy', True, [], now + dt.timedelta(hours=1), 76),
+                ('healthy', False, [], now, 76),
+                (None, False, [], now, 76),
             ]:
-                with self.subTest(status=status, intake=intake, observed=observed):
+                with self.subTest(status=status, intake=intake, reasons=reasons, observed=observed):
                     if status is None:
                         receipt.unlink(missing_ok=True)
                     else:
-                        closure = dict(schema='jovie-closure-health/v1', status=status, authority='Summer', newIssueIntakeAllowed=intake, promotionContinues=True, remediationContinues=True, reasons=[])
-                        admission = dict(allowed=intake, newIssueIntakeAllowed=intake, newImplementationAllowed=intake, fallbackPrGenerationAllowed=intake, authority='Summer', status=status, promotionContinues=True, remediationContinues=True)
+                        closure = dict(schema='jovie-closure-health/v1', status=status, authority='Summer', newIssueIntakeAllowed=intake, promotionContinues=True, remediationContinues=True, reasons=reasons)
+                        admission = dict(allowed=intake, newIssueIntakeAllowed=intake, newImplementationAllowed=intake, fallbackPrGenerationAllowed=intake, authority='Summer', status=status, promotionContinues=True, remediationContinues=True, reasons=reasons)
                         receipt.write_text(json.dumps(dict(schema='jovie-fleet-gate/v1', observedAt=observed.isoformat(), state='GREEN' if status == 'healthy' else 'AMBER', signals=dict(closureHealth=closure), closureAdmission=admission)))
                     before = receipt.read_bytes() if receipt.exists() else None
                     result = subprocess.run(['bash', '-c', script], cwd=ROOT, env={**os.environ, 'HOME': str(home)}, capture_output=True, text=True, timeout=5)
                     self.assertEqual(result.returncode, expected, result.stderr + result.stdout)
+                    if expected == 0 and reasons:
+                        self.assertIn('::notice::', result.stdout)
+                        for reason in reasons:
+                            self.assertIn(reason, result.stdout)
                     self.assertEqual(receipt.read_bytes() if receipt.exists() else None, before)
                     self.assertFalse((home / '.local').exists())
 

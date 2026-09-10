@@ -143,10 +143,15 @@ jobs:
           # The enforcing wrapper waits before spawning its child on a hold.
           # Refuse before changing any installed files instead of replacing a
           # live listener with a process that cannot yet expose its API.
-          verdict = _read_stop_line(ClosureStopLine())
+          # Controller installation is the repair path: a grace/red closure
+          # whose reasons are all repair-feed signals feeds this installer
+          # instead of stopping it; every other violation still holds.
+          verdict = _read_stop_line(ClosureStopLine(purpose="controller-activation"))
           if verdict["hold"]:
               print("::error::Candidate startup is held by the existing closure validator: " + verdict["reason"])
               raise SystemExit(76)
+          if verdict["reason"] == "closure-health-repair-feed":
+              print("::notice::Closure repair-feed reasons feed the installed controller instead of stopping activation: " + ",".join(verdict.get("repairFeedReasons") or []))
           PY
       - name: Establish lingering user-systemd session
         if: steps.marker.outputs.superseded != 'true'

@@ -66,6 +66,17 @@ UNKNOWN_MAIN_SHA = "0" * 40
 # Keep in sync with the consumer fail-closed window
 # (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
 RECEIPT_STALE_AFTER = timedelta(minutes=10)
+# Mirrors symphony_official_runtime.REPAIR_FEED_REASONS. Repair-feed closure
+# reasons describe debt the installed controller itself retires (repairable
+# open PRs, merge-progress stall, controller outage); treating them as a stop
+# deadlocks controller repair against the outage it exists to fix.
+REPAIR_FEED_REASONS = frozenset(
+    {
+        "internally-repairable-prs-open",
+        "no-merge-progress-over-1h",
+        "queue-controller-red-over-10m",
+    }
+)
 WRITER_LOCK_TIMEOUT_SECONDS = 60.0
 SEVERE_REASONS = {
     "credential-compromise",
@@ -1433,10 +1444,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         closure_health.get("status") == "healthy"
         or (
             closure_health.get("status") in {"grace", "red"}
-            and closure_reasons
-            <= {
-                "queue-controller-red-over-10m",
-            }
+            and closure_reasons <= REPAIR_FEED_REASONS
             and closure_health.get("newIssueIntakeAllowed") is False
         )
     )
