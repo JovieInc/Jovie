@@ -15,6 +15,29 @@ import symphony_accepted_completion
 JOVIE_REPOSITORY = "JovieInc/Jovie"
 
 
+def run_capacity_projection() -> int:
+    """Re-project useful-turn proofs into the capacity receipt every cycle.
+
+    Completion acceptance is allowed to fail (attestation drift, GitHub
+    outages, bootstrap with no enrolled identities); the fleet gate and the
+    admitter still need a fresh, typed receipt so closed capacity is
+    distinguishable from stale or missing evidence (JOV-INV-007).
+    """
+    try:
+        projection = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("symphony_capacity_evidence.py")),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return 1
+    return projection.returncode
+
+
 def run_summer_bottleneck_producer() -> int:
     """Refresh Jovie's fleet receipt and publish one snapshot per timer cadence."""
     workspace = Path(
@@ -78,6 +101,9 @@ def main() -> int:
         completion_returncode = 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         completion_returncode = 78
+    # The projection runs even when acceptance fails: a fresh closed receipt is
+    # observable, while a stale or missing one reads as evidence loss.
+    projection_returncode = run_capacity_projection()
     results: list[tuple[str, int]] = []
     for repo in pr_drain_repos():
         environment = os.environ.copy()
@@ -104,6 +130,7 @@ def main() -> int:
         consumer_returncode = 1
     print("Gem PR rehabilitation cycle:")
     print(f"Accepted completion reconciliation: rc={completion_returncode}")
+    print(f"Capacity evidence projection: rc={projection_returncode}")
     for repo, returncode in results:
         print(f"  {repo}: rc={returncode}")
     print(f"Summer Jovie bottleneck snapshot: rc={summer_returncode}")
