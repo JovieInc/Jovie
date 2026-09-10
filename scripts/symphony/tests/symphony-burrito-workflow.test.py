@@ -989,6 +989,28 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 observe_result["errors"],
             )
 
+    def test_unit_refuses_manual_stop(self):
+        # RefuseManualStop is a [Unit] directive; the safe-restart helper reads
+        # it via `systemctl --user show -p RefuseManualStop` and refuses (exit
+        # 22) without it, so the canonical unit must carry it in [Unit].
+        helper = _load_helper()
+        unit_section = UNIT.split("[Unit]\n", 1)[1].split("\n[", 1)[0]
+        self.assertIn("RefuseManualStop=yes", unit_section.splitlines())
+        with tempfile.TemporaryDirectory() as tmp:
+            variant = pathlib.Path(tmp) / "symphony-elixir.service"
+            variant.write_text(
+                UNIT.replace("RefuseManualStop=yes\n", ""), encoding="utf-8"
+            )
+            result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=variant,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(result["ok"])
+            self.assertIn("unit_missing_refuse_manual_stop", result["errors"])
+
     def test_closure_stop_line_red_receipt_holds_new_admission(self):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:

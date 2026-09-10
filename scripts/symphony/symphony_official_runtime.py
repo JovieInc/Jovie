@@ -589,6 +589,8 @@ def validate_source(
             errors.append("unit_hardcodes_codex_account")
         if "SuccessExitStatus=0 1" not in unit:
             errors.append("unit_missing_clean_beam_stop_status")
+        if "RefuseManualStop=yes" not in unit:
+            errors.append("unit_missing_refuse_manual_stop")
         for token in OBSOLETE_TOKENS:
             if token in unit:
                 errors.append(f"unit_obsolete_token:{token}")
