@@ -2553,7 +2553,19 @@ describe('canary health gate workflow', () => {
     expect(receiptJob).not.toContain('vercel rollback');
     expect(releaseResult).toContain('staging-deployment-receipt,');
     expect(releaseResult).toContain(
-      'staging-deployment-receipt:${{ needs.staging-deployment-receipt.result }}'
+      'staging_refresh_outcome="${{ needs.staging-deployment-receipt.outputs.staging_refresh_outcome }}"'
+    );
+    expect(releaseResult).toContain(
+      '[ "${{ needs.staging-deployment-receipt.result }}" != "success" ]'
+    );
+    expect(releaseResult).toContain(
+      '[ "${{ needs.staging-deployment-receipt.outputs.deployed }}" = "true" ]'
+    );
+    expect(releaseResult).toContain(
+      'Superseded staging refresh lacked exact pre-promotion staging gates or exact production promotion evidence.'
+    );
+    expect(releaseResult).toContain(
+      'Current staging refresh lacked an exact deployed receipt.'
     );
     expect(release.indexOf('  promote-production:')).toBeLessThan(
       release.indexOf('  staging-deployment-receipt:')
@@ -5131,7 +5143,15 @@ describe('production promotion exact-artifact contract', () => {
     expect(reusable).toContain(
       'Could not resolve exact main at the release-result boundary'
     );
-    expect(reusable).toContain('before post-deploy fanout; neutral');
+    const releaseResult = getJobBlock(reusable, 'release-result');
+    const finalBoundary = releaseResult.slice(
+      releaseResult.indexOf('boundary_sha=')
+    );
+    expect(finalBoundary).toContain(
+      'if [ "$boundary_sha" != "$EXPECTED_SHA" ]'
+    );
+    expect(finalBoundary).toContain('echo "released=true" >> "$GITHUB_OUTPUT"');
+    expect(finalBoundary).not.toContain('exit 0');
     expect(controller).toContain('production-marker-state.mjs');
     expect(health).toContain('production-marker-state.mjs');
     expect(markerState).toContain('controllerAttempt');
