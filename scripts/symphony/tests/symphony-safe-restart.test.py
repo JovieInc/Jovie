@@ -199,7 +199,7 @@ class ActivationAuthorityTests(unittest.TestCase):
             gh.write_text('#!/usr/bin/env python3\nimport json\nprint(json.dumps(dict(id=123,name="Production Controller",path=".github/workflows/production-controller.yml",state="active")))\n')
             gh.chmod(0o755)
             node=root/'node'
-            node.write_text('#!/usr/bin/env python3\nimport os,sys\nassert sys.argv[1]==".github/scripts/production-marker-state.mjs"\nassert "--sha" in sys.argv and "--controller-workflow-id" in sys.argv\nprint(os.environ["MARKER"])\n')
+            node.write_text('#!/usr/bin/env python3\nimport os,sys\nif sys.argv[1]=="--check":\n    raise SystemExit(0)\nassert os.path.isabs(sys.argv[1]) and sys.argv[1].endswith("/production-marker-state.mjs")\nassert "--sha" in sys.argv and "--controller-workflow-id" in sys.argv\nprint(os.environ["MARKER"])\n')
             node.chmod(0o755)
             for marker,expected in [
                 ({'state':'none','reason':'no_marker'},False),
@@ -208,11 +208,19 @@ class ActivationAuthorityTests(unittest.TestCase):
                 ({'state':'verified','controllerRun':99,'controllerAttempt':1},False),
                 ({'state':'verified','controllerRun':42,'controllerAttempt':2},False),
                 ({'state':'verified','controllerRun':42,'controllerAttempt':1},True),
+                ({'state':'none','reason':'no_marker','coalesced':True},'skip'),
+                ({'state':'none','reason':'no_marker','supersededBy':{'run':43,'sha':'b'*40,'createdAt':'2026-09-10T02:23:47Z'}},'skip'),
+                ({'state':'none','reason':'no_marker','coalesced':'yes'},False),
+                ({'state':'none','reason':'no_marker','supersededBy':{'run':None}},False),
             ]:
                 with self.subTest(marker=marker):
                     env={**os.environ,'PATH':str(root)+os.pathsep+os.environ['PATH'],'MARKER':json.dumps(marker),'PRODUCTION_SHA':'a'*40,'PRODUCTION_CONTROLLER_RUN':'42','PRODUCTION_CONTROLLER_ATTEMPT':'1','REPOSITORY':'JovieInc/Jovie'}
                     result=subprocess.run(['bash','-c',script],env=env,capture_output=True,text=True,timeout=5)
-                    self.assertEqual(result.returncode==0,expected,result.stderr)
+                    if expected=='skip':
+                        self.assertEqual(result.returncode,0,result.stderr)
+                        self.assertIn('::notice::',result.stdout)
+                    else:
+                        self.assertEqual(result.returncode==0,expected,result.stderr)
 
     def test_activation_refreshes_canonical_receipt_before_closure_check(self):
         workflow=(ROOT/'.github/workflows/gem-delivery-controller-activation.yml').read_text()
@@ -233,6 +241,8 @@ class ActivationAuthorityTests(unittest.TestCase):
         self.assertIn('--producer-run-id',marker)
         self.assertIn('--producer-attempt',marker)
         self.assertIn("echo \"superseded=true\"",marker)
+        self.assertIn('contents/.github/scripts/production-marker-state.mjs?ref=main',marker)
+        self.assertIn('node --check "$verifier"',marker)
         for name in (
             'Generate read-only Jovie Bot token for the canonical gate refresh',
             'Refresh canonical fleet gate receipt',

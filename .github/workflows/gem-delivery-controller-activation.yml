@@ -71,7 +71,19 @@ jobs:
               .path == ".github/workflows/production-controller.yml" and .state == "active") |
             .id | select(type == "number" and . > 0)
           ' <<< "$workflow_json")"
-          marker_json="$(node .github/scripts/production-marker-state.mjs \
+          # The verifier is a read-only evidence classifier: always run the
+          # default-branch copy so verifier fixes apply to every activation,
+          # including activations for producers that predate them. The
+          # installed controller revision stays pinned to this exact producer
+          # checkout; only the gate code follows main (same trust surface as
+          # the workflow definition itself, which is already default-branch).
+          verifier_dir="$(mktemp -d)"
+          verifier="$verifier_dir/production-marker-state.mjs"
+          gh api -H "Accept: application/vnd.github.raw" \
+            "repos/$REPOSITORY/contents/.github/scripts/production-marker-state.mjs?ref=main" \
+            > "$verifier"
+          node --check "$verifier"
+          marker_json="$(node "$verifier" \
             --sha "$PRODUCTION_SHA" --repo "$REPOSITORY" \
             --controller-workflow-id "$workflow_id" \
             --producer-run-id "$PRODUCTION_CONTROLLER_RUN" \
@@ -87,9 +99,11 @@ jobs:
             exit 0
           fi
           # A producer that coalesced into a newer main head intentionally
-          # preserves no marker; a newer successful controller run owns the
-          # newest production-proven revision. Both skip paths are proven by
-          # production-marker-state.mjs from live evidence and fail closed.
+          # preserves no marker; a newer controller run for a newer head
+          # (successful, in flight, or otherwise past startup) already owns
+          # the activation path for the newest revision. Both skip paths are
+          # proven by production-marker-state.mjs from live evidence and fail
+          # closed.
           if [[ "$(jq -r '.coalesced // false' <<< "$marker_json")" == "true" ]]; then
             echo "superseded=true" >> "$output_file"
             echo "::notice::Producer run $PRODUCTION_CONTROLLER_RUN coalesced into a newer main head and intentionally preserved no marker; the newest production-proven generation owns activation. Skipping."
@@ -98,7 +112,7 @@ jobs:
           superseded_by="$(jq -r '(.supersededBy.run // "") | tostring' <<< "$marker_json")"
           if [[ -n "$superseded_by" ]]; then
             echo "superseded=true" >> "$output_file"
-            echo "::notice::Producer run $PRODUCTION_CONTROLLER_RUN has no exact verified marker; newer successful Production Controller run $superseded_by owns the newest production-proven revision. Skipping."
+            echo "::notice::Producer run $PRODUCTION_CONTROLLER_RUN has no exact verified marker; newer Production Controller run $superseded_by for a newer main head owns the activation path. Skipping."
             exit 0
           fi
           echo "::error::Activation requires this exact producer attempt's verified production marker."
