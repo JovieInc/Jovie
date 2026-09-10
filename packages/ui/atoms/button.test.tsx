@@ -191,7 +191,7 @@ describe('Button', () => {
     expect(textContract).toContain('max-sm:before:h-11');
     expect(textContract).toContain('max-sm:before:min-w-11');
     expect(textContract).not.toMatch(/\bh-8\b/);
-    expect(source).not.toMatch(/density-32|32-in-44/);
+    expect(textContract).not.toMatch(/\bh-8\b|\bmin-h-8\b/);
   });
 
   it('keeps the marketing text contract at 28px visible inside a 44px mobile hit', () => {
