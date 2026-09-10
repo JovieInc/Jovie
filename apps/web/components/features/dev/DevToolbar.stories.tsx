@@ -6,6 +6,9 @@ const meta = {
   component: DevToolbar,
   parameters: {
     layout: 'fullscreen',
+    jovie: {
+      uncoveredProps: ['disabled', 'loading'],
+    },
   },
   args: {
     env: 'preview',

@@ -6,6 +6,9 @@ const meta = {
   component: WaitlistIntakeChat,
   parameters: {
     layout: 'centered',
+    jovie: {
+      uncoveredProps: ['disabled'],
+    },
   },
   args: {
     userEmail: 'artist@example.com',
