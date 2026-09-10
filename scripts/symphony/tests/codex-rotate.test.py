@@ -50,6 +50,11 @@ def respond(request):
         send({"id": request["id"], "result": {"userAgent": "fake-codex/1"}})
         return
     behavior = config.get("rpc", {}).get(method, {"mode": "error"})
+    if method == "account/rateLimitResetCredit/consume" and behavior.get("applyPostStateFile"):
+        with open(behavior["applyPostStateFile"]) as stream:
+            post = stream.read()
+        with open(config["stateFile"], "w") as stream:
+            stream.write(post)
     if behavior.get("mode") == "drop":
         os._exit(1)
     if behavior.get("mode") == "error":
@@ -59,6 +64,9 @@ def respond(request):
         with open(config["stateFile"]) as stream:
             snapshot = json.load(stream)
         send({"id": request["id"], "result": snapshot})
+        return
+    if method == "account/rateLimitResetCredit/consume":
+        send({"id": request["id"], "result": behavior.get("result", {"outcome": "reset"})})
         return
     send({"id": request["id"], "error": {"code": -32601, "message": "unknown method"}})
 
@@ -110,7 +118,7 @@ else:
 
 
 def rate_limit_state(primary_used, primary_reset, secondary_used, secondary_reset,
-                     reached=None, allowed=None):
+                     reached=None, credits=None, allowed=None):
     """Wire-shaped account/rateLimits/read result (app-server v2, camelCase)."""
     state = {
         "rateLimits": {
@@ -122,7 +130,24 @@ def rate_limit_state(primary_used, primary_reset, secondary_used, secondary_rese
     }
     if allowed is not None:
         state["ordinaryUsageAllowed"] = allowed
+    if credits is not None:
+        state["rateLimitResetCredits"] = {
+            "availableCount": sum(1 for credit in credits if credit["status"] == "available"),
+            "credits": credits,
+        }
     return state
+
+
+def reset_credit(credit_id, expires_at, status="available", reset_type="codexRateLimits"):
+    return {
+        "id": credit_id,
+        "resetType": reset_type,
+        "status": status,
+        "grantedAt": 1757000000,
+        "expiresAt": expires_at,
+        "title": None,
+        "description": None,
+    }
 
 
 class CodexAccountEligibilityTests(unittest.TestCase):
@@ -825,6 +850,390 @@ class CodexRotateRpcTests(unittest.TestCase):
         result = self.run_limited()
         self.assertEqual(result.returncode, 1)
         self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+
+
+@unittest.skipUnless(shutil.which("flock"), "requires util-linux flock")
+class CodexRotateBankedResetTests(unittest.TestCase):
+    """Banked reset-credit redemption over the app-server JSON-RPC transport.
+
+    The fake codex serves the account/rateLimits/read and
+    account/rateLimitResetCredit/consume v2 methods from a config file; the
+    work child (non-app-server argv) always fails with a usage-limit stderr so
+    every run takes the typed rate-limit path through the launcher.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.tmp.name)
+        self.accounts = self.root / "accounts"
+        self.accounts.mkdir()
+        for name in ("account-a", "account-b"):
+            account = self.accounts / name
+            account.mkdir()
+            (account / "auth.json").write_text(json.dumps(
+                {"auth_mode": "chatgpt", "tokens": {"account_id": name}}
+            ))
+            (account / "config.toml").write_text('model = "test"\n')
+            (account / "lifecycle.json").write_text(json.dumps(
+                {"paidAccessEndsAt": int(time.time()) + 30 * 86400, "renewalIntent": True}
+            ))
+        (self.accounts / "state.json").write_text(
+            json.dumps({"active": "account-a", "cooldowns": {}, "last_error": {}})
+        )
+        self.receipts = self.root / "receipts"
+        self.rpc_log = self.root / "rpc.log"
+        self.rpc_state = self.root / "rpc-state.json"
+        self.rpc_post = self.root / "rpc-post.json"
+        self.rpc_config_path = self.root / "rpc-config.json"
+        self.evidence = self.root / "concurrency.json"
+        self.write_evidence()
+        self.codex = self.root / "codex"
+        self.codex.write_text(RPC_CODEX_FAKE.replace("PYTHON_EXE", sys.executable))
+        self.codex.chmod(0o755)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write_evidence(self, age_seconds=0, target=2):
+        observed = datetime.fromtimestamp(
+            time.time() - age_seconds, timezone.utc
+        ).isoformat().replace("+00:00", "Z")
+        self.evidence.write_text(json.dumps({
+            "schema": "gem-concurrency-evidence/v1",
+            "source": "execution-proven-useful-turns",
+            "observedAt": observed,
+            "target": target,
+        }))
+
+    def write_rpc(self, state, consume=None, read=None, work=None):
+        self.rpc_state.write_text(json.dumps(state))
+        self.rpc_config_path.write_text(json.dumps({
+            "stateFile": str(self.rpc_state),
+            "rpcLog": str(self.rpc_log),
+            "work": {"stderr": "usage limit; try again at 2099-01-02T03:04:05Z", "exit": 1}
+            if work is None else work,
+            "rpc": {
+                "account/rateLimits/read": {"mode": "ok"} if read is None else read,
+                "account/rateLimitResetCredit/consume": {"mode": "ok"} if consume is None else consume,
+            },
+        }))
+
+    def clear_cooldowns(self):
+        # A later exhaustion event on the same weekly window only reaches
+        # redemption after the probe (or a pre-mark_cooldown crash) frees the
+        # account; simulate that instead of waiting out the cooldown.
+        (self.accounts / "state.json").write_text(
+            json.dumps({"active": "account-a", "cooldowns": {}, "last_error": {}})
+        )
+
+    def env(self, **overrides):
+        env = os.environ.copy()
+        env.update({
+            "CODEX_ACCOUNTS_ROOT": str(self.accounts),
+            "CODEX_REAL_BIN": str(self.codex),
+            "CODEX_ACCOUNT_WAIT_SECONDS": "0",
+            "CODEX_ROTATE_RPC_TIMEOUT": "5",
+            "CODEX_CAPACITY_EVIDENCE": str(self.evidence),
+            "CODEX_REDEMPTION_RECEIPTS_DIR": str(self.receipts),
+            "RPC_CONFIG": str(self.rpc_config_path),
+        })
+        env.update({key: str(value) for key, value in overrides.items()})
+        return env
+
+    def run_limited(self, **overrides):
+        return subprocess.run(
+            [str(LAUNCHER), "exec", "test"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=self.env(**overrides),
+            check=False,
+            timeout=30,
+        )
+
+    def rpc_calls(self, method):
+        if not self.rpc_log.exists():
+            return []
+        return [
+            json.loads(line)
+            for line in self.rpc_log.read_text().splitlines()
+            if json.loads(line).get("method") == method
+        ]
+
+    def receipts_now(self):
+        if not self.receipts.exists():
+            return []
+        return [
+            json.loads(path.read_text())
+            for path in self.receipts.glob("codex-reset-credit-*.json")
+        ]
+
+    def state(self):
+        return json.loads((self.accounts / "state.json").read_text())
+
+    def exhausted_weekly(self, now, days=4, credits=None):
+        return rate_limit_state(
+            100, now + 1800, 100, now + days * 86400,
+            reached="rate_limit_reached", allowed=False, credits=credits,
+        )
+
+    def recovered(self, now):
+        return rate_limit_state(0, now + 1800, 0, now + 7 * 86400, allowed=True)
+
+    def test_weekly_exhaustion_redeems_earliest_expiry_credit_and_clears_cooldown(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[
+            reset_credit("credit-late", now + 10 * 86400),
+            reset_credit("credit-early", now + 86400),
+            reset_credit("credit-never", None),
+            reset_credit("credit-spent", now + 3600, status="redeemed"),
+            reset_credit("credit-foreign", now + 1800, reset_type="otherLimit"),
+        ])
+        self.rpc_post.write_text(json.dumps(self.recovered(now)))
+        self.write_rpc(pre, consume={"mode": "ok", "applyPostStateFile": str(self.rpc_post)})
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        state = self.state()
+        self.assertLessEqual(state["cooldowns"]["account-a"], int(time.time()))
+        self.assertNotIn("account-a", state["last_error"])
+        consumes = self.rpc_calls("account/rateLimitResetCredit/consume")
+        self.assertEqual(len(consumes), 1)
+        params = consumes[0]["params"]
+        self.assertEqual(params["creditId"], "credit-early")
+        receipts = self.receipts_now()
+        self.assertEqual(len(receipts), 1)
+        receipt = receipts[0]
+        self.assertEqual(receipt["schema"], "codex-reset-credit-redemption/v1")
+        self.assertEqual(receipt["decision"], "redeemed")
+        self.assertEqual(receipt["reason"], "redeemed")
+        self.assertEqual(receipt["consumeOutcome"], "reset")
+        self.assertTrue(receipt["consumeAttempted"])
+        self.assertTrue(receipt["readbackProven"])
+        self.assertEqual(receipt["creditId"], "credit-early")
+        self.assertEqual(receipt["naturalResetAt"], weekly_reset)
+        self.assertEqual(receipt["idempotencyKey"], params["idempotencyKey"])
+        self.assertEqual(receipt["evidence"]["target"], 2)
+        self.assertIn("paidAccessEndsAt", receipt["lifecycle"])
+        receipt_path = next(self.receipts.glob("codex-reset-credit-*.json"))
+        self.assertEqual(receipt_path.stat().st_mode & 0o777, 0o600)
+
+    def test_ambiguous_consume_reconciles_by_resending_with_the_same_key(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        # Run 1: the consume connection drops before any response; the effect
+        # is unknown, so the account parks on the natural window.
+        self.write_rpc(pre, consume={"mode": "drop"})
+        first = self.run_limited()
+        self.assertEqual(first.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        self.assertEqual(len(self.rpc_calls("account/rateLimitResetCredit/consume")), 1)
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["decision"], "parked")
+        self.assertEqual(receipt["reason"], "consume_ambiguous")
+        self.assertTrue(receipt["consumeAttempted"])
+        self.assertEqual(receipt["consumeSends"], 1)
+        key = receipt["idempotencyKey"]
+        # Run 2: a later event on the same window reuses the stable key — the
+        # backend dedupes via alreadyRedeemed, so the resend cannot double-redeem.
+        self.clear_cooldowns()
+        self.rpc_post.write_text(json.dumps(self.recovered(now)))
+        self.write_rpc(pre, consume={"mode": "ok", "applyPostStateFile": str(self.rpc_post)})
+        second = self.run_limited()
+        self.assertEqual(second.returncode, 1)
+        consumes = self.rpc_calls("account/rateLimitResetCredit/consume")
+        self.assertEqual(len(consumes), 2)
+        self.assertEqual([call["params"]["idempotencyKey"] for call in consumes], [key, key])
+        self.assertEqual([call["params"]["creditId"] for call in consumes], ["credit-early", "credit-early"])
+        state = self.state()
+        self.assertLessEqual(state["cooldowns"]["account-a"], int(time.time()))
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["decision"], "redeemed")
+        self.assertEqual(receipt["consumeStatus"], "resent")
+        self.assertEqual(receipt["consumeSends"], 2)
+        self.assertTrue(receipt["readbackProven"])
+        self.assertEqual(receipt["idempotencyKey"], key)
+        self.assertEqual(receipt["priorConsume"]["consumeStatus"], "ambiguous")
+
+    def test_resend_cap_parks_after_three_uncertain_consumes(self):
+        import hashlib
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        key = hashlib.sha256(
+            f"codex-reset-credit|account-a|{weekly_reset}".encode("utf-8")
+        ).hexdigest()[:32]
+        self.receipts.mkdir()
+        (self.receipts / f"codex-reset-credit-{key}.json").write_text(json.dumps({
+            "schema": "codex-reset-credit-redemption/v1",
+            "account": "account-a",
+            "idempotencyKey": key,
+            "consumeAttempted": True,
+            "consumeSends": 3,
+            "consumeStatus": "ambiguous",
+            "consumeOutcome": None,
+            "recordedAt": "2026-09-10T00:00:00Z",
+        }))
+        self.write_rpc(pre)
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        self.assertEqual(self.rpc_calls("account/rateLimitResetCredit/consume"), [])
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["decision"], "parked")
+        self.assertEqual(receipt["reason"], "resend_cap")
+        self.assertEqual(receipt["consumeSends"], 3)
+
+    def test_clean_consume_refusal_is_retried_with_the_same_key(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        self.write_rpc(pre, consume={"mode": "error"})
+        first = self.run_limited()
+        self.assertEqual(first.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["decision"], "parked")
+        self.assertEqual(receipt["reason"], "consume_rejected")
+        # A clean refusal consumed nothing, so the key may be retried.
+        self.assertFalse(receipt["consumeAttempted"])
+        key = receipt["idempotencyKey"]
+        self.clear_cooldowns()
+        self.rpc_post.write_text(json.dumps(self.recovered(now)))
+        self.write_rpc(pre, consume={"mode": "ok", "applyPostStateFile": str(self.rpc_post)})
+        second = self.run_limited()
+        self.assertEqual(second.returncode, 1)
+        consumes = self.rpc_calls("account/rateLimitResetCredit/consume")
+        self.assertEqual(len(consumes), 2)
+        self.assertEqual([call["params"]["idempotencyKey"] for call in consumes], [key, key])
+        self.assertEqual(self.receipts_now()[0]["decision"], "redeemed")
+
+    def test_consume_no_credit_outcome_parks_but_allows_retry(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        self.write_rpc(pre, consume={"mode": "ok", "result": {"outcome": "noCredit"}})
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["reason"], "consume_no_credit")
+        self.assertEqual(receipt["consumeOutcome"], "noCredit")
+        self.assertFalse(receipt["consumeAttempted"])
+
+    def test_consume_nothing_to_reset_is_definitive_for_the_window(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        self.write_rpc(pre, consume={"mode": "ok", "result": {"outcome": "nothingToReset"}})
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["reason"], "consume_nothing_to_reset")
+        self.assertTrue(receipt["consumeAttempted"])
+        # A later event on the same window reconciles by readback only: the
+        # snapshot never moved, so the account stays parked and no second
+        # consume is sent.
+        self.clear_cooldowns()
+        second = self.run_limited()
+        self.assertEqual(second.returncode, 1)
+        self.assertEqual(len(self.rpc_calls("account/rateLimitResetCredit/consume")), 1)
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["reason"], "consume_reconcile_unproven")
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+
+    def test_already_redeemed_outcome_still_requires_readback_proof(self):
+        now = int(time.time())
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        self.rpc_post.write_text(json.dumps(self.recovered(now)))
+        self.write_rpc(pre, consume={
+            "mode": "ok",
+            "result": {"outcome": "alreadyRedeemed"},
+            "applyPostStateFile": str(self.rpc_post),
+        })
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["decision"], "redeemed")
+        self.assertEqual(receipt["consumeOutcome"], "alreadyRedeemed")
+
+    def test_unproven_readback_keeps_the_cooldown(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        # The consume reports success but the windows never move.
+        self.write_rpc(pre, consume={"mode": "ok", "result": {"outcome": "reset"}})
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        receipt = self.receipts_now()[0]
+        self.assertEqual(receipt["decision"], "parked")
+        self.assertEqual(receipt["reason"], "readback_unproven")
+        self.assertFalse(receipt["readbackProven"])
+
+    def test_guardrail_inputs_fail_closed_without_a_consume(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        pre = self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)])
+        for name, sabotage in (
+            ("stale_evidence", lambda: self.write_evidence(age_seconds=3600)),
+            ("future_evidence", lambda: self.write_evidence(age_seconds=-3600)),
+            ("missing_evidence", lambda: self.evidence.unlink()),
+            ("missing_lifecycle", lambda: (self.accounts / "account-a/lifecycle.json").unlink()),
+            ("expired_paid_access", lambda: (self.accounts / "account-a/lifecycle.json").write_text(
+                json.dumps({"paidAccessEndsAt": now - 60})
+            )),
+        ):
+            with self.subTest(name=name):
+                self.tearDown()
+                self.setUp()
+                self.write_rpc(pre)
+                sabotage()
+                result = self.run_limited()
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+                self.assertEqual(self.rpc_calls("account/rateLimitResetCredit/consume"), [])
+                self.assertEqual(self.receipts_now(), [])
+
+    def test_primary_only_exhaustion_is_never_redeemed(self):
+        now = int(time.time())
+        primary_reset = now + 1800
+        self.write_rpc(rate_limit_state(
+            100, primary_reset, 20, now + 4 * 86400,
+            reached="rate_limit_reached", allowed=False,
+            credits=[reset_credit("credit-early", now + 86400)],
+        ))
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], primary_reset)
+        self.assertEqual(self.rpc_calls("account/rateLimitResetCredit/consume"), [])
+        self.assertEqual(self.receipts_now(), [])
+
+    def test_kill_switch_disables_redemption(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        self.write_rpc(self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)]))
+        result = self.run_limited(CODEX_REDEEM_RESET_CREDITS=0)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        self.assertEqual(self.rpc_calls("account/rateLimitResetCredit/consume"), [])
+        self.assertEqual(self.receipts_now(), [])
+
+    def test_auth_failure_never_triggers_redemption(self):
+        now = int(time.time())
+        weekly_reset = now + 4 * 86400
+        self.write_rpc(
+            self.exhausted_weekly(now, credits=[reset_credit("credit-early", now + 86400)]),
+            work={"stderr": "Error: token_invalidated", "exit": 1},
+        )
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        # Auth kinds never reach redemption; the cooldown still comes from the
+        # authoritative RPC snapshot rather than any error text.
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        self.assertEqual(self.rpc_calls("account/rateLimitResetCredit/consume"), [])
+        self.assertEqual(self.receipts_now(), [])
 
 
 if __name__ == "__main__":
