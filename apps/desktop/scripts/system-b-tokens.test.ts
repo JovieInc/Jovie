@@ -140,4 +140,15 @@ describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => 
       normalize(readCssVar('--shadow-popover', appShellFrameBlock))
     );
   });
+
+  test('splash-B mark size and cream stay locked to the web brand tokens', () => {
+    const webBrandTokens = readFileSync(
+      join(webRoot, 'lib', 'brand', 'tokens.ts'),
+      'utf8'
+    );
+    expect(SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx).toBe(32);
+    expect(SYSTEM_B_DESKTOP_TOKENS.markCream).toBe('#F5F4F0');
+    expect(webBrandTokens).toMatch(/splash:\s*32/);
+    expect(webBrandTokens).toMatch(/export const BRAND_MARK_CREAM = '#F5F4F0'/);
+  });
 });

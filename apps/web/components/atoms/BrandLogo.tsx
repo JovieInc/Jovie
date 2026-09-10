@@ -2,15 +2,17 @@ import type { CSSProperties } from 'react';
 import {
   BRAND_PATHS,
   BRAND_WORDMARKS,
+  type BrandMarkSize,
   type BrandVariant,
   JOVIE_VIEWBOX,
+  resolveBrandMarkSize,
 } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 export type BrandLogoTone = 'auto' | 'white' | 'color' | 'muted';
 
 export interface BrandLogoProps {
-  readonly size?: number;
+  readonly size?: BrandMarkSize;
   readonly className?: string;
   readonly tone?: BrandLogoTone;
   readonly variant?: BrandVariant;
@@ -30,7 +32,7 @@ const TONE_CLASSES: Record<BrandLogoTone, string | undefined> = {
 const BRAND_VIEW_BOX = `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`;
 
 export function BrandLogo({
-  size = 48,
+  size = 'chrome',
   className,
   tone = 'auto',
   variant = 'jovie',
@@ -40,6 +42,7 @@ export function BrandLogo({
   'aria-hidden': ariaHidden,
 }: BrandLogoProps) {
   const resolvedAlt = alt ?? BRAND_WORDMARKS[variant];
+  const markSize = resolveBrandMarkSize(size);
   return (
     <span
       className={cn(
@@ -51,12 +54,13 @@ export function BrandLogo({
       style={style}
       aria-hidden={ariaHidden}
       data-brand-variant={variant}
+      data-brand-mark-size={markSize}
     >
       <svg
         xmlns='http://www.w3.org/2000/svg'
         viewBox={BRAND_VIEW_BOX}
-        width={size}
-        height={size}
+        width={markSize}
+        height={markSize}
         fill='currentColor'
         shapeRendering='geometricPrecision'
         role={ariaHidden ? undefined : 'img'}

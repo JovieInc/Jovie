@@ -58,7 +58,7 @@ export function AssigneeChip({
         title={`Assigned to ${label}`}
       >
         <BrandLogo
-          size={expanded ? 14 : 12}
+          size='compact'
           tone='auto'
           rounded={false}
           className='text-cyan-400'
