@@ -17,7 +17,8 @@ export const REMEDIATION_SCHEMA = 'symphony-backlog-remediation/v1';
 export const CAPACITY_SCHEMA = 'symphony-runtime-capacity/v1';
 export const WORKPAD_PREFIX = '<!-- symphony-backlog-remediation/v1 -->';
 export const WORKPAD_SUFFIX = '<!--/symphony-backlog-remediation-->';
-export const WORKPAD_HEADING = '## Symphony backlog remediation';
+export const WORKPAD_HEADING = '## Codex Workpad';
+const LEGACY_WORKPAD_HEADING = '## Symphony backlog remediation';
 export const OFFICIAL_SYMPHONY_REFRESH_URL =
   'http://127.0.0.1:4041/api/v1/refresh';
 export const OFFICIAL_SYMPHONY_STATE_URL = 'http://127.0.0.1:4041/api/v1/state';
@@ -622,7 +623,8 @@ export function findWorkpadComment(issue) {
       const body = typeof comment === 'string' ? comment : comment?.body || '';
       return (
         body.startsWith(`${WORKPAD_PREFIX}\n`) ||
-        body.startsWith(`${WORKPAD_HEADING}\n`)
+        body.startsWith(`${WORKPAD_HEADING}\n`) ||
+        body.startsWith(`${LEGACY_WORKPAD_HEADING}\n`)
       );
     }) || null
   );
@@ -632,8 +634,8 @@ export function buildRemediationWorkpad(receipt) {
   const selected = receipt.cohort?.selected || [];
   const excluded = receipt.matrix || [];
   const lines = [
-    WORKPAD_PREFIX,
     WORKPAD_HEADING,
+    WORKPAD_PREFIX,
     '',
     `Observed: ${receipt.observedAt}`,
     `Main: \`${receipt.inventory?.mainSha || 'unknown'}\``,
