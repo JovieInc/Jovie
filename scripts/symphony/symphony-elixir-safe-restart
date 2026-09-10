@@ -38,11 +38,17 @@ state=$(curl -fsS "$api_url")
 running=$(jq -er '.running | length' <<<"$state")
 retrying=$(jq -er '.retrying | length' <<<"$state")
 blocked=$(jq -er '.blocked | length' <<<"$state")
-live_count=$((running + retrying + blocked))
+# Only executing work (running/retrying) holds a restart. Blocked entries are
+# retry-exhausted terminal states that can never drain on their own; refusing
+# on them deadlocks recovery (the restart is exactly how they get reconciled).
+live_count=$((running + retrying))
 
 if [[ "$live_count" -ne 0 ]]; then
   echo "refusing restart: running=$running retrying=$retrying blocked=$blocked" >&2
   exit 20
+fi
+if [[ "$blocked" -ne 0 ]]; then
+  echo "proceeding with blocked=$blocked retry-exhausted issue(s); the reconciler re-dispatches or dead-letters them after restart"
 fi
 
 refs=$(
@@ -127,7 +133,7 @@ if [[ -z "$old_pid" || "$old_pid" == 0 ]]; then
 fi
 
 if [[ "$check_only" == true ]]; then
-  echo "safe restart preconditions passed: pid=$old_pid running=0 retrying=0 blocked=0 process_refs=0"
+  echo "safe restart preconditions passed: pid=$old_pid running=$running retrying=$retrying blocked=$blocked process_refs=0"
   exit 0
 fi
 

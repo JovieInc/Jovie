@@ -121,10 +121,18 @@ raise SystemExit(99)
         self.assertEqual(self.run_helper('--check-only').returncode,0)
 
     def test_busy_or_process_references_refuse_before_guard_write(self):
-        for overrides in ({'API_STATE':'{"running":[{}],"retrying":[],"blocked":[]}'}, {'PROCESS_REFS':'1'}):
+        for overrides in ({'API_STATE':'{"running":[{}],"retrying":[],"blocked":[]}'}, {'API_STATE':'{"running":[],"retrying":[{}],"blocked":[]}'}, {'PROCESS_REFS':'1'}):
             with self.subTest(overrides=overrides):
                 self.assertNotEqual(self.run_helper(**overrides).returncode,0)
                 self.assertFalse(self.guard.exists())
+
+    def test_retry_exhausted_blocked_issues_do_not_hold_restart(self):
+        # Blocked entries are terminal retry-exhausted states that can never
+        # drain without a restart; holding on them deadlocks recovery.
+        result=self.run_helper(API_STATE='{"running":[],"retrying":[],"blocked":[{},{}]}')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('proceeding with blocked=2',result.stdout)
+        self.assertIn('stop guard prepared:',result.stdout)
 
     def test_failed_reload_or_identity_readback_never_claims_success(self):
         for overrides in ({'RELOAD_FAIL':'1'},{'PID_DRIFT':'1'},{'GUARD_DENIED':'1'}):
