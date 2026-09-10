@@ -1246,10 +1246,10 @@ export function buildAffectedTestPlan(
       nodeTests: [],
     };
   }
-  if (files.some((file) => SYMPHONY_AGENT_ROUTER_INPUTS.has(file))) {
+  if (files.some(file => SYMPHONY_AGENT_ROUTER_INPUTS.has(file))) {
     const gates = ['scripts/symphony/tests/run-issue-lease-gate.py'];
     if (
-      !files.every((file) => SYMPHONY_AGENT_ROUTER_LANE.has(file)) ||
+      !files.every(file => SYMPHONY_AGENT_ROUTER_LANE.has(file)) ||
       ![
         ...SYMPHONY_AGENT_ROUTER_INPUTS,
         ...gates,

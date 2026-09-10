@@ -1046,8 +1046,8 @@ describe('automation-verify affected scope', () => {
     for (const missing of [sender, test, gate, selectorTest]) {
       expect(
         buildAffectedTestPlan([sender], {
-          isFileAvailable: (file) => file !== missing,
-        }).mode,
+          isFileAvailable: file => file !== missing,
+        }).mode
       ).toBe('full');
     }
     for (const unrelated of [
