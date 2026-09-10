@@ -28,6 +28,9 @@ export const MAX_CLONE_LATENCY_MS = 15_000;
 export const HIGH_CONFLICT_RATE = 0.25;
 export const HIGH_ERROR_RATE = 0.25;
 export const CAPACITY_MAX_AGE_MS = 10 * 60 * 1000;
+const SEVERE_LOAD_PER_CPU = 2;
+const HIGH_LOAD_PER_CPU = 1;
+const LOW_LOAD_PER_CPU = 0.5;
 
 const ISSUE_ID = /\bJOV-\d+\b/g;
 const HOMEMADE_WRAPPER_MARKERS = Object.freeze([
@@ -346,6 +349,12 @@ export function readHostPressure(procRoot) {
       readFileSync(`${procRoot}/pressure/io`, 'utf8'),
       'full'
     );
+    const loadAvg1 = Number(
+      readFileSync(`${procRoot}/loadavg`, 'utf8').trim().split(/\s+/)[0]
+    );
+    const cpuCount = readFileSync(`${procRoot}/cpuinfo`, 'utf8')
+      .split('\n')
+      .filter(line => /^processor\s*:/.test(line)).length;
     let availableMemoryBytes = null;
     for (const line of readFileSync(`${procRoot}/meminfo`, 'utf8').split(
       '\n'
@@ -358,6 +367,8 @@ export function readHostPressure(procRoot) {
       cpuSomeAvg10: cpu,
       memoryFullAvg10: memory,
       ioFullAvg10: io,
+      loadAvg1: Number.isFinite(loadAvg1) ? loadAvg1 : null,
+      cpuCount: cpuCount > 0 ? cpuCount : null,
       availableMemoryBytes,
     };
   } catch {
@@ -365,6 +376,8 @@ export function readHostPressure(procRoot) {
       cpuSomeAvg10: null,
       memoryFullAvg10: null,
       ioFullAvg10: null,
+      loadAvg1: null,
+      cpuCount: null,
       availableMemoryBytes: null,
     };
   }
@@ -376,15 +389,20 @@ function hostPressureClass(host) {
     !finiteNumber(host.cpuSomeAvg10) ||
     !finiteNumber(host.memoryFullAvg10) ||
     !finiteNumber(host.ioFullAvg10) ||
+    !finiteNumber(host.loadAvg1) ||
+    !Number.isInteger(host.cpuCount) ||
+    host.cpuCount <= 0 ||
     !finiteNumber(host.availableMemoryBytes)
   ) {
     return 'unknown';
   }
+  const loadPerCpu = host.loadAvg1 / host.cpuCount;
   if (
     host.availableMemoryBytes < 4 * 1024 ** 3 ||
     host.cpuSomeAvg10 >= 40 ||
     host.memoryFullAvg10 >= 5 ||
-    host.ioFullAvg10 >= 20
+    host.ioFullAvg10 >= 20 ||
+    loadPerCpu >= SEVERE_LOAD_PER_CPU
   ) {
     return 'severe';
   }
@@ -392,14 +410,16 @@ function hostPressureClass(host) {
     host.availableMemoryBytes < 8 * 1024 ** 3 ||
     host.cpuSomeAvg10 >= 20 ||
     host.memoryFullAvg10 >= 2 ||
-    host.ioFullAvg10 >= 10
+    host.ioFullAvg10 >= 10 ||
+    loadPerCpu >= HIGH_LOAD_PER_CPU
   ) {
     return 'high';
   }
   if (
     host.cpuSomeAvg10 <= 5 &&
     host.memoryFullAvg10 <= 0.5 &&
-    host.ioFullAvg10 <= 2
+    host.ioFullAvg10 <= 2 &&
+    loadPerCpu <= LOW_LOAD_PER_CPU
   ) {
     return 'low';
   }

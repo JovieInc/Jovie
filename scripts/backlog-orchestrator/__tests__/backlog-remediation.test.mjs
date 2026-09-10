@@ -16,6 +16,7 @@ import {
   inventoryBacklog,
   OFFICIAL_SYMPHONY_REFRESH_URL,
   REMEDIATION_SCHEMA,
+  readHostPressure,
   upsertRemediationWorkpad,
   WORKPAD_HEADING,
   WORKPAD_PREFIX,
@@ -77,6 +78,8 @@ function healthySignals(overrides = {}) {
       cpuSomeAvg10: 1,
       memoryFullAvg10: 0.1,
       ioFullAvg10: 0.2,
+      loadAvg1: 1,
+      cpuCount: 4,
       availableMemoryBytes: 16 * 1024 ** 3,
     },
     provider: { accounts: 3, ready: 2 },
@@ -338,6 +341,29 @@ describe('official Symphony backlog remediation', () => {
     );
     assert.equal(scaled.cohortSize, 4);
     assert.equal(scaled.reason, 'capacity-available');
+  });
+
+  it('includes normalized host load in capacity evidence and backoff', () => {
+    const host = readHostPressure('/proc');
+    assert.ok(Number.isFinite(host.loadAvg1));
+    assert.ok(Number.isInteger(host.cpuCount));
+    assert.ok(host.cpuCount > 0);
+
+    const overloaded = evaluateRuntimeCapacity(
+      healthySignals({
+        host: {
+          cpuSomeAvg10: 1,
+          memoryFullAvg10: 0.1,
+          ioFullAvg10: 0.2,
+          loadAvg1: 8,
+          cpuCount: 4,
+          availableMemoryBytes: 16 * 1024 ** 3,
+        },
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(overloaded.reason, 'host-pressure-severe');
+    assert.equal(overloaded.allowed, false);
   });
 
   it('writes a single workpad matrix and feeds only the official Elixir Symphony refresh', async () => {
