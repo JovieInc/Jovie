@@ -62,11 +62,11 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
     ).toHaveLength(0);
   });
 
-  it('keeps canonical focus one opaque blue across modes and above 3:1 on surfaces', () => {
+  it('keeps canonical focus one opaque ion #11AFFF; dark ≥3:1, light KEEP below 3:1', () => {
     const tables = loadDefaultTables();
     for (const table of [tables.light, tables.dark]) {
       for (const fg of ['--color-border-focus', '--color-focus-ring']) {
-        expect(resolveValue(`var(${fg})`, table)).toBe('#2563ff');
+        expect(resolveValue(`var(${fg})`, table)).toBe('#11afff');
         for (const bg of [
           '--color-bg-base',
           '--color-bg-page',
@@ -76,9 +76,19 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
           '--color-bg-elevated',
         ]) {
           const result = checkPair(
-            { name: 'canonical blue focus', fg, bg, minRatio: 3 },
+            { name: 'canonical ion focus', fg, bg, minRatio: 3 },
             table
           );
+          // Lighter ion #11AFFF is below 3:1 on the light ladder (~2.33–1.72).
+          // Do not invent a darker ion — Tim KEEP 2026-09-10.
+          if (table === tables.light) {
+            expect(
+              result.status,
+              `${fg} on light ${bg}: ${JSON.stringify(result)}`
+            ).toBe('fail');
+            expect(result.ratio).toBeLessThan(3);
+            continue;
+          }
           expect(
             result.status,
             `${fg} on ${bg}: ${JSON.stringify(result)}`

@@ -81,12 +81,11 @@ export const PALETTE = {
   ],
   feature: [
     { name: 'Ion', hex: '#11AFFF' },
-    { name: 'Ultra', hex: '#A982FF' },
-    { name: 'Pulse', hex: '#FF48D2' },
-    { name: 'Aqua', hex: '#24F6D2' },
-    { name: 'Mint', hex: '#39E58C' },
-    { name: 'Orange', hex: '#FFC857' },
-    { name: 'Red', hex: '#FF677D' },
+    { name: 'Ultra', hex: '#8E56F5' },
+    { name: 'Pulse', hex: '#F52BB5' },
+    { name: 'Mint', hex: '#3FFA8B' },
+    { name: 'Orange', hex: '#FF7800' },
+    { name: 'Red', hex: '#F72A36' },
     { name: 'Gray', hex: '#8D8D93' },
   ],
 } as const;
