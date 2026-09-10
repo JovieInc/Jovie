@@ -1,18 +1,19 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
+
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
@@ -28,9 +29,8 @@ import {
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
-import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import { InstallBanner } from '@/components/shell/InstallBanner';
+import { SidebarInboxButton } from '@/components/shell/SidebarInboxButton';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -46,16 +46,9 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
-import {
-  isElectronRuntime,
-  useIsElectronRuntime,
-} from '@/lib/desktop/electron-bridge';
-import { env } from '@/lib/env-client';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
-import {
-  useVersionMonitor,
-  type VersionMismatchInfo,
-} from '@/lib/hooks/useVersionMonitor';
+
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -71,9 +64,6 @@ export interface UnifiedSidebarProps {
   /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
   readonly variant?: BrandVariant;
 }
-
-const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
-const VERSION_NOTIFICATION_DELAY_MS = 10_000;
 
 /** Render a group of nav items */
 function SettingsNavGroup({
@@ -254,168 +244,100 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
+  const { inboxNavigation } = useDashboardData();
 
   return (
-    <div className='flex w-full items-center'>
-      {(() => {
-        if (isRouteSidebar) {
-          return (
-            <div className='flex w-full items-center gap-2'>
-              <Link
-                href={routeBackHref}
-                aria-label={routeBackLabel}
+    <div className='flex w-full items-center' data-sidebar-brand-row='true'>
+      <div className='min-w-0 flex-1'>
+        {(() => {
+          if (isRouteSidebar) {
+            return (
+              <div className='flex w-full items-center gap-2'>
+                <Link
+                  href={routeBackHref}
+                  aria-label={routeBackLabel}
+                  className={cn(
+                    'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                    'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                  )}
+                >
+                  <ArrowLeft
+                    className='size-3.5 text-sidebar-item-icon'
+                    aria-hidden='true'
+                  />
+                  <span className='truncate group-data-[collapsible=icon]:hidden'>
+                    {routeBackLabel}
+                  </span>
+                </Link>
+              </div>
+            );
+          }
+          if (isDemoRoute) {
+            return (
+              <div
                 className={cn(
-                  'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-                  'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                  'group-data-[collapsible=icon]:justify-center'
                 )}
               >
-                <ArrowLeft
-                  className='size-3.5 text-sidebar-item-icon'
-                  aria-hidden='true'
+                <BrandLogo
+                  size={14}
+                  tone='auto'
+                  rounded={false}
+                  className='rounded-sm shrink-0'
                 />
-                <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  {routeBackLabel}
+                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                  Demo
                 </span>
-              </Link>
-            </div>
-          );
-        }
-        if (isDemoRoute) {
+              </div>
+            );
+          }
+          if (canSwitchWorkspaces) {
+            return (
+              <WorkspaceSelector
+                currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
+                workspaces={APP_SHELL_WORKSPACES}
+              />
+            );
+          }
+          if (hasMultipleProfiles && !isOperatorSection) {
+            return <ProfileSwitcher />;
+          }
+          // Clean header: brand logo + wordmark for identity (matches Linear's
+          // workspace pill pattern). User menu lives in the bottom Settings button.
+          // Wordmark and logo variant are driven by the active brand skin.
           return (
             <div
               className={cn(
-                'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                'flex h-7 w-full items-center gap-1.5 px-2.5',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo
                 size={14}
                 tone='auto'
+                variant={variant}
                 rounded={false}
                 className='rounded-sm shrink-0'
               />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                Demo
+              <span className='truncate text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
+                {BRAND_WORDMARKS[variant]}
               </span>
             </div>
           );
-        }
-        if (canSwitchWorkspaces) {
-          return (
-            <WorkspaceSelector
-              currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
-              workspaces={APP_SHELL_WORKSPACES}
-            />
-          );
-        }
-        if (hasMultipleProfiles && !isOperatorSection) {
-          return <ProfileSwitcher />;
-        }
-        // Clean header: brand logo + wordmark for identity (matches Linear's
-        // workspace pill pattern). User menu lives in the bottom Settings button.
-        // Wordmark and logo variant are driven by the active brand skin.
-        return (
-          <div
-            className={cn(
-              'flex h-7 w-full items-center gap-1.5 px-2.5',
-              'group-data-[collapsible=icon]:justify-center'
-            )}
-          >
-            <BrandLogo
-              size={14}
-              tone='auto'
-              variant={variant}
-              rounded={false}
-              className='rounded-sm shrink-0'
-            />
-            <span className='truncate text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
-              {BRAND_WORDMARKS[variant]}
-            </span>
-          </div>
-        );
-      })()}
+        })()}
+      </div>
+      {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
+        <>
+          <SidebarInboxButton availability={inboxNavigation} />
+          <HeaderSearchSurfaceFromContext compact />
+        </>
+      ) : null}
 
       {!isDesktop ? (
         <SidebarCollapseButton className='ml-auto shrink-0' />
       ) : null}
     </div>
-  );
-}
-
-function ShellSidebarInstallBanner() {
-  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
-  const [versionUpdate, setVersionUpdate] =
-    useState<VersionMismatchInfo | null>(null);
-  const [showVersionBanner, setShowVersionBanner] = useState(false);
-  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-
-  const handleVersionMismatch = useCallback((info: VersionMismatchInfo) => {
-    try {
-      if (sessionStorage.getItem(VERSION_DISMISSAL_KEY)) return;
-    } catch {
-      // Session storage may be unavailable in restricted browsers.
-    }
-
-    setVersionUpdate(info);
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-    }
-    notificationTimeoutRef.current = setTimeout(() => {
-      setShowVersionBanner(true);
-    }, VERSION_NOTIFICATION_DELAY_MS);
-  }, []);
-
-  useVersionMonitor({
-    onVersionMismatch: handleVersionMismatch,
-    enabled: !isPassiveRuntime,
-  });
-
-  useEffect(() => {
-    return () => {
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const dismissVersionUpdate = useCallback(() => {
-    try {
-      sessionStorage.setItem(VERSION_DISMISSAL_KEY, 'true');
-    } catch {
-      // Session storage may be unavailable in restricted browsers.
-    }
-    setShowVersionBanner(false);
-    setVersionUpdate(null);
-  }, []);
-
-  const reload = useCallback(() => {
-    globalThis.location.reload();
-  }, []);
-
-  if (isPassiveRuntime) {
-    return null;
-  }
-
-  if (!showVersionBanner || !versionUpdate) {
-    return null;
-  }
-
-  const title = getVersionUpdateTitle(versionUpdate.newVersion);
-
-  return (
-    <InstallBanner
-      open
-      icon={RefreshCw}
-      title={title}
-      description='A new version is available. Reload to update.'
-      ctaLabel='Reload'
-      ctaIcon={RefreshCw}
-      onCta={reload}
-      onDismiss={dismissVersionUpdate}
-      className='group-data-[collapsible=icon]:hidden'
-    />
   );
 }
 
@@ -462,7 +384,6 @@ export function UnifiedSidebar({
   // Read the bridge synchronously so the desktop update listener mounts on
   // the first committed sidebar render. Electron emits update events once;
   // waiting for the effect-backed runtime hook would miss a boot-time event.
-  const isDesktop = isElectronRuntime();
 
   const { profileHref } = useProfileData(section !== 'ov');
 
@@ -511,25 +432,14 @@ export function UnifiedSidebar({
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (
-              <DashboardNav>
-                <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
+              <DashboardNav headerOwnsInbox={!isDemoRoute}>
+                {isDemoRoute ? (
+                  <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
+                ) : null}
               </DashboardNav>
             )}
           </SidebarGroupContent>
         </SidebarGroup>
-        <div
-          data-sidebar='notifications'
-          data-testid='sidebar-notifications'
-          className='shrink-0 group-data-[collapsible=icon]:hidden'
-        >
-          {isDesktop ? (
-            <div className='flex px-2 pb-1.5'>
-              <UpdateAvailablePill />
-            </div>
-          ) : (
-            <ShellSidebarInstallBanner />
-          )}
-        </div>
       </SidebarContent>
 
       {section === 'ov' ? (

@@ -224,36 +224,28 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
-    expect(panel).toHaveTextContent('jov.ie/timwhite');
+    expect(
+      within(panel).getByRole('link', { name: /Public Profile/i })
+    ).toHaveAccessibleName('Public Profile jov.ie/timwhite');
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
 
-    const update = screen.getByTestId('update-available-pill');
-    expect(screen.getByTestId('sidebar-notifications')).toContainElement(
-      update
+    const row = screen
+      .getByRole('link', { name: /Inbox —/ })
+      .closest('[data-sidebar-brand-row]');
+    expect(row).toContainElement(
+      screen.getByRole('button', { name: 'Search Sidebar' })
     );
-    expect(update.closest('[data-sidebar="content"]')).not.toBeNull();
-    expect(update.closest('[data-sidebar="footer"]')).toBeNull();
-  });
-
-  it('mounts the desktop update listener before the runtime effect resolves', () => {
-    electronRuntimeMock.isElectronRuntime = false;
-    document.documentElement.dataset.desktopRuntime = 'electron';
-
-    renderUnifiedSidebar({
-      pathname: APP_ROUTES.DASHBOARD,
-      section: 'dashboard',
-    });
-
-    // The runtime hook is intentionally still false on this first render,
-    // but the synchronous bridge check must mount the pill now so a one-shot
-    // Electron update event emitted during boot cannot be missed.
-    expect(screen.getByTestId('update-available-pill')).toBeInTheDocument();
-    expect(screen.getByTestId('sidebar-notifications')).toContainElement(
-      screen.getByTestId('update-available-pill')
+    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+      'href',
+      '/app'
     );
-
-    document.documentElement.removeAttribute('data-desktop-runtime');
+    expect(
+      screen.queryByTestId('sidebar-notifications')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('update-available-pill')
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the unified user panel available on settings routes', () => {

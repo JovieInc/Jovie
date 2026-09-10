@@ -7,6 +7,7 @@ import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
 import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
@@ -95,35 +96,37 @@ function AuthShellInner({
   const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 
   return (
-    <AppShellFrame
-      sidebar={sidebar}
-      header={
-        hideTopHeader ? null : (
-          <DashboardHeader
-            breadcrumbs={breadcrumbs}
-            sidebarTrigger={sidebarTrigger}
-            railToggle={railToggle}
-            breadcrumbSuffix={headerBadge}
-            action={headerAction}
-            commandPaletteHeader={commandPaletteHeader}
-            mobileProfileSlot={
-              section === 'ov' || section === 'admin' ? null : (
-                <MobileProfileDrawer onOpen={previewPanelState.toggle} />
-              )
-            }
-            showDivider={isTableRoute}
-            transparent={isChatRoute}
-          />
-        )
-      }
-      chatAmbientGradient={isChatRoute}
-      main={children}
-      rightPanel={rightPanel}
-      audioPlayer={audioPlayer}
-      mobileBottomNav={mobileBottomNav}
-      contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
-      composerFocusActive={isComposerFocused && !isMobile}
-    />
+    <RuntimeUpdateProvider>
+      <AppShellFrame
+        sidebar={sidebar}
+        header={
+          hideTopHeader ? null : (
+            <DashboardHeader
+              breadcrumbs={breadcrumbs}
+              sidebarTrigger={sidebarTrigger}
+              railToggle={railToggle}
+              breadcrumbSuffix={headerBadge}
+              action={headerAction}
+              commandPaletteHeader={commandPaletteHeader}
+              mobileProfileSlot={
+                section === 'ov' || section === 'admin' ? null : (
+                  <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+                )
+              }
+              showDivider={isTableRoute}
+              transparent={isChatRoute}
+            />
+          )
+        }
+        chatAmbientGradient={isChatRoute}
+        main={children}
+        rightPanel={rightPanel}
+        audioPlayer={audioPlayer}
+        mobileBottomNav={mobileBottomNav}
+        contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
+        composerFocusActive={isComposerFocused && !isMobile}
+      />
+    </RuntimeUpdateProvider>
   );
 }
 
