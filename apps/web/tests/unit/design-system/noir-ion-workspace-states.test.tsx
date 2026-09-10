@@ -86,7 +86,7 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
       '--color-row-selected: rgba(255, 255, 255, 0.085)'
     );
     expect(shellBlock).toContain(
-      '--color-focus-ring: rgba(17, 175, 255, 0.72)'
+      '--color-focus-ring: rgba(31, 123, 245, 0.72)'
     );
     expect(shellBlock).toContain('--color-bg-elevated: #1b1d22');
     expect(shellBlock).toContain('--color-bg-tooltip: #24272d');
