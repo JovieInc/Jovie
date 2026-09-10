@@ -145,10 +145,7 @@ export function validateOklchPalette(
     add('elevation-light', 'light surface-0..3 L must be monotonic');
   }
   if (lightSurfaces.length === 4 && lightSurfaces[3].l >= lightSurfaces[0].l) {
-    add(
-      'elevation-light',
-      'light surface-3 must recede (darker) vs surface-0'
-    );
+    add('elevation-light', 'light surface-3 must recede (darker) vs surface-0');
   }
   if (
     parsed.canvas?.light &&

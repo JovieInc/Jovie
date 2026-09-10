@@ -33,7 +33,8 @@ function darkBlockContaining(css: string, marker: string): string {
 }
 
 function lightBlockContaining(css: string, marker: string): string {
-  const blocks = css.match(/:root(?:\.dark)?(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? [];
+  const blocks =
+    css.match(/:root(?:\.dark)?(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? [];
   const hit = blocks.find(
     block =>
       /^:root\b(?!\.dark)/.test(block.slice(0, block.indexOf('{'))) &&
