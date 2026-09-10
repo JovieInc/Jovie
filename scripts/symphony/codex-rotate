@@ -402,6 +402,7 @@ from pathlib import Path
 
 EXHAUSTED_PERCENT = 99.5
 SAFE_ACCOUNT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+MAX_COOLDOWN_SECONDS = 45 * 86400
 
 
 def rpc_timeout():
@@ -728,6 +729,13 @@ def iso(epoch):
 
 
 def emit(outcome, reason, until="", key=""):
+    # An emitted until steers the account cooldown, so it gets the same
+    # plausibility bound reset_until_via_rpc applies: a lapsed or implausible
+    # horizon is withheld and the launcher falls back to the bounded default.
+    if until != "":
+        now = int(time.time())
+        if not isinstance(until, int) or until <= now or until > now + MAX_COOLDOWN_SECONDS:
+            until = ""
     print(f"outcome={outcome} reason={reason} until={until} key={key}")
 
 

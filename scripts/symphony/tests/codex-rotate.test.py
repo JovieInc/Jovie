@@ -1220,6 +1220,41 @@ class CodexRotateBankedResetTests(unittest.TestCase):
         self.assertEqual(self.rpc_calls("account/rateLimitResetCredit/consume"), [])
         self.assertEqual(self.receipts_now(), [])
 
+    def test_implausible_horizon_without_credit_parks_on_bounded_default(self):
+        # The part-1 contract holds through the redemption integration: a >45d
+        # weekly reset is implausible and must never steer the cooldown, even
+        # when the redemption path is the one that observed it.
+        now = int(time.time())
+        self.write_rpc(rate_limit_state(
+            100, now + 1800, 100, now + 90 * 86400,
+            reached="rate_limit_reached", allowed=False, credits=[],
+        ))
+        result = self.run_limited(CODEX_DEFAULT_COOLDOWN_SECONDS=60)
+        self.assertEqual(result.returncode, 1)
+        cooldown = self.state()["cooldowns"]["account-a"]
+        self.assertGreaterEqual(cooldown, now + 60)
+        self.assertLessEqual(cooldown, int(time.time()) + 60)
+        self.assertEqual(self.rpc_calls("account/rateLimitResetCredit/consume"), [])
+        self.assertEqual(self.receipts_now(), [])
+
+    def test_implausible_horizon_still_redeems_when_readback_proves(self):
+        # An implausible advertised horizon does not block redemption: the
+        # consume is only trusted after the fresh readback proves both windows
+        # reset and the weekly reset moved.
+        now = int(time.time())
+        self.rpc_post.write_text(json.dumps(self.recovered(now)))
+        self.write_rpc(
+            self.exhausted_weekly(now, days=90, credits=[reset_credit("credit-early", now + 86400)]),
+            consume={"mode": "ok", "applyPostStateFile": str(self.rpc_post)},
+        )
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        self.assertLessEqual(self.state()["cooldowns"]["account-a"], int(time.time()))
+        self.assertEqual(self.receipts_now()[0]["decision"], "redeemed")
+        consumes = self.rpc_calls("account/rateLimitResetCredit/consume")
+        self.assertEqual(len(consumes), 1)
+        self.assertEqual(consumes[0]["params"]["creditId"], "credit-early")
+
     def test_auth_failure_never_triggers_redemption(self):
         now = int(time.time())
         weekly_reset = now + 4 * 86400
