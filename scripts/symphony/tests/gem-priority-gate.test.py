@@ -1427,6 +1427,15 @@ class DeploymentBindingTests(unittest.TestCase):
         for status, reasons in (
             ("grace", []),
             ("red", ["queue-controller-red-over-10m"]),
+            ("red", ["internally-repairable-prs-open", "no-merge-progress-over-1h"]),
+            (
+                "red",
+                [
+                    "internally-repairable-prs-open",
+                    "no-merge-progress-over-1h",
+                    "queue-controller-red-over-10m",
+                ],
+            ),
         ):
             with self.subTest(status=status):
                 signals = dict(GREEN_SIGNALS)
