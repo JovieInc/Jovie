@@ -20,6 +20,8 @@ WAIT_SECONDS="${CODEX_ACCOUNT_WAIT_SECONDS:-900}"
 # can never strand behind a dead reader.
 HEARTBEAT_SECONDS="${CODEX_ROTATE_HEARTBEAT_SECONDS:-2}"
 DEFAULT_COOLDOWN_SECONDS="${CODEX_DEFAULT_COOLDOWN_SECONDS:-21600}"
+# App-server JSON-RPC budget per account/rateLimits/read request.
+RPC_TIMEOUT="${CODEX_ROTATE_RPC_TIMEOUT:-15}"
 
 app_server_mode=0
 for arg in "$@"; do
@@ -190,50 +192,176 @@ with open(str(path) + ".lock", "a+") as lock:
 PY
 }
 
-cooldown_until() {
-  ERROR_FILE="$1" DEFAULT_SECONDS="$DEFAULT_COOLDOWN_SECONDS" python3 - <<'PY'
+# Reset windows come from the official app-server RPC account/rateLimits/read,
+# never from parsing error text: the "try again at" strings proved ~7h
+# inaccurate (9/6 RCA). Transport mirrors codex_cli_artifact.initialize: one
+# `codex app-server` process, newline-delimited JSON-RPC, response matched by
+# id with a bounded budget. Every failure is fail-closed (bounded default
+# cooldown); the account is never parked on a guessed timestamp.
+reset_until_via_rpc() {
+  REAL_CODEX="$REAL_CODEX" RPC_TIMEOUT="$RPC_TIMEOUT" python3 - <<'PY' 2>>"$LOG_FILE"
+import json
 import os
-import re
+import selectors
+import subprocess
 import time
-from datetime import datetime, timezone
 
-try:
-    from zoneinfo import ZoneInfo
-except Exception:
-    ZoneInfo = None
+EXHAUSTED_PERCENT = 99.5
+MAX_COOLDOWN_SECONDS = 45 * 86400
 
-text = open(os.environ["ERROR_FILE"], encoding="utf-8", errors="replace").read()
-patterns = [
-    r"try again at\s+([A-Za-z]{3,9}\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\s+\d{1,2}:\d{2}\s*[APMapm]{2})",
-    r"try again at\s+(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)",
-]
-match = next((found for pattern in patterns if (found := re.search(pattern, text, re.I))), None)
-fallback = int(time.time()) + int(os.environ["DEFAULT_SECONDS"])
-if match is None:
-    print(fallback)
-    raise SystemExit
-raw = re.sub(r"(\d+)(st|nd|rd|th)", r"\1", match.group(1)).replace(",", "")
-parsed = None
-for fmt in (
-    "%b %d %Y %I:%M %p",
-    "%B %d %Y %I:%M %p",
-    "%Y-%m-%dT%H:%M:%S%z",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%d %H:%M:%S",
-):
+
+def rpc_timeout():
     try:
-        parsed = datetime.strptime(raw.strip(), fmt)
-        break
-    except ValueError:
-        continue
-if parsed is None:
-    print(fallback)
-    raise SystemExit
-if parsed.tzinfo is None:
-    parsed = parsed.replace(
-        tzinfo=ZoneInfo("America/Los_Angeles") if ZoneInfo else timezone.utc
-    )
-print(int(parsed.timestamp()))
+        value = float(os.environ.get("RPC_TIMEOUT", "15"))
+    except (TypeError, ValueError):
+        return 15.0
+    return value if 0 < value <= 30 else 15.0
+
+
+class AppServer:
+    """Newline-delimited JSON-RPC over one `codex app-server` process."""
+
+    def __init__(self):
+        self.timeout = rpc_timeout()
+        self.buffer = b""
+        self.process = subprocess.Popen(
+            [os.environ["REAL_CODEX"], "app-server"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        self.selector = selectors.DefaultSelector()
+        self.selector.register(self.process.stdout, selectors.EVENT_READ)
+        status, payload = self.request(1, "initialize", {
+            "clientInfo": {"name": "codex-rotate", "version": "1"},
+            "capabilities": {"experimentalApi": True},
+        })
+        if status != "ok" or not isinstance(payload, dict) or not payload.get("userAgent"):
+            raise RuntimeError("initialize failed")
+        self.send({"method": "initialized", "params": {}})
+
+    def send(self, message):
+        self.process.stdin.write((json.dumps(message) + "\n").encode())
+        self.process.stdin.flush()
+
+    def request(self, request_id, method, params):
+        """Returns (status, payload): 'ok' | 'error' (clean refusal) | 'ambiguous'."""
+        self.send({"id": request_id, "method": method, "params": params})
+        deadline = time.monotonic() + self.timeout
+        while time.monotonic() < deadline:
+            if self.process.poll() is not None and not self.selector.select(0):
+                # The server exited: drain what it sent, but never wait on a
+                # pipe a surviving child still holds open.
+                break
+            # Cap each wait so a server dying mid-read is caught promptly.
+            if not self.selector.select(min(0.1, max(0, deadline - time.monotonic()))):
+                continue
+            chunk = os.read(self.process.stdout.fileno(), 4096)
+            if not chunk:
+                break
+            self.buffer += chunk
+            if len(self.buffer) > 1048576:
+                raise RuntimeError("response exceeds the 1MiB bound")
+            while b"\n" in self.buffer:
+                line, self.buffer = self.buffer.split(b"\n", 1)
+                try:
+                    message = json.loads(line)
+                except ValueError:
+                    continue
+                # Server->client requests and notifications carry a method; a
+                # response to us never does. Match strictly on our id.
+                if not isinstance(message, dict) or "method" in message:
+                    continue
+                if message.get("id") != request_id:
+                    continue
+                if "error" in message:
+                    return "error", message.get("error")
+                return "ok", message.get("result")
+        return "ambiguous", None
+
+    def close(self):
+        try:
+            self.selector.close()
+        except Exception:
+            pass
+        try:
+            self.process.stdin.close()
+        except OSError:
+            pass
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+
+
+def parse_window(value):
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("window must be an object or null")
+    used = value.get("usedPercent")
+    resets_at = value.get("resetsAt")
+    if isinstance(used, bool) or not isinstance(used, (int, float)):
+        raise ValueError("usedPercent must be a number")
+    # resetsAt is nullable in the v2 schema: a window without a known recovery
+    # instant can never supply a cooldown target.
+    if resets_at is not None and (isinstance(resets_at, bool) or not isinstance(resets_at, int)):
+        raise ValueError("resetsAt must be epoch seconds or null")
+    return {"usedPercent": float(used), "resetsAt": resets_at}
+
+
+def parse_snapshot(result):
+    if not isinstance(result, dict):
+        raise ValueError("rateLimits result must be an object")
+    rate_limits = result.get("rateLimits")
+    if not isinstance(rate_limits, dict):
+        raise ValueError("rateLimits must be an object")
+    reached = rate_limits.get("rateLimitReachedType")
+    if reached is not None and not isinstance(reached, str):
+        raise ValueError("rateLimitReachedType must be a string or null")
+    return {
+        "primary": parse_window(rate_limits.get("primary")),
+        "secondary": parse_window(rate_limits.get("secondary")),
+        "reached": reached,
+    }
+
+
+def binding_reset(snapshot):
+    exhausted = [
+        snapshot[name]["resetsAt"]
+        for name in ("primary", "secondary")
+        if snapshot[name] is not None
+        and snapshot[name]["usedPercent"] >= EXHAUSTED_PERCENT
+        and snapshot[name]["resetsAt"] is not None
+    ]
+    if not exhausted:
+        return None
+    return max(exhausted)
+
+
+now = int(time.time())
+try:
+    server = AppServer()
+except (OSError, RuntimeError):
+    raise SystemExit(1)
+try:
+    status, payload = server.request(2, "account/rateLimits/read", {})
+finally:
+    server.close()
+if status != "ok":
+    raise SystemExit(1)
+try:
+    snapshot = parse_snapshot(payload)
+except ValueError:
+    raise SystemExit(1)
+until = binding_reset(snapshot)
+if until is None or until <= now or until > now + MAX_COOLDOWN_SECONDS:
+    # The typed limit event contradicts the snapshot, or the reset time is
+    # implausible: park on the bounded default instead of trusting it.
+    raise SystemExit(1)
+print(until)
 PY
 }
 
@@ -488,7 +616,12 @@ set -e
 wait || true
 
 if classify_provider_error "$tmp_out" "$tmp_err" "$rc" >"$tmp_provider_error"; then
-  until="$(cooldown_until "$tmp_provider_error")"
+  # The cooldown horizon comes from the authoritative account/rateLimits/read
+  # snapshot; on any RPC failure the account parks on the bounded default.
+  until="$(reset_until_via_rpc)" || until=""
+  if [[ -z "$until" ]]; then
+    until=$(( $(date +%s) + DEFAULT_COOLDOWN_SECONDS ))
+  fi
   mark_cooldown "$account" "$until"
   log "COOLDOWN account=$account until=$until rc=$rc"
   if [[ "$rc" -eq 0 ]]; then

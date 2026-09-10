@@ -9,13 +9,120 @@ import pathlib
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
+from datetime import datetime, timezone
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 LAUNCHER = ROOT / "scripts/symphony/codex-rotate"
+
+# Fake codex speaking the app-server JSON-RPC transport from a config file.
+# `app-server` argv that never receives an initialize request is the launcher's
+# work child and follows the config's "work" spec instead.
+RPC_CODEX_FAKE = '''#!PYTHON_EXE
+import json
+import os
+import select
+import sys
+
+config = json.loads(open(os.environ["RPC_CONFIG"]).read())
+
+
+def record(entry):
+    log = config.get("rpcLog")
+    if log:
+        with open(log, "a") as stream:
+            stream.write(json.dumps(entry) + "\\n")
+
+
+def send(payload):
+    sys.stdout.write(json.dumps(payload) + "\\n")
+    sys.stdout.flush()
+
+
+def respond(request):
+    record({"method": request.get("method"), "params": request.get("params")})
+    method = request.get("method")
+    if method == "initialize":
+        send({"id": request["id"], "result": {"userAgent": "fake-codex/1"}})
+        return
+    behavior = config.get("rpc", {}).get(method, {"mode": "error"})
+    if behavior.get("mode") == "drop":
+        os._exit(1)
+    if behavior.get("mode") == "error":
+        send({"id": request["id"], "error": {"code": -32000, "message": behavior.get("message", "rpc failure")}})
+        return
+    if method == "account/rateLimits/read":
+        with open(config["stateFile"]) as stream:
+            snapshot = json.load(stream)
+        send({"id": request["id"], "result": snapshot})
+        return
+    send({"id": request["id"], "error": {"code": -32601, "message": "unknown method"}})
+
+
+def rpc_serve(first_line):
+    pending = [first_line] if first_line is not None else []
+    while True:
+        if pending:
+            line = pending.pop(0)
+        else:
+            line = sys.stdin.readline()
+            if not line:
+                return
+        try:
+            request = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(request, dict) or "id" not in request or "method" not in request:
+            continue
+        respond(request)
+
+
+def work():
+    spec = config.get("work", {})
+    for line in spec.get("stdout", []):
+        print(line, flush=True)
+    if spec.get("stderr"):
+        sys.stderr.write(spec["stderr"] + "\\n")
+    sys.exit(spec.get("exit", 0))
+
+
+if "app-server" in sys.argv:
+    first_line = None
+    if select.select([sys.stdin], [], [], 0.5)[0]:
+        line = sys.stdin.readline()
+        try:
+            candidate = json.loads(line)
+        except ValueError:
+            candidate = None
+        if isinstance(candidate, dict) and candidate.get("method") == "initialize" and "id" in candidate:
+            first_line = line
+    if first_line is not None:
+        rpc_serve(first_line)
+    else:
+        work()
+else:
+    work()
+'''
+
+
+def rate_limit_state(primary_used, primary_reset, secondary_used, secondary_reset,
+                     reached=None, allowed=None):
+    """Wire-shaped account/rateLimits/read result (app-server v2, camelCase)."""
+    state = {
+        "rateLimits": {
+            "limitId": "codex",
+            "primary": {"usedPercent": primary_used, "windowDurationMins": 300, "resetsAt": primary_reset},
+            "secondary": {"usedPercent": secondary_used, "windowDurationMins": 10080, "resetsAt": secondary_reset},
+            "rateLimitReachedType": reached,
+        }
+    }
+    if allowed is not None:
+        state["ordinaryUsageAllowed"] = allowed
+    return state
 
 
 class CodexAccountEligibilityTests(unittest.TestCase):
@@ -378,7 +485,7 @@ class CodexRotateTests(unittest.TestCase):
         self.assertEqual(second.wait(timeout=5), 0)
         self.assertEqual(third.wait(timeout=5), 0)
 
-    def test_limit_failure_records_the_provider_retry_time(self):
+    def test_limit_failure_without_rpc_ignores_error_text_retry_time(self):
         limited = self.root / "limited-codex"
         limited.write_text(
             "#!/usr/bin/env bash\n"
@@ -386,16 +493,27 @@ class CodexRotateTests(unittest.TestCase):
             "exit 1\n"
         )
         limited.chmod(0o755)
+        before = int(time.time())
         result = subprocess.run(
             [str(LAUNCHER), "exec", "test"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            env=self.env(CODEX_REAL_BIN=limited),
+            env=self.env(
+                CODEX_REAL_BIN=limited,
+                CODEX_DEFAULT_COOLDOWN_SECONDS=60,
+                CODEX_ROTATE_RPC_TIMEOUT=2,
+            ),
             check=False,
         )
         self.assertEqual(result.returncode, 1)
         state = json.loads((self.accounts / "state.json").read_text())
-        self.assertEqual(state["cooldowns"]["account-a"], 1893553445)
+        cooldown = state["cooldowns"]["account-a"]
+        # The "try again at" error text (2030-01-02T03:04:05Z = 1893553445)
+        # must never steer the cooldown: without an RPC snapshot the account
+        # parks on the bounded default instead.
+        self.assertNotEqual(cooldown, 1893553445)
+        self.assertGreaterEqual(cooldown, before + 60)
+        self.assertLessEqual(cooldown, int(time.time()) + 60)
         self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
 
     def test_app_server_stdout_limit_quarantines_zero_exit_account(self):
@@ -406,18 +524,28 @@ class CodexRotateTests(unittest.TestCase):
             "exit 0\n"
         )
         limited.chmod(0o755)
+        before = int(time.time())
         result = subprocess.run(
             [str(LAUNCHER), "app-server"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
-            env=self.env(CODEX_REAL_BIN=limited),
+            env=self.env(
+                CODEX_REAL_BIN=limited,
+                CODEX_DEFAULT_COOLDOWN_SECONDS=60,
+                CODEX_ROTATE_RPC_TIMEOUT=2,
+            ),
             check=False,
         )
         self.assertEqual(result.returncode, 75)
         self.assertIn('"method":"error"', result.stdout)
         state = json.loads((self.accounts / "state.json").read_text())
-        self.assertEqual(state["cooldowns"]["account-a"], 1893553445)
+        cooldown = state["cooldowns"]["account-a"]
+        # A bash fake cannot serve account/rateLimits/read, so the typed
+        # limit parks on the bounded default rather than the 2030 error text.
+        self.assertNotEqual(cooldown, 1893553445)
+        self.assertGreaterEqual(cooldown, before + 60)
+        self.assertLessEqual(cooldown, int(time.time()) + 60)
         self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
 
     def test_app_server_non_error_payload_with_quota_like_content_does_not_cool(self):
@@ -568,6 +696,135 @@ class CodexRotateTests(unittest.TestCase):
         holder.wait(timeout=5)
         successor = self.start(FAKE_CODEX_SLEEP=0)
         self.assertEqual(successor.wait(timeout=10), 0)
+
+
+@unittest.skipUnless(shutil.which("flock"), "requires util-linux flock")
+class CodexRotateRpcTests(unittest.TestCase):
+    """Cooldown horizons come from account/rateLimits/read, never error text.
+
+    The fake codex serves the app-server v2 read from a state file; the work
+    child (non-app-server argv) always fails with a usage-limit stderr so
+    every run takes the typed rate-limit path through the launcher.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.tmp.name)
+        self.accounts = self.root / "accounts"
+        self.accounts.mkdir()
+        for name in ("account-a", "account-b"):
+            account = self.accounts / name
+            account.mkdir()
+            (account / "auth.json").write_text(json.dumps(
+                {"auth_mode": "chatgpt", "tokens": {"account_id": name}}
+            ))
+            (account / "config.toml").write_text('model = "test"\n')
+        (self.accounts / "state.json").write_text(
+            json.dumps({"active": "account-a", "cooldowns": {}, "last_error": {}})
+        )
+        self.rpc_log = self.root / "rpc.log"
+        self.rpc_state = self.root / "rpc-state.json"
+        self.rpc_config_path = self.root / "rpc-config.json"
+        self.codex = self.root / "codex"
+        self.codex.write_text(RPC_CODEX_FAKE.replace("PYTHON_EXE", sys.executable))
+        self.codex.chmod(0o755)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write_rpc(self, state, read=None, work=None):
+        self.rpc_state.write_text(json.dumps(state))
+        self.rpc_config_path.write_text(json.dumps({
+            "stateFile": str(self.rpc_state),
+            "rpcLog": str(self.rpc_log),
+            "work": {"stderr": "usage limit; try again at 2099-01-02T03:04:05Z", "exit": 1}
+            if work is None else work,
+            "rpc": {"account/rateLimits/read": {"mode": "ok"} if read is None else read},
+        }))
+
+    def env(self, **overrides):
+        env = os.environ.copy()
+        env.update({
+            "CODEX_ACCOUNTS_ROOT": str(self.accounts),
+            "CODEX_REAL_BIN": str(self.codex),
+            "CODEX_ACCOUNT_WAIT_SECONDS": "0",
+            "CODEX_ROTATE_RPC_TIMEOUT": "5",
+            "RPC_CONFIG": str(self.rpc_config_path),
+        })
+        env.update({key: str(value) for key, value in overrides.items()})
+        return env
+
+    def run_limited(self, **overrides):
+        return subprocess.run(
+            [str(LAUNCHER), "exec", "test"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=self.env(**overrides),
+            check=False,
+            timeout=30,
+        )
+
+    def state(self):
+        return json.loads((self.accounts / "state.json").read_text())
+
+    def test_cooldown_comes_from_rpc_snapshot_not_error_text(self):
+        now = int(time.time())
+        weekly_reset = now + 2 * 86400
+        self.write_rpc(rate_limit_state(
+            100, now + 1800, 100, weekly_reset,
+            reached="rate_limit_reached", allowed=False,
+        ))
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        # The error text advertises 2099-01-02; the RPC snapshot wins.
+        text_epoch = int(datetime(2099, 1, 2, 3, 4, 5, tzinfo=timezone.utc).timestamp())
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
+        self.assertNotEqual(self.state()["cooldowns"]["account-a"], text_epoch)
+
+    def test_rpc_read_failure_parks_on_bounded_default_cooldown(self):
+        now = int(time.time())
+        self.write_rpc(
+            rate_limit_state(100, now + 1800, 100, now + 86400),
+            read={"mode": "error"},
+        )
+        result = self.run_limited(CODEX_DEFAULT_COOLDOWN_SECONDS=60)
+        self.assertEqual(result.returncode, 1)
+        cooldown = self.state()["cooldowns"]["account-a"]
+        self.assertGreaterEqual(cooldown, now + 60)
+        self.assertLessEqual(cooldown, int(time.time()) + 60)
+
+    def test_snapshot_contradicting_the_typed_event_parks_on_default(self):
+        now = int(time.time())
+        self.write_rpc(rate_limit_state(5, now + 1800, 10, now + 86400, allowed=True))
+        result = self.run_limited(CODEX_DEFAULT_COOLDOWN_SECONDS=60)
+        self.assertEqual(result.returncode, 1)
+        cooldown = self.state()["cooldowns"]["account-a"]
+        self.assertGreaterEqual(cooldown, now + 60)
+        self.assertLessEqual(cooldown, int(time.time()) + 60)
+
+    def test_implausible_reset_horizon_parks_on_default(self):
+        now = int(time.time())
+        self.write_rpc(rate_limit_state(
+            100, now + 1800, 100, now + 90 * 86400,
+            reached="rate_limit_reached", allowed=False,
+        ))
+        result = self.run_limited(CODEX_DEFAULT_COOLDOWN_SECONDS=60)
+        self.assertEqual(result.returncode, 1)
+        cooldown = self.state()["cooldowns"]["account-a"]
+        self.assertGreaterEqual(cooldown, now + 60)
+        self.assertLessEqual(cooldown, int(time.time()) + 60)
+
+    def test_nullable_window_reset_never_crashes_the_read(self):
+        now = int(time.time())
+        # v2 windows may carry resetsAt=null; the exhausted weekly still binds.
+        weekly_reset = now + 86400
+        self.write_rpc(rate_limit_state(
+            100, None, 100, weekly_reset,
+            reached="rate_limit_reached", allowed=False,
+        ))
+        result = self.run_limited()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["cooldowns"]["account-a"], weekly_reset)
 
 
 if __name__ == "__main__":
