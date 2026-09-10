@@ -34,6 +34,7 @@ export function OpportunityInboxYoutubeThumbnailCard({
     <article
       className='system-b-opportunity-inbox-card overflow-hidden rounded-xl border border-subtle bg-surface-1 p-4'
       data-testid={`opportunity-inbox-youtube-thumbnail-${card.id}`}
+      aria-busy={isBusy}
     >
       <header className='system-b-opportunity-inbox-card-meta flex items-center gap-1 text-2xs text-tertiary-token'>
         <span className='system-b-opportunity-inbox-card-type'>
@@ -112,6 +113,10 @@ export function OpportunityInboxYoutubeThumbnailCard({
 
       <p className='mt-3 text-xs text-secondary-token'>{card.why}</p>
       <p className='mt-2 font-mono text-2xs text-quaternary-token'>
+        <time dateTime={candidate.apiMetrics.capturedAt}>
+          API snapshot {formatDecisionDate(candidate.apiMetrics.capturedAt)}
+        </time>
+        {' · '}
         Artifact {candidate.artifactSha256.slice(0, 12)}… · Video{' '}
         {candidate.youtubeVideoId}
       </p>

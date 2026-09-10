@@ -141,4 +141,92 @@ describe('FounderReviewStack', () => {
       'true'
     );
   });
+
+  it('renders a YouTube thumbnail candidate with reject and approve candidate actions', async () => {
+    const user = userEvent.setup();
+    const youtubeCard = {
+      ...CARD,
+      id: 'yt-card-1',
+      sourceKind: 'youtube.thumbnail_candidate',
+      typeLabel: 'YouTube Thumbnail',
+      title: 'Review thumbnail for A song',
+      why: 'YouTube API snapshot captured 2026-09-01T12:00:00.000Z.',
+      primaryActionLabel: 'Approve Candidate',
+      category: 'youtube_thumbnail' as const,
+      youtubeThumbnail: {
+        channelId: 'UC-owned',
+        youtubeVideoId: 'video-1',
+        currentThumbnailUrl: 'https://i.ytimg.com/current.jpg',
+        candidateImageUrl: 'https://cdn.example.com/candidate.jpg',
+        artifactSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        apiMetrics: {
+          capturedAt: '2026-09-01T12:00:00.000Z',
+          views: 1250,
+          watchTimeMinutes: 300,
+          avgViewDurationSeconds: 42,
+        },
+        publicationBlockedReason:
+          'direct-thumbnail-mutation-disabled-native-experiment-required',
+      },
+    };
+    const { onApprove, onReject } = renderStack({ cards: [youtubeCard] });
+
+    expect(
+      screen.getByTestId('opportunity-inbox-youtube-thumbnail-yt-card-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Current live YouTube thumbnail' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('1,250')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+
+    expect(onApprove).toHaveBeenCalledWith('yt-card-1');
+    expect(onReject).toHaveBeenCalledWith('yt-card-1');
+    expect(hoisted.createReview).not.toHaveBeenCalled();
+  });
+
+  it('maps keyboard arrows on a YouTube candidate to decision-gate approve and reject', async () => {
+    const youtubeCard = {
+      ...CARD,
+      id: 'yt-card-2',
+      sourceKind: 'youtube.thumbnail_candidate',
+      typeLabel: 'YouTube Thumbnail',
+      title: 'Review thumbnail for A song',
+      primaryActionLabel: 'Approve Candidate',
+      category: 'youtube_thumbnail' as const,
+      youtubeThumbnail: {
+        channelId: 'UC-owned',
+        youtubeVideoId: 'video-1',
+        currentThumbnailUrl: 'https://i.ytimg.com/current.jpg',
+        candidateImageUrl: 'https://cdn.example.com/candidate.jpg',
+        artifactSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        apiMetrics: {
+          capturedAt: '2026-09-01T12:00:00.000Z',
+          views: 1250,
+          watchTimeMinutes: 300,
+          avgViewDurationSeconds: 42,
+        },
+        publicationBlockedReason:
+          'direct-thumbnail-mutation-disabled-native-experiment-required',
+      },
+    };
+    const { onApprove, onReject } = renderStack({ cards: [youtubeCard] });
+    const user = userEvent.setup();
+
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: 'Review Current Opportunity' })
+    ).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(onApprove).toHaveBeenCalledWith('yt-card-2');
+
+    await user.keyboard('{ArrowLeft}');
+    expect(onReject).toHaveBeenCalledWith('yt-card-2');
+    expect(hoisted.createReview).not.toHaveBeenCalled();
+  });
 });

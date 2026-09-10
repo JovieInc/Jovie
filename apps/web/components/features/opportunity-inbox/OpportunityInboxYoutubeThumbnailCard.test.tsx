@@ -52,6 +52,8 @@ describe('OpportunityInboxYoutubeThumbnailCard', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('1,250')).toBeInTheDocument();
     expect(screen.getByText('300 min')).toBeInTheDocument();
+    expect(screen.getByText(/API snapshot/)).toBeInTheDocument();
+    expect(screen.getByText(/Video video-1/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
     await user.click(screen.getByRole('button', { name: 'Reject' }));
