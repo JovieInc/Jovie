@@ -30,11 +30,11 @@ def test_poke_step_targets_hyperagent_webhook() -> None:
     assert "HYPERAGENT_CI_WEBHOOK_URL" in workflow
     assert "HYPERAGENT_CI_WEBHOOK_SECRET" in workflow
     assert "X-Hyperagent-Webhook-Secret" in workflow
+    assert "X-Hyperagent-Webhook-Signature" in workflow
+    assert "X-Hyperagent-Webhook-Timestamp" in workflow
     assert "HTTP 202" in workflow or "202" in workflow
     assert "Authorization: Bearer" not in workflow
     assert "X-HA-Access" not in workflow
-    assert "X-Hyperagent-Webhook-Signature" not in workflow
-    assert "X-Hyperagent-Webhook-Timestamp" not in workflow
     assert "HYPERAGENT_CI_WEBHOOK_URL and HYPERAGENT_CI_WEBHOOK_SECRET are required" in workflow
 
 

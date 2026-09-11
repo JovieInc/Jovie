@@ -1,7 +1,8 @@
 """Hyperagent webhook receiver contract (ha-webhook-auth-only-v1).
 
-Hyperagent's hosted webhook compares one shared secret. It does not accept
-Authorization Bearer, X-HA-Access, or an HMAC of the body.
+Hyperagent's hosted webhook compares one shared secret. Extra Timestamp /
+Signature HMAC headers are ignored and do not conflict. Authorization Bearer
+and X-HA-Access are not substitutes for the secret header.
 
 Documented header: X-Hyperagent-Webhook-Secret
 Documented statuses:

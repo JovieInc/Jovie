@@ -3,8 +3,9 @@ name: HA CI remediator poke
 # accountable-writer: Hyperagent
 # necessary-trust-boundary: GitHub-hosted CI failure events on pull_request/merge_group
 #   wake the Hyperagent remediator via X-Hyperagent-Webhook-Secret (HA docs;
-#   ha-webhook-auth-only-v1). HA compares that shared secret and does not verify
-#   HMAC body signatures, Authorization Bearer, or X-HA-Access. No self-hosted
+#   ha-webhook-auth-only-v1). Timestamp/Signature HMAC headers are also sent;
+#   HA ignores them and 401s only when the secret header is missing. Do not
+#   send Authorization Bearer or X-HA-Access as a substitute. No self-hosted
 #   runner access, no local systemd, no Symphony port pokes.
 # removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
 # idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA.
@@ -71,10 +72,15 @@ jobs:
             --arg event "$EVENT" \
             '{repository: $repo, pr_number: ($pr_number | tonumber? // null), head_sha: $head_sha, run_url: $run_url, event: $event, source: "ha-ci-remediator-poke"}')
 
+          timestamp=$(date -u +%s)
+          signature=$(printf '%s.%s' "$timestamp" "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)
+
           http_code=$(curl -sS -o /tmp/hyperagent-response -w '%{http_code}' \
             -X POST --max-time 5 \
             -H 'Content-Type: application/json' \
             -H "X-Hyperagent-Webhook-Secret: $WEBHOOK_SECRET" \
+            -H "X-Hyperagent-Webhook-Timestamp: $timestamp" \
+            -H "X-Hyperagent-Webhook-Signature: sha256=$signature" \
             -d "$payload" \
             "$WEBHOOK_URL")
 
