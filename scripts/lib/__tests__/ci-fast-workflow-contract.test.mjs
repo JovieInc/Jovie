@@ -3,6 +3,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -813,6 +814,56 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).toContain(
       "if: ${{ success() && steps.structural.outputs.skip != 'true' }}"
     );
+  });
+
+  it('retains successful structural evidence beyond the short artifact excerpt', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-evidence-'));
+    try {
+      const executable = join(repo, 'pnpm'),
+        coverage = join(repo, 'coverage');
+      writeFileSync(
+        executable,
+        '#!/bin/sh\nprintf "%s\\n" "CONTROL_EVIDENCE_BEGIN" "' +
+          'x'.repeat(150_000) +
+          '"\n'
+      );
+      chmodSync(executable, 0o700);
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          maxBuffer: 8 * 1024 * 1024,
+          env: {
+            ...process.env,
+            PATH: repo,
+            GITHUB_EVENT_NAME: 'workflow_dispatch',
+            CI_PRODUCT_LANES: 'web',
+            CI_FAST_LANE_GROUP: 'remaining',
+            CI_FAST_ONLY_STRUCTURAL: 'true',
+            CI_FAST_SKIP_STRUCTURAL: 'false',
+            NODE_V8_COVERAGE: coverage,
+            CI_FAST_LANES_OUT: join(repo, 'result.json'),
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('CONTROL_EVIDENCE_BEGIN');
+      expect(result.stdout.endsWith('[ci-fast] all lanes passed\n')).toBe(true);
+      const receipts = readdirSync(coverage).flatMap(
+        name => JSON.parse(readFileSync(join(coverage, name), 'utf8')).result
+      );
+      const runner = receipts.find(item =>
+        item.url.endsWith('/scripts/ci-fast-lanes.mjs')
+      );
+      expect(
+        runner.functions.find(item => item.functionName === 'main').ranges[0]
+          .count
+      ).toBeGreaterThan(0);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('fail-fast skips later remaining lanes after the first failure', () => {

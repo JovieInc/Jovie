@@ -696,6 +696,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
         'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
         'scripts/lib/__tests__/native-queue-eval.test.mjs',
+        'scripts/lib/__tests__/native-queue-collector.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
