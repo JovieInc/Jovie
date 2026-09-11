@@ -1,0 +1,5 @@
+{
+  "schema": "jovie.design-system-source-identity/v1",
+  "identities": [],
+  "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value. Prefer deleting the debt over adding an escape."
+}

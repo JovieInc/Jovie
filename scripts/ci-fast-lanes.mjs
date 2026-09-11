@@ -85,7 +85,7 @@ const LANES = [
   },
   {
     id: 'design-system-source-ratchet',
-    name: 'Design-system source count ratchet',
+    name: 'Design-system source identity ratchet',
     nextLocalCommand: 'pnpm design:source-count-ratchet',
     run: runDesignSystemSourceRatchet,
   },
