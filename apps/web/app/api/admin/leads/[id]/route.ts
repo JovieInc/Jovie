@@ -11,8 +11,8 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { approveLead } from '@/lib/leads/approve-lead';
-import { recordLeadRejectionEvent } from '@/lib/leads/rejection-event';
 import { pipelineLog } from '@/lib/leads/pipeline-logger';
+import { recordLeadRejectionEvent } from '@/lib/leads/rejection-event';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;

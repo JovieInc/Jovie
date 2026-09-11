@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  PREMADE_ARTIST_PROFILE_EXPERIMENT_ID,
   captureAcquisitionRejection,
+  PREMADE_ARTIST_PROFILE_EXPERIMENT_ID,
   rejectionEventDedupKey,
 } from '@/lib/acquisition';
 
