@@ -108,18 +108,22 @@ export const CRYPTO_FORBIDDEN = Object.freeze([
   'randomFillSync',
 ]);
 
-const FORBIDDEN_BY_SOURCE = new Map(
-  [
-    [...FS_SOURCES].map(source => [source, new Set(FS_FORBIDDEN)]),
-    [...CHILD_SOURCES].map(source => [source, new Set(CHILD_FORBIDDEN)]),
-    [...ZLIB_SOURCES].map(source => [source, new Set(ZLIB_FORBIDDEN)]),
-    [...CRYPTO_SOURCES].map(source => [source, new Set(CRYPTO_FORBIDDEN)]),
-  ].flat()
-);
+/** @type {Array<[string, Set<string>]>} */
+const forbiddenEntries = [];
+for (const source of FS_SOURCES)
+  forbiddenEntries.push([source, new Set(FS_FORBIDDEN)]);
+for (const source of CHILD_SOURCES)
+  forbiddenEntries.push([source, new Set(CHILD_FORBIDDEN)]);
+for (const source of ZLIB_SOURCES)
+  forbiddenEntries.push([source, new Set(ZLIB_FORBIDDEN)]);
+for (const source of CRYPTO_SOURCES)
+  forbiddenEntries.push([source, new Set(CRYPTO_FORBIDDEN)]);
+const FORBIDDEN_BY_SOURCE = new Map(forbiddenEntries);
 
-const GRAY_BY_SOURCE = new Map(
-  [...FS_SOURCES].map(source => [source, new Set(FS_GRAY)])
-);
+/** @type {Array<[string, Set<string>]>} */
+const grayEntries = [];
+for (const source of FS_SOURCES) grayEntries.push([source, new Set(FS_GRAY)]);
+const GRAY_BY_SOURCE = new Map(grayEntries);
 
 const ALL_FORBIDDEN = new Set([
   ...FS_FORBIDDEN,
