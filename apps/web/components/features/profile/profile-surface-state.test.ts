@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
+  getPublicProfileHistoryExitDelta,
+  readPublicProfileHistoryDepth,
   resolveProfileSurfaceState,
   resolvePublicProfileBackAction,
   shouldShowPublicProfileBackChevron,
+  withPublicProfileHistoryDepth,
 } from './profile-surface-state';
 
 const artist = {
@@ -293,8 +296,35 @@ describe('resolveProfileSurfaceState', () => {
         referrer: '',
         isSignedIn: true,
         arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
       })
     ).toBe('history-exit');
+  });
+
+  it('does not overshoot when browser back left a stale history.length', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 0,
+      })
+    ).toBe('history-back');
+  });
+
+  it('reads and stamps profile history depth on history state', () => {
+    expect(readPublicProfileHistoryDepth(null)).toBe(0);
+    expect(readPublicProfileHistoryDepth({ joviePublicProfileDepth: 2 })).toBe(
+      2
+    );
+    expect(getPublicProfileHistoryExitDelta(2)).toBe(-3);
+    expect(getPublicProfileHistoryExitDelta(0)).toBe(-1);
+    expect(withPublicProfileHistoryDepth({ keep: true }, 1)).toMatchObject({
+      keep: true,
+      joviePublicProfileDepth: 1,
+    });
   });
 
   it('exits past internal mode entries for a logged-out referrer arrival', () => {
@@ -304,6 +334,7 @@ describe('resolveProfileSurfaceState', () => {
         historyLength: 4,
         referrer: 'https://jov.ie/explore',
         arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
       })
     ).toBe('history-exit');
   });
