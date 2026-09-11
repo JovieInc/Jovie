@@ -249,6 +249,46 @@ const config: StorybookConfig = {
           find: 'next/navigation',
           replacement: require.resolve('./next-navigation-mock.js'),
         },
+        // Mock Clerk authentication for Storybook
+        // IMPORTANT: More specific paths MUST come before less specific ones
+        {
+          find: '@clerk/nextjs/server/auth',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
+        {
+          find: '@clerk/nextjs/server/currentUser',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
+        {
+          find: '@clerk/nextjs/server',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
+        {
+          find: '@clerk/nextjs/errors',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
+        {
+          find: '@clerk/nextjs',
+          replacement: path.resolve(__dirname, 'clerk-mock.jsx'),
+        },
+        // Mock @clerk/elements to prevent package.json lookup warning
+        // IMPORTANT: More specific paths MUST come before less specific ones
+        {
+          find: '@clerk/elements/common',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        {
+          find: '@clerk/elements/sign-in',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        {
+          find: '@clerk/elements/sign-up',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        {
+          find: '@clerk/elements',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
         // Project aliases
         {
           find: '@/features',
@@ -289,7 +329,7 @@ const config: StorybookConfig = {
     // forever while /sb-vite/deps/* never materializes.
     config.optimizeDeps = {
       ...config.optimizeDeps,
-      exclude: [...(config.optimizeDeps?.exclude || [])],
+      exclude: [...(config.optimizeDeps?.exclude || []), '@clerk/elements'],
       holdUntilCrawlEnd: false,
       // React 19 CJS entries need default-export interop in the browser ESM graph.
       needsInterop: [

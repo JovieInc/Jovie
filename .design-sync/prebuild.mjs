@@ -4,7 +4,7 @@
 // Why: the converter's own tsconfigPathsPlugin (lib/bundle.mjs) mis-resolves this
 // repo's wildcard `@/*` imports to directories ("is a directory"). Native esbuild
 // resolves them correctly, so we bundle here (resolving @/* + applying the
-// next/sentry stubs) into dist/homepage.mjs with react/react-dom externalized.
+// next/clerk/sentry stubs) into dist/homepage.mjs with react/react-dom externalized.
 // The converter then re-bundles a module that has no @/* imports left, sidestepping
 // the bug. Run from the repo root AFTER the converter deps are staged (.ds-sync/):
 //   node .design-sync/build-css.mjs            # css first
@@ -32,6 +32,8 @@ const STUBS = {
   'next/image': './.design-sync/stubs/next-image.tsx',
   'next/link': './.design-sync/stubs/next-link.tsx',
   'next/font/local': './.design-sync/stubs/next-font-local.js',
+  '@clerk/nextjs': './apps/web/.storybook/clerk-mock.jsx',
+  '@clerk/nextjs/server': './apps/web/.storybook/clerk-server-mock.js',
   '@sentry/react': './.design-sync/stubs/sentry-passthrough.tsx',
   '@sentry/browser': './.design-sync/stubs/sentry-passthrough.tsx',
   '@sentry/nextjs': './.design-sync/stubs/sentry-passthrough.tsx',
