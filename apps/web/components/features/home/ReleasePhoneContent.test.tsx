@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ReleasePhoneContent } from './ReleasePhoneContent';
 import { RELEASES } from './releases-data';
 
@@ -34,14 +34,15 @@ describe('ReleasePhoneContent', () => {
   it('renders secondary DSP rows transparent at rest via the shared button', () => {
     render(<ReleasePhoneContent release={RELEASES[1]} />);
 
-    for (const provider of [
-      'spotify',
-      'apple_music',
-      'youtube_music',
-      'amazon_music',
+    // Rows render without data-dsp-provider (providerKey is not passed on
+    // this surface), so reach each row through its label span.
+    for (const label of [
+      'Spotify',
+      'Apple Music',
+      'YouTube Music',
+      'Amazon Music',
     ]) {
-      const row = document.querySelector(`[data-dsp-provider="${provider}"]`);
-      expect(row).not.toBeNull();
+      const row = screen.getByText(label).parentElement as HTMLElement;
       expect(row).toHaveClass('bg-transparent');
       expect(row).not.toHaveClass('bg-surface-1');
       expect(row).not.toHaveClass('bg-white/10');
