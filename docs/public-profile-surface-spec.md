@@ -153,8 +153,8 @@ Content that does not apply this padding will be obscured by the tab bar on devi
 | Viewport | Tab Bar Behavior |
 |---|---|
 | < 768px (mobile) | Tab bar renders at the bottom of the viewport-locked surface |
-| 768–1180px (tablet / embedded mode) | Tab bar renders; profile card is inset inside the page; safe area padding still applies |
-| > 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses a sidebar panel instead of a bottom drawer for secondary modes. The bottom tab bar does not render on `ProfileDesktopSurface`. Navigation uses sidebar/panel affordances. |
+| 768–1179px (tablet / embedded mode) | Tab bar renders; profile card is inset inside the page; safe area padding still applies |
+| >= 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses a sidebar panel instead of a bottom drawer for secondary modes. The bottom tab bar does not render on `ProfileDesktopSurface`. Navigation uses sidebar/panel affordances. |
 
 Desktop tab behavior is owned by JOV-2024. This spec records the current behavior; JOV-2024 may modify it.
 
