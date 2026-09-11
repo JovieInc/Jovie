@@ -135,6 +135,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           allow-images: true
+          public-images: true
 
       - name: Capture screenshot catalog
         timeout-minutes: 30
