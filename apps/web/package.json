@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.9.1",
+  "version": "26.9.2",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -250,7 +250,7 @@
     "@tanstack/react-pacer": "^0.21.1",
     "@tanstack/react-query": "^5.102.8",
     "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.13.24",
+    "@tanstack/react-virtual": "^3.14.11",
     "@tiptap/core": "3.30.4",
     "@tiptap/extension-placeholder": "3.31.3",
     "@tiptap/pm": "3.30.4",
