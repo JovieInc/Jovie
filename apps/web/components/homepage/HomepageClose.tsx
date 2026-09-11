@@ -24,6 +24,7 @@ export function HomepageClose() {
       data-marketing-variant='editorial-search'
       data-homepage-testid='homepage-close'
       data-marketing-owner='apps/web/components/homepage/HomepageClose.tsx'
+      data-rhythm='close'
       aria-labelledby='homepage-close-heading'
     >
       <div className='homepage-close__inner'>
