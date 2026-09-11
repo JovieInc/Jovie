@@ -39,7 +39,10 @@ export function buildViewMetadata(
   const description = entry.subtitle ?? `${input.artistName} on Jovie.`;
 
   return {
-    title,
+    // `absolute` opts out of the root layout's `%s | Jovie` template —
+    // the composed title already ends in "· Jovie", so the template would
+    // double the brand ("… · Jovie | Jovie") in the tab title and SERP.
+    title: { absolute: title },
     description,
     robots: getPublicProfileRobots(input.artistHandle),
     alternates: {
