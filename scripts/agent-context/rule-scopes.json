@@ -1,11 +1,7 @@
 [
   {
     "file": ".claude/rules/auth.md",
-    "paths": [
-      "apps/web/**/auth/**",
-      "apps/web/proxy.ts",
-      "apps/web/tests/**"
-    ],
+    "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
     "bodySha256": "f51100637f153d064b0c292b508a0b4ea5079fc238d86c6de4244f02e5ea3f5c"
   },
   {
