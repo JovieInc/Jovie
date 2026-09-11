@@ -67,13 +67,6 @@ const baseConfig = {
     'no-restricted-imports': [
       'error',
       {
-        patterns: [
-          {
-            group: ['@clerk', '@clerk/*'],
-            message:
-              'Clerk is retired. Use Better Auth via @/lib/auth/better-auth and @/hooks/useJovieAuth.',
-          },
-        ],
         paths: [
           {
             name: '@/components/atoms/Select',
@@ -146,6 +139,11 @@ const baseConfig = {
           },
         ],
         patterns: [
+          {
+            group: ['@clerk', '@clerk/*'],
+            message:
+              'Clerk is retired. Use Better Auth via @/lib/auth/better-auth and @/hooks/useJovieAuth.',
+          },
           {
             group: [
               '../components/atoms/Button',
