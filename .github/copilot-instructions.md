@@ -7,7 +7,7 @@ This repository uses GitHub Copilot (including the Coding Agent) to propose and 
 ## Repository Overview
 
 - **Stack**: Next.js 15 (App Router), TypeScript, Tailwind CSS v4
-- **Auth**: Clerk (migrated from Supabase Auth)
+- **Auth**: Better Auth (Clerk is retired)
 - **Database**: Neon PostgreSQL with Drizzle ORM (migrated from Supabase)
 - **Package Manager**: pnpm 9.15.4 (exact version required - NOT npm or yarn)
 - **Node.js**: 22.23.2 required (see `.nvmrc`)
@@ -68,9 +68,9 @@ doppler run -- pnpm --filter web dev:local
 
 **Critical Environment Variables** (required for basic functionality):
 ```bash
-# Clerk Authentication (REQUIRED)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+# Better Auth (REQUIRED)
+BETTER_AUTH_SECRET=...
+BETTER_AUTH_URL=http://localhost:3100
 
 # Neon Database (REQUIRED for DB operations)  
 DATABASE_URL=postgresql://...
@@ -105,8 +105,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ### Security and Environment  
 - **Secrets**: Never print or commit secrets; do not commit `.env*` files
 - **Environment**: Always use `env` from `lib/env.ts` for validated environment variables
-- **Authentication**: Use Clerk's native integration patterns (see CONTRIBUTING.md)
-- **Database**: All tables use RLS with Clerk JWT integration
+- **Authentication**: Use Better Auth via `@/lib/auth/better-auth` and `@/hooks/useJovieAuth`
+- **Database**: Neon + Drizzle; app users link through `users.better_auth_user_id`
 
 ### Accessibility and Design
 - **Accessibility**: Preserve focus-visible, aria-labels, color contrast ratios
@@ -132,10 +132,10 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 4. **Review migrations**: Check `drizzle/migrations/` for recent changes
 
 ### Working with Authentication  
-1. **Use Clerk patterns**: See existing auth components in `app/(auth)/`
-2. **Server-side auth**: Use `auth()` from `@clerk/nextjs/server`  
-3. **Client-side auth**: Use `useUser()` and `useSession()` hooks
-4. **Database integration**: User data synced via webhooks to `users` table
+1. **Use Better Auth patterns**: See existing auth components in `app/(auth)/`
+2. **Server-side auth**: Use `getCachedAuth()` from `@/lib/auth/cached`
+3. **Client-side auth**: Use `useJovieAuth` / `useUserSafe` from `@/hooks/useJovieAuth`
+4. **Database integration**: Provisioning hook links `ba_users` to `users`
 
 ### Styling and UI Components
 1. **Design system**: Check `packages/ui/` for reusable components
@@ -166,7 +166,7 @@ components/                   # React components
 
 lib/                         # Utility libraries
 ├── db/                      # Database configuration and queries
-├── auth/                    # Clerk authentication utilities
+├── auth/                    # Better Auth utilities
 ├── env.ts                   # Environment variable validation (USE THIS)
 ├── stripe/                  # Stripe payment integration
 └── utils/                   # General utilities
@@ -189,7 +189,7 @@ tests/                       # Test suites (unit, e2e, integration)
 ### Database Architecture (Neon + Drizzle)
 - **Migration recent**: Recently migrated from Supabase to Neon PostgreSQL
 - **ORM**: Uses Drizzle ORM for type-safe database operations  
-- **Auth Integration**: Clerk JWT tokens integrated with RLS policies
+- **Auth Integration**: Better Auth sessions linked to `users.better_auth_user_id`
 - **Core Tables**: `users`, `creator_profiles`, `social_links`, `click_events`, `tips`
 - **Migrations**: Located in `drizzle/migrations/`, managed via `scripts/drizzle-migrate.ts`
 
@@ -197,7 +197,7 @@ tests/                       # Test suites (unit, e2e, integration)
 
 ### Frontend Development
 - **`app/(marketing)/page.tsx`** - Homepage with featured artists
-- **`app/dashboard/page.tsx`** - Main dashboard (fetches Clerk user → Neon database)
+- **`app/dashboard/page.tsx`** - Main dashboard (Better Auth session → Neon database)
 - **`app/[username]/page.tsx`** - Public profile pages
 - **`components/home/FeaturedArtists.tsx`** - Homepage featured section
 - **`components/dashboard/`** - Dashboard-specific components
@@ -205,7 +205,7 @@ tests/                       # Test suites (unit, e2e, integration)
 ### Backend/API Development  
 - **`app/api/`** - API routes for various features
 - **`lib/db/queries.ts`** - Database query functions
-- **`lib/auth/`** - Clerk authentication helpers
+- **`lib/auth/`** - Better Auth helpers
 - **`apps/web/proxy.ts`** - Auth/proxy entrypoint (do not create `middleware.ts`)
 
 ### Development Tools
@@ -339,7 +339,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 4. **Review migrations**: Ensure migrations are applied
 
 ### Authentication Problems
-1. **Check Clerk config**: Verify publishable key in environment
+1. **Check Better Auth config**: Verify `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 2. **Clear browser data**: Clear cookies and local storage
 3. **Test in incognito**: Rule out browser state issues
 4. **Review proxy routing**: Check `apps/web/proxy.ts` configuration
@@ -404,7 +404,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 **Hard Rules:**
 - **NEVER create a new Vercel cron entry** without explicit human approval
 - **NEVER iterate over all users to call an external API** — O(users) calls per run scales linearly. At 1,000 users hourly = 24,000 API calls/day
-- **NEVER poll external APIs for state you can receive via webhook** — Stripe, Clerk, Resend all have webhooks
+- **NEVER poll external APIs for state you can receive via webhook** — Stripe, Resend all have webhooks
 - **NEVER add new job queue libraries** (Bull, Agenda, BullMQ) — use the existing in-database job queue
 - **NEVER use `setInterval`/`setTimeout` in server code** — serverless functions terminate before timers fire
 - Always calculate: `(calls per run) × (runs per day) × 30 = monthly API calls`. If >1,000/month, justify it.
@@ -419,7 +419,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 ### High-Risk Changes
 
 - **Database schema changes**: Migrations, RLS policy changes, new tables
-- **Authentication flow modifications**: Clerk configuration, JWT handling, session management
+- **Authentication flow modifications**: Better Auth configuration, session management, OAuth callbacks
 - **Billing/payment logic**: Stripe integration, subscription management, pricing changes
 - **Performance-critical paths**: Core routing, middleware, authentication middleware
 - **Cron jobs / scheduled tasks**: Any new recurring background work (see guardrails above)
