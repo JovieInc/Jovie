@@ -4,10 +4,10 @@ import {
   buildHarnessReceipt,
   validateHarnessContract,
 } from './harness-contract.mjs';
+import { validateLatencySensitiveExecution } from './latency-sensitive-execution.mjs';
 import { validatePerformanceFactory } from './performance-factory.mjs';
 import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
 import { validateQualityRatchet } from './quality-ratchet.mjs';
-import { validateLatencySensitiveExecution } from './latency-sensitive-execution.mjs';
 // JOV-INV-029 is composed here so every CI invariant run checks the lifecycle.
 // JOV-INV-031 is composed here so every CI invariant run checks thread-blocking.
 
@@ -32,7 +32,9 @@ const harnessErrors = validateHarnessContract(registry);
 const performanceErrors = validatePerformanceFactory(undefined, { registry });
 const qualityErrors = validateQualityRatchet(registry);
 const lifecycleErrors = validatePrLifecycleContract(registry);
-const latencyErrors = validateLatencySensitiveExecution(undefined, { registry });
+const latencyErrors = validateLatencySensitiveExecution(undefined, {
+  registry,
+});
 const errors = [
   ...result.errors,
   ...harnessErrors.map(error => `harness-contract: ${error}`),

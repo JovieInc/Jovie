@@ -15,7 +15,7 @@
  * crawler/bot wait latency; do not claim that it does.
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -108,12 +108,14 @@ export const CRYPTO_FORBIDDEN = Object.freeze([
   'randomFillSync',
 ]);
 
-const FORBIDDEN_BY_SOURCE = new Map([
-  [...FS_SOURCES].map(source => [source, new Set(FS_FORBIDDEN)]),
-  [...CHILD_SOURCES].map(source => [source, new Set(CHILD_FORBIDDEN)]),
-  [...ZLIB_SOURCES].map(source => [source, new Set(ZLIB_FORBIDDEN)]),
-  [...CRYPTO_SOURCES].map(source => [source, new Set(CRYPTO_FORBIDDEN)]),
-].flat());
+const FORBIDDEN_BY_SOURCE = new Map(
+  [
+    [...FS_SOURCES].map(source => [source, new Set(FS_FORBIDDEN)]),
+    [...CHILD_SOURCES].map(source => [source, new Set(CHILD_FORBIDDEN)]),
+    [...ZLIB_SOURCES].map(source => [source, new Set(ZLIB_FORBIDDEN)]),
+    [...CRYPTO_SOURCES].map(source => [source, new Set(CRYPTO_FORBIDDEN)]),
+  ].flat()
+);
 
 const GRAY_BY_SOURCE = new Map(
   [...FS_SOURCES].map(source => [source, new Set(FS_GRAY)])
@@ -147,10 +149,6 @@ export const ESLINT_RESTRICTED_SYNTAX = Object.freeze([
       'JOV-INV-031 thread-blocking: importing a known sync I/O/crypto API is rejected in runtime app code, including aliases. Moving the call into a helper is zero escape.',
   },
 ]);
-
-function hasText(value) {
-  return typeof value === 'string' && value.trim().length > 0;
-}
 
 function posixRel(repoRoot, absPath) {
   return relative(repoRoot, absPath).split('\\').join('/');
@@ -224,15 +222,6 @@ function isFunctionLike(node) {
     ts.isMethodDeclaration(node) ||
     ts.isConstructorDeclaration(node)
   );
-}
-
-function sourceFamily(specifier) {
-  if (!specifier) return null;
-  if (FS_SOURCES.has(specifier)) return 'fs';
-  if (CHILD_SOURCES.has(specifier)) return 'child_process';
-  if (ZLIB_SOURCES.has(specifier)) return 'zlib';
-  if (CRYPTO_SOURCES.has(specifier)) return 'crypto';
-  return null;
 }
 
 function trackedName(specifier, name) {
@@ -349,7 +338,8 @@ export function scanSource(relPath, sourceText) {
 
   function bindInitializer(nameNode, initializer) {
     if (!initializer) return;
-    const spec = requireSpecifier(initializer) ?? importCallSpecifier(initializer);
+    const spec =
+      requireSpecifier(initializer) ?? importCallSpecifier(initializer);
     if (spec) {
       bindBindingName(nameNode, spec);
       if (ts.isIdentifier(nameNode)) bindNamespace(nameNode.text);
@@ -410,9 +400,15 @@ export function scanSource(relPath, sourceText) {
               ts.isFunctionDeclaration(node.parent) ||
               ts.isFunctionExpression(node.parent) ||
               ts.isArrowFunction(node.parent)
-                ? Boolean(node.parent.modifiers?.some(
-                    modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword
-                  )) || Boolean(node.parent.kind === ts.SyntaxKind.ArrowFunction && node.parent.modifiers)
+                ? Boolean(
+                    node.parent.modifiers?.some(
+                      modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword
+                    )
+                  ) ||
+                  Boolean(
+                    node.parent.kind === ts.SyntaxKind.ArrowFunction &&
+                      node.parent.modifiers
+                  )
                 : false,
           });
         }
@@ -477,8 +473,7 @@ export function projectAllowlist(findings) {
     schema: ALLOWLIST_SCHEMA,
     checkClass: LATENCY_SENSITIVE_CHECK_CLASS,
     siblingCheckClass: ROUTE_LATENCY_CHECK_CLASS,
-    note:
-      'Existing request-path thread-blocking calls. Counts may only decrease. Not a route-response-latency budget.',
+    note: 'Existing request-path thread-blocking calls. Counts may only decrease. Not a route-response-latency budget.',
     entries: countByFile(findings),
   };
 }
@@ -557,9 +552,7 @@ export function validateLatencySensitiveContract(
     item => item.id === LATENCY_SENSITIVE_INVARIANT_ID
   );
   if (!invariant) {
-    return [
-      `${LATENCY_SENSITIVE_INVARIANT_ID} is missing from the registry`,
-    ];
+    return [`${LATENCY_SENSITIVE_INVARIANT_ID} is missing from the registry`];
   }
   const policy = invariant.policy?.value ?? {};
   const errors = [];
@@ -584,7 +577,9 @@ export function validateLatencySensitiveContract(
     errors.push('must refuse invented route-latency budget numbers');
   }
   if (policy.checkClass === policy.siblingCheckClass) {
-    errors.push('thread-blocking and route-response-latency must stay distinct');
+    errors.push(
+      'thread-blocking and route-response-latency must stay distinct'
+    );
   }
   return errors;
 }

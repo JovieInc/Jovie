@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
+  diffAllowlist,
   LATENCY_SENSITIVE_CHECK_CLASS,
   LATENCY_SENSITIVE_INVARIANT_ID,
   LATENCY_SENSITIVE_SCHEMA,
   LATENCY_SENSITIVE_SLUG,
   ROUTE_LATENCY_CHECK_CLASS,
   ROUTE_LATENCY_CONTRACT,
-  diffAllowlist,
   scanFixture,
   scanRuntime,
   validateEslintSelectors,
@@ -25,9 +25,18 @@ describe('JOV-INV-031 latency-sensitive-execution-v1', () => {
   it('keeps thread-blocking distinct from route-response-latency', () => {
     assert.equal(LATENCY_SENSITIVE_CHECK_CLASS, 'thread-blocking');
     assert.equal(ROUTE_LATENCY_CHECK_CLASS, 'route-response-latency');
-    assert.equal(ROUTE_LATENCY_CONTRACT, 'docs/performance/performance-invariants-v1.md');
-    assert.equal(LATENCY_SENSITIVE_SLUG, 'jovie/coordination/latency-sensitive-execution-v1');
-    assert.equal(LATENCY_SENSITIVE_SCHEMA, 'jovie-latency-sensitive-execution/v1');
+    assert.equal(
+      ROUTE_LATENCY_CONTRACT,
+      'docs/performance/performance-invariants-v1.md'
+    );
+    assert.equal(
+      LATENCY_SENSITIVE_SLUG,
+      'jovie/coordination/latency-sensitive-execution-v1'
+    );
+    assert.equal(
+      LATENCY_SENSITIVE_SCHEMA,
+      'jovie-latency-sensitive-execution/v1'
+    );
     assert.equal(LATENCY_SENSITIVE_INVARIANT_ID, 'JOV-INV-031');
     assert.notEqual(LATENCY_SENSITIVE_CHECK_CLASS, ROUTE_LATENCY_CHECK_CLASS);
   });
@@ -119,7 +128,10 @@ describe('JOV-INV-031 latency-sensitive-execution-v1', () => {
     assert.ok(invariant);
     assert.equal(invariant.lifecycle.state, 'adopted');
     assert.equal(invariant.policy.value.checkClass, 'thread-blocking');
-    assert.equal(invariant.policy.value.siblingCheckClass, 'route-response-latency');
+    assert.equal(
+      invariant.policy.value.siblingCheckClass,
+      'route-response-latency'
+    );
     assert.equal(invariant.policy.value.inventBudgets, false);
   });
 });
