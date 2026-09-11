@@ -100,6 +100,7 @@ describe('public profile back destination', () => {
         referrer: '',
         isSignedIn: true,
         arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
       })
     ).toBe('history-exit');
     expect(
@@ -108,7 +109,18 @@ describe('public profile back destination', () => {
         historyLength: 4,
         referrer: 'https://jov.ie/explore',
         arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
       })
     ).toBe('history-exit');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 0,
+      })
+    ).toBe('history-back');
   });
 });
