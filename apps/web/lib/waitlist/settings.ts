@@ -208,8 +208,18 @@ export function isMissingWaitlistSettingsTableError(error: unknown): boolean {
 async function ensureSettingsRow(
   dbOrTx: DbOrTransaction = db
 ): Promise<WaitlistGateSettings> {
-  try {
-    return await withRetry(async () => {
+  // withRetry is only safe on the shared pooled client: each attempt can get
+  // a fresh connection. Callers inside a serializable transaction
+  // (access-request.ts, auto-accept.ts) pass the live tx down — retrying
+  // inside it would re-run queries on an already-aborted client and fail
+  // permanently instead of letting the caller's withSerializableRetry restart
+  // the whole transaction (JOV-6137). Drift is intercepted inside the
+  // operation so withRetry never logs it and the fail-soft below is the
+  // single signal (JOV-3353).
+  const isPooledClient = dbOrTx === db;
+
+  const readSettings = async (): Promise<WaitlistGateSettings> => {
+    try {
       // Hot path: cheap SELECT first (matches previous behavior and keeps
       // existing test mocks working without requiring full insert chain mocks).
       const [existing] = await dbOrTx
@@ -268,21 +278,30 @@ async function ensureSettingsRow(
       }
 
       return getDefaultWaitlistGateSettings(now);
-    }, 'waitlist.ensureSettingsRow');
-  } catch (error) {
-    // Migration drift (JOV-3353): degrade reads to the documented default
-    // gate state instead of 500-ing /start and /signin. Only the missing-
-    // relation class degrades; every other error still throws. Write paths
-    // (admin updates) surface the error from their own UPDATE statement.
-    if (!isMissingWaitlistSettingsTableError(error)) {
-      throw error;
+    } catch (error) {
+      // Migration drift (JOV-3353): degrade reads to the documented default
+      // gate state instead of 500-ing /start and /signin. Only the missing-
+      // relation class degrades; every other error still throws. Write paths
+      // (admin updates) surface the error from their own UPDATE statement.
+      //
+      // Intercepted inside the operation (before withRetry can see it) so the
+      // fail-soft captureWarning below is the single signal for this class —
+      // withRetry's terminal captureException would double-log it otherwise.
+      if (!isMissingWaitlistSettingsTableError(error)) {
+        throw error;
+      }
+      await captureWarning(
+        '[waitlist] waitlist_settings relation missing (migration drift); using default gate settings',
+        error
+      );
+      return getDefaultWaitlistGateSettings();
     }
-    await captureWarning(
-      '[waitlist] waitlist_settings relation missing (migration drift); using default gate settings',
-      error
-    );
-    return getDefaultWaitlistGateSettings();
-  }
+  };
+
+  const result = isPooledClient
+    ? await withRetry(readSettings, 'waitlist.ensureSettingsRow')
+    : await readSettings();
+  return result;
 }
 
 export async function getWaitlistSettings(
