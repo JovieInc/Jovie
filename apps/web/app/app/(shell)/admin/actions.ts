@@ -511,7 +511,6 @@ export async function banUserAction(formData: FormData): Promise<void> {
     const [current] = await tx
       .select({
         userStatus: users.userStatus,
-        clerkId: users.clerkId,
         betterAuthUserId: users.betterAuthUserId,
       })
       .from(users)
@@ -548,7 +547,6 @@ export async function banUserAction(formData: FormData): Promise<void> {
     });
 
     return {
-      clerkId: current.clerkId,
       betterAuthUserId: current.betterAuthUserId,
     };
   });
@@ -584,10 +582,9 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
   // status was before banning. Default to 'active' if no record found.
   // ACID requirement: status update + audit log must be atomic to prevent
   // inconsistent state (e.g. status restored but no audit trail).
-  const result = await runLegacyDbTransaction(async tx => {
+  await runLegacyDbTransaction(async tx => {
     const [user] = await tx
       .select({
-        clerkId: users.clerkId,
         deletedAt: users.deletedAt,
         userStatus: users.userStatus,
       })
@@ -658,10 +655,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
       action: 'unban_user',
       metadata: { restoredTo: restoreStatus },
     });
-
-    return { clerkId: user.clerkId };
   });
-
 
   try {
     await invalidateProxyUserStateCache(userId);

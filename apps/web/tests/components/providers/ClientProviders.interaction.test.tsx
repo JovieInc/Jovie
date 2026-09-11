@@ -159,7 +159,9 @@ describe('ClientProviders composition', () => {
       );
 
       expect(screen.getByTestId('jovie-auth-values')).toBeInTheDocument();
-      expect(screen.queryByTestId('jovie-auth-defaults')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('jovie-auth-defaults')
+      ).not.toBeInTheDocument();
     });
   });
 });
