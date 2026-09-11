@@ -276,7 +276,8 @@ export function writeIdentityBaseline(options = {}) {
   );
   mkdirSync(dirname(outPath), { recursive: true });
   // Compact JSON on purpose: a pretty-printed identity list is thousands of
-  // lines and trips the source-PR size cap. Parse is identical.
+  // lines and trips the source-PR size cap. Biome excludes this generated
+  // file so format cannot expand it. Parse is identical.
   writeFileSync(
     outPath,
     `${JSON.stringify({

@@ -237,6 +237,10 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
     expect(parsed.schema).toBe(IDENTITY_SCHEMA);
     expect(Array.isArray(parsed.identities)).toBe(true);
     expect(parsed.identities).toHaveLength(parsed.count);
+    const biome = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'biome.json'), 'utf8')
+    );
+    expect(biome.files.includes).toContain(`!${IDENTITY_BASELINE_RELATIVE}`);
   });
 
   it('passes the live tree against the committed identity baseline', () => {
