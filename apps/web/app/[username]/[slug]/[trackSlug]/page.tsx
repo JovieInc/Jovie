@@ -18,6 +18,7 @@ import {
   getProviderConfidence,
 } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
+import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
@@ -112,7 +113,21 @@ export default async function TrackDeepLinkPage({
     providerLinks: effectiveProviderLinks,
   });
 
-  const artistName = creator.displayName ?? creator.username;
+  const ownerName = creator.displayName ?? creator.username;
+  const artistByline = resolveSmartLinkArtistByline({
+    primaryArtists: track.primaryArtists,
+    ownerName,
+    ownerHandle: creator.usernameNormalized,
+  });
+  const artistName = artistByline.text;
+  const primaryArtistIds = new Set(
+    (track.primaryArtists ?? []).map(entry => entry.artistId)
+  );
+  const featuredArtists =
+    track.credits
+      ?.find(group => group.role === 'featured_artist')
+      ?.entries.filter(entry => !primaryArtistIds.has(entry.artistId))
+      .map(entry => ({ name: entry.name, handle: entry.handle })) ?? [];
   const trackUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
   const releaseUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}`;
   const isUnreleased =
@@ -187,10 +202,13 @@ export default async function TrackDeepLinkPage({
           previewSource: previewState.previewSource,
         }}
         artist={{
-          name: artistName,
+          name: ownerName,
           handle: creator.usernameNormalized,
           avatarUrl: creator.avatarUrl,
         }}
+        primaryArtists={artistByline.entries}
+        featuredArtists={featuredArtists}
+        credits={track.credits}
         providers={allProviders}
         tracking={{
           contentType: 'track',
@@ -249,7 +267,11 @@ export async function generateMetadata({
     }
   }
 
-  const artistName = creator.displayName ?? creator.username;
+  const artistName = resolveSmartLinkArtistByline({
+    primaryArtists: track.primaryArtists,
+    ownerName: creator.displayName ?? creator.username,
+    ownerHandle: creator.usernameNormalized,
+  }).text;
   const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
 
   const title = `${track.title} by ${artistName}`;
