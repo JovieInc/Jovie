@@ -60,6 +60,13 @@ describe('ArtistProfilePhoneFrame size-derived chrome (homepage-optical-polish-v
     expect(css).not.toMatch(
       /\.ap-phone-frame__notch[^{]*\{[^}]*\bwidth:\s*7rem/
     );
+
+    const story = readFileSync(
+      path.resolve(__dirname, 'ArtistProfilePhoneFrame.stories.tsx'),
+      'utf8'
+    );
+    expect(story).toContain("size: 'md'");
+    expect(story).toContain("size: 'sm'");
   });
 
   it('rejects the unscaled-notch deliberate-red fixture that would overwhelm 7.5rem', () => {
