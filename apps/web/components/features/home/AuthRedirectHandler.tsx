@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/home/AuthRedirectHandler.test.tsx
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
