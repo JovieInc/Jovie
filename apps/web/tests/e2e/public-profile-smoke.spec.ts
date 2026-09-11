@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { publicProfileActionAffordanceSelector } from './utils/public-profile-action-affordances';
 
 /**
  * Public profile smoke test — regression net for every deploy (JOV-1653).
@@ -11,7 +12,8 @@ import { expect, test } from '@playwright/test';
  *  - Page loads within LOAD_BUDGET_MS
  *  - Artist display name renders (h1 visible, non-empty)
  *  - At least one release/listen affordance is visible
- *  - At least one action affordance (support / contact / listen mode)
+ *  - At least one action affordance (desktop about/follow/listen/share
+ *    testids, subscribe/listen chrome, or compact fallbacks)
  *  - Captures a screenshot as a test artifact
  *
  * Intentionally does NOT assert on CSS / design values (per JOV-1381 learnings).
@@ -103,32 +105,11 @@ test('public profile renders core elements within budget', async ({ page }) => {
     'No release or listen affordance visible on public profile'
   ).toBeVisible({ timeout: 5_000 });
 
-  // System B redesign uses a bottom tab bar (Profile / Music / Events / Alerts)
-  // and an inline alerts link (?mode=subscribe). Legacy affordance selectors are
-  // kept for backward compat but most now render as <a> or aria-label buttons.
+  // Desktop synthetic viewport is 1280×720. Compact tab chrome is hidden at
+  // 1180px+ (JOV-5995); conversion is AEO about testids / follow anchors and,
+  // after hydration, desktop primary-tab subscribe/listen controls.
   const actionAffordances = page
-    .locator(
-      [
-        'a[href*="mode=subscribe"]',
-        'a[href*="/tip"]',
-        'a[href*="/subscribe"]',
-        'a[href*="/tour"]',
-        'a[href*="/contact"]',
-        'a[href*="/listen"]',
-        'button:has-text("Tip")',
-        'button:has-text("Follow")',
-        'button:has-text("Subscribe")',
-        'button:has-text("Support")',
-        'button:has-text("Open support")',
-        'button[aria-label="Home"]',
-        'button[aria-label="Music"]',
-        'button[aria-label="Events"]',
-        'button[aria-label="Alerts"]',
-        '[data-mode]',
-        '[data-testid="profile-home-alerts-row"]',
-        '[data-testid="profile-tab-bar"]',
-      ].join(', ')
-    )
+    .locator(publicProfileActionAffordanceSelector())
     .filter({ visible: true });
   await expect(
     actionAffordances.first(),
