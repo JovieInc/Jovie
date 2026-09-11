@@ -527,12 +527,16 @@ describe('withRetry scoping (JOV-6137)', () => {
   it('emits a single captureWarning for missing-relation drift (no withRetry terminal double-log) on the pooled path (JOV-6137)', async () => {
     setupDbSelectError(createMissingWaitlistSettingsError());
 
+    const { captureException } = await import('@sentry/nextjs');
+
     await expect(getWaitlistSettings()).resolves.toEqual(
       expect.objectContaining({ gateEnabled: true })
     );
     // Drift intercepted inside the operation: withRetry never sees it, so
     // its terminal logDbError captureException must not fire — the fail-soft
-    // warning is the only signal.
+    // warning is the only signal (under the pre-JOV-6137 wrapping, withRetry
+    // logged the same drift via Sentry.captureException first).
     expect(captureWarning).toHaveBeenCalledTimes(1);
+    expect(captureException).not.toHaveBeenCalled();
   });
 });
