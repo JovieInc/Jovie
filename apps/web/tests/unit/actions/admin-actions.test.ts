@@ -261,19 +261,20 @@ describe('admin/actions.ts', () => {
       'deleteCreatorOrUserAction',
     ] as const;
 
-    it.each(
-      actionNames
-    )('%s rejects unauthenticated users', async actionName => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
+    it.each(actionNames)(
+      '%s rejects unauthenticated users',
+      async actionName => {
+        mockGetCachedAuth.mockResolvedValue({ userId: null });
 
-      const mod = await import('@/app/app/(shell)/admin/actions');
-      const action = mod[actionName] as (
-        ...args: unknown[]
-      ) => Promise<unknown>;
-      const fd = makeFormData({ profileId: 'p1' });
+        const mod = await import('@/app/app/(shell)/admin/actions');
+        const action = mod[actionName] as (
+          ...args: unknown[]
+        ) => Promise<unknown>;
+        const fd = makeFormData({ profileId: 'p1' });
 
-      await expect(action(fd)).rejects.toThrow('Unauthorized');
-    });
+        await expect(action(fd)).rejects.toThrow('Unauthorized');
+      }
+    );
 
     it.each(actionNames)('%s rejects non-admin users', async actionName => {
       mockGetCachedAuth.mockResolvedValue({ userId: 'user_regular' });
