@@ -7,11 +7,16 @@ but now forwards CI failures to the Hyperagent remediator webhook.
 
 from __future__ import annotations
 
+import importlib.util
 import pathlib
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 POKE = ROOT / ".github/workflows/ha-ci-remediator-poke.yml"
+AUTH_SOURCE = ROOT / "scripts/symphony/hyperagent/webhook_auth.py"
+SPEC = importlib.util.spec_from_file_location("hyperagent_webhook_auth", AUTH_SOURCE)
+webhook_auth = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(webhook_auth)
 
 
 class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
@@ -23,9 +28,71 @@ class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
         self.assertNotIn("systemctl", text)
         self.assertIn("HYPERAGENT_CI_WEBHOOK_URL", text)
         self.assertIn("HYPERAGENT_CI_WEBHOOK_SECRET", text)
+        self.assertIn("X-Hyperagent-Webhook-Secret", text)
         self.assertIn("X-Hyperagent-Webhook-Signature", text)
         self.assertIn("202", text)
         self.assertIn("accountable-writer: Hyperagent", text)
+
+    def test_poke_sends_secret_header_and_keeps_hmac_headers(self):
+        text = POKE.read_text(encoding="utf-8")
+        self.assertIn('-H "X-Hyperagent-Webhook-Secret: $WEBHOOK_SECRET"', text)
+        self.assertIn("X-Hyperagent-Webhook-Timestamp", text)
+        self.assertIn("X-Hyperagent-Webhook-Signature", text)
+        self.assertNotIn("-H \"Authorization: Bearer", text)
+        self.assertNotIn("-H \"X-HA-Access", text)
+        self.assertIn("HYPERAGENT_CI_WEBHOOK_URL and HYPERAGENT_CI_WEBHOOK_SECRET are required", text)
+
+    def test_receiver_rejects_missing_wrong_and_lookalike_headers(self):
+        secret = "ha-webhook-secret"
+        self.assertEqual(webhook_auth.authorize_hyperagent_webhook({}, secret), 401)
+        self.assertEqual(
+            webhook_auth.authorize_hyperagent_webhook({"Authorization": f"Bearer {secret}"}, secret),
+            401,
+        )
+        self.assertEqual(
+            webhook_auth.authorize_hyperagent_webhook({"X-HA-Access": secret}, secret),
+            401,
+        )
+        self.assertEqual(
+            webhook_auth.authorize_hyperagent_webhook(
+                {
+                    "X-Hyperagent-Webhook-Signature": "sha256=deadbeef",
+                    "X-Hyperagent-Webhook-Timestamp": "1",
+                },
+                secret,
+            ),
+            401,
+        )
+        self.assertEqual(
+            webhook_auth.authorize_hyperagent_webhook(
+                {webhook_auth.HA_WEBHOOK_SECRET_HEADER: "wrong"},
+                secret,
+            ),
+            403,
+        )
+        self.assertEqual(
+            webhook_auth.authorize_hyperagent_webhook(
+                {webhook_auth.HA_WEBHOOK_SECRET_HEADER: secret},
+                secret,
+            ),
+            202,
+        )
+        self.assertEqual(
+            webhook_auth.authorize_hyperagent_webhook(
+                {
+                    webhook_auth.HA_WEBHOOK_SECRET_HEADER: secret,
+                    "X-Hyperagent-Webhook-Signature": "sha256=deadbeef",
+                    "X-Hyperagent-Webhook-Timestamp": "1",
+                },
+                secret,
+            ),
+            202,
+        )
+        with self.assertRaises(ValueError):
+            webhook_auth.authorize_hyperagent_webhook(
+                {webhook_auth.HA_WEBHOOK_SECRET_HEADER: secret},
+                "",
+            )
 
     def test_poke_runs_on_github_hosted_ubuntu(self):
         text = POKE.read_text(encoding="utf-8")

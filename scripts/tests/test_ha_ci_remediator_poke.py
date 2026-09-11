@@ -29,8 +29,13 @@ def test_poke_step_targets_hyperagent_webhook() -> None:
 
     assert "HYPERAGENT_CI_WEBHOOK_URL" in workflow
     assert "HYPERAGENT_CI_WEBHOOK_SECRET" in workflow
+    assert "X-Hyperagent-Webhook-Secret" in workflow
     assert "X-Hyperagent-Webhook-Signature" in workflow
+    assert "X-Hyperagent-Webhook-Timestamp" in workflow
     assert "HTTP 202" in workflow or "202" in workflow
+    assert '-H "Authorization: Bearer' not in workflow
+    assert '-H "X-HA-Access' not in workflow
+    assert "HYPERAGENT_CI_WEBHOOK_URL and HYPERAGENT_CI_WEBHOOK_SECRET are required" in workflow
 
 
 def test_no_local_symphony_poke() -> None:
