@@ -72,8 +72,6 @@ function TanStackHeaderCheckbox({
   const normalizedState = normalizeHeaderState(headerCheckboxState);
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation only — header Checkbox is the control
-    // biome-ignore lint/a11y/noStaticElementInteractions: same — wrapper is not a control
     <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
@@ -105,8 +103,6 @@ function TanStackRowCheckbox({
   onToggleSelect: () => void;
 }) {
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation only — row Checkbox is the control
-    // biome-ignore lint/a11y/noStaticElementInteractions: same — wrapper is not a control
     <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}

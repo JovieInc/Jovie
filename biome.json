@@ -171,6 +171,20 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "apps/web/components/organisms/table/atoms/AudienceRowSelectionCell.tsx",
+        "apps/web/components/organisms/table/atoms/TableCheckboxCell.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noNoninteractiveElementInteractions": "off",
+            "noStaticElementInteractions": "off"
+          }
+        }
+      }
     }
   ],
   "javascript": {

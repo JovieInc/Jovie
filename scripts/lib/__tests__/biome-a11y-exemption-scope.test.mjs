@@ -49,15 +49,31 @@ function runBiome(paths) {
   );
 }
 
+const TABLE_CELL_A11Y_OVERRIDE_PATHS = [
+  'apps/web/components/organisms/table/atoms/AudienceRowSelectionCell.tsx',
+  'apps/web/components/organisms/table/atoms/TableCheckboxCell.tsx',
+];
+
 describe('Biome a11y exemption scope', () => {
   it('does not disable a11y rules for entire production components', () => {
     expect(BIOME_CONFIG).not.toContain('"useSemanticElements": "off"');
-    expect(BIOME_CONFIG).not.toContain('"noStaticElementInteractions": "off"');
     expect(BIOME_CONFIG).not.toContain('"useFocusableInteractive": "off"');
     expect(BIOME_CONFIG).not.toContain('"useAriaPropsSupportedByRole": "off"');
     for (const name of FORMER_WHOLE_FILE_EXEMPTIONS) {
       expect(BIOME_CONFIG).not.toContain(`**/${name}`);
     }
+    const config = JSON.parse(BIOME_CONFIG);
+    const staticOffIncludes = (config.overrides ?? []).flatMap(override =>
+      override.linter?.rules?.a11y?.noStaticElementInteractions === 'off'
+        ? (override.includes ?? [])
+        : []
+    );
+    expect(staticOffIncludes).toEqual(TABLE_CELL_A11Y_OVERRIDE_PATHS);
+  });
+
+  it('keeps the table-cell stopPropagation wrappers green without touching those files', () => {
+    const result = runBiome(TABLE_CELL_A11Y_OVERRIDE_PATHS);
+    expect(result.status, result.stderr || result.stdout).toBe(0);
   });
 
   it('keeps KanbanBoard green after targeted suppressions', () => {
