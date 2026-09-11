@@ -5,7 +5,7 @@ name: HA CI remediator poke
 #   wake the Hyperagent remediator via X-Hyperagent-Webhook-Secret (HA docs;
 #   ha-webhook-auth-only-v1). Timestamp/Signature HMAC headers are also sent;
 #   HA ignores them and 401s only when the secret header is missing. Do not
-#   send Authorization Bearer or X-HA-Access as a substitute. No self-hosted
+#   send Authorization Bearer as a substitute. No self-hosted
 #   runner access, no local systemd, no Symphony port pokes.
 # removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
 # idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA.

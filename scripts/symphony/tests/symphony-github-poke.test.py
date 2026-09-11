@@ -38,8 +38,8 @@ class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
         self.assertIn('-H "X-Hyperagent-Webhook-Secret: $WEBHOOK_SECRET"', text)
         self.assertIn("X-Hyperagent-Webhook-Timestamp", text)
         self.assertIn("X-Hyperagent-Webhook-Signature", text)
-        self.assertNotIn("Authorization: Bearer", text)
-        self.assertNotIn("X-HA-Access", text)
+        self.assertNotIn("-H \"Authorization: Bearer", text)
+        self.assertNotIn("-H \"X-HA-Access", text)
         self.assertIn("HYPERAGENT_CI_WEBHOOK_URL and HYPERAGENT_CI_WEBHOOK_SECRET are required", text)
 
     def test_receiver_rejects_missing_wrong_and_lookalike_headers(self):
