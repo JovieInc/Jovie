@@ -81,10 +81,6 @@ vi.mock('@/lib/auth/status-checker', () => ({
   checkUserStatus: vi.fn().mockReturnValue({ isBlocked: false }),
 }));
 
-vi.mock('@/lib/auth/clerk-sync', () => ({
-  syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
-}));
-
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
 }));

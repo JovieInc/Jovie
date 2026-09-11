@@ -10,43 +10,15 @@
  * @see apps/web/components/providers/ClientProviders.tsx
  */
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-const { availabilityState } = vi.hoisted(() => ({
-  availabilityState: {
-    shouldBypass: true,
-  },
-}));
-
-// Mock Clerk and env to avoid real auth setup
-vi.mock('@clerk/nextjs', () => ({
-  ClerkProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid='clerk-provider'>{children}</div>
+vi.mock('@/hooks/useJovieAuth', () => ({
+  JovieAuthDefaultsProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid='jovie-auth-defaults'>{children}</div>
   ),
-}));
-vi.mock('@clerk/ui', () => ({
-  ui: {},
-}));
-vi.mock('@/hooks/useClerkSafe', () => ({
-  ClerkSafeBootstrapProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid='clerk-safe-bootstrap'>{children}</div>
+  JovieAuthValuesProvider: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid='jovie-auth-values'>{children}</div>
   ),
-  ClerkSafeDefaultsProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid='clerk-safe-defaults'>{children}</div>
-  ),
-  ClerkSafeValuesProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid='clerk-safe-values'>{children}</div>
-  ),
-}));
-vi.mock('@/lib/env-public', () => ({
-  publicEnv: {
-    NEXT_PUBLIC_CLERK_MOCK: '0',
-  },
-}));
-vi.mock('@/components/providers/clerkAvailability', () => ({
-  shouldBypassClerk: () => availabilityState.shouldBypass,
-  getClerkJSUrl: () => undefined,
-  getClerkProxyUrl: () => '/__clerk',
 }));
 
 // Mock CoreProviders to track rendering without full provider setup
@@ -86,27 +58,21 @@ function TestChild() {
 }
 
 describe('ClientProviders composition', () => {
-  beforeEach(() => {
-    availabilityState.shouldBypass = true;
-  });
-
-  it('supports route-level forced Clerk bypass for public surfaces', () => {
-    availabilityState.shouldBypass = false;
-
+  it('uses signed-out defaults for public surfaces', () => {
     render(
-      <ClientProviders publishableKey='pk_live_example' forceBypassClerk>
+      <ClientProviders forceSignedOutDefaults>
         <TestChild />
       </ClientProviders>
     );
 
-    expect(screen.queryByTestId('clerk-provider')).not.toBeInTheDocument();
-    expect(screen.getByTestId('clerk-safe-defaults')).toBeInTheDocument();
+    expect(screen.getByTestId('jovie-auth-defaults')).toBeInTheDocument();
+    expect(screen.queryByTestId('jovie-auth-values')).not.toBeInTheDocument();
   });
 
   describe('skipCoreProviders=false (default)', () => {
     it('renders CoreProviders wrapping children', () => {
       render(
-        <ClientProviders publishableKey={undefined}>
+        <ClientProviders>
           <TestChild />
         </ClientProviders>
       );
@@ -119,7 +85,7 @@ describe('ClientProviders composition', () => {
   describe('skipCoreProviders=true (profile pages)', () => {
     it('renders TooltipProvider wrapping children (a518d3fb5 regression)', () => {
       render(
-        <ClientProviders publishableKey={undefined} skipCoreProviders>
+        <ClientProviders skipCoreProviders>
           <TestChild />
         </ClientProviders>
       );
@@ -131,7 +97,7 @@ describe('ClientProviders composition', () => {
 
     it('renders QueryProvider for data fetching', () => {
       render(
-        <ClientProviders publishableKey={undefined} skipCoreProviders>
+        <ClientProviders skipCoreProviders>
           <TestChild />
         </ClientProviders>
       );
@@ -141,7 +107,7 @@ describe('ClientProviders composition', () => {
 
     it('does NOT render CoreProviders', () => {
       render(
-        <ClientProviders publishableKey={undefined} skipCoreProviders>
+        <ClientProviders skipCoreProviders>
           <TestChild />
         </ClientProviders>
       );
@@ -151,7 +117,7 @@ describe('ClientProviders composition', () => {
 
     it('TooltipProvider has correct delay duration', () => {
       render(
-        <ClientProviders publishableKey={undefined} skipCoreProviders>
+        <ClientProviders skipCoreProviders>
           <TestChild />
         </ClientProviders>
       );
@@ -163,32 +129,37 @@ describe('ClientProviders composition', () => {
     });
   });
 
-  describe('Clerk bypass path', () => {
-    it.skip('wraps with ClerkSafeDefaultsProvider when no auth bootstrap (retired BA values provider)', () => {
+  describe('Better Auth provider path', () => {
+    it('wraps with JovieAuthDefaultsProvider when forced signed-out', () => {
       render(
-        <ClientProviders publishableKey={undefined}>
+        <ClientProviders forceSignedOutDefaults>
           <TestChild />
         </ClientProviders>
       );
 
-      expect(screen.getByTestId('clerk-safe-defaults')).toBeInTheDocument();
+      expect(screen.getByTestId('jovie-auth-defaults')).toBeInTheDocument();
     });
 
-    it.skip('wraps with ClerkSafeBootstrapProvider when auth bootstrap provided (retired BA values provider)', () => {
+    it('wraps with JovieAuthValuesProvider when a bootstrap session is present', () => {
       render(
         <ClientProviders
-          publishableKey={undefined}
+          forceSignedOutDefaults
           authBootstrap={{
             isAuthenticated: true,
             userId: 'test-user-id',
-            sessionId: 'test-session-id',
+            email: 'test@example.com',
+            username: 'testuser',
+            fullName: 'Test User',
+            isAdmin: false,
+            persona: 'creator',
           }}
         >
           <TestChild />
         </ClientProviders>
       );
 
-      expect(screen.getByTestId('clerk-safe-bootstrap')).toBeInTheDocument();
+      expect(screen.getByTestId('jovie-auth-values')).toBeInTheDocument();
+      expect(screen.queryByTestId('jovie-auth-defaults')).not.toBeInTheDocument();
     });
   });
 });

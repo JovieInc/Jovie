@@ -8,12 +8,11 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
 
 /**
  * Runs post-onboarding sync operations in the background.
- * Syncs username and Clerk metadata without blocking.
+ * Syncs username without blocking.
  */
 export function runBackgroundSyncOperations(
   userId: string,
@@ -21,12 +20,8 @@ export function runBackgroundSyncOperations(
 ): void {
   void Promise.allSettled([
     syncCanonicalUsernameFromApp(userId, username),
-    syncAllClerkMetadata(userId),
   ]).then(results => {
-    const syncContexts = [
-      'onboarding_username_sync',
-      'onboarding_metadata_sync',
-    ];
+    const syncContexts = ['onboarding_username_sync'];
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         const context = syncContexts[index];
