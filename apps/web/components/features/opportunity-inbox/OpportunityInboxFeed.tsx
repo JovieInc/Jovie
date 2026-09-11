@@ -7,6 +7,7 @@ import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity
 import { cn } from '@/lib/utils';
 import { FounderReviewStack } from './FounderReviewStack';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
+import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeThumbnailCard';
 import { WorkflowCaptureInboxCard } from './WorkflowCaptureInboxCard';
 
 export interface OpportunityInboxFeedProps {
@@ -141,6 +142,14 @@ export function OpportunityInboxFeed({
               onDismiss={onDismiss}
               isSubmittingNextStep={pendingNextStepId === card.id}
               isDismissing={pendingActionId === card.id}
+            />
+          ) : card.category === 'youtube_thumbnail' && card.youtubeThumbnail ? (
+            <OpportunityInboxYoutubeThumbnailCard
+              key={card.id}
+              card={card}
+              onApprove={onApprove}
+              onReject={onDismiss}
+              isBusy={pendingActionId === card.id}
             />
           ) : (
             <OpportunityRow

@@ -9,6 +9,7 @@ import {
   FounderReviewRecorder,
   type FounderReviewRecorderHandle,
 } from './FounderReviewRecorder';
+import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeThumbnailCard';
 
 export interface FounderReviewStackProps {
   readonly cards: readonly (OpportunityInboxCardViewModel & {
@@ -31,9 +32,12 @@ export function FounderReviewStack({
 }: FounderReviewStackProps) {
   const card = cards[0] ?? null;
   const recorderRef = useRef<FounderReviewRecorderHandle>(null);
+  const isYoutubeThumbnail =
+    card?.category === 'youtube_thumbnail' && Boolean(card.youtubeThumbnail);
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {
       if (
+        !card ||
         event.defaultPrevented ||
         event.metaKey ||
         event.ctrlKey ||
@@ -46,13 +50,21 @@ export function FounderReviewStack({
       }
       if (event.key === 'ArrowRight') {
         event.preventDefault();
+        if (isYoutubeThumbnail) {
+          void onApprove(card.id);
+          return;
+        }
         recorderRef.current?.approve();
       } else if (event.key === 'ArrowLeft') {
         event.preventDefault();
+        if (isYoutubeThumbnail) {
+          void onReject(card.id);
+          return;
+        }
         recorderRef.current?.reject();
       }
     },
-    []
+    [card, isYoutubeThumbnail, onApprove, onReject]
   );
   if (!card) return null;
 
@@ -76,53 +88,62 @@ export function FounderReviewStack({
         <span>Founder Queue</span>
         <span aria-live='polite'>1 of {cards.length}</span>
       </div>
-      <article
-        className='overflow-hidden rounded-lg border border-subtle bg-surface-0 shadow-sm'
-        data-testid={`founder-review-card-${card.id}`}
-        aria-busy={pendingActionId === card.id}
-      >
-        <div className='relative flex aspect-2/1 min-h-52 items-center justify-center overflow-hidden border-b border-subtle bg-surface-1'>
-          {card.visual ? (
-            <Image
-              src={card.visual.url}
-              alt={card.visual.alt}
-              fill
-              unoptimized
-              sizes='(max-width: 768px) 100vw, 720px'
-              className='object-contain'
-            />
-          ) : (
-            <div className='flex max-w-xs flex-col items-center gap-3 px-6 text-center text-tertiary-token'>
-              <ImageIcon aria-hidden='true' className='size-8 stroke-1' />
-              <span className='text-xs'>Source visual not available</span>
-            </div>
-          )}
-        </div>
-        <div className='p-5 sm:p-6'>
-          <div className='flex min-h-5 items-center justify-between gap-3 text-2xs font-medium text-tertiary-token'>
-            <span>{card.typeLabel}</span>
-            <span>{card.sourceKind.replaceAll(/[._]/g, ' ')}</span>
+      {isYoutubeThumbnail && card.youtubeThumbnail ? (
+        <OpportunityInboxYoutubeThumbnailCard
+          card={card}
+          onApprove={onApprove}
+          onReject={onReject}
+          isBusy={pendingActionId === card.id}
+        />
+      ) : (
+        <article
+          className='overflow-hidden rounded-lg border border-subtle bg-surface-0 shadow-sm'
+          data-testid={`founder-review-card-${card.id}`}
+          aria-busy={pendingActionId === card.id}
+        >
+          <div className='relative flex aspect-2/1 min-h-52 items-center justify-center overflow-hidden border-b border-subtle bg-surface-1'>
+            {card.visual ? (
+              <Image
+                src={card.visual.url}
+                alt={card.visual.alt}
+                fill
+                unoptimized
+                sizes='(max-width: 768px) 100vw, 720px'
+                className='object-contain'
+              />
+            ) : (
+              <div className='flex max-w-xs flex-col items-center gap-3 px-6 text-center text-tertiary-token'>
+                <ImageIcon aria-hidden='true' className='size-8 stroke-1' />
+                <span className='text-xs'>Source visual not available</span>
+              </div>
+            )}
           </div>
-          <h2 className='mt-2 truncate text-xl font-semibold tracking-tight text-primary-token sm:text-2xl'>
-            {card.title}
-          </h2>
-          <p className='mt-2 line-clamp-3 min-h-18 text-sm leading-6 text-secondary-token'>
-            {card.why}
-          </p>
-          <FounderReviewRecorder
-            ref={recorderRef}
-            target={{
-              type: 'inbox-card',
-              id: card.id,
-              title: card.title,
-              sourceKind: card.sourceKind,
-              category: card.category,
-            }}
-            onApprove={() => onApprove(card.id)}
-            onReject={() => onReject(card.id)}
-          />
-        </div>
-      </article>
+          <div className='p-5 sm:p-6'>
+            <div className='flex min-h-5 items-center justify-between gap-3 text-2xs font-medium text-tertiary-token'>
+              <span>{card.typeLabel}</span>
+              <span>{card.sourceKind.replaceAll(/[._]/g, ' ')}</span>
+            </div>
+            <h2 className='mt-2 truncate text-xl font-semibold tracking-tight text-primary-token sm:text-2xl'>
+              {card.title}
+            </h2>
+            <p className='mt-2 line-clamp-3 min-h-18 text-sm leading-6 text-secondary-token'>
+              {card.why}
+            </p>
+            <FounderReviewRecorder
+              ref={recorderRef}
+              target={{
+                type: 'inbox-card',
+                id: card.id,
+                title: card.title,
+                sourceKind: card.sourceKind,
+                category: card.category,
+              }}
+              onApprove={() => onApprove(card.id)}
+              onReject={() => onReject(card.id)}
+            />
+          </div>
+        </article>
+      )}
     </section>
   );
 }
