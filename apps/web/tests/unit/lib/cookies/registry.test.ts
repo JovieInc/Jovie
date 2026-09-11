@@ -16,7 +16,7 @@ describe('cookie registry', () => {
 
   it('identifies exact and prefix cookie names', () => {
     expect(isRegisteredCookieName('jv_aid')).toBe(true);
-    expect(isRegisteredCookieName('__clerk_db_jwt')).toBe(true);
+    expect(isRegisteredCookieName('better-auth.session_token')).toBe(true);
     expect(isRegisteredCookieName('unknown_cookie')).toBe(false);
   });
 

@@ -70,7 +70,7 @@ Key routing rules:
 - Design system, brand → invoke `design-canonical`, then `design-consultation`
 - Visual audit, design polish → invoke `design-canonical`, then `design-review`
 - Architecture review → invoke `plan-eng-review`
-- Clerk user management, instance inspection, auth debugging → invoke `clerk-cli`
+- Auth console redirect URIs (Google + Apple) → invoke `auth-console-sync`
 - Continuous QA swarm recipes (diff review, explore, vision, jury, test-gen, flakes) → invoke matching `/qa-swarm-*` command; load `qa-swarm` skill
 - A shared link/tool/product with no context expecting an opinion or evaluation → invoke `tool-discovery` instead of asking the human to research it first
 - HTML artifact, design comp, review surface, dashboard, deck, report for human annotation → invoke `lavish` to open it in the browser-based review loop instead of embedding a screenshot
