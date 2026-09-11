@@ -62,7 +62,7 @@ export function StepCard({
         >
           <div className='text-center'>
             {/* Icon circle */}
-            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow-lg'>
+            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent text-on-accent shadow-lg'>
               {icon}
             </div>
 
