@@ -6,7 +6,7 @@ import { env } from '@/lib/env-server';
  * Integration Health Diagnostic Tests
  *
  * Tests the health of main integrations:
- * 1. Clerk auth integration
+ * 1. Better Auth configuration
  * 2. Database connection (Drizzle + Neon/PostgreSQL)
  */
 
@@ -20,16 +20,18 @@ describe('Integration Health Diagnostics', () => {
     it('should detect missing environment variables appropriately', () => {
       // In CI/test environment, env vars are expected to be undefined
       // This tests that our env validation handles missing vars gracefully
-      const clerkKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+      const betterAuthUrl = publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL;
       const databaseUrl = env.DATABASE_URL;
 
       // In test mode, these might be undefined - that's expected
-      if (!clerkKey) {
-        expect(clerkKey).toBeUndefined();
-        console.log('✓ Clerk key is undefined (expected in test environment)');
+      if (!betterAuthUrl) {
+        expect(betterAuthUrl).toBeUndefined();
+        console.log(
+          '✓ Better Auth URL is undefined (expected in test environment)'
+        );
       } else {
-        expect(clerkKey).toMatch(/pk_(test|live)_/);
-        console.log('✓ Clerk key is present and formatted correctly');
+        expect(betterAuthUrl).toMatch(/^https?:\/\//);
+        console.log('✓ Better Auth URL is present and formatted correctly');
       }
 
       if (!databaseUrl) {
@@ -105,7 +107,7 @@ describe('Integration Health Diagnostics', () => {
   describe('Integration Summary', () => {
     it('should provide a comprehensive health report', () => {
       const integrations = {
-        clerk: !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+        betterAuth: !!publicEnv.NEXT_PUBLIC_BETTER_AUTH_URL,
         database: !!env.DATABASE_URL,
         stripe: !!(
           env.STRIPE_SECRET_KEY && publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -113,7 +115,7 @@ describe('Integration Health Diagnostics', () => {
       };
 
       console.log('🔍 Integration Health Summary:');
-      console.log(`  Clerk Auth: ${integrations.clerk ? '✅' : '❌'}`);
+      console.log(`  Better Auth: ${integrations.betterAuth ? '✅' : '❌'}`);
       console.log(`  Database: ${integrations.database ? '✅' : '❌'}`);
       console.log(`  Stripe Billing: ${integrations.stripe ? '✅' : '❌'}`);
 
