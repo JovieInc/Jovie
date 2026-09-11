@@ -12,6 +12,10 @@ const meta = {
           'Cloudflare Turnstile is intentionally bypassed in deterministic Storybook and AUTH_MOCK runtimes. Production challenge behavior is covered by focused component tests.',
       },
     },
+    jovie: {
+      // `loading` is an OnboardingTurnstileStatus value, not a component prop.
+      uncoveredProps: ['loading'],
+    },
   },
 } satisfies Meta<typeof OnboardingTurnstile>;
 
