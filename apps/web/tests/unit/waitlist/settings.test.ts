@@ -472,6 +472,15 @@ describe('withRetry scoping (JOV-6137)', () => {
     mockDbInsert.mockClear();
     mockDbUpdate.mockClear();
     vi.mocked(captureWarning).mockClear();
+    // withRetry's terminal catch captures NON-retryable terminal errors via
+    // Sentry.captureException (correct behavior exercised by earlier suites in
+    // this file). vi.resetModules() does not reset vi.mock call history, so
+    // clear the Sentry mock here to keep this suite's double-log assertions
+    // scoped to their own test activity (JOV-6137).
+    const { captureException: captureExceptionMock } = await import(
+      '@sentry/nextjs'
+    );
+    vi.mocked(captureExceptionMock).mockClear();
 
     const mod = await import('@/lib/waitlist/settings');
     getWaitlistSettings = mod.getWaitlistSettings;
