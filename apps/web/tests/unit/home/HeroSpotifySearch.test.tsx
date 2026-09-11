@@ -129,6 +129,23 @@ describe('HeroSpotifySearch', () => {
       ).toHaveAccessibleName('Search your name');
     });
 
+    it('uses the shared editorial aura treatment for homepage pills', () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+
+      const frame = document.querySelector('.input-aura-frame--editorial');
+      expect(frame).toHaveAttribute('data-aura-treatment', 'editorial');
+      expect(frame).not.toHaveClass('group/aura');
+      expect(
+        frame?.querySelector('.input-aura-frame__illumination')
+      ).toBeInTheDocument();
+    });
+
     it('renders combobox role on input', () => {
       renderComponent();
       expect(getInput()).toHaveAttribute('role', 'combobox');

@@ -373,7 +373,10 @@ export function HeroSpotifySearch({
       <label htmlFor={inputId} className='sr-only'>
         {isEditorial ? placeholder : 'Search Spotify artists or paste a link'}
       </label>
-      <InputAuraFrame className={isEditorial ? 'rounded-full' : undefined}>
+      <InputAuraFrame
+        treatment={isEditorial ? 'editorial' : 'default'}
+        className={isEditorial ? 'rounded-full' : undefined}
+      >
         <div className={fieldClassName}>
           {isEditorial ? null : (
             <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>

@@ -97,9 +97,13 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(css).toMatch(
       /@media \(max-width: 1023px\)[\s\S]*?\.homepage-editorial-hero__search\s*\{[\s\S]*?width: 100%;[\s\S]*?\}/
     );
-    expect(css).toMatch(
-      /\.homepage-name-search > \.group\\\/aura > \[aria-hidden="true"\]\s*\{[\s\S]*?inset: 0;[\s\S]*?clip-path: inset\(0 round var\(--radius-pill\)\);[\s\S]*?\}/
+    expect(css).not.toMatch(/\.group\\\//);
+    const auraCss = readFileSync(
+      path.join(webRoot, 'components/features/home/InputAuraFrame.css'),
+      'utf8'
     );
+    expect(auraCss).toContain('input-aura-frame--editorial');
+    expect(auraCss).toContain('mask-composite: exclude');
   });
 
   it('keeps the Find me pill on the 32/510 marketing button contract', () => {
