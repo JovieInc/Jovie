@@ -243,4 +243,72 @@ describe('resolveProfileSurfaceState', () => {
       })
     ).toBe('profile-root');
   });
+
+  // profile-logged-in-escape-hatch-v1: a signed-in viewer always keeps a
+  // visible escape hatch on the profile root; logged-out visitors keep the
+  // quiet chrome.
+  it('keeps the escape chevron for signed-in viewers at the root without history', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('signed-in-escape');
+  });
+
+  it('keeps the root quiet for logged-out visitors without history', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: false,
+      })
+    ).toBe(false);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: false,
+      })
+    ).toBe('none');
+  });
+
+  it('prefers history-back over the signed-in escape when a destination exists', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: true,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 2,
+        referrer: 'https://jov.ie/explore',
+        isSignedIn: true,
+      })
+    ).toBe('history-back');
+  });
+
+  it('never shows the root escape chevron when the back chrome is force-hidden', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        forceHidden: true,
+        isSignedIn: true,
+      })
+    ).toBe(false);
+  });
 });
