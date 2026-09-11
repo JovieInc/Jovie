@@ -24,14 +24,12 @@ export default function ProfileLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // JOV-2268: public profile pages are unauthenticated by design. Bypassing
-  // Clerk on this route avoids loading ~400KB of clerk.browser.js for every
-  // anonymous visitor — the single client-side Clerk consumer in this subtree
-  // (ProfileInlineNotificationsCTA → useUserSafe) degrades gracefully to
-  // `user: null` when Clerk is bypassed. Authenticated flows (sign-in, claim,
-  // dashboard) run under their own route groups which mount ClerkProvider.
+  // Public profile pages are unauthenticated by design. Signed-out defaults
+  // skip a live Better Auth session subscribe so anonymous visitors do not
+  // wait on cookie-backed auth. Authenticated flows (sign-in, claim,
+  // dashboard) mount JovieAuthValuesProvider under their own route groups.
   return (
-    <ClientProviders forceBypassClerk skipCoreProviders>
+    <ClientProviders forceSignedOutDefaults skipCoreProviders>
       {children}
       <ProfileWebVitalsReporter />
     </ClientProviders>

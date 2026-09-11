@@ -1,10 +1,11 @@
 import { CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE } from '@/lib/auth/oauth-providers';
 
 /**
- * Legacy auth copy map retained for tests and copy reuse after the Better Auth
- * cutover. The export name is stable while call sites migrate to BA names.
+ * First-party auth copy map used by the front-door contract test and any
+ * leftover copy reuse. Better Auth owns the live form; this is not a vendor
+ * localization object.
  */
-export const authClerkLocalization = {
+export const authCopy = {
   socialButtonsBlockButton: CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE,
   socialButtonsBlockButtonManyInView: CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE,
   signIn: {
