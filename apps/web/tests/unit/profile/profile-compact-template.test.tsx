@@ -159,6 +159,19 @@ vi.mock('@/features/profile/templates/ProfileDesktopSurface', () => ({
     mockProfileDesktopSurface(props),
 }));
 
+const mockAuthState = vi.hoisted(() => ({ isSignedIn: false }));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useUserSafe: () => ({
+    isLoaded: true,
+    isSignedIn: mockAuthState.isSignedIn,
+    user: mockAuthState.isSignedIn
+      ? { id: 'user_test', name: 'Test Viewer' }
+      : null,
+  }),
+  useAuthSafe: () => ({ isLoaded: true, isSignedIn: mockAuthState.isSignedIn }),
+}));
+
 const mockArtist: Artist = {
   id: 'artist-1',
   name: 'Test Artist',
@@ -245,6 +258,7 @@ describe('ProfileCompactTemplate', () => {
     mockProfileDesktopSurface.mockClear();
     mockProfileUnifiedDrawer.mockClear();
     mockProfilePrimaryTabPanel.mockClear();
+    mockAuthState.isSignedIn = false;
     mockProfileInlineNotificationsCTA.mockImplementation(
       (props: {
         readonly onManageNotifications?: () => void;
@@ -346,6 +360,147 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
+  // profile-logged-in-escape-hatch-v1 — a signed-in viewer keeps a visible
+  // escape hatch on the profile root: history-back when an in-profile
+  // history destination exists, otherwise a hard navigate to the in-app
+  // workspace. Logged-out visitors keep the quiet chrome.
+  it('shows the back escape on the profile root for signed-in viewers', async () => {
+    mockAuthState.isSignedIn = true;
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
+  it('stays quiet on the profile root for logged-out visitors without history', async () => {
+    mockAuthState.isSignedIn = false;
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('escapes a signed-in root visit to the in-app workspace when no history exists', async () => {
+    mockAuthState.isSignedIn = true;
+    const assignSpy = vi.fn();
+    Object.defineProperty(globalThis.window, 'location', {
+      configurable: true,
+      value: { ...globalThis.window.location, assign: assignSpy },
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(assignSpy).toHaveBeenCalledTimes(1);
+    expect(assignSpy).toHaveBeenCalledWith('/app');
+  });
+
+  it('keeps history-back for signed-in viewers when a history destination exists', async () => {
+    mockAuthState.isSignedIn = true;
+    const assignSpy = vi.fn();
+    Object.defineProperty(globalThis.window, 'location', {
+      configurable: true,
+      value: { ...globalThis.window.location, assign: assignSpy },
+    });
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const originalReferrer = document.referrer;
+
+    Object.defineProperty(document, 'referrer', {
+      configurable: true,
+      value: 'https://example.com/previous',
+    });
+    window.history.pushState(null, '', '/previous');
+    window.history.pushState(null, '', '/test-artist');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    Object.defineProperty(document, 'referrer', {
+      configurable: true,
+      value: originalReferrer,
+    });
+    backSpy.mockRestore();
+  });
+
+  it('passes the escape handler to the desktop surface only for signed-in viewers', async () => {
+    const restoreViewport = mockViewport('desktop');
+
+    mockAuthState.isSignedIn = true;
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockProfileDesktopSurface).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          onEscapeToApp: expect.any(Function),
+        })
+      );
+    });
+
+    cleanup();
+    mockAuthState.isSignedIn = false;
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockProfileDesktopSurface).toHaveBeenLastCalledWith(
+        expect.objectContaining({ onEscapeToApp: undefined })
+      );
+    });
+
+    restoreViewport();
   });
 
   // Regression: JOV-4103 — public profile hero must show social media icons
