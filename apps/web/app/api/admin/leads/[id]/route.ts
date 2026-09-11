@@ -11,7 +11,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { approveLead } from '@/lib/leads/approve-lead';
-import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
+import { recordLeadRejectionEvent } from '@/lib/leads/rejection-event';
 import { pipelineLog } from '@/lib/leads/pipeline-logger';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
 
@@ -101,17 +101,11 @@ export async function PATCH(
         reason: rejection.reason,
         productGap: rejection.productGap,
       });
-      await recordLeadFunnelEvent(
-        {
-          leadId: id,
-          eventType: 'rejected',
-          ...acquisitionFunnelAttribution(experimentId),
-          metadata: {
-            rejection,
-          },
-        },
-        { idempotent: true }
-      );
+      await recordLeadRejectionEvent({
+        leadId: id,
+        rejection,
+        ...acquisitionFunnelAttribution(experimentId),
+      });
       return NextResponse.json(updated, {
         status: 200,
         headers: NO_STORE_HEADERS,
