@@ -278,10 +278,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) throw new Error('Unauthorized');
-
-    if (error) throw error;
     // Handle success
-  } catch (error) {
+  } catch {
     setError('Failed to save data');
   } finally {
     setLoading(false);
@@ -299,12 +297,10 @@ useEffect(() => {
   const fetchData = async () => {
     try {
       const { userId } = await getCachedAuth();
-      void userId;
-
-      if (error) throw error;
-      setData(data || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+      if (!userId) throw new Error('Unauthorized');
+      setData([]);
+    } catch (fetchError) {
+      console.error('Error fetching data:', fetchError);
     } finally {
       setLoading(false);
     }
