@@ -758,11 +758,11 @@ describe('ProfileCompactTemplate', () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop
     });
-    const assignSpy = vi
-      .spyOn(window.location, 'assign')
-      .mockImplementation(() => {
-        // noop
-      });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
     Object.defineProperty(window.history, 'length', {
       configurable: true,
       value: 3,
@@ -783,7 +783,7 @@ describe('ProfileCompactTemplate', () => {
     expect(assignSpy).not.toHaveBeenCalled();
 
     backSpy.mockRestore();
-    assignSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('returns a signed-in arrival without history to the app dashboard', async () => {
@@ -791,11 +791,11 @@ describe('ProfileCompactTemplate', () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop
     });
-    const assignSpy = vi
-      .spyOn(window.location, 'assign')
-      .mockImplementation(() => {
-        // noop
-      });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
     Object.defineProperty(window.history, 'length', {
       configurable: true,
       value: 1,
@@ -816,7 +816,7 @@ describe('ProfileCompactTemplate', () => {
     expect(assignSpy).toHaveBeenCalledWith('/app');
 
     backSpy.mockRestore();
-    assignSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
