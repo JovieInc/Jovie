@@ -440,7 +440,9 @@ describe('migration-drift fail-soft (JOV-3353)', () => {
     // Transient connection errors still throw after retry (not fail-soft).
     setupDbSelectError(new Error('syntax error in SQL'));
 
-    await expect(isWaitlistGateEnabled()).rejects.toThrow('syntax error in SQL');
+    await expect(isWaitlistGateEnabled()).rejects.toThrow(
+      'syntax error in SQL'
+    );
     expect(captureWarning).not.toHaveBeenCalled();
   });
 
