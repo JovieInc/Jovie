@@ -367,6 +367,7 @@ export function getPublicProfileHistoryServerSnapshot() {
 export type PublicProfileBackAction =
   | 'profile-root'
   | 'history-back'
+  | 'history-exit'
   | 'app-fallback'
   | 'none';
 
@@ -388,24 +389,38 @@ export function shouldShowPublicProfileBackChevron(params: {
   return params.hasHistoryDestination;
 }
 
+function hasInternalPublicProfileHistory(params: {
+  readonly historyLength: number;
+  readonly arrivalHistoryLength?: number;
+}): boolean {
+  const arrival = params.arrivalHistoryLength ?? params.historyLength;
+  return params.historyLength > arrival;
+}
+
 export function resolvePublicProfileBackAction(params: {
   readonly isProfileRoot: boolean;
   readonly historyLength: number;
   readonly referrer: string;
   readonly isSignedIn?: boolean;
+  readonly arrivalHistoryLength?: number;
 }): PublicProfileBackAction {
   if (!params.isProfileRoot) {
     return 'profile-root';
   }
-  if (hasPublicProfileHistoryDestination(params)) {
-    return 'history-back';
-  }
-  // Signed-in SPA arrivals often have history but no document.referrer.
-  if (params.isSignedIn && params.historyLength > 1) {
-    return 'history-back';
-  }
+
+  const arrival = params.arrivalHistoryLength ?? params.historyLength;
+  const hasInternalEntries = hasInternalPublicProfileHistory(params);
+
   if (params.isSignedIn) {
-    return 'app-fallback';
+    // New-tab / no prior surface: never walk internal mode pushStates.
+    if (arrival <= 1) {
+      return 'app-fallback';
+    }
+    return hasInternalEntries ? 'history-exit' : 'history-back';
   }
-  return 'none';
+
+  if (!hasPublicProfileHistoryDestination(params)) {
+    return 'none';
+  }
+  return hasInternalEntries ? 'history-exit' : 'history-back';
 }

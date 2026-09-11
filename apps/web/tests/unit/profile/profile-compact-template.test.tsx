@@ -875,6 +875,103 @@ describe('ProfileCompactTemplate', () => {
     vi.unstubAllGlobals();
   });
 
+  it('does not trap a signed-in new-tab arrival in internal mode history', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 1,
+    });
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const goSpy = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-mode',
+      'profile'
+    );
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 3,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(goSpy).not.toHaveBeenCalled();
+    expect(assignSpy).toHaveBeenCalledWith('/app');
+
+    backSpy.mockRestore();
+    goSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('exits past internal mode history to the prior app surface for a signed-in arrival', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 2,
+    });
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const goSpy = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-mode',
+      'profile'
+    );
+
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 4,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(goSpy).toHaveBeenCalledWith(-3);
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    backSpy.mockRestore();
+    goSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
   it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop

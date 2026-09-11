@@ -84,5 +84,31 @@ describe('public profile back destination', () => {
         isSignedIn: true,
       })
     ).toBe('app-fallback');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 1,
+      })
+    ).toBe('app-fallback');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+      })
+    ).toBe('history-exit');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: 'https://jov.ie/explore',
+        arrivalHistoryLength: 2,
+      })
+    ).toBe('history-exit');
   });
 });
