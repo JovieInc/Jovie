@@ -3,13 +3,13 @@ import 'server-only';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import { normalizeEmail } from '@/lib/utils/email';
 
-export interface ClerkEmailAddress {
+export interface UserEmailAddress {
   emailAddress?: string | null;
   verification?: { status?: string | null } | null;
 }
 
-export function selectVerifiedClerkEmail(
-  emailAddresses: ReadonlyArray<ClerkEmailAddress> | null | undefined
+export function selectVerifiedUserEmail(
+  emailAddresses: ReadonlyArray<UserEmailAddress> | null | undefined
 ): string | null {
   return (
     emailAddresses?.find(e => e.verification?.status === 'verified')
@@ -17,46 +17,46 @@ export function selectVerifiedClerkEmail(
   );
 }
 
-export interface ClerkPrivateMetadata {
+export interface UserPrivateMetadata {
   fullName?: string | null;
 }
 
-export interface ClerkExternalAccount {
+export interface UserExternalAccount {
   provider?: string | null;
   username?: string | null;
 }
 
-export interface ClerkUserIdentityInput {
-  primaryEmailAddress?: ClerkEmailAddress | null;
-  emailAddresses?: ReadonlyArray<ClerkEmailAddress> | null;
+export interface UserIdentityInput {
+  primaryEmailAddress?: UserEmailAddress | null;
+  emailAddresses?: ReadonlyArray<UserEmailAddress> | null;
   fullName?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   username?: string | null;
   imageUrl?: string | null;
-  externalAccounts?: ClerkExternalAccount[] | null;
-  privateMetadata?: ClerkPrivateMetadata | null;
+  externalAccounts?: UserExternalAccount[] | null;
+  privateMetadata?: UserPrivateMetadata | null;
 }
 
-export type ClerkDisplayNameSource =
+export type UserDisplayNameSource =
   | 'private_metadata_full_name'
-  | 'clerk_full_name'
-  | 'clerk_name_parts'
-  | 'clerk_first_name'
-  | 'clerk_username'
+  | 'user_full_name'
+  | 'user_name_parts'
+  | 'user_first_name'
+  | 'user_username'
   | 'email_local_part'
   | null;
 
-export interface ClerkResolvedIdentity {
+export interface ResolvedUserIdentity {
   email: string | null;
   displayName: string | null;
   avatarUrl: string | null;
   spotifyUsername: string | null;
-  displayNameSource: ClerkDisplayNameSource;
+  displayNameSource: UserDisplayNameSource;
 }
 
 function resolveSpotifyUsername(
-  externalAccounts: ClerkExternalAccount[] | null | undefined
+  externalAccounts: UserExternalAccount[] | null | undefined
 ): string | null {
   if (!externalAccounts?.length) return null;
   const spotifyAccount = externalAccounts.find(account =>
@@ -70,9 +70,9 @@ function deriveDisplayNameFromEmail(email: string): string {
   return localPart.trim().replaceAll(/[._-]+/g, ' ');
 }
 
-export function resolveClerkIdentity(
-  user: ClerkUserIdentityInput | null | undefined
-): ClerkResolvedIdentity {
+export function resolveUserIdentity(
+  user: UserIdentityInput | null | undefined
+): ResolvedUserIdentity {
   const emailRaw =
     user?.primaryEmailAddress?.emailAddress ??
     user?.emailAddresses?.[0]?.emailAddress ??
@@ -87,12 +87,12 @@ export function resolveClerkIdentity(
   const nameFromParts = [firstName, lastName].filter(Boolean).join(' ').trim();
   const username = (user?.username ?? '').trim();
   const derivedFromEmail = email ? deriveDisplayNameFromEmail(email) : null;
-  const candidates: readonly [string | null, ClerkDisplayNameSource][] = [
+  const candidates: readonly [string | null, UserDisplayNameSource][] = [
     [privateMetadataFullName || null, 'private_metadata_full_name'],
-    [fullName || null, 'clerk_full_name'],
-    [nameFromParts || null, 'clerk_name_parts'],
-    [firstName || null, 'clerk_first_name'],
-    [username || null, 'clerk_username'],
+    [fullName || null, 'user_full_name'],
+    [nameFromParts || null, 'user_name_parts'],
+    [firstName || null, 'user_first_name'],
+    [username || null, 'user_username'],
     [derivedFromEmail, 'email_local_part'],
   ];
   const match = candidates.find(([value]) => value);
