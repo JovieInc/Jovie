@@ -349,6 +349,7 @@ export function shouldShowPublicProfileBackChevron(params: {
   readonly isProfileRoot: boolean;
   readonly hasHistoryDestination: boolean;
   readonly forceHidden?: boolean;
+  readonly isSignedIn?: boolean;
 }): boolean {
   if (params.forceHidden) {
     return false;
@@ -356,19 +357,38 @@ export function shouldShowPublicProfileBackChevron(params: {
   if (!params.isProfileRoot) {
     return true;
   }
-  return params.hasHistoryDestination;
+  if (params.hasHistoryDestination) {
+    return true;
+  }
+  // Signed-in viewers always keep a visible escape hatch on the profile
+  // root (locked invariant profile-logged-in-escape-hatch-v1); logged-out
+  // visitors keep the quiet chrome. Hydration-safe by contract — the server
+  // render passes no auth signal, so the control only appears once the
+  // client session resolves.
+  return params.isSignedIn === true;
 }
 
 export function resolvePublicProfileBackAction(params: {
   readonly isProfileRoot: boolean;
   readonly historyLength: number;
   readonly referrer: string;
-}): 'profile-root' | 'history-back' | 'none' {
+  /**
+   * Whether the viewer has a signed-in Jovie session (client-side signal —
+   * the public profile render is ISR-safe and never reads auth server-side).
+   * When signed in, the profile root always keeps an escape hatch: history
+   * if present, otherwise the in-app workspace
+   * (locked invariant profile-logged-in-escape-hatch-v1).
+   */
+  readonly isSignedIn?: boolean;
+}): 'profile-root' | 'history-back' | 'signed-in-escape' | 'none' {
   if (!params.isProfileRoot) {
     return 'profile-root';
   }
   if (hasPublicProfileHistoryDestination(params)) {
     return 'history-back';
+  }
+  if (params.isSignedIn === true) {
+    return 'signed-in-escape';
   }
   return 'none';
 }
