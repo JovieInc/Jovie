@@ -140,12 +140,24 @@ export async function getLeadAttributionCookie(): Promise<LeadAttributionCookieP
   }
 }
 
+export interface RecordLeadFunnelEventOptions {
+  idempotent?: boolean;
+  /**
+   * Persistence-critical events rethrow after capture so callers can retry.
+   * Best-effort funnel breadcrumbs keep the default swallow.
+   */
+  required?: boolean;
+}
+
 export async function recordLeadFunnelEvent(
   input: RecordLeadFunnelEventInput,
-  options?: { idempotent?: boolean }
+  options?: RecordLeadFunnelEventOptions
 ): Promise<void> {
   try {
     if (typeof db.insert !== 'function') {
+      if (options?.required) {
+        throw new Error('Lead funnel event insert is unavailable');
+      }
       return;
     }
     const insertQuery = db.insert(leadFunnelEvents).values({
@@ -175,6 +187,9 @@ export async function recordLeadFunnelEvent(
         eventType: input.eventType,
       },
     });
+    if (options?.required) {
+      throw error;
+    }
   }
 }
 
@@ -370,19 +385,24 @@ export async function attributeLeadPaidConversionByAppUserId(
     .where(eq(leads.signupUserId, appUserId))
     .limit(1);
 
-  if (!lead || lead.paidAt) {
+  if (!lead) {
     return;
   }
 
+  // paidAt can land before paid_converted when the event write fails.
+  // Retry must still write the missing event; the unique (leadId, eventType)
+  // constraint plus onConflictDoNothing keeps the happy path at one row.
   const now = new Date();
-  await db
-    .update(leads)
-    .set({
-      paidAt: now,
-      paidSubscriptionId: subscriptionId,
-      updatedAt: now,
-    })
-    .where(eq(leads.id, lead.id));
+  if (!lead.paidAt) {
+    await db
+      .update(leads)
+      .set({
+        paidAt: now,
+        paidSubscriptionId: subscriptionId,
+        updatedAt: now,
+      })
+      .where(eq(leads.id, lead.id));
+  }
 
   await recordLeadFunnelEvent(
     {
@@ -393,7 +413,7 @@ export async function attributeLeadPaidConversionByAppUserId(
         stripeSubscriptionId: subscriptionId,
       },
     },
-    { idempotent: true }
+    { idempotent: true, required: true }
   );
 }
 
