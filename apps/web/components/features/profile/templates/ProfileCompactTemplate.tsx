@@ -29,6 +29,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { useUserSafe } from '@/hooks/useClerkSafe';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import {
@@ -282,6 +283,11 @@ export function ProfileCompactTemplate({
     { hasContacts, hasTip, hasReleases },
     'compact'
   );
+
+  // Signed-in escape hatch (profile-logged-in-escape-hatch-v1): the public
+  // profile is ISR-rendered, so auth is resolved client-side only. Signed-out
+  // stays the default (safe for SSR + logged-out visitors).
+  const { isSignedIn } = useUserSafe();
 
   // alertOptInVariant starts as the ISR-rendered default ('button').
   // AnonCookieBootstrap resolves the per-user Statsig variant on mount and
@@ -766,6 +772,7 @@ export function ProfileCompactTemplate({
       isProfileRoot: requestedMode === 'profile',
       historyLength: globalThis.history.length,
       referrer: document.referrer,
+      isSignedIn,
     });
 
     if (action === 'profile-root') {
@@ -775,8 +782,16 @@ export function ProfileCompactTemplate({
 
     if (action === 'history-back') {
       globalThis.history.back();
+      return;
     }
-  }, [requestedMode]);
+
+    // Signed-in viewer with no in-profile history: hard-navigate to the
+    // in-app workspace (same leave-the-public-surface pattern as signOut —
+    // location.assign drops the public-profile client state cleanly).
+    if (action === 'signed-in-escape') {
+      globalThis.location.assign(APP_ROUTES.DASHBOARD);
+    }
+  }, [requestedMode, isSignedIn]);
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -901,6 +916,7 @@ export function ProfileCompactTemplate({
                   revealNotificationsRef.current?.();
                 }}
                 releases={releases}
+                isSignedIn={isSignedIn}
               />
             </div>
           </div>
@@ -942,6 +958,7 @@ export function ProfileCompactTemplate({
             onTogglePref={handleTogglePref}
             onUnsubscribe={handleUnsubscribe}
             isUnsubscribing={unsubMutation.isPending}
+            onEscapeToApp={isSignedIn ? handleBack : undefined}
           />
         }
       />
