@@ -13,7 +13,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   AuthRedirectHandler,
   hasActiveAuthSession,
-} from '@/features/home/AuthRedirectHandler';
+} from '@/components/features/home/AuthRedirectHandler';
 
 describe('hasActiveAuthSession', () => {
   it('returns false when the cookie is missing', () => {
