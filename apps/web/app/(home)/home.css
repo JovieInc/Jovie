@@ -2482,6 +2482,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
     .homepage-certified-section__media {
     grid-column: 1 / span 6;
   }
+
+  /* Trio phones share a ~half-rail column here, so bezel tokens follow
+     the squeezed width. Notch already uses cqi. */
+  .homepage-certified-section__phones[data-count="3"]
+    .homepage-certified-section__device {
+    --ap-phone-scale: 0.367;
+  }
 }
 
 @media (max-width: 767px) {
