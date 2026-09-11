@@ -37,8 +37,12 @@ vi.mock('drizzle-orm', () => ({
 // Mocks for the new Redis + observability layer in settings.ts (gate cache hardening).
 // Redis returns null so tests exercise the mem-cache + DB fallback paths exactly
 // as before; breadcrumbs and warnings are no-ops.
+// withRetry logs final non-retryable failures via Sentry.captureException before
+// the JOV-3353 fail-soft catch returns defaults + captureWarning. The mock must
+// export captureException so vitest does not throw and skip fail-soft.
 vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: vi.fn(),
+  captureException: vi.fn(),
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -432,11 +436,29 @@ describe('migration-drift fail-soft (JOV-3353)', () => {
   });
 
   it('still throws non-drift DB errors (no broad swallow)', async () => {
-    setupDbSelectError(new Error('connection terminated unexpectedly'));
+    // Non-retryable so withRetry does not burn the 5s CI testTimeout on backoff.
+    // Transient connection errors still throw after retry (not fail-soft).
+    setupDbSelectError(new Error('syntax error in SQL'));
 
     await expect(isWaitlistGateEnabled()).rejects.toThrow(
-      'connection terminated unexpectedly'
+      'syntax error in SQL'
     );
     expect(captureWarning).not.toHaveBeenCalled();
+  });
+
+  it('throws transient connection errors after retry instead of fail-softing', async () => {
+    vi.useFakeTimers();
+    setupDbSelectError(new Error('connection terminated unexpectedly'));
+
+    try {
+      const assertion = expect(isWaitlistGateEnabled()).rejects.toThrow(
+        'connection terminated unexpectedly'
+      );
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(captureWarning).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
