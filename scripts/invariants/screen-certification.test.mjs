@@ -120,6 +120,27 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('registers provider-host layouts that ship with start and public profile', () => {
+    assert.equal(
+      kindOf('apps/web/app/(dynamic)/start/layout.tsx'),
+      'registered'
+    );
+    assert.equal(kindOf('apps/web/app/[username]/layout.tsx'), 'registered');
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
+        { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(
+      result.changedScreens.map(screen => screen.id).sort(),
+      ['web.public-profile', 'web.start']
+    );
+  });
+
   it('registers every protected revenue screen source', () => {
     assert.deepEqual(protectedSources(), [
       'apps/web/app/(dynamic)/start/page.tsx',
