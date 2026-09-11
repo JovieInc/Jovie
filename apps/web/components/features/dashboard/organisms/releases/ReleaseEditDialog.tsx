@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/releases/ReleaseEditDialog.test.tsx
 import { Badge, Input } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';

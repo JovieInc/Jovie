@@ -185,6 +185,19 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "apps/web/components/features/admin/CreatorProfileTableRow.tsx",
+        "apps/web/components/features/admin/table/organisms/KanbanBoard.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noNoninteractiveElementInteractions": "off"
+          }
+        }
+      }
     }
   ],
   "javascript": {

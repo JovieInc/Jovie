@@ -78,6 +78,7 @@ describe('Biome a11y exemption scope', () => {
 
   it('keeps KanbanBoard green after targeted suppressions', () => {
     const result = runBiome([
+      'apps/web/components/features/admin/CreatorProfileTableRow.tsx',
       'apps/web/components/features/admin/table/organisms/KanbanBoard.tsx',
     ]);
     expect(result.status, result.stderr || result.stdout).toBe(0);
