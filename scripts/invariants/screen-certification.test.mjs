@@ -141,6 +141,33 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers public SmartLink release and track pages', () => {
+    assert.equal(
+      kindOf('apps/web/app/[username]/[slug]/page.tsx'),
+      'registered'
+    );
+    assert.equal(
+      kindOf('apps/web/app/[username]/[slug]/[trackSlug]/page.tsx'),
+      'registered'
+    );
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/[username]/[slug]/page.tsx', status: 'M' },
+        {
+          path: 'apps/web/app/[username]/[slug]/[trackSlug]/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+      proofs: [],
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens.map(screen => screen.id).sort(), [
+      'web.smartlink-release',
+      'web.smartlink-track',
+    ]);
+  });
+
   it('registers every protected revenue screen source', () => {
     assert.deepEqual(protectedSources(), [
       'apps/web/app/(dynamic)/start/page.tsx',
