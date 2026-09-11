@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/providers/ClientProviders.interaction.test.tsx
 import { TooltipProvider } from '@jovie/ui';
 import React from 'react';
 import {

@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/auth-client-providers.test.tsx
 import { type ReactNode } from 'react';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
 import { QueryProvider } from './QueryProvider';
