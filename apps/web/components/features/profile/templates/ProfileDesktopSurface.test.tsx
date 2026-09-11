@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -353,5 +353,69 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.getByRole('link', { name: 'Follow Tim White on Twitter' })
     ).toHaveAttribute('href', 'https://x.com/timwhite');
+  });
+
+  // profile-logged-in-escape-hatch-v1 — the desktop surface owns no back
+  // chrome of its own; the template passes the escape handler only for
+  // signed-in viewers, and it renders as a leading control in the chrome row.
+  it('renders the signed-in escape control and wires it to the template handler', () => {
+    const onEscapeToApp = vi.fn();
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+        onEscapeToApp={onEscapeToApp}
+      />
+    );
+
+    const escape = screen.getByTestId('profile-desktop-escape');
+    expect(escape).toHaveAccessibleName('Back to Jovie');
+    expect(escape).toHaveClass('h-11', 'w-11');
+
+    fireEvent.click(escape);
+    expect(onEscapeToApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the escape control for logged-out visitors', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('profile-desktop-escape')
+    ).not.toBeInTheDocument();
   });
 });
