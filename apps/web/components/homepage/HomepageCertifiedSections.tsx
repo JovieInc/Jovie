@@ -99,6 +99,7 @@ export function HomepageCertifiedSections({
         data-homepage-testid='homepage-proof'
         data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
         data-marketing-variant='inline-strip'
+        data-rhythm='proof'
         aria-label='Proof'
       >
         <div className='homepage-certified-proof__logos system-b-mounted-home-trust-strip-shell'>
@@ -127,6 +128,7 @@ export function HomepageCertifiedSections({
             data-marketing-occurrence={section.id}
             data-align={index % 2 === 0 ? 'start' : 'end'}
             data-media={media ? 'true' : 'false'}
+            data-rhythm={media ? 'product' : 'text'}
             aria-labelledby={headingId}
           >
             <div className='homepage-certified-section__inner'>
