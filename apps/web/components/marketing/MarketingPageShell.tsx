@@ -16,7 +16,7 @@ export interface MarketingPageShellProps {
  * the homepage variant in `app/(home)/layout.tsx`) owns the header, footer,
  * skip link, viewport height, and fixed-header offset.
  *
- * JOV-4872: this wrapper must not re-apply `min-h-screen`. Nesting a
+ * JOV-4872: this wrapper must not re-apply `min-h-svh`. Nesting a
  * viewport-height box inside the shell's `flex-1` main column double-applies
  * the viewport height on top of the fixed-header offset, pushing the footer
  * below the fold by the header height on short pages. `grow` fills exactly

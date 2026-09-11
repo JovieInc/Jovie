@@ -195,30 +195,42 @@ export function DeeplinksGrid() {
   const sectionRef = useRef<HTMLElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
+  const measureFrameRef = useRef(0);
+
   const handleScroll = useCallback(() => {
-    const section = sectionRef.current;
-    if (!section) return;
+    if (measureFrameRef.current) return;
+    measureFrameRef.current = globalThis.requestAnimationFrame(() => {
+      measureFrameRef.current = 0;
+      const section = sectionRef.current;
+      if (!section) return;
 
-    const rect = section.getBoundingClientRect();
-    const sectionHeight = rect.height;
-    const scrolled = -rect.top;
-    const scrollableHeight = sectionHeight - globalThis.innerHeight;
+      const rect = section.getBoundingClientRect();
+      const sectionHeight = rect.height;
+      const scrolled = -rect.top;
+      const scrollableHeight = sectionHeight - globalThis.innerHeight;
 
-    if (scrollableHeight <= 0) return;
+      if (scrollableHeight <= 0) return;
 
-    const progress = Math.max(0, Math.min(1, scrolled / scrollableHeight));
-    const newIndex = Math.min(
-      MODES.length - 1,
-      Math.floor(progress * MODES.length)
-    );
+      const progress = Math.max(0, Math.min(1, scrolled / scrollableHeight));
+      const newIndex = Math.min(
+        MODES.length - 1,
+        Math.floor(progress * MODES.length)
+      );
 
-    setActiveIndex(newIndex);
+      setActiveIndex(current => (current === newIndex ? current : newIndex));
+    });
   }, []);
 
   useEffect(() => {
     globalThis.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
-    return () => globalThis.removeEventListener('scroll', handleScroll);
+    return () => {
+      globalThis.removeEventListener('scroll', handleScroll);
+      if (measureFrameRef.current) {
+        globalThis.cancelAnimationFrame(measureFrameRef.current);
+        measureFrameRef.current = 0;
+      }
+    };
   }, [handleScroll]);
 
   const headlines = useMemo(

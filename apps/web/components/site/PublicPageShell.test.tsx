@@ -116,6 +116,14 @@ describe('PublicPageShell', () => {
     ).toHaveAttribute('href', '/start');
   });
 
+  it('uses min-h-svh so iOS Safari chrome cannot jump the public shell', () => {
+    const { container } = render(<PublicPageShell>body</PublicPageShell>);
+    expect(container.firstElementChild?.className).toContain('min-h-svh');
+    expect(container.firstElementChild?.className).not.toContain(
+      'min-h-screen'
+    );
+  });
+
   it('renders the skip-to-content link by default and can disable it', () => {
     const { unmount } = render(<PublicPageShell>body</PublicPageShell>);
     expect(
