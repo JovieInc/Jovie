@@ -2,7 +2,9 @@ name: HA CI remediator poke
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Hyperagent
 # necessary-trust-boundary: GitHub-hosted CI failure events on pull_request/merge_group
-#   wake the Hyperagent remediator via a signed outbound webhook. No self-hosted
+#   wake the Hyperagent remediator via X-Hyperagent-Webhook-Secret (HA docs;
+#   ha-webhook-auth-only-v1). HA compares that shared secret and does not verify
+#   HMAC body signatures, Authorization Bearer, or X-HA-Access. No self-hosted
 #   runner access, no local systemd, no Symphony port pokes.
 # removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
 # idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA.
@@ -56,6 +58,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ -z "${WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
+            echo "::error::HYPERAGENT_CI_WEBHOOK_URL and HYPERAGENT_CI_WEBHOOK_SECRET are required. Refusing an unauthenticated Hyperagent poke (ha-webhook-auth-only-v1)."
+            exit 1
+          fi
+
           payload=$(jq -n \
             --arg repo "$REPO" \
             --arg pr_number "$PR_NUMBER" \
@@ -64,14 +71,10 @@ jobs:
             --arg event "$EVENT" \
             '{repository: $repo, pr_number: ($pr_number | tonumber? // null), head_sha: $head_sha, run_url: $run_url, event: $event, source: "ha-ci-remediator-poke"}')
 
-          timestamp=$(date -u +%s)
-          signature=$(printf '%s.%s' "$timestamp" "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)
-
           http_code=$(curl -sS -o /tmp/hyperagent-response -w '%{http_code}' \
             -X POST --max-time 5 \
             -H 'Content-Type: application/json' \
-            -H "X-Hyperagent-Webhook-Timestamp: $timestamp" \
-            -H "X-Hyperagent-Webhook-Signature: sha256=$signature" \
+            -H "X-Hyperagent-Webhook-Secret: $WEBHOOK_SECRET" \
             -d "$payload" \
             "$WEBHOOK_URL")
 
