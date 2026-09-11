@@ -77,8 +77,8 @@ interface ReleaseLandingPageProps
       readonly handle: string | null;
       readonly avatarUrl: string | null;
     };
-    readonly primaryArtists?: FeaturedArtist[];
-    readonly featuredArtists?: FeaturedArtist[];
+    readonly primaryArtists?: readonly FeaturedArtist[];
+    readonly featuredArtists?: readonly FeaturedArtist[];
     readonly providers: Provider[];
     readonly credits?: SmartLinkCreditGroup[];
     readonly artworkSizes?: Record<string, string> | null;
@@ -249,8 +249,8 @@ function SmartLinkArtistLine({
   featuredArtists,
 }: Readonly<{
   artist: { name: string; handle: string | null };
-  primaryArtists?: FeaturedArtist[];
-  featuredArtists?: FeaturedArtist[];
+  primaryArtists?: readonly FeaturedArtist[];
+  featuredArtists?: readonly FeaturedArtist[];
 }>) {
   const hasFeatured = featuredArtists && featuredArtists.length > 0;
   const featuredArtistKeyCounts = new Map<string, number>();
