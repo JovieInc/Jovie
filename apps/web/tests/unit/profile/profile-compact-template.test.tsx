@@ -393,6 +393,39 @@ describe('ProfileCompactTemplate', () => {
     expect(twitter).toHaveAttribute('href', 'https://x.com/test-artist');
   });
 
+  it('uses registry brand casing for hero social aria labels', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[
+          {
+            id: 'tiktok',
+            artist_id: mockArtist.id,
+            platform: 'tiktok',
+            url: 'https://www.tiktok.com/@test-artist',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+        contacts={[]}
+      />
+    );
+
+    const socialRow = await screen.findByTestId('profile-hero-social-row');
+    // Registry casing ('TikTok'), not naive title case ('Tiktok').
+    expect(
+      within(socialRow).getByRole('link', {
+        name: `Follow ${mockArtist.name} on TikTok`,
+      })
+    ).toHaveAttribute('href', 'https://www.tiktok.com/@test-artist');
+    expect(
+      within(socialRow).queryByRole('link', {
+        name: `Follow ${mockArtist.name} on Tiktok`,
+      })
+    ).toBeNull();
+  });
+
   it('links the artist name back to the canonical profile route', async () => {
     render(
       <ProfileCompactTemplate
