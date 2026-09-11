@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 
 export interface OpportunityInboxYoutubeThumbnailCardProps {
@@ -121,23 +122,26 @@ export function OpportunityInboxYoutubeThumbnailCard({
         {candidate.youtubeVideoId}
       </p>
 
-      <div className='system-b-opportunity-inbox-card-actions mt-4 flex items-center justify-end gap-2'>
-        <button
+      <div className='system-b-opportunity-inbox-card-actions mt-4'>
+        <Button
           type='button'
-          className='system-b-opportunity-inbox-dismiss inline-flex min-h-8 items-center justify-center rounded-full px-3 text-xs font-medium text-secondary-token hover:bg-surface-0'
+          variant='ghost'
+          size='sm'
+          className='system-b-opportunity-inbox-dismiss'
           disabled={isBusy}
           onClick={() => onReject(card.id)}
         >
           Reject
-        </button>
-        <button
+        </Button>
+        <Button
           type='button'
-          className='system-b-opportunity-inbox-primary inline-flex min-h-8 items-center justify-center rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-50'
+          size='sm'
+          className='system-b-opportunity-inbox-primary'
           disabled={isBusy}
           onClick={() => onApprove(card.id)}
         >
           {isBusy ? 'Saving…' : card.primaryActionLabel}
-        </button>
+        </Button>
       </div>
     </article>
   );
