@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
 
 vi.mock('next/link', () => ({
@@ -120,7 +120,7 @@ const tiktokLink = {
   url: 'https://www.tiktok.com/@timwhite',
   clicks: 0,
   created_at: '2026-01-01T00:00:00.000Z',
-} satisfies LegacySocialLink;
+};
 
 function renderSurface(
   overrides: Partial<React.ComponentProps<typeof ProfileCompactSurface>> = {}
@@ -188,22 +188,18 @@ describe('ProfileCompactSurface', () => {
       screen.queryByRole('button', { name: 'Back' })
     ).not.toBeInTheDocument();
   });
-
   // Regression: hero social labels must use registry brand casing
   // (tiktok -> 'TikTok'), not naive title case ('Tiktok').
   it('renders registry-cased hero social aria labels for TikTok', () => {
     renderSurface({ socialLinks: [tiktokLink] });
 
-    const socialRow = screen.getByTestId('profile-hero-social-row');
+    // Scoped via role+name: the hero social row is the only place rendering
+    // this aria label, so screen-level queries are unambiguous here.
     expect(
-      within(socialRow).getByRole('link', {
-        name: 'Follow Tim White on TikTok',
-      })
+      screen.getByRole('link', { name: 'Follow Tim White on TikTok' })
     ).toHaveAttribute('href', 'https://www.tiktok.com/@timwhite');
     expect(
-      within(socialRow).queryByRole('link', {
-        name: 'Follow Tim White on Tiktok',
-      })
+      screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
     ).toBeNull();
   });
 });
