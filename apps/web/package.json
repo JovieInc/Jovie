@@ -262,7 +262,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.8.0",
     "@vercel/oidc": "3.8.7",
-    "@vercel/toolbar": "^0.2.5",
+    "@vercel/toolbar": "^0.2.7",
     "ai": "^6.0.137",
     "better-auth": "1.7.0-rc.1",
     "class-variance-authority": "^0.7.1",
