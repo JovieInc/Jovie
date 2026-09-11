@@ -2,6 +2,7 @@
 
 import { Button, Switch } from '@jovie/ui';
 import {
+  ArrowLeft,
   BadgeCheck,
   Bell,
   CalendarDays,
@@ -103,6 +104,12 @@ interface ProfileDesktopSurfaceProps {
   readonly onTogglePref?: (key: NotificationContentType) => void;
   readonly onUnsubscribe?: () => void;
   readonly isUnsubscribing?: boolean;
+  /**
+   * Signed-in escape hatch (profile-logged-in-escape-hatch-v1). Rendered as
+   * a leading control in the desktop chrome row when provided (signed-in
+   * viewers only — the template omits it for logged-out visitors).
+   */
+  readonly onEscapeToApp?: () => void;
 }
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -262,6 +269,7 @@ export function ProfileDesktopSurface({
   onTogglePref = () => {},
   onUnsubscribe = () => {},
   isUnsubscribing = false,
+  onEscapeToApp,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => setIsHydrated(true), []);
@@ -877,6 +885,18 @@ export function ProfileDesktopSurface({
         data-testid='profile-desktop-surface'
       >
         <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>
+          {onEscapeToApp ? (
+            <button
+              type='button'
+              onClick={onEscapeToApp}
+              data-testid='profile-desktop-escape'
+              aria-label='Back to Jovie'
+              title='Back to Jovie'
+              className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+            >
+              <ArrowLeft className='h-5 w-5' aria-hidden='true' />
+            </button>
+          ) : null}
           <nav
             className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
             aria-label='Profile Navigation'
