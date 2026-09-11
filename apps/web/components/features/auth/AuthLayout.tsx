@@ -16,6 +16,7 @@ import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
+import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 import { AuthBrandPanel } from './AuthBrandPanel';
 
@@ -98,7 +99,7 @@ function AuthFormColumn({
             aria-hidden={isKeyboardVisible}
             tabIndex={isKeyboardVisible ? -1 : undefined}
           >
-            <BrandLogo size={32} tone='white' aria-hidden />
+            <BrandLogo size={BRAND_MARK_SIZE.splash} tone='white' aria-hidden />
           </Link>
         </div>
       ) : null}
@@ -281,7 +282,7 @@ export function AuthLayout({
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible ? -1 : undefined}
           >
-            <BrandLogo size={18} tone='auto' aria-hidden />
+            <BrandLogo size={BRAND_MARK_SIZE.chrome} tone='auto' aria-hidden />
           </Link>
         </div>
       ) : null}

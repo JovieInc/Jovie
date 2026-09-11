@@ -90,6 +90,11 @@ describe('MarketingFooter', () => {
       'href',
       '/cli'
     );
+    expect(
+      screen
+        .getByRole('link', { name: 'Jovie Home' })
+        .querySelector('[data-brand-mark-size]')
+    ).toHaveAttribute('data-brand-mark-size', '20');
   });
 
   it.each([

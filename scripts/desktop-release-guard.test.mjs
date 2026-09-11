@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  appendFile,
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,8 +36,12 @@ import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
 );
-const { notarizeStagingDmg } = desktopRequire(
-  './scripts/notarize-staging-dmg.cjs'
+const { notarizeReleaseDmg } = desktopRequire(
+  './scripts/notarize-release-dmg.cjs'
+);
+const desktopProductionBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.yml', import.meta.url),
+  'utf8'
 );
 const desktopStagingBuilder = readFileSync(
   new URL('../apps/desktop/electron-builder.staging.yml', import.meta.url),
@@ -74,8 +86,33 @@ function step(workflow, stepName) {
   );
 }
 
+function shellStepBody(workflow, stepName) {
+  const block = step(workflow, stepName);
+  const marker = '        run: |\n';
+  const start = block.indexOf(marker);
+  assert.notEqual(start, -1, `Missing shell body: ${stepName}`);
+  return block
+    .slice(start + marker.length)
+    .split('\n')
+    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
+    .join('\n');
+}
+
 function assertPatterns(source, patterns) {
   patterns.forEach(pattern => assert.match(source, pattern));
+}
+
+function dedentShell(source) {
+  const indentation = Math.min(
+    ...source
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => line.match(/^\s*/)[0].length)
+  );
+  return source
+    .split('\n')
+    .map(line => line.slice(indentation))
+    .join('\n');
 }
 
 function hash(buffer, algorithm, encoding) {
@@ -216,10 +253,10 @@ test('desktop builder can parse Electron macOS property lists', () => {
   assert.deepEqual(parsed, { CFBundleName: 'Jovie' });
 });
 
-test('staging DMG notarization finalizes blockmap and updater metadata after stapling', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'jovie-staging-dmg-'));
+test('release DMG finalization signs, notarizes, staples, and refreshes updater metadata', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'jovie-release-dmg-'));
   t.after(() => rm(dir, { force: true, recursive: true }));
-  const dmg = join(dir, 'Jovie-Staging-26.8.3-staging.1.1-universal.dmg');
+  const dmg = join(dir, 'Jovie-26.9.0-universal.dmg');
   const blockmap = `${dmg}.blockmap`;
   await writeFile(dmg, Buffer.from('pre-staple-dmg'));
   await writeFile(blockmap, Buffer.from('stale-blockmap'));
@@ -232,15 +269,20 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
   };
   const calls = [];
 
-  await notarizeStagingDmg(event, {
+  await notarizeReleaseDmg(event, {
     environment: {
       APPLE_API_ISSUER: 'issuer',
       APPLE_API_KEY: '/tmp/private-key.p8',
       APPLE_API_KEY_ID: 'key-id',
-      JOVIE_STAGING_RELEASE: 'true',
+      JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
+      JOVIE_RELEASE_DMG: 'true',
+    },
+    executeCodesign: async args => {
+      calls.push(['codesign', ...args]);
+      return { stdout: '' };
     },
     executeXcrun: async args => {
-      calls.push(args);
+      calls.push(['xcrun', ...args]);
       if (args[0] === 'notarytool') {
         return {
           stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
@@ -253,7 +295,10 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
 
   const finalBytes = await readFile(dmg);
   assert.deepEqual(calls, [
+    ['codesign', '--force', '--timestamp', '--sign', 'developer-id-hash', dmg],
+    ['codesign', '--verify', '--verbose=2', dmg],
     [
+      'xcrun',
       'notarytool',
       'submit',
       dmg,
@@ -269,43 +314,47 @@ test('staging DMG notarization finalizes blockmap and updater metadata after sta
       '--output-format',
       'json',
     ],
-    ['stapler', 'staple', dmg],
-    ['stapler', 'validate', dmg],
+    ['xcrun', 'stapler', 'staple', dmg],
+    ['xcrun', 'stapler', 'validate', dmg],
   ]);
   assert.equal(event.updateInfo.size, finalBytes.length);
   assert.equal(event.updateInfo.sha512, hash(finalBytes, 'sha512', 'base64'));
   assert.notEqual(await readFile(blockmap, 'utf8'), 'stale-blockmap');
 });
 
-test('staging DMG notarization fails closed before publishing incoherent artifacts', async t => {
+test('release DMG finalization fails closed before publishing incoherent artifacts', async t => {
   const dmg = '/tmp/Jovie-Staging-26.8.3-staging.1.1-universal.dmg';
   const accepted = async () => ({
     stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
   });
+  const codesignAccepted = async () => ({ stdout: '' });
   const environment = {
     APPLE_API_ISSUER: 'issuer',
     APPLE_API_KEY: '/tmp/private-key.p8',
     APPLE_API_KEY_ID: 'key-id',
-    JOVIE_STAGING_RELEASE: 'true',
+    JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
+    JOVIE_RELEASE_DMG: 'true',
   };
 
   await t.test('ignores non-DMG artifacts', async () => {
-    await notarizeStagingDmg(
+    await notarizeReleaseDmg(
       { file: `${dmg}.blockmap`, updateInfo: {} },
       {
         buildBlockMap: () => assert.fail('must not build'),
         environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
         executeXcrun: () => assert.fail('must not execute'),
       }
     );
   });
   await t.test('keeps ordinary CI packaging credential-free', async () => {
     const updateInfo = { sha512: 'unchanged', size: 1 };
-    await notarizeStagingDmg(
+    await notarizeReleaseDmg(
       { file: dmg, updateInfo },
       {
         buildBlockMap: () => assert.fail('must not build'),
         environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
         executeXcrun: () => assert.fail('must not execute'),
       }
     );
@@ -313,7 +362,7 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
   });
   await t.test('requires builder update metadata', async () => {
     await assert.rejects(
-      notarizeStagingDmg(
+      notarizeReleaseDmg(
         { file: dmg },
         { buildBlockMap: assert.fail, environment, executeXcrun: accepted }
       ),
@@ -321,17 +370,23 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
     );
   });
   await t.test('requires every notarization credential', async () => {
-    await assert.rejects(
-      notarizeStagingDmg(
-        { file: dmg, updateInfo: {} },
-        {
-          buildBlockMap: assert.fail,
-          environment: { ...environment, APPLE_API_ISSUER: '' },
-          executeXcrun: accepted,
-        }
-      ),
-      /credential is missing: issuer/
-    );
+    for (const [name, missingEnvironment] of [
+      ['issuer', { ...environment, APPLE_API_ISSUER: '' }],
+      ['signingIdentity', { ...environment, JOVIE_MAC_SIGNING_IDENTITY: '' }],
+    ]) {
+      await assert.rejects(
+        notarizeReleaseDmg(
+          { file: dmg, updateInfo: {} },
+          {
+            buildBlockMap: assert.fail,
+            environment: missingEnvironment,
+            executeCodesign: assert.fail,
+            executeXcrun: accepted,
+          }
+        ),
+        new RegExp(`credential is missing: ${name}`)
+      );
+    }
   });
   await t.test('requires an accepted structured Apple response', async () => {
     for (const stdout of [
@@ -340,11 +395,12 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
       JSON.stringify({ id: '', status: 'Accepted' }),
     ]) {
       await assert.rejects(
-        notarizeStagingDmg(
+        notarizeReleaseDmg(
           { file: dmg, updateInfo: {} },
           {
             buildBlockMap: assert.fail,
             environment,
+            executeCodesign: codesignAccepted,
             executeXcrun: async () => ({ stdout }),
           }
         ),
@@ -352,13 +408,30 @@ test('staging DMG notarization fails closed before publishing incoherent artifac
       );
     }
   });
+  await t.test('stops before notarization when DMG signing fails', async () => {
+    await assert.rejects(
+      notarizeReleaseDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: assert.fail,
+          environment,
+          executeCodesign: async () => {
+            throw new Error('signing failed');
+          },
+          executeXcrun: assert.fail,
+        }
+      ),
+      /signing failed/
+    );
+  });
   await t.test('requires final metadata for the stapled bytes', async () => {
     await assert.rejects(
-      notarizeStagingDmg(
+      notarizeReleaseDmg(
         { file: dmg, updateInfo: {} },
         {
           buildBlockMap: async () => ({ sha512: '', size: 0 }),
           environment,
+          executeCodesign: codesignAccepted,
           executeXcrun: accepted,
         }
       ),
@@ -864,6 +937,25 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
   ]);
   assert.doesNotMatch(proof, /desktop-staging-/);
   assert.doesNotMatch(proof, /gh api[\s\S]{0,160}\|\| continue/);
+  assert.doesNotMatch(
+    proof,
+    /if \[ "\$EVENT_NAME" = "workflow_dispatch" \]; then\s+exit 0/
+  );
+  assert.match(
+    proof,
+    /Production desktop reconciliation requires a proven desktop publish baseline/
+  );
+  const reconciliationExit = proof.indexOf(
+    'if [ "$EVENT_NAME" = "workflow_dispatch" ] &&'
+  );
+  assert.ok(
+    reconciliationExit > proof.indexOf('echo "authorized=true"'),
+    'manual force/staging bypass must remain behind production authorization'
+  );
+  assert.ok(
+    reconciliationExit < proof.indexOf('publish_markers="$(gh api'),
+    'production reconciliation must continue into durable baseline discovery'
+  );
   const failClosedIndex = proof.indexOf(
     'if [ "$publish_marker_presence_count" -gt 0 ]'
   );
@@ -874,6 +966,321 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
   assert.ok(
     failClosedIndex < proof.indexOf('legacy_runs_json='),
     'unproved marker history must fail before legacy or bootstrap fallback'
+  );
+  const missingReconciliationBaseline = proof.indexOf(
+    'Production desktop reconciliation requires a proven desktop publish baseline'
+  );
+  assert.ok(
+    missingReconciliationBaseline > failClosedIndex,
+    'expired or inconsistent marker history must retain its existing fail-closed error'
+  );
+  assert.ok(
+    missingReconciliationBaseline < proof.indexOf('legacy_runs_json='),
+    'markerless reconciliation must fail before legacy or bootstrap fallback'
+  );
+});
+
+test('desktop selection finds an intervening JOV-5996 change from the durable baseline', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-select-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+
+  git('init', '-q');
+  git('config', 'user.email', 'desktop-release-test@jov.ie');
+  git('config', 'user.name', 'Desktop Release Test');
+  await writeFile(join(root, 'README.md'), 'baseline\n');
+  git('add', 'README.md');
+  git('commit', '-qm', 'baseline');
+  const baseline = git('rev-parse', 'HEAD');
+
+  await mkdir(join(root, 'apps/desktop/src'), { recursive: true });
+  await writeFile(
+    join(root, 'apps/desktop/src/preload.ts'),
+    'export const sandboxPreloadIsSelfContained = true;\n'
+  );
+  git('add', 'apps/desktop/src/preload.ts');
+  git('commit', '-qm', 'fix desktop preload');
+  await writeFile(join(root, 'README.md'), 'baseline\nunrelated follow-up\n');
+  git('add', 'README.md');
+  git('commit', '-qm', 'unrelated follow-up');
+  const releaseSha = git('rev-parse', 'HEAD');
+  const repository = 'JovieInc/Jovie';
+  const artifactId = 101;
+  const runId = 202;
+  const workflowId = 303;
+  const publisherJobId = 404;
+  const markerName = 'desktop-production-published.json';
+  await writeFile(
+    join(root, markerName),
+    JSON.stringify({
+      schema: 1,
+      environment: 'production',
+      sha: baseline,
+      runId: String(runId),
+      publisherAttempt: '1',
+      publisherJobId: String(publisherJobId),
+    })
+  );
+  const markerArchive = join(root, 'desktop-production-published.zip');
+  execFileSync('zip', ['-q', markerArchive, markerName], { cwd: root });
+  const mockBin = join(root, 'bin');
+  await mkdir(mockBin);
+  const mockGh = join(mockBin, 'gh');
+  await writeFile(
+    mockGh,
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint="\${!#}"
+case "$endpoint" in
+  *"actions/artifacts?name=desktop-production-published"*) printf '%s' "$MOCK_MARKERS_JSON" ;;
+  *"actions/runs/$MOCK_RUN_ID/attempts/1/jobs"*) printf '%s' "$MOCK_JOBS_JSON" ;;
+  *"actions/runs/$MOCK_RUN_ID") printf '%s' "$MOCK_RUN_JSON" ;;
+  *"actions/workflows/$MOCK_WORKFLOW_ID") printf '%s' "$MOCK_WORKFLOW_JSON" ;;
+  *"actions/artifacts/$MOCK_ARTIFACT_ID/zip") command cat "$MOCK_MARKER_ARCHIVE" ;;
+  *) printf 'unexpected gh endpoint: %s\n' "$endpoint" >&2; exit 64 ;;
+esac
+`
+  );
+  await chmod(mockGh, 0o755);
+
+  const proofBody = shellStepBody(
+    desktopWorkflow,
+    'Cross-prove exact production evidence'
+  );
+  const baselineStart = proofBody.indexOf('baseline_sha=""');
+  const baselineOutputLine =
+    'echo "baseline_sha=$baseline_sha" >> "$GITHUB_OUTPUT"';
+  const baselineEnd = proofBody.indexOf(baselineOutputLine, baselineStart);
+  assert.ok(
+    baselineStart >= 0 && baselineEnd > baselineStart,
+    'missing durable baseline proof block'
+  );
+  const authorizationOutput = join(root, 'authorization-output.txt');
+  await writeFile(authorizationOutput, '');
+  execFileSync(
+    'bash',
+    [
+      '-c',
+      `release_sha="$RELEASE_SHA"\n${proofBody.slice(
+        baselineStart,
+        baselineEnd + baselineOutputLine.length
+      )}`,
+    ],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        DESKTOP_RUN_ATTEMPT: '1',
+        DESKTOP_RUN_ID: '505',
+        EVENT_NAME: 'workflow_dispatch',
+        GITHUB_OUTPUT: authorizationOutput,
+        MANUAL_FORCE_REBUILD: 'false',
+        MOCK_ARTIFACT_ID: String(artifactId),
+        MOCK_JOBS_JSON: JSON.stringify([
+          {
+            jobs: [
+              {
+                id: publisherJobId,
+                name: 'Publish production desktop release',
+                head_sha: baseline,
+                status: 'completed',
+                conclusion: 'success',
+                steps: [
+                  {
+                    name: 'Publish production desktop release',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                ],
+              },
+            ],
+          },
+        ]),
+        MOCK_MARKERS_JSON: JSON.stringify({
+          artifacts: [
+            {
+              id: artifactId,
+              name: 'desktop-production-published',
+              expired: false,
+              created_at: '2026-09-09T00:00:00Z',
+              workflow_run: { id: runId },
+            },
+          ],
+        }),
+        MOCK_MARKER_ARCHIVE: markerArchive,
+        MOCK_RUN_ID: String(runId),
+        MOCK_RUN_JSON: JSON.stringify({
+          workflow_id: workflowId,
+          run_attempt: 1,
+          head_branch: 'main',
+          head_repository: { full_name: repository },
+          path: '.github/workflows/desktop-release.yml',
+          event: 'workflow_run',
+          head_sha: baseline,
+          display_title: `Desktop release ${baseline}`,
+        }),
+        MOCK_WORKFLOW_ID: String(workflowId),
+        MOCK_WORKFLOW_JSON: JSON.stringify({
+          id: workflowId,
+          name: 'desktop-release',
+          path: '.github/workflows/desktop-release.yml',
+        }),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        RELEASE_SHA: releaseSha,
+        REPOSITORY: repository,
+        RUNNER_TEMP: root,
+        environment: 'production',
+      },
+    }
+  );
+  const provenBaseline = (await readFile(authorizationOutput, 'utf8')).match(
+    /^baseline_sha=([0-9a-f]{40})$/m
+  )?.[1];
+  assert.equal(provenBaseline, baseline);
+  const output = join(root, 'github-output.txt');
+  await writeFile(output, '');
+
+  const stdout = execFileSync(
+    'bash',
+    [
+      '-c',
+      shellStepBody(
+        desktopWorkflow,
+        'Select desktop-relevant production generation'
+      ),
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ALREADY_RELEASED: 'false',
+        AUTHORIZED: 'true',
+        BASELINE_SHA: provenBaseline,
+        GITHUB_OUTPUT: output,
+        MANUAL: 'false',
+        RELEASE_SHA: releaseSha,
+      },
+    }
+  );
+  const outputs = await readFile(output, 'utf8');
+
+  assert.match(stdout, /apps\/desktop\/src\/preload\.ts/);
+  assert.match(
+    stdout,
+    /Verified production generation requires a post-land desktop release stamp/
+  );
+  assert.match(outputs, /^should_stamp=true$/m);
+  assert.doesNotMatch(outputs, /^should_release=true$/m);
+});
+
+test('desktop reconciliation continues to baseline proof and fails closed without one', () => {
+  const proof = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
+  const afterAuthorization = proof.slice(
+    proof.indexOf('echo "authorized=true"')
+  );
+  const dispatchGate = afterAuthorization.match(
+    /\s+if \[ "\$EVENT_NAME" = "workflow_dispatch" \] &&[\s\S]*?\n\s+fi/
+  )?.[0];
+  assert.ok(dispatchGate, 'missing workflow_dispatch reconciliation gate');
+  const gateScript = `${dedentShell(dispatchGate)}\nprintf continued`;
+
+  const reconcile = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_dispatch',
+      MANUAL_FORCE_REBUILD: 'false',
+      environment: 'production',
+    },
+  });
+  assert.equal(reconcile, 'continued');
+  const forced = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_dispatch',
+      MANUAL_FORCE_REBUILD: 'true',
+      environment: 'production',
+    },
+  });
+  assert.equal(forced, '');
+  const staging = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_dispatch',
+      MANUAL_FORCE_REBUILD: 'false',
+      environment: 'staging',
+    },
+  });
+  assert.equal(staging, '');
+  const workflowRun = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_run',
+      MANUAL_FORCE_REBUILD: 'false',
+      environment: 'production',
+    },
+  });
+  assert.equal(workflowRun, 'continued');
+
+  const expiredStart = proof.indexOf(
+    'if [ "$publish_marker_presence_count" -gt 0 ]'
+  );
+  const expiredGuard = proof
+    .slice(expiredStart)
+    .match(/^if [\s\S]*?\n\s+fi/m)?.[0];
+  assert.ok(expiredGuard, 'missing expired baseline fail-closed guard');
+  const expired = spawnSync(
+    'bash',
+    ['-c', `${dedentShell(expiredGuard)}\nprintf continued`],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        baseline_sha: '',
+        publish_marker_presence_count: '1',
+      },
+    }
+  );
+  assert.equal(expired.status, 1);
+  assert.match(
+    expired.stdout,
+    /1 desktop publish marker\(s\) existed, but none fully proved a release/
+  );
+
+  const missingStart = proof.indexOf(
+    'if [ "$EVENT_NAME" = "workflow_dispatch" ] &&',
+    proof.indexOf('publish_marker_presence_count')
+  );
+  const missingGuard = proof
+    .slice(missingStart)
+    .match(/^if [\s\S]*?\n\s+fi/m)?.[0];
+  assert.ok(missingGuard, 'missing baseline fail-closed guard');
+  const missing = spawnSync(
+    'bash',
+    ['-c', `${dedentShell(missingGuard)}\nprintf continued`],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        EVENT_NAME: 'workflow_dispatch',
+        MANUAL_FORCE_REBUILD: 'false',
+        baseline_sha: '',
+        environment: 'production',
+      },
+    }
+  );
+  assert.equal(missing.status, 1);
+  assert.match(
+    missing.stdout,
+    /Production desktop reconciliation requires a proven desktop publish baseline/
   );
 });
 
@@ -920,6 +1327,26 @@ test('desktop stable marker listing distinguishes empty from unprovable history'
     }).trim(),
     '1'
   );
+
+  const candidateProgram = proof.match(
+    /marker_candidates="\$\(jq -r '\n([\s\S]*?)\n\s+' <<<"\$publish_markers"\)"/
+  )?.[1];
+  assert.ok(candidateProgram, 'missing durable baseline marker selector');
+  const selected = execFileSync('jq', ['-r', candidateProgram], {
+    encoding: 'utf8',
+    input: JSON.stringify({
+      artifacts: [
+        marker,
+        {
+          ...marker,
+          id: 3,
+          expired: false,
+          workflow_run: { id: 4 },
+        },
+      ],
+    }),
+  });
+  assert.equal(selected.trim(), '3\t4');
 });
 
 test('desktop recovery ignores legacy push titles and selects new run-name evidence', () => {
@@ -1008,7 +1435,13 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     'Cross-prove exact production evidence'
   );
   const build = job(desktopWorkflow, 'build');
+  const productionPackage = step(build, 'Package production desktop app');
+  const productionVerify = step(
+    build,
+    'Verify production desktop artifact set'
+  );
   const publish = step(build, 'Publish production desktop release');
+  const stagingPackage = step(build, 'Package staging desktop app');
   const stagingPublish = step(build, 'Publish staging desktop prerelease');
   const stagingVerify = step(build, 'Verify staging desktop artifact set');
   const stagingUpload = step(build, 'Upload staging desktop package');
@@ -1025,11 +1458,12 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
-    /JOVIE_STAGING_RELEASE: 'true'/,
+    /JOVIE_RELEASE_DMG: 'true'/,
     /package:production/,
     /sync-version\.mjs[\s\S]*--staging-version/,
     /Validate rolling staging prerelease/,
     /Require staging signing and notarization credentials/,
+    /JOVIE_MAC_SIGNING_IDENTITY=/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
     /dist\/staging-mac\.yml/,
@@ -1039,6 +1473,24 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /desktop-release-assets\.mjs upload-and-publish/,
     /--dist "apps\/desktop\/dist"/,
   ]);
+  assertPatterns(stagingPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+  ]);
+  assertPatterns(productionPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+    /package:production/,
+  ]);
+  assertPatterns(productionVerify, [
+    /if: env\.ENVIRONMENT == 'production'/,
+    /codesign --verify --deep --strict "\$production_app"/,
+    /spctl --assess --type execute --verbose=2 "\$production_app"/,
+    /xcrun stapler validate "\$production_app"/,
+    /codesign --verify --verbose=2 "\$production_dmg"/,
+    /xcrun stapler validate "\$production_dmg"/,
+    /spctl --assess --type open --context context:primary-signature/,
+  ]);
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
@@ -1047,7 +1499,11 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   ]);
   assert.match(
     desktopStagingBuilder,
-    /^artifactBuildCompleted: scripts\/notarize-staging-dmg\.cjs$/m
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
+  );
+  assert.match(
+    desktopProductionBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
   );
   assert.doesNotMatch(
     build,
@@ -1082,6 +1538,14 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   assert.ok(
     build.indexOf('Prepare private production draft') <
       build.indexOf('Package production desktop app')
+  );
+  assert.ok(
+    build.indexOf('- name: Package production desktop app') <
+      build.indexOf('- name: Verify production desktop artifact set')
+  );
+  assert.ok(
+    build.indexOf('- name: Verify production desktop artifact set') <
+      build.indexOf('- name: Publish production desktop release')
   );
   assert.ok(
     build.indexOf('Validate rolling staging prerelease') <

@@ -9,14 +9,17 @@ workspace_roots=(
   /srv/worktrees/jovie
 )
 check_only=false
+prepare_stop_guard=false
 maintenance_manifest=""
 
 if [[ "${1:-}" == "--maintenance-replace" && $# -eq 2 ]]; then
   maintenance_manifest="$2"
+elif [[ "${1:-}" == "--prepare-stop-guard" && $# -eq 1 ]]; then
+  prepare_stop_guard=true
 elif [[ "${1:-}" == "--check-only" ]]; then
   check_only=true
 elif [[ $# -ne 0 ]]; then
-  echo "usage: symphony-elixir-safe-restart [--check-only] [--maintenance-replace MANIFEST]" >&2
+  echo "usage: symphony-elixir-safe-restart [--check-only] [--prepare-stop-guard] [--maintenance-replace MANIFEST]" >&2
   exit 64
 fi
 
@@ -35,11 +38,17 @@ state=$(curl -fsS "$api_url")
 running=$(jq -er '.running | length' <<<"$state")
 retrying=$(jq -er '.retrying | length' <<<"$state")
 blocked=$(jq -er '.blocked | length' <<<"$state")
-live_count=$((running + retrying + blocked))
+# Only executing work (running/retrying) holds a restart. Blocked entries are
+# retry-exhausted terminal states that can never drain on their own; refusing
+# on them deadlocks recovery (the restart is exactly how they get reconciled).
+live_count=$((running + retrying))
 
 if [[ "$live_count" -ne 0 ]]; then
   echo "refusing restart: running=$running retrying=$retrying blocked=$blocked" >&2
   exit 20
+fi
+if [[ "$blocked" -ne 0 ]]; then
+  echo "proceeding with blocked=$blocked retry-exhausted issue(s); the reconciler re-dispatches or dead-letters them after restart"
 fi
 
 refs=$(
@@ -55,6 +64,63 @@ if [[ "$refs" -ne 0 ]]; then
   exit 21
 fi
 
+if [[ "$prepare_stop_guard" == true ]]; then
+  old_pid=$(systemctl --user show "$service" -p MainPID --value)
+  old_invocation=$(systemctl --user show "$service" -p InvocationID --value)
+  fragment=$(systemctl --user show "$service" -p FragmentPath --value)
+  [[ "$old_pid" =~ ^[1-9][0-9]*$ && "$old_invocation" =~ ^[0-9a-f]{32}$ ]] || exit 23
+  [[ "$fragment" == "$HOME/.config/systemd/user/$service" ]] || exit 22
+  # This preparation installs only the missing safety property. It never sends
+  # a signal or changes the running command, workflow or provider generation.
+  guard_created=$(python3 - <<'GUARD_PY'
+import os
+from pathlib import Path
+import tempfile
+root = Path.home() / ".config/systemd/user"
+unit = root / "symphony-elixir.service"
+directory = root / "symphony-elixir.service.d"
+guard = directory / "90-symphony-safe-restart-guard.conf"
+content = b"[Unit]\nRefuseManualStop=yes\n"
+if root.is_symlink() or unit.is_symlink() or not unit.is_file() or directory.is_symlink():
+    raise SystemExit("unsafe stop-guard destination")
+directory.mkdir(mode=0o755, exist_ok=True)
+if guard.is_symlink():
+    raise SystemExit("stop-guard symlink refused")
+if guard.exists():
+    if not guard.is_file() or guard.read_bytes() != content:
+        raise SystemExit("unowned stop-guard content")
+    print("false")
+else:
+    fd, temporary = tempfile.mkstemp(prefix=".stop-guard-", dir=directory)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fchmod(stream.fileno(), 0o644)
+            os.fsync(stream.fileno())
+        # Do not overwrite a concurrent writer's file.
+        os.link(temporary, guard)
+        directory_fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        os.unlink(temporary)
+    print("true")
+GUARD_PY
+  )
+  if ! systemctl --user daemon-reload ||
+    [[ "$(systemctl --user show "$service" -p RefuseManualStop --value)" != yes ]] ||
+    [[ "$(systemctl --user show "$service" -p MainPID --value)" != "$old_pid" ]] ||
+    [[ "$(systemctl --user show "$service" -p InvocationID --value)" != "$old_invocation" ]]; then
+    echo "stop guard preparation failed readback; no restart attempted (created=$guard_created)" >&2
+    exit 22
+  fi
+  echo "stop guard prepared: pid=$old_pid unchanged; no restart"
+  exit 0
+fi
+
 if [[ "$(systemctl --user show "$service" -p RefuseManualStop --value)" != yes ]]; then
   echo "refusing restart: $service is missing RefuseManualStop=yes" >&2
   exit 22
@@ -67,7 +133,7 @@ if [[ -z "$old_pid" || "$old_pid" == 0 ]]; then
 fi
 
 if [[ "$check_only" == true ]]; then
-  echo "safe restart preconditions passed: pid=$old_pid running=0 retrying=0 blocked=0 process_refs=0"
+  echo "safe restart preconditions passed: pid=$old_pid running=$running retrying=$retrying blocked=$blocked process_refs=0"
   exit 0
 fi
 

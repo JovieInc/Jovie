@@ -95,7 +95,8 @@ class ResearchAndEvalTests(unittest.TestCase):
             for name, output in (
                 ("cursor-agent", "echo cursor\n"),
                 ("grok", "echo grok-4.6\n"),
-                ("kimi", "echo 0.34.0\n"),
+                ("kimi", "printf '%s\\n' "
+                "'{\"providers\":{\"managed:kimi-code\":{}},\"models\":{\"kimi-code/k3\":{},\"kimi-code/kimi-for-coding\":{}}}'\n"),
                 ("codex", "echo GEM_MODEL_READY\n"),
                 ("hermes", "echo ok\n"),
                 ("ollama", "echo qwen3-coder:30b\n"),

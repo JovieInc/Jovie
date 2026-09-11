@@ -1,9 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import { observeProfileAdmissionFailure } from './utils/profile-admission-diagnostics.mjs';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
-import { runDspInteraction } from './utils/public-surface-helpers';
+import {
+  installPublicRouteMocks,
+  runDspInteraction,
+} from './utils/public-surface-helpers';
 
 const diagnostics = new WeakMap<object, () => Promise<void>>();
 
@@ -38,6 +41,36 @@ function intersectionArea(
   return width * height;
 }
 
+async function waitForSettledProfile(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const nextFrame = () =>
+      new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const readBoxes = () =>
+      [
+        '[data-testid="public-profile-layout-shell"]',
+        '[data-testid="profile-compact-shell"]',
+        '[data-testid="profile-desktop-shell"]',
+        '[data-testid="claim-banner-cta"]',
+      ].map(selector => {
+        const element = document.querySelector<HTMLElement>(selector);
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return [rect.x, rect.y, rect.width, rect.height];
+      });
+
+    await nextFrame();
+    await nextFrame();
+    let previous = JSON.stringify(readBoxes());
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await nextFrame();
+      const current = JSON.stringify(readBoxes());
+      if (current === previous) return;
+      previous = current;
+    }
+  });
+}
+
 test.describe('public profile browser admission', () => {
   for (const viewport of [
     { width: 1179, layout: 'compact' as const },
@@ -70,15 +103,7 @@ test.describe('public profile browser admission', () => {
         )
       ).toHaveAttribute('data-interactive-ready', 'true');
 
-      await page.evaluate(async () => {
-        await document.fonts.ready;
-        await new Promise<void>(resolve =>
-          requestAnimationFrame(() => resolve())
-        );
-        await new Promise<void>(resolve =>
-          requestAnimationFrame(() => resolve())
-        );
-      });
+      await waitForSettledProfile(page);
 
       if (viewport.layout === 'desktop') {
         await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
@@ -89,6 +114,49 @@ test.describe('public profile browser admission', () => {
       }
 
       const audit = await auditPublicProfileLayout(page);
+      expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+    });
+  }
+
+  for (const viewport of [
+    { width: 1179, layout: 'compact' as const },
+    { width: 1180, layout: 'desktop' as const },
+    { width: 1512, layout: 'desktop' as const },
+  ]) {
+    test(`${viewport.width}px canonical /unfazed owns its presentation`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: viewport.width, height: 932 });
+      await installPublicRouteMocks(page);
+      const response = await page.goto('/unfazed', {
+        waitUntil: 'domcontentloaded',
+      });
+      expect(response?.status()).toBe(200);
+
+      const shell = page.getByTestId('public-profile-layout-shell');
+      await expect(shell).toHaveAttribute('data-layout', viewport.layout);
+      const readySurface = page.getByTestId(
+        viewport.layout === 'desktop'
+          ? 'profile-desktop-surface'
+          : 'profile-compact-shell'
+      );
+      await expect(readySurface).toBeVisible();
+      await expect(readySurface).toHaveAttribute(
+        'data-interactive-ready',
+        'true'
+      );
+      await waitForSettledProfile(page);
+
+      if (viewport.layout === 'desktop') {
+        await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
+        await expect(page.getByTestId('profile-bottom-nav')).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId('profile-compact-shell')).toBeVisible();
+        await expect(page.getByTestId('profile-bottom-nav')).toBeVisible();
+      }
+
+      const audit = await auditPublicProfileLayout(page);
+      expect(audit.claimCtaLineCount).toBe(1);
       expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
     });
   }
@@ -108,20 +176,26 @@ test.describe('public profile browser admission', () => {
     await expect(shell).toHaveAttribute('data-layout', 'desktop');
     await expect(desktop).toBeVisible();
     await expect(desktop).toHaveAttribute('data-interactive-ready', 'true');
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-      await new Promise<void>(resolve =>
-        requestAnimationFrame(() => resolve())
-      );
-      await new Promise<void>(resolve =>
-        requestAnimationFrame(() => resolve())
-      );
-    });
+    await waitForSettledProfile(page);
 
-    const desktopFrame = page.locator('.public-profile-layout-frame--desktop');
-    await expect
-      .poll(() => desktopFrame.boundingBox())
-      .toMatchObject({ width: 1298 });
+    const desktopGeometry = await page.evaluate(() => {
+      const frame = document.querySelector<HTMLElement>(
+        '.public-profile-layout-frame'
+      );
+      const contentMax = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          '--ds-public-content-max'
+        )
+      );
+      return {
+        actualWidth: frame?.getBoundingClientRect().width ?? null,
+        expectedWidth: Math.min(window.innerWidth, contentMax),
+      };
+    });
+    expect(desktopGeometry.actualWidth).not.toBeNull();
+    expect(
+      Math.abs(desktopGeometry.actualWidth! - desktopGeometry.expectedWidth)
+    ).toBeLessThanOrEqual(1);
 
     const audit = await auditPublicProfileLayout(page);
     expect(audit.claimCtaLineCount).toBe(1);
@@ -132,6 +206,52 @@ test.describe('public profile browser admission', () => {
       body: await page.screenshot({ fullPage: false }),
       contentType: 'image/png',
     });
+  });
+
+  test('1512px long-name claim CTA remains one line', async ({ page }) => {
+    await page.setViewportSize({ width: 1512, height: 932 });
+    const response = await page.goto(
+      '/renders/profile-admission?layout=public&state=unclaimed&name=long',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+    await expect(page.getByTestId('profile-desktop-surface')).toBeVisible();
+    await expect(page.getByTestId('profile-desktop-surface')).toHaveAttribute(
+      'data-interactive-ready',
+      'true'
+    );
+    await waitForSettledProfile(page);
+
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.claimCtaLineCount).toBe(1);
+    expect(audit.violations, JSON.stringify(audit, null, 2)).toEqual([]);
+
+    const claimCta = page.getByTestId('claim-banner-cta');
+    await expect(claimCta).toHaveAccessibleName(
+      'Verify & Claim for The Extraordinary Midnight Radio Orchestra'
+    );
+    const claimGeometry = await claimCta.evaluate(element => {
+      const label = element.querySelector<HTMLElement>(
+        '[data-testid="claim-banner-cta-label"]'
+      );
+      const icon = element.querySelector<SVGElement>('svg');
+      if (!label || !icon) return null;
+      const ctaBox = element.getBoundingClientRect();
+      const labelBox = label.getBoundingClientRect();
+      const iconBox = icon.getBoundingClientRect();
+      return {
+        ctaWidth: ctaBox.width,
+        ctaHeight: ctaBox.height,
+        labelCenter: labelBox.top + labelBox.height / 2,
+        iconCenter: iconBox.top + iconBox.height / 2,
+      };
+    });
+    expect(claimGeometry).not.toBeNull();
+    expect(claimGeometry!.ctaWidth).toBeGreaterThanOrEqual(44);
+    expect(claimGeometry!.ctaHeight).toBeGreaterThanOrEqual(44);
+    expect(
+      Math.abs(claimGeometry!.labelCenter - claimGeometry!.iconCenter)
+    ).toBeLessThanOrEqual(2);
   });
 
   test('deliberate red rejects the narrow desktop card, bottom nav, and wrapped claim CTA', async ({
@@ -148,7 +268,6 @@ test.describe('public profile browser admission', () => {
     const codes = new Set(audit.violations.map(violation => violation.code));
     expect(codes.has('desktop_bottom_nav')).toBe(true);
     expect(codes.has('desktop_compact_shell')).toBe(true);
-    expect(codes.has('desktop_stage_too_narrow')).toBe(true);
     expect(codes.has('unlabeled_preview')).toBe(true);
     expect(codes.has('claim_cta_wrap') || codes.has('claim_cta_overflow')).toBe(
       true

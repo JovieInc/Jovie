@@ -1056,16 +1056,28 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 }
 
 changelog_collision_decision_for_pr() {  # <num>
-  local n="$1" candidate queued members='[]' files branch
+  local n="$1" candidate queued members='[]' files branch admission queue_state queue_snap
   candidate="$(pr_changed_paths_json "$n")"
   branch="$(echo "$SNAP" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
-  while read -r queued; do
-    [[ -n "$queued" ]] || continue
-    files="$(pr_changed_paths_json "$queued")"
-    members="$(jq -c --argjson pr "$queued" --argjson files "$files" \
-      '. + [{prNumber:$pr, files:$files}]' <<<"$members")"
-  done < <(echo "$SNAP" | jq -r --argjson self "$n" \
-    '.[] | select(.q == true) | select(.n != $self) | .n')
+  admission="$(PRE_LAND_CHANGELOG_JSON="$(jq -nc --argjson changedFiles "$candidate" --arg branch "$branch" \
+    '{changedFiles:$changedFiles, branch:$branch}')" \
+    node scripts/lib/pre-land-changelog.mjs admission)"
+  if [[ "$(jq -r '.reason' <<<"$admission")" == "stamp-path" ]]; then
+    # Targeted enrollment SNAP contains only the candidate. Read the existing
+    # paginated native inventory separately; never widen mutation scope.
+    if queue_state="$(inventory_native_queue_state)" \
+      && queue_snap="$(native_state_to_snap <<<"$queue_state")"; then
+      while read -r queued; do
+        [[ -n "$queued" ]] || continue
+        files="$(pr_changed_paths_json "$queued")"
+        members="$(jq -c --argjson pr "$queued" --argjson files "$files" \
+          '. + [{prNumber:$pr, files:$files}]' <<<"$members")"
+      done < <(echo "$queue_snap" | jq -r --argjson self "$n" \
+        '.[] | select(.q == true) | select(.n != $self) | .n')
+    else
+      members='null'
+    fi
+  fi
   CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" --arg branch "$branch" \
     '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles, branch:$branch}')" \
     node scripts/ci-merge-queue-check.mjs changelog-collision

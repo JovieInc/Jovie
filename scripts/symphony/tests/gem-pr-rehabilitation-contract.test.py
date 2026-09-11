@@ -152,6 +152,15 @@ class RegistryContractTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
         self.assertTrue(all(repo.local_path for repo in repositories))
 
+    def test_issue_intake_products_map_from_registry_ids(self):
+        by_id = {repo.id: repo.github for repo in REGISTRY.issue_intake_repos()}
+        self.assertEqual(by_id["jovie"], "JovieInc/Jovie")
+        self.assertEqual(by_id["logyourbody"], "JovieInc/LogYourBody")
+        self.assertEqual(by_id["ovie"], "JovieInc/ovie")
+        self.assertEqual(REGISTRY.product_id_for_issue("JOV-12"), "jovie")
+        self.assertEqual(REGISTRY.product_id_for_issue("LYB-9"), "logyourbody")
+        self.assertEqual(REGISTRY.product_id_for_github("JovieInc/ovie"), "ovie")
+
 
 class DeploymentContractTests(unittest.TestCase):
     def test_versioned_service_uses_versioned_cycle_registry_and_model_router(self):
@@ -194,9 +203,14 @@ class DeploymentContractTests(unittest.TestCase):
             SimpleNamespace(github="JovieInc/ovie"),
         ]
         drains = []
+        projections = []
 
         def run_drain(args, **kwargs):
-            drains.append(kwargs["env"]["GEM_PR_DRAIN_REPO"])
+            env = kwargs.get("env") or {}
+            if "GEM_PR_DRAIN_REPO" in env:
+                drains.append(env["GEM_PR_DRAIN_REPO"])
+            else:
+                projections.append(args[1])
             return SimpleNamespace(returncode=0)
 
         def summer():
@@ -215,6 +229,65 @@ class DeploymentContractTests(unittest.TestCase):
         producer.assert_called_once_with()
         consumer.assert_called_once_with()
         self.assertEqual(drains, [repo.github for repo in repos])
+        self.assertEqual(len(projections), 1)
+        self.assertIn("symphony_capacity_evidence.py", projections[0])
+
+    def test_capacity_projection_runs_even_when_completion_reconcile_fails(self):
+        repos = [SimpleNamespace(github="JovieInc/Jovie")]
+        calls = []
+
+        def run(args, **kwargs):
+            env = kwargs.get("env") or {}
+            if "GEM_PR_DRAIN_REPO" in env:
+                calls.append("drain")
+            else:
+                calls.append("projection")
+            return SimpleNamespace(returncode=0)
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ), mock.patch.object(
+            CYCLE, "run_summer_bottleneck_producer", return_value=0
+        ), mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=0
+        ), mock.patch.object(
+            CYCLE.symphony_accepted_completion,
+            "reconcile",
+            side_effect=ValueError("service attestation drift"),
+        ):
+            self.assertEqual(CYCLE.main(), 0)
+
+        self.assertEqual(calls, ["projection", "drain"])
+
+    def test_capacity_projection_failure_is_isolated_from_drains(self):
+        repos = [SimpleNamespace(github="JovieInc/Jovie")]
+        drains = []
+
+        def run(args, **kwargs):
+            env = kwargs.get("env") or {}
+            if "GEM_PR_DRAIN_REPO" in env:
+                drains.append(env["GEM_PR_DRAIN_REPO"])
+                return SimpleNamespace(returncode=0)
+            return SimpleNamespace(returncode=1)
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ), mock.patch.object(
+            CYCLE, "run_summer_bottleneck_producer", return_value=0
+        ), mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=0
+        ), mock.patch.object(
+            CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 0}
+        ):
+            self.assertEqual(CYCLE.main(), 0)
+
+        self.assertEqual(drains, ["JovieInc/Jovie"])
+
+    def test_capacity_projection_subprocess_failure_is_typed(self):
+        with mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=OSError("exec format error")
+        ):
+            self.assertEqual(CYCLE.run_capacity_projection(), 1)
 
     def test_activation_requires_exact_rehabilitation_attestation(self):
         workflow = ACTIVATION.read_text(encoding="utf-8")

@@ -16,7 +16,48 @@ from gem_gate_contract import V2_PROOF_SCHEMA, V2_PROOF_SOURCE
 from symphony_proof_context import load_context, profile_identity
 
 
-def produce(context_path: Path, account_path: Path, codex: Path, *, timeout: int = 30) -> dict:
+def _canonical(value: dict) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+
+
+def _append_ledger_row(ledger: Path, proof: dict) -> None:
+    """Append the exact attested row so the capacity projector can count it.
+
+    An artifact without its ledger row is invisible to the projector; a row
+    without its artifact is rejected as unattested. The append is serialized
+    under the ledger lock, replay of an identical row is a no-op, and a
+    conflicting row refuses the proof.
+    """
+    ledger.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    lock_path = ledger.with_name(ledger.name + ".lock")
+    with lock_path.open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        existing = []
+        try:
+            with ledger.open("r", encoding="utf-8") as stream:
+                for line in stream:
+                    if not line.strip():
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(row, dict) and row.get("probeId") == proof["probeId"]:
+                        existing.append(row)
+        except FileNotFoundError:
+            pass
+        if any(row != proof for row in existing):
+            raise ValueError("probe replay conflicts with ledger")
+        if existing:
+            return
+        with ledger.open("ab") as stream:
+            stream.write(_canonical(proof) + b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+
+def produce(context_path: Path, account_path: Path, codex: Path, *, timeout: int = 30, ledger: Path | None = None) -> dict:
+    ledger = ledger or Path(context_path).resolve().parent / "useful-turn-proofs.jsonl"
     now = lambda: datetime.now(timezone.utc)
     context = load_context(now(), context_path)
     if codex.is_symlink() or codex.resolve() != context["codexPath"]:
@@ -68,6 +109,12 @@ def produce(context_path: Path, account_path: Path, codex: Path, *, timeout: int
             json.dump(proof, stream, sort_keys=True)
             stream.flush()
             os.fsync(stream.fileno())
+        try:
+            _append_ledger_row(ledger, proof)
+        except (OSError, ValueError):
+            # Never leave an artifact the projector cannot count.
+            target.unlink(missing_ok=True)
+            raise
         return proof
 
 
@@ -76,9 +123,11 @@ def main() -> int:
     parser.add_argument("--context", required=True, type=Path)
     parser.add_argument("--account", required=True, type=Path)
     parser.add_argument("--codex", required=True, type=Path)
+    parser.add_argument("--ledger", type=Path, default=None,
+        help="useful-turn proof ledger (default: useful-turn-proofs.jsonl beside --context)")
     args = parser.parse_args()
     try:
-        print(json.dumps(produce(args.context, args.account, args.codex), sort_keys=True))
+        print(json.dumps(produce(args.context, args.account, args.codex, ledger=args.ledger), sort_keys=True))
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         print("authenticated useful completion unproven", file=__import__("sys").stderr)
         return 78

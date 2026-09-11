@@ -118,6 +118,154 @@ def _runtime_command(args, *, established_clock=False):
     return [sys.executable, "-c", launcher, *args]
 
 
+class DispatchAdmissionTests(unittest.TestCase):
+    def setUp(self):
+        self.helper = _load_helper()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = pathlib.Path(self.tmp.name) / "gate.json"
+
+    def payload(self, status="healthy"):
+        payload = _fleet_gate_payload(status, status == "healthy")
+        payload.update(
+            workAdmission={"allowed": True, "newIssueLeaseAllowed": status == "healthy",
+                           "newImplementationAllowed": status == "healthy"},
+            remediationAdmission={"allowed": True, "localAllowed": True,
+                "authority": "single-pr-writer-exact-head", "activities": ["isolated-pr-repair"],
+                "pushAllowed": False, "maxConcurrent": 1},
+            concurrency={"gem": {"maxConcurrent": 1, "evidenceAccepted": True,
+                                  "newMutationAllowed": True, "runtimeFloor": 1}},
+        )
+        return payload
+
+    def check(self, payload, mode="new-work", product="jovie"):
+        self.path.write_text(json.dumps(payload))
+        before = self.path.read_bytes()
+        result = self.helper.read_dispatch_admission(self.path, mode=mode, product_id=product)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(set(pathlib.Path(self.tmp.name).iterdir()), {self.path})
+        return result
+
+    def test_fresh_gate_is_only_non_consuming_prerequisite(self):
+        for mode in ("new-work", "existing-pr-repair"):
+            self.assertTrue(self.check(self.payload(), mode)["allowed"])
+        red = self.payload("red")
+        self.assertFalse(self.check(red)["allowed"])
+        self.assertTrue(self.check(red, "existing-pr-repair")["allowed"])
+        self.assertTrue(self.check(red, "existing-pr-repair")["allowed"])
+        self.assertNotIn("pushAllowed", self.check(red, "existing-pr-repair"))
+
+    def test_real_producer_controller_hold_overrides_closure_projection(self):
+        import copy
+        import runpy
+        scope = runpy.run_path(str(ROOT / "scripts/symphony/tests/gem-priority-gate.test.py"))
+        producer = scope["MODULE"]
+        signals = copy.deepcopy(scope["GREEN_SIGNALS"])
+        signals["controller"] = {"status": "failed", "error": "observation failed"}
+        now = producer.isoformat(producer.utc_now())
+        signals["independentReview"]["observedAt"] = now
+        signals["concurrencyEvidence"] = scope["capacity_evidence"](1, now)
+        receipt = producer.evaluate(signals, now)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["jovie"])
+        self.assertTrue(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
+        self.assertFalse(self.check(receipt)["allowed"])
+
+    def test_floor_and_local_permission_never_replace_capacity(self):
+        for maximum, accepted, mutation in [(0, False, False), (True, True, True),
+                                           (-1, True, True), (1, False, True),
+                                           (1, True, False), ("1", True, True)]:
+            with self.subTest(maximum=maximum, accepted=accepted, mutation=mutation):
+                payload = self.payload("red")
+                payload["concurrency"]["gem"].update(maxConcurrent=maximum,
+                    evidenceAccepted=accepted, newMutationAllowed=mutation)
+                self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+        for capacity in (None, {}, {"gem": []}):
+            payload = self.payload()
+            payload["concurrency"] = capacity
+            self.assertFalse(self.check(payload)["allowed"])
+        payload = self.payload()
+        payload["state"] = "RED"
+        self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+
+    def test_typed_remediation_and_work_fields_fail_closed(self):
+        for key, value in [("allowed", False), ("localAllowed", False),
+                           ("authority", "someone"), ("activities", []),
+                           ("activities", ["isolated-pr-repair", 1]),
+                           ("activities", "isolated-pr-repair"),
+                           ("pushAllowed", 0), ("maxConcurrent", True),
+                           ("maxConcurrent", 2)]:
+            payload = self.payload("red")
+            payload["remediationAdmission"][key] = value
+            self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+        for key in ("workAdmission", "remediationAdmission"):
+            payload = self.payload()
+            payload[key] = None
+            self.assertFalse(self.check(payload, "new-work" if key == "workAdmission" else "existing-pr-repair")["allowed"])
+        payload = self.payload()
+        payload["workAdmission"]["allowed"] = False
+        self.assertFalse(self.check(payload)["allowed"])
+
+    def test_product_projection_does_not_open_jovie(self):
+        payload = self.payload("red")
+        payload["closureAdmission"]["products"] = {
+            "ovie": {"newIssueIntakeAllowed": True},
+            "jovie": {"newIssueIntakeAllowed": False},
+        }
+        payload["workAdmission"]["productNewIssueLeaseAllowed"] = {"ovie": True, "jovie": False}
+        self.assertFalse(self.check(payload, product="ovie")["allowed"])
+        payload["workAdmission"].update(newIssueLeaseAllowed=True, newImplementationAllowed=True)
+        self.assertTrue(self.check(payload, product="ovie")["allowed"])
+        self.assertFalse(self.check(payload)["allowed"])
+        payload["workAdmission"]["productNewIssueLeaseAllowed"]["ovie"] = False
+        self.assertFalse(self.check(payload, product="ovie")["allowed"])
+        self.assertFalse(self.check(payload, product="unbound")["allowed"])
+        self.assertFalse(self.check(payload, mode="anything")["allowed"])
+
+    def test_stale_future_malformed_and_naive_dates_refuse_every_mode(self):
+        now = dt.datetime.now(dt.timezone.utc)
+        for date in ((now - dt.timedelta(hours=1)).isoformat(),
+                     (now + dt.timedelta(hours=1)).isoformat(),
+                     now.replace(tzinfo=None).isoformat(), "invalid"):
+            for mode in ("new-work", "existing-pr-repair"):
+                payload = self.payload()
+                payload["observedAt"] = date
+                self.assertFalse(self.check(payload, mode)["allowed"])
+        for bad_state in ([], {}, False):
+            payload = self.payload()
+            payload["state"] = bad_state
+            self.assertFalse(self.check(payload)["allowed"])
+        self.assertFalse(self.check(self.payload(), mode=[])["allowed"])
+        self.assertFalse(self.check(self.payload(), product={})["allowed"])
+        for bad_products in (None, [], True):
+            payload = self.payload()
+            payload["workAdmission"]["productNewIssueLeaseAllowed"] = bad_products
+            self.assertFalse(self.check(payload)["allowed"])
+        for malformed in ([], {}, {"schema": "wrong"}):
+            self.assertFalse(self.check(malformed)["allowed"])
+        self.path.write_text("{")
+        self.assertFalse(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+        self.path.unlink()
+        self.assertFalse(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+
+    def test_snapshot_read_once_and_installed_cli_contract(self):
+        payload = self.payload()
+        with mock.patch.object(pathlib.Path, "read_text", return_value=json.dumps(payload)) as read:
+            self.assertTrue(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+            self.assertEqual(read.call_count, 1)
+        for status, code in (("healthy", 0), ("red", 75)):
+            self.path.write_text(json.dumps(self.payload(status)))
+            command = _runtime_command(["dispatch-preflight", "--gate-file", str(self.path),
+                                        "--mode", "new-work", "--product-id", "jovie"])
+            result = subprocess.run(command, text=True, capture_output=True, timeout=5)
+            self.assertEqual(result.returncode, code, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["allowed"], code == 0)
+
+
 class OfficialSymphonyContractTests(unittest.TestCase):
     def test_shutdown_drains_child_output_for_parent_and_group_signals(self):
         for signum, group, paused in (
@@ -306,6 +454,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("symphony-elixir-logs", UNIT)
         self.assertIn("symphony-official-runtime run", UNIT)
         self.assertIn("--max-gate-sleep-seconds 3900", UNIT)
+        self.assertNotIn("--closure-observe-only", UNIT)
         self.assertNotIn("ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate", UNIT)
         self.assertIn(
             "--i-understand-that-this-will-be-running-without-the-usual-guardrails",
@@ -819,6 +968,49 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertFalse(result["ok"])
             self.assertIn("unit_missing_closure_stop_line_gate", result["errors"])
 
+            observe_only = pathlib.Path(tmp) / "observe-only.service"
+            observe_only.write_text(
+                UNIT.replace(
+                    f"{flag} ",
+                    f"{flag} --closure-observe-only ",
+                ),
+                encoding="utf-8",
+            )
+            observe_result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=observe_only,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(observe_result["ok"])
+            self.assertIn(
+                "unit_closure_stop_line_observe_only",
+                observe_result["errors"],
+            )
+
+    def test_unit_refuses_manual_stop(self):
+        # RefuseManualStop is a [Unit] directive; the safe-restart helper reads
+        # it via `systemctl --user show -p RefuseManualStop` and refuses (exit
+        # 22) without it, so the canonical unit must carry it in [Unit].
+        helper = _load_helper()
+        unit_section = UNIT.split("[Unit]\n", 1)[1].split("\n[", 1)[0]
+        self.assertIn("RefuseManualStop=yes", unit_section.splitlines())
+        with tempfile.TemporaryDirectory() as tmp:
+            variant = pathlib.Path(tmp) / "symphony-elixir.service"
+            variant.write_text(
+                UNIT.replace("RefuseManualStop=yes\n", ""), encoding="utf-8"
+            )
+            result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=variant,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(result["ok"])
+            self.assertIn("unit_missing_refuse_manual_stop", result["errors"])
+
     def test_closure_stop_line_red_receipt_holds_new_admission(self):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:
@@ -862,6 +1054,39 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(receipt["closureStatus"], "red")
             self.assertEqual(receipt["receiptPath"], str(closure_gate))
             self.assertFalse(receipt["newIssueIntakeAllowed"])
+
+    def test_lyb_and_ovie_stop_line_independent_of_jovie_mq_red(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            payload = _fleet_gate_payload(status="red", intake=False)
+            payload["signals"]["closureHealth"]["reasons"] = [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ]
+            payload["closureAdmission"]["reasons"] = [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ]
+            closure_gate.write_text(json.dumps(payload), encoding="utf-8")
+
+            jovie = helper.read_closure_stop_line(closure_gate, product_id="jovie")
+            lyb = helper.read_closure_stop_line(closure_gate, product_id="logyourbody")
+            ovie = helper.read_closure_stop_line(closure_gate, product_id="ovie")
+
+            self.assertTrue(jovie["hold"])
+            self.assertEqual(jovie["reason"], "closure-health-not-green")
+            self.assertFalse(lyb["hold"])
+            self.assertEqual(lyb["reason"], "closure-health-product-independent")
+            self.assertTrue(lyb["newIssueIntakeAllowed"])
+            self.assertFalse(ovie["hold"])
+            self.assertTrue(ovie["newIssueIntakeAllowed"])
+
+            missing = helper.read_closure_stop_line(
+                pathlib.Path(tmp) / "absent.json", product_id="logyourbody"
+            )
+            self.assertTrue(missing["hold"])
+            self.assertEqual(missing["reason"], "fleet-gate-receipt-missing")
 
     def test_closure_stop_line_green_receipt_admits(self):
         helper = _load_helper()
@@ -989,6 +1214,186 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertTrue(verdict["hold"])
             self.assertEqual(verdict["reason"], "closure-health-not-green")
             self.assertEqual(verdict["closureStatus"], "grace")
+
+    def test_closure_stop_line_controller_activation_feed_vs_stop(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 10, 14, 6, 0, tzinfo=dt.timezone.utc)
+        observed = "2026-09-10T14:05:00Z"
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+
+            def write_closure(status, reasons):
+                payload = _fleet_gate_payload(
+                    status=status, intake=False, observed_at=observed
+                )
+                payload["signals"]["closureHealth"]["reasons"] = reasons
+                payload["closureAdmission"]["reasons"] = reasons
+                gate.write_text(json.dumps(payload), encoding="utf-8")
+
+            # The live deadlock shape: repair-feed reasons are a subset of the
+            # feed set, so controller activation passes with a notice while new
+            # admission still holds.
+            write_closure(
+                "red", ["internally-repairable-prs-open", "no-merge-progress-over-1h"]
+            )
+            activation = helper.read_closure_stop_line(
+                gate, now=now, purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(activation["reason"], "closure-health-repair-feed")
+            self.assertEqual(activation["closureStatus"], "red")
+            self.assertEqual(activation["closurePurpose"], "controller-activation")
+            self.assertEqual(
+                activation["repairFeedReasons"],
+                ["internally-repairable-prs-open", "no-merge-progress-over-1h"],
+            )
+            self.assertIn("notice", activation)
+            admission = helper.read_closure_stop_line(gate, now=now)
+            self.assertTrue(admission["hold"])
+            self.assertEqual(admission["reason"], "closure-health-not-green")
+            self.assertEqual(admission["closurePurpose"], "admission")
+
+            # Grace carrying only the controller-outage feed reason behaves the
+            # same in both purposes.
+            write_closure("grace", ["queue-controller-red-over-10m"])
+            activation = helper.read_closure_stop_line(
+                gate, now=now, purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(
+                activation["repairFeedReasons"], ["queue-controller-red-over-10m"]
+            )
+            self.assertTrue(helper.read_closure_stop_line(gate, now=now)["hold"])
+
+            # Mixed or non-feed reasons hold in both purposes.
+            for reasons in (
+                ["internally-repairable-prs-open", "closure-observation-unknown"],
+                ["duplicate-issue-lanes-unresolved"],
+            ):
+                write_closure("red", reasons)
+                for purpose in ("admission", "controller-activation"):
+                    with self.subTest(reasons=reasons, purpose=purpose):
+                        verdict = helper.read_closure_stop_line(
+                            gate, now=now, purpose=purpose
+                        )
+                        self.assertTrue(verdict["hold"])
+                        self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+            # A non-string reasons list fails closed in both purposes.
+            write_closure("red", [{"code": "internally-repairable-prs-open"}])
+            for purpose in ("admission", "controller-activation"):
+                with self.subTest(purpose=purpose, reasons="non-string"):
+                    verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                    self.assertTrue(verdict["hold"])
+                    self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+            # A non-jovie product closure red with only feed reasons passes
+            # activation but still holds admission.
+            payload = _fleet_gate_payload(observed_at=observed)
+            payload["signals"]["productClosureHealth"] = {
+                "ovie": {
+                    "schema": "jovie-closure-health/v1",
+                    "authority": "Summer",
+                    "status": "red",
+                    "newIssueIntakeAllowed": False,
+                    "promotionContinues": True,
+                    "remediationContinues": True,
+                    "reasons": ["no-merge-progress-over-1h"],
+                }
+            }
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            activation = helper.read_closure_stop_line(
+                gate, now=now, product_id="ovie", purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(activation["reason"], "closure-health-repair-feed")
+            self.assertEqual(activation["repairFeedReasons"], ["no-merge-progress-over-1h"])
+            admission = helper.read_closure_stop_line(gate, now=now, product_id="ovie")
+            self.assertTrue(admission["hold"])
+            self.assertEqual(admission["reason"], "closure-health-not-green")
+
+    def test_closure_stop_line_controller_activation_still_fails_closed(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 10, 14, 6, 0, tzinfo=dt.timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+            feed = ["internally-repairable-prs-open"]
+
+            # Missing receipt holds in both purposes.
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "fleet-gate-receipt-missing")
+
+            # Stale receipts hold in both purposes even with feed reasons.
+            payload = _fleet_gate_payload(
+                status="red", intake=False, observed_at="2026-09-10T13:55:00Z"
+            )
+            payload["signals"]["closureHealth"]["reasons"] = feed
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "fleet-gate-receipt-stale")
+
+            # Schema/authority violations hold in both purposes.
+            payload = _fleet_gate_payload(
+                status="red", intake=False, observed_at="2026-09-10T14:05:00Z"
+            )
+            payload["signals"]["closureHealth"]["reasons"] = feed
+            payload["signals"]["closureHealth"]["authority"] = "Gem"
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+
+            # An unknown purpose fails closed rather than relaxing anything.
+            payload["signals"]["closureHealth"]["authority"] = "Summer"
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            verdict = helper.read_closure_stop_line(gate, now=now, purpose="observe")
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-purpose-unknown")
+
+            # ClosureStopLine threads its purpose through _read_stop_line.
+            stop_line = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                purpose="controller-activation",
+            )
+            verdict = helper._read_stop_line(stop_line, now=now)
+            self.assertFalse(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-repair-feed")
+            admission_line = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            verdict = helper._read_stop_line(admission_line, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+    def test_repair_feed_reasons_mirror_gem_priority_gate(self):
+        helper = _load_helper()
+        gate_spec = importlib.util.spec_from_file_location(
+            "gem_priority_gate", ROOT / "scripts/symphony/gem-priority-gate.py"
+        )
+        assert gate_spec and gate_spec.loader
+        gate = importlib.util.module_from_spec(gate_spec)
+        sys.modules[gate_spec.name] = gate
+        gate_spec.loader.exec_module(gate)
+        self.assertEqual(
+            helper.REPAIR_FEED_REASONS,
+            frozenset(
+                {
+                    "internally-repairable-prs-open",
+                    "no-merge-progress-over-1h",
+                    "queue-controller-red-over-10m",
+                }
+            ),
+        )
+        self.assertEqual(gate.REPAIR_FEED_REASONS, helper.REPAIR_FEED_REASONS)
 
     def test_closure_hold_releases_when_receipt_turns_green(self):
         helper = _load_helper()
@@ -1520,6 +1925,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             codex_entry = target_home / ".local/bin/symphony-codex-entry"
             codex_entry.write_bytes(agent_router.read_bytes())
             codex_entry.chmod(0o755)
+            # Keep this Linux package transaction offline and platform-independent,
+            # using the same strict npm fixture as the provider promotion suite.
+            from provider_cli_fixtures import install_fake_npm
+            _, npm = install_fake_npm(pathlib.Path(tmp))
+            env = {**env, "PATH": str(npm.parent) + os.pathsep + env.get("PATH", "")}
             promoted = subprocess.run(
                 ["bash", str(updater), "--provider-runtime-only"],
                 cwd=ROOT,

@@ -1,14 +1,15 @@
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import type { BrandMarkSize } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 interface LogoLoaderProps {
-  readonly size?: number;
+  readonly size?: BrandMarkSize;
   readonly className?: string;
   readonly 'aria-label'?: string;
 }
 
 export function LogoLoader({
-  size = 32,
+  size = 'splash',
   className,
   'aria-label': ariaLabel = 'Loading',
 }: LogoLoaderProps) {

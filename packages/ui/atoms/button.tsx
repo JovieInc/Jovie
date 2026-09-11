@@ -35,10 +35,11 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
 const ICON_HIT_TARGET_44 =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
-// Every text size name is a compatibility alias for the founder-selected
-// 28px control, with one typography/padding contract and a 44px hit target.
+// ActionButton / product CTAs (Tim KEEP 2026-09-10): 28px visible pill,
+// weight 510, radius 999. Mobile wraps that pill in a 44px tap target.
+// Not 32-in-44 and not density-32 on every size.
 const TEXT_BUTTON_CLASSES =
-  'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+  'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] max-sm:before:h-11 max-sm:before:min-w-11';
 
 const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: TEXT_BUTTON_CLASSES,

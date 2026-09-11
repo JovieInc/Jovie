@@ -505,8 +505,10 @@ jobs:
           echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
           echo "authorized=true" >> "$GITHUB_OUTPUT"
 
-          # Manual production may rebuild, but cannot bypass verification.
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          # Explicit staging/force rebuilds may skip deduplication, but a
+          # production reconciliation must load the last proven publication.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] &&
+            { [ "$environment" = "staging" ] || [ "$MANUAL_FORCE_REBUILD" = "true" ]; }; then
             exit 0
           fi
 
@@ -770,6 +772,14 @@ jobs:
 
           if [ "$publish_marker_presence_count" -gt 0 ] && [ -z "$baseline_sha" ]; then
             echo "::error::$publish_marker_presence_count desktop publish marker(s) existed, but none fully proved a release."
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] &&
+            [ "$environment" = "production" ] &&
+            [ "$MANUAL_FORCE_REBUILD" != "true" ] &&
+            [ -z "$baseline_sha" ]; then
+            echo "::error::Production desktop reconciliation requires a proven desktop publish baseline."
             exit 1
           fi
 
@@ -1216,8 +1226,22 @@ jobs:
           # Echo identity for build-log breadcrumb (no secret in output).
           security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
 
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              awk '/"Developer ID Application:/{print $2}'
+          )"
+          SIGNING_IDENTITY_COUNT="$(
+            printf '%s\n' "$SIGNING_IDENTITY" |
+              awk 'NF { count++ } END { print count + 0 }'
+          )"
+          [ "$SIGNING_IDENTITY_COUNT" -eq 1 ] || {
+            echo "::error::Expected exactly one Developer ID Application identity."
+            exit 1
+          }
+
           rm -f "$CERT_PATH"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "JOVIE_MAC_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
 
       # Notarization uses App Store Connect API keys instead of an Apple ID +
       # app-specific password. @electron/notarize (which electron-builder
@@ -1249,7 +1273,7 @@ jobs:
         if: env.ENVIRONMENT == 'staging'
         env:
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
-          JOVIE_STAGING_RELEASE: 'true'
+          JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           # Apple notarization via App Store Connect API key. All three are
           # required by @electron/notarize when notarize: true is set; if any
@@ -1383,6 +1407,8 @@ jobs:
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production'
         env:
+          JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
+          JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -1390,6 +1416,36 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
         run: pnpm --filter @jovie/desktop package:production
+
+      - name: Verify production desktop artifact set
+        if: env.ENVIRONMENT == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::VERSION is not a valid desktop semver."
+            exit 1
+          }
+
+          production_app="apps/desktop/dist/mac-universal/Jovie.app"
+          [ -d "$production_app" ] || {
+            echo "::error::Packaged production app bundle is missing."
+            exit 1
+          }
+          codesign --verify --deep --strict "$production_app"
+          spctl --assess --type execute --verbose=2 "$production_app"
+          xcrun stapler validate "$production_app"
+
+          production_dmg="apps/desktop/dist/Jovie-${release_version}-universal.dmg"
+          [ -f "$production_dmg" ] || {
+            echo "::error::Packaged production disk image is missing."
+            exit 1
+          }
+          codesign --verify --verbose=2 "$production_dmg"
+          xcrun stapler validate "$production_dmg"
+          spctl --assess --type open --context context:primary-signature \
+            --verbose=2 "$production_dmg"
 
       - name: Publish production desktop release
         id: publish-production

@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/provider-runtime-promotion.test.py"
 TARGETS = {
     "provider_runtime_promotion.py": set(),
+    "codex_cli_artifact.py": set(),
 }
 
 

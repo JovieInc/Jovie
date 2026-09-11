@@ -110,9 +110,32 @@ class HyperagentLifecycleTests(unittest.TestCase):
             changed = {**self.envelope, field: ""}
             self.assertEqual(lifecycle.validate_dispatch(changed, self.now)["decision"], "HOLD")
 
-    def test_repository_keeps_hyperagent_ineligible(self):
+    def test_registry_admits_hyperagent_as_post_subscription_gateway_pool(self):
         registry = json.loads((ROOT / "scripts/symphony/config/model-registry.json").read_text())
-        self.assertFalse(any(model["provider"] == "hyperagent" for model in registry["models"]))
+        hyperagent = [model for model in registry["models"] if model["provider"] == "hyperagent"]
+        self.assertEqual(
+            [model["id"] for model in hyperagent],
+            [
+                "hyperagent-glm-5.3-flash",
+                "hyperagent-glm-5.3",
+                "hyperagent-kimi-k3",
+                "hyperagent-deepseek-v4",
+                "hyperagent-astra",
+            ],
+        )
+        for model in hyperagent:
+            self.assertEqual(model["channel"], "api")
+            self.assertEqual(model["cost_tier"], "gateway-budgeted-paid")
+            self.assertEqual(model["pool"], "hyperagent")
+            self.assertEqual(model["probe_mode"], "json-model-key")
+        for chain in registry["route_chains"].values():
+            last_subscription = max(
+                chain.index(model["id"])
+                for model in registry["models"]
+                if model["channel"] == "subscription"
+            )
+            for model in hyperagent:
+                self.assertGreater(chain.index(model["id"]), last_subscription)
 
     def test_preflight_fails_closed_on_identity_auth_scope_mode_and_hash(self):
         mutations = (

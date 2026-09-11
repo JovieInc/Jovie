@@ -2,9 +2,10 @@
 
 > Canonical machine-readable source for migrated base-token families:
 > `apps/web/design/tokens.json`. The compiler emits CSS, TypeScript, and the
-> agent manifest; generated files are never edited by hand. Color projection
-> remains owned by `apps/web/design/oklch-palette.json` and
-> `apps/web/styles/design-system.css` until its divergence-safe migration wave.
+> agent manifest; generated files are never edited by hand. Color hexes are
+> owned by Pen node ZiaWI (`apps/web/design/ziawi-color-sot.json`,
+> `ziawi-color-sot-v1`). `oklch-palette.json` and `design-system.css` project
+> that node — they are not a parallel React-only color root.
 
 ## Overview
 
@@ -39,7 +40,8 @@ writes `styles/generated/design-tokens.css`,
 ### `apps/web/styles/design-system.css`
 
 This is the live semantic emitter and projection layer for token families that
-have not yet moved into the compiler:
+have not yet moved into the compiler. Color hexes project Pen node ZiaWI
+(`ziawi-color-sot-v1`); do not author a second color root here:
 
 - color tokens
 - surface tokens
@@ -125,9 +127,10 @@ are not described by the marketing or public-surface shell libraries.
 Shell V1 app chrome should prefer the semantic `--app-shell-*` aliases for
 shared geometry and surfaces. These aliases live in `design-system.css` and
 resolve to Linear-derived geometry with **Jovie Noir Ion** dark color anchors
-(JOV-4635): canvas `#030407`, shell `#06080D`, panel `#0A0D16`, card `#0F1420`,
-Ion focus/selection `#11AFFF`. Product tokens map from `--noir-ion-*` anchors
-in `design-system.css` (no parallel theme provider).
+(JOV-4635 / Pen node ZiaWI, Tim KEEP 2026-09-10): canvas `#030407`, shell `#06080D`,
+card `#0F1420`, elevated `#151B2A`, floating `#1B2436`. Product focus is ion
+`#11AFFF`. Panel / glass are retired. Product tokens project `--noir-ion-*`
+from `ziawi-color-sot-v1` (no parallel theme provider or React-only color root).
 
 - `--app-shell-sidebar-width`
 - `--app-shell-header-height`
@@ -163,9 +166,9 @@ Both are live marketing pages, not canonical design-system review surfaces.
 
 - Add generated brand, gray, and radius tokens in `design/tokens.json` and
   rebuild; never duplicate them in `design-system.css`.
-- Keep authored OKLCH color values in `design/oklch-palette.json` and their live
-  projection in `design-system.css` until the color migration wave moves that
-  ownership explicitly.
+- Keep color hexes in `design/ziawi-color-sot.json` (Pen node ZiaWI). OKLCH in
+  `design/oklch-palette.json` and live CSS in `design-system.css` are
+  projections of that SoT.
 - Keep `theme.css` as an extension layer, not a competing token source.
 - Reuse `components/marketing/*` for shared marketing-page primitives.
 - Reuse `components/organisms/public-surface/*` for shared public-facing shell
@@ -212,9 +215,9 @@ these, not redefine them.
     Wave 4).
 - **Canonical button variants** — `primary`, `secondary`, `tertiary`, `ghost`,
   and `link`; destructive styling is `destructive`, not a variant.
-- **Canonical button sizes** — `sm` = 28px, `marketing` = 32px visible inside a
-  44px minimum hit target, `md` = 36px, `lg` = 44px; `icon` uses the `md`
-  control height with equal width.
+- **Canonical button sizes** — `sm`, `marketing`, `md`, and `lg` share one
+  28px visible ActionButton (weight 510, radius 999) inside a 44px mobile
+  tap target. Not 32-in-44. `icon` uses the `md` control height with equal width.
 
 ### Concentric radius-by-elevation
 

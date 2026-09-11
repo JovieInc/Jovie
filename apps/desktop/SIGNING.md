@@ -17,10 +17,11 @@ Without code signing:
   signature consistency between installed and downloaded versions
 - An installed user is permanently stuck on the version they first downloaded
 
-The desktop release pipeline is already built and runs automatically on push
-to `main`. It just needs these secrets to actually sign and notarize the
-output. When secrets are absent, the workflow still builds (unsigned DMG)
-but skips signing/notarization with a warning. Prod/staging register a LaunchAgent for closed-app updates.
+The desktop release pipeline is already built and runs automatically after the
+Production Controller verifies exact current `main`. It just needs these
+secrets to actually sign and notarize the output. When secrets are absent, the
+workflow still builds (unsigned DMG) but skips signing/notarization with a
+warning. Prod/staging register a LaunchAgent for closed-app updates.
 
 ## One-time setup (≈15 minutes)
 
@@ -108,14 +109,25 @@ gh workflow run desktop-release.yml -f environment=production
 gh run watch
 ```
 
+For a non-forced production reconciliation, pass `-f force_rebuild=false`.
+That path cross-proves the last `desktop-production-published` marker and
+compares the full range from that published generation to current `main`. It
+fails closed if no durable production baseline can be proven.
+
 A successful run produces a release at <https://github.com/JovieInc/Jovie/releases/latest>
-with a signed `Jovie-<version>-universal.dmg`. Verify signing on the artifact:
+with a signed, notarized, and stapled `Jovie-<version>-universal.dmg`. Verify
+both the downloaded container and the app inside it:
 
 ```bash
 # After downloading the DMG:
+codesign --verify --verbose=2 Jovie-<version>-universal.dmg
+xcrun stapler validate Jovie-<version>-universal.dmg
+spctl --assess --type open --context context:primary-signature --verbose=2 \
+  Jovie-<version>-universal.dmg
 hdiutil attach Jovie-<version>-universal.dmg
-codesign -dv --verbose=4 /Volumes/Jovie/Jovie.app
-spctl --assess -vv /Volumes/Jovie/Jovie.app
+codesign --verify --deep --strict /Volumes/Jovie/Jovie.app
+xcrun stapler validate /Volumes/Jovie/Jovie.app
+spctl --assess --type execute --verbose=2 /Volumes/Jovie/Jovie.app
 # Expected: "accepted" + "source=Notarized Developer ID"
 ```
 
@@ -139,8 +151,9 @@ download the first signed build once. The renderer `useDesktopUpdate` hook
 falls back to opening the GitHub releases page when the bridge is unusable
 (see `apps/web/lib/desktop/electron-bridge.ts`).
 
-After installing the first signed build, every subsequent push triggers an
-auto-update they can apply with one click.
+After installing the first signed build, subsequent production-impacting
+desktop changes on verified `main` trigger an auto-update they can apply with
+one click.
 
 ## Cost & cadence
 
@@ -163,6 +176,8 @@ auto-update they can apply with one click.
 
 - `apps/desktop/electron-builder.yml` — production signing config
 - `apps/desktop/electron-builder.staging.yml` — staging signing config
+- `apps/desktop/scripts/notarize-release-dmg.cjs` — shared DMG signing,
+  notarization, stapling, and updater-metadata finalization hook
 - `apps/desktop/build/entitlements.mac.plist` — hardened-runtime entitlements
 - `.github/workflows/desktop-release.yml` — auto-trigger + keychain setup + build
 - `apps/web/lib/desktop/electron-bridge.ts` — guarded renderer wrappers + fallback

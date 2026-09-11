@@ -47,7 +47,7 @@ export function HomeV1Design() {
               className='inline-flex items-center gap-2 text-white dark:text-white focus-ring-themed rounded-md'
               aria-label='Jovie Home'
             >
-              <BrandLogo size={20} tone='white' aria-hidden />
+              <BrandLogo size='chrome' tone='white' aria-hidden />
               <span className='text-mid font-semibold'>Jovie</span>
             </Link>
             <div className='flex items-center gap-2'>

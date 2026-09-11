@@ -11,13 +11,14 @@ import {
 export const SUMMER_CONVERSATION_ID = 'summer-session-current';
 export const SUMMER_CONVERSATION_MODEL = 'zai/glm-5.3-flash';
 const eventIdSchema = z.string().regex(/^sum_[A-Za-z0-9_-]{24}$/u);
+export const summerDeploymentIdSchema = z.string().regex(/^dpl_[A-Za-z0-9]+$/u);
 export const conversationInputSchema = z
   .object({
     eventId: eventIdSchema,
     conversationId: z.literal(SUMMER_CONVERSATION_ID),
     previousEventId: eventIdSchema.nullable(),
     principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
-    deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
+    deploymentId: summerDeploymentIdSchema,
     message: z.string().trim().min(1).max(4000),
     canonicalTailRecovery: z.boolean().optional(),
     history: z
@@ -35,7 +36,7 @@ const acceptedRecordSchema = z
     eventId: eventIdSchema,
     conversationId: z.literal(SUMMER_CONVERSATION_ID),
     principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
-    deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
+    deploymentId: summerDeploymentIdSchema,
     sessionId: z.string().regex(/^ses_/u),
     startIndex: z.number().int().nonnegative().safe(),
     model: z.literal(SUMMER_CONVERSATION_MODEL),

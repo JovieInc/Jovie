@@ -16,6 +16,32 @@
 export const JOVIE_VIEWBOX = { width: 360, height: 360 } as const;
 
 /**
+ * Locked mark size ladder (KEEP 2026-09-10 / splash-b-everywhere-v1).
+ * Matches the existing Logo.tsx icon scale (xs/sm/md/lg) — no new mark shape.
+ * Splash is 32px only: tiny centered cream mark on an empty field.
+ * Chrome/header uses 20px. Do not pass ad-hoc pixel sizes.
+ */
+export const BRAND_MARK_SIZE = {
+  compact: 16,
+  chrome: 20,
+  control: 24,
+  splash: 32,
+} as const;
+
+export type BrandMarkSizeName = keyof typeof BRAND_MARK_SIZE;
+export type BrandMarkSizePx = (typeof BRAND_MARK_SIZE)[BrandMarkSizeName];
+export type BrandMarkSize = BrandMarkSizeName | BrandMarkSizePx;
+
+export const BRAND_MARK_CREAM = '#F5F4F0' as const;
+
+export function resolveBrandMarkSize(
+  size: BrandMarkSize = 'chrome'
+): BrandMarkSizePx {
+  if (typeof size === 'number') return size;
+  return BRAND_MARK_SIZE[size];
+}
+
+/**
  * Brand skin variants for the app shell (JOV-4083 / #13493).
  * 'jovie' is the customer product; 'ov' is the internal/admin skin.
  */
@@ -81,12 +107,11 @@ export const PALETTE = {
   ],
   feature: [
     { name: 'Ion', hex: '#11AFFF' },
-    { name: 'Ultra', hex: '#A982FF' },
-    { name: 'Pulse', hex: '#FF48D2' },
-    { name: 'Aqua', hex: '#24F6D2' },
-    { name: 'Mint', hex: '#39E58C' },
-    { name: 'Orange', hex: '#FFC857' },
-    { name: 'Red', hex: '#FF677D' },
+    { name: 'Ultra', hex: '#8E56F5' },
+    { name: 'Pulse', hex: '#F52BB5' },
+    { name: 'Mint', hex: '#3FFA8B' },
+    { name: 'Orange', hex: '#FF7800' },
+    { name: 'Red', hex: '#F72A36' },
     { name: 'Gray', hex: '#8D8D93' },
   ],
 } as const;

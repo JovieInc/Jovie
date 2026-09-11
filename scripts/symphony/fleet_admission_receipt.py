@@ -470,6 +470,42 @@ def _project_closure_admission(value: object) -> dict[str, Any]:
     reasons = admission.get("reasons")
     if isinstance(reasons, list) and all(isinstance(reason, str) for reason in reasons):
         projected["reasons"] = list(reasons)
+    products = admission.get("products")
+    if isinstance(products, dict) and products:
+        projected_products: dict[str, dict[str, Any]] = {}
+        for product_id, row in products.items():
+            if not isinstance(product_id, str) or not product_id or not isinstance(row, dict):
+                raise AdmissionProjectionError("closureAdmission.products is malformed")
+            product_status = row.get("status")
+            product_intake = _require_bool(
+                row.get("newIssueIntakeAllowed"),
+                f"closureAdmission.products.{product_id}.newIssueIntakeAllowed",
+            )
+            if product_status not in CLOSURE_STATUSES:
+                raise AdmissionProjectionError(
+                    f"closureAdmission.products.{product_id}.status is invalid"
+                )
+            if product_intake is not (product_status == "healthy"):
+                raise AdmissionProjectionError(
+                    f"closureAdmission.products.{product_id} contradicts intake"
+                )
+            if row.get("remediationContinues") is not True:
+                raise AdmissionProjectionError(
+                    f"closureAdmission.products.{product_id} must preserve remediation"
+                )
+            projected_products[product_id] = {
+                "productId": product_id,
+                "status": product_status,
+                "newIssueIntakeAllowed": product_intake,
+                "promotionContinues": True,
+                "remediationContinues": True,
+            }
+            product_reasons = row.get("reasons")
+            if isinstance(product_reasons, list) and all(
+                isinstance(reason, str) for reason in product_reasons
+            ):
+                projected_products[product_id]["reasons"] = list(product_reasons)
+        projected["products"] = projected_products
     return projected
 
 

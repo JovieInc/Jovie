@@ -66,5 +66,10 @@ describe('HomeV1Design', () => {
     expect(rawDocument.body.textContent).toContain(
       'Built for artists and teams replacing scattered release work'
     );
+    expect(
+      rawDocument
+        .querySelector('[data-brand-mark-size]')
+        ?.getAttribute('data-brand-mark-size')
+    ).toBe('20');
   });
 });

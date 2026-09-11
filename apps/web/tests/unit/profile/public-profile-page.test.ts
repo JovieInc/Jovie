@@ -865,16 +865,17 @@ describe('Public Profile Page Logic', () => {
 });
 
 describe('profile mode route redirects', () => {
-  it('keeps the canonical profile admission URL backed by the production canary', async () => {
+  it('keeps the canonical profile admission URL source-backed and database-independent', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
 
-    expect(redirects).toContainEqual({
-      source: '/unfazed',
-      destination: '/authqaprod',
-      permanent: false,
-    });
+    expect(redirects).not.toContainEqual(
+      expect.objectContaining({ source: '/unfazed/:path*' })
+    );
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      "username.toLowerCase() === 'unfazed'"
+    );
   });
 
   it('does not shadow smart-link slugs with config-level redirects', async () => {

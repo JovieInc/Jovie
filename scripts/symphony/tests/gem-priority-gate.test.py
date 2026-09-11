@@ -1013,6 +1013,36 @@ class DeploymentBindingTests(unittest.TestCase):
                     evidence = MODULE.observe_concurrency(path, now)
                     self.assertEqual(evidence["accepted"], expected)
 
+    def test_jovie_mq_red_does_not_freeze_lyb_or_ovie_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "repository": "JovieInc/Jovie",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ],
+        }
+
+        receipt = self.evaluate(signals)
+        products = receipt["closureAdmission"]["products"]
+
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["logyourbody"])
+        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["ovie"])
+        self.assertTrue(receipt["closureAdmission"]["remediationContinues"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+
     def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
         signals = dict(GREEN_SIGNALS)
         signals["closureHealth"] = {
@@ -1397,6 +1427,15 @@ class DeploymentBindingTests(unittest.TestCase):
         for status, reasons in (
             ("grace", []),
             ("red", ["queue-controller-red-over-10m"]),
+            ("red", ["internally-repairable-prs-open", "no-merge-progress-over-1h"]),
+            (
+                "red",
+                [
+                    "internally-repairable-prs-open",
+                    "no-merge-progress-over-1h",
+                    "queue-controller-red-over-10m",
+                ],
+            ),
         ):
             with self.subTest(status=status):
                 signals = dict(GREEN_SIGNALS)

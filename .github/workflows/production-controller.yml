@@ -973,6 +973,15 @@ jobs:
             echo "::error::Exact source CI authorization failed."
             exit 1
           fi
+          if [ "${{ needs.production-release.outputs.superseded_before_promotion }}" = "true" ]; then
+            if [ "${{ needs.production-release.result }}" = "success" ] &&
+              [ "${{ needs.production-release.outputs.released }}" != "true" ]; then
+              echo "::notice::Release generation was intentionally superseded before production promotion; leaving verified=false without a marker or success notification."
+              exit 0
+            fi
+            echo "::error::Pre-promotion supersession output contradicted the production release result."
+            exit 1
+          fi
           if [ "${{ needs.production-release.result }}" != "success" ] ||
             [ "${{ needs.production-release.outputs.released }}" != "true" ]; then
             echo "::error::Production release did not complete successfully."
@@ -1034,7 +1043,7 @@ jobs:
 
       - name: Finalize exact current release generation
         id: finalize
-        if: ${{ always() && (steps.current.outputs.is_current == 'true' || steps.verify.outputs.canonical_verified == 'true') }}
+        if: ${{ always() && needs.production-release.outputs.superseded_before_promotion != 'true' && (steps.current.outputs.is_current == 'true' || steps.verify.outputs.canonical_verified == 'true') }}
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}

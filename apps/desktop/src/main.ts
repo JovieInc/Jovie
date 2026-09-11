@@ -1159,11 +1159,11 @@ function buildDesktopShellHtml(input: {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${input.title}</title>
     <style>
-      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; }
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; --system-b-mark-cream: ${SYSTEM_B_DESKTOP_TOKENS.markCream}; }
       html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); color: var(--system-b-text-primary); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
       body { display: grid; place-items: center; overflow: hidden; }
-      .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; }
-      .mark { position: absolute; left: 50%; top: 50%; width: 180px; height: 180px; opacity: 0.035; pointer-events: none; transform: translate(-50%, -50%); }
+      .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; justify-items: center; }
+      .mark { width: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; height: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; color: var(--system-b-mark-cream); }
       .copy { position: relative; display: grid; gap: 8px; justify-items: center; }
       h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
       p { margin: 0; max-width: 34ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
@@ -1206,14 +1206,34 @@ function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
+function buildDesktopBootSplashHtml(): string {
+  const markPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
+  const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jovie</title>
+    <style>
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-mark-cream: ${markCream}; }
+      html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); }
+      body { display: grid; place-items: center; overflow: hidden; }
+      .mark { width: ${markPx}px; height: ${markPx}px; color: var(--system-b-mark-cream); }
+    </style>
+  </head>
+  <body>
+    <main role="main" aria-label="Jovie is loading" data-desktop-splash="splash-b">
+      <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
+        <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
+      </svg>
+    </main>
+  </body>
+</html>`;
+}
+
 function buildDesktopBootSplashUrl(): string {
-  const html = buildDesktopShellHtml({
-    title: 'Jovie',
-    heading: 'Loading Jovie',
-    body: 'Starting the app…',
-    identityHtml: renderDesktopBuildIdentitySection(desktopBuildIdentity),
-  });
-  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(buildDesktopBootSplashHtml())}`;
 }
 
 function buildDesktopAboutUrl(): string {
