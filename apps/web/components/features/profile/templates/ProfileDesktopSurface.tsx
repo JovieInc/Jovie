@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Bell,
   CalendarDays,
+  ChevronLeft,
   ChevronRight,
   Disc3,
   House,
@@ -16,7 +17,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -29,9 +31,16 @@ import type {
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
-import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
+import {
+  getPublicProfileHistoryServerSnapshot,
+  getPublicProfileHistorySnapshot,
+  resolveProfileSurfaceState,
+  shouldShowPublicProfileBackChevron,
+  subscribeToPublicProfileHistory,
+} from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
@@ -98,6 +107,7 @@ interface ProfileDesktopSurfaceProps {
   readonly onDrawerViewChange: (view: DrawerView) => void;
   readonly onOpenMenu: () => void;
   readonly onPlayClick: () => void;
+  readonly onBack?: () => void;
   readonly profileHref: string;
   readonly isSubscribed?: boolean;
   readonly contentPrefs?: Record<NotificationContentType, boolean>;
@@ -252,6 +262,7 @@ export function ProfileDesktopSurface({
   onDrawerViewChange,
   onOpenMenu,
   onPlayClick,
+  onBack,
   profileHref,
   isSubscribed = false,
   contentPrefs = {
@@ -266,6 +277,17 @@ export function ProfileDesktopSurface({
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => setIsHydrated(true), []);
+  const isSignedIn = useIsAuthenticated();
+  const hasHistoryDestination = useSyncExternalStore(
+    subscribeToPublicProfileHistory,
+    getPublicProfileHistorySnapshot,
+    getPublicProfileHistoryServerSnapshot
+  );
+  const showBackChevron = shouldShowPublicProfileBackChevron({
+    isProfileRoot: activeMode === 'profile',
+    hasHistoryDestination,
+    isSignedIn,
+  });
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
@@ -877,39 +899,55 @@ export function ProfileDesktopSurface({
         data-interactive-ready={isHydrated ? 'true' : undefined}
         data-testid='profile-desktop-surface'
       >
-        <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>
-          <nav
-            className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
-            aria-label='Profile Navigation'
-          >
-            {visiblePrimaryTabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activePrimaryTab === tab.mode;
-              return (
-                <button
-                  key={tab.mode}
-                  type='button'
-                  onClick={() => onModeSelect(tab.mode)}
-                  data-testid={`profile-primary-tab-${tab.mode}`}
-                  className={cn(
-                    'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
-                    isActive
-                      ? 'text-white dark:text-white'
-                      : 'text-white/50 hover:text-white/78'
-                  )}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon
+        <div
+          className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'
+          data-testid='profile-desktop-top-chrome'
+        >
+          <div className='flex min-w-0 items-center gap-2'>
+            {showBackChevron && onBack ? (
+              <CircleIconButton
+                onClick={onBack}
+                size='lg'
+                variant='pearlQuiet'
+                className='profile-top-chrome-icon text-white dark:text-white'
+                ariaLabel='Back'
+              >
+                <ChevronLeft className='h-5 w-5' />
+              </CircleIconButton>
+            ) : null}
+            <nav
+              className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
+              aria-label='Profile Navigation'
+            >
+              {visiblePrimaryTabs.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activePrimaryTab === tab.mode;
+                return (
+                  <button
+                    key={tab.mode}
+                    type='button'
+                    onClick={() => onModeSelect(tab.mode)}
+                    data-testid={`profile-primary-tab-${tab.mode}`}
                     className={cn(
-                      'h-4 w-4 shrink-0 transition-colors duration-subtle',
-                      isActive && 'text-white dark:text-white'
+                      'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
+                      isActive
+                        ? 'text-white dark:text-white'
+                        : 'text-white/50 hover:text-white/78'
                     )}
-                  />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 shrink-0 transition-colors duration-subtle',
+                        isActive && 'text-white dark:text-white'
+                      )}
+                    />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
           <button
             type='button'
