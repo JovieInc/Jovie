@@ -88,6 +88,18 @@ describe('HomepageCertifiedSections', () => {
       );
     }
 
+    const connectedDevice = document.querySelector(
+      '[data-homepage-testid="homepage-section-connected"] .ap-phone-frame'
+    );
+    const relationshipDevices = document.querySelectorAll(
+      '[data-homepage-testid="homepage-section-relationships"] .ap-phone-frame'
+    );
+    expect(connectedDevice).toHaveAttribute('data-size', 'md');
+    expect(relationshipDevices).toHaveLength(3);
+    for (const device of relationshipDevices) {
+      expect(device).toHaveAttribute('data-size', 'sm');
+    }
+
     // Real product exports only where the copy talks about the profile.
     expect(
       within(
