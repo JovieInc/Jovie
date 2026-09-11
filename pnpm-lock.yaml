@@ -272,8 +272,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/gateway':
-        specifier: ^3.0.79
-        version: 3.0.79(zod@4.3.6)
+        specifier: ^4.0.74
+        version: 4.0.78(zod@4.3.6)
       '@ai-sdk/react':
         specifier: ^4.0.100
         version: 4.0.100(react@19.2.8)(zod@4.3.6)
