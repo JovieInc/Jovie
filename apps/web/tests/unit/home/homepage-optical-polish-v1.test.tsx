@@ -73,6 +73,9 @@ describe('homepage-optical-polish-v1', () => {
     const heroCss = readHeroCss();
     const search = read('components/features/home/HeroSpotifySearch.tsx');
 
+    expect(heroCss).toMatch(
+      /\.homepage-name-search__field\s*\{[\s\S]*?--homepage-editorial-field:/
+    );
     expect(heroCss).toContain('--homepage-name-search-inset: var(--space-2);');
     expect(heroCss).toMatch(
       /min-height:\s*calc\(\s*var\(--space-6\)\s*\+\s*var\(--space-1\)\s*\+\s*var\(--homepage-name-search-inset\)\s*\*\s*2/

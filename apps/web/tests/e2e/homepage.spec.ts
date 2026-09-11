@@ -820,6 +820,7 @@ test.describe('Homepage', () => {
       closeSearch?.fieldHeight ?? 0,
       0
     );
+    expect(heroSearch?.fieldBackground).toBe(closeSearch?.fieldBackground);
 
     const input = page
       .getByTestId('homepage-editorial-hero-search')

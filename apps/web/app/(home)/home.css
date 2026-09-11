@@ -1992,11 +1992,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     var(--system-b-text-primary) 12%,
     transparent
   );
-  --homepage-editorial-field: color-mix(
-    in oklab,
-    var(--system-b-text-primary) 4%,
-    var(--system-b-bg-page)
-  );
 
   position: relative;
   display: grid;
@@ -2097,8 +2092,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin-top: var(--space-8);
 }
 
-/* Field geometry only. Illumination lives on InputAuraFrame. */
+/* Field geometry only. Illumination lives on InputAuraFrame.
+   The opaque interior token lives here so hero and close match. */
 .homepage-name-search__field {
+  --homepage-editorial-field: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 4%,
+    var(--system-b-bg-page)
+  );
   --homepage-name-search-inset: var(--space-2);
   /* 28px visible action + matching top/bottom/right inset = 44px pill. */
   min-height: calc(
