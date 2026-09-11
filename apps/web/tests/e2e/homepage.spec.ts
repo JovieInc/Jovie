@@ -529,17 +529,19 @@ test.describe('Homepage', () => {
           '.homepage-name-search__field'
         );
         const glow = element.querySelector<HTMLElement>(
-          ":scope > .group\\/aura > [aria-hidden='true']"
+          '.input-aura-frame__illumination'
         );
         if (!(field && glow)) return null;
         const fieldBounds = field.getBoundingClientRect();
         const glowBounds = glow.getBoundingClientRect();
+        const glowStyle = getComputedStyle(glow);
         return {
           fieldLeft: fieldBounds.left,
           fieldRight: fieldBounds.right,
           glowLeft: glowBounds.left,
           glowRight: glowBounds.right,
-          glowClipPath: getComputedStyle(glow).clipPath,
+          glowMaskComposite: glowStyle.maskComposite,
+          glowWebkitMaskComposite: glowStyle.webkitMaskComposite,
         };
       }),
     ]);
@@ -560,7 +562,11 @@ test.describe('Homepage', () => {
       searchMaterial?.fieldRight ?? Number.NaN,
       0
     );
-    expect(searchMaterial?.glowClipPath).not.toBe('none');
+    expect(
+      searchMaterial?.glowMaskComposite === 'exclude' ||
+        searchMaterial?.glowWebkitMaskComposite === 'xor' ||
+        searchMaterial?.glowWebkitMaskComposite === 'XOR'
+    ).toBe(true);
     await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
 
     await page.evaluate(() => {
@@ -755,6 +761,105 @@ test.describe('Homepage', () => {
       expect(notch.ratio).toBeLessThan(0.45);
       expect(notch.notchWidth).toBeLessThan(notch.frameWidth);
     }
+  });
+
+  test('optical polish keeps shared search geometry and a quiet hero field', async ({
+    page,
+  }) => {
+    await page.evaluate(() => document.fonts.ready);
+
+    const measureSearch = (root: string) =>
+      page.locator(root).evaluate(element => {
+        const field = element.querySelector<HTMLElement>(
+          '.homepage-name-search__field'
+        );
+        const glow = element.querySelector<HTMLElement>(
+          '.input-aura-frame__illumination'
+        );
+        const action = element.querySelector<HTMLElement>(
+          'button[data-size="marketing"]'
+        );
+        if (!(field && glow && action)) return null;
+        const fieldBox = field.getBoundingClientRect();
+        const actionBox = action.getBoundingClientRect();
+        const fieldStyle = getComputedStyle(field);
+        const glowStyle = getComputedStyle(glow);
+        return {
+          fieldHeight: fieldBox.height,
+          fieldBackground: fieldStyle.backgroundColor,
+          insetTop: actionBox.top - fieldBox.top,
+          insetBottom: fieldBox.bottom - actionBox.bottom,
+          insetRight: fieldBox.right - actionBox.right,
+          actionHeight: actionBox.height,
+          glowTop: glow.getBoundingClientRect().top,
+          fieldTop: fieldBox.top,
+          maskComposite: glowStyle.maskComposite,
+          treatment: element
+            .querySelector('[data-aura-treatment]')
+            ?.getAttribute('data-aura-treatment'),
+        };
+      });
+
+    const heroSearch = await measureSearch(
+      '[data-testid="homepage-editorial-hero-search"]'
+    );
+    const closeSearch = await measureSearch(
+      '[data-testid="homepage-close-search"]'
+    );
+    expect(heroSearch).not.toBeNull();
+    expect(closeSearch).not.toBeNull();
+    expect(heroSearch?.treatment).toBe('editorial');
+    expect(closeSearch?.treatment).toBe('editorial');
+    expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
+    expect(closeSearch?.actionHeight).toBeCloseTo(28, 0);
+    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
+    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
+    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetBottom ?? 0, 0);
+    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetRight ?? 0, 0);
+    expect(heroSearch?.fieldHeight).toBeCloseTo(
+      closeSearch?.fieldHeight ?? 0,
+      0
+    );
+
+    const input = page
+      .getByTestId('homepage-editorial-hero-search')
+      .getByRole('combobox');
+    const idleBackground = heroSearch?.fieldBackground;
+    await input.focus();
+    const focused = await measureSearch(
+      '[data-testid="homepage-editorial-hero-search"]'
+    );
+    expect(focused?.fieldBackground).toBe(idleBackground);
+    expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
+
+    const lightWell = page.locator('.homepage-editorial-hero__light-well');
+    expect(
+      await lightWell.evaluate(element => {
+        const style = getComputedStyle(element);
+        return {
+          borderWidth: style.borderWidth,
+          backgroundImage: style.backgroundImage,
+        };
+      })
+    ).toMatchObject({
+      borderWidth: '0px',
+      backgroundImage: expect.not.stringMatching(/55\.1%/),
+    });
+
+    await page.setViewportSize({ width: 900, height: 800 });
+    await page.evaluate(() => document.fonts.ready);
+    const heading = page.getByRole('heading', {
+      name: 'Control how the world sees you.',
+    });
+    const headingLines = await heading.evaluate(element => {
+      const style = getComputedStyle(element);
+      return Math.ceil(
+        element.getBoundingClientRect().height /
+          Number.parseFloat(style.lineHeight) -
+          0.05
+      );
+    });
+    expect(headingLines).toBe(1);
   });
 
   test('loads without critical console errors', async ({ page }) => {
