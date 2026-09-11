@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingTurnstile.test.tsx
 import { Skeleton } from '@jovie/ui';
 import { useReducedMotion } from 'motion/react';
 import Script from 'next/script';
