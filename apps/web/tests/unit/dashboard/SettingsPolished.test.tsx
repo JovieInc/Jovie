@@ -125,20 +125,20 @@ describe('SettingsPolished', () => {
     expect(document.getElementById('touring')).toBeNull();
   });
 
-  it.each([
-    'max',
-    'growth',
-  ])('passes the %s alias to both gated surfaces', plan => {
-    billingState.plan = plan;
-    render(<SettingsPolished artist={{ id: 'artist_1' } as Artist} />);
+  it.each(['max', 'growth'])(
+    'passes the %s alias to both gated surfaces',
+    plan => {
+      billingState.plan = plan;
+      render(<SettingsPolished artist={{ id: 'artist_1' } as Artist} />);
 
-    expect(screen.getByTestId('account-settings')).toHaveAttribute(
-      'data-growth',
-      'true'
-    );
-    expect(screen.getByTestId('audience-settings')).toHaveAttribute(
-      'data-growth',
-      'true'
-    );
-  });
+      expect(screen.getByTestId('account-settings')).toHaveAttribute(
+        'data-growth',
+        'true'
+      );
+      expect(screen.getByTestId('audience-settings')).toHaveAttribute(
+        'data-growth',
+        'true'
+      );
+    }
+  );
 });
