@@ -705,12 +705,30 @@ export function ProfileDesktopSurface({
                         {item.label}
                       </span>
                     </div>
-                    <Switch
-                      checked={checked}
-                      onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label={item.label}
-                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
-                    />
+                    {isSubscribed ? (
+                      // Subscribed visitors manage preferences in place: the
+                      // template's onTogglePref runs the real optimistic
+                      // mutation and rolls back on error.
+                      <Switch
+                        checked={checked}
+                        onCheckedChange={() =>
+                          onTogglePref(item.key as NotificationContentType)
+                        }
+                        aria-label={item.label}
+                        className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
+                      />
+                    ) : (
+                      // Unsubscribed visitors have no notification identity yet
+                      // (the prefs API requires an email/phone), so the row
+                      // routes into the subscribe flow instead — it must not
+                      // render a switch that flips and springs back.
+                      <Switch
+                        checked={false}
+                        onCheckedChange={() => onModeSelect('subscribe')}
+                        aria-label={item.label}
+                        className='data-[state=unchecked]:bg-white/14'
+                      />
+                    )}
                   </div>
                 );
               })}
