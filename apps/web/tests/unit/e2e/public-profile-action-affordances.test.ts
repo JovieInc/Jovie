@@ -17,7 +17,9 @@ const smokeSpec = readFileSync(
 describe('public profile smoke action affordances', () => {
   it('matches the desktop 1280×720 contract, not hidden compact tab chrome', () => {
     const selector = publicProfileActionAffordanceSelector();
-    const selectorSet = new Set<string>(PUBLIC_PROFILE_ACTION_AFFORDANCE_SELECTORS);
+    const selectorSet = new Set<string>(
+      PUBLIC_PROFILE_ACTION_AFFORDANCE_SELECTORS
+    );
 
     for (const testId of DESKTOP_PUBLIC_PROFILE_ACTION_TESTIDS) {
       const testIdSelector = `[data-testid="${testId}"]`;
@@ -39,6 +41,6 @@ describe('public profile smoke action affordances', () => {
 
   it('uses the shared desktop-aware selector list from the synthetic smoke spec', () => {
     expect(smokeSpec).toContain('publicProfileActionAffordanceSelector');
-    expect(smokeSpec).not.toContain("'[data-testid=\"profile-tab-bar\"]'");
+    expect(smokeSpec).not.toContain('\'[data-testid="profile-tab-bar"]\'');
   });
 });
