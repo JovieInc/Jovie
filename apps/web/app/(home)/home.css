@@ -2313,6 +2313,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-certified-section__copy {
+  /* Reading-width LIMIT inside the assigned column. Does not position the
+     column — desktop spans in the 900px grid do that. */
   max-width: 34rem;
 }
 
@@ -2354,7 +2356,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-certified-section__device {
   width: min(100%, 15rem);
   max-width: none;
-  padding: var(--space-2);
 }
 
 .homepage-certified-section__phones[data-count="3"]
@@ -2453,24 +2454,40 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (min-width: 900px) {
-  .homepage-certified-section[data-media="true"]
-    .homepage-certified-section__inner {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Shared 12-column contract for all six editorial sections. Left-copy,
+     right-copy, and media occupy the same spans whether or not media exists.
+     34rem stays a reading-width limit inside the assigned column. */
+  .homepage-certified-section__inner {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: clamp(var(--space-4), 2vw, var(--space-6));
+    row-gap: clamp(var(--space-8), 5vw, var(--space-16));
   }
 
-  .homepage-certified-section[data-media="true"][data-align="end"]
+  .homepage-certified-section[data-align="start"]
     .homepage-certified-section__copy {
-    order: 2;
+    grid-column: 1 / span 6;
   }
 
-  .homepage-certified-section[data-media="true"][data-align="end"]
+  .homepage-certified-section[data-align="end"]
+    .homepage-certified-section__copy {
+    grid-column: 7 / span 6;
+  }
+
+  .homepage-certified-section[data-align="start"]
     .homepage-certified-section__media {
-    order: 1;
+    grid-column: 7 / span 6;
   }
 
-  .homepage-certified-section[data-media="false"][data-align="end"]
-    .homepage-certified-section__copy {
-    margin-left: auto;
+  .homepage-certified-section[data-align="end"]
+    .homepage-certified-section__media {
+    grid-column: 1 / span 6;
+  }
+
+  /* Trio phones share a ~half-rail column here, so bezel tokens follow
+     the squeezed width. Notch already uses cqi. */
+  .homepage-certified-section__phones[data-count="3"]
+    .homepage-certified-section__device {
+    --ap-phone-scale: 0.367;
   }
 }
 
@@ -2478,7 +2495,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-certified-section__phones[data-count="3"]
     .homepage-certified-section__device {
     width: min(100%, 7.5rem);
-    padding: var(--space-1);
+    --ap-phone-scale: 0.3529;
+    --ap-phone-max-width: 7.5rem;
   }
 
   .homepage-certified-section__phones[data-count="3"]

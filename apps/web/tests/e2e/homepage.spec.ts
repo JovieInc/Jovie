@@ -677,6 +677,86 @@ test.describe('Homepage', () => {
     }
   });
 
+  test('editorial sections share one desktop column grid and scaled phone chrome', async ({
+    page,
+  }) => {
+    const measure = async (width: number) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+      return page.evaluate(() => {
+        const copies = [
+          ...document.querySelectorAll<HTMLElement>(
+            '.homepage-certified-section .homepage-certified-section__copy'
+          ),
+        ];
+        const starts = copies.map(copy => {
+          const section = copy.closest<HTMLElement>(
+            '.homepage-certified-section'
+          );
+          return {
+            align: section?.dataset.align ?? '',
+            left: copy.getBoundingClientRect().left,
+          };
+        });
+        const startLefts = starts
+          .filter(entry => entry.align === 'start')
+          .map(entry => entry.left);
+        const endLefts = starts
+          .filter(entry => entry.align === 'end')
+          .map(entry => entry.left);
+        const notches = [
+          ...document.querySelectorAll<HTMLElement>(
+            '.homepage-certified-section__phones[data-count="3"] .ap-phone-frame'
+          ),
+        ].map(frame => {
+          const notch = frame.querySelector<HTMLElement>(
+            '.ap-phone-frame__notch'
+          );
+          const frameWidth = frame.getBoundingClientRect().width;
+          const notchWidth = notch?.getBoundingClientRect().width ?? 0;
+          return { frameWidth, notchWidth, ratio: notchWidth / frameWidth };
+        });
+        return { startLefts, endLefts, notches };
+      });
+    };
+
+    const spread = (values: number[]) =>
+      Math.max(...values) - Math.min(...values);
+
+    const desktop = await measure(1440);
+    expect(spread(desktop.startLefts)).toBeLessThanOrEqual(2);
+    expect(spread(desktop.endLefts)).toBeLessThanOrEqual(2);
+    expect(desktop.endLefts[0] ?? 0).toBeGreaterThan(
+      (desktop.startLefts[0] ?? 0) + 80
+    );
+
+    const aboveSwitch = await measure(900);
+    const belowSwitch = await measure(899);
+    expect(spread(aboveSwitch.startLefts)).toBeLessThanOrEqual(2);
+    expect(spread(aboveSwitch.endLefts)).toBeLessThanOrEqual(2);
+    expect(aboveSwitch.endLefts[0] ?? 0).toBeGreaterThan(
+      (aboveSwitch.startLefts[0] ?? 0) + 40
+    );
+    expect(
+      spread([...belowSwitch.startLefts, ...belowSwitch.endLefts])
+    ).toBeLessThanOrEqual(2);
+
+    const mobile = await measure(390);
+    expect(
+      spread([...mobile.startLefts, ...mobile.endLefts])
+    ).toBeLessThanOrEqual(2);
+    expect(mobile.notches.length).toBeGreaterThan(0);
+    for (const notch of mobile.notches) {
+      expect(notch.ratio).toBeLessThan(0.45);
+      expect(notch.notchWidth).toBeLessThan(notch.frameWidth);
+    }
+  });
+
   test('loads without critical console errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', msg => {
