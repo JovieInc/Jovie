@@ -82,6 +82,10 @@ vi.mock('@/lib/dsp', () => ({
   sortDSPsByGeoPopularity: (value: unknown) => value,
 }));
 
+vi.mock('@/lib/profile-dsps', () => ({
+  getCanonicalProfileDSPs: () => [],
+}));
+
 const mockUseIsAuthenticated = vi.hoisted(() => vi.fn(() => false));
 
 vi.mock('@/hooks/useIsAuthenticated', () => ({
@@ -143,7 +147,7 @@ describe('ProfileCompactSurface', () => {
     mockUseIsAuthenticated.mockReturnValue(true);
     const onBack = vi.fn();
 
-    renderSurface({ onBack });
+    renderSurface({ onBack, allowSignedInEscape: true });
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(onBack).toHaveBeenCalledTimes(1);
@@ -160,7 +164,7 @@ describe('ProfileCompactSurface', () => {
   it('keeps the signed-in back control subject to hideBackButton', () => {
     mockUseIsAuthenticated.mockReturnValue(true);
 
-    renderSurface({ hideBackButton: true });
+    renderSurface({ hideBackButton: true, allowSignedInEscape: true });
 
     expect(
       screen.queryByRole('button', { name: 'Back' })
