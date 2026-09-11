@@ -243,4 +243,33 @@ describe('resolveProfileSurfaceState', () => {
       })
     ).toBe('profile-root');
   });
+
+  it('shows the root back chevron for a signed-in session without history', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('app-fallback');
+  });
+
+  it('uses history back for a signed-in session when history exists without a referrer', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 2,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('history-back');
+  });
 });

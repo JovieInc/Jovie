@@ -29,6 +29,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import {
@@ -761,11 +762,13 @@ export function ProfileCompactTemplate({
     setRequestedMode('listen');
   }, [clearCloseResetTimer, mergedDSPs.length]);
 
+  const isSignedIn = useIsAuthenticated();
   const handleBack = useCallback(() => {
     const action = resolvePublicProfileBackAction({
       isProfileRoot: requestedMode === 'profile',
       historyLength: globalThis.history.length,
       referrer: document.referrer,
+      isSignedIn,
     });
 
     if (action === 'profile-root') {
@@ -775,8 +778,13 @@ export function ProfileCompactTemplate({
 
     if (action === 'history-back') {
       globalThis.history.back();
+      return;
     }
-  }, [requestedMode]);
+
+    if (action === 'app-fallback') {
+      globalThis.location.assign(APP_ROUTES.DASHBOARD);
+    }
+  }, [isSignedIn, requestedMode]);
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -936,6 +944,7 @@ export function ProfileCompactTemplate({
             onDrawerViewChange={handleDrawerViewChange}
             onOpenMenu={() => openDrawerMode('menu')}
             onPlayClick={handlePlayClick}
+            onBack={handleBack}
             profileHref={profileHref}
             isSubscribed={isSubscribed}
             contentPrefs={contentPrefs}

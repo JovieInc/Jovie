@@ -345,15 +345,44 @@ export function hasPublicProfileHistoryDestination(params: {
   return params.historyLength > 1 && params.referrer.trim().length > 0;
 }
 
+export function subscribeToPublicProfileHistory() {
+  return () => {};
+}
+
+export function getPublicProfileHistorySnapshot() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+
+  return hasPublicProfileHistoryDestination({
+    historyLength: globalThis.history.length,
+    referrer: document.referrer,
+  });
+}
+
+export function getPublicProfileHistoryServerSnapshot() {
+  return false;
+}
+
+export type PublicProfileBackAction =
+  | 'profile-root'
+  | 'history-back'
+  | 'app-fallback'
+  | 'none';
+
 export function shouldShowPublicProfileBackChevron(params: {
   readonly isProfileRoot: boolean;
   readonly hasHistoryDestination: boolean;
+  readonly isSignedIn?: boolean;
   readonly forceHidden?: boolean;
 }): boolean {
   if (params.forceHidden) {
     return false;
   }
   if (!params.isProfileRoot) {
+    return true;
+  }
+  if (params.isSignedIn) {
     return true;
   }
   return params.hasHistoryDestination;
@@ -363,12 +392,20 @@ export function resolvePublicProfileBackAction(params: {
   readonly isProfileRoot: boolean;
   readonly historyLength: number;
   readonly referrer: string;
-}): 'profile-root' | 'history-back' | 'none' {
+  readonly isSignedIn?: boolean;
+}): PublicProfileBackAction {
   if (!params.isProfileRoot) {
     return 'profile-root';
   }
   if (hasPublicProfileHistoryDestination(params)) {
     return 'history-back';
+  }
+  // Signed-in SPA arrivals often have history but no document.referrer.
+  if (params.isSignedIn && params.historyLength > 1) {
+    return 'history-back';
+  }
+  if (params.isSignedIn) {
+    return 'app-fallback';
   }
   return 'none';
 }

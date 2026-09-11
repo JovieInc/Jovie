@@ -59,4 +59,30 @@ describe('public profile back destination', () => {
       })
     ).toBe('history-back');
   });
+
+  it('shows a signed-in root escape hatch and prefers history over the app fallback', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 3,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('history-back');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('app-fallback');
+  });
 });

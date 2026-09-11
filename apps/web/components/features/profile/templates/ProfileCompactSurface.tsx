@@ -28,13 +28,16 @@ import type { ProfilePrimaryActionCardRelease } from '@/features/profile/Profile
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
-  hasPublicProfileHistoryDestination,
+  getPublicProfileHistoryServerSnapshot,
+  getPublicProfileHistorySnapshot,
   resolveProfileSurfaceState,
   shouldShowPublicProfileBackChevron,
+  subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -251,21 +254,6 @@ function resolveActivePrimaryTab(params: {
   }
 }
 
-function subscribeToPublicProfileHistory() {
-  return () => {};
-}
-
-function getPublicProfileHistorySnapshot() {
-  return hasPublicProfileHistoryDestination({
-    historyLength: globalThis.history.length,
-    referrer: document.referrer,
-  });
-}
-
-function getPublicProfileHistoryServerSnapshot() {
-  return false;
-}
-
 export function ProfileCompactSurface({
   renderMode = 'interactive',
   presentation = 'standalone',
@@ -477,6 +465,9 @@ export function ProfileCompactSurface({
   const homeContentScrollClassName = 'min-h-0 flex-1';
   // Prefer current/based location for the hero pin; hometown lives in About.
   const locationLabel = artist.location?.trim() || null;
+  const isLivePublicProfile =
+    renderMode === 'interactive' && presentation !== 'embedded';
+  const isSignedIn = useIsAuthenticated() && isLivePublicProfile;
   const hasHistoryDestination = useSyncExternalStore(
     subscribeToPublicProfileHistory,
     getPublicProfileHistorySnapshot,
@@ -485,6 +476,7 @@ export function ProfileCompactSurface({
   const showBackChevron = shouldShowPublicProfileBackChevron({
     isProfileRoot: activeMode === 'profile',
     hasHistoryDestination,
+    isSignedIn,
     forceHidden: hideBackButton || isNotificationsFlowOpen,
   });
 

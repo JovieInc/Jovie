@@ -18,6 +18,7 @@ import { ProfileCompactTemplate } from '../../../components/features/profile/tem
 const {
   mockCanonicalProfileDSPs,
   mockUseProfileShell,
+  mockUseIsAuthenticated,
   mockProfileInlineNotificationsCTA,
   mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
@@ -25,6 +26,7 @@ const {
 } = vi.hoisted(() => ({
   mockCanonicalProfileDSPs: vi.fn(() => []),
   mockUseProfileShell: vi.fn(),
+  mockUseIsAuthenticated: vi.fn(() => false),
   mockProfileInlineNotificationsCTA: vi.fn(),
   mockProfileDesktopSurface: vi.fn(),
   mockProfileUnifiedDrawer: vi.fn(),
@@ -121,6 +123,10 @@ vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
     primaryChannel: null,
     isEnabled: false,
   }),
+}));
+
+vi.mock('@/hooks/useIsAuthenticated', () => ({
+  useIsAuthenticated: () => mockUseIsAuthenticated(),
 }));
 
 vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
@@ -240,6 +246,7 @@ describe('ProfileCompactTemplate', () => {
     originalMatchMedia = window.matchMedia;
     cleanup();
     mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseIsAuthenticated.mockReturnValue(false);
     mockUseProfileShell.mockReset();
     mockProfileInlineNotificationsCTA.mockClear();
     mockProfileDesktopSurface.mockClear();
@@ -318,6 +325,21 @@ describe('ProfileCompactTemplate', () => {
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
+  });
+
+  it('shows the floating back control on the public profile root for a signed-in session', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
   it('hides the floating back control on the public profile root first landing', async () => {
@@ -729,6 +751,72 @@ describe('ProfileCompactTemplate', () => {
       value: originalReferrer,
     });
     backSpy.mockRestore();
+  });
+
+  it('uses browser back for a signed-in arrival when history exists without a referrer', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi
+      .spyOn(window.location, 'assign')
+      .mockImplementation(() => {
+        // noop
+      });
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 3,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    backSpy.mockRestore();
+    assignSpy.mockRestore();
+  });
+
+  it('returns a signed-in arrival without history to the app dashboard', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi
+      .spyOn(window.location, 'assign')
+      .mockImplementation(() => {
+        // noop
+      });
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 1,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(assignSpy).toHaveBeenCalledWith('/app');
+
+    backSpy.mockRestore();
+    assignSpy.mockRestore();
   });
 
   it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
