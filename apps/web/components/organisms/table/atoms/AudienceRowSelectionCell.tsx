@@ -25,6 +25,8 @@ export function AudienceRowSelectionCell({
         className
       )}
     >
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation only — Checkbox is the control; row click must not fire */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: same — wrapper is not a control */}
       <div
         className='relative flex h-5 w-5 items-center justify-center'
         onClick={event => event.stopPropagation()}

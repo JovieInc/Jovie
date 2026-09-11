@@ -233,6 +233,7 @@ function CreatorProfileTableRowComponent({
       tabIndex={0}
       aria-selected={isSelected}
     >
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation only — checkbox inside is the control; row click must not fire */}
       <td
         className='w-14 px-4 py-3 align-middle'
         onClick={event => event.stopPropagation()}
@@ -302,6 +303,7 @@ function CreatorProfileTableRowComponent({
       <td className='max-md:hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-xs text-tertiary-token md:table-cell'>
         {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation only — icon actions inside are the controls; row click must not fire */}
       <td
         className='px-4 py-2.5 align-middle text-right'
         onClick={e => e.stopPropagation()}
