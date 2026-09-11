@@ -695,8 +695,9 @@ test.describe('Homepage', () => {
           ),
         ];
         const starts = copies.map(copy => {
-          const section =
-            copy.closest<HTMLElement>('.homepage-certified-section');
+          const section = copy.closest<HTMLElement>(
+            '.homepage-certified-section'
+          );
           return {
             align: section?.dataset.align ?? '',
             left: copy.getBoundingClientRect().left,
@@ -746,9 +747,9 @@ test.describe('Homepage', () => {
     ).toBeLessThanOrEqual(2);
 
     const mobile = await measure(390);
-    expect(spread([...mobile.startLefts, ...mobile.endLefts])).toBeLessThanOrEqual(
-      2
-    );
+    expect(
+      spread([...mobile.startLefts, ...mobile.endLefts])
+    ).toBeLessThanOrEqual(2);
     expect(mobile.notches.length).toBeGreaterThan(0);
     for (const notch of mobile.notches) {
       expect(notch.ratio).toBeLessThan(0.45);

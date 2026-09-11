@@ -57,7 +57,9 @@ describe('ArtistProfilePhoneFrame size-derived chrome (homepage-optical-polish-v
     expect(css).toContain('8.71cqi');
     expect(css).toContain('[data-size="sm"]');
     expect(css).toContain('[data-size="md"]');
-    expect(css).not.toMatch(/\.ap-phone-frame__notch[^{]*\{[^}]*\bwidth:\s*7rem/);
+    expect(css).not.toMatch(
+      /\.ap-phone-frame__notch[^{]*\{[^}]*\bwidth:\s*7rem/
+    );
   });
 
   it('rejects the unscaled-notch deliberate-red fixture that would overwhelm 7.5rem', () => {

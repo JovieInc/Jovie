@@ -17,10 +17,7 @@ function extractCertifiedCss(): string {
 }
 
 /** Right-copy / left-media start on the shared 12-col span-6 contract. */
-function sharedRightColumnStart(
-  innerWidth: number,
-  columnGap: number
-): number {
+function sharedRightColumnStart(innerWidth: number, columnGap: number): number {
   const track = (innerWidth - 11 * columnGap) / 12;
   return 6 * track + 6 * columnGap;
 }
@@ -34,7 +31,9 @@ describe('homepage certified optical grid (homepage-optical-polish-v1 item 1)', 
     const css = extractCertifiedCss();
     const desktop = css.slice(css.indexOf('@media (min-width: 900px)'));
 
-    expect(desktop).toContain('grid-template-columns: repeat(12, minmax(0, 1fr))');
+    expect(desktop).toContain(
+      'grid-template-columns: repeat(12, minmax(0, 1fr))'
+    );
     expect(desktop).toContain('grid-column: 1 / span 6');
     expect(desktop).toContain('grid-column: 7 / span 6');
     expect(desktop).not.toContain('repeat(2, minmax(0, 1fr))');
@@ -66,7 +65,9 @@ describe('homepage certified optical grid (homepage-optical-polish-v1 item 1)', 
     const sharedStart = sharedRightColumnStart(innerWidth, columnGap);
     const offsetStart = offsetCopyStart(innerWidth);
 
-    expect(HOMEPAGE_OFFSET_COPY_RED_CSS).toContain("data-deliberate-red='homepage-offset-copy'");
+    expect(HOMEPAGE_OFFSET_COPY_RED_CSS).toContain(
+      "data-deliberate-red='homepage-offset-copy'"
+    );
     expect(HOMEPAGE_OFFSET_COPY_RED_CSS).toContain('margin-left: auto');
     expect(HOMEPAGE_OFFSET_COPY_RED_CSS).toContain('max-width: 34rem');
     expect(css).not.toMatch(/margin-left:\s*auto/);
