@@ -41,16 +41,16 @@ describe('buildViewMetadata', () => {
   });
 
   it('titles routed modes mode-first so the URL-tab scan target is the intent', () => {
-    expect(buildViewMetadata('listen', BASELINE).title).toBe(
-      'Listen · The Weeknd · Jovie'
-    );
-    expect(buildViewMetadata('pay', BASELINE).title).toBe(
-      'Pay · The Weeknd · Jovie'
-    );
+    expect(buildViewMetadata('listen', BASELINE).title).toEqual({
+      absolute: 'Listen · The Weeknd · Jovie',
+    });
+    expect(buildViewMetadata('pay', BASELINE).title).toEqual({
+      absolute: 'Pay · The Weeknd · Jovie',
+    });
     // Base profile is artist-first.
-    expect(buildViewMetadata('profile', BASELINE).title).toBe(
-      'The Weeknd · Jovie'
-    );
+    expect(buildViewMetadata('profile', BASELINE).title).toEqual({
+      absolute: 'The Weeknd · Jovie',
+    });
   });
 
   it('opts routed-mode titles out of the root layout template', () => {
