@@ -11,6 +11,7 @@ import {
   CANONICAL_LIVE_STORIES,
   LIVE_VIEWPORTS,
   REPO_ROOT,
+  resolveLiveStoriesForRun,
   runLiveStorybookCertification,
   seededPassingObservations,
   validateCanonicalStoryInventory,
@@ -554,7 +555,12 @@ export async function collectLiveObservations(options = {}) {
           baseURL: `http://127.0.0.1:${port}`,
         });
         const page = await context.newPage();
-        for (const story of CANONICAL_LIVE_STORIES) {
+        for (const story of resolveLiveStoriesForRun({
+          storyIds: process.env.JOVIE_LIVE_STORY_IDS
+            ? process.env.JOVIE_LIVE_STORY_IDS.split(',').filter(Boolean)
+            : options.storyIds,
+          changedComponents: options.changedComponents,
+        })) {
           for (const viewport of LIVE_VIEWPORTS) {
             if (signal.aborted) {
               failCollect('live Storybook collect aborted; fail closed');
@@ -574,7 +580,15 @@ export async function collectLiveObservations(options = {}) {
 }
 
 export async function collectAndCertify(options = {}) {
-  const observations = await collectLiveObservations(options);
+  const storyIds =
+    options.storyIds ??
+    (process.env.JOVIE_LIVE_STORY_IDS
+      ? process.env.JOVIE_LIVE_STORY_IDS.split(',').filter(Boolean)
+      : undefined);
+  const observations = await collectLiveObservations({
+    ...options,
+    storyIds,
+  });
   const templates = new Map(
     seededPassingObservations().map(item => [item.id, item])
   );
@@ -592,6 +606,8 @@ export async function collectAndCertify(options = {}) {
     headSha: options.headSha,
     observations: merged,
     repoRoot: options.repoRoot,
+    storyIds,
+    changedComponents: options.changedComponents,
   });
 }
 
