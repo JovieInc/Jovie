@@ -98,7 +98,6 @@ const artist = {
   name: 'Tim White',
   handle: 'timwhite',
   spotify_id: '4u',
-  image_url: null,
   tagline: 'Producer, songwriter, and after-hours romantic.',
   location: null,
   hometown: null,
