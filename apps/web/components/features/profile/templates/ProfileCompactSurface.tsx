@@ -212,6 +212,12 @@ interface ProfileCompactSurfaceProps {
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
   readonly renderInteractiveOverlays?: boolean;
   readonly renderSemanticHeading?: boolean;
+  /**
+   * Client-resolved signed-in signal (profile-logged-in-escape-hatch-v1).
+   * Undefined on the server render / for logged-out visitors — the back
+   * chevron stays hidden at the profile root in both cases.
+   */
+  readonly isSignedIn?: boolean;
 }
 
 function resolveActivePrimaryTab(params: {
@@ -321,6 +327,7 @@ export function ProfileCompactSurface({
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
+  isSignedIn,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
@@ -486,6 +493,7 @@ export function ProfileCompactSurface({
     isProfileRoot: activeMode === 'profile',
     hasHistoryDestination,
     forceHidden: hideBackButton || isNotificationsFlowOpen,
+    isSignedIn,
   });
 
   const registerNotificationsReveal = useCallback(
