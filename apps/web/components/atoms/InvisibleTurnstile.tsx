@@ -65,7 +65,7 @@ export function isTurnstileClientBypassed(): boolean {
   return (
     process.env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    publicEnv.NEXT_PUBLIC_AUTH_MOCK === '1' ||
     isStorybookRuntime()
   );
 }

@@ -171,8 +171,11 @@ export default async function RootLayout({
     process.env.VERCEL_ENV === 'preview';
   const isPublicNoAuthSmokeRuntime =
     process.env.PUBLIC_NOAUTH_SMOKE === '1' && !isSecureVercelDeployment;
-  const clerkMockEnabled = process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
-  const clerkProxyDisabled =
+  const authMockEnabled =
+    process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+    process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
+  const authProxyDisabled =
+    process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1' ||
     process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
   const devEnv =
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
@@ -232,8 +235,8 @@ export default async function RootLayout({
     <html
       lang='en'
       className='dark'
-      data-clerk-mock={clerkMockEnabled ? '1' : undefined}
-      data-clerk-proxy-disabled={clerkProxyDisabled ? '1' : undefined}
+      data-auth-mock={authMockEnabled ? '1' : undefined}
+      data-auth-proxy-disabled={authProxyDisabled ? '1' : undefined}
       data-e2e-mode={
         isE2EClientRuntime ||
         isTestAuthBypassRuntime ||

@@ -65,7 +65,6 @@ vi.mock(
 vi.mock('@/lib/env-public', () => ({
   publicEnv: {
     NEXT_PUBLIC_BETTER_AUTH_URL: 'https://auth.example.test',
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_123',
   },
 }));
 
