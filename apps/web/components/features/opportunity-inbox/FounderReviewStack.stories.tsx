@@ -66,3 +66,41 @@ export const NoVisual: Story = {
     keyboardControlRef: { current: null },
   },
 };
+
+export const YoutubeThumbnailCandidate: Story = {
+  args: {
+    cards: [
+      {
+        ...baseCard,
+        id: 'yt-opportunity-1',
+        sourceKind: 'youtube.thumbnail_candidate',
+        typeLabel: 'YouTube Thumbnail',
+        title: 'Review thumbnail for The Last Time',
+        why: 'YouTube API snapshot captured Sep 1, 2026. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.',
+        primaryActionLabel: 'Approve Candidate',
+        category: 'youtube_thumbnail',
+        youtubeThumbnail: {
+          channelId: 'UC90tJdD38139ytPUdEZVl1A',
+          youtubeVideoId: 'video-1',
+          currentThumbnailUrl:
+            'https://i.ytimg.com/vi/aqz-KE-bpKQ/maxresdefault.jpg',
+          candidateImageUrl:
+            'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+          artifactSha256:
+            'aab81dd7f28d4421478c03e4d0d62a58ef13db556c4c52beacf56f24f782ba01',
+          apiMetrics: {
+            capturedAt: '2026-09-01T12:00:00.000Z',
+            views: 128_450,
+            watchTimeMinutes: 438_900,
+            avgViewDurationSeconds: 205,
+          },
+          publicationBlockedReason:
+            'direct-thumbnail-mutation-disabled-native-experiment-required',
+        },
+      } as OpportunityInboxCardViewModel & { readonly sourceKind: string },
+    ],
+    onApprove: () => {},
+    onReject: () => {},
+    keyboardControlRef: { current: null },
+  },
+};

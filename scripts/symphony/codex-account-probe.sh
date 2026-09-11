@@ -59,10 +59,12 @@ def finite_timeout(name, default):
 
 TIMEOUT = finite_timeout("PROBE_TIMEOUT", 15.0)
 TOTAL_TIMEOUT = finite_timeout("TOTAL_TIMEOUT", 30.0)
+RPC_TIMEOUT = finite_timeout("CODEX_ACCOUNT_PROBE_RPC_TIMEOUT", 8.0)
 MAX_RECOVERIES = int(os.environ["MAX_RECOVERIES"])
 TTL = int(os.environ["RECEIPT_TTL"])
 SOURCE = "authenticated_completion_probe/v1"
 READY_MARKER = "SYMPHONY_ACCOUNT_READY"
+EXHAUSTED_PERCENT = 99.5
 SAFE_ACCOUNT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SYSTEMD_RUN = shutil.which("systemd-run")
 SYSTEMCTL = shutil.which("systemctl")
@@ -445,6 +447,119 @@ def authenticated_probe(account, deadline):
     return "ready" if stdout.strip() == READY_MARKER else "indeterminate"
 
 
+def rpc_read_verdict(account, deadline):
+    """Fresh app-server account/rateLimits/read; only 'exhausted' skips the canary.
+
+    The official app-server account state is authoritative for reset windows, so
+    a snapshot proving the account is still limited makes the completion canary
+    unnecessary spend. 'available' and every failure mode fall through to the
+    canary, which remains the only proof that clears a cooldown.
+    Caller must hold the canonical account lease.
+    """
+    env = account_environment(account)
+    if env is None:
+        return "unknown"
+    remaining = deadline - time.monotonic()
+    budget = min(RPC_TIMEOUT, remaining)
+    if budget <= 0:
+        return "unknown"
+    try:
+        tree_token = os.urandom(16).hex()
+        env["SYMPHONY_PROCESS_TREE_TOKEN"] = tree_token
+        command, systemd_unit = process_command([REAL_CODEX, "app-server"])
+        process = subprocess.Popen(
+            command,
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            process.stdin.write(json.dumps({"id": 1, "method": "initialize", "params": {
+                "clientInfo": {"name": "codex-account-probe", "version": "1"},
+                "capabilities": {"experimentalApi": True}}}) + "\n")
+            process.stdin.write(json.dumps({"method": "initialized", "params": {}}) + "\n")
+            process.stdin.write(json.dumps(
+                {"id": 2, "method": "account/rateLimits/read", "params": {}}) + "\n")
+            process.stdin.flush()
+            result = "unknown"
+            end = time.monotonic() + budget
+            buffer = b""
+            done = False
+            while not done and time.monotonic() < end:
+                if process.poll() is not None and not select.select([process.stdout], [], [], 0)[0]:
+                    # The server exited: drain what it sent, but never wait on
+                    # a pipe a surviving child still holds open.
+                    break
+                # Cap each wait so a server dying mid-read is caught promptly.
+                ready = select.select(
+                    [process.stdout], [], [], min(0.1, max(0, end - time.monotonic()))
+                )[0]
+                if not ready:
+                    continue
+                chunk = os.read(process.stdout.fileno(), 65536)
+                if not chunk:
+                    break
+                buffer += chunk
+                if len(buffer) > 1048576:
+                    break
+                while b"\n" in buffer:
+                    line, buffer = buffer.split(b"\n", 1)
+                    try:
+                        message = json.loads(line)
+                    except ValueError:
+                        continue
+                    # Server->client requests and notifications carry a
+                    # method; a response to the read never does.
+                    if not isinstance(message, dict) or "method" in message:
+                        continue
+                    if message.get("id") != 2:
+                        continue
+                    if "error" not in message:
+                        result = snapshot_verdict(message.get("result"))
+                    done = True
+                    break
+            return result
+        finally:
+            scope_clean = stop_systemd_scope(systemd_unit)
+            terminate_tree(process, tree_token)
+            if not scope_clean:
+                return "unknown"
+    except (OSError, ValueError):
+        return "unknown"
+
+
+def snapshot_verdict(result):
+    if not isinstance(result, dict):
+        return "unknown"
+    rate_limits = result.get("rateLimits")
+    if not isinstance(rate_limits, dict):
+        return "unknown"
+    now = time.time()
+    saw_window = False
+    for name in ("primary", "secondary"):
+        window = rate_limits.get(name)
+        if window is None:
+            continue
+        if not isinstance(window, dict):
+            return "unknown"
+        used = window.get("usedPercent")
+        resets_at = window.get("resetsAt")
+        if isinstance(used, bool) or not isinstance(used, (int, float)):
+            return "unknown"
+        # resetsAt is nullable in the v2 schema: a saturated window without a
+        # known recovery instant is still exhausted (the canary would fail on
+        # the same limit), while a lapsed reset time needs the canary's proof.
+        if resets_at is not None and (isinstance(resets_at, bool) or not isinstance(resets_at, int)):
+            return "unknown"
+        saw_window = True
+        if used >= EXHAUSTED_PERCENT and (resets_at is None or resets_at > now):
+            return "exhausted"
+    return "available" if saw_window else "unknown"
+
+
 def probe_and_recover(account, observed_cooldown, observed_error, observed_active, observed_auth, observed_config, now, deadline):
     if LOCKS.exists() and LOCKS.is_symlink():
         return "indeterminate"
@@ -473,6 +588,10 @@ def probe_and_recover(account, observed_cooldown, observed_error, observed_activ
         if ((auth_path.stat().st_dev, auth_path.stat().st_ino) != observed_auth or
                 (config_path.stat().st_dev, config_path.stat().st_ino) != observed_config):
             return "indeterminate"
+        if rpc_read_verdict(account, deadline) == "exhausted":
+            # The authoritative account state still shows a bound window; the
+            # canary would fail on the same limit, so skip the spend.
+            return "not_ready"
         probe = authenticated_probe(account, deadline)
         if probe != "ready":
             return probe

@@ -1,5 +1,10 @@
 import { classifyAdmissionDisposition } from './admission-disposition.mjs';
-import { preAdmissionDecision } from './admission-policy.mjs';
+import {
+  isFounderSteeringAssignee,
+  preAdmissionDecision,
+} from './admission-policy.mjs';
+
+// JOV-INV-028: founder assignment carries steering, not a human hold.
 
 const AGENT_READY_LABELS = new Set(['agent-ready', 'ready-for-intake']);
 const BLOCKED_RELATIONS = new Set(['blocked_by', 'blockedBy']);
@@ -34,7 +39,8 @@ export function extractFollowupParentIdentifier(issue) {
 export function triageOwnershipDecision(issue) {
   const policy = preAdmissionDecision(issue);
   if (!policy.allowed) return { allowed: false, reason: policy.reason.code };
-  if (issue.assignee) return { allowed: false, reason: 'already-assigned' };
+  if (issue.assignee && !isFounderSteeringAssignee(issue))
+    return { allowed: false, reason: 'already-assigned' };
   const { ownership, evidence } = classifyAdmissionDisposition(issue);
   if (evidence.nestedEvidenceIncomplete) {
     return { allowed: false, reason: 'nested-evidence-incomplete' };

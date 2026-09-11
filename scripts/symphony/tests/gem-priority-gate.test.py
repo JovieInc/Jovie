@@ -451,7 +451,7 @@ AUTOENROLL_RECEIPT_JQ = """
 (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
 (.promotionAdmission.allowed | type == "boolean") and
 (.isolatedPromotionAdmission.allowed | type == "boolean") and
-(.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
+(.promotionMode | IN("normal", "isolated-only", "controller-repair-only", "draft-only", "hold-intake", "blocked"))
 """.strip()
 
 
@@ -500,7 +500,7 @@ def receipt_satisfies_autoenroll(receipt: dict[str, object]) -> bool:
         and isinstance(isolated, dict)
         and isinstance(isolated.get("allowed"), bool)
         and receipt.get("promotionMode")
-        in {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
+        in {"normal", "isolated-only", "controller-repair-only", "draft-only", "hold-intake", "blocked"}
     )
 
 
@@ -1013,6 +1013,36 @@ class DeploymentBindingTests(unittest.TestCase):
                     evidence = MODULE.observe_concurrency(path, now)
                     self.assertEqual(evidence["accepted"], expected)
 
+    def test_jovie_mq_red_does_not_freeze_lyb_or_ovie_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "repository": "JovieInc/Jovie",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ],
+        }
+
+        receipt = self.evaluate(signals)
+        products = receipt["closureAdmission"]["products"]
+
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["logyourbody"])
+        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["ovie"])
+        self.assertTrue(receipt["closureAdmission"]["remediationContinues"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+
     def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
         signals = dict(GREEN_SIGNALS)
         signals["closureHealth"] = {
@@ -1062,13 +1092,35 @@ class DeploymentBindingTests(unittest.TestCase):
         # New-issue intake stays closed; only promotion resumes.
         self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
-        # Any additional closure reason keeps the gate blocked.
+        # Unrelated closure debt still holds intake, not qualified source promotion.
         signals["closureHealth"]["reasons"] = [
             "native-queue-empty-with-eligible-over-15m",
             "duplicate-issue-lanes-unresolved",
         ]
         receipt = self.evaluate(signals)
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
+    def test_queue_empty_feed_does_not_mint_hold_intake_without_review(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "headSha": "b" * 40,
+        }
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["native-queue-empty-with-eligible-over-15m"],
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertNotEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["reviewAdmission"]["allowed"])
 
     def test_stale_or_missing_capacity_closes_mutation_admission(self):
         stale = MODULE.isoformat(MODULE.utc_now() - MODULE.timedelta(days=2))
@@ -1349,7 +1401,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
 
-    def test_failed_controller_observation_blocks_hold_intake(self):
+    def test_failed_controller_observation_preserves_qualified_source_admission(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
@@ -1362,7 +1414,85 @@ class DeploymentBindingTests(unittest.TestCase):
             "error": "controller-observation-failed: Connection refused",
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertFalse(receipt["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertTrue(receipt_satisfies_autoenroll(receipt))
+        self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
+
+    def test_controller_outage_closure_debt_does_not_deadlock_exact_repair(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        for status, reasons in (
+            ("grace", []),
+            ("red", ["queue-controller-red-over-10m"]),
+            ("red", ["internally-repairable-prs-open", "no-merge-progress-over-1h"]),
+            (
+                "red",
+                [
+                    "internally-repairable-prs-open",
+                    "no-merge-progress-over-1h",
+                    "queue-controller-red-over-10m",
+                ],
+            ),
+        ):
+            with self.subTest(status=status):
+                signals = dict(GREEN_SIGNALS)
+                signals["independentReview"] = {
+                    **GREEN_SIGNALS["independentReview"],
+                    "observedAt": MODULE.isoformat(now),
+                }
+                signals["controller"] = {"status": "failed"}
+                signals["closureHealth"] = {
+                    **GREEN_SIGNALS["closureHealth"],
+                    "status": status,
+                    "newIssueIntakeAllowed": False,
+                    "reasons": reasons,
+                }
+                receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+                self.assertEqual(receipt["promotionMode"], "hold-intake")
+                self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
+                self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+
+    def test_unknown_closure_observation_blocks_controller_repair(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {"status": "failed"}
+        signals["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["closure-observation-unknown"],
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
+
+    def test_unrelated_closure_debt_still_blocks_controller_repair(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {"status": "failed"}
+        signals["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": [
+                "closure-observation-unknown",
+                "duplicate-issue-lanes-unresolved",
+            ],
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
 
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
         timeout = subprocess.CalledProcessError(
@@ -1654,12 +1784,120 @@ class DeploymentBindingTests(unittest.TestCase):
             {"production-deployment-unbound"},
         )
 
+    def test_contained_runtime_does_not_freeze_qualified_source_promotion(self):
+        for deployed_sha in (MAIN_SHA, "b" * 40):
+            with self.subTest(deployed_sha=deployed_sha):
+                signals = dict(GREEN_SIGNALS)
+                signals["production"] = {"status": "green", "deployedSha": deployed_sha}
+                signals["controller"] = {"status": "failed", "detail": "connection refused"}
+                signals["queue"] = {"status": "unknown", "detail": "gh pr list exit 1"}
+                signals["closureHealth"] = {
+                    **GREEN_SIGNALS["closureHealth"],
+                    "status": "red", "newIssueIntakeAllowed": False,
+                    "reasons": ["closure-observation-unknown"],
+                }
+                signals["concurrencyEvidence"] = {
+                    **GREEN_SIGNALS["concurrencyEvidence"],
+                    "source": "untrusted-capacity-source",
+                }
+                receipt = self.evaluate(signals)
+                self.assertEqual(receipt["promotionMode"], "hold-intake")
+                self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertFalse(receipt["concurrency"]["gem"]["newMutationAllowed"])
+                self.assertFalse(receipt["productionUnboundRepairAdmission"]["allowed"])
+
+    def test_runtime_hold_does_not_override_unknown_source_or_integrity(self):
+        for key, value in (
+            ("main", {"status": "unknown"}),
+            ("controller", {"status": "unknown"}),
+            ("production", {"status": "unknown"}),
+            ("integrity", {"status": "active", "reason": next(iter(MODULE.SEVERE_REASONS))}),
+            ("independentReview", {**GREEN_SIGNALS["independentReview"], "headSha": "b" * 40}),
+        ):
+            with self.subTest(signal=key):
+                signals = dict(GREEN_SIGNALS)
+                signals["controller"] = {"status": "failed"}
+                signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+                signals[key] = value
+                receipt = self.evaluate(signals)
+                self.assertEqual(receipt["promotionMode"], "blocked")
+                self.assertFalse(receipt["promotionAdmission"]["allowed"])
+                self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
     def test_controller_failure_blocks_deployment(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["controller"] = {"status": "failed"}
         receipt = self.evaluate(signals)
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
+    def test_controller_failure_allows_qualified_source_admission(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["controller"] = {"status": "failed"}
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["controllerRepairAdmission"],
+            {
+                "allowed": False,
+                "condition": None,
+                "mainSha": None,
+                "deployedSha": None,
+                "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+                "maxConcurrent": 0,
+                "deploymentsAllowed": False,
+                "runtimeActivationAllowed": False,
+                "authority": "canonical-merge-queue-controller",
+            },
+        )
+        self.assertEqual(
+            receipt["alreadyAdmittedCohort"],
+            {
+                "preserve": True,
+                "newIntakeAllowed": False,
+                "semantics": "preserve-cohort-and-stop-new-implementation-intake",
+            },
+        )
+
+    def test_controller_repair_admission_fails_closed_on_unknown_or_extra_fault(self):
+        for controller, production in (
+            ({"status": "unknown"}, {"status": "green", "deployedSha": "b" * 7}),
+            ({"status": "failed"}, {"status": "red"}),
+        ):
+            with self.subTest(controller=controller, production=production):
+                signals = dict(GREEN_SIGNALS)
+                signals["controller"] = controller
+                signals["production"] = production
+                receipt = self.evaluate(signals)
+                self.assertEqual(receipt["promotionMode"], "blocked")
+                self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
+                self.assertFalse(receipt["controllerRepairAdmission"]["deploymentsAllowed"])
+                self.assertFalse(
+                    receipt["controllerRepairAdmission"]["runtimeActivationAllowed"]
+                )
+
+    def test_controller_repair_admission_requires_current_independent_review(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {"status": "failed"}
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "headSha": "b" * 40,
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
 
     def test_red_production_keeps_the_isolated_exception(self):
         signals = dict(GREEN_SIGNALS)

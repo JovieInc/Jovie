@@ -6,6 +6,7 @@ import importlib.util
 import json
 import pathlib
 import re
+import subprocess
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -208,22 +209,19 @@ def snapshot(**overrides: object) -> dict[str, object]:
         "greenReadyPrs": 2,
         "nativeQueueCount": 1,
         "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
-        "classifications": {
-            "dispositions": [
-                {
-                    "number": 1,
-                    "state": "queued",
-                    "queueState": "AWAITING_CHECKS",
-                },
-                {"number": 2, "state": "promote"},
+        "classifications": MODULE.classify_open_prs(
+            [
+                pr(1, title="feat: ship JOV-1", queued=True),
+                pr(2, title="feat: ship JOV-2"),
             ],
-            "unclassified": [],
-            "duplicateIssueLanes": [],
-            "expiredHolds": [],
-            "changedFileEvidence": [],
-        },
+            NOW,
+        ),
     }
     value.update(overrides)
+    if "classifications" in overrides and "openPrs" not in overrides:
+        lifecycle_actions = value["classifications"].get("lifecycleActions")
+        if isinstance(lifecycle_actions, list):
+            value["openPrs"] = len(lifecycle_actions)
     return value
 
 
@@ -411,6 +409,127 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(held["reason"], "draft")
         self.assertIsInstance(held["expiresAt"], str)
         self.assertEqual(result["unclassified"], [])
+
+    def test_mixed_84_row_inventory_has_one_machine_owned_lifecycle_action_each(self):
+        rows = []
+        for number in range(1001, 1084):
+            variant = number % 5
+            rows.append(
+                pr(
+                    number,
+                    title=f"change: JOV-{number}",
+                    queued=variant == 0,
+                    draft=variant == 1,
+                    merge_state="DIRTY" if variant == 2 else "CLEAN",
+                    labels=("duplicate",) if variant == 3 else (),
+                )
+            )
+        rows.append(pr(17156, title="protected: JOV-17156", draft=True))
+
+        actions = MODULE.classify_open_prs(rows, NOW)["lifecycleActions"]
+
+        self.assertEqual(len(actions), 84)
+        self.assertEqual(len({item["lifecycleKey"] for item in actions}), 84)
+        self.assertEqual(len({item["actionKey"] for item in actions}), 84)
+        self.assertTrue(
+            all(
+                item["owner"] == item["writer"]
+                and item["owner"]
+                in {"controller", "gem", "github-native-merge-queue", "symphony"}
+                and item["disposition"]
+                in {"active-remediation", "terminal"}
+                for item in actions
+            )
+        )
+
+    def test_lifecycle_mapping_preserves_native_queue_and_machine_routes(self):
+        actions = MODULE.classify_open_prs(
+            [
+                pr(10, title="queued JOV-10", queued=True),
+                pr(11, title="promote JOV-11"),
+                pr(12, title="repair JOV-12", merge_state="DIRTY"),
+                pr(13, title="draft JOV-13", draft=True),
+                pr(14, title="duplicate JOV-14", labels=("duplicate",)),
+            ],
+            NOW,
+        )["lifecycleActions"]
+        by_pr = {item["pr"]: item for item in actions}
+
+        self.assertEqual(
+            (by_pr[10]["owner"], by_pr[10]["action"]),
+            ("github-native-merge-queue", "preserve-native-queue-ownership"),
+        )
+        self.assertEqual(
+            (by_pr[11]["owner"], by_pr[11]["action"]),
+            ("gem", "reconcile-exact-head-queue-admission"),
+        )
+        self.assertEqual(
+            (by_pr[12]["owner"], by_pr[12]["action"]),
+            ("gem", "exact-head-branch-update"),
+        )
+        self.assertEqual(by_pr[13]["owner"], "symphony")
+        self.assertTrue(by_pr[14]["terminal"])
+
+    def test_protected_pr_is_inventoried_as_terminal_machine_exclusion(self):
+        action = MODULE.classify_open_prs(
+            [pr(17156, title="protected JOV-17156", draft=True)], NOW
+        )["lifecycleActions"][0]
+
+        self.assertEqual(action["sourceState"], "protected")
+        self.assertEqual(action["disposition"], "terminal")
+        self.assertEqual(action["owner"], "gem")
+        self.assertEqual(action["action"], "preserve-protected-pr-exclusion")
+
+    def test_legacy_human_taste_and_no_auto_labels_never_create_a_hold(self):
+        rows = [
+            pr(20 + index, title=f"ready JOV-{20 + index}", labels=(label,))
+            for index, label in enumerate(
+                (
+                    "needs-human",
+                    "human-review-required",
+                    "needs:taste",
+                    "needs-human-taste",
+                    "taste",
+                    "no-auto",
+                    "no-auto-merge",
+                    "no-automerge",
+                )
+            )
+        ]
+        result = MODULE.classify_open_prs(rows, NOW)
+
+        self.assertEqual(
+            {item["state"] for item in result["dispositions"]}, {"promote"}
+        )
+        self.assertTrue(
+            all(item["owner"] == "gem" for item in result["lifecycleActions"])
+        )
+
+    def test_malformed_row_fails_closed_without_dropping_other_lifecycle_actions(self):
+        malformed = pr(31, title="malformed JOV-31")
+        malformed["headRefOid"] = None
+        result = MODULE.classify_open_prs(
+            [pr(30, title="ready JOV-30"), malformed], NOW
+        )
+        by_pr = {item["pr"]: item for item in result["lifecycleActions"]}
+
+        self.assertEqual(len(result["lifecycleActions"]), 2)
+        self.assertEqual(by_pr[30]["sourceState"], "promote")
+        self.assertEqual(by_pr[31]["sourceState"], "unclassified")
+        self.assertEqual(by_pr[31]["owner"], "controller")
+        self.assertIsNone(by_pr[31]["headSha"])
+
+    def test_native_merge_queue_policy_scales_builds_with_20_minute_budget(self):
+        ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(
+            encoding="utf-8"
+        )
+        guard = (ROOT / "scripts/lib/merge-queue-guard.mjs").read_text(
+            encoding="utf-8"
+        )
+        for source in (ruleset, guard):
+            self.assertRegex(source, r"check_response_timeout_minutes:\s*20")
+            self.assertRegex(source, r"max_entries_to_build:\s*2")
+            self.assertRegex(source, r"max_entries_to_merge:\s*5")
 
     def test_clean_pr_with_stale_base_is_repair_not_promote(self):
         evidence = exact_green_promotion_evidence(12)
@@ -1107,6 +1226,87 @@ class ClosureClassificationTests(unittest.TestCase):
 
 
 class ClosureHealthEvaluationTests(unittest.TestCase):
+    def test_lifecycle_action_digest_is_cross_runtime_canonical(self):
+        identity = {
+            "repository": "JovieInc/Jovie",
+            "pr": 17001,
+            "headSha": "a" * 40,
+            "issue": None,
+            "disposition": "active-remediation",
+            "sourceState": "repair",
+            "owner": "symphony",
+            "writer": "symphony",
+            "action": "create-bounded-ci-repair-pr",
+            "reason": "required-checks-not-green",
+            "terminal": False,
+        }
+
+        self.assertEqual(
+            MODULE._lifecycle_action_digest(identity),
+            "5a34f15f28cdfed416aa498dd84fdf5d048f68f9f183f782c1a2b95800f28c52",
+        )
+
+    def test_health_fails_closed_when_one_open_pr_lacks_owned_lifecycle_action(self):
+        observed = snapshot()
+        observed["classifications"]["lifecycleActions"] = observed[
+            "classifications"
+        ]["lifecycleActions"][:-1]
+
+        health = MODULE.evaluate_closure_health(observed, None, NOW)
+
+        self.assertEqual(health["status"], "red")
+        self.assertIn("lifecycle-action-inventory-incomplete", health["reasons"])
+
+    def test_health_fails_closed_for_malformed_or_unbound_lifecycle_content(self):
+        mutations = {
+            "missing-pr": (lambda action: action.update(pr=None), True),
+            "missing-head": (lambda action: action.update(headSha=None), True),
+            "missing-action": (lambda action: action.pop("action"), True),
+            "missing-reason": (lambda action: action.pop("reason"), True),
+            "missing-observed-at": (lambda action: action.pop("observedAt"), True),
+            "unbound-lifecycle-key": (
+                lambda action: action.update(lifecycleKey="JovieInc/Jovie:pr:999"),
+                True,
+            ),
+            "wrong-repository": (
+                lambda action: action.update(repository="JovieInc/LogYourBody"),
+                True,
+            ),
+            "unbound-action-key": (
+                lambda action: action.update(headSha="b" * 40),
+                False,
+            ),
+            "wrong-native-queue-writer": (
+                lambda action: action.update(owner="gem", writer="gem"),
+                True,
+            ),
+        }
+
+        for name, (mutate, rebind_action_key) in mutations.items():
+            with self.subTest(name=name):
+                observed = snapshot()
+                action = dict(observed["classifications"]["lifecycleActions"][0])
+                mutate(action)
+                if rebind_action_key:
+                    action["actionKey"] = MODULE._lifecycle_action_digest(
+                        MODULE._lifecycle_action_identity(action)
+                    )
+                observed["classifications"] = {
+                    **observed["classifications"],
+                    "lifecycleActions": [
+                        action,
+                        observed["classifications"]["lifecycleActions"][1],
+                    ],
+                }
+
+                health = MODULE.evaluate_closure_health(observed, None, NOW)
+
+                self.assertEqual(health["status"], "red")
+                self.assertFalse(health["newIssueIntakeAllowed"])
+                self.assertIn(
+                    "lifecycle-action-inventory-incomplete", health["reasons"]
+                )
+
     def test_boundary_offset_timestamp_is_treated_as_missing_history(self):
         self.assertIsNone(MODULE.parse_time("0001-01-01T00:00:00+14:00"))
 
@@ -1303,13 +1503,12 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertTrue(cleared["newIssueIntakeAllowed"])
 
     def test_unclassified_pr_crosses_fifteen_minute_deliberate_red(self):
+        missing_provenance = pr(1, title="fix: JOV-1")
+        missing_provenance["isCrossRepository"] = None
         unclassified = snapshot(
-            classifications={
-                "dispositions": [{"number": 2, "state": "promote"}],
-                "unclassified": [{"number": 1, "reason": "missing-owner"}],
-                "duplicateIssueLanes": [],
-                "expiredHolds": [],
-            }
+            classifications=MODULE.classify_open_prs(
+                [missing_provenance, pr(2, title="fix: JOV-2")], NOW
+            )
         )
         first = MODULE.evaluate_closure_health(unclassified, previous=None, now=NOW)
         self.assertEqual(first["status"], "grace")
@@ -1323,6 +1522,107 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["status"], "red")
         self.assertIn("unclassified-open-pr-over-15m", result["reasons"])
 
+    def test_lyb_closure_receipt_independent_of_jovie_mq_empty_or_unmergeable(self):
+        jovie_empty = MODULE.evaluate_closure_health(
+            snapshot(nativeQueueCount=0, greenReadyPrs=1, eligiblePrs=1),
+            previous=None,
+            now=NOW,
+        )
+        jovie_empty_red = MODULE.evaluate_closure_health(
+            snapshot(nativeQueueCount=0, greenReadyPrs=1, eligiblePrs=1),
+            previous=jovie_empty,
+            now=NOW + timedelta(minutes=16),
+        )
+        jovie_unmergeable = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(
+                            7,
+                            title="fix: repair JOV-707",
+                            queued=True,
+                            queue_state="UNMERGEABLE",
+                        )
+                    ],
+                    NOW,
+                ),
+            ),
+            previous=None,
+            now=NOW,
+        )
+        jovie_unmergeable_red = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(
+                            7,
+                            title="fix: repair JOV-707",
+                            queued=True,
+                            queue_state="UNMERGEABLE",
+                        )
+                    ],
+                    NOW,
+                ),
+            ),
+            previous=jovie_unmergeable,
+            now=NOW + timedelta(minutes=16),
+        )
+        lyb = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/LogYourBody",
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(1, title="feat: ship LYB-1", queued=True),
+                        pr(2, title="feat: ship LYB-2"),
+                    ],
+                    NOW,
+                    repository="JovieInc/LogYourBody",
+                ),
+            ),
+            previous=None,
+            now=NOW,
+        )
+
+        self.assertEqual(jovie_empty_red["productId"], "jovie")
+        self.assertFalse(jovie_empty_red["newIssueIntakeAllowed"])
+        self.assertIn("native-queue-empty-with-eligible-over-15m", jovie_empty_red["reasons"])
+        self.assertEqual(jovie_unmergeable_red["productId"], "jovie")
+        self.assertFalse(jovie_unmergeable_red["newIssueIntakeAllowed"])
+        self.assertIn("native-queue-unmergeable", jovie_unmergeable_red["reasons"])
+        self.assertEqual(lyb["productId"], "logyourbody")
+        self.assertEqual(lyb["repository"], "JovieInc/LogYourBody")
+        self.assertEqual(lyb["status"], "healthy")
+        self.assertTrue(lyb["newIssueIntakeAllowed"])
+        self.assertTrue(lyb["remediationContinues"])
+        self.assertTrue(
+            MODULE.product_intake_allowed(jovie_empty_red, "logyourbody")
+        )
+        self.assertTrue(MODULE.product_intake_allowed(jovie_unmergeable_red, "ovie"))
+        self.assertFalse(MODULE.product_intake_allowed(jovie_empty_red, "jovie"))
+
+        products = MODULE.build_product_closure_health(jovie_empty_red)
+        self.assertFalse(products["jovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
+        self.assertTrue(products["logyourbody"]["remediationContinues"])
+
+        systems_down = {
+            **jovie_empty_red,
+            "reasons": ["gate-evaluation-failed"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+        }
+        self.assertFalse(MODULE.product_intake_allowed(systems_down, "logyourbody"))
+        self.assertFalse(
+            MODULE.build_product_closure_health(systems_down)["ovie"]["newIssueIntakeAllowed"]
+        )
+
     def test_previous_closure_history_is_scoped_to_repository(self):
         previous = MODULE.evaluate_closure_health(
             snapshot(
@@ -1333,10 +1633,19 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
             now=NOW,
         )
         current_now = NOW + timedelta(minutes=20)
+        lyb_classifications = MODULE.classify_open_prs(
+            [
+                pr(1, title="feat: ship LYB-1", queued=True),
+                pr(2, title="feat: ship LYB-2"),
+            ],
+            NOW,
+            repository="JovieInc/LogYourBody",
+        )
         current = MODULE.evaluate_closure_health(
             snapshot(
                 repository="JovieInc/LogYourBody",
                 nativeQueueCount=0,
+                classifications=lyb_classifications,
             ),
             previous=previous,
             now=current_now,
@@ -1808,6 +2117,46 @@ class ClosureObservationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "owner/name"):
             MODULE._repo_parts("Jovie")
 
+    def test_graphql_snapshot_retries_command_failure_and_keeps_redacted_stderr(self):
+        pages = [
+            {
+                "data": {
+                    "repository": {
+                        "main": {"target": {"oid": "a" * 40}},
+                        "pullRequests": {"totalCount": 0, "nodes": []},
+                        "merged": {"nodes": []},
+                    }
+                }
+            }
+        ]
+        transient = subprocess.CalledProcessError(
+            1,
+            ["gh", "api", "graphql"],
+            stderr="GraphQL transport reset Authorization: bearer-sensitive",
+        )
+        completed = mock.Mock(stdout=MODULE.json.dumps(pages))
+        with mock.patch.object(
+            MODULE.subprocess, "run", side_effect=[transient, completed]
+        ) as run:
+            result = MODULE._run_graphql_snapshot("JovieInc/Jovie")
+
+        self.assertEqual(result["mainOid"], "a" * 40)
+        self.assertEqual(run.call_count, 2)
+
+        limited = subprocess.CalledProcessError(
+            1,
+            ["gh", "api", "graphql"],
+            stderr="HTTP 429 rate limit Authorization: bearer-sensitive",
+        )
+        with mock.patch.object(
+            MODULE.subprocess, "run", side_effect=limited
+        ) as run:
+            with self.assertRaisesRegex(ValueError, "HTTP 429 rate limit") as raised:
+                MODULE._run_graphql_snapshot("JovieInc/Jovie")
+        self.assertEqual(run.call_count, 1)
+        self.assertNotIn("bearer-sensitive", str(raised.exception))
+        self.assertIn("[REDACTED]", str(raised.exception))
+
     def test_queue_controller_maps_terminal_active_and_missing_runs(self):
         cases = [
             ({"status": "completed", "conclusion": "success"}, "green"),
@@ -1858,6 +2207,7 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(snapshot_read.call_args.args[1], expected_deadline)
         self.assertEqual(promotion_read.call_args.args[3], expected_deadline)
         self.assertEqual(controller_read.call_args.args[1], expected_deadline)
+        self.assertEqual(controller_read.call_count, 1)
 
     def test_live_observer_emits_typed_health_and_fails_closed_on_transport(self):
         prs = [

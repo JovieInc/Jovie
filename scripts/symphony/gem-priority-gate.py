@@ -34,10 +34,12 @@ from closure_health import (  # noqa: E402 - sibling executable module
     AUTHORITY as CLOSURE_HEALTH_AUTHORITY,
     STACK_MAX_DEPTH,
     bounded_stack_health,
+    build_product_closure_health,
     empty_stack_health,
+    observe_closure_health,
+    project_product_admission,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
-from closure_health import observe_closure_health  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
     V2_PROOF_SCHEMA,
     validate_capacity_receipt as validate_legacy_capacity_receipt,
@@ -64,6 +66,17 @@ UNKNOWN_MAIN_SHA = "0" * 40
 # Keep in sync with the consumer fail-closed window
 # (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
 RECEIPT_STALE_AFTER = timedelta(minutes=10)
+# Mirrors symphony_official_runtime.REPAIR_FEED_REASONS. Repair-feed closure
+# reasons describe debt the installed controller itself retires (repairable
+# open PRs, merge-progress stall, controller outage); treating them as a stop
+# deadlocks controller repair against the outage it exists to fix.
+REPAIR_FEED_REASONS = frozenset(
+    {
+        "internally-repairable-prs-open",
+        "no-merge-progress-over-1h",
+        "queue-controller-red-over-10m",
+    }
+)
 WRITER_LOCK_TIMEOUT_SECONDS = 60.0
 SEVERE_REASONS = {
     "credential-compromise",
@@ -121,6 +134,12 @@ def already_admitted_cohort_semantics(promotion_mode: str) -> dict[str, Any]:
             "preserve": False,
             "newIntakeAllowed": True,
             "semantics": "isolated-only",
+        }
+    if promotion_mode == "controller-repair-only":
+        return {
+            "preserve": True,
+            "newIntakeAllowed": False,
+            "semantics": "preserve-cohort-and-admit-one-controller-repair",
         }
     if promotion_mode == "draft-only":
         return {
@@ -184,6 +203,9 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             if isinstance(repair_actions, list)
             else stack_health["repairActions"]
         )
+        product_id = result.get("productId")
+        if isinstance(product_id, str) and product_id:
+            result["productId"] = product_id
         return result
     return {
         "schema": CLOSURE_HEALTH_SCHEMA,
@@ -1155,6 +1177,13 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     queue_value = signals.get("queue")
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
     closure_health = validate_closure_health(signals.get("closureHealth"))
+    product_closures = build_product_closure_health(
+        closure_health, signals.get("productClosureHealth")
+    )
+    product_closures = {
+        product_id: validate_closure_health(row)
+        for product_id, row in product_closures.items()
+    }
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
     concurrency_evidence_value = signals.get("concurrencyEvidence")
     capacity_now = parse_time(observed_at) or utc_now()
@@ -1174,6 +1203,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     normalized_signals = {
         **signals,
         "closureHealth": closure_health,
+        "productClosureHealth": product_closures,
         "concurrencyEvidence": concurrency_evidence,
     }
     review = validate_independent_review(
@@ -1387,21 +1417,52 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     hold_intake_allowed = (
         state == "AMBER"
-        and controller.get("status") == "green"
+        and review_allowed
         and main.get("status") == "green"
         and production.get("status") == "green"
-        and production_unbound
         and integrity.get("status") in {"clear", "resolved"}
-        and len(reasons) == 1
-        and reasons[0]["code"] == "production-deployment-unbound"
+        # Runtime containment and deployment lag hold runtime/intake authority,
+        # not independently qualified PRs. The native controller still checks
+        # each exact source head and required combined-head admission evidence.
+        and {reason["code"] for reason in reasons}
+        <= {"controller-failure", "production-deployment-unbound"}
     )
+    runtime_intake_hold = hold_intake_allowed and controller.get("status") == "failed"
     unbound_repair_allowed = (
         hold_intake_allowed
+        and controller.get("status") == "green"
+        and production_unbound
         and review_allowed
         and capacity_fresh
         and gem_concurrency >= 1
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
+    )
+    controller_repair_reason_codes = {reason["code"] for reason in reasons}
+    closure_reasons = set(closure_health.get("reasons") or [])
+    closure_allows_controller_repair = (
+        closure_health.get("status") == "healthy"
+        or (
+            closure_health.get("status") in {"grace", "red"}
+            and closure_reasons <= REPAIR_FEED_REASONS
+            and closure_health.get("newIssueIntakeAllowed") is False
+        )
+    )
+    controller_repair_allowed = (
+        state == "AMBER"
+        and review_allowed
+        and closure_allows_controller_repair
+        and controller.get("status") == "failed"
+        and main.get("status") == "green"
+        and valid_commit_sha(main.get("sha"), exact=True)
+        and production.get("status") == "green"
+        and valid_commit_sha(production.get("deployedSha"))
+        and integrity.get("status") in {"clear", "resolved"}
+        and controller_repair_reason_codes
+        in (
+            {"controller-failure"},
+            {"controller-failure", "production-deployment-unbound"},
+        )
     )
     if isolated_promotion_allowed:
         promotion_mode = "isolated-only"
@@ -1414,29 +1475,24 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     ):
         promotion_mode = "draft-only"
     elif hold_intake_allowed:
+        # Empty-queue closure red is a FEED signal, not a stop. When the only
+        # runtime reasons are controller-failure and/or production SHA lag,
+        # this branch resumes qualified promotion. Do not mint hold-intake from
+        # a weaker fallback: consumers now require exact-main review and those
+        # bounded reasons, and a rejectable receipt fails the fleet projector.
         promotion_mode = "hold-intake"
-    elif (
-        state == "AMBER"
-        and main.get("status") == "green"
-        and production.get("status") == "green"
-        and integrity.get("status") in {"clear", "resolved"}
-        and closure_health.get("status") == "red"
-        and set(closure_health.get("reasons") or [])
-        <= {"native-queue-empty-with-eligible-over-15m"}
-    ):
-        # An empty native queue with eligible PRs waiting is a FEED signal,
-        # not a stop signal: blocking admission here deadlocks the loop
-        # (queue stays empty because admission is blocked; closure stays red
-        # because the queue is empty; controller then fails on queue-noop).
-        # Live 2026-09-03: 10+ mergeable PRs stranded with an empty queue.
-        # New-issue intake stays closed (closure red); only promotion of
-        # already-green work resumes.
-        promotion_mode = "hold-intake"
+    elif controller_repair_allowed:
+        promotion_mode = "controller-repair-only"
     else:
         promotion_mode = "blocked"
+    # The existing typed repair exception carries authority only when selected.
+    # A hold-intake receipt must not simultaneously advertise that exception.
+    controller_repair_allowed = (
+        controller_repair_allowed and promotion_mode == "controller-repair-only"
+    )
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed:
+    elif not closure_intake_allowed or runtime_intake_hold:
         # Existing validation/review work remains useful, but no new
         # implementation or fallback PR may begin while Summer holds intake
         # (JOV-INV-011). Capacity evidence no longer gates intake: missing
@@ -1470,7 +1526,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     # closure, so duplicate lanes cannot freeze Grok/Kimi remediations.
     remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
-    if not closure_intake_allowed:
+    if not closure_intake_allowed or runtime_intake_hold:
         cohort = {
             **cohort,
             "newIntakeAllowed": False,
@@ -1505,12 +1561,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "reasons": closure_health["reasons"],
             "promotionContinues": True,
             "remediationContinues": True,
+            "products": project_product_admission(product_closures),
         },
         "workAdmission": {
             "allowed": state != "RED",
             "activities": work_activities,
             "newIssueLeaseAllowed": "approved-issue-lease" in work_activities,
             "newImplementationAllowed": "approved-issue-lease" in work_activities,
+            "productNewIssueLeaseAllowed": {
+                product_id: (
+                    state != "RED"
+                    and row.get("newIssueIntakeAllowed") is True
+                )
+                for product_id, row in product_closures.items()
+            },
         },
         "promotionAdmission": {
             "allowed": state == "GREEN" and review_allowed,
@@ -1546,6 +1610,21 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
             "maxConcurrent": unbound_repair_concurrency if unbound_repair_allowed else 0,
             "deploymentsAllowed": False,
+            "authority": "canonical-merge-queue-controller",
+        },
+        "controllerRepairAdmission": {
+            "allowed": controller_repair_allowed,
+            "condition": "controller-failure"
+            if controller_repair_allowed
+            else None,
+            "mainSha": main.get("sha") if controller_repair_allowed else None,
+            "deployedSha": production.get("deployedSha")
+            if controller_repair_allowed
+            else None,
+            "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+            "maxConcurrent": 1 if controller_repair_allowed else 0,
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },
         "isolatedPromotionAdmission": {
@@ -1698,6 +1777,26 @@ def failed_evaluation_receipt(
     """
     promotion_mode = "blocked"
     observed = observed_at or isoformat(utc_now())
+    blocked_closure = {
+        "schema": CLOSURE_HEALTH_SCHEMA,
+        "productId": "jovie",
+        "repository": "JovieInc/Jovie",
+        "status": "red",
+        "authority": CLOSURE_HEALTH_AUTHORITY,
+        "observedAt": observed,
+        "newIssueIntakeAllowed": False,
+        "promotionContinues": True,
+        "remediationContinues": True,
+        "blockedActivities": [
+            "new-issue-lease",
+            "new-implementation",
+            "fallback-pr-generation",
+        ],
+        "reasons": ["gate-evaluation-failed"],
+        "stackHealth": empty_stack_health(),
+        "repairActions": [],
+    }
+    product_closures = build_product_closure_health(blocked_closure)
     return {
         "schema": SCHEMA,
         "observedAt": observed,
@@ -1710,23 +1809,8 @@ def failed_evaluation_receipt(
             "controller": {"status": "unknown"},
             "integrity": {"status": "invalid", "detail": str(error)},
             "queue": {"status": "unknown", "eligiblePrs": None, "target": 0},
-            "closureHealth": {
-                "schema": CLOSURE_HEALTH_SCHEMA,
-                "status": "red",
-                "authority": CLOSURE_HEALTH_AUTHORITY,
-                "observedAt": observed,
-                "newIssueIntakeAllowed": False,
-                "promotionContinues": True,
-                "remediationContinues": True,
-                "blockedActivities": [
-                    "new-issue-lease",
-                    "new-implementation",
-                    "fallback-pr-generation",
-                ],
-                "reasons": ["gate-evaluation-failed"],
-                "stackHealth": empty_stack_health(),
-                "repairActions": [],
-            },
+            "closureHealth": blocked_closure,
+            "productClosureHealth": product_closures,
             "independentReview": {
                 "schema": INDEPENDENT_REVIEW_SCHEMA,
                 "status": "unknown",
@@ -1768,11 +1852,15 @@ def failed_evaluation_receipt(
             "reasons": ["gate-evaluation-failed"],
             "promotionContinues": True,
             "remediationContinues": True,
+            "products": project_product_admission(product_closures),
         },
         "workAdmission": {
             "allowed": False,
             "activities": [],
             "newIssueLeaseAllowed": False,
+            "productNewIssueLeaseAllowed": {
+                product_id: False for product_id in product_closures
+            },
             "newImplementationAllowed": False,
         },
         "promotionAdmission": {"allowed": False, "activities": []},

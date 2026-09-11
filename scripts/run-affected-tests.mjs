@@ -277,6 +277,10 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
+  'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
+  'scripts/lib/__tests__/native-queue-eval.test.mjs',
+  'scripts/lib/__tests__/native-queue-collector.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
@@ -284,6 +288,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
@@ -534,6 +539,8 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/symphony/config/model-registry.json',
   'scripts/symphony/closure_health.py',
   'scripts/symphony/gem-disk-reclaim.py',
+  'scripts/symphony/gem-symphony-workspace-boot-simulate',
+  'scripts/symphony/gem-workspace-migrate.py',
   'scripts/symphony/gem-pr-drain.py',
   'scripts/symphony/gem-ops-hud.py',
   'scripts/symphony/gem-priority-gate.py',
@@ -542,15 +549,23 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/symphony/gem_repo_registry.py',
   'scripts/symphony/gem_rehabilitation_policy.py',
   'scripts/symphony/install-gem-fleet-controller.sh',
+  'scripts/symphony/install-gem-symphony-storage.sh',
   'scripts/symphony/install-gem-pr-rehabilitation.sh',
   'scripts/symphony/install-symphony-ui-pilot.sh',
   'scripts/symphony/model-router.py',
+  'scripts/symphony/jovie-symphony-workspace',
+  'scripts/symphony/jovie-symphony-workspace-create',
   'scripts/symphony/symphony-reconciler.py',
+  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
+  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
   'scripts/symphony/systemd/gem-disk-reclaim.service',
   'scripts/symphony/systemd/gem-disk-reclaim.timer',
   'scripts/symphony/systemd/gem-pr-drain.service',
   'scripts/symphony/systemd/gem-pr-drain.timer',
   'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
   'scripts/symphony/tests/gem-pr-drain.test.py',
   'scripts/symphony/tests/gem-ops-hud.test.py',
   'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
@@ -570,6 +585,8 @@ const GEM_PR_REHABILITATION_LANE = new Set([
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/symphony/tests/closure-health.test.py',
   'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
   'scripts/symphony/tests/gem-priority-gate.test.py',
   'scripts/symphony/tests/gem-pr-drain.test.py',
   'scripts/symphony/tests/gem-ops-hud.test.py',
@@ -580,6 +597,9 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
 ];
 const GEM_PR_REHABILITATION_PYTEST_TESTS = [
   'scripts/tests/test_symphony_ui_pilot_runtime.py',
+];
+const GEM_PR_REHABILITATION_NODE_TESTS = [
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/symphony/WORKFLOW.md',
@@ -603,9 +623,73 @@ const GEM_CHECKIN_HUD_PYTHON_TESTS = [
   'scripts/symphony/tests/gem-checkin-hud.test.py',
   'scripts/symphony/tests/symphony-burrito-workflow.test.py',
 ];
+const GEM_STORAGE_PRIMARY_INPUTS = new Set([
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/gem-symphony-workspace-boot-simulate',
+  'scripts/symphony/gem-workspace-migrate.py',
+  'scripts/symphony/install-gem-symphony-storage.sh',
+  'scripts/symphony/jovie-symphony-workspace',
+  'scripts/symphony/jovie-symphony-workspace-create',
+  'scripts/symphony/symphony_official_runtime.py',
+  'scripts/symphony/systemd/gem-disk-reclaim.service',
+]);
+const GEM_STORAGE_LANE = new Set([
+  ...GEM_STORAGE_PRIMARY_INPUTS,
+  '.github/workflows/ci.yml',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
+  'scripts/tests/test_openai_symphony_install.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+]);
+const GEM_STORAGE_PYTHON_TESTS = [
+  'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/test_gem_workspace_migrate.py',
+];
+const GEM_STORAGE_PYTEST_TESTS = [
+  'scripts/tests/test_openai_symphony_install.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+];
 const SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS = new Set([
   'scripts/symphony/symphony-codex-exhausted.py',
   'scripts/symphony/tests/symphony-additive-router.test.py',
+]);
+const SYMPHONY_NATIVE_ADMISSION_ANCHOR =
+  'scripts/symphony/tests/native-admission-consumers.test.py';
+const SYMPHONY_NATIVE_ADMISSION_GATES = [
+  'scripts/symphony/tests/run-issue-lease-gate.py',
+  'scripts/symphony/tests/run-lease-gate.py',
+  'scripts/symphony/tests/run-provider-promotion-gate.py',
+  'scripts/symphony/tests/run-runtime-proof-gate.py',
+];
+const SYMPHONY_NATIVE_ADMISSION_LANE = new Set([
+  SYMPHONY_NATIVE_ADMISSION_ANCHOR,
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/symphony-agent-router',
+  'scripts/symphony/symphony-codex-exhausted.py',
+  'scripts/symphony/symphony-codex-router',
+  'scripts/symphony/symphony-lease-guard',
+  'scripts/symphony/tests/existing-pr-repair.test.py',
+  'scripts/symphony/tests/symphony-agent-router.test.py',
+  'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
+  'scripts/symphony/tests/provider-runtime-promotion.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  ...SYMPHONY_NATIVE_ADMISSION_GATES,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SYMPHONY_AGENT_ROUTER_INPUTS = new Set([
+  'scripts/symphony/symphony-agent-router',
+  'scripts/symphony/tests/symphony-agent-router.test.py',
+]);
+const SYMPHONY_AGENT_ROUTER_LANE = new Set([
+  ...SYMPHONY_AGENT_ROUTER_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
   ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
@@ -632,6 +716,9 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/symphony/gem_repo_registry.py',
   'scripts/symphony/gem_rehabilitation_policy.py',
   'scripts/symphony/symphony-reconciler.py',
+  'scripts/symphony/summer-symphony-outbox-consumer.mjs',
+  'scripts/symphony/summer-symphony-outbox-contract.test.mjs',
+  'scripts/symphony/summer-symphony-outbox-consumer.test.mjs',
   'scripts/symphony/install-gem-fleet-controller.sh',
   'scripts/symphony/install-gem-pr-rehabilitation.sh',
   'scripts/symphony/install-symphony-ui-pilot.sh',
@@ -1117,6 +1204,73 @@ export function buildAffectedTestPlan(
       nodeTests: [],
     };
   }
+  const isBoundedGemStorageChange =
+    files.some(file => GEM_STORAGE_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => GEM_STORAGE_LANE.has(file));
+  if (isBoundedGemStorageChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: GEM_STORAGE_PYTEST_TESTS,
+      pythonUnittestTests: GEM_STORAGE_PYTHON_TESTS,
+      scriptVitestTests: [
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [],
+    };
+  }
+  if (files.includes(SYMPHONY_NATIVE_ADMISSION_ANCHOR)) {
+    // Run the actual operational coverage gates, not an unrelated full web
+    // suite. This exception cannot absorb unknown peers or missing gate files.
+    if (
+      !files.every(file => SYMPHONY_NATIVE_ADMISSION_LANE.has(file)) ||
+      ![
+        SYMPHONY_NATIVE_ADMISSION_ANCHOR,
+        ...SYMPHONY_NATIVE_ADMISSION_GATES,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SYMPHONY_NATIVE_ADMISSION_GATES,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (files.some(file => SYMPHONY_AGENT_ROUTER_INPUTS.has(file))) {
+    const gates = ['scripts/symphony/tests/run-issue-lease-gate.py'];
+    if (
+      !files.every(file => SYMPHONY_AGENT_ROUTER_LANE.has(file)) ||
+      ![
+        ...SYMPHONY_AGENT_ROUTER_INPUTS,
+        ...gates,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: gates,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
   const hasLegacySymphonyTestChange = files.includes(
     'scripts/symphony/tests/symphony-codex-auth-fallback.test.py'
   );
@@ -1158,7 +1312,11 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
-      nodeTests: [],
+      nodeTests: files.includes(
+        'scripts/symphony/summer-symphony-outbox-consumer.test.mjs'
+      )
+        ? ['scripts/symphony/summer-symphony-outbox-consumer.test.mjs']
+        : GEM_PR_REHABILITATION_NODE_TESTS,
     };
   }
   const isBoundedNoUnattendedRedChange =
@@ -2209,6 +2367,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       ...['--config', 'vitest.config.mts'],
       'run',
       ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
+      '--coverage',
+      '--coverage.include=merge-queue-backend.mjs',
+      '--coverage.include=lib/merge-group-admission.mjs',
+      '--coverage.include=lib/merge-queue-guard.mjs',
+      '--coverage.include=lib/native-queue-group-evidence.mjs',
+      '--coverage.include=lib/native-queue-policy-evidence.mjs',
+      '--coverage.include=lib/native-queue-eval.mjs',
+      '--coverage.include=**/scripts/native-queue-eval.mjs',
+      '--coverage.thresholds.perFile=true',
+      '--coverage.thresholds.lines=85',
+      '--coverage.thresholds.branches=75',
+      '--coverage.thresholds.functions=82',
     ]);
   }
   const base = argValue(args, '--base', 'origin/main');

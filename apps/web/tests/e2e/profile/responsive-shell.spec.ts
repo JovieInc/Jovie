@@ -129,10 +129,16 @@ async function assertBottomTabBarState(
         ).toHaveAttribute('aria-label', expectedLabel);
       }
     }
-  } else if (!route.showsBottomTabBar) {
+  } else if (!route.showsBottomTabBar || viewport.width >= 1180) {
+    if (viewport.width >= 1180 && route.showsBottomTabBar) {
+      await expect(
+        tabBar,
+        `${label} must not render mobile navigation in desktop mode`
+      ).toHaveCount(0, { timeout: SMOKE_TIMEOUTS.QUICK });
+    }
     // Secondary task flows hide the tab bar. Allow it to be absent OR hidden.
     const count = await tabBar.count();
-    if (count > 0) {
+    if (count > 0 && !route.showsBottomTabBar) {
       await expect(
         tabBar,
         `${label} should hide the bottom tab bar on secondary flows`

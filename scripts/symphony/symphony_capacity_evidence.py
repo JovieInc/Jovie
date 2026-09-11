@@ -97,7 +97,7 @@ def _write_atomic(path: pathlib.Path, value: dict[str, Any]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    root = pathlib.Path("/home/timwhite/gem-workspace/state")
+    root = pathlib.Path(os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")) / "state"
     parser.add_argument("--proof-ledger", type=pathlib.Path, default=root / "useful-turn-proofs.jsonl")
     parser.add_argument("--inventory", type=pathlib.Path, default=root / "provider-inventory.json")
     parser.add_argument("--output", type=pathlib.Path, default=root / "concurrency.json")

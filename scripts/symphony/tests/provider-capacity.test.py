@@ -76,6 +76,33 @@ class ProviderCapacityTests(unittest.TestCase):
         self.assertEqual(state["providers"]["cursor"]["limit"], 3)
         self.assertEqual(state["providers"]["grok"]["limit"], 4)
 
+    def test_changed_live_measurement_adjusts_without_erasing_adaptive_pressure(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        state = capacity.apply_observation(
+            state, provider="cursor", kind="capacity_observed", event_id="seed",
+            observed_at="2026-09-05T12:00:00Z", observed_capacity=20,
+        )
+        state = capacity.apply_observation(
+            state, provider="cursor", kind="downstream_pressure", event_id="pressure",
+            observed_at="2026-09-05T12:01:00Z",
+        )
+        unchanged = capacity.apply_observation(
+            state, provider="cursor", kind="capacity_observed", event_id="same",
+            observed_at="2026-09-05T12:02:00Z", observed_capacity=20,
+        )
+        self.assertEqual(unchanged["providers"]["cursor"]["limit"], 10)
+        increased = capacity.apply_observation(
+            unchanged, provider="cursor", kind="capacity_observed", event_id="more",
+            observed_at="2026-09-05T12:03:00Z", observed_capacity=24,
+        )
+        self.assertEqual(increased["providers"]["cursor"]["limit"], 14)
+        decreased = capacity.apply_observation(
+            increased, provider="cursor", kind="capacity_observed", event_id="less",
+            observed_at="2026-09-05T12:04:00Z", observed_capacity=8,
+        )
+        self.assertEqual(decreased["providers"]["cursor"]["limit"], 0)
+        self.assertEqual(decreased["providers"]["cursor"]["observedCapacity"], 8)
+
     def test_each_pressure_decreases_and_sets_typed_cooldown(self):
         for kind in capacity.PRESSURE_KINDS:
             with self.subTest(kind=kind):
@@ -124,6 +151,54 @@ class ProviderCapacityTests(unittest.TestCase):
             capacity.apply_observation(
                 once, **{**event, "kind": "quota_pressure"}
             )
+
+    def test_older_completion_cannot_clear_newer_provider_pressure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "provider-capacity.json"
+            pressure = capacity.record_observation(
+                path, provider="cursor", kind="quota_pressure", event_id="pressure",
+                observed_at="2026-09-05T10:00:00Z",
+            )
+            with self.assertRaisesRegex(ValueError, "older than current provider state"):
+                capacity.record_observation(
+                    path, provider="cursor", kind="useful_completion", event_id="late-merge",
+                    observed_at="2026-09-05T09:00:00Z",
+                )
+            current = capacity.read_state(path, "2026-09-05T10:01:00Z")
+            self.assertEqual(current, pressure)
+            self.assertEqual(current["providers"]["cursor"]["status"], "cooling")
+            self.assertEqual(current["providers"]["cursor"]["limit"], 0)
+            self.assertEqual(current["providers"]["cursor"]["lastObservedAt"], "2026-09-05T10:00:00Z")
+
+    def test_provider_auth_pool_proof_cannot_imply_multiple_chairs(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        state = capacity.apply_observation(
+            state, provider="cursor", kind="capacity_observed", event_id="reported-four",
+            observed_at="2026-09-05T12:00:00Z", observed_capacity=4,
+        )
+        for index in range(2):
+            state = capacity.apply_observation(
+                state, provider="cursor", kind="useful_completion", event_id=f"merge-{index}",
+                observed_at=f"2026-09-05T12:0{index + 1}:00Z", verified_identity_capacity=1,
+            )
+        provider = state["providers"]["cursor"]
+        self.assertEqual(provider["usefulCompletions"], 2)
+        self.assertEqual(provider["verifiedIdentityCapacity"], 1)
+        self.assertEqual(provider["limit"], 1)
+
+    def test_distinct_verified_identity_can_raise_provider_capacity(self):
+        state = capacity.empty_state("2026-09-05T12:00:00Z")
+        state = capacity.apply_observation(
+            state, provider="cursor", kind="useful_completion", event_id="pool-a",
+            observed_at="2026-09-05T12:01:00Z", verified_identity_capacity=1,
+        )
+        state = capacity.apply_observation(
+            state, provider="cursor", kind="useful_completion", event_id="pool-b",
+            observed_at="2026-09-05T12:02:00Z", verified_identity_capacity=2,
+        )
+        provider = state["providers"]["cursor"]
+        self.assertEqual(provider["verifiedIdentityCapacity"], 2)
+        self.assertEqual(provider["limit"], 2)
 
     def test_shared_resource_reserves_one_slot_for_remediation(self):
         receipt = {

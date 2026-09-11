@@ -371,6 +371,17 @@ describe('proxy.ts middleware', () => {
   // Catch-all handle hardening (JOV-3054)
   // ==========================================================================
   describe('catch-all handle hardening', () => {
+    it('passes the canonical profile admission fixture to its concrete profile route', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/unfazed',
+        searchParams: { source: 'profile-admission' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).not.toBe(307);
+      expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalled();
+    });
+
     it('redirects /login to /signin without touching the audience block', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/login' });
       const res = await callMiddleware(req);

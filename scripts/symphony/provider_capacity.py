@@ -79,6 +79,22 @@ def validate_state(value: object) -> dict[str, Any]:
                 raise ValueError(f"provider capacity {name} must be non-negative")
         if item.get("recoverAfter") is not None:
             _utc(str(item["recoverAfter"]))
+        if item.get("lastObservedAt") is not None:
+            _utc(str(item["lastObservedAt"]))
+        observed_capacity = item.get("observedCapacity")
+        if observed_capacity is not None and (
+            not isinstance(observed_capacity, int)
+            or isinstance(observed_capacity, bool)
+            or observed_capacity < 0
+        ):
+            raise ValueError("provider observed capacity must be non-negative")
+        verified_identity_capacity = item.get("verifiedIdentityCapacity")
+        if verified_identity_capacity is not None and (
+            not isinstance(verified_identity_capacity, int)
+            or isinstance(verified_identity_capacity, bool)
+            or verified_identity_capacity < 1
+        ):
+            raise ValueError("provider verified identity capacity must be positive")
     for event_id, fingerprint in events.items():
         if not isinstance(event_id, str) or not event_id or not isinstance(fingerprint, str):
             raise ValueError("provider capacity event ledger is invalid")
@@ -118,16 +134,31 @@ def provider_record(
             or observed_capacity < 0
         ):
             raise ValueError("observed capacity must be a non-negative integer")
-        # A live measurement seeds a new provider and can lower a stale state,
-        # but it must not erase an adaptive decrease on every reconcile.
+        previous_observation = current.get("observedCapacity")
         if not existed:
             current["limit"] = observed_capacity
-            current["source"] = "live-observation"
+        elif (
+            isinstance(previous_observation, int)
+            and previous_observation != observed_capacity
+        ):
+            # Apply only the measurement delta. Replaying the same observation
+            # must not erase adaptive pressure, while a changed provider-local
+            # signal can raise or lower admission without a global ceiling.
+            delta = observed_capacity - previous_observation
+            current["limit"] = max(0, current.get("limit", 0) + delta)
+        elif previous_observation is None:
+            current["limit"] = min(
+                current.get("limit", observed_capacity), observed_capacity
+            )
+        current["observedCapacity"] = observed_capacity
+        current["source"] = "live-observation"
     current.setdefault("limit", 1)
     current.setdefault("source", "runtime-floor")
     current.setdefault("status", "available")
     current.setdefault("pressureCount", 0)
     current.setdefault("usefulCompletions", 0)
+    if current.get("verifiedIdentityCapacity") is not None:
+        current["limit"] = min(current["limit"], current["verifiedIdentityCapacity"])
     deadline = current.get("recoverAfter")
     if deadline and _utc(deadline) <= _utc(now):
         current.update(
@@ -169,6 +200,7 @@ def apply_observation(
     issue_identifier: str | None = None,
     evidence_reference: str | None = None,
     root_reason: str | None = None,
+    verified_identity_capacity: int | None = None,
 ) -> dict[str, Any]:
     """Apply one idempotent observation; conflicting replay is refused."""
     validate_state(state)
@@ -177,19 +209,33 @@ def apply_observation(
         raise ValueError("event id is required")
     if kind not in PRESSURE_KINDS and kind not in {"useful_completion", "capacity_observed"}:
         raise ValueError("provider capacity observation kind is invalid")
-    record = provider_record(state, provider, observed_at, observed_capacity)
+    if verified_identity_capacity is not None and (
+        not isinstance(verified_identity_capacity, int)
+        or isinstance(verified_identity_capacity, bool)
+        or verified_identity_capacity < 1
+    ):
+        raise ValueError("verified identity capacity must be positive")
     event = {
         "provider": provider,
         "kind": kind,
         "observedAt": observed_at,
         "observedCapacity": observed_capacity,
     }
+    if verified_identity_capacity is not None:
+        event["verifiedIdentityCapacity"] = verified_identity_capacity
     fingerprint = _fingerprint(event)
     prior = state["events"].get(event_id)
     if prior is not None:
         if prior != fingerprint:
             raise ValueError("provider capacity event replay conflicts")
         return state
+    current = state["providers"].get(provider)
+    last_observed_at = current.get("lastObservedAt") if isinstance(current, dict) else None
+    if last_observed_at is not None and _utc(observed_at) < _utc(last_observed_at):
+        raise ValueError("provider capacity observation is older than current provider state")
+    record = provider_record(state, provider, observed_at, observed_capacity)
+    if verified_identity_capacity is not None:
+        record["verifiedIdentityCapacity"] = verified_identity_capacity
     if kind == "useful_completion":
         record.update(
             {
@@ -213,8 +259,11 @@ def apply_observation(
                 "source": kind,
             }
         )
+    record["lastObservedAt"] = observed_at
+    if record.get("verifiedIdentityCapacity") is not None:
+        record["limit"] = min(record["limit"], record["verifiedIdentityCapacity"])
     updated = json.loads(json.dumps(state))
-    updated["observedAt"] = observed_at
+    updated["observedAt"] = _iso(max(_utc(state["observedAt"]), _utc(observed_at)))
     updated["providers"][provider] = record
     updated["events"][event_id] = fingerprint
     if kind in PRESSURE_KINDS:

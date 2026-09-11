@@ -22,6 +22,21 @@ export const PROTECTED_ADMISSION_LABELS = Object.freeze([
 
 const PROTECTED_LABEL_SET = new Set(PROTECTED_ADMISSION_LABELS);
 
+const FOUNDER_STEERING_ASSIGNEE = /tim(?:\s|-|_)*white|itstimwhite|^tim$/i;
+
+/**
+ * Tim's Linear assignment is a prioritization/steering signal, not an
+ * implementation lease. Machine ownership still requires the normal Symphony
+ * receipts, so this exception cannot collide with an active machine claim.
+ */
+export function isFounderSteeringAssignee(issue) {
+  const assignee = issue?.assignee;
+  if (!assignee) return false;
+  return FOUNDER_STEERING_ASSIGNEE.test(
+    `${assignee.id || ''} ${assignee.name || assignee.displayName || ''} ${assignee.email || ''}`
+  );
+}
+
 function rawLabels(value) {
   if (Array.isArray(value)) return value;
   return value?.labels?.nodes || value?.labels || [];

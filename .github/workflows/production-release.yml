@@ -11,6 +11,9 @@ on:
       released:
         description: Whether this SHA reached and passed production rollback gates.
         value: ${{ jobs.release-result.outputs.released }}
+      superseded_before_promotion:
+        description: Whether this SHA was intentionally superseded before production mutation.
+        value: ${{ jobs.release-result.outputs.superseded_before_promotion }}
       production_deployment_id:
         description: Exact Vercel production deployment ID.
         value: ${{ jobs.release-result.outputs.production_deployment_id }}
@@ -201,6 +204,7 @@ jobs:
               sleep 10
               if [ "$i" -eq 3 ]; then exit 1; fi
             done
+            node .github/scripts/materialize-vercel-static.mjs
             # Vercel's function trace references the generated robots response at
             # its public-file path even though the source route is app/robots.ts.
             test -f apps/web/.next/server/app/robots.txt.body
@@ -841,6 +845,7 @@ jobs:
           required_runtime_env=(
             BETTER_AUTH_URL
             NEXT_PUBLIC_BETTER_AUTH_URL
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID
             BETTER_AUTH_SECRET
             DATABASE_URL
             SESSION_SECRET
@@ -891,6 +896,11 @@ jobs:
             fail_stage "Production signup configuration is incomplete." production_artifact_failed
           fi
 
+          provenance_dir="$RUNNER_TEMP/production-input-provenance"
+          mkdir "$provenance_dir"
+          node .github/scripts/production-input-provenance.mjs inputs \
+            "$provenance_dir/inputs.json"
+
           if ! env -u TURBO_REMOTE_ONLY \
             VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
             NEXT_PUBLIC_BUILD_SHA="$expected" \
@@ -900,6 +910,9 @@ jobs:
           fi
           if [ ! -f .vercel/output/config.json ]; then
             fail_stage "Production build did not create .vercel/output/config.json." production_artifact_failed
+          fi
+          if ! node .github/scripts/materialize-vercel-static.mjs; then
+            fail_stage "Production static asset materialization failed." production_artifact_failed
           fi
 
           # Measure the exact cache subtree before a separate save action can
@@ -942,6 +955,12 @@ jobs:
             echo "- save eligible (<= ${PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES} bytes): $next_cache_save_eligible"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          provenance_digests="$(node .github/scripts/production-input-provenance.mjs artifact \
+            "$provenance_dir/artifact.json" "$provenance_dir/inputs.json")"
+          read -r input_receipt_digest artifact_digest <<< "$provenance_digests"
+          [[ "$input_receipt_digest" =~ ^[0-9a-f]{64}$ && "$artifact_digest" =~ ^[0-9a-f]{64}$ ]] || \
+            fail_stage "Production input receipt digest is invalid." production_artifact_failed
+
           deploy_json=""
           export VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"
           export NEXT_PUBLIC_BUILD_SHA="$expected"
@@ -951,6 +970,8 @@ jobs:
             --env NEXT_PUBLIC_BUILD_SHA \
             "${runtime_env_args[@]}" \
             --meta "githubCommitSha=${EXPECTED_SHA}" \
+            --meta "jovieInputReceipt=${input_receipt_digest}" \
+            --meta "jovieArtifactDigest=${artifact_digest}" \
             "${scope_args[@]}")"; then
             fail_stage "Production prebuilt deployment failed." production_artifact_failed
           fi
@@ -974,8 +995,10 @@ jobs:
           ./node_modules/.bin/vercel inspect "$production_deploy_id" \
             --wait --timeout 15m "${scope_args[@]}" ||
             inspect_wait_status=$?
-          if ! production_deploy_json="$(./node_modules/.bin/vercel inspect \
-            "$production_deploy_id" --format=json \
+          # inspect --format=json omits meta in Vercel 56.3.2. Read the full
+          # authenticated deployment record for the unchanged provenance checks.
+          if ! production_deploy_json="$(./node_modules/.bin/vercel api \
+            "/v13/deployments/$production_deploy_id" --method GET --raw \
             "${scope_args[@]}")" ||
             ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$production_deploy_json"; then
             fail_stage "Unable to inspect the staged production deployment." staged_production_not_ready
@@ -1002,6 +1025,12 @@ jobs:
             fail_stage "Staged production URL does not match the exact project-scoped Vercel inspection." staged_production_not_ready
           fi
 
+          if ! node .github/scripts/production-input-provenance.mjs bind \
+            "$provenance_dir/deployment.json" "$provenance_dir/artifact.json" \
+            <<< "$production_deploy_json"; then
+            fail_stage "Production input/artifact/deployment binding failed." production_artifact_failed
+          fi
+
           if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
             fail_stage "Production bypass credential is required for the staged deployment canary." missing_creds
           fi
@@ -1024,8 +1053,17 @@ jobs:
           }
           export -f production_stage
           doppler run --project jovie-web --config prd \
-            --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,AUTH_GOOGLE_CLIENT_ID,AUTH_GOOGLE_CLIENT_SECRET,SENTRY_AUTH_TOKEN \
+            --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,NEXT_PUBLIC_GOOGLE_CLIENT_ID,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,AUTH_GOOGLE_CLIENT_ID,AUTH_GOOGLE_CLIENT_SECRET,SENTRY_AUTH_TOKEN \
             --no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage
+
+      - name: Preserve production input and artifact provenance
+        if: ${{ always() && steps.mutation-head.outputs.is_current == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-input-provenance-${{ inputs.expected_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-input-provenance/*.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Setup Playwright for exact-build performance gate
         if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
@@ -1208,6 +1246,7 @@ jobs:
     outputs:
       deployed: ${{ steps.receipt.outputs.deployed }}
       deployment_id: ${{ steps.receipt.outputs.deployment_id }}
+      staging_refresh_outcome: ${{ steps.receipt.outputs.staging_refresh_outcome || steps.reassert.outputs.staging_refresh_outcome }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1215,9 +1254,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Reassert the exact preview after production settles
+        id: reassert
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          PROMOTION_RESULT: ${{ needs.promote-production.result }}
+          PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
+          ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -1225,8 +1268,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "staging_refresh_outcome=current" >> "$GITHUB_OUTPUT"
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            if [ "$PROMOTION_RESULT" = "success" ] &&
+              [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced to $current_main after exact production promotion; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_after_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "::error::Refusing to reassert stale staging preview $EXPECTED_COMMIT_SHA; current main is $current_main."
             exit 1
           fi
@@ -1239,6 +1290,7 @@ jobs:
             --scope "$VERCEL_ORG_ID"
 
       - name: Prove exact staging identity, privacy, and representative routes
+        if: ${{ steps.reassert.outputs.staging_refresh_outcome == 'current' }}
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -1325,15 +1377,41 @@ jobs:
             echo "::error::Staging homepage is missing the HTTP noindex policy."
             exit 1
           fi
+          preview_robots_policy_valid() {
+            awk '
+              function trim(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+              BEGIN { wildcard_group = 0; group_has_rules = 0; wildcard_disallow = 0; root_allow = 0; sitemap_advertised = 0 }
+              {
+                line = $0; sub(/\r$/, "", line); sub(/[[:space:]]*#.*/, "", line); line = trim(line)
+                if (line == "") next
+                separator = index(line, ":"); if (separator == 0) next
+                directive = tolower(trim(substr(line, 1, separator - 1)))
+                value = trim(substr(line, separator + 1))
+                if (directive == "sitemap") { sitemap_advertised = 1; next }
+                if (directive == "user-agent") {
+                  if (group_has_rules) { wildcard_group = 0; group_has_rules = 0 }
+                  if (value == "*") wildcard_group = 1
+                  next
+                }
+                if (directive == "allow" || directive == "disallow") {
+                  group_has_rules = 1
+                  if (wildcard_group && directive == "allow" && value == "/") root_allow = 1
+                  if (wildcard_group && directive == "disallow" && value == "/") wildcard_disallow = 1
+                }
+              }
+              END { exit(wildcard_disallow && !root_allow && !sitemap_advertised ? 0 : 1) }
+            '
+          }
+
           robots="$(curl "${curl_args[@]}" https://staging.jov.ie/robots.txt)"
-          if [[ "$robots" != *$'User-Agent: *\nDisallow: /'* ]] ||
-            [[ "$robots" == *'Sitemap:'* ]]; then
+          if ! printf '%s\n' "$robots" | preview_robots_policy_valid; then
             echo "::error::Staging robots policy is not private/noindex."
             exit 1
           fi
 
       - name: Write typed staging deployment receipt
         id: receipt
+        if: ${{ steps.reassert.outputs.staging_refresh_outcome == 'current' }}
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -1341,6 +1419,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PROMOTION_RESULT: ${{ needs.promote-production.result }}
+          PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
           ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
           SOURCE_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           SOURCE_CI_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -1349,6 +1428,13 @@ jobs:
           set -euo pipefail
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            if [ "$PROMOTION_RESULT" = "success" ] &&
+              [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced to $current_main before the staging receipt boundary; omitting a falsely current receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_after_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "::error::Refusing a stale staging receipt for $EXPECTED_COMMIT_SHA; current main is $current_main."
             exit 1
           fi
@@ -1389,10 +1475,14 @@ jobs:
               privacy: "robots-block-all-and-http-noindex",
               observedAt: $observedAt
             }' > "$RUNNER_TEMP/staging-deployment-receipt.json"
-          echo "deployed=true" >> "$GITHUB_OUTPUT"
-          echo "deployment_id=$EXPECTED_DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo "staging_refresh_outcome=current_receipt"
+            echo "deployed=true"
+            echo "deployment_id=$EXPECTED_DEPLOYMENT_ID"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload exact staging deployment receipt
+        if: ${{ steps.receipt.outputs.deployed == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: staging-deployment-${{ inputs.expected_sha }}
@@ -1857,6 +1947,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       released: ${{ steps.result.outputs.released }}
+      superseded_before_promotion: ${{ steps.result.outputs.superseded_before_promotion }}
       production_deployment_id: ${{ steps.result.outputs.production_deployment_id }}
       production_deployment_url_b64: ${{ steps.result.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.result.outputs.previous_production_deployment_id }}
@@ -1879,6 +1970,7 @@ jobs:
           set -euo pipefail
           {
             echo "released=false"
+            echo "superseded_before_promotion=false"
             echo "production_deployment_id=$PRODUCTION_DEPLOYMENT_ID"
             echo "production_deployment_url_b64=$PRODUCTION_DEPLOYMENT_URL_B64"
             echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
@@ -1893,21 +1985,49 @@ jobs:
             exit 1
           fi
           if [ "${{ needs.release-head.outputs.is_current }}" != "true" ]; then
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded before release work; neutral."
             exit 0
           fi
           if [ "${{ needs.staging-head.result }}" = "success" ] &&
             [ "${{ needs.staging-head.outputs.is_current }}" != "true" ]; then
+            if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ]; then
+              echo "::error::Pre-staging-alias supersession cannot mask failed build, attestation, or canary work."
+              exit 1
+            fi
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded before staging alias; neutral."
             exit 0
           fi
           if [ "${{ needs.alias-staging.result }}" = "success" ] &&
             [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ]; then
+            if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ]; then
+              echo "::error::Staging-alias supersession cannot mask failed exact staging work."
+              exit 1
+            fi
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded at staging alias; neutral."
             exit 0
           fi
           if [ "${{ needs.production-head.result }}" = "success" ] &&
             [ "${{ needs.production-head.outputs.is_current }}" != "true" ]; then
+            if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.alias-staging.result }}" != "success" ] ||
+              [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ]; then
+              echo "::error::Pre-production supersession cannot mask failed exact staging work."
+              exit 1
+            fi
+            echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
             echo "Superseded before production mutation; neutral."
             exit 0
           fi
@@ -1917,6 +2037,20 @@ jobs:
               exit 1
             }
             if [ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]; then
+              if [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+                [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+                [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+                [ "${{ needs.staging-head.result }}" != "success" ] ||
+                [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
+                [ "${{ needs.alias-staging.result }}" != "success" ] ||
+                [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ] ||
+                [ "${{ needs.production-head.result }}" != "success" ] ||
+                [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
+                [ "${{ needs.migrate-production.result }}" != "success" ]; then
+                echo "::error::Production-mutation supersession cannot mask failed release work."
+                exit 1
+              fi
+              echo "superseded_before_promotion=true" >> "$GITHUB_OUTPUT"
               echo "Superseded at production mutation by $PROMOTION_SHA; neutral."
               exit 0
             fi
@@ -1949,6 +2083,36 @@ jobs:
             exit 1
           fi
 
+          staging_refresh_outcome="${{ needs.staging-deployment-receipt.outputs.staging_refresh_outcome }}"
+          if [ "$staging_refresh_outcome" = "superseded_after_promotion" ]; then
+            if [ "${{ needs.staging-deployment-receipt.result }}" != "success" ] ||
+              [ "${{ needs.staging-deployment-receipt.outputs.deployed }}" = "true" ] ||
+              [ "${{ needs.deploy-staging.result }}" != "success" ] ||
+              [ "${{ needs.attest-staging-build.result }}" != "success" ] ||
+              [ "${{ needs.canary-health-gate.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.result }}" != "success" ] ||
+              [ "${{ needs.staging-head.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.alias-staging.result }}" != "success" ] ||
+              [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.production-head.result }}" != "success" ] ||
+              [ "${{ needs.production-head.outputs.is_current }}" != "true" ] ||
+              [ "${{ needs.promote-production.result }}" != "success" ] ||
+              [ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]; then
+              echo "::error::Superseded staging refresh lacked exact pre-promotion staging gates or exact production promotion evidence."
+              exit 1
+            fi
+            echo "Main advanced after exact production promotion; no current staging receipt was emitted."
+          elif [ "$staging_refresh_outcome" = "current_receipt" ]; then
+            if [ "${{ needs.staging-deployment-receipt.result }}" != "success" ] ||
+              [ "${{ needs.staging-deployment-receipt.outputs.deployed }}" != "true" ]; then
+              echo "::error::Current staging refresh lacked an exact deployed receipt."
+              exit 1
+            fi
+          else
+            echo "::error::Staging refresh omitted a recognized terminal outcome."
+            exit 1
+          fi
+
           for gate in \
             "migrate-production:${{ needs.migrate-production.result }}" \
             "deploy-staging:${{ needs.deploy-staging.result }}" \
@@ -1956,7 +2120,6 @@ jobs:
             "canary-health-gate:${{ needs.canary-health-gate.result }}" \
             "staging-head:${{ needs.staging-head.result }}" \
             "alias-staging:${{ needs.alias-staging.result }}" \
-            "staging-deployment-receipt:${{ needs.staging-deployment-receipt.result }}" \
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
             "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \
@@ -1983,15 +2146,15 @@ jobs:
             exit 1
           fi
 
-          # Do not spend the sole production lease on deep probes for a SHA
-          # that main already superseded while release gates soaked.
+          # Exact promotion identity and all release gates have passed. A newer
+          # main generation must not erase that completed older-generation fact;
+          # controller probes remain bound to this immutable deployment and SHA.
           boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact main at the release-result boundary."
             exit 1
           }
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
-            echo "Release $EXPECTED_SHA was superseded by $boundary_sha before post-deploy fanout; neutral."
-            exit 0
+            echo "::notice::Main advanced to $boundary_sha after exact promotion and release gates; preserving released=true only for immutable generation $EXPECTED_SHA."
           fi
           echo "released=true" >> "$GITHUB_OUTPUT"

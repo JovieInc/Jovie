@@ -376,7 +376,7 @@ function ConnectionBrandIcon({
   if (row.kind === 'jovie') {
     return (
       <BrandLogo
-        size={20}
+        size='chrome'
         tone='color'
         rounded={false}
         aria-hidden

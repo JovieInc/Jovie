@@ -44,6 +44,288 @@
       "gap": "Personal email and text messages were not read or parsed."
     }
   ],
+  "growthLearningIntake": {
+    "schemaVersion": "jovie-growth-learning-intake/v1",
+    "authority": "evidence-only",
+    "period": "2026-W36",
+    "sourceDigest": "sha256:cee5dbfd608ac62bedddfba151a689ebdb20c0aa8be32c25c409ea5ac9e4a9aa",
+    "sourceRevisionDigestAlgorithm": "sha256:sorted-source-id-ref-revision/v1",
+    "sourceRevisionDigest": "sha256:3d9c198c314db3ad230729b72a8326d5113d54341b7ab6d55492b0f209714f2b",
+    "dedupeKey": "growth-learning:2026-W36:sha256:3d9c198c314db3ad230729b72a8326d5113d54341b7ab6d55492b0f209714f2b",
+    "maxSources": 5,
+    "maxProposals": 1,
+    "noDuplicateScheduler": true,
+    "priorDedupeKeys": [],
+    "records": [
+      {
+        "schemaVersion": "jovie-growth-learning/v1",
+        "id": "growth-learning-2026-09-04-yc-signal-fit",
+        "phase": "propose",
+        "assessedAt": "2026-09-05T01:33:49.300Z",
+        "sourceDigest": "sha256:cee5dbfd608ac62bedddfba151a689ebdb20c0aa8be32c25c409ea5ac9e4a9aa",
+        "sources": [
+          {
+            "id": "yc-growth-learning",
+            "ref": "gbrain:startup-advice/yc-public-advice-atoms/signal-fit-growth-learning-2026-09-04",
+            "title": "Signal-fit growth learning research",
+            "kind": "gbrain-research",
+            "publishedAt": null,
+            "publishedAtKnown": false,
+            "publishedAtPrecision": "unknown",
+            "accessedAt": "2026-09-05T01:32:22.300Z",
+            "sourceRevision": "gbrain:startup-advice/yc-public-advice-atoms/signal-fit-growth-learning-2026-09-04:b86378a8606726d1f6091d0dcb8cd109ba86eaba422175e9b2d5911dc615e7a3",
+            "provenance": "GBrain research page; source-bound evidence receipt.",
+            "incentiveOrBias": "Public growth advice and retrospective examples are not a Jovie forecast or controlled experiment.",
+            "observedFacts": [
+              "The research record emphasizes hypothesis-driven testing, downstream retention, and high-intent behavior.",
+              "The record does not establish a causal Jovie growth effect."
+            ],
+            "inferences": [
+              "A narrow signal-bound hypothesis is worth preserving for measurement only."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-05T01:32:22.300Z",
+              "ttlDays": 30
+            },
+            "status": "active",
+            "duplicateOf": null
+          },
+          {
+            "id": "product-canon",
+            "ref": "repo:canon/PRODUCT.md",
+            "title": "Jovie Product Canon",
+            "kind": "internal-product-canon",
+            "publishedAt": null,
+            "publishedAtKnown": false,
+            "publishedAtPrecision": "unknown",
+            "accessedAt": "2026-09-05T01:33:49.300Z",
+            "sourceRevision": "repo-snapshot:c9589bcd2987b30d65b8300ed557b9943ae3375e:canon/PRODUCT.md",
+            "provenance": "Repository read of canonical product guidance.",
+            "incentiveOrBias": "Internal product framing is a scope guard, not customer evidence.",
+            "observedFacts": [
+              "Jovie product guidance prioritizes creator value, activation, retention, and trust guardrails."
+            ],
+            "inferences": [
+              "Qualified activation and retained creator value are safer endpoints than reply or follower counts."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-05T01:33:49.300Z",
+              "ttlDays": 30
+            },
+            "status": "active",
+            "duplicateOf": null
+          },
+          {
+            "id": "vercel-open-source-program-spring-2026",
+            "ref": "https://vercel.com/blog/vercel-open-source-program-spring-2026-cohort",
+            "title": "Vercel Open Source Program — Spring 2026 cohort",
+            "kind": "vercel-official-program",
+            "publishedAt": "2026-06-29T00:00:00.000Z",
+            "publishedAtKnown": true,
+            "publishedAtPrecision": "day",
+            "accessedAt": "2026-09-08T22:55:18.000Z",
+            "sourceRevision": "vercel-blog:published-2026-06-29:vercel-open-source-program-spring-2026-cohort",
+            "provenance": "Vercel first-party program announcement; bounded public-signal handoff.",
+            "incentiveOrBias": "A vendor program announcement may emphasize benefits and does not establish eligibility, customer value, or a general cash grant.",
+            "observedFacts": [
+              "The program accepts open-source maintainer cohorts four times per year.",
+              "The described maintainer benefit is 3600 USD in Vercel platform credits, third-party credits, and guidance."
+            ],
+            "inferences": [
+              "This is a credits-and-support opportunity to observe and verify for eligibility, not authorization to apply or spend."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-08T22:55:18.000Z",
+              "ttlDays": 30
+            },
+            "status": "active",
+            "duplicateOf": null
+          },
+          {
+            "id": "vercel-labs-agent-browser-v0-37-1",
+            "ref": "https://github.com/vercel-labs/agent-browser/releases/tag/v0.37.1",
+            "title": "vercel-labs agent-browser v0.37.1",
+            "kind": "vercel-labs-release",
+            "publishedAt": "2026-09-08T16:05:56.000Z",
+            "publishedAtKnown": true,
+            "publishedAtPrecision": "instant",
+            "accessedAt": "2026-09-08T22:55:18.000Z",
+            "sourceRevision": "vercel-labs/agent-browser:v0.37.1",
+            "provenance": "Vercel Labs first-party release; bounded public-signal handoff.",
+            "incentiveOrBias": "A maintained release highlights shipped fixes and is not evidence that Jovie has the corresponding bottleneck or should adopt the tool.",
+            "observedFacts": [
+              "The release fixed Windows headless Chrome desktop artifacts and process-tree cleanup."
+            ],
+            "inferences": [
+              "This is a comparison candidate only if Windows browser-worker cleanup is measured as a current bottleneck."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-08T22:55:18.000Z",
+              "ttlDays": 14
+            },
+            "status": "active",
+            "duplicateOf": null
+          },
+          {
+            "id": "vercel-sandbox-agent-architecture",
+            "ref": "https://vercel.com/changelog/run-cursor-cloud-agents-vercel-sandbox",
+            "title": "Run Cursor Cloud Agents on Vercel Sandbox",
+            "kind": "vercel-official-changelog",
+            "publishedAt": "2026-09-03T00:00:00.000Z",
+            "publishedAtKnown": true,
+            "publishedAtPrecision": "day",
+            "accessedAt": "2026-09-08T22:55:18.000Z",
+            "sourceRevision": "vercel-changelog:published-2026-09-03:run-cursor-cloud-agents-vercel-sandbox",
+            "provenance": "Vercel first-party changelog; bounded public-signal handoff.",
+            "incentiveOrBias": "Vendor architecture material presents a provider's operating model and does not prove fit, cost, or authorization for Jovie's runtime.",
+            "observedFacts": [
+              "The reference architecture uses an isolated Firecracker microVM per agent request, a scale-to-zero worker pool, durable retries, and short-lived user-scoped credentials.",
+              "The Cursor self-hosted machines path requires Cursor Enterprise."
+            ],
+            "inferences": [
+              "This is an adopt-first comparison for an isolated worker bottleneck, not authorization to replace Symphony or add a control plane."
+            ],
+            "freshness": {
+              "status": "current",
+              "checkedAt": "2026-09-08T22:55:18.000Z",
+              "ttlDays": 14
+            },
+            "status": "active",
+            "duplicateOf": null
+          }
+        ],
+        "claim": {
+          "evidenceClass": "mixed-source-study",
+          "causalStatus": "unproven",
+          "causalCertification": "not-certified",
+          "measurementVerified": false,
+          "observedFacts": [
+            "The source-bound research supports testing a downstream creator outcome.",
+            "No randomized Jovie outcome has been observed.",
+            "The verified Vercel sources provide bounded signals about agent tooling, open-source credits, and worker bottlenecks; they do not establish Jovie customer demand."
+          ],
+          "inferences": [
+            "A transparent signal-specific preview may be a bounded activation hypothesis.",
+            "The Vercel signals remain comparison candidates and do not authorize adoption, program application, or external action."
+          ],
+          "counterevidence": [
+            "The source is not a controlled Jovie study and does not prove activation, revenue, retention, or causality.",
+            "Unknown or unmatched outcomes remain missing and must be reported by arm.",
+            "Vendor program and architecture claims require current eligibility, license, overlap, credential-boundary, cost, and measured-bottleneck checks before any decision."
+          ]
+        },
+        "fit": {
+          "product": "Jovie",
+          "audience": "Independent artists and creators with a public release-window signal.",
+          "painSignal": "Publicly observable fragmented link or owned-audience friction corroborated by a second public artifact.",
+          "decision": "fit-hypothesis",
+          "evidenceRefs": ["yc-growth-learning", "product-canon"],
+          "disqualifiers": [
+            "No release-window signal.",
+            "No explicit public product-fit pain signal.",
+            "Private, gated, or sensitive data required.",
+            "No authorized route for any external action."
+          ]
+        },
+        "proposal": {
+          "status": "proposed",
+          "hypothesis": "Among qualified independent artists, a transparent signal-specific Jovie profile preview during a release window increases qualified activation within 14 days versus a no-contact holdout.",
+          "sourceSignal": "A public release or event announcement within 14 days plus a second public artifact showing fragmented links or owned-audience friction; follower count alone never qualifies.",
+          "audienceRule": "Independent artists or creators with a public release-window signal and one corroborated product-fit pain signal.",
+          "comparator": "Account-level 50% no-contact holdout; treatment is a founder-approved, signal-specific invitation only after authorization.",
+          "owner": "Summer",
+          "authorizationOwner": "Founder",
+          "authorizationScope": "external-consequential",
+          "executionAuthority": "pending-founder-authorization",
+          "externalActions": ["prepare-only"],
+          "effortCap": {
+            "amount": 7,
+            "unit": "hours"
+          },
+          "spendCap": {
+            "amount": 0,
+            "unit": "USD"
+          },
+          "primaryMetric": {
+            "name": "qualified activation rate",
+            "numerator": "Assigned eligible creator accounts that publish or claim a Jovie profile and complete one owned-audience action within 14 days.",
+            "denominator": "All assigned eligible creator accounts.",
+            "windowDays": 14
+          },
+          "negativeMetrics": [
+            "Complaint or opt-out rate.",
+            "No-fit classification rate.",
+            "Duplicate or recontact rate.",
+            "Unauthorized-send count.",
+            "Time per qualified candidate."
+          ],
+          "minimumDetectableEffect": {
+            "metric": "qualified activation rate",
+            "absolute": 0.15,
+            "interpretation": "Predeclared decision threshold for an exploratory pilot; not a powered-study claim."
+          },
+          "sampleSize": {
+            "treatment": 20,
+            "control": 20,
+            "unit": "eligible creator account",
+            "designIntent": "exploratory-pilot",
+            "powerStatus": "not-powered"
+          },
+          "cohortProtocol": {
+            "qualifiedCohortFrozenAt": "2026-09-04T17:00:00.000Z",
+            "assignmentAt": "2026-09-04T18:00:00.000Z",
+            "allocation": {
+              "method": "reproducible-account-level-randomization",
+              "seedRef": "growth-learning:2026-W36"
+            }
+          },
+          "signalTiming": {
+            "announcementAt": "2026-09-02T18:00:00.000Z",
+            "eventAt": "2026-09-10T18:00:00.000Z"
+          },
+          "outcomeObservation": {
+            "bothArmsObservable": true,
+            "matchMethod": "Account-level analytics receipt keyed to frozen assignment.",
+            "holdoutContacted": false,
+            "missingnessReportedByArm": true,
+            "unknownOutcomesAreMissing": true
+          },
+          "stopRules": [
+            "Stop immediately on any external contact without founder authorization.",
+            "Stop on any deceptive, privacy, or complaint signal, or if qualification precision is below 50% after the first 10 candidates.",
+            "Stop at expiry or on any unknown source coverage, cost, or ownership state.",
+            "Treat 20 accounts per arm as exploratory only; do not present the 15 percentage-point threshold as proof of statistical power."
+          ],
+          "dataBoundary": [
+            "Public sources only; no personal email or private messages.",
+            "No sensitive personal data, private or gated scraping, account connection, ads, or publication."
+          ],
+          "expiresAt": "2026-10-04T00:00:00.000Z",
+          "outcomeReviewAt": "2026-11-18T00:00:00.000Z",
+          "rollback": "Keep the candidate record and negative results, withdraw the prepared message, and return the proposal to rejected or expired without changing product policy.",
+          "decisionWriteback": "GBrain research record plus experiments/jovie-release-window-qualified-activation-v1 and existing analytics outcome receipt."
+        },
+        "amendment": {
+          "status": "none",
+          "scope": [],
+          "sourceRevision": null,
+          "measuredOutcome": {
+            "state": "not-run"
+          },
+          "compatibilityCheck": "not-run",
+          "conflictCheck": "not-run",
+          "conflictsWith": [],
+          "rollback": "",
+          "reviewAt": null
+        },
+        "retrievedAt": "2026-09-05T01:33:49.300Z"
+      }
+    ]
+  },
   "candidates": [
     {
       "id": "P01-typed-proof-claims",

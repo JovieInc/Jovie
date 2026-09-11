@@ -48,6 +48,7 @@ RUNTIME_READBACK=0
 PROVIDER_ONLY=0
 PROVIDER_ROLLBACK=0
 PROVIDER_STAGE=0
+MANAGED_CONTROLLER_ONLY=0
 RETIRE_LEGACY=0
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 # Genuinely retired units only. The grok/kimi sidecar
@@ -63,7 +64,7 @@ LEGACY_UNITS=(
   symphony-burrito-update.timer
 )
 
-usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--retire-legacy] [--runtime-readback] [--provider-runtime-only] [--provider-runtime-rollback] [--stage-provider-runtime]" >&2; }
+usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--retire-legacy] [--runtime-readback] [--provider-runtime-only] [--provider-runtime-rollback] [--stage-provider-runtime] [--managed-controller-only]" >&2; }
 
 for arg in "$@"; do
   case "$arg" in
@@ -76,10 +77,16 @@ for arg in "$@"; do
     --provider-runtime-only) PROVIDER_ONLY=1 ;;
     --provider-runtime-rollback) PROVIDER_ONLY=1; PROVIDER_ROLLBACK=1 ;;
     --stage-provider-runtime) PROVIDER_ONLY=1; PROVIDER_STAGE=1 ;;
+    --managed-controller-only) MANAGED_CONTROLLER_ONLY=1; SKIP_BINARY=1 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
 done
+
+if [ "$PROVIDER_ONLY" -eq 1 ] && [ "$MANAGED_CONTROLLER_ONLY" -eq 1 ]; then
+  echo "PROVIDER_RED provider and managed-controller promotion are separate operations" >&2
+  exit 2
+fi
 
 if [ "$PROVIDER_ONLY" -eq 1 ]; then
   if [ "$PROVIDER_STAGE" -eq 1 ] && [ "$PROVIDER_ROLLBACK" -eq 1 ]; then
@@ -92,6 +99,17 @@ if [ "$PROVIDER_ONLY" -eq 1 ]; then
   fi
   exec python3 "$REPO_ROOT/scripts/symphony/provider_runtime_promotion.py" \
     "$REPO_ROOT" "$TARGET_HOME" "$STATE_DIR" "$PROVIDER_ROLLBACK" "$DRY_RUN" "$PROVIDER_STAGE"
+fi
+
+if [ "$MANAGED_CONTROLLER_ONLY" -eq 1 ]; then
+  if [ "$CHECK_ONLY" -eq 1 ] || [ "$RUNTIME_READBACK" -eq 1 ]; then
+    echo "PROVIDER_RED --managed-controller-only cannot be combined with readback modes" >&2
+    exit 2
+  fi
+  if [ ! -L "$STATE_DIR/provider-generations/current" ]; then
+    echo "PROVIDER_RED --managed-controller-only requires a managed provider generation" >&2
+    exit 10
+  fi
 fi
 
 if [ "$RESTART" -eq 1 ]; then
@@ -164,6 +182,11 @@ check_one() {
   return "$rc"
 }
 
+check_provider_runtime() {
+  python3 "$REPO_ROOT/scripts/symphony/provider_runtime_promotion.py" \
+    "$REPO_ROOT" "$TARGET_HOME" "$STATE_DIR" 0 0 0 1
+}
+
 check_workflow() {
   local src="$1" dst="$2"
   if [ ! -f "$dst" ]; then
@@ -181,14 +204,14 @@ def normalized(path):
     if len(matches) != 1:
         return None
     value = int(matches[0][1])
-    if not 1 <= value <= 8:
+    if value < 1:
         return None
     return pattern.sub(r"\g<1>__RUNTIME_OVERLAY__\g<3>", text)
 
 raise SystemExit(0 if normalized(sys.argv[1]) == normalized(sys.argv[2]) else 1)
 PY
   then
-    echo "OK $dst (bounded max_concurrent_agents overlay accepted)"
+    echo "OK $dst (adaptive max_concurrent_agents overlay accepted)"
   else
     echo "DRIFT $dst"
     return 1
@@ -395,7 +418,7 @@ if [ "$RUNTIME_READBACK" -eq 1 ]; then
   exit "$?"
 fi
 
-if [ "$DRY_RUN" -eq 0 ] && [ "$CHECK_ONLY" -eq 0 ] && [ -L "$STATE_DIR/provider-generations/current" ]; then
+if [ "$DRY_RUN" -eq 0 ] && [ "$CHECK_ONLY" -eq 0 ] && [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ] && [ -L "$STATE_DIR/provider-generations/current" ]; then
   echo "PROVIDER_RED provider generation is managed; use --provider-runtime-only or --provider-runtime-rollback" >&2
   exit 10
 fi
@@ -403,6 +426,10 @@ fi
 if ! validate_source; then
   echo "SOURCE_INVALID refusing obsolete or over-budget Symphony config" >&2
   exit 4
+fi
+if [ "$MANAGED_CONTROLLER_ONLY" -eq 1 ]; then
+  python3 "$REPO_ROOT/scripts/symphony/provider_runtime_promotion.py" \
+    "$REPO_ROOT" "$TARGET_HOME" "$STATE_DIR" 0 0 0 1
 fi
 
 BIN_URL="${RELEASE_URL}/${BIN_NAME}"
@@ -416,6 +443,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "DRY_RUN $BIN_URL"
   echo "DRY_RUN $SUM_URL"
   echo "INSTALL $BIN_DST"
+  if [ "$MANAGED_CONTROLLER_ONLY" -eq 1 ]; then
+    echo "PRESERVE_MANAGED_PROVIDER $STATE_DIR/provider-generations/current"
+    echo "PRESERVE_BINARY $BIN_DST"
+  fi
   echo "HELPER $HELPER_DST"
   echo "AGENT_ROUTER $AGENT_ROUTER_DST"
   echo "AUTO_ROUTE $AUTO_ROUTE_DST"
@@ -437,11 +468,15 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   check_workflow "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
   check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
-  check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
   check_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" || rc=1
-  check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
-  check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
-  check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
+  if [ -L "$STATE_DIR/provider-generations/current" ]; then
+    check_provider_runtime || rc=1
+  else
+    check_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" || rc=1
+    check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
+    check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
+    check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
+  fi
   check_one "$SAFE_RESTART_SRC" "$SAFE_RESTART_DST" || rc=1
   check_one "$FROZEN_TRANSITION_SRC" "$FROZEN_TRANSITION_DST" || rc=1
   exit "$rc"
@@ -483,11 +518,15 @@ cleanup() {
     if [ "$promotion_started" -eq 1 ]; then
       restore_target binary "$BIN_DST" 0755
       restore_target helper "$HELPER_DST" 0755
-      restore_target agent-router "$AGENT_ROUTER_DST" 0755
+      if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
+        restore_target agent-router "$AGENT_ROUTER_DST" 0755
+      fi
       restore_target auto-route "$AUTO_ROUTE_DST" 0755
-      restore_target cursor-adapter "$CURSOR_ADAPTER_DST" 0755
-      restore_target codex-router "$CODEX_ROUTER_DST" 0755
-      restore_target codex-probe "$CODEX_PROBE_DST" 0755
+      if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
+        restore_target cursor-adapter "$CURSOR_ADAPTER_DST" 0755
+        restore_target codex-router "$CODEX_ROUTER_DST" 0755
+        restore_target codex-probe "$CODEX_PROBE_DST" 0755
+      fi
       restore_target safe-restart "$SAFE_RESTART_DST" 0755
       restore_target frozen-transition "$FROZEN_TRANSITION_DST" 0755
       restore_target unit "$UNIT_DST" 0644
@@ -495,7 +534,9 @@ cleanup() {
     fi
     if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
       systemctl --user daemon-reload >/dev/null 2>&1 || true
-      if [ "$RESTART" -eq 1 ] && [ "$official_stopped_for_promotion" -eq 1 ]; then
+      if [ "$RESTART" -eq 1 ] && [ "$MANAGED_CONTROLLER_ONLY" -eq 1 ] && [ "$official_was_active" -eq 1 ]; then
+        "$SAFE_RESTART_DST" >/dev/null 2>&1 || true
+      elif [ "$RESTART" -eq 1 ] && [ "$official_stopped_for_promotion" -eq 1 ]; then
         systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 || true
       fi
     fi
@@ -531,7 +572,11 @@ if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
   fi
 fi
 if [ "$RESTART" -eq 1 ]; then
-  stop_idle_official_for_restart
+  if [ "$MANAGED_CONTROLLER_ONLY" -eq 1 ]; then
+    "$SAFE_RESTART_SRC" --check-only
+  else
+    stop_idle_official_for_restart
+  fi
 fi
 if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 1 ] && [ "$official_was_active" -ne 1 ]; then
   echo "PROMOTION_RED --no-restart retirement requires an already-active $SERVICE_NAME" >&2
@@ -542,11 +587,15 @@ mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_
 rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
 backup_target binary "$BIN_DST"
 backup_target helper "$HELPER_DST"
-backup_target agent-router "$AGENT_ROUTER_DST"
+if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
+  backup_target agent-router "$AGENT_ROUTER_DST"
+fi
 backup_target auto-route "$AUTO_ROUTE_DST"
-backup_target cursor-adapter "$CURSOR_ADAPTER_DST"
-backup_target codex-router "$CODEX_ROUTER_DST"
-backup_target codex-probe "$CODEX_PROBE_DST"
+if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
+  backup_target cursor-adapter "$CURSOR_ADAPTER_DST"
+  backup_target codex-router "$CODEX_ROUTER_DST"
+  backup_target codex-probe "$CODEX_PROBE_DST"
+fi
 backup_target safe-restart "$SAFE_RESTART_DST"
 backup_target frozen-transition "$FROZEN_TRANSITION_DST"
 backup_target unit "$UNIT_DST"
@@ -557,11 +606,15 @@ if [ "$SKIP_BINARY" -eq 0 ]; then
   install_one "${tmpdir}/${BIN_NAME}" "$BIN_DST" 0755
 fi
 install_one "$HELPER_SRC" "$HELPER_DST" 0755
-install_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" 0755
+if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
+  install_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" 0755
+fi
 install_one "$AUTO_ROUTE_SRC" "$AUTO_ROUTE_DST" 0755
-install_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" 0755
-install_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" 0755
-install_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" 0755
+if [ "$MANAGED_CONTROLLER_ONLY" -eq 0 ]; then
+  install_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" 0755
+  install_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" 0755
+  install_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" 0755
+fi
 install_one "$SAFE_RESTART_SRC" "$SAFE_RESTART_DST" 0755
 install_one "$FROZEN_TRANSITION_SRC" "$FROZEN_TRANSITION_DST" 0755
 install_one "$UNIT_SRC" "$UNIT_DST"
@@ -576,7 +629,11 @@ if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
 fi
 if [ "$RESTART" -eq 1 ]; then
   systemctl --user enable "$SERVICE_NAME"
-  systemctl --user restart "$SERVICE_NAME"
+  if [ "$MANAGED_CONTROLLER_ONLY" -eq 1 ]; then
+    "$SAFE_RESTART_DST"
+  else
+    systemctl --user restart "$SERVICE_NAME"
+  fi
   for _ in $(seq 1 45); do
     if systemctl --user is-active --quiet "$SERVICE_NAME" && curl -fsS --max-time 3 "$STATE_URL" >/dev/null; then
       break

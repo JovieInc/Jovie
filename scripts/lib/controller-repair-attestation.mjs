@@ -10,6 +10,9 @@ const SHA = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const REPOSITORY = /^[^/\s]+\/[^/\s]+$/;
 const OPERATION_ID = /^[a-z0-9][a-z0-9-]{7,63}$/;
+const SEER_CHECK_NAME = 'Seer Code Review';
+const SEER_APP_ID = 12637;
+const SEER_APP_SLUG = 'sentry';
 const MAX_LIFETIME_MS = 15 * 60_000;
 const CLOCK_SKEW_MS = 60_000;
 const EXACT_KEYS = [
@@ -50,6 +53,46 @@ export function hashControllerRepairPaths(paths) {
     throw new Error('paths must not contain duplicates');
   }
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+export function selectSeerControllerRepairReview(
+  { checkRuns, checkSuite },
+  { expectedHead }
+) {
+  if (!SHA.test(String(expectedHead ?? '')) || !Array.isArray(checkRuns)) {
+    throw new Error('Seer review inventory is malformed');
+  }
+  const candidates = checkRuns.filter(run => run?.name === SEER_CHECK_NAME);
+  if (candidates.length !== 1) {
+    throw new Error('Seer review evidence must contain exactly one check run');
+  }
+  const [run] = candidates;
+  if (
+    !Number.isInteger(run.id) ||
+    run.id < 1 ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success' ||
+    run.head_sha !== expectedHead ||
+    run.app?.id !== SEER_APP_ID ||
+    run.app?.slug !== SEER_APP_SLUG ||
+    !Number.isInteger(run.check_suite?.id) ||
+    run.check_suite.id < 1 ||
+    !checkSuite ||
+    checkSuite.id !== run.check_suite.id ||
+    checkSuite.head_sha !== expectedHead ||
+    checkSuite.app?.id !== SEER_APP_ID ||
+    checkSuite.app?.slug !== SEER_APP_SLUG
+  ) {
+    throw new Error(
+      'Seer review evidence is not a successful exact-head review'
+    );
+  }
+  return {
+    checkRunId: run.id,
+    checkSuiteId: checkSuite.id,
+    reviewId: `seer-check-${run.id}`,
+    reviewedHead: expectedHead,
+  };
 }
 
 export function validateControllerRepairAttestation(
@@ -238,6 +281,16 @@ export async function runCli(argv = process.argv.slice(2)) {
     );
     return 0;
   }
+  if (command === 'seer-review') {
+    process.stdout.write(
+      `${JSON.stringify(
+        selectSeerControllerRepairReview(JSON.parse(await stdin()), {
+          expectedHead: args.head,
+        })
+      )}\n`
+    );
+    return 0;
+  }
   if (command === 'extract') {
     const attestation = extractControllerRepairAttestation(await stdin());
     if (!attestation) return 3;
@@ -284,7 +337,7 @@ export async function runCli(argv = process.argv.slice(2)) {
     return 0;
   }
   throw new Error(
-    'Usage: controller-repair-attestation.mjs <paths-hash|extract|matches|render>'
+    'Usage: controller-repair-attestation.mjs <paths-hash|seer-review|extract|matches|render>'
   );
 }
 

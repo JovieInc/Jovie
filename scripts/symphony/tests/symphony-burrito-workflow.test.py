@@ -8,10 +8,12 @@ import io
 import os
 import pathlib
 import re
+import signal
 import socket
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 import importlib.util
 import json
@@ -89,7 +91,314 @@ def _closure_run_args(tmp):
     ]
 
 
+def _runtime_command(args, *, established_clock=False):
+    directory = os.environ.get("SYMPHONY_RUNTIME_COVERAGE_DIR")
+    if not directory and not established_clock:
+        return [sys.executable, str(HELPER_PATH), *args]
+    # Same executable and selector; merge real child execution into the CI trace.
+    launcher = (
+        "import json, os, pathlib, runpy, sys, time, trace\n"
+        f"sys.argv = [{str(HELPER_PATH)!r}] + sys.argv[1:]\n"
+    )
+    if established_clock:
+        # Older macOS Python starts monotonic at zero; model an established host
+        # clock so this fixture enters the first periodic closure check immediately.
+        launcher += "clock = time.monotonic\ntime.monotonic = lambda: clock() + 60\n"
+    if not directory:
+        launcher += f"runpy.run_path({str(HELPER_PATH)!r}, run_name='__main__')\n"
+        return [sys.executable, "-c", launcher, *args]
+    launcher += (
+        "tracer = trace.Trace(count=True, trace=False)\n"
+        "try:\n"
+        f" tracer.runfunc(runpy.run_path, {str(HELPER_PATH)!r}, run_name='__main__')\n"
+        "finally:\n"
+        " rows = [[file, line, count] for (file, line), count in tracer.results().counts.items()]\n"
+        f" pathlib.Path({directory!r}, str(os.getpid()) + '.json').write_text(json.dumps(rows))\n"
+    )
+    return [sys.executable, "-c", launcher, *args]
+
+
+class DispatchAdmissionTests(unittest.TestCase):
+    def setUp(self):
+        self.helper = _load_helper()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = pathlib.Path(self.tmp.name) / "gate.json"
+
+    def payload(self, status="healthy"):
+        payload = _fleet_gate_payload(status, status == "healthy")
+        payload.update(
+            workAdmission={"allowed": True, "newIssueLeaseAllowed": status == "healthy",
+                           "newImplementationAllowed": status == "healthy"},
+            remediationAdmission={"allowed": True, "localAllowed": True,
+                "authority": "single-pr-writer-exact-head", "activities": ["isolated-pr-repair"],
+                "pushAllowed": False, "maxConcurrent": 1},
+            concurrency={"gem": {"maxConcurrent": 1, "evidenceAccepted": True,
+                                  "newMutationAllowed": True, "runtimeFloor": 1}},
+        )
+        return payload
+
+    def check(self, payload, mode="new-work", product="jovie"):
+        self.path.write_text(json.dumps(payload))
+        before = self.path.read_bytes()
+        result = self.helper.read_dispatch_admission(self.path, mode=mode, product_id=product)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(set(pathlib.Path(self.tmp.name).iterdir()), {self.path})
+        return result
+
+    def test_fresh_gate_is_only_non_consuming_prerequisite(self):
+        for mode in ("new-work", "existing-pr-repair"):
+            self.assertTrue(self.check(self.payload(), mode)["allowed"])
+        red = self.payload("red")
+        self.assertFalse(self.check(red)["allowed"])
+        self.assertTrue(self.check(red, "existing-pr-repair")["allowed"])
+        self.assertTrue(self.check(red, "existing-pr-repair")["allowed"])
+        self.assertNotIn("pushAllowed", self.check(red, "existing-pr-repair"))
+
+    def test_real_producer_controller_hold_overrides_closure_projection(self):
+        import copy
+        import runpy
+        scope = runpy.run_path(str(ROOT / "scripts/symphony/tests/gem-priority-gate.test.py"))
+        producer = scope["MODULE"]
+        signals = copy.deepcopy(scope["GREEN_SIGNALS"])
+        signals["controller"] = {"status": "failed", "error": "observation failed"}
+        now = producer.isoformat(producer.utc_now())
+        signals["independentReview"]["observedAt"] = now
+        signals["concurrencyEvidence"] = scope["capacity_evidence"](1, now)
+        receipt = producer.evaluate(signals, now)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["workAdmission"]["productNewIssueLeaseAllowed"]["jovie"])
+        self.assertTrue(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
+        self.assertFalse(self.check(receipt)["allowed"])
+
+    def test_floor_and_local_permission_never_replace_capacity(self):
+        for maximum, accepted, mutation in [(0, False, False), (True, True, True),
+                                           (-1, True, True), (1, False, True),
+                                           (1, True, False), ("1", True, True)]:
+            with self.subTest(maximum=maximum, accepted=accepted, mutation=mutation):
+                payload = self.payload("red")
+                payload["concurrency"]["gem"].update(maxConcurrent=maximum,
+                    evidenceAccepted=accepted, newMutationAllowed=mutation)
+                self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+        for capacity in (None, {}, {"gem": []}):
+            payload = self.payload()
+            payload["concurrency"] = capacity
+            self.assertFalse(self.check(payload)["allowed"])
+        payload = self.payload()
+        payload["state"] = "RED"
+        self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+
+    def test_typed_remediation_and_work_fields_fail_closed(self):
+        for key, value in [("allowed", False), ("localAllowed", False),
+                           ("authority", "someone"), ("activities", []),
+                           ("activities", ["isolated-pr-repair", 1]),
+                           ("activities", "isolated-pr-repair"),
+                           ("pushAllowed", 0), ("maxConcurrent", True),
+                           ("maxConcurrent", 2)]:
+            payload = self.payload("red")
+            payload["remediationAdmission"][key] = value
+            self.assertFalse(self.check(payload, "existing-pr-repair")["allowed"])
+        for key in ("workAdmission", "remediationAdmission"):
+            payload = self.payload()
+            payload[key] = None
+            self.assertFalse(self.check(payload, "new-work" if key == "workAdmission" else "existing-pr-repair")["allowed"])
+        payload = self.payload()
+        payload["workAdmission"]["allowed"] = False
+        self.assertFalse(self.check(payload)["allowed"])
+
+    def test_product_projection_does_not_open_jovie(self):
+        payload = self.payload("red")
+        payload["closureAdmission"]["products"] = {
+            "ovie": {"newIssueIntakeAllowed": True},
+            "jovie": {"newIssueIntakeAllowed": False},
+        }
+        payload["workAdmission"]["productNewIssueLeaseAllowed"] = {"ovie": True, "jovie": False}
+        self.assertFalse(self.check(payload, product="ovie")["allowed"])
+        payload["workAdmission"].update(newIssueLeaseAllowed=True, newImplementationAllowed=True)
+        self.assertTrue(self.check(payload, product="ovie")["allowed"])
+        self.assertFalse(self.check(payload)["allowed"])
+        payload["workAdmission"]["productNewIssueLeaseAllowed"]["ovie"] = False
+        self.assertFalse(self.check(payload, product="ovie")["allowed"])
+        self.assertFalse(self.check(payload, product="unbound")["allowed"])
+        self.assertFalse(self.check(payload, mode="anything")["allowed"])
+
+    def test_stale_future_malformed_and_naive_dates_refuse_every_mode(self):
+        now = dt.datetime.now(dt.timezone.utc)
+        for date in ((now - dt.timedelta(hours=1)).isoformat(),
+                     (now + dt.timedelta(hours=1)).isoformat(),
+                     now.replace(tzinfo=None).isoformat(), "invalid"):
+            for mode in ("new-work", "existing-pr-repair"):
+                payload = self.payload()
+                payload["observedAt"] = date
+                self.assertFalse(self.check(payload, mode)["allowed"])
+        for bad_state in ([], {}, False):
+            payload = self.payload()
+            payload["state"] = bad_state
+            self.assertFalse(self.check(payload)["allowed"])
+        self.assertFalse(self.check(self.payload(), mode=[])["allowed"])
+        self.assertFalse(self.check(self.payload(), product={})["allowed"])
+        for bad_products in (None, [], True):
+            payload = self.payload()
+            payload["workAdmission"]["productNewIssueLeaseAllowed"] = bad_products
+            self.assertFalse(self.check(payload)["allowed"])
+        for malformed in ([], {}, {"schema": "wrong"}):
+            self.assertFalse(self.check(malformed)["allowed"])
+        self.path.write_text("{")
+        self.assertFalse(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+        self.path.unlink()
+        self.assertFalse(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+
+    def test_snapshot_read_once_and_installed_cli_contract(self):
+        payload = self.payload()
+        with mock.patch.object(pathlib.Path, "read_text", return_value=json.dumps(payload)) as read:
+            self.assertTrue(self.helper.read_dispatch_admission(self.path, mode="new-work", product_id="jovie")["allowed"])
+            self.assertEqual(read.call_count, 1)
+        for status, code in (("healthy", 0), ("red", 75)):
+            self.path.write_text(json.dumps(self.payload(status)))
+            command = _runtime_command(["dispatch-preflight", "--gate-file", str(self.path),
+                                        "--mode", "new-work", "--product-id", "jovie"])
+            result = subprocess.run(command, text=True, capture_output=True, timeout=5)
+            self.assertEqual(result.returncode, code, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["allowed"], code == 0)
+
+
 class OfficialSymphonyContractTests(unittest.TestCase):
+    def test_shutdown_drains_child_output_for_parent_and_group_signals(self):
+        for signum, group, paused in (
+            (signal.SIGTERM, False, False),
+            (signal.SIGTERM, True, False),
+            (signal.SIGINT, False, False),
+            (signal.SIGTERM, False, True),
+        ):
+            with self.subTest(signal=signum, group=group, paused=paused):
+                with tempfile.TemporaryDirectory() as tmp:
+                    ready = pathlib.Path(tmp) / "ready"
+                    completed = pathlib.Path(tmp) / "completed"
+                    log = pathlib.Path(tmp) / "output"
+                    child = (
+                        "import os, pathlib, signal, sys, time\n"
+                        "def stop(sig, frame):\n"
+                        " signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                        " signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+                        " sys.stdout.write('x' * 262144 + '\\nshutdown-drained\\n')\n"
+                        " sys.stdout.flush()\n"
+                        f" pathlib.Path({str(completed)!r}).write_text('complete')\n"
+                        " raise SystemExit(0)\n"
+                        "signal.signal(signal.SIGTERM, stop)\n"
+                        "signal.signal(signal.SIGINT, stop)\n"
+                        f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid()))\n"
+                        "while True: time.sleep(1)\n"
+                    )
+                    with log.open("w") as output:
+                        process = subprocess.Popen(
+                            _runtime_command(["run",
+                             "--gate-file", str(pathlib.Path(tmp) / "rate.json"),
+                             *_closure_run_args(tmp), "--", sys.executable, "-c", child]),
+                            stdout=output, stderr=subprocess.STDOUT,
+                            start_new_session=True,
+                        )
+                        try:
+                            deadline = time.monotonic() + 5
+                            while not ready.exists() and time.monotonic() < deadline:
+                                self.assertIsNone(process.poll())
+                                time.sleep(0.01)
+                            self.assertTrue(ready.exists(), log.read_text())
+                            if paused:
+                                os.kill(int(ready.read_text()), signal.SIGSTOP)
+                            if group:
+                                os.killpg(process.pid, signum)
+                            else:
+                                process.send_signal(signum)
+                            self.assertEqual(process.wait(timeout=5), 0, log.read_text()[-1000:])
+                            self.assertEqual(completed.read_text(), "complete")
+                            self.assertIn("shutdown-drained", log.read_text())
+                            # Check before any harness cleanup: the runtime reaped its child.
+                            with self.assertRaises(ProcessLookupError):
+                                os.kill(int(ready.read_text()), 0)
+                        finally:
+                            try:
+                                os.killpg(process.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                            process.wait(timeout=5)
+
+    def test_shutdown_interrupts_rate_limit_sleep_without_relaunch(self):
+        self._assert_shutdown_interrupts_gate("rate_limit")
+
+    def test_shutdown_interrupts_closure_hold_without_relaunch(self):
+        self._assert_shutdown_interrupts_gate("closure")
+
+    def _assert_shutdown_interrupts_gate(self, kind):
+        with tempfile.TemporaryDirectory() as tmp:
+            ready = pathlib.Path(tmp) / "ready"
+            draining = pathlib.Path(tmp) / "draining"
+            release = pathlib.Path(tmp) / "release"
+            gate = pathlib.Path(tmp) / "rate.json"
+            log = pathlib.Path(tmp) / "output"
+            closure_args = _closure_run_args(tmp)
+            gate_event = "rate_limit_gate_wait" if kind == "rate_limit" else "closure_hold_wait"
+            announcement = "print('status=429 retry-after: 3600 RATELIMITED', flush=True)\n"
+            if kind == "closure":
+                gate = pathlib.Path(tmp) / "fleet-gate.json"
+                announcement = (
+                    f"pathlib.Path({str(gate)!r}).write_text({json.dumps(_fleet_gate_payload(status='red', intake=False))!r})\n"
+                    "print('scheduler-tick', flush=True)\n"
+                )
+            child = (
+                "import os, pathlib, signal, sys, time\n"
+                "def stop(sig, frame):\n"
+                " signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                " signal.signal(signal.SIGINT, signal.SIG_IGN)\n"
+                f" pathlib.Path({str(draining)!r}).touch()\n"
+                f" while not pathlib.Path({str(release)!r}).exists(): time.sleep(0.01)\n"
+                " print('x' * 262144 + '\\nshutdown-drained', flush=True)\n"
+                " raise SystemExit(75)\n"
+                "signal.signal(signal.SIGTERM, stop)\n"
+                f"pathlib.Path({str(ready)!r}).write_text(str(os.getpid()))\n"
+                + announcement +
+                "while True: time.sleep(1)\n"
+            )
+            with log.open("w") as output:
+                process = subprocess.Popen(
+                    _runtime_command(["run", "--gate-file", str(pathlib.Path(tmp) / "rate.json"),
+                                      *closure_args, "--", sys.executable, "-c", child],
+                                     established_clock=kind == "closure"),
+                    stdout=output, stderr=subprocess.STDOUT, start_new_session=True,
+                )
+                try:
+                    deadline = time.monotonic() + 5
+                    while time.monotonic() < deadline:
+                        self.assertIsNone(process.poll())
+                        if ready.exists() and gate_event in log.read_text():
+                            break
+                        time.sleep(0.01)
+                    self.assertTrue(gate.exists(), log.read_text())
+                    self.assertIn(gate_event, log.read_text())
+                    process.send_signal(signal.SIGTERM)
+                    deadline = time.monotonic() + 5
+                    while not draining.exists() and time.monotonic() < deadline:
+                        self.assertIsNone(process.poll())
+                        time.sleep(0.01)
+                    self.assertTrue(draining.exists(), log.read_text())
+                    process.send_signal(signal.SIGINT)
+                    release.touch()
+                    self.assertEqual(process.wait(timeout=5), 128 + signal.SIGTERM)
+                    self.assertIn("shutdown-drained", log.read_text())
+                    marker = "status=429" if kind == "rate_limit" else "scheduler-tick"
+                    self.assertEqual(log.read_text().count(marker), 1)
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(int(ready.read_text()), 0)
+                finally:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.wait(timeout=5)
+
     def test_live_queue_budget_and_no_root_workflow(self):
         """Official runtime is ~/.config/symphony/WORKFLOW.md; product clone is not a Symphony config."""
         helper = _load_helper()
@@ -113,19 +422,22 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
-            re.compile(r"^\s+command: SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
+            re.compile(r"^\s+command: env SYMPHONY_CODEX_DISABLE_APPS=1 symphony-agent-router app-server$", re.M),
         )
         authority_map = AUTHORITY_MAP_PATH.read_text(encoding="utf-8")
         self.assertIn("`symphony-agent-router` | active", authority_map)
         self.assertIn("`symphony-concurrency-controller.py` | observer/overlay", authority_map)
         self.assertIn("`symphony-reconciler.py` | retired by the official updater", authority_map)
         self.assertIn("symphony-provider-route/v1", authority_map)
+        self.assertIn("Cursor/Grok/Kimi CLI executors", authority_map)
+        self.assertIn("native Codex app-server transport", authority_map)
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]
-        self.assertIn("git clone --depth 1 https://github.com/JovieInc/Jovie.git .", hook)
+        self.assertIn('jovie-symphony-workspace-create" "$PWD"', hook)
+        self.assertNotIn("git clone ", hook)
         self.assertTrue("git@" not in hook and "mix " not in hook)
-        self.assertIn("symphony-nvme-package-cache.sh after-create", hook)
+        self.assertIn('jovie-symphony-workspace cleanup "$PWD"', hook)
         self.assertIn("pnpm install --offline --frozen-lockfile --ignore-scripts", WORKFLOW)
         self.assertIn("before_remove:", WORKFLOW)
         self.assertIn("symphony-nvme-package-cache.sh before-remove", WORKFLOW)
@@ -137,10 +449,12 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("- Rework", WORKFLOW)
         self.assertNotIn("team:JOV", WORKFLOW)
         self.assertIsNone(TOKEN_RE.search(WORKFLOW))
+
         self.assertIn("--port 4041", UNIT)
         self.assertIn("symphony-elixir-logs", UNIT)
         self.assertIn("symphony-official-runtime run", UNIT)
         self.assertIn("--max-gate-sleep-seconds 3900", UNIT)
+        self.assertNotIn("--closure-observe-only", UNIT)
         self.assertNotIn("ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate", UNIT)
         self.assertIn(
             "--i-understand-that-this-will-be-running-without-the-usual-guardrails",
@@ -178,6 +492,27 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertFalse(missing_count["ok"], missing_count)
         self.assertIn("linear_active_issue_count_missing", missing_count["errors"])
+
+    def test_agent_command_survives_symphony_exec_prefix(self):
+        command = re.search(r"^\s+command:\s+(.+)$", WORKFLOW, re.M)
+        self.assertIsNotNone(command)
+        with tempfile.TemporaryDirectory() as tmp:
+            router = pathlib.Path(tmp) / "symphony-agent-router"
+            router.write_text(
+                "#!/bin/sh\n"
+                '[ "$SYMPHONY_CODEX_DISABLE_APPS" = "1" ] || exit 91\n'
+                '[ "$1" = "app-server" ] || exit 92\n',
+                encoding="utf-8",
+            )
+            router.chmod(0o755)
+            result = subprocess.run(
+                ["/bin/bash", "-lc", f"exec {command.group(1)}"],
+                cwd=tmp,
+                env={**os.environ, "PATH": f"{tmp}:{os.environ.get('PATH', '')}"},
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
     def test_budget_fails_for_five_second_polling_or_unbounded_concurrency(self):
         helper = _load_helper()
@@ -294,10 +629,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             gate = pathlib.Path(tmp) / "linear-rate-limit.json"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(gate),
                     *_closure_run_args(tmp),
@@ -307,7 +639,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     f"print({line!r})",
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -395,6 +727,34 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     for error in missing_rework["errors"]
                 ),
                 missing_rework["errors"],
+            )
+
+            direct_clone = check(
+                WORKFLOW.replace(
+                    'exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"',
+                    "git clone --depth 1 https://github.com/JovieInc/Jovie.git .",
+                )
+            )
+            self.assertFalse(direct_clone["ok"])
+            self.assertIn(
+                "workflow_after_create_missing_managed_wrapper",
+                direct_clone["errors"],
+            )
+            self.assertIn(
+                "workflow_after_create_bypasses_managed_wrapper",
+                direct_clone["errors"],
+            )
+
+            missing_cleanup = check(
+                WORKFLOW.replace(
+                    '    sudo -n /usr/local/sbin/jovie-symphony-workspace cleanup "$PWD" || cleanup_status=$?\n',
+                    "",
+                )
+            )
+            self.assertFalse(missing_cleanup["ok"])
+            self.assertIn(
+                "workflow_before_remove_missing_managed_cleanup",
+                missing_cleanup["errors"],
             )
 
     def test_linear_eligible_count_uses_team_key_pagination(self):
@@ -534,10 +894,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             gate = pathlib.Path(tmp) / "linear-rate-limit.json"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(gate),
                     *_closure_run_args(tmp),
@@ -547,7 +904,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     script,
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -611,6 +968,49 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertFalse(result["ok"])
             self.assertIn("unit_missing_closure_stop_line_gate", result["errors"])
 
+            observe_only = pathlib.Path(tmp) / "observe-only.service"
+            observe_only.write_text(
+                UNIT.replace(
+                    f"{flag} ",
+                    f"{flag} --closure-observe-only ",
+                ),
+                encoding="utf-8",
+            )
+            observe_result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=observe_only,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(observe_result["ok"])
+            self.assertIn(
+                "unit_closure_stop_line_observe_only",
+                observe_result["errors"],
+            )
+
+    def test_unit_refuses_manual_stop(self):
+        # RefuseManualStop is a [Unit] directive; the safe-restart helper reads
+        # it via `systemctl --user show -p RefuseManualStop` and refuses (exit
+        # 22) without it, so the canonical unit must carry it in [Unit].
+        helper = _load_helper()
+        unit_section = UNIT.split("[Unit]\n", 1)[1].split("\n[", 1)[0]
+        self.assertIn("RefuseManualStop=yes", unit_section.splitlines())
+        with tempfile.TemporaryDirectory() as tmp:
+            variant = pathlib.Path(tmp) / "symphony-elixir.service"
+            variant.write_text(
+                UNIT.replace("RefuseManualStop=yes\n", ""), encoding="utf-8"
+            )
+            result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=variant,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(result["ok"])
+            self.assertIn("unit_missing_refuse_manual_stop", result["errors"])
+
     def test_closure_stop_line_red_receipt_holds_new_admission(self):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:
@@ -625,10 +1025,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(verdict["reason"], "closure-health-not-green")
             self.assertEqual(verdict["closureStatus"], "red")
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     "--closure-gate-file",
@@ -643,7 +1040,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     "print('must-not-run')",
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -658,14 +1055,44 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(receipt["receiptPath"], str(closure_gate))
             self.assertFalse(receipt["newIssueIntakeAllowed"])
 
+    def test_lyb_and_ovie_stop_line_independent_of_jovie_mq_red(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            payload = _fleet_gate_payload(status="red", intake=False)
+            payload["signals"]["closureHealth"]["reasons"] = [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ]
+            payload["closureAdmission"]["reasons"] = [
+                "native-queue-empty-with-eligible-over-15m",
+                "native-queue-unmergeable",
+            ]
+            closure_gate.write_text(json.dumps(payload), encoding="utf-8")
+
+            jovie = helper.read_closure_stop_line(closure_gate, product_id="jovie")
+            lyb = helper.read_closure_stop_line(closure_gate, product_id="logyourbody")
+            ovie = helper.read_closure_stop_line(closure_gate, product_id="ovie")
+
+            self.assertTrue(jovie["hold"])
+            self.assertEqual(jovie["reason"], "closure-health-not-green")
+            self.assertFalse(lyb["hold"])
+            self.assertEqual(lyb["reason"], "closure-health-product-independent")
+            self.assertTrue(lyb["newIssueIntakeAllowed"])
+            self.assertFalse(ovie["hold"])
+            self.assertTrue(ovie["newIssueIntakeAllowed"])
+
+            missing = helper.read_closure_stop_line(
+                pathlib.Path(tmp) / "absent.json", product_id="logyourbody"
+            )
+            self.assertTrue(missing["hold"])
+            self.assertEqual(missing["reason"], "fleet-gate-receipt-missing")
+
     def test_closure_stop_line_green_receipt_admits(self):
         helper = _load_helper()
         with tempfile.TemporaryDirectory() as tmp:
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     *_closure_run_args(tmp),
@@ -675,7 +1102,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     "print('closure-green-child-ran')",
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -787,6 +1214,186 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertTrue(verdict["hold"])
             self.assertEqual(verdict["reason"], "closure-health-not-green")
             self.assertEqual(verdict["closureStatus"], "grace")
+
+    def test_closure_stop_line_controller_activation_feed_vs_stop(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 10, 14, 6, 0, tzinfo=dt.timezone.utc)
+        observed = "2026-09-10T14:05:00Z"
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+
+            def write_closure(status, reasons):
+                payload = _fleet_gate_payload(
+                    status=status, intake=False, observed_at=observed
+                )
+                payload["signals"]["closureHealth"]["reasons"] = reasons
+                payload["closureAdmission"]["reasons"] = reasons
+                gate.write_text(json.dumps(payload), encoding="utf-8")
+
+            # The live deadlock shape: repair-feed reasons are a subset of the
+            # feed set, so controller activation passes with a notice while new
+            # admission still holds.
+            write_closure(
+                "red", ["internally-repairable-prs-open", "no-merge-progress-over-1h"]
+            )
+            activation = helper.read_closure_stop_line(
+                gate, now=now, purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(activation["reason"], "closure-health-repair-feed")
+            self.assertEqual(activation["closureStatus"], "red")
+            self.assertEqual(activation["closurePurpose"], "controller-activation")
+            self.assertEqual(
+                activation["repairFeedReasons"],
+                ["internally-repairable-prs-open", "no-merge-progress-over-1h"],
+            )
+            self.assertIn("notice", activation)
+            admission = helper.read_closure_stop_line(gate, now=now)
+            self.assertTrue(admission["hold"])
+            self.assertEqual(admission["reason"], "closure-health-not-green")
+            self.assertEqual(admission["closurePurpose"], "admission")
+
+            # Grace carrying only the controller-outage feed reason behaves the
+            # same in both purposes.
+            write_closure("grace", ["queue-controller-red-over-10m"])
+            activation = helper.read_closure_stop_line(
+                gate, now=now, purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(
+                activation["repairFeedReasons"], ["queue-controller-red-over-10m"]
+            )
+            self.assertTrue(helper.read_closure_stop_line(gate, now=now)["hold"])
+
+            # Mixed or non-feed reasons hold in both purposes.
+            for reasons in (
+                ["internally-repairable-prs-open", "closure-observation-unknown"],
+                ["duplicate-issue-lanes-unresolved"],
+            ):
+                write_closure("red", reasons)
+                for purpose in ("admission", "controller-activation"):
+                    with self.subTest(reasons=reasons, purpose=purpose):
+                        verdict = helper.read_closure_stop_line(
+                            gate, now=now, purpose=purpose
+                        )
+                        self.assertTrue(verdict["hold"])
+                        self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+            # A non-string reasons list fails closed in both purposes.
+            write_closure("red", [{"code": "internally-repairable-prs-open"}])
+            for purpose in ("admission", "controller-activation"):
+                with self.subTest(purpose=purpose, reasons="non-string"):
+                    verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                    self.assertTrue(verdict["hold"])
+                    self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+            # A non-jovie product closure red with only feed reasons passes
+            # activation but still holds admission.
+            payload = _fleet_gate_payload(observed_at=observed)
+            payload["signals"]["productClosureHealth"] = {
+                "ovie": {
+                    "schema": "jovie-closure-health/v1",
+                    "authority": "Summer",
+                    "status": "red",
+                    "newIssueIntakeAllowed": False,
+                    "promotionContinues": True,
+                    "remediationContinues": True,
+                    "reasons": ["no-merge-progress-over-1h"],
+                }
+            }
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            activation = helper.read_closure_stop_line(
+                gate, now=now, product_id="ovie", purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(activation["reason"], "closure-health-repair-feed")
+            self.assertEqual(activation["repairFeedReasons"], ["no-merge-progress-over-1h"])
+            admission = helper.read_closure_stop_line(gate, now=now, product_id="ovie")
+            self.assertTrue(admission["hold"])
+            self.assertEqual(admission["reason"], "closure-health-not-green")
+
+    def test_closure_stop_line_controller_activation_still_fails_closed(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 10, 14, 6, 0, tzinfo=dt.timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+            feed = ["internally-repairable-prs-open"]
+
+            # Missing receipt holds in both purposes.
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "fleet-gate-receipt-missing")
+
+            # Stale receipts hold in both purposes even with feed reasons.
+            payload = _fleet_gate_payload(
+                status="red", intake=False, observed_at="2026-09-10T13:55:00Z"
+            )
+            payload["signals"]["closureHealth"]["reasons"] = feed
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "fleet-gate-receipt-stale")
+
+            # Schema/authority violations hold in both purposes.
+            payload = _fleet_gate_payload(
+                status="red", intake=False, observed_at="2026-09-10T14:05:00Z"
+            )
+            payload["signals"]["closureHealth"]["reasons"] = feed
+            payload["signals"]["closureHealth"]["authority"] = "Gem"
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            for purpose in ("admission", "controller-activation"):
+                verdict = helper.read_closure_stop_line(gate, now=now, purpose=purpose)
+                self.assertTrue(verdict["hold"])
+                self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+
+            # An unknown purpose fails closed rather than relaxing anything.
+            payload["signals"]["closureHealth"]["authority"] = "Summer"
+            gate.write_text(json.dumps(payload), encoding="utf-8")
+            verdict = helper.read_closure_stop_line(gate, now=now, purpose="observe")
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-purpose-unknown")
+
+            # ClosureStopLine threads its purpose through _read_stop_line.
+            stop_line = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                purpose="controller-activation",
+            )
+            verdict = helper._read_stop_line(stop_line, now=now)
+            self.assertFalse(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-repair-feed")
+            admission_line = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "closure-hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            verdict = helper._read_stop_line(admission_line, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-not-green")
+
+    def test_repair_feed_reasons_mirror_gem_priority_gate(self):
+        helper = _load_helper()
+        gate_spec = importlib.util.spec_from_file_location(
+            "gem_priority_gate", ROOT / "scripts/symphony/gem-priority-gate.py"
+        )
+        assert gate_spec and gate_spec.loader
+        gate = importlib.util.module_from_spec(gate_spec)
+        sys.modules[gate_spec.name] = gate
+        gate_spec.loader.exec_module(gate)
+        self.assertEqual(
+            helper.REPAIR_FEED_REASONS,
+            frozenset(
+                {
+                    "internally-repairable-prs-open",
+                    "no-merge-progress-over-1h",
+                    "queue-controller-red-over-10m",
+                }
+            ),
+        )
+        self.assertEqual(gate.REPAIR_FEED_REASONS, helper.REPAIR_FEED_REASONS)
 
     def test_closure_hold_releases_when_receipt_turns_green(self):
         helper = _load_helper()
@@ -978,10 +1585,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
         with tempfile.TemporaryDirectory() as tmp:
             dead = pathlib.Path(tmp) / "dead-letters"
-            command = [
-                "python3",
-                str(HELPER_PATH),
-                "run",
+            command = _runtime_command(["run",
                 "--gate-file",
                 str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                 *_closure_run_args(tmp),
@@ -991,7 +1595,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 "python3",
                 "-c",
                 script,
-            ]
+            ])
             result = subprocess.run(
                 command, cwd=ROOT, capture_output=True, text=True
             )
@@ -1113,10 +1717,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dead = pathlib.Path(tmp) / "dead-letters"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     *_closure_run_args(tmp),
@@ -1126,7 +1727,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     script,
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -1145,10 +1746,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dead = pathlib.Path(tmp) / "dead-letters"
             result = subprocess.run(
-                [
-                    "python3",
-                    str(HELPER_PATH),
-                    "run",
+                _runtime_command(["run",
                     "--gate-file",
                     str(pathlib.Path(tmp) / "linear-rate-limit.json"),
                     *_closure_run_args(tmp),
@@ -1158,7 +1756,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "python3",
                     "-c",
                     script,
-                ],
+                ]),
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -1169,7 +1767,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_linear_eligible_count_override_is_dependency_free_and_validated(self):
         result = subprocess.run(
-            ["python3", str(HELPER_PATH), "linear-eligible-count"],
+            _runtime_command(["linear-eligible-count"]),
             cwd=ROOT,
             env={**os.environ, "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110"},
             capture_output=True,
@@ -1178,7 +1776,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "110")
         invalid = subprocess.run(
-            ["python3", str(HELPER_PATH), "linear-eligible-count"],
+            _runtime_command(["linear-eligible-count"]),
             cwd=ROOT,
             env={**os.environ, "SYMPHONY_LINEAR_ACTIVE_ISSUES": "not-a-number"},
             capture_output=True,
@@ -1276,6 +1874,23 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 (ROOT / "scripts/symphony/codex-account-probe.sh").read_bytes(),
             )
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
+            unmanaged_controller = subprocess.run(
+                [
+                    "bash",
+                    str(updater),
+                    "--managed-controller-only",
+                    "--no-restart",
+                ],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(unmanaged_controller.returncode, 10)
+            self.assertIn(
+                "requires a managed provider generation",
+                unmanaged_controller.stderr,
+            )
             existing.write_text(
                 existing.read_text().replace(
                     "max_concurrent_agents: 8", "max_concurrent_agents: 4"
@@ -1289,7 +1904,106 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(overlay.returncode, 0, overlay.stdout + overlay.stderr)
-            self.assertIn("bounded max_concurrent_agents overlay accepted", overlay.stdout)
+            self.assertIn("adaptive max_concurrent_agents overlay accepted", overlay.stdout)
+            existing.write_text(
+                existing.read_text().replace(
+                    "max_concurrent_agents: 4", "max_concurrent_agents: 128"
+                )
+            )
+            adaptive_overlay = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                adaptive_overlay.returncode,
+                0,
+                adaptive_overlay.stdout + adaptive_overlay.stderr,
+            )
+            codex_entry = target_home / ".local/bin/symphony-codex-entry"
+            codex_entry.write_bytes(agent_router.read_bytes())
+            codex_entry.chmod(0o755)
+            # Keep this Linux package transaction offline and platform-independent,
+            # using the same strict npm fixture as the provider promotion suite.
+            from provider_cli_fixtures import install_fake_npm
+            _, npm = install_fake_npm(pathlib.Path(tmp))
+            env = {**env, "PATH": str(npm.parent) + os.pathsep + env.get("PATH", "")}
+            promoted = subprocess.run(
+                ["bash", str(updater), "--provider-runtime-only"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(promoted.returncode, 0, promoted.stdout + promoted.stderr)
+            managed_readback = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                managed_readback.returncode,
+                0,
+                managed_readback.stdout + managed_readback.stderr,
+            )
+            self.assertIn("PROVIDER_OK", managed_readback.stdout)
+            provider_current = (
+                target_home / ".local/state/symphony-elixir/provider-generations/current"
+            )
+            provider_before = provider_current.resolve(strict=True)
+            provider_alias_before = agent_router.resolve(strict=True)
+            helper.write_text("drifted non-provider helper\n")
+            frozen_transition = (
+                target_home / ".local/bin/symphony-frozen-generation-transition"
+            )
+            frozen_transition.unlink()
+            helper_drift = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(helper_drift.returncode, 1)
+            self.assertIn(f"DRIFT {helper}", helper_drift.stdout)
+            self.assertIn(f"MISSING {frozen_transition}", helper_drift.stdout)
+            repaired = subprocess.run(
+                [
+                    "bash",
+                    str(updater),
+                    "--managed-controller-only",
+                    "--no-restart",
+                ],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(repaired.returncode, 0, repaired.stdout + repaired.stderr)
+            self.assertEqual(provider_current.resolve(strict=True), provider_before)
+            self.assertEqual(agent_router.resolve(strict=True), provider_alias_before)
+            self.assertEqual(helper.read_bytes(), HELPER_PATH.read_bytes())
+            self.assertEqual(
+                frozen_transition.read_bytes(),
+                (ROOT / "scripts/symphony/symphony-frozen-generation-transition").read_bytes(),
+            )
+            managed_repaired_readback = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                managed_repaired_readback.returncode,
+                0,
+                managed_repaired_readback.stdout + managed_repaired_readback.stderr,
+            )
+            self.assertIn("PROVIDER_OK", managed_repaired_readback.stdout)
             existing.write_text(
                 existing.read_text().replace("interval_ms: 30000", "interval_ms: 31000")
             )
@@ -1302,6 +2016,21 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             )
             self.assertEqual(drift.returncode, 1, drift.stdout + drift.stderr)
             self.assertIn(f"DRIFT {existing}", drift.stdout)
+
+    def test_provider_and_managed_controller_promotions_are_separate(self):
+        result = subprocess.run(
+            [
+                "bash",
+                str(ROOT / "scripts/symphony/update-symphony-burrito.sh"),
+                "--provider-runtime-only",
+                "--managed-controller-only",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("separate operations", result.stderr)
 
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
         account_guard = UPDATER.index("assert_account_environment_ready\n")
@@ -1426,7 +2155,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 (target_home / ".config/systemd/user/symphony-elixir.service").exists()
             )
 
-    def test_deliberate_red_activation_cannot_reinstall_custom_runtime(self):
+    def test_managed_generation_activation_composes_provider_and_controller_installers(self):
         activation = (
             ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
         ).read_text(encoding="utf-8")
@@ -1434,10 +2163,20 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertNotIn("install-symphony-ui-pilot.sh", activation)
-        self.assertIn(
-            "update-symphony-burrito.sh --skip-binary",
-            activation,
+        provider = activation.index(
+            "update-symphony-burrito.sh --provider-runtime-only"
         )
+        managed_controller = activation.index(
+            "update-symphony-burrito.sh --managed-controller-only"
+        )
+        controller = activation.index("install-gem-fleet-controller.sh")
+        adaptive = activation.index("symphony-concurrency-controller.py")
+        provider_check = activation.index("update-symphony-burrito.sh --check")
+        self.assertLess(provider, managed_controller)
+        self.assertLess(managed_controller, controller)
+        self.assertLess(controller, adaptive)
+        self.assertLess(adaptive, provider_check)
+        self.assertNotIn("update-symphony-burrito.sh --skip-binary", activation)
         self.assertNotIn("--no-restart --retire-legacy", activation)
         self.assertNotIn('test "$main_pid" = "$after_pid"', activation)
         self.assertIn('readonly SERVICE="symphony-elixir.service"', fleet)

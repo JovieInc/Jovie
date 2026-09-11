@@ -21,6 +21,7 @@ const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
 const JOVIE_PRODUCTION_OIDC_SUBJECT =
   'owner:jovie:project:jovie:environment:production';
+const JOVIE_VERCEL_OIDC_ISSUER = 'https://oidc.vercel.com/jovie';
 const timestamp = z.string().datetime({ offset: true });
 const exactSha = z.string().regex(SHA);
 const safeCount = z.number().int().nonnegative().safe();
@@ -234,12 +235,15 @@ function readInput(request: Request): Promise<unknown> {
   return readBoundedJson(request.body, request.headers.get('content-length'));
 }
 
-function hasExpectedProductionSubject(token: string): boolean {
+function hasExpectedProductionClaims(token: string): boolean {
   try {
     const payload = JSON.parse(
       Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')
-    ) as { sub?: unknown };
-    return payload.sub === JOVIE_PRODUCTION_OIDC_SUBJECT;
+    ) as { iss?: unknown; sub?: unknown };
+    return (
+      payload.iss === JOVIE_VERCEL_OIDC_ISSUER &&
+      payload.sub === JOVIE_PRODUCTION_OIDC_SUBJECT
+    );
   } catch {
     return false;
   }
@@ -326,7 +330,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!oidcToken) {
     return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
   }
-  if (!hasExpectedProductionSubject(oidcToken)) {
+  if (!hasExpectedProductionClaims(oidcToken)) {
     return json({ ok: false, code: 'wrong_oidc_audience' }, 503);
   }
 

@@ -401,6 +401,9 @@ describe('pr-check-failures', () => {
     expect(ADVISORY_CHECK_NAMES).toContain(
       'Capture changed UI (desktop + mobile) (advisory)'
     );
+    expect(ADVISORY_CHECK_NAMES).not.toContain(
+      'Capture changed UI (desktop + mobile)'
+    );
     expect(ADVISORY_CHECK_NAMES).toContain(
       'Review screenshots and post advisory review'
     );
@@ -429,6 +432,15 @@ describe('pr-check-failures', () => {
         { bucket: 'fail', name: 'Vercel Agent Review' },
       ])
     ).toEqual(['Gitleaks Secret Scanning', 'Security Advisory Enforcement']);
+
+    expect(
+      extractTerminalFailures([
+        {
+          bucket: 'fail',
+          name: 'Capture changed UI (desktop + mobile)',
+        },
+      ])
+    ).toEqual(['Capture changed UI (desktop + mobile)']);
   });
 
   it('blocks pending and missing required or canonical gates', () => {

@@ -57,8 +57,8 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     'Taste Label Guard',
     'Claude Review',
     'Seer Code Review',
-    // PR Visual Review is explicitly advisory (workflow header + job name).
-    // Terminal red must not dequeue green native-MQ members.
+    // Historical advisory capture names remain attached to old heads. The
+    // current exact capture name omits this suffix and is a terminal gate.
     'Capture changed UI (desktop + mobile) (advisory)',
     'Review screenshots and post advisory review',
     'PR Visual Review',

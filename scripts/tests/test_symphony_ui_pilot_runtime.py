@@ -328,11 +328,14 @@ def test_activation_exports_user_systemd_before_both_installers() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
     establish = activation.index("Establish lingering user-systemd session")
     official = activation.index(
-        "update-symphony-burrito.sh --skip-binary"
+        "update-symphony-burrito.sh --provider-runtime-only"
+    )
+    managed_controller = activation.index(
+        "update-symphony-burrito.sh --managed-controller-only"
     )
     install = activation.index("bash scripts/symphony/install-gem-fleet-controller.sh")
     rehab = activation.index("bash scripts/symphony/install-gem-pr-rehabilitation.sh")
-    assert establish < official < install < rehab
+    assert establish < official < managed_controller < install < rehab
     assert "GITHUB_ENV" in activation
     assert "XDG_RUNTIME_DIR" in activation
     assert "DBUS_SESSION_BUS_ADDRESS" in activation
@@ -355,10 +358,10 @@ def test_activation_requires_official_runtime_and_retires_custom_automation() ->
     activation = ACTIVATION_WORKFLOW.read_text()
     assert "symphony-elixir.service" in activation
     assert 'DEFAULT_WORKSPACES = "~/symphony-elixir-workspaces"' in RECONCILER.read_text()
-    assert (
-        "update-symphony-burrito.sh --skip-binary"
-        in activation
-    )
+    assert "update-symphony-burrito.sh --provider-runtime-only" in activation
+    assert "update-symphony-burrito.sh --managed-controller-only" in activation
+    assert "update-symphony-burrito.sh --check" in activation
+    assert "update-symphony-burrito.sh --skip-binary" not in activation
     assert "--no-restart --retire-legacy" not in activation
     assert 'test "$main_pid" = "$after_pid"' not in activation
     assert "install-symphony-ui-pilot.sh" not in activation

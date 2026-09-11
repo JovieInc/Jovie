@@ -299,6 +299,8 @@ export function EntityCarousel({
           isProfileLandscape ? 'gap-(--page-pad) md:gap-4' : 'gap-3',
           className
         )}
+        // biome-ignore lint/a11y/noRedundantRoles: list-none strips the implicit list role in Safari/VoiceOver — the explicit role restores it per the W3C list-style none accessibility mapping
+        role='list'
         data-testid={dataTestId ?? 'entity-carousel'}
         data-layout={layout}
         onScroll={showsProfileControls ? handleScroll : undefined}
@@ -309,6 +311,8 @@ export function EntityCarousel({
             data-carousel-slot-index={0}
             data-layout={layout}
             data-carousel-active={currentIndex === 0 ? 'true' : 'false'}
+            aria-roledescription='slide'
+            aria-label={`1 of ${slotCount}`}
             className={cardItemClassName}
           >
             {leading}
@@ -327,6 +331,8 @@ export function EntityCarousel({
               data-carousel-slot-index={slotIndex}
               data-layout={layout}
               data-carousel-active={isActive ? 'true' : 'false'}
+              aria-roledescription='slide'
+              aria-label={`${slotIndex + 1} of ${slotCount}`}
               className={cardItemClassName}
             >
               <EntityCard
@@ -356,6 +362,8 @@ export function EntityCarousel({
             data-carousel-active={
               currentIndex === slotCount - 1 ? 'true' : 'false'
             }
+            aria-roledescription='slide'
+            aria-label={`${slotCount} of ${slotCount}`}
             className={cardItemClassName}
           >
             {trailing}

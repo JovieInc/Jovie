@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
 import './globals.css';
 // JOV-2145: HeaderNav.css is imported here so that the marketing-glass-header
 // visibility rules load on EVERY route, not just pages inside the (home) and
@@ -117,7 +118,7 @@ export const metadata: Metadata = {
   other: {
     'application-name': APP_NAME,
     'apple-mobile-web-app-capable': 'yes',
-    'msapplication-TileColor': '#6366f1',
+    'msapplication-TileColor': BRAND_ION_BLUE,
     'msapplication-TileImage': '/android-chrome-192x192.png',
     'msapplication-config': 'none',
     'theme-color': '#0a0a0a',
@@ -143,7 +144,7 @@ export const metadata: Metadata = {
       {
         rel: 'mask-icon',
         url: '/favicon.svg',
-        color: '#6366f1',
+        color: BRAND_ION_BLUE,
       },
     ],
   },

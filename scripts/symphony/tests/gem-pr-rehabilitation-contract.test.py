@@ -11,6 +11,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 # Pre-push leaks these into children and poisons fixture-repo git commands.
 _LEAKED_GIT_ENV_VARS = (
@@ -18,15 +20,34 @@ _LEAKED_GIT_ENV_VARS = (
     "GIT_WORK_TREE",
     "GIT_PREFIX",
     "GIT_INDEX_FILE",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
 )
 
 
 def _git_env() -> dict[str, str]:
-    return {
+    env = {
         key: value
         for key, value in os.environ.items()
         if key not in _LEAKED_GIT_ENV_VARS
+        and not key.startswith("GIT_CONFIG_KEY_")
+        and not key.startswith("GIT_CONFIG_VALUE_")
     }
+    # Fixture repositories are deleted immediately after their assertions. Keep
+    # Git from starting detached maintenance that can race TemporaryDirectory's
+    # cleanup and leave a newly-created file under .git after rmtree scans it.
+    env.update(
+        {
+            "GIT_CONFIG_COUNT": "3",
+            "GIT_CONFIG_KEY_0": "maintenance.auto",
+            "GIT_CONFIG_VALUE_0": "false",
+            "GIT_CONFIG_KEY_1": "maintenance.autoDetach",
+            "GIT_CONFIG_VALUE_1": "false",
+            "GIT_CONFIG_KEY_2": "gc.auto",
+            "GIT_CONFIG_VALUE_2": "0",
+        }
+    )
+    return env
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -41,6 +62,12 @@ if SPEC is None or SPEC.loader is None:
 REGISTRY = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = REGISTRY
 SPEC.loader.exec_module(REGISTRY)
+
+CYCLE_SOURCE = HERMES / "gem-repo-drain-cycle.py"
+CYCLE_SPEC = importlib.util.spec_from_file_location("gem_repo_drain_cycle", CYCLE_SOURCE)
+assert CYCLE_SPEC and CYCLE_SPEC.loader
+CYCLE = importlib.util.module_from_spec(CYCLE_SPEC)
+CYCLE_SPEC.loader.exec_module(CYCLE)
 
 
 class RegistryContractTests(unittest.TestCase):
@@ -125,14 +152,142 @@ class RegistryContractTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
         self.assertTrue(all(repo.local_path for repo in repositories))
 
+    def test_issue_intake_products_map_from_registry_ids(self):
+        by_id = {repo.id: repo.github for repo in REGISTRY.issue_intake_repos()}
+        self.assertEqual(by_id["jovie"], "JovieInc/Jovie")
+        self.assertEqual(by_id["logyourbody"], "JovieInc/LogYourBody")
+        self.assertEqual(by_id["ovie"], "JovieInc/ovie")
+        self.assertEqual(REGISTRY.product_id_for_issue("JOV-12"), "jovie")
+        self.assertEqual(REGISTRY.product_id_for_issue("LYB-9"), "logyourbody")
+        self.assertEqual(REGISTRY.product_id_for_github("JovieInc/ovie"), "ovie")
+
 
 class DeploymentContractTests(unittest.TestCase):
     def test_versioned_service_uses_versioned_cycle_registry_and_model_router(self):
         service = (HERMES / "systemd/gem-pr-drain.service").read_text(encoding="utf-8")
         self.assertIn("%h/gem-workspace/scripts/gem-repo-drain-cycle.py", service)
+        self.assertIn("/usr/bin/flock -n /tmp/gem-pr-drain.lock", service)
         self.assertIn("%h/gem-workspace/config/gem-repo-registry.json", service)
         self.assertIn("%h/gem-workspace/scripts/model-router.py", service)
+        self.assertIn(
+            "EnvironmentFile=-%h/.config/symphony/summer-bottleneck.env",
+            service,
+        )
         self.assertNotIn("/home/timwhite/Jovie/", service)
+
+    def test_jovie_producer_refreshes_once_even_when_jovie_drain_is_disabled(self):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append((args, kwargs))
+            return SimpleNamespace(returncode=2 if len(calls) == 1 else 0)
+
+        with mock.patch.object(CYCLE.subprocess, "run", side_effect=run), mock.patch.dict(
+            CYCLE.os.environ,
+            {"GEM_WORKSPACE": "/tmp/gem-workspace"},
+            clear=False,
+        ):
+            self.assertEqual(CYCLE.run_summer_bottleneck_producer(), 0)
+
+        self.assertEqual(len(calls), 2)
+        gate_args = calls[0][0]
+        self.assertEqual(gate_args.count(CYCLE.JOVIE_REPOSITORY), 1)
+        self.assertIn("gem-priority-gate.py", gate_args[1])
+        self.assertIn("/tmp/gem-workspace/state/gem-priority-gate", gate_args)
+        self.assertEqual(calls[1][0][-1], "--submit")
+        self.assertIn("summer_bottleneck_producer.py", calls[1][0][1])
+
+    def test_producer_failure_is_isolated_after_all_repository_cycles(self):
+        repos = [
+            SimpleNamespace(github="JovieInc/LogYourBody"),
+            SimpleNamespace(github="JovieInc/ovie"),
+        ]
+        drains = []
+        projections = []
+
+        def run_drain(args, **kwargs):
+            env = kwargs.get("env") or {}
+            if "GEM_PR_DRAIN_REPO" in env:
+                drains.append(env["GEM_PR_DRAIN_REPO"])
+            else:
+                projections.append(args[1])
+            return SimpleNamespace(returncode=0)
+
+        def summer():
+            self.assertEqual(drains, [repo.github for repo in repos])
+            return 1
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run_drain
+        ), mock.patch.object(CYCLE, "run_summer_bottleneck_producer", side_effect=summer) as producer, mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=78
+        ) as consumer, mock.patch.object(
+            CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 1}
+        ):
+            self.assertEqual(CYCLE.main(), 0)
+
+        producer.assert_called_once_with()
+        consumer.assert_called_once_with()
+        self.assertEqual(drains, [repo.github for repo in repos])
+        self.assertEqual(len(projections), 1)
+        self.assertIn("symphony_capacity_evidence.py", projections[0])
+
+    def test_capacity_projection_runs_even_when_completion_reconcile_fails(self):
+        repos = [SimpleNamespace(github="JovieInc/Jovie")]
+        calls = []
+
+        def run(args, **kwargs):
+            env = kwargs.get("env") or {}
+            if "GEM_PR_DRAIN_REPO" in env:
+                calls.append("drain")
+            else:
+                calls.append("projection")
+            return SimpleNamespace(returncode=0)
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ), mock.patch.object(
+            CYCLE, "run_summer_bottleneck_producer", return_value=0
+        ), mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=0
+        ), mock.patch.object(
+            CYCLE.symphony_accepted_completion,
+            "reconcile",
+            side_effect=ValueError("service attestation drift"),
+        ):
+            self.assertEqual(CYCLE.main(), 0)
+
+        self.assertEqual(calls, ["projection", "drain"])
+
+    def test_capacity_projection_failure_is_isolated_from_drains(self):
+        repos = [SimpleNamespace(github="JovieInc/Jovie")]
+        drains = []
+
+        def run(args, **kwargs):
+            env = kwargs.get("env") or {}
+            if "GEM_PR_DRAIN_REPO" in env:
+                drains.append(env["GEM_PR_DRAIN_REPO"])
+                return SimpleNamespace(returncode=0)
+            return SimpleNamespace(returncode=1)
+
+        with mock.patch.object(CYCLE, "pr_drain_repos", return_value=repos), mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=run
+        ), mock.patch.object(
+            CYCLE, "run_summer_bottleneck_producer", return_value=0
+        ), mock.patch.object(
+            CYCLE, "run_summer_symphony_consumer", return_value=0
+        ), mock.patch.object(
+            CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 0}
+        ):
+            self.assertEqual(CYCLE.main(), 0)
+
+        self.assertEqual(drains, ["JovieInc/Jovie"])
+
+    def test_capacity_projection_subprocess_failure_is_typed(self):
+        with mock.patch.object(
+            CYCLE.subprocess, "run", side_effect=OSError("exec format error")
+        ):
+            self.assertEqual(CYCLE.run_capacity_projection(), 1)
 
     def test_activation_requires_exact_rehabilitation_attestation(self):
         workflow = ACTIVATION.read_text(encoding="utf-8")
@@ -173,7 +328,7 @@ class DeploymentContractTests(unittest.TestCase):
                     "HOME": directory,
                     "GEM_WORKSPACE": str(pathlib.Path(directory) / "gem"),
                     "GEM_REHABILITATION_VERIFY_ONLY": "true",
-                    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                    "PATH": f"{pathlib.Path(shutil.which('node')).parent}:/usr/bin:/bin:/usr/sbin:/sbin",
                 },
                 text=True,
                 capture_output=True,
@@ -279,7 +434,7 @@ exit 0
             env={
                 "HOME": str(home),
                 "GEM_WORKSPACE": str(gem),
-                "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
+                "PATH": f"{fake_bin}:{pathlib.Path(shutil.which('node')).parent}:/usr/bin:/bin:/usr/sbin:/sbin",
                 "FAKE_SYSTEMCTL_LOG": str(log),
                 "FAKE_TIMER_ENABLED": str(enabled),
                 "FAKE_TIMER_ACTIVE": str(active),
@@ -312,6 +467,49 @@ exit 0
         self.assertIn("--user is-enabled --quiet gem-pr-drain.timer", commands)
         self.assertTrue(receipt["timerEnabled"])
         self.assertTrue(receipt["timerActive"])
+
+    def test_installer_ships_priority_gate_runtime_dependencies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, _, _, _ = self._install_runtime(directory)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            installed_gate = (
+                pathlib.Path(directory) / "gem/scripts/gem-priority-gate.py"
+            )
+            installed_context = (
+                pathlib.Path(directory) / "gem/scripts/symphony_proof_context.py"
+            )
+            self.assertTrue(installed_context.is_file())
+            installed_consumer = (
+                pathlib.Path(directory)
+                / "gem/scripts/summer-symphony-outbox-consumer.mjs"
+            )
+            self.assertTrue(installed_consumer.is_file())
+            for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py"):
+                self.assertTrue((installed_gate.parent / name).is_file(), name)
+            import_check = subprocess.run(
+                [sys.executable, str(installed_gate), "--help"],
+                cwd=installed_gate.parent,
+                env={
+                    "HOME": str(pathlib.Path(directory) / "home"),
+                    "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            receipt = json.loads(
+                (
+                    pathlib.Path(directory)
+                    / "gem/state/gem-pr-rehabilitation-attestation.json"
+                ).read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(import_check.returncode, 0, import_check.stderr)
+        self.assertTrue(receipt["artifacts"]["proofContext"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerSymphonyConsumer"]["matches"])
+        self.assertTrue(receipt["artifacts"]["acceptedCompletion"]["matches"])
+        self.assertTrue(receipt["artifacts"]["capacityEvidence"]["matches"])
+        self.assertTrue(receipt["artifacts"]["providerCapacity"]["matches"])
 
     def test_failed_install_restores_every_prior_timer_state(self):
         for prior_enabled in (False, True):
@@ -361,6 +559,23 @@ exit 0
 
 
 class FleetControllerInstallerContractTests(unittest.TestCase):
+    def test_fixture_git_runs_without_detached_maintenance(self):
+        env = _git_env()
+
+        def config_value(key: str) -> str:
+            result = subprocess.run(
+                ["git", "config", "--get", key],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            return result.stdout.strip()
+
+        self.assertEqual(config_value("maintenance.auto"), "false")
+        self.assertEqual(config_value("maintenance.autoDetach"), "false")
+        self.assertEqual(config_value("gc.auto"), "0")
+
     def _fixture(
         self, directory: str, *, policy_source=None
     ) -> pathlib.Path:

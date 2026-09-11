@@ -11,14 +11,16 @@ import {
 export const SUMMER_CONVERSATION_ID = 'summer-session-current';
 export const SUMMER_CONVERSATION_MODEL = 'zai/glm-5.3-flash';
 const eventIdSchema = z.string().regex(/^sum_[A-Za-z0-9_-]{24}$/u);
+export const summerDeploymentIdSchema = z.string().regex(/^dpl_[A-Za-z0-9]+$/u);
 export const conversationInputSchema = z
   .object({
     eventId: eventIdSchema,
     conversationId: z.literal(SUMMER_CONVERSATION_ID),
     previousEventId: eventIdSchema.nullable(),
     principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
-    deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
+    deploymentId: summerDeploymentIdSchema,
     message: z.string().trim().min(1).max(4000),
+    canonicalTailRecovery: z.boolean().optional(),
     history: z
       .array(
         z
@@ -34,7 +36,7 @@ const acceptedRecordSchema = z
     eventId: eventIdSchema,
     conversationId: z.literal(SUMMER_CONVERSATION_ID),
     principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
-    deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
+    deploymentId: summerDeploymentIdSchema,
     sessionId: z.string().regex(/^ses_/u),
     startIndex: z.number().int().nonnegative().safe(),
     model: z.literal(SUMMER_CONVERSATION_MODEL),
@@ -73,6 +75,7 @@ const rejectedRecordSchema = z.discriminatedUnion('code', [
     })
     .strict(),
 ]);
+const MAX_CANONICAL_TAIL_HOPS = 200;
 export type ConversationStore = {
   read(path: string): Promise<ShadowRecord | null>;
   persist(path: string, record: ShadowRecord): Promise<'created' | 'exists'>;
@@ -166,6 +169,8 @@ export function createConversationIngress(
     }
     if (input.previousEventId && input.history.length)
       return json({ ok: false, code: 'history_already_migrated' }, 422);
+    if (input.previousEventId && input.canonicalTailRecovery)
+      return json({ ok: false, code: 'invalid_tail_recovery' }, 422);
     // Canonical schema order makes equivalent JSON replay identically. This digest
     // stays in private durable storage; never expose it in responses or logs.
     const bodySHA256 = createHash('sha256')
@@ -212,29 +217,122 @@ export function createConversationIngress(
         if (admission)
           return json({ ok: false, code: 'dispatch_unknown' }, 503);
       }
-      const previousResult = input.previousEventId
-        ? await deps.read(conversationPath('results', input.previousEventId))
+      let resolvedPreviousEventId =
+        existing &&
+        typeof existing.previousEventId === 'string' &&
+        eventIdSchema.safeParse(existing.previousEventId).success
+          ? existing.previousEventId
+          : input.previousEventId;
+      let previousResult = resolvedPreviousEventId
+        ? await deps.read(conversationPath('results', resolvedPreviousEventId))
         : null;
-      const previousRejection =
-        input.previousEventId && !previousResult
+      let previousRejection =
+        resolvedPreviousEventId && !previousResult
           ? rejectedRecordSchema.safeParse(
               await deps.read(
-                conversationPath('rejected', input.previousEventId)
+                conversationPath('rejected', resolvedPreviousEventId)
               )
             )
           : null;
-      const previous =
-        previousResult ??
+      let parsedPrevious = terminalResultSchema.safeParse(previousResult);
+      let previous =
+        (parsedPrevious.success ? parsedPrevious.data : null) ??
         (previousRejection?.success &&
         previousRejection.data.code === 'daily_turn_budget_exhausted'
           ? previousRejection.data.checkpoint
           : null);
+
+      // A product datastore can be restored or replaced while Eve's canonical
+      // conversation remains durable. An authenticated recovery request may
+      // carry preserved local history, but that history is never evidence for
+      // Eve's tail and is never merged over an existing canonical chain.
       if (
-        input.previousEventId &&
+        !existing &&
+        !resolvedPreviousEventId &&
+        (input.history.length === 0 || input.canonicalTailRecovery === true)
+      ) {
+        const visited = new Set<string>();
+        let successor = await deps.read(conversationPath('successors', 'root'));
+        for (let hop = 0; successor; hop += 1) {
+          const candidate = successor.eventId;
+          if (
+            hop >= MAX_CANONICAL_TAIL_HOPS ||
+            typeof candidate !== 'string' ||
+            !eventIdSchema.safeParse(candidate).success ||
+            visited.has(candidate)
+          )
+            return json({ ok: false, code: 'canonical_tail_unavailable' }, 503);
+          visited.add(candidate);
+
+          previousResult = await deps.read(
+            conversationPath('results', candidate)
+          );
+          parsedPrevious = terminalResultSchema.safeParse(previousResult);
+          previousRejection = previousResult
+            ? null
+            : rejectedRecordSchema.safeParse(
+                await deps.read(conversationPath('rejected', candidate))
+              );
+          previous =
+            (parsedPrevious.success ? parsedPrevious.data : null) ??
+            (previousRejection?.success &&
+            previousRejection.data.code === 'daily_turn_budget_exhausted'
+              ? previousRejection.data.checkpoint
+              : null);
+          if (!previous) {
+            const pending =
+              acceptedRecordSchema.safeParse(
+                await deps.read(conversationPath('accepted', candidate))
+              ).data ??
+              admissionRecordSchema.safeParse(
+                await deps.read(conversationPath('admissions', candidate))
+              ).data;
+            if (
+              pending &&
+              pending.eventId === candidate &&
+              pending.conversationId === input.conversationId &&
+              pending.principalHash === input.principalHash
+            )
+              return json(
+                {
+                  ok: false,
+                  code: 'conversation_busy',
+                  blockingEvent: {
+                    eventId: candidate,
+                    deploymentId: pending.deploymentId,
+                  },
+                },
+                409
+              );
+            if (
+              pending &&
+              (pending.conversationId !== input.conversationId ||
+                pending.principalHash !== input.principalHash)
+            )
+              return json(
+                { ok: false, code: 'canonical_binding_conflict' },
+                409
+              );
+            return json({ ok: false, code: 'conversation_busy' }, 409);
+          }
+          if (
+            previous.conversationId !== input.conversationId ||
+            previous.principalHash !== input.principalHash
+          )
+            return json({ ok: false, code: 'canonical_binding_conflict' }, 409);
+
+          resolvedPreviousEventId = candidate;
+          successor = await deps.read(
+            conversationPath('successors', candidate)
+          );
+        }
+      }
+      if (
+        resolvedPreviousEventId &&
         (!previous ||
+          previous.eventId !== resolvedPreviousEventId ||
           previous.conversationId !== input.conversationId ||
-          previous.principalHash !== input.principalHash ||
-          previous.deploymentId !== input.deploymentId)
+          previous.principalHash !== input.principalHash)
       )
         return json({ ok: false, code: 'previous_turn_not_terminal' }, 409);
       if (
@@ -243,7 +341,7 @@ export function createConversationIngress(
           bodySHA256,
           eventId: input.eventId,
           conversationId: input.conversationId,
-          previousEventId: input.previousEventId,
+          previousEventId: resolvedPreviousEventId,
           principalHash: input.principalHash,
           deploymentId: input.deploymentId,
         })) !== 'created'
@@ -259,7 +357,7 @@ export function createConversationIngress(
       // event can resume this immutable fence after a crash or UTC-day rollover.
       const successorPath = conversationPath(
         'successors',
-        input.previousEventId ?? 'root'
+        resolvedPreviousEventId ?? 'root'
       );
       if (
         (await deps.persist(successorPath, { eventId: input.eventId })) !==
@@ -401,9 +499,12 @@ export function createConversationIngress(
         // delivery key is not authority to send again after an ambiguous outcome.
         return json({ ok: false, code: 'dispatch_unknown' }, 503);
       }
+      const dispatchInput = input.canonicalTailRecovery
+        ? { ...input, history: [] }
+        : input;
       const sessionId = await deps.dispatch(
-        input,
-        renderConversation(input),
+        dispatchInput,
+        renderConversation(dispatchInput),
         typeof previous?.sessionId === 'string' ? previous.sessionId : null
       );
       const accepted = {

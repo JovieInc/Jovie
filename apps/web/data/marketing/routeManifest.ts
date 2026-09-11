@@ -26,6 +26,8 @@ export type RenderedSectionBinding =
       readonly sectionId: MarketingSectionId;
       readonly componentPath: string;
       readonly variantId?: string;
+      /** Stable identity for otherwise equal repeated production beats. */
+      readonly occurrenceId?: string;
     }
   | {
       readonly kind: 'proposal';
@@ -35,7 +37,8 @@ export type RenderedSectionBinding =
 const approvedBinding = (
   componentPath: string,
   sectionId: MarketingSectionId,
-  variantId?: string
+  variantId?: string,
+  occurrenceId?: string
 ): RenderedSectionBinding => {
   const section = getMarketingSection(sectionId);
   if (section.status !== 'approved') {
@@ -58,6 +61,7 @@ const approvedBinding = (
     sectionId,
     componentPath,
     ...(variantId ? { variantId } : {}),
+    ...(occurrenceId ? { occurrenceId } : {}),
   };
 };
 
@@ -70,9 +74,10 @@ const approvedBindings = (
 const approvedVariantBinding = (
   componentPath: string,
   sectionId: MarketingSectionId,
-  variantId: string
+  variantId: string,
+  occurrenceId?: string
 ): RenderedSectionBinding =>
-  approvedBinding(componentPath, sectionId, variantId);
+  approvedBinding(componentPath, sectionId, variantId, occurrenceId);
 
 /** A route entry — either bound to a recipe or exempt with a sanctioned reason. */
 export interface RouteManifestEntry {
@@ -115,6 +120,12 @@ export interface RouteManifestEntry {
     readonly path: string;
     readonly expected: 'page' | 'redirect' | 'not-found';
     readonly waitFor?: string;
+    /** Explicit fallback roots: census must verify identity and hidden state. */
+    readonly runtimeFallbacks?: readonly {
+      readonly selector: string;
+      readonly componentPath: string;
+      readonly hiddenWhen: 'scripting-enabled';
+    }[];
     readonly allowedFinalPaths?: readonly string[];
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
@@ -151,16 +162,82 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(home)/page.tsx',
     recipeId: 'homepage',
-    renderedSections: approvedBindings('apps/web/app/(home)/page.tsx', 'hero'),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageEditorialHero.tsx',
+        'hero',
+        'centered-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'logo-cloud',
+        'inline-strip'
+      ),
+      // All six source-owned editorial occurrences remain ordered and legal.
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'feature-split',
+        'editorial',
+        'connected'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'feature-split',
+        'editorial',
+        'found'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'feature-split',
+        'editorial',
+        'know'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'feature-split',
+        'editorial',
+        'relationships'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'feature-split',
+        'editorial',
+        'smarter'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+        'feature-split',
+        'editorial',
+        'built'
+      ),
+      approvedBinding(
+        'apps/web/components/homepage/HomepageClose.tsx',
+        'cta',
+        'editorial-search'
+      ),
+    ],
     bindingEvidence: {
-      status: 'verified',
-      source: 'route audit 2026-07-11',
+      status: 'unverified',
+      source: 'source history #17063, #17185, #17353; pinned 12b203f9',
       notes:
-        'Live route audit; feature-flagged story variants are not certified as recipe parity.',
+        'Nine scripted beats and source owners are inventoried. Editorial rows have an explicit optional-media source contract; Search-close CTA has a source-only canonical root and editorial-search body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
-    specVersion: '1.0.0',
+    specVersion: '1.3.0',
     url: '/',
+    healthCheck: {
+      path: '/',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+      runtimeFallbacks: [
+        {
+          selector: '[data-marketing-runtime-state="no-script-fallback"]',
+          componentPath:
+            'apps/web/components/homepage/HomepageNoScriptContent.tsx',
+          hiddenWhen: 'scripting-enabled',
+        },
+      ],
+    },
   },
   {
     glob: '(marketing)/new/page.tsx',
@@ -385,21 +462,36 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/youtube-thumbnails/page.tsx',
     recipeId: 'feature',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
-      'hero',
-      'how-it-works',
-      'feature-grid',
-      'cta'
-    ),
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/marketing/MarketingHero.tsx',
+        'hero',
+        'left-none'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        'how-it-works',
+        '3-step-strip'
+      ),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        'feature-grid',
+        'two-column-text'
+      ),
+      approvedBinding(
+        'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+        'cta',
+        'included-single'
+      ),
+    ],
     bindingEvidence: {
-      status: 'verified',
-      source: 'route implementation 2026-09-02 (JOV-5862)',
+      status: 'unverified',
+      source: 'route implementation #17076 (JOV-5862); pinned 12b203f9',
       notes:
-        'Paste-channel hero with one primary action; no standalone SKU or pricing section. Uses canonical System B marketing primitives without identity imagery.',
+        'Current left/no-media hero, two-column title/body safeguards, and inline CTA are intentional source output. Hero/grid source variants are explicit; inline CTA has a source-only canonical root and included-single body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No render or visual admission.',
     },
     status: 'active',
-    specVersion: '1.2.0',
+    specVersion: '1.3.0',
     url: '/youtube-thumbnails',
   },
   {

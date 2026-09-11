@@ -49,7 +49,7 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
 // Shared chrome for the circular surface family (profile chrome, auth back
 // buttons): soft-material layering plus the legacy circular transition.
 const CIRCLE_CHROME_CLASSNAME =
-  'relative isolate cursor-pointer overflow-hidden transition-colors duration-subtle ease-subtle';
+  'relative isolate cursor-pointer overflow-visible transition-colors duration-subtle ease-subtle';
 
 // Applied after variant chrome so quiet/ghost token colors cannot override
 // the shared Button destructive state.

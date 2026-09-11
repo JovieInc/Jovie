@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
+  getPublicProfileHistoryExitDelta,
+  readPublicProfileHistoryDepth,
   resolveProfileSurfaceState,
   resolvePublicProfileBackAction,
   shouldShowPublicProfileBackChevron,
+  withPublicProfileHistoryDepth,
 } from './profile-surface-state';
 
 const artist = {
@@ -242,5 +245,97 @@ describe('resolveProfileSurfaceState', () => {
         referrer: '',
       })
     ).toBe('profile-root');
+  });
+
+  it('shows the root back chevron for a signed-in session without history', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('app-fallback');
+  });
+
+  it('uses history back for a signed-in session when history exists without a referrer', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 2,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('history-back');
+  });
+
+  it('does not walk internal mode history for a signed-in new-tab arrival', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 3,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 1,
+      })
+    ).toBe('app-fallback');
+  });
+
+  it('exits past internal mode entries to the prior app surface', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
+      })
+    ).toBe('history-exit');
+  });
+
+  it('does not overshoot when browser back left a stale history.length', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 0,
+      })
+    ).toBe('history-back');
+  });
+
+  it('reads and stamps profile history depth on history state', () => {
+    expect(readPublicProfileHistoryDepth(null)).toBe(0);
+    expect(readPublicProfileHistoryDepth({ joviePublicProfileDepth: 2 })).toBe(
+      2
+    );
+    expect(getPublicProfileHistoryExitDelta(2)).toBe(-3);
+    expect(getPublicProfileHistoryExitDelta(0)).toBe(-1);
+    expect(withPublicProfileHistoryDepth({ keep: true }, 1)).toMatchObject({
+      keep: true,
+      joviePublicProfileDepth: 1,
+    });
+  });
+
+  it('exits past internal mode entries for a logged-out referrer arrival', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: 'https://jov.ie/explore',
+        arrivalHistoryLength: 2,
+        internalHistoryDepth: 2,
+      })
+    ).toBe('history-exit');
   });
 });

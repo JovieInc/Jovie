@@ -233,7 +233,7 @@ describe('marketing generation pipeline', () => {
       },
       {
         role: 'ultra',
-        ui: '#A982FF',
+        ui: '#8E56F5',
         scene: '#A789F0',
         oklch: 'oklch(70% 0.15 296)',
         corridor: { minHue: 276, maxHue: 314 },
@@ -244,7 +244,7 @@ describe('marketing generation pipeline', () => {
       },
       {
         role: 'pulse',
-        ui: '#FF48D2',
+        ui: '#F52BB5',
         scene: '#EB6AC6',
         oklch: 'oklch(71% 0.19 340)',
         corridor: { minHue: 322, maxHue: 358 },

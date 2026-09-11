@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyQueueOwnership,
   countsAsRecoveryFailure,
+  fetchOfficialSymphonyState,
+  ownerlessRecoveryFailureDisposition,
+  processFleetClosureRemediationIntents,
   readRecoveryEvent,
   recoveryEventDecision,
   recoveryIssueSnapshot,
+  recoveryNativeAdmissionDecision,
   run,
 } from '../../ownerless-recovery-sweeper.mjs';
 import {
@@ -44,6 +48,191 @@ const audit = (pullRequests, linearIssues, extra = {}) =>
   });
 
 describe('ownerless recovery policy', () => {
+  it('retries a transient official state read before failing closed', async () => {
+    let calls = 0;
+    const state = {
+      generated_at: fresh,
+      running: [],
+      retrying: [],
+      blocked: [],
+    };
+    const result = await fetchOfficialSymphonyState({
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response(JSON.stringify(calls === 1 ? {} : state));
+      },
+      sleepImpl: async () => {},
+    });
+
+    expect(calls).toBe(2);
+    expect(result).toEqual({
+      ...state,
+      source: 'official-symphony-state',
+    });
+  });
+
+  it('treats a read-back Linear remediation receipt as queued while the healthy runtime is occupied', async () => {
+    const intent = {
+      pr: 42,
+      head,
+      issue: 'JOV-42',
+      displayCategory: 'draft',
+      reason: 'in-progress-without-live-symphony-lease',
+      action: 'reattach-remediation-lane',
+      consumer: 'symphony-linear-writer',
+    };
+    const current = issue('JOV-42', 'In Progress', { id: 'issue-id' });
+    let commentsAdded = 0;
+    let transitions = 0;
+    const clientImpl = {
+      fetchIssue: async () => current,
+      addComment: async (_id, body) => {
+        commentsAdded += 1;
+        current.comments.push({ body });
+        return { commentCreate: { success: true } };
+      },
+      transitionIssue: async () => {
+        transitions += 1;
+        current.state = { name: 'Todo' };
+        return { issueUpdate: { success: true } };
+      },
+    };
+    const symphonyState = {
+      generated_at: fresh,
+      running: [{ issue_identifier: 'JOV-OTHER' }],
+      retrying: [],
+      blocked: [],
+    };
+    const options = {
+      clientImpl,
+      fetchOfficialSymphonyStateImpl: async () => symphonyState,
+      nowImpl: () => now,
+      sleepImpl: async () => {},
+      symphonyReadbackAttempts: 1,
+      todoStateId: 'todo-id',
+    };
+
+    const first = await processFleetClosureRemediationIntents(
+      { remediationIntents: [intent] },
+      options
+    );
+    const replay = await processFleetClosureRemediationIntents(
+      { remediationIntents: [intent] },
+      options
+    );
+
+    expect(first).toMatchObject({
+      ok: true,
+      results: [{ status: 'queued', reason: intent.reason }],
+    });
+    expect(replay.results[0].status).toBe('queued');
+    expect(commentsAdded).toBe(1);
+    expect(transitions).toBe(1);
+  });
+
+  it('refuses conflicting durable remediation receipts and malformed runtime state', async () => {
+    const intent = {
+      pr: 42,
+      head,
+      issue: 'JOV-42',
+      displayCategory: 'draft',
+      reason: 'in-progress-without-live-symphony-lease',
+      action: 'reattach-remediation-lane',
+      consumer: 'symphony-linear-writer',
+    };
+    const conflictBody = `<!-- jovie-pr-fleet-remediation-lease:v1 -->\n${JSON.stringify(
+      {
+        ...intent,
+        schema: 'jovie-pr-fleet-remediation-lease/v1',
+        reason: 'terminal-linear-issue-open-pr',
+      }
+    )}\n<!-- /jovie-pr-fleet-remediation-lease -->`;
+    const conflicting = issue('JOV-42', 'Todo', {
+      id: 'issue-id',
+      comments: [{ body: conflictBody }],
+    });
+    const clientImpl = {
+      fetchIssue: async () => conflicting,
+      addComment: async () => {
+        throw new Error('must not mutate');
+      },
+      transitionIssue: async () => {
+        throw new Error('must not mutate');
+      },
+    };
+    const baseOptions = {
+      clientImpl,
+      nowImpl: () => now,
+      sleepImpl: async () => {},
+      symphonyReadbackAttempts: 1,
+      todoStateId: 'todo-id',
+    };
+    const healthy = {
+      generated_at: fresh,
+      running: [],
+      retrying: [],
+      blocked: [],
+    };
+    const conflict = await processFleetClosureRemediationIntents(
+      { remediationIntents: [intent] },
+      {
+        ...baseOptions,
+        fetchOfficialSymphonyStateImpl: async () => healthy,
+      }
+    );
+    expect(conflict).toMatchObject({
+      ok: false,
+      results: [{ status: 'failed', reason: 'intent-conflict' }],
+    });
+
+    conflicting.comments = [];
+    const malformed = await processFleetClosureRemediationIntents(
+      { remediationIntents: [intent] },
+      {
+        ...baseOptions,
+        fetchOfficialSymphonyStateImpl: async () => ({
+          ...healthy,
+          running: null,
+        }),
+      }
+    );
+    expect(malformed).toMatchObject({
+      ok: false,
+      results: [{ status: 'failed', reason: 'symphony-state-malformed' }],
+    });
+  });
+
+  it('defers a nested Linear cooldown with its exact retry clock', () => {
+    const resetAt = Date.parse(now) + 60_000;
+    const cause = Object.assign(new Error('credential cooling down'), {
+      code: 'RATE_LIMITED',
+      attempts: 0,
+      metadata: { resetAt },
+    });
+    const error = Object.assign(
+      new Error('Linear pagination page fetch failed'),
+      {
+        name: 'LinearPaginationError',
+        code: 'PAGE_FETCH_FAILED',
+        attempts: 0,
+        resetAt,
+        cause,
+      }
+    );
+
+    expect(
+      ownerlessRecoveryFailureDisposition(error, Date.parse(now))
+    ).toMatchObject({
+      schema: 'jovie-ownerless-recovery-failure/v1',
+      status: 'deferred',
+      code: 'PAGE_FETCH_FAILED',
+      attempts: 0,
+      resetAt,
+      retryAt: new Date(resetAt).toISOString(),
+      cause: { code: 'RATE_LIMITED', attempts: 0 },
+    });
+  });
+
   it('admits focused green recovery work after one ownerless hour', () => {
     expect(
       evaluateRecoveryCandidate({
@@ -78,7 +267,12 @@ describe('ownerless recovery policy', () => {
 
   it('keeps ownerless dispatch available unless the snapshot or Symphony is unsafe', () => {
     const ownerless = audit([pull(7, { title: 'Ownerless', body: '' })], [], {
-      symphonyState: { observedAt: fresh, running: [] },
+      symphonyState: {
+        observedAt: fresh,
+        running: [],
+        retrying: [],
+        blocked: [],
+      },
     });
     expect(ownerless.status).toBe('blocked');
     expect(shouldDispatchOwnerlessRecovery(ownerless)).toBe(true);
@@ -99,6 +293,30 @@ describe('ownerless recovery policy', () => {
         })
       )
     ).toBe(false);
+  });
+
+  it('accepts the official Symphony API timestamp schema', () => {
+    const result = audit([pull(60)], [issue('JOV-60', 'In Progress')], {
+      symphonyState: {
+        generated_at: fresh,
+        running: [{ issue_identifier: 'JOV-60' }],
+        retrying: [],
+        blocked: [],
+      },
+    });
+
+    expect(
+      result.violations.some(
+        violation => violation.reason === 'symphony-state-malformed'
+      )
+    ).toBe(false);
+    expect(result.symphony).toMatchObject({
+      healthy: true,
+      observedAt: fresh,
+      running: 1,
+      retrying: 0,
+      blocked: 0,
+    });
   });
 
   it('validates queue ownership and comment dedupe keys', () => {
@@ -168,6 +386,7 @@ describe('tracker scan admission', () => {
     );
     expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
     expect(workflow).not.toContain('ready_for_review');
+    expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toMatch(
       /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
     );
@@ -198,6 +417,7 @@ describe('recovery event admission before tracker reads', () => {
   });
   const ready = {
     number: 17298,
+    head: { sha: head },
     draft: false,
     state: 'open',
     base: { ref: 'main' },
@@ -258,12 +478,87 @@ describe('recovery event admission before tracker reads', () => {
         eventContext,
         now: Date.parse(now),
         resolvePolicyHead: async () => main,
+        readEventQueueState: async () => ({
+          number: 17298,
+          headRefOid: head,
+          state: 'OPEN',
+          isDraft: false,
+          queued: false,
+          autoMergeEnabled: false,
+        }),
         readOpenPulls: async () => [ready],
         readIssueSnapshot: async () => {
           throw new Error('full closure audit reached');
         },
       })
     ).rejects.toThrow('full closure audit reached');
+  });
+
+  it.each([
+    { queued: true, autoMergeEnabled: true },
+    { queued: false, autoMergeEnabled: true },
+  ])('repeated events for admitted exact heads never inventory GitHub or Linear: %j', async admission => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await run({
+        eventContext: event('opened'),
+        now: Date.parse(now),
+        readEventQueueState: async input => {
+          expect(input).toEqual({
+            repository: 'JovieInc/Jovie',
+            number: 17298,
+          });
+          return {
+            number: 17298,
+            headRefOid: head,
+            state: 'OPEN',
+            isDraft: false,
+            ...admission,
+          };
+        },
+        resolvePolicyHead: unexpected,
+        readOpenPulls: unexpected,
+        readIssueSnapshot: unexpected,
+      });
+    }
+  });
+
+  it.each([
+    { number: 17298, headRefOid: main },
+    { number: 17299, headRefOid: head },
+    { number: 17298, headRefOid: head, state: 'OPEN', isDraft: false },
+    { number: 17298, headRefOid: head },
+    null,
+  ])('rejects stale or partial live admission evidence before tracker inventory: %j', async state => {
+    await expect(
+      run({
+        eventContext: event('opened'),
+        readEventQueueState: async () => state,
+        resolvePolicyHead: unexpected,
+        readOpenPulls: unexpected,
+        readIssueSnapshot: unexpected,
+      })
+    ).rejects.toThrow(/indeterminate|changed/);
+  });
+
+  it('skips a current closed or draft PR and propagates failed readback', async () => {
+    for (const changed of [
+      { state: 'CLOSED', isDraft: false },
+      { state: 'OPEN', isDraft: true },
+    ]) {
+      expect(
+        await recoveryNativeAdmissionDecision(event('opened'), async () => ({
+          number: 17298,
+          headRefOid: head,
+          ...changed,
+        }))
+      ).toEqual({ required: false, reason: 'current-pr-not-ready' });
+    }
+    await expect(
+      recoveryNativeAdmissionDecision(event('opened'), unexpected)
+    ).rejects.toThrow('unexpected external read');
+    await expect(
+      recoveryNativeAdmissionDecision(event('opened', { head: {} }), unexpected)
+    ).rejects.toThrow('exact PR head is indeterminate');
   });
 
   it('requires a full ownerless hour after the most recent assignment transition', async () => {

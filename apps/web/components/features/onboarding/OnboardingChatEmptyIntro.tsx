@@ -63,7 +63,7 @@ export function OnboardingChatEmptyIntro({
           aria-hidden='true'
           className='mb-4 text-primary-token opacity-[0.18]'
         >
-          <BrandLogo size={56} aria-hidden={true} />
+          <BrandLogo size='splash' aria-hidden={true} />
         </div>
       ) : null}
 

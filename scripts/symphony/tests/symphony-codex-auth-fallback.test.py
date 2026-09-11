@@ -385,6 +385,14 @@ class FallbackTests(unittest.TestCase):
         self.root = pathlib.Path(self.tmp.name)
         self.home = self.root / "home"
         self.home.mkdir()
+        for path in (
+            self.home / ".cursor/cli-config.json",
+            self.home / ".grok/auth.json",
+            self.home / ".kimi-code/credentials/kimi-code.json",
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"opaque":"test-auth-pool"}\n')
+            path.chmod(0o600)
         self.bin = self.root / "bin"
         self.bin.mkdir()
         python = self.bin / "python3"
@@ -416,6 +424,8 @@ class FallbackTests(unittest.TestCase):
             "SYMPHONY_OPEN_PR_INDEX": "empty",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
+            "SYMPHONY_PROVIDER_CAPACITY_STATE": str(self.root / "provider-capacity.json"),
+            "SYMPHONY_GROK_OBSERVED_CAPACITY": "4",
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
@@ -451,6 +461,8 @@ class FallbackTests(unittest.TestCase):
             "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
+            "SYMPHONY_PROVIDER_CAPACITY_STATE": str(self.root / "provider-capacity.json"),
+            "SYMPHONY_GROK_OBSERVED_CAPACITY": "4",
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
@@ -478,6 +490,11 @@ class FallbackTests(unittest.TestCase):
             "SYMPHONY_FALLBACK_RECEIPT_DIR": str(self.root / "fallback-receipts"),
         })
         env.update({key: str(value) for key, value in overrides.items()})
+        if (
+            "SYMPHONY_GROK_MAX" in overrides
+            and "SYMPHONY_GROK_OBSERVED_CAPACITY" not in overrides
+        ):
+            env.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
         return env
 
     def command(self, name, body):
@@ -495,10 +512,11 @@ class FallbackTests(unittest.TestCase):
                   done
                   /usr/bin/python3 - "$number" <<'PY'
 import json
+import os
 import sys
 
 number = int(sys.argv[1])
-head = "b" * 40
+head = os.environ.get("GEM_TEST_PROMOTION_HEAD", "b" * 40)
 gate_ids = (
     "exact-head",
     "writer",
@@ -608,7 +626,17 @@ PY
         destination = destination or self.home / ".local/bin"
         result = self.run_install(destination, controller=controller)
         self.assertEqual(result.returncode, 0, result.stderr)
-        return pathlib.Path(destination)
+        installed = pathlib.Path(destination)
+        # grok-ship-one prepends $HOME/.local/bin and /usr/local/bin before
+        # PATH. Host gh on this runner would otherwise shadow the hermetic
+        # mocks and exit 75 (open_pr_inventory_unknown) before the stop-line.
+        for name in ("gh", "git", "flock", "grok"):
+            source = self.bin / name
+            if source.is_file() and name not in LAUNCHER_NAMES:
+                target = installed / name
+                shutil.copy2(source, target)
+                target.chmod(0o755)
+        return installed
 
     def assert_complete_install(self, destination, source_dir=SOURCE_DIR):
         current = destination / ".symphony-codex-auth-fallback/current"
@@ -1618,7 +1646,7 @@ PY
             self.assertIsNone(module._linear_identifiers())
         self.assertEqual(len(LinearHandler.requests), 2)
 
-    def test_grok_limit_autoscales_from_live_oauth_seats_not_codex(self):
+    def test_grok_capacity_is_provider_local_and_has_no_fixed_ceiling(self):
         module = self.load_controller_module()
         with tempfile.TemporaryDirectory() as tmp:
             home = pathlib.Path(tmp)
@@ -1645,8 +1673,8 @@ PY
             with mock.patch.object(module.pathlib.Path, "home", return_value=home):
                 with mock.patch.dict(os.environ):
                     os.environ.pop("SYMPHONY_GROK_MAX", None)
-                    self.assertEqual(module._live_oauth_seats(), 2)
-                    self.assertEqual(module._grok_limit(), 4)
+                    os.environ.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
+                    self.assertEqual(module._grok_limit(), 1)
                 extra = {
                     f"https://auth.x.ai::{index}": {
                         "auth_mode": "oidc",
@@ -1658,17 +1686,23 @@ PY
                 (grok / "auth.json").write_text(json.dumps(extra), encoding="utf-8")
                 with mock.patch.dict(os.environ):
                     os.environ.pop("SYMPHONY_GROK_MAX", None)
-                    self.assertEqual(module._live_oauth_seats(), 7)
-                    self.assertEqual(module._grok_limit(), 7)
-                with mock.patch.dict(os.environ, {"SYMPHONY_GROK_MAX": "0"}):
-                    self.assertEqual(module._grok_limit(), 0)
+                    os.environ.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
+                    self.assertEqual(module._grok_limit(), 6)
+                with mock.patch.dict(
+                    os.environ, {"SYMPHONY_GROK_OBSERVED_CAPACITY": "25"}
+                ):
+                    self.assertEqual(module._grok_limit(), 25)
 
-    def test_default_grok_limit_and_only_machine_labels_gate_admission(self):
+    def test_no_fixed_provider_ceiling_and_only_machine_labels_gate_admission(self):
         module = self.load_controller_module()
-        self.assertEqual(module.DEFAULT_GROK_MAX, 4)
-        self.assertEqual(module.MAX_GROK_MAX, 10)
-        self.assertEqual(module.DEFAULT_KIMI_MAX, 4)
-        self.assertEqual(module.MAX_KIMI_MAX, 10)
+        for name in (
+            "DEFAULT_GROK_MAX", "MAX_GROK_MAX", "DEFAULT_KIMI_MAX", "MAX_KIMI_MAX"
+        ):
+            self.assertFalse(hasattr(module, name))
+        with mock.patch.dict(
+            os.environ, {"SYMPHONY_CURSOR_OBSERVED_CAPACITY": "40"}
+        ):
+            self.assertEqual(module._provider_measured_capacity("cursor"), 40)
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("no-symphony", module.BLOCKED_ADMISSION_LABELS)
         for label in ("held", "manual-incident"):
@@ -1959,6 +1993,7 @@ PY
                 "SYMPHONY_KIMI_MAX": "8",
                 "GEM_KIMI_EXECUTABLE": str(kimi),
                 "GEM_GROK_EXECUTABLE": "/missing",
+                "SYMPHONY_GROK_OBSERVED_CAPACITY": "8",
             },
             clear=False,
         ):
@@ -2408,6 +2443,38 @@ PY
         self.assertIn("Summer closure stop-line blocks new fallback work", result.stderr)
         self.assertFalse(self.events.exists())
 
+    def test_lyb_new_work_is_not_frozen_by_jovie_mq_closure_stop_line(self):
+        self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
+        self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "GREEN",
+            "closureAdmission": {
+                "newIssueIntakeAllowed": False,
+                "status": "red",
+                "reasons": ["native-queue-unmergeable"],
+            },
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "LYB-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 75, result.stderr)
+        self.assertNotIn("Summer closure stop-line blocks new fallback work", result.stderr)
+        self.assertNotIn("fleet gate blocks isolated work", result.stderr)
+
     def test_revision_scoped_unit_names_prevent_same_revision_duplicates(self):
         module = self.load_controller_module()
         first = module._fallback_unit("JOV-1", "revision-a")
@@ -2720,6 +2787,48 @@ PY
         self.assertEqual(len(launched), 1)
         self.assertTrue(
             any("JOV-4894" in arg for command in launches for arg in command), launches
+        )
+        self.assertFalse(
+            any("JOV-5003" in arg for command in launches for arg in command), launches
+        )
+
+    def test_lyb_new_work_launches_while_jovie_closure_stop_line_is_red(self):
+        module = self.load_controller_module()
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "closureAdmission": {
+                "newIssueIntakeAllowed": False,
+                "status": "red",
+                "reasons": ["native-queue-empty-with-eligible-over-15m"],
+            },
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+        launches: list[list[str]] = []
+        lyb_issue = self._admitted_issue("LYB-5003", "In Progress")
+        jov_issue = self._admitted_issue("JOV-5003", "In Progress")
+        issues = {"LYB-5003": lyb_issue, "JOV-5003": jov_issue}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(
+                module, "_fetch_single_issue", side_effect=lambda ident: issues.get(ident)
+            ),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5003", "LYB-5003"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertGreaterEqual(used, 1)
+        self.assertTrue(
+            any("LYB-5003" in arg for command in launches for arg in command), launches
         )
         self.assertFalse(
             any("JOV-5003" in arg for command in launches for arg in command), launches
@@ -3450,11 +3559,40 @@ PY
         self.assertTrue(created.exists())
 
     def test_grok_ship_one_retries_cursor_model_flag_when_grok_46_rejected(self):
-        """Live JOV-5220: cursor argv uses --model grok-4.6, not -m."""
+        """Cursor executes through the generic worker while its shared issue lease is held."""
         created = self.root / "pr-created"
+        self.command(
+            "flock",
+            """
+            /usr/bin/python3 - <<'PY'
+import fcntl
+
+fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+PY
+            """,
+        )
+        self.command(
+            "assert-lease-held",
+            """
+            /usr/bin/python3 - "$SYMPHONY_FALLBACK_LEASE_DIR/JOV-7.lock" "$GEM_EVENTS" <<'PY'
+import fcntl
+import pathlib
+import sys
+
+with pathlib.Path(sys.argv[1]).open("a+") as candidate:
+    try:
+        fcntl.flock(candidate, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        pathlib.Path(sys.argv[2]).open("a").write("cursor shared lease held\\n")
+    else:
+        raise SystemExit("cursor ran without the shared issue lease")
+PY
+            """,
+        )
         self.command(
             "cursor-agent",
             'printf "cursor %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'assert-lease-held\n'
             'case " $* " in\n'
             '  *" --model grok-4.6 "*)\n'
             '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
@@ -3478,7 +3616,7 @@ PY
             'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
             '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
             'case "$*" in\n'
-            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse HEAD") [ ! -f "$GROK_CREATED" ] && printf "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n" || printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
             '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
             '  *"merge-base HEAD origin/main") exit 0;;\n'
             '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
@@ -3499,23 +3637,38 @@ PY
                 },
             },
         }
-        result = subprocess.run(
-            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+        runtime = self.install_runtime()
+        run_env = {
+            "GEM_EVENTS": self.events,
+            "GROK_CREATED": created,
+            "GROK_SHIP_WS_ROOT": self.root / "workspaces",
+            "GROK_SHIP_LOG_DIR": self.root / "logs",
+            "LINEAR_API_KEY": "linear-secret",
+            "LINEAR_API_URL": self.grok_linear_url(),
+            "SYMPHONY_OPEN_PR_INDEX": "live",
+            "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(
+                json.dumps(selection).encode()
+            ).decode(),
+        }
+        external_push = subprocess.run(
+            [runtime / GROK_SHIP.name, "JOV-7"],
             capture_output=True,
             text=True,
-            env=self.env(
-                GEM_EVENTS=self.events,
-                GROK_CREATED=created,
-                GROK_SHIP_WS_ROOT=self.root / "workspaces",
-                GROK_SHIP_LOG_DIR=self.root / "logs",
-                LINEAR_API_KEY="linear-secret",
-                LINEAR_API_URL=self.grok_linear_url(),
-                SYMPHONY_OPEN_PR_INDEX="live",
-                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
-                    json.dumps(selection).encode()
-                ).decode(),
-            ),
+            env=self.env(**run_env, GEM_TEST_PROMOTION_HEAD="c" * 40),
             check=False,
+        )
+        self.assertEqual(external_push.returncode, 0, external_push.stderr + external_push.stdout)
+        completion_dir = self.root / "fallback-receipts/completions"
+        self.assertEqual(list(completion_dir.glob("*.json")), [])
+
+        for stale in ("workspaces", "logs", "fallback-leases", "fallback-receipts"):
+            shutil.rmtree(self.root / stale, ignore_errors=True)
+        for stale in (created, self.events):
+            stale.unlink(missing_ok=True)
+
+        result = subprocess.run(
+            [runtime / GROK_SHIP.name, "JOV-7"], capture_output=True, text=True,
+            env=self.env(**run_env), check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         log = (self.root / "logs/JOV-7.log").read_text()
@@ -3523,7 +3676,33 @@ PY
         events = self.events.read_text()
         self.assertIn("--model grok-4.6", events)
         self.assertIn("--model cursor-grok-4.6-high-fast", events)
+        self.assertEqual(events.count("cursor shared lease held"), 2)
         self.assertTrue(created.exists())
+        receipt_path = self.root / "fallback-receipts/JOV-7.json"
+        receipt = json.loads(receipt_path.read_text())
+        self.assertEqual(receipt_path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(receipt["repository"], "JovieInc/Jovie")
+        self.assertEqual(receipt["executorPath"], str((self.bin / "cursor-agent").resolve()))
+        self.assertRegex(receipt["executorSha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(receipt["profile"], r"^[0-9a-f]{64}$")
+        self.assertEqual(receipt["authStatePath"], str((self.home / ".cursor/cli-config.json").resolve()))
+        self.assertRegex(receipt["authStateSha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(receipt["authPoolIdentity"], receipt["profile"])
+        self.assertRegex(receipt["leaseIdentity"], r"^[0-9a-f]{64}$")
+        result_path = self.root / "fallback-receipts/completions" / f"JOV-7-{'b' * 40}.json"
+        completion = json.loads(result_path.read_text())
+        self.assertEqual(result_path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(completion["schema"], "symphony-fallback-result/v1")
+        self.assertEqual(completion["executionBaseHead"], "a" * 40)
+        self.assertEqual(completion["executionFinalHead"], "b" * 40)
+        self.assertEqual(completion["headSha"], "b" * 40)
+        self.assertEqual(completion["prNumber"], 1)
+        self.assertEqual(completion["provider"], "cursor")
+        self.assertEqual(completion["model"], "cursor-grok-4.6-high-fast")
+        self.assertEqual(completion["selectedModel"], "grok-4.6")
+        self.assertEqual(completion["authPoolIdentity"], completion["profile"])
+        self.assertEqual(completion["leaseReceiptSha256"], hashlib.sha256(receipt_path.read_bytes()).hexdigest())
+        self.assertFalse((self.root / "provider-capacity.json").exists())
 
     def test_grok_ship_one_changelog_strip_failure_still_invokes_grok(self):
         """A missing main-stage CHANGELOG degrades to bounded Grok remediation."""
@@ -3815,6 +3994,9 @@ class FallbackLockGcTests(unittest.TestCase):
         assert spec is not None and spec.loader is not None
         self.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.module)
+        prerequisite = mock.patch.object(self.module, "_native_dispatch_prerequisite", return_value=None)
+        prerequisite.start()
+        self.addCleanup(prerequisite.stop)
         self.env = mock.patch.dict(
             os.environ,
             {
@@ -4281,6 +4463,13 @@ class FallbackLockGcTests(unittest.TestCase):
                 self.module,
                 "_issue_meta",
                 return_value=(True, "admitted", {"issue_revision": "2026-08-22T00:00:00Z"}),
+            ),
+            mock.patch.object(
+                self.module, "_provider_capacity_state",
+                return_value=({"schema": "symphony-provider-capacity/v1", "observedAt": "2026-09-08T00:00:00Z",
+                               "providers": {"grok": {"limit": 1, "status": "available"},
+                                             "kimi": {"limit": 0, "status": "available"}},
+                               "events": {}, "incidents": {}}, pathlib.Path("unused")),
             ),
             mock.patch.object(
                 self.module, "_control", side_effect=lambda command: launches.append(command) or True
