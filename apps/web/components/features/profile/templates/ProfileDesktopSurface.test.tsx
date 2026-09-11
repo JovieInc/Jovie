@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -120,6 +120,12 @@ vi.mock('@/lib/dsp', () => ({
   sortDSPsByGeoPopularity: (value: unknown) => value,
 }));
 
+const mockUseIsAuthenticated = vi.hoisted(() => vi.fn(() => false));
+
+vi.mock('@/hooks/useIsAuthenticated', () => ({
+  useIsAuthenticated: () => mockUseIsAuthenticated(),
+}));
+
 const artist = {
   id: 'artist-1',
   owner_user_id: 'user-1',
@@ -152,6 +158,60 @@ const contentPrefs: Record<NotificationContentType, boolean> = {
 };
 
 describe('ProfileDesktopSurface', () => {
+  beforeEach(() => {
+    mockUseIsAuthenticated.mockReturnValue(false);
+  });
+
+  it('hides the desktop back control on the public profile root for logged-out visitors', () => {
+    mockUseIsAuthenticated.mockReturnValue(false);
+
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onBack={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the desktop back control for a signed-in session', () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    const onBack = vi.fn();
+
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onBack={onBack}
+        profileHref='/timwhite'
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('publishes readiness only after the desktop surface hydrates', () => {
     const surface = (
       <ProfileDesktopSurface
