@@ -59,4 +59,56 @@ describe('public profile back destination', () => {
       })
     ).toBe('history-back');
   });
+
+  it('shows a signed-in root escape hatch and prefers history over the app fallback', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 3,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('history-back');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('app-fallback');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 1,
+      })
+    ).toBe('app-fallback');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+      })
+    ).toBe('history-exit');
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: 'https://jov.ie/explore',
+        arrivalHistoryLength: 2,
+      })
+    ).toBe('history-exit');
+  });
 });

@@ -29,6 +29,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import {
@@ -311,6 +312,7 @@ export function ProfileCompactTemplate({
   const lastPrimaryModeRef = useRef<ProfileMode>('profile');
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
+  const arrivalHistoryLengthRef = useRef<number | null>(null);
 
   const clearCloseResetTimer = useCallback(() => {
     if (closeResetTimerRef.current !== null) {
@@ -322,6 +324,10 @@ export function ProfileCompactTemplate({
   useEffect(() => {
     drawerOpenRef.current = drawerOpen;
   }, [drawerOpen]);
+
+  useEffect(() => {
+    arrivalHistoryLengthRef.current = globalThis.history.length;
+  }, []);
 
   useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
 
@@ -761,11 +767,17 @@ export function ProfileCompactTemplate({
     setRequestedMode('listen');
   }, [clearCloseResetTimer, mergedDSPs.length]);
 
+  const isSignedIn = useIsAuthenticated();
   const handleBack = useCallback(() => {
+    const historyLength = globalThis.history.length;
+    const arrivalHistoryLength =
+      arrivalHistoryLengthRef.current ?? historyLength;
     const action = resolvePublicProfileBackAction({
       isProfileRoot: requestedMode === 'profile',
-      historyLength: globalThis.history.length,
+      historyLength,
       referrer: document.referrer,
+      isSignedIn,
+      arrivalHistoryLength,
     });
 
     if (action === 'profile-root') {
@@ -775,8 +787,18 @@ export function ProfileCompactTemplate({
 
     if (action === 'history-back') {
       globalThis.history.back();
+      return;
     }
-  }, [requestedMode]);
+
+    if (action === 'history-exit') {
+      globalThis.history.go(-(historyLength - arrivalHistoryLength + 1));
+      return;
+    }
+
+    if (action === 'app-fallback') {
+      globalThis.location.assign(APP_ROUTES.DASHBOARD);
+    }
+  }, [isSignedIn, requestedMode]);
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -868,6 +890,7 @@ export function ProfileCompactTemplate({
                 hideJovieBranding={hideJovieBranding}
                 hideMoreMenu={hideMoreMenu}
                 allowFanCapture={allowFanCapture}
+                allowSignedInEscape={!embeddedPreview}
                 renderInteractiveOverlays
                 renderSemanticHeading={!isDesktopLayout}
                 drawerOpen={drawerOpen}
@@ -936,6 +959,7 @@ export function ProfileCompactTemplate({
             onDrawerViewChange={handleDrawerViewChange}
             onOpenMenu={() => openDrawerMode('menu')}
             onPlayClick={handlePlayClick}
+            onBack={handleBack}
             profileHref={profileHref}
             isSubscribed={isSubscribed}
             contentPrefs={contentPrefs}

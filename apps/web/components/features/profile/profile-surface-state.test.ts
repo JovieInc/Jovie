@@ -243,4 +243,68 @@ describe('resolveProfileSurfaceState', () => {
       })
     ).toBe('profile-root');
   });
+
+  it('shows the root back chevron for a signed-in session without history', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+        isSignedIn: true,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('app-fallback');
+  });
+
+  it('uses history back for a signed-in session when history exists without a referrer', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 2,
+        referrer: '',
+        isSignedIn: true,
+      })
+    ).toBe('history-back');
+  });
+
+  it('does not walk internal mode history for a signed-in new-tab arrival', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 3,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 1,
+      })
+    ).toBe('app-fallback');
+  });
+
+  it('exits past internal mode entries to the prior app surface', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: '',
+        isSignedIn: true,
+        arrivalHistoryLength: 2,
+      })
+    ).toBe('history-exit');
+  });
+
+  it('exits past internal mode entries for a logged-out referrer arrival', () => {
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 4,
+        referrer: 'https://jov.ie/explore',
+        arrivalHistoryLength: 2,
+      })
+    ).toBe('history-exit');
+  });
 });

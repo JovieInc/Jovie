@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
 import { BadgeCheck, ChevronLeft, MapPin, MoreHorizontal } from 'lucide-react';
@@ -28,13 +29,16 @@ import type { ProfilePrimaryActionCardRelease } from '@/features/profile/Profile
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
-  hasPublicProfileHistoryDestination,
+  getPublicProfileHistoryServerSnapshot,
+  getPublicProfileHistorySnapshot,
   resolveProfileSurfaceState,
   shouldShowPublicProfileBackChevron,
+  subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -207,6 +211,11 @@ interface ProfileCompactSurfaceProps {
   readonly previewReleaseActionLabel?: string;
   readonly dataTestId?: string;
   readonly hideBackButton?: boolean;
+  /**
+   * Live public-profile documents opt in. Marketing/homepage embeds must stay
+   * false even when tablet chrome uses presentation="embedded".
+   */
+  readonly allowSignedInEscape?: boolean;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
@@ -249,21 +258,6 @@ function resolveActivePrimaryTab(params: {
     default:
       return 'profile';
   }
-}
-
-function subscribeToPublicProfileHistory() {
-  return () => {};
-}
-
-function getPublicProfileHistorySnapshot() {
-  return hasPublicProfileHistoryDestination({
-    historyLength: globalThis.history.length,
-    referrer: document.referrer,
-  });
-}
-
-function getPublicProfileHistoryServerSnapshot() {
-  return false;
 }
 
 export function ProfileCompactSurface({
@@ -317,6 +311,7 @@ export function ProfileCompactSurface({
   },
   dataTestId,
   hideBackButton = false,
+  allowSignedInEscape = false,
   hideMoreMenu = false,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
@@ -477,6 +472,7 @@ export function ProfileCompactSurface({
   const homeContentScrollClassName = 'min-h-0 flex-1';
   // Prefer current/based location for the hero pin; hometown lives in About.
   const locationLabel = artist.location?.trim() || null;
+  const isSignedIn = useIsAuthenticated() && allowSignedInEscape;
   const hasHistoryDestination = useSyncExternalStore(
     subscribeToPublicProfileHistory,
     getPublicProfileHistorySnapshot,
@@ -485,6 +481,7 @@ export function ProfileCompactSurface({
   const showBackChevron = shouldShowPublicProfileBackChevron({
     isProfileRoot: activeMode === 'profile',
     hasHistoryDestination,
+    isSignedIn,
     forceHidden: hideBackButton || isNotificationsFlowOpen,
   });
 
