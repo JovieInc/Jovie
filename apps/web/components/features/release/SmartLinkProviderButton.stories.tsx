@@ -46,7 +46,7 @@ export const PrimaryCta: StoryObj<typeof meta> = {
 
 export const SmartLinkStack: StoryObj<typeof meta> = {
   render: () => (
-    <div className='flex w-80 flex-col gap-2 rounded-3xl bg-black p-4'>
+    <div className='flex w-80 flex-col gap-2 rounded-3xl bg-surface-2 p-4'>
       <SmartLinkProviderButton
         label='Stream Now'
         iconPath={spotify.iconPath}
