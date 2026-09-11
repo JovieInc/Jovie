@@ -19,6 +19,7 @@ import {
   countLinearNamespaceUsage,
   evaluateDesignSystemSourceRatchet,
   IDENTITY_ALLOWLIST_RELATIVE,
+  IDENTITY_BASELINE_RELATIVE,
   IDENTITY_SCAN_ROOTS,
   IDENTITY_SCHEMA,
   identityKey,
@@ -223,6 +224,19 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
     } finally {
       rmSync(repoRoot, { recursive: true, force: true });
     }
+  });
+
+  it('keeps the committed identity baseline compact for the source-PR size cap', () => {
+    const baseline = readFileSync(
+      resolve(REPO_ROOT, IDENTITY_BASELINE_RELATIVE),
+      'utf8'
+    );
+    const lines = baseline.split('\n').length;
+    expect(lines, `baseline is ${lines} lines`).toBeLessThanOrEqual(3);
+    const parsed = JSON.parse(baseline);
+    expect(parsed.schema).toBe(IDENTITY_SCHEMA);
+    expect(Array.isArray(parsed.identities)).toBe(true);
+    expect(parsed.identities).toHaveLength(parsed.count);
   });
 
   it('passes the live tree against the committed identity baseline', () => {

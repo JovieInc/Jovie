@@ -234,9 +234,7 @@ export function collectDesignSystemIdentities(options = {}) {
 }
 
 function uniqueSorted(values) {
-  return [...new Set(values)].toSorted((left, right) =>
-    left.localeCompare(right)
-  );
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
 
 function readIdentityList(filePath, label) {
@@ -277,19 +275,16 @@ export function writeIdentityBaseline(options = {}) {
     options.relativePath ?? IDENTITY_BASELINE_RELATIVE
   );
   mkdirSync(dirname(outPath), { recursive: true });
+  // Compact JSON on purpose: a pretty-printed identity list is thousands of
+  // lines and trips the source-PR size cap. Parse is identical.
   writeFileSync(
     outPath,
-    `${JSON.stringify(
-      {
-        schema: IDENTITY_SCHEMA,
-        generatedBy:
-          'scripts/design-system-source-ratchet.mjs --write-baseline',
-        count: identities.length,
-        identities,
-      },
-      null,
-      2
-    )}\n`
+    `${JSON.stringify({
+      schema: IDENTITY_SCHEMA,
+      generatedBy: 'scripts/design-system-source-ratchet.mjs --write-baseline',
+      count: identities.length,
+      identities,
+    })}\n`
   );
   return { path: outPath, count: identities.length };
 }
