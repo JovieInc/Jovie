@@ -390,19 +390,19 @@ module.exports = [
         },
         {
           selector:
-            "CallExpression[callee.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]",
+            'CallExpression[callee.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]',
           message:
             'JOV-INV-031 thread-blocking: known sync I/O/crypto blocks the event loop. Use nonblocking I/O or precompute. This is not a route-response-latency budget and does not change crawler/bot wait.',
         },
         {
           selector:
-            "CallExpression[callee.property.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]",
+            'CallExpression[callee.property.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]',
           message:
             'JOV-INV-031 thread-blocking: known sync I/O/crypto blocks the event loop. Aliases and members are the same violation. This is not a route-response-latency budget.',
         },
         {
           selector:
-            "ImportSpecifier[imported.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]",
+            'ImportSpecifier[imported.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]',
           message:
             'JOV-INV-031 thread-blocking: importing a known sync I/O/crypto API is rejected in runtime app code, including aliases. Moving the call into a helper is zero escape.',
         },
