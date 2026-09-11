@@ -230,8 +230,7 @@ export function collectDesignSystemIdentities(options = {}) {
       identities.push(identityKey(rel, IDENTITY_RULES.linearNamespace, value));
     }
   }
-  identities.sort((left, right) => left.localeCompare(right));
-  return identities;
+  return uniqueSorted(identities);
 }
 
 function uniqueSorted(values) {
