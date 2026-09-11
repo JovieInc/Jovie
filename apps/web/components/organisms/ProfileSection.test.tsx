@@ -5,9 +5,7 @@ import type { Artist } from '@/types/db';
 import { ProfileSection } from './ProfileSection';
 
 vi.mock('@/components/molecules/ArtistInfo', () => ({
-  ArtistInfo: ({ artist }: { readonly artist: Artist }) => (
-    <p>{artist.name}</p>
-  ),
+  ArtistInfo: ({ artist }: { readonly artist: Artist }) => <p>{artist.name}</p>,
 }));
 
 vi.mock('@/components/molecules/FrostedContainer', () => ({
