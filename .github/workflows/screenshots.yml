@@ -91,6 +91,26 @@ jobs:
           cat "$RUNNER_TEMP/product-screenshots-server.log"
           exit 1
 
+      # Build/start can dirty tracked files or leave untracked non-ignored
+      # artifacts. Exact-head provenance (JOV-4731) refuses GITHUB_SHA on a
+      # dirty tree, so restore source cleanliness without touching ignored
+      # build output (.next) or the already-running server.
+      - name: Restore clean source tree for provenance
+        working-directory: .
+        run: |
+          echo "GITHUB_SHA=${GITHUB_SHA:-}"
+          echo "Worktree before restore:"
+          git status --porcelain --untracked-files=all || true
+          git checkout -- .
+          git clean -fd
+          REMAINING="$(git status --porcelain --untracked-files=all)"
+          if [ -n "$REMAINING" ]; then
+            echo "::error::Source tree is still dirty after provenance restore; exact-head screenshots require a clean checkout."
+            printf '%s\n' "$REMAINING"
+            exit 1
+          fi
+          echo "Source tree is clean for exact-head screenshot provenance."
+
       - name: Capture exact marketing routes
         timeout-minutes: 30
         run: |
