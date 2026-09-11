@@ -343,6 +343,27 @@ describe('@critical ReleaseLandingPage', () => {
     expect(screen.getByText('Claim profile')).toBeDefined();
   });
 
+  it('renders every canonical primary artist in the byline', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        primaryArtists={[
+          { name: 'Tim White', handle: 'timwhite' },
+          { name: 'LYNX', handle: null },
+        ]}
+      />
+    );
+
+    const byline = screen.getByTestId('smart-link-artist-byline');
+    expect(byline.textContent).toBe('Tim White and LYNX');
+    expect(screen.getByText('Tim White').closest('a')).toHaveAttribute(
+      'href',
+      '/timwhite'
+    );
+    expect(screen.getByText('LYNX').tagName).toBe('SPAN');
+    expect(screen.getByText('LYNX').closest('a')).toBeNull();
+  });
+
   it('featured artists line renders "feat." with linked names', () => {
     const featured = [
       { name: 'DJ Nova', handle: 'djnova' },
