@@ -505,4 +505,45 @@ describe('ProfileDesktopSurface', () => {
       expect(onTogglePref).not.toHaveBeenCalled();
     });
   });
+  // Regression: hero social labels must use registry brand casing
+  // (tiktok → 'TikTok'), not naive title case ('Tiktok').
+  it('renders registry-cased hero social aria labels for TikTok', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[
+          {
+            id: 'tt-1',
+            artist_id: artist.id,
+            platform: 'tiktok',
+            url: 'https://www.tiktok.com/@timwhite',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Follow Tim White on TikTok' })
+    ).toHaveAttribute('href', 'https://www.tiktok.com/@timwhite');
+    expect(
+      screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
+    ).toBeNull();
+  });
 });

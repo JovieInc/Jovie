@@ -37,9 +37,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 Name tests by behavior: `describe('ComponentName')` → `it('shows error when input is empty')`.
 
-## E2E Authentication with Clerk
+## E2E Authentication with Better Auth
 
-See `.claude/rules/auth.md` → "E2E Authentication with Clerk" for the canonical helpers, do-not patterns, and golden-path references. Cleanup is mandatory after any session that creates test accounts.
+See `.claude/rules/auth.md` → "E2E Authentication" for the canonical helpers, do-not patterns, and golden-path references. Use `E2E_USE_TEST_AUTH_BYPASS=1` and `/api/dev/test-auth/enter`. Do not import `@clerk/testing` or create Clerk test users.
 
 ## Next Cache APIs In Shared Test Helpers
 

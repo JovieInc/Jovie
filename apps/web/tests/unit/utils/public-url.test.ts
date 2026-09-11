@@ -3,6 +3,7 @@ import {
   isPaymentSupportPlatform,
   isRenderablePublicUrl,
   publicLinkAriaLabel,
+  publicPlatformDisplayName,
   sanitizePublicHref,
 } from '@/lib/utils/public-url';
 
@@ -48,5 +49,15 @@ describe('public-url hygiene', () => {
     expect(publicLinkAriaLabel('Tim White', 'venmo', 'Venmo')).toBe(
       'Support Tim White on Venmo'
     );
+  });
+
+  it('resolves platform display labels from the DSP registry', () => {
+    // Registry names win — brand casing for known platforms.
+    expect(publicPlatformDisplayName('tiktok')).toBe('TikTok');
+    expect(publicPlatformDisplayName('youtube')).toBe('YouTube');
+    expect(publicPlatformDisplayName('instagram')).toBe('Instagram');
+    // Unknown ids keep the sentence-case fallback (no registry entry).
+    expect(publicPlatformDisplayName('twitter')).toBe('Twitter');
+    expect(publicPlatformDisplayName('threads')).toBe('Threads');
   });
 });
