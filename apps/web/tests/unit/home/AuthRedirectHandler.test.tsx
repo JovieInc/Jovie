@@ -9,11 +9,11 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-import { APP_ROUTES } from '@/constants/routes';
 import {
   AuthRedirectHandler,
   hasActiveAuthSession,
 } from '@/components/features/home/AuthRedirectHandler';
+import { APP_ROUTES } from '@/constants/routes';
 
 describe('hasActiveAuthSession', () => {
   it('returns false when the cookie is missing', () => {
