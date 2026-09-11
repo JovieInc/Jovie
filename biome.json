@@ -25,6 +25,7 @@
       "!apps/web/design/oklch-palette.json",
       "!apps/web/typecheck-tests-baseline.json",
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
+      "!apps/web/tests/unit/design-system/source-identity.baseline.json",
       "!packages/action-contracts/generated/**"
     ]
   },
@@ -114,6 +115,20 @@
               "prompt": "Use <Dialog> with a controlled input — native prompt() is blocking and unstyled. See AGENTS.md §4f."
             }
           }
+        },
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "simple-icons": "Use SocialIcon from @/components/atoms/SocialIcon. Do not import simple-icons directly."
+            },
+            "patterns": [
+              {
+                "group": ["simple-icons/*"],
+                "message": "Use SocialIcon from @/components/atoms/SocialIcon. Do not import simple-icons/* directly."
+              }
+            ]
+          }
         }
       }
     }
@@ -159,47 +174,27 @@
     },
     {
       "includes": [
-        "**/LoadingSpinner.tsx",
-        "**/LogoLoader.tsx",
-        "**/StatusBadge.tsx",
-        "**/ProfileSkeleton.tsx",
-        "**/EmptyState.tsx",
-        "**/StarterEmptyState.tsx",
-        "**/ProfileForm.tsx",
-        "**/OnboardingHandleStep.tsx",
-        "**/ComboboxDropdown.tsx",
-        "**/SmartHandleInput.tsx",
-        "**/CopyToClipboardButton.tsx",
-        "**/UniversalLinkInputUrlMode.tsx",
-        "**/OptimisticProgress.tsx",
-        "**/ProgressIndicator.tsx",
-        "**/TipSelector.tsx",
-        "**/DashboardOverviewToolbar.tsx",
-        "**/ProfileLinkCategorySelector.tsx",
-        "**/KanbanBoard.tsx",
-        "**/TableCheckboxCell.tsx",
-        "**/AudienceCreatedAtCell.tsx",
-        "**/AudienceLastSeenCell.tsx",
-        "**/AudienceRowSelectionCell.tsx",
-        "**/CreatorProfileTableRow.tsx",
-        "**/WaitlistSocialStep.tsx",
-        "**/WaitlistSpotifySearch.tsx",
-        "**/UniversalLinkInputArtistSearchMode.tsx",
-        "**/UniversalLinkInput.tsx",
-        "**/ComboboxOptionItem.tsx",
-        "**/ReleasesEmptyState.tsx",
-        "**/AvatarUploadable.tsx",
-        "**/PlatformPill.tsx",
-        "**/YouTubeCrossCategoryPrompt.tsx"
+        "apps/web/components/organisms/table/atoms/AudienceRowSelectionCell.tsx",
+        "apps/web/components/organisms/table/atoms/TableCheckboxCell.tsx"
       ],
       "linter": {
         "rules": {
           "a11y": {
-            "useSemanticElements": "off",
-            "noStaticElementInteractions": "off",
             "noNoninteractiveElementInteractions": "off",
-            "useFocusableInteractive": "off",
-            "useAriaPropsSupportedByRole": "off"
+            "noStaticElementInteractions": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/web/components/features/admin/CreatorProfileTableRow.tsx",
+        "apps/web/components/features/admin/table/organisms/KanbanBoard.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noNoninteractiveElementInteractions": "off"
           }
         }
       }

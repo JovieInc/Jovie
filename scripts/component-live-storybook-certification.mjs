@@ -156,11 +156,50 @@ function normalizeRepoPath(value) {
     .replace(/\\/g, '/');
 }
 
+const LIVE_FAMILY_BY_BASENAME = Object.freeze({
+  badge: 'atom.badge',
+  button: 'atom.button',
+  card: 'atom.card',
+});
+
+export function liveFamilyFromComponentPath(componentPath) {
+  const normalized = String(componentPath || '')
+    .trim()
+    .replace(/\\/g, '/');
+  const base = normalized
+    .split('/')
+    .pop()
+    ?.replace(/\.stories\.(?:tsx|ts|jsx|js)$/i, '')
+    ?.replace(/\.(?:tsx|ts|jsx|js)$/i, '')
+    ?.toLowerCase();
+  return LIVE_FAMILY_BY_BASENAME[base] ?? null;
+}
+
+export function selectLiveStoriesForChanges(changedComponents = []) {
+  const owners = new Set(
+    changedComponents.map(liveFamilyFromComponentPath).filter(Boolean)
+  );
+  return CANONICAL_LIVE_STORIES.filter(story => owners.has(story.owner));
+}
+
+export function resolveLiveStoriesForRun(options = {}) {
+  if (Array.isArray(options.stories)) return options.stories;
+  if (Array.isArray(options.storyIds) && options.storyIds.length > 0) {
+    const wanted = new Set(options.storyIds);
+    return CANONICAL_LIVE_STORIES.filter(story => wanted.has(story.id));
+  }
+  if (options.changedComponents !== undefined) {
+    return selectLiveStoriesForChanges(options.changedComponents);
+  }
+  return CANONICAL_LIVE_STORIES;
+}
+
 export function validateCanonicalStoryInventory(options = {}) {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
   const stories = options.stories ?? CANONICAL_LIVE_STORIES;
   const issues = [];
-  if (!Array.isArray(stories) || stories.length !== 5) {
+  const allowSubset = options.allowSubset === true;
+  if (!Array.isArray(stories) || (!allowSubset && stories.length !== 5)) {
     issues.push(
       `canonical live inventory must declare exactly 5 seeded primitive stories; found ${Array.isArray(stories) ? stories.length : 0}`
     );
@@ -830,32 +869,73 @@ function resolveHeadSha(explicit) {
   return sha.toLowerCase();
 }
 
-function liveVisualCertification(ok, stories) {
+function liveVisualCertification(ok, stories, extra = {}) {
   return {
-    status: ok ? 'certified' : 'blocked',
-    certified: ok ? CANONICAL_LIVE_STORIES.length : 0,
+    status: extra.skipped ? 'skipped' : ok ? 'certified' : 'blocked',
+    certified: extra.skipped ? 0 : ok ? stories.length : 0,
+    skipped: extra.skipped === true,
     claimBoundary: LIVE_CERT_CLAIM_BOUNDARY,
     viewports: LIVE_VIEWPORTS.map(item => item.id),
     stories: stories.map(item => item.id),
-    requires: ok
-      ? []
-      : [
-          'rendered observations from the exact Jovie Storybook',
-          'exact CI receipt',
-        ],
+    requires:
+      extra.skipped || ok
+        ? []
+        : [
+            'rendered observations from the exact Jovie Storybook',
+            'exact CI receipt',
+          ],
+    ...extra,
   };
 }
 
 /**
- * @param {{ headSha?: string, observations?: any[], redFixtures?: any[], repoRoot?: string, skipCollect?: boolean, collect?: boolean, nodeVersion?: string, stories?: any[] }} [options]
+ * @param {{ headSha?: string, observations?: any[], redFixtures?: any[], repoRoot?: string, skipCollect?: boolean, collect?: boolean, nodeVersion?: string, stories?: any[], changedComponents?: string[], storyIds?: string[] }} [options]
  */
 export function runLiveStorybookCertification(options = {}) {
   const node = qualifyNode22(options.nodeVersion ?? process.versions.node);
   const issues = [];
   if (!node.ok) issues.push(node.detail);
+  const catalog = validateCanonicalStoryInventory({
+    repoRoot: options.repoRoot,
+    stories: CANONICAL_LIVE_STORIES,
+  });
+  if (!catalog.ok) issues.push(...catalog.issues);
+
+  const selected = resolveLiveStoriesForRun(options);
+  const selectingFromChanges = options.changedComponents !== undefined;
+  if (selectingFromChanges && selected.length === 0) {
+    const headSha = resolveHeadSha(options.headSha);
+    return {
+      ok: issues.length === 0,
+      skipped: true,
+      schema: LIVE_CERT_SCHEMA,
+      receipt: {
+        schema: LIVE_CERT_SCHEMA,
+        gate: 'component-ship-gate',
+        section: 'liveStorybookCertification',
+        headSha,
+        ok: issues.length === 0,
+        skipped: true,
+        issues,
+        claimBoundary: LIVE_CERT_CLAIM_BOUNDARY,
+        liveVisualCertification: liveVisualCertification(true, [], {
+          skipped: true,
+          note: 'no enrolled canonical family changed',
+        }),
+        inventory: CANONICAL_LIVE_STORIES.map(item => ({
+          id: item.id,
+          importPath: item.importPath,
+        })),
+        fixtures: [],
+        observations: [],
+      },
+    };
+  }
+
   const inventory = validateCanonicalStoryInventory({
     repoRoot: options.repoRoot,
-    stories: options.stories,
+    stories: options.stories ?? selected,
+    allowSubset: selectingFromChanges || Boolean(options.storyIds),
   });
   if (!inventory.ok) issues.push(...inventory.issues);
 
@@ -886,11 +966,17 @@ export function runLiveStorybookCertification(options = {}) {
       );
       observations = [];
     } else {
-      return collectViaSubprocess(options, inventory, issues, redReceipts);
+      return collectViaSubprocess(
+        options,
+        inventory,
+        issues,
+        redReceipts,
+        selected
+      );
     }
   }
 
-  const expectedPairs = CANONICAL_LIVE_STORIES.flatMap(story =>
+  const expectedPairs = selected.flatMap(story =>
     LIVE_VIEWPORTS.map(viewport => `${story.id}@${viewport.id}`)
   );
   const seen = new Set(observations.map(item => item?.id));
@@ -931,7 +1017,7 @@ export function runLiveStorybookCertification(options = {}) {
       ok,
       issues,
       claimBoundary: LIVE_CERT_CLAIM_BOUNDARY,
-      liveVisualCertification: liveVisualCertification(ok, inventory.stories),
+      liveVisualCertification: liveVisualCertification(ok, selected),
       inventory: inventory.stories.map(item => ({
         id: item.id,
         importPath: item.importPath,
@@ -942,7 +1028,13 @@ export function runLiveStorybookCertification(options = {}) {
   };
 }
 
-function collectViaSubprocess(options, inventory, priorIssues, redReceipts) {
+function collectViaSubprocess(
+  options,
+  inventory,
+  priorIssues,
+  redReceipts,
+  selected
+) {
   const headSha = resolveHeadSha(options.headSha);
   const work = createWorkDir('jovie-live-cert-receipt-');
   const receiptFile = resolve(work, 'receipt.json');
@@ -962,6 +1054,7 @@ function collectViaSubprocess(options, inventory, priorIssues, redReceipts) {
         env: {
           ...process.env,
           JOVIE_LIVE_STORYBOOK_CERT: '1',
+          JOVIE_LIVE_STORY_IDS: selected.map(story => story.id).join(','),
         },
       }
     );

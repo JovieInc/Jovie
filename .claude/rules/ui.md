@@ -255,7 +255,7 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
 
 ### Locked Marketing Geometry and Review
 
-- Marketing pill controls are visibly 32px high inside a 44px minimum target.
+- Marketing pill controls are visibly 28px high inside a 44px minimum target.
 - The marketing O-mark is visibly 32px and shares the control alignment.
 - Decorative icons and emoji have no border, ring, circle, or badge container.
 - Reuse one canonical component family; encode supported states as variants and

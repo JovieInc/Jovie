@@ -98,10 +98,12 @@ from `ci-fast-lanes.mjs` is WARN, not FAIL — the audit must not demand a
 merge halt.
 
 Exception (JOV-5301): the remaining-group `design-system-source-ratchet` lane
-is a ~100ms filesystem count of apps/web arbitrary Tailwind values and
-`--linear-*` usage. It fails only on growth so a source-green PR cannot enroll
-and UNMERGEABLE an ALLGREEN group. It does not expand `design-conformance:gate`,
-unit tests, or e2e.
+is a cheap filesystem identity scan (`file + rule + value`) of arbitrary
+Tailwind values, arbitrary properties (`[width:327px]`), and `--linear-*`
+usage across `apps/web/{app,components,styles,lib}` and `packages/ui`. It
+fails only on new identities so a source-green PR cannot enroll and
+UNMERGEABLE an ALLGREEN group. Existing identities are grandfathered. It does
+not expand `design-conformance:gate`, unit tests, or e2e.
 
 Exception (JOV-5447): `design-exception-registry` compares inventoried
 design-debt registries to the trusted ci-fast base and fails closed on growth.
