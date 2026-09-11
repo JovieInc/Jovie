@@ -21,8 +21,8 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
 }));
 
-vi.mock('@/components/atoms/ImageWithFallback', () => ({
-  ImageWithFallback: () => <div data-testid='release-artwork' />,
+vi.mock('@/components/atoms/ReleaseArtworkThumb', () => ({
+  ReleaseArtworkThumb: () => <div data-testid='release-artwork' />,
 }));
 
 vi.mock('@/components/atoms/ProviderIcon', () => ({
