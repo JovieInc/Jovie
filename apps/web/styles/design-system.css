@@ -419,6 +419,17 @@
   max-width: min(var(--profile-shell-max-width), 100%);
 }
 
+/* JOV-5995: between the md card framing and the 1180px desktop hand-off the
+   outer profile document must not render the 430px phone card centered in a
+   wide viewport (the "430px hybrid"). The compact surface owns the readable
+   compact width instead; embedded previews keep the phone frame. */
+@media (min-width: 768px) and (max-width: 1179.98px) {
+  .profile-viewport:not(.profile-viewport--embedded)
+    .public-profile-compact-shell {
+    max-width: min(100%, var(--content-max));
+  }
+}
+
 :where(.profile-aeo-content) {
   --profile-aeo-text: var(--color-text-tooltip);
   --profile-aeo-muted: color-mix(
