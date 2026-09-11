@@ -135,10 +135,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       proofs: [],
     });
     assert.deepEqual(result.issues, []);
-    assert.deepEqual(
-      result.changedScreens.map(screen => screen.id).sort(),
-      ['web.public-profile', 'web.start']
-    );
+    assert.deepEqual(result.changedScreens.map(screen => screen.id).sort(), [
+      'web.public-profile',
+      'web.start',
+    ]);
   });
 
   it('registers every protected revenue screen source', () => {
