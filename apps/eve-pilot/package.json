@@ -26,7 +26,7 @@
     "braintrust": "3.30.0",
     "eve": "0.47.7",
     "just-bash": "3.4.2",
-    "microsandbox": "0.6.16",
+    "microsandbox": "0.6.18",
     "zod": "4.3.6"
   },
   "devDependencies": {
