@@ -13,7 +13,7 @@
 
 import { expect, test } from '@playwright/test';
 import { isProductionTarget } from '../helpers/auth';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { hasAdminCredentials, signInAsAdmin } from './utils/admin-test-utils';
 import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
+import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 import {
   assertNoCriticalErrors,
   setupPageMonitoring,

@@ -16,7 +16,7 @@ import {
   setTestAuthBypassSession,
   waitForAuthenticatedHealth,
   waitForClerkSignInApi,
-} from '@/tests/helpers/clerk-auth';
+} from '@/tests/helpers/auth';
 
 /* ------------------------------------------------------------------ */
 /*  Environment gates                                                   */

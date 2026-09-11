@@ -1,5 +1,5 @@
 import { expect, Page, test } from '@playwright/test';
-import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
+import { createOrReuseTestUserSession } from '../helpers/auth';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   getPersonaEmail,
+  isPrivateOrLoopbackHost,
   parseBrowseAuthArgs,
   parseSetCookieHeaders,
+  runBrowseAuth,
 } from '../../../../../scripts/browse-auth';
 
 describe('scripts/browse-auth.ts', () => {
@@ -58,5 +60,21 @@ describe('scripts/browse-auth.ts', () => {
 
     expect(getPersonaEmail('admin')).toBe('browse-admin+clerk_test@jov.ie');
     expect(getPersonaEmail('creator')).toBe('browse+clerk_test@jov.ie');
+  });
+
+  it('accepts loopback hosts and rejects public hosts', () => {
+    expect(isPrivateOrLoopbackHost('localhost')).toBe(true);
+    expect(isPrivateOrLoopbackHost('127.0.0.1')).toBe(true);
+    expect(isPrivateOrLoopbackHost('jov.ie')).toBe(false);
+  });
+
+  it('refuses public hosts instead of falling back to Clerk', async () => {
+    await expect(
+      runBrowseAuth({
+        baseUrl: 'https://jov.ie',
+        output: '/tmp/browse-auth-cookies.json',
+        persona: 'creator',
+      })
+    ).rejects.toThrow(/Clerk fallback is retired/);
   });
 });

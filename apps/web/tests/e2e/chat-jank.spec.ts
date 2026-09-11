@@ -24,7 +24,7 @@ import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 
 async function forceChatJankMonitor(page: Page) {
   const overrides = JSON.stringify({

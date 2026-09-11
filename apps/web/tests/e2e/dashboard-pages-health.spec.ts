@@ -15,7 +15,7 @@ import {
   setTestAuthBypassSession,
   signInUser,
   waitForAuthenticatedHealth,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import {
   DASHBOARD_ROUTE_MATRIX,
   type DashboardRouteDescriptor,

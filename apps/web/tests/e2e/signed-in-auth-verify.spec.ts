@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser, signInUser } from '../helpers/clerk-auth';
+import { ensureSignedInUser, signInUser } from '../helpers/auth';
 import {
   SMOKE_TIMEOUTS,
   setupPageMonitoring,
