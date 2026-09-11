@@ -414,4 +414,95 @@ describe('ProfileDesktopSurface', () => {
       screen.getByRole('link', { name: 'Follow Tim White on Twitter' })
     ).toHaveAttribute('href', 'https://x.com/timwhite');
   });
+
+  // Dead-control regression (JOV-6124 desktop hydrated-beat cert): the Alerts
+  // card preference switches rendered `checked={contentPrefs[key]}` but routed
+  // activation to the subscribe flow, so a role="switch" never changed state —
+  // for subscribed visitors the template's real mutation handler was dropped.
+  describe('Alerts card preference switches', () => {
+    const renderAlertsCard = (props: {
+      readonly onTogglePref: (key: NotificationContentType) => void;
+    }) =>
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode='profile'
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+          isSubscribed
+          contentPrefs={contentPrefs}
+          onTogglePref={props.onTogglePref}
+          onUnsubscribe={vi.fn()}
+        />
+      );
+
+    it('routes activation to the template preference mutation when subscribed', () => {
+      const onTogglePref = vi.fn<(key: NotificationContentType) => void>();
+      renderAlertsCard({ onTogglePref });
+
+      const merchSwitch = screen.getByRole('switch', { name: 'Merch' });
+      expect(merchSwitch).toHaveAttribute('data-state', 'unchecked');
+      merchSwitch.click();
+
+      expect(onTogglePref).toHaveBeenCalledTimes(1);
+      expect(onTogglePref).toHaveBeenCalledWith('merch');
+    });
+
+    it('keeps the switch state owned by contentPrefs when subscribed', () => {
+      renderAlertsCard({ onTogglePref: vi.fn() });
+      expect(screen.getByRole('switch', { name: 'New Music' })).toHaveAttribute(
+        'data-state',
+        'checked'
+      );
+      expect(screen.getByRole('switch', { name: 'Shows' })).toHaveAttribute(
+        'data-state',
+        'unchecked'
+      );
+    });
+
+    it('routes activation to the subscribe flow for unsubscribed visitors', () => {
+      const onModeSelect = vi.fn();
+      const onTogglePref = vi.fn();
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode='profile'
+          onModeSelect={onModeSelect}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+          allowFanCapture
+          isSubscribed={false}
+          contentPrefs={contentPrefs}
+          onTogglePref={onTogglePref}
+          onUnsubscribe={vi.fn()}
+        />
+      );
+
+      const newMusicSwitch = screen.getByRole('switch', {
+        name: 'New Music',
+      });
+      expect(newMusicSwitch).toHaveAttribute('data-state', 'unchecked');
+      newMusicSwitch.click();
+
+      expect(onModeSelect).toHaveBeenCalledWith('subscribe');
+      expect(onTogglePref).not.toHaveBeenCalled();
+    });
+  });
 });
