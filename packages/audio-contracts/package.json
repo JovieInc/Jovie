@@ -13,7 +13,7 @@
     "test:mutation": "../../apps/web/node_modules/.bin/stryker run stryker.config.mjs"
   },
   "devDependencies": {
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "4.1.8"
   }
 }
