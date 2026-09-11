@@ -31,7 +31,7 @@ export const SMART_LINK_PRIMARY_PROVIDER_BUTTON_CLASSNAME =
  * active. No bounce, scale, or translation. JOV-6149 / JOV-1451.
  */
 export const SMART_LINK_SECONDARY_PROVIDER_BUTTON_CLASSNAME =
-  'group flex min-h-11 w-full items-center gap-3.5 rounded-full bg-transparent px-4 py-3 ring-1 ring-inset ring-white/[0.08] transition-[background-color,color] duration-subtle ease-subtle motion-reduce:transition-none hover:bg-interactive-hover focus-visible:bg-interactive-hover focus-visible:outline-none focus-visible:ring-focus/35 active:bg-interactive-active';
+  'group flex min-h-11 w-full items-center gap-3.5 rounded-full bg-transparent px-4 py-3 ring-1 ring-inset ring-white/[0.08] transition-colors duration-subtle ease-subtle motion-reduce:transition-none hover:bg-interactive-hover focus-visible:bg-interactive-hover focus-visible:outline-none focus-visible:ring-focus/35 active:bg-interactive-active';
 
 /**
  * Canonical DSP provider button used across smart link, listen mode, and marketing demos.

@@ -65,6 +65,7 @@ describe('SmartLinkProviderButton', () => {
     expect(button).toHaveClass('hover:bg-interactive-hover');
     expect(button).toHaveClass('focus-visible:bg-interactive-hover');
     expect(button).toHaveClass('active:bg-interactive-active');
+    expect(button).toHaveClass('transition-colors');
     expect(button).toHaveClass('duration-subtle');
     expect(button).not.toHaveClass('bg-white/10');
     expect(button).not.toHaveClass('hover:bg-white/15');
@@ -106,6 +107,12 @@ describe('SmartLinkProviderButton', () => {
     );
     expect(SMART_LINK_SECONDARY_PROVIDER_BUTTON_CLASSNAME).toContain(
       'min-h-11'
+    );
+    expect(SMART_LINK_SECONDARY_PROVIDER_BUTTON_CLASSNAME).toContain(
+      'transition-colors'
+    );
+    expect(SMART_LINK_SECONDARY_PROVIDER_BUTTON_CLASSNAME).not.toContain(
+      'transition-['
     );
 
     for (const token of SECONDARY_REST_FILL_TOKENS) {
