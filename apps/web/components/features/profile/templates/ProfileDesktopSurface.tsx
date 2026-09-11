@@ -51,6 +51,7 @@ import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import {
   publicLinkAriaLabel,
+  publicPlatformDisplayName,
   sanitizePublicHref,
 } from '@/lib/utils/public-url';
 import type { PublicContact } from '@/types/contacts';
@@ -500,9 +501,9 @@ export function ProfileDesktopSurface({
                     if (!link.platform) return null;
                     const href = sanitizePublicHref(link.url);
                     if (!href) return null;
-                    const platformLabel =
-                      link.platform.charAt(0).toUpperCase() +
-                      link.platform.slice(1);
+                    const platformLabel = publicPlatformDisplayName(
+                      link.platform
+                    );
                     return (
                       <a
                         key={link.id}

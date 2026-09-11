@@ -113,6 +113,15 @@ const artist = {
   },
 } satisfies Artist;
 
+const tiktokLink = {
+  id: 'tt-1',
+  artist_id: artist.id,
+  platform: 'tiktok',
+  url: 'https://www.tiktok.com/@timwhite',
+  clicks: 0,
+  created_at: '2026-01-01T00:00:00.000Z',
+};
+
 function renderSurface(
   overrides: Partial<React.ComponentProps<typeof ProfileCompactSurface>> = {}
 ) {
@@ -178,5 +187,19 @@ describe('ProfileCompactSurface', () => {
     expect(
       screen.queryByRole('button', { name: 'Back' })
     ).not.toBeInTheDocument();
+  });
+  // Regression: hero social labels must use registry brand casing
+  // (tiktok -> 'TikTok'), not naive title case ('Tiktok').
+  it('renders registry-cased hero social aria labels for TikTok', () => {
+    renderSurface({ socialLinks: [tiktokLink] });
+
+    // Scoped via role+name: the hero social row is the only place rendering
+    // this aria label, so screen-level queries are unambiguous here.
+    expect(
+      screen.getByRole('link', { name: 'Follow Tim White on TikTok' })
+    ).toHaveAttribute('href', 'https://www.tiktok.com/@timwhite');
+    expect(
+      screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
+    ).toBeNull();
   });
 });
