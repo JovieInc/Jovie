@@ -34,6 +34,14 @@ export type BrandMarkSize = BrandMarkSizeName | BrandMarkSizePx;
 
 export const BRAND_MARK_CREAM = '#F5F4F0' as const;
 
+/**
+ * Ion blue — the canonical brand accent (Noir Ion; PALETTE.feature Ion).
+ * Consumed by app-chrome metadata (msapplication-TileColor, Safari mask-icon)
+ * so browser chrome renders the locked brand accent instead of retired
+ * placeholder hexes.
+ */
+export const BRAND_ION_BLUE = '#11AFFF' as const;
+
 export function resolveBrandMarkSize(
   size: BrandMarkSize = 'chrome'
 ): BrandMarkSizePx {
