@@ -261,7 +261,7 @@
     "@upstash/redis": "^1.38.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.8.0",
-    "@vercel/oidc": "3.8.5",
+    "@vercel/oidc": "3.8.7",
     "@vercel/toolbar": "^0.2.5",
     "ai": "^6.0.137",
     "better-auth": "1.7.0-rc.1",
