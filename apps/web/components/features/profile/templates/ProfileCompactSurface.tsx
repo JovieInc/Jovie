@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/profile/profile-shell-token-contract.test.ts
 'use client';
 
 import { BadgeCheck, ChevronLeft, MapPin, MoreHorizontal } from 'lucide-react';
