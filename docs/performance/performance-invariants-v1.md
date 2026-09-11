@@ -42,3 +42,10 @@ disagree, the stricter number governs and the file is named in the audit report.
 
 Fixes for these holes are separate flips, one PR per file, per the enforcement path in the
 GBrain page. This contract file intentionally changes no product or CI behavior.
+
+## Sibling check class: thread-blocking
+
+Route-response-latency budgets in this file are **not** a substitute for keeping the request
+path free of blocking I/O. The thread-blocking gate is `JOV-INV-031`
+([latency-sensitive-execution-v1](./latency-sensitive-execution-v1.md)). That gate invents
+no numbers here and does not claim that async metadata changes crawler/bot wait.
