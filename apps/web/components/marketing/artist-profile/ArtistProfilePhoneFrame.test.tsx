@@ -55,6 +55,7 @@ describe('ArtistProfilePhoneFrame size-derived chrome (homepage-optical-polish-v
     expect(css).toContain('--ap-phone-notch-inset');
     expect(css).toContain('32.94cqi');
     expect(css).toContain('8.71cqi');
+    expect(css).toContain('@layer components');
     expect(css).toContain('[data-size="sm"]');
     expect(css).toContain('[data-size="md"]');
     expect(css).not.toMatch(
