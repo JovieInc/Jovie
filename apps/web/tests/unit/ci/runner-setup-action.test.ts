@@ -140,6 +140,61 @@ describe('self-hosted runner setup action', () => {
   });
 });
 
+describe('full browser matrix setup routing', () => {
+  const workflow = readFileSync(
+    resolve(repoRoot, '.github/workflows/e2e-full-matrix.yml'),
+    'utf8'
+  );
+  const setupSteps = workflow
+    .split(/\n      - /)
+    .filter(step => /(?:Cache|Install|Setup) Playwright/.test(step));
+
+  it('routes Chromium exclusively through the shared apt-free setup action', () => {
+    const chromiumSteps = setupSteps.filter(step =>
+      step.includes("if: matrix.browser == 'chromium'")
+    );
+    expect(chromiumSteps).toHaveLength(1);
+    expect(chromiumSteps[0]).toContain(
+      'uses: ./.github/actions/setup-playwright'
+    );
+    expect(chromiumSteps[0]).not.toContain('run:');
+  });
+
+  it('keeps the existing browser cache and dependency installer Firefox-only', () => {
+    const firefoxSteps = setupSteps.filter(step =>
+      step.includes("if: matrix.browser == 'firefox'")
+    );
+    expect(firefoxSteps).toHaveLength(2);
+    expect(firefoxSteps[0]).toContain('path: ~/.cache/ms-playwright');
+    expect(firefoxSteps[0]).toContain(
+      '${{ runner.os }}-playwright-${{ matrix.browser }}-'
+    );
+    expect(firefoxSteps[1]).toContain(
+      'run: pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps'
+    );
+    // No unconditional installer may put Chromium back on the apt path.
+    expect(setupSteps).toHaveLength(3);
+  });
+
+  it('preserves browser host validation and serialized execution', () => {
+    expect(workflow).toContain('browser: [chromium, firefox]');
+    expect(workflow).toContain('max-parallel: 1');
+    const action = readFileSync(
+      resolve(repoRoot, '.github/actions/setup-playwright/action.yml'),
+      'utf8'
+    );
+    expect(action).toContain(
+      'node .github/runner-image/verify-prerequisites.mjs --component playwright'
+    );
+    expect(action).toContain(
+      'run: pnpm --filter=@jovie/web exec playwright install chromium\n'
+    );
+    for (const source of [workflow, action]) {
+      expect(source).not.toMatch(/PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS/);
+    }
+  });
+});
+
 describe('baked runner prerequisite contract', () => {
   const temporaryDirectories: string[] = [];
   const verifierPath = resolve(

@@ -25,6 +25,7 @@ const meta: Meta<typeof ProfileDesktopSurface> = {
     onDrawerViewChange: profileStoryNoop,
     onOpenMenu: profileStoryNoop,
     onPlayClick: profileStoryNoop,
+    onBack: profileStoryNoop,
     profileHref: '/timwhite',
     contentPrefs: PROFILE_STORY_CONTENT_PREFS,
     latestRelease: {

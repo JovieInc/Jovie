@@ -345,9 +345,36 @@ export function hasPublicProfileHistoryDestination(params: {
   return params.historyLength > 1 && params.referrer.trim().length > 0;
 }
 
+export function subscribeToPublicProfileHistory() {
+  return () => {};
+}
+
+export function getPublicProfileHistorySnapshot() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+
+  return hasPublicProfileHistoryDestination({
+    historyLength: globalThis.history.length,
+    referrer: document.referrer,
+  });
+}
+
+export function getPublicProfileHistoryServerSnapshot() {
+  return false;
+}
+
+export type PublicProfileBackAction =
+  | 'profile-root'
+  | 'history-back'
+  | 'history-exit'
+  | 'app-fallback'
+  | 'none';
+
 export function shouldShowPublicProfileBackChevron(params: {
   readonly isProfileRoot: boolean;
   readonly hasHistoryDestination: boolean;
+  readonly isSignedIn?: boolean;
   readonly forceHidden?: boolean;
 }): boolean {
   if (params.forceHidden) {
@@ -356,19 +383,44 @@ export function shouldShowPublicProfileBackChevron(params: {
   if (!params.isProfileRoot) {
     return true;
   }
+  if (params.isSignedIn) {
+    return true;
+  }
   return params.hasHistoryDestination;
+}
+
+function hasInternalPublicProfileHistory(params: {
+  readonly historyLength: number;
+  readonly arrivalHistoryLength?: number;
+}): boolean {
+  const arrival = params.arrivalHistoryLength ?? params.historyLength;
+  return params.historyLength > arrival;
 }
 
 export function resolvePublicProfileBackAction(params: {
   readonly isProfileRoot: boolean;
   readonly historyLength: number;
   readonly referrer: string;
-}): 'profile-root' | 'history-back' | 'none' {
+  readonly isSignedIn?: boolean;
+  readonly arrivalHistoryLength?: number;
+}): PublicProfileBackAction {
   if (!params.isProfileRoot) {
     return 'profile-root';
   }
-  if (hasPublicProfileHistoryDestination(params)) {
-    return 'history-back';
+
+  const arrival = params.arrivalHistoryLength ?? params.historyLength;
+  const hasInternalEntries = hasInternalPublicProfileHistory(params);
+
+  if (params.isSignedIn) {
+    // New-tab / no prior surface: never walk internal mode pushStates.
+    if (arrival <= 1) {
+      return 'app-fallback';
+    }
+    return hasInternalEntries ? 'history-exit' : 'history-back';
   }
-  return 'none';
+
+  if (!hasPublicProfileHistoryDestination(params)) {
+    return 'none';
+  }
+  return hasInternalEntries ? 'history-exit' : 'history-back';
 }

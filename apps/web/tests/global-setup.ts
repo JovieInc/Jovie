@@ -7,6 +7,10 @@ import {
   ensureDevTestAuthPersona,
   resolveDevTestAuthPersona,
 } from './helpers/dev-test-auth-personas';
+import {
+  PROFILE_CTA_SPEC,
+  runProfileCtaPreflight,
+} from './helpers/profile-cta-fixture-preflight';
 import { seedTestData } from './seed-test-data';
 
 // Load environment variables in priority order (first-loaded wins with override: false)
@@ -23,6 +27,11 @@ const webServerWarmupProfile = resolveWebServerWarmupProfile({ isCI });
 
 async function globalSetup() {
   const startTime = Date.now();
+  const profileCtaPreflight =
+    process.env.PROFILE_CTA_TEST_FILTER === PROFILE_CTA_SPEC;
+  if (profileCtaPreflight) {
+    await runProfileCtaPreflight(process.env, webRoot, seedTestData);
+  }
   console.log('🚀 Starting E2E global setup...');
 
   // Diagnostic: show which env files loaded
@@ -79,7 +88,11 @@ async function globalSetup() {
   });
 
   // Seed test database with required profiles for smoke tests
-  if (process.env.E2E_SKIP_SEED === '1') {
+  if (profileCtaPreflight) {
+    console.log(
+      '✓ Profile CTA fixtures verified against the owned local database'
+    );
+  } else if (process.env.E2E_SKIP_SEED === '1') {
     console.log('ℹ E2E_SKIP_SEED=1, skipping test data seeding');
   } else if (process.env.DATABASE_URL) {
     try {
