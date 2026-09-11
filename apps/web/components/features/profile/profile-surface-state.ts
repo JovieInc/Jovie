@@ -389,10 +389,46 @@ export function shouldShowPublicProfileBackChevron(params: {
   return params.hasHistoryDestination;
 }
 
+export const PUBLIC_PROFILE_HISTORY_DEPTH_KEY = 'joviePublicProfileDepth';
+
+export function readPublicProfileHistoryDepth(state: unknown): number {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    return 0;
+  }
+  const depth = Reflect.get(state, PUBLIC_PROFILE_HISTORY_DEPTH_KEY);
+  return typeof depth === 'number' && Number.isFinite(depth) && depth >= 0
+    ? Math.floor(depth)
+    : 0;
+}
+
+export function withPublicProfileHistoryDepth(
+  state: unknown,
+  depth: number
+): Record<string, unknown> {
+  const base =
+    state && typeof state === 'object' && !Array.isArray(state)
+      ? { ...(state as Record<string, unknown>) }
+      : {};
+  return {
+    ...base,
+    [PUBLIC_PROFILE_HISTORY_DEPTH_KEY]: depth,
+  };
+}
+
+export function getPublicProfileHistoryExitDelta(
+  internalHistoryDepth: number
+): number {
+  return -(Math.max(0, internalHistoryDepth) + 1);
+}
+
 function hasInternalPublicProfileHistory(params: {
   readonly historyLength: number;
   readonly arrivalHistoryLength?: number;
+  readonly internalHistoryDepth?: number;
 }): boolean {
+  if (params.internalHistoryDepth !== undefined) {
+    return params.internalHistoryDepth > 0;
+  }
   const arrival = params.arrivalHistoryLength ?? params.historyLength;
   return params.historyLength > arrival;
 }
@@ -403,6 +439,7 @@ export function resolvePublicProfileBackAction(params: {
   readonly referrer: string;
   readonly isSignedIn?: boolean;
   readonly arrivalHistoryLength?: number;
+  readonly internalHistoryDepth?: number;
 }): PublicProfileBackAction {
   if (!params.isProfileRoot) {
     return 'profile-root';

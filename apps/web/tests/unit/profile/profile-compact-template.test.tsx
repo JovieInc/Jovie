@@ -963,6 +963,11 @@ describe('ProfileCompactTemplate', () => {
       configurable: true,
       value: 2,
     });
+    window.history.replaceState(
+      { joviePublicProfileDepth: 2 },
+      '',
+      '/test-artist'
+    );
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop
     });
@@ -977,7 +982,7 @@ describe('ProfileCompactTemplate', () => {
 
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='profile'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -985,9 +990,46 @@ describe('ProfileCompactTemplate', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
-      'data-mode',
-      'profile'
+
+    expect(goSpy).toHaveBeenCalledWith(-3);
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(assignSpy).not.toHaveBeenCalled();
+
+    backSpy.mockRestore();
+    goSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('does not overshoot the prior app surface after browser back', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: 2,
+    });
+    window.history.replaceState(
+      { joviePublicProfileDepth: 0 },
+      '',
+      '/test-artist'
+    );
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const goSpy = vi.spyOn(window.history, 'go').mockImplementation(() => {
+      // noop
+    });
+    const assignSpy = vi.fn();
+    vi.stubGlobal('location', {
+      ...window.location,
+      assign: assignSpy,
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
     );
 
     Object.defineProperty(window.history, 'length', {
@@ -996,8 +1038,8 @@ describe('ProfileCompactTemplate', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
 
-    expect(goSpy).toHaveBeenCalledWith(-3);
-    expect(backSpy).not.toHaveBeenCalled();
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    expect(goSpy).not.toHaveBeenCalled();
     expect(assignSpy).not.toHaveBeenCalled();
 
     backSpy.mockRestore();

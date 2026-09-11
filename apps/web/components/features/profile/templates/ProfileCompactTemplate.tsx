@@ -23,7 +23,12 @@ import type {
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
-import { resolvePublicProfileBackAction } from '@/features/profile/profile-surface-state';
+import {
+  getPublicProfileHistoryExitDelta,
+  readPublicProfileHistoryDepth,
+  resolvePublicProfileBackAction,
+  withPublicProfileHistoryDepth,
+} from '@/features/profile/profile-surface-state';
 import {
   getProfileMode,
   getProfileModeHref,
@@ -313,6 +318,7 @@ export function ProfileCompactTemplate({
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
   const arrivalHistoryLengthRef = useRef<number | null>(null);
+  const profileHistoryDepthRef = useRef(0);
 
   const clearCloseResetTimer = useCallback(() => {
     if (closeResetTimerRef.current !== null) {
@@ -327,6 +333,9 @@ export function ProfileCompactTemplate({
 
   useEffect(() => {
     arrivalHistoryLengthRef.current = globalThis.history.length;
+    profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
+      globalThis.history.state
+    );
   }, []);
 
   useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
@@ -647,6 +656,9 @@ export function ProfileCompactTemplate({
 
   useEffect(() => {
     const handlePopState = () => {
+      profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
+        globalThis.history.state
+      );
       syncRequestedModeFromLocation();
     };
 
@@ -687,7 +699,13 @@ export function ProfileCompactTemplate({
       return;
     }
 
-    globalThis.history.pushState(globalThis.history.state, '', href);
+    const nextDepth = profileHistoryDepthRef.current + 1;
+    profileHistoryDepthRef.current = nextDepth;
+    globalThis.history.pushState(
+      withPublicProfileHistoryDepth(globalThis.history.state, nextDepth),
+      '',
+      href
+    );
   }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
 
   const profileHref = useMemo(
@@ -772,12 +790,14 @@ export function ProfileCompactTemplate({
     const historyLength = globalThis.history.length;
     const arrivalHistoryLength =
       arrivalHistoryLengthRef.current ?? historyLength;
+    const internalHistoryDepth = profileHistoryDepthRef.current;
     const action = resolvePublicProfileBackAction({
       isProfileRoot: requestedMode === 'profile',
       historyLength,
       referrer: document.referrer,
       isSignedIn,
       arrivalHistoryLength,
+      internalHistoryDepth,
     });
 
     if (action === 'profile-root') {
@@ -791,7 +811,9 @@ export function ProfileCompactTemplate({
     }
 
     if (action === 'history-exit') {
-      globalThis.history.go(-(historyLength - arrivalHistoryLength + 1));
+      globalThis.history.go(
+        getPublicProfileHistoryExitDelta(internalHistoryDepth)
+      );
       return;
     }
 
