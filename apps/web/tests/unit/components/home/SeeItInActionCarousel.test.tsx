@@ -117,6 +117,31 @@ describe('SeeItInActionCarousel', () => {
     ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');
   });
 
+  it('renders smart link DSP rows without a persistent rest fill (JOV-6149)', async () => {
+    const user = userEvent.setup();
+
+    render(<SeeItInActionCarousel />);
+    await user.click(
+      screen.getByRole('button', {
+        name: /Open Never Say A Word smart link preview/i,
+      })
+    );
+
+    expect(await screen.findByTestId('popover-content')).toBeInTheDocument();
+    for (const name of [
+      /Open Spotify/i,
+      /Open Apple Music/i,
+      /Open YouTube Music/i,
+      /Open Amazon Music/i,
+    ]) {
+      const row = screen.getByRole('link', { name });
+      expect(row).toHaveClass('bg-transparent');
+      expect(row).not.toHaveClass('bg-surface-1');
+      expect(row).not.toHaveClass('bg-white/10');
+      expect(row).not.toHaveClass('backdrop-blur-sm');
+    }
+  });
+
   it('uses canonical duration tokens instead of --linear-duration-*', () => {
     const source = readFileSync(
       resolve(

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AutomaticReleaseSmartlinksSection } from './AutomaticReleaseSmartlinksSection';
@@ -27,5 +29,16 @@ describe('AutomaticReleaseSmartlinksSection', () => {
     expect(screen.getByText('The Deep End')).toBeInTheDocument();
     expect(screen.getByTestId('phone-capture')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Spotify' })).toBeInTheDocument();
+  });
+
+  it('passes no className override to the shared DSP buttons', () => {
+    // JOV-6149: rest styling belongs to the shared secondary variant; this
+    // consumer renders SmartLinkProviderButton without a className prop.
+    const source = readFileSync(
+      resolve(__dirname, './AutomaticReleaseSmartlinksSection.tsx'),
+      'utf8'
+    );
+    expect(source).toMatch(/<SmartLinkProviderButton\b/);
+    expect(source).not.toMatch(/<SmartLinkProviderButton\b[^>]*className=/);
   });
 });
