@@ -337,6 +337,78 @@ module.exports = [
       '@next/next/no-img-element': 'off',
     },
   },
+
+  // JOV-INV-031 thread-blocking hard-gate (latency-sensitive-execution-v1).
+  // Separate from route-response-latency budgets in performance-invariants-v1.
+  // Author-time selectors; the CI harness also follows aliases/wrappers so a
+  // helper import cannot bypass. existsSync is gray (harness-only). Existing
+  // request-path debt is allowlisted in
+  // scripts/invariants/latency-sensitive-execution-allowlist.json.
+  {
+    files: [
+      'app/**/*.{ts,tsx,js,mjs}',
+      'lib/**/*.{ts,tsx,js,mjs}',
+      'components/**/*.{ts,tsx,js,mjs}',
+      'hooks/**/*.{ts,tsx,js,mjs}',
+      'middleware.ts',
+      'proxy.ts',
+    ],
+    ignores: [
+      '**/*.test.*',
+      '**/*.spec.*',
+      '**/*.stories.*',
+      '**/scripts/**',
+      'components/atoms/**',
+      'app/(marketing)/changelog/feed.xml/route.ts',
+      'app/api/health/build-info/route.ts',
+      'components/features/home/RecentlyShippedSection.tsx',
+      'lib/a11y-gates/contrast-engine.ts',
+      'lib/a11y-gates/touch-target-engine.ts',
+      'lib/changelog-source.ts',
+      'lib/chat/knowledge/topics.ts',
+      'lib/eval/calibration.ts',
+      'lib/hud/ovie-mac-hud.server.ts',
+      'lib/hud/shipper-state.ts',
+      'lib/hud/symphony-codex-accounts.server.ts',
+      'lib/library-share/passphrase.ts',
+      'lib/merch/artwork.ts',
+      'lib/ovie/identity.ts',
+      'lib/ovie/mcp/artist-profile-inventory.ts',
+      'lib/seo/ratchet.ts',
+      'lib/testing/quarantine-ledger.server.ts',
+      'lib/utils/pii-encryption.ts',
+      'lib/utils/url-encryption.server.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ImportSpecifier[imported.name='sql'][local.name='sql'][parent.source.value='drizzle-orm']",
+          message:
+            "Alias drizzle's sql as drizzleSql to avoid conflicts with Neon client.",
+        },
+        {
+          selector:
+            "CallExpression[callee.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]",
+          message:
+            'JOV-INV-031 thread-blocking: known sync I/O/crypto blocks the event loop. Use nonblocking I/O or precompute. This is not a route-response-latency budget and does not change crawler/bot wait.',
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]",
+          message:
+            'JOV-INV-031 thread-blocking: known sync I/O/crypto blocks the event loop. Aliases and members are the same violation. This is not a route-response-latency budget.',
+        },
+        {
+          selector:
+            "ImportSpecifier[imported.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]",
+          message:
+            'JOV-INV-031 thread-blocking: importing a known sync I/O/crypto API is rejected in runtime app code, including aliases. Moving the call into a helper is zero escape.',
+        },
+      ],
+    },
+  },
   // lib/db internal files are allowed to use database patterns
   {
     files: ['**/lib/db/**'],
