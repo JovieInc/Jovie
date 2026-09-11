@@ -84,6 +84,8 @@ describe('StickyPhoneTour', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByTestId('phone-frame')).toBeInTheDocument();
+    expect(container.innerHTML).toContain('h-svh');
+    expect(container.innerHTML).not.toContain('h-screen');
 
     const routeCopy = Array.from(container.querySelectorAll('p.font-mono'));
     expect(routeCopy.map(route => route.textContent)).toEqual([

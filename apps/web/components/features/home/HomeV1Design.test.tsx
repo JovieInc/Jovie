@@ -72,4 +72,13 @@ describe('HomeV1Design', () => {
         ?.getAttribute('data-brand-mark-size')
     ).toBe('20');
   });
+
+  it('uses min-h-svh so iOS Safari chrome cannot jump the homepage shell', () => {
+    const { container } = render(<HomeV1Design />);
+
+    expect(container.firstElementChild?.className).toContain('min-h-svh');
+    expect(container.firstElementChild?.className).not.toContain(
+      'min-h-screen'
+    );
+  });
 });

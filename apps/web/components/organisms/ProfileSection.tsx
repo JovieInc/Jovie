@@ -33,7 +33,7 @@ export function ProfileSection({
       showGradientBlurs={showGradientBlurs}
     >
       <Container>
-        <div className='flex min-h-screen flex-col py-12 relative z-10'>
+        <div className='flex min-h-svh flex-col py-12 relative z-10'>
           <div className='flex-1 flex flex-col items-center justify-center px-4'>
             <div className={`${maxWidthClass} space-y-8`}>
               <ArtistInfo

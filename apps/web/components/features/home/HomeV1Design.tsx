@@ -26,7 +26,7 @@ const TRUST_LOGOS = [
 
 export function HomeV1Design() {
   return (
-    <div className='min-h-screen bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
+    <div className='min-h-svh bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
       <section
         className='relative isolate flex min-h-[100svh] overflow-hidden'
         aria-labelledby='home-hero-heading'

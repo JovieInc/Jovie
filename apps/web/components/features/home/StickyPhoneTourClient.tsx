@@ -32,17 +32,23 @@ export function StickyPhoneTourClient({
   const sectionRef = useRef<HTMLElement>(null);
   const [activeSlide, setActiveSlide] = useState(0);
 
+  const measureFrameRef = useRef(0);
+
   const handleScroll = useCallback(() => {
-    const section = sectionRef.current;
-    if (!section) return;
-    const rect = section.getBoundingClientRect();
-    const newIndex = scrollToActiveIndex(
-      rect.top,
-      rect.height,
-      globalThis.innerHeight,
-      slideCount
-    );
-    setActiveSlide(newIndex);
+    if (measureFrameRef.current) return;
+    measureFrameRef.current = globalThis.requestAnimationFrame(() => {
+      measureFrameRef.current = 0;
+      const section = sectionRef.current;
+      if (!section) return;
+      const rect = section.getBoundingClientRect();
+      const newIndex = scrollToActiveIndex(
+        rect.top,
+        rect.height,
+        globalThis.innerHeight,
+        slideCount
+      );
+      setActiveSlide(current => (current === newIndex ? current : newIndex));
+    });
   }, [slideCount]);
 
   useEffect(() => {
@@ -63,6 +69,10 @@ export function StickyPhoneTourClient({
         if (animationFrame) {
           globalThis.cancelAnimationFrame(animationFrame);
         }
+        if (measureFrameRef.current) {
+          globalThis.cancelAnimationFrame(measureFrameRef.current);
+          measureFrameRef.current = 0;
+        }
       };
     }
 
@@ -71,6 +81,10 @@ export function StickyPhoneTourClient({
       globalThis.removeEventListener('scroll', handleScroll);
       if (animationFrame) {
         globalThis.cancelAnimationFrame(animationFrame);
+      }
+      if (measureFrameRef.current) {
+        globalThis.cancelAnimationFrame(measureFrameRef.current);
+        measureFrameRef.current = 0;
       }
     };
   }, [handleScroll]);
@@ -115,14 +129,14 @@ export function StickyPhoneTourClient({
         <PhoneTourDivider />
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-screen'
+          className='pointer-events-none absolute inset-x-0 top-0 h-svh'
           style={{
             background: 'var(--linear-hero-backdrop)',
           }}
         />
         <div
           aria-hidden='true'
-          className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-screen'
+          className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-svh'
         />
 
         <div className='sticky top-0 z-10 flex h-dvh items-center justify-center'>
