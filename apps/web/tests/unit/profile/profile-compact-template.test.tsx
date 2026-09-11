@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
+import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
 import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
 
 const {
@@ -325,6 +326,61 @@ describe('ProfileCompactTemplate', () => {
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
+  });
+
+  it('keeps the signed-in escape hatch on a live tablet profile that uses embedded presentation', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+
+    render(
+      <ProfileCompactSurface
+        renderMode='interactive'
+        presentation='embedded'
+        allowSignedInEscape
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onBack={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onShare={vi.fn()}
+        profileHref='/test-artist'
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
+  it('does not treat marketing embeds as a signed-in live public profile', async () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+
+    render(
+      <ProfileCompactSurface
+        renderMode='interactive'
+        presentation='embedded'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onBack={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onShare={vi.fn()}
+        profileHref='/test-artist'
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
   });
 
   it('shows the floating back control on the public profile root for a signed-in session', async () => {

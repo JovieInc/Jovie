@@ -876,6 +876,7 @@ export function ProfileCompactTemplate({
                 hideJovieBranding={hideJovieBranding}
                 hideMoreMenu={hideMoreMenu}
                 allowFanCapture={allowFanCapture}
+                allowSignedInEscape={!embeddedPreview}
                 renderInteractiveOverlays
                 renderSemanticHeading={!isDesktopLayout}
                 drawerOpen={drawerOpen}
