@@ -1918,6 +1918,40 @@ ${fixtureCheckout}
     ).toEqual([]);
   }, 90_000);
 
+  it('retains filtered profile diagnostics and only explicitly public profile images', () => {
+    const workflow = readFileSync(
+      join(workflowsRoot, 'e2e-full-matrix.yml'),
+      'utf8'
+    );
+    const pattern = workflow.match(
+      /PLAYWRIGHT_ARTIFACT_PATHS:.*&& '([^']+)'/
+    )?.[1];
+    expect(pattern).toBeDefined();
+    const workspace = fixture();
+    const prefix = 'apps/web/test-results/';
+    const diagnostics = [
+      `${prefix}profile-cta-fixture-preflight.json`,
+      `${prefix}.last-run.json`,
+      `${prefix}case/diagnostic.jsonl`,
+    ];
+    for (const file of diagnostics) write(join(workspace, file), '{}');
+    // Failed preflight must still retain diagnostics before any PNG exists.
+    expect(resolveArtifactFiles([pattern!], workspace)).toEqual(
+      diagnostics.map(file => join(workspace, file)).sort()
+    );
+    const publicImage = `${prefix}profile-case/profile-cta-public/events.png`;
+    for (const file of [
+      publicImage,
+      `${prefix}auth-setup/failure.png`,
+      `${prefix}profile-case/test-failed-1.png`,
+    ])
+      write(join(workspace, file), 'fixture');
+    write(join(workspace, 'neon-connection/connection.json'), '{}');
+    expect(resolveArtifactFiles([pattern!], workspace)).toEqual(
+      [...diagnostics, publicImage].map(file => join(workspace, file)).sort()
+    );
+  });
+
   it('rejects outside, symlinked, and non-regular artifact paths', () => {
     const workspace = fixture();
     const outside = fixture();

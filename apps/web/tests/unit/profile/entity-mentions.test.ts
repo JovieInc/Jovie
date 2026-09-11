@@ -94,21 +94,45 @@ describe('linkEntityMentions', () => {
     ]);
   });
 
-  it('links the profile owner name to their own profile', () => {
+  it('keeps the profile owner name as plain text (self-mention)', () => {
+    // Self-mentions must not link back to the profile the bio lives on —
+    // or to a duplicate profile row carrying the same handle.
     const segments = linkEntityMentions(
       'Tim started producing in 2012.',
       context
     );
 
     expect(segments).toEqual([
-      { type: 'artist', text: 'Tim', href: '/tim' },
-      { type: 'text', text: ' started producing in 2012.' },
+      { type: 'text', text: 'Tim started producing in 2012.' },
     ]);
+  });
+
+  it('keeps same-name duplicate profile rows out of mention candidates', () => {
+    // A credited-artist row can resolve the owner's display name to a
+    // DIFFERENT handle (duplicate auto-created profile). The own-handle
+    // guard only catches exact matches, so same-name rows whose handle
+    // differs from ownHandle still link — this pins that they at least
+    // never shadow the release candidate for the same phrase.
+    const segments = linkEntityMentions(
+      'Tim collaborated on Take Me Over.',
+      context
+    );
+
+    expect(segments).toContainEqual({
+      type: 'release',
+      text: 'Take Me Over',
+      href: '/tim/take-me-over',
+    });
+    expect(segments).not.toContainEqual({
+      type: 'artist',
+      text: 'Tim',
+      href: '/tim',
+    });
   });
 
   it('links multiple entities in one paragraph', () => {
     const segments = linkEntityMentions(
-      'After Take Me Over, Tim remixed Cosmic Gate.',
+      'After Take Me Over, Cosmic Gate remixed it.',
       context
     );
 
@@ -116,10 +140,8 @@ describe('linkEntityMentions', () => {
       { type: 'text', text: 'After ' },
       { type: 'release', text: 'Take Me Over', href: '/tim/take-me-over' },
       { type: 'text', text: ', ' },
-      { type: 'artist', text: 'Tim', href: '/tim' },
-      { type: 'text', text: ' remixed ' },
       { type: 'artist', text: 'Cosmic Gate', href: '/cosmicgate' },
-      { type: 'text', text: '.' },
+      { type: 'text', text: ' remixed it.' },
     ]);
   });
 
@@ -171,6 +193,12 @@ describe('collectEntityMentions', () => {
     // No Jovie profile → not collected.
     expect(
       mentions.some(mention => mention.name === 'The Disco Biscuits')
+    ).toBe(false);
+    // Own handle → self-mention, never collected.
+    expect(
+      mentions.some(
+        mention => mention.kind === 'artist' && mention.href === '/tim'
+      )
     ).toBe(false);
   });
 
