@@ -72,6 +72,12 @@ export const libraryPresenceFindings = pgTable(
       .$type<'artist' | 'release' | 'recording' | 'track'>()
       .notNull(),
     subjectId: text('subject_id').notNull(),
+    /** Explicit rendering scope (JOV-6170): 'asset' renders in that asset's inspector, 'artist' stays on the Presence surface. Legacy rows are null and fall back to subject matching. */
+    scopeType: text('scope_type').$type<'artist' | 'asset'>(),
+    /** Owning object id when scopeType is set (asset id or creator profile id). */
+    scopeId: text('scope_id'),
+    /** Optional grouping label for Presence presentation (e.g. 'canonical_profile'). */
+    category: text('category'),
     kind: libraryPresenceFindingKindEnum('kind').notNull(),
     issueType: libraryPresenceIssueTypeEnum('issue_type').notNull(),
     platform: text('platform').notNull(),
