@@ -14,7 +14,7 @@ SUITE = ROOT / "scripts/symphony/tests/symphony-codex-auth-fallback.test.py"
 TARGETS = {
     "symphony-codex-exhausted.py": {"_fallback_lock_count", "_inherited_issue_lease_held", "expire_fallback_lock_decision", "gc_fallback_locks",
         "_repair_module", "_repair_assignments", "_validated_existing_pr_repair", "repair_preflight_command",
-        "repair_assign_command", "pickup_refuse_reason", "pickup_check_command", "_native_dispatch_prerequisite"},
+        "repair_assign_command", "owned_repair_command", "pickup_refuse_reason", "pickup_check_command", "_native_dispatch_prerequisite"},
     "existing_pr_repair.py": set(),
     "symphony-lease-guard": {"_existing_repair_preflight"},
 }
