@@ -34,6 +34,12 @@ export interface LeadSignalSnapshot {
   trackingPixelPlatforms: string[];
   discoveryQuery: string | null;
   sourcePlatform: 'linktree' | 'beacons' | 'laylo';
+  /** Public-only requalification provenance. */
+  publicObservedAt?: string;
+  publicSourceDigest?: string;
+  publicSourceRevision?: string;
+  spotifyGenres?: string[];
+  spotifyEnrichmentStatus?: string;
 }
 
 export interface LeadGuardrailThresholds {

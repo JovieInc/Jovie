@@ -201,6 +201,59 @@ export async function recordLeadFunnelEvent(
   }
 }
 
+/**
+ * Record an idempotent event and report whether this caller inserted it.
+ *
+ * This receipt-returning variant is used by append-only candidate runs that
+ * need to distinguish the first writer from a concurrent duplicate. Existing
+ * funnel callers keep the legacy void helper above so their test and retry
+ * semantics remain unchanged.
+ */
+export async function recordLeadFunnelEventReceipt(
+  input: RecordLeadFunnelEventInput,
+  options?: Omit<RecordLeadFunnelEventOptions, 'idempotent'>
+): Promise<boolean> {
+  try {
+    if (typeof db.insert !== 'function') {
+      if (options?.required) {
+        throw new Error('Lead funnel event insert is unavailable');
+      }
+      return false;
+    }
+
+    const rows = await db
+      .insert(leadFunnelEvents)
+      .values({
+        leadId: input.leadId,
+        eventType: input.eventType,
+        channel: input.channel ?? null,
+        provider: input.provider ?? null,
+        campaignKey: input.campaignKey ?? null,
+        variantKey: input.variantKey ?? null,
+        metadata: input.metadata,
+        occurredAt: input.occurredAt ?? new Date(),
+      })
+      .onConflictDoNothing({
+        target: [leadFunnelEvents.leadId, leadFunnelEvents.eventType],
+      })
+      .returning({ id: leadFunnelEvents.id });
+
+    return rows.length > 0;
+  } catch (error) {
+    await captureError('Failed to record lead funnel event receipt', error, {
+      route: 'lib/leads/funnel-events',
+      contextData: {
+        leadId: input.leadId,
+        eventType: input.eventType,
+      },
+    });
+    if (options?.required) {
+      throw error;
+    }
+    return false;
+  }
+}
+
 export async function lookupLeadByClaimToken(token: string): Promise<{
   id: string;
   outreachRoute: string | null;
