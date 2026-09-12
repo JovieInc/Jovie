@@ -1,18 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
-import { getVisibleMarketingPricingPlans } from '@/data/marketingPricingPlans';
+import { PRICING_REQUEST_ACCESS_COPY } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { PricingRecipeBody } from './PricingRecipeBody';
 
-const visiblePaidPlans = getVisibleMarketingPricingPlans().filter(
-  plan => plan.id !== 'free'
-);
-const primaryPaidPlanName =
-  visiblePaidPlans.length === 1 ? visiblePaidPlans[0]?.name : null;
-
-export const PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY = primaryPaidPlanName
-  ? `Claim the profile first. Choose ${primaryPaidPlanName} when you want the release system turned on.`
-  : 'Claim the profile first. Choose a paid plan when you want the release system turned on.';
+export const PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY =
+  PRICING_REQUEST_ACCESS_COPY;
 
 const meta = {
   title: 'Marketing/Recipes/PricingProduction',

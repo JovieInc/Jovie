@@ -3,53 +3,44 @@ import { describe, expect, it } from 'vitest';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 
 describe('MarketingPricingPlans', () => {
-  it('renders the canonical Free, Pro, and Max plans by default', () => {
+  it('renders the canonical Free, Pro, and Enterprise plans by default', () => {
     render(
       <MarketingPricingPlans mode='compact' variant='tier-cards-neutral' />
     );
 
-    for (const plan of ['free', 'pro', 'max']) {
+    for (const plan of ['free', 'pro', 'enterprise']) {
       expect(
         screen.getByTestId(`marketing-pricing-plan-${plan}`)
       ).toBeInTheDocument();
       expect(
         screen.getByTestId(`marketing-pricing-plan-${plan}`)
-      ).toHaveAttribute('data-plan-active', 'true');
+      ).toHaveAttribute('data-plan-active', 'false');
     }
     expect(screen.queryByTestId('marketing-pricing-plan-team')).toBeNull();
-    expect(
-      screen.queryByTestId('marketing-pricing-plan-enterprise')
-    ).toBeNull();
   });
 
-  it('stores selected plan ids in signup links', () => {
+  it('offers access requests without trial or Enterprise checkout links', () => {
     render(
-      <MarketingPricingPlans mode='compact' variant='tier-cards-neutral' />
+      <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
     );
-
+    for (const link of screen.getAllByRole('link', {
+      name: 'Request access',
+    })) {
+      expect(link).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    }
+    const pro = within(screen.getByTestId('marketing-pricing-plan-pro'));
+    expect(pro.getByText('$199')).toBeInTheDocument();
+    expect(pro.getByText('Limited access')).toBeInTheDocument();
+    expect(pro.getByText(/not yet generally available/)).toBeInTheDocument();
+    const enterprise = within(
+      screen.getByTestId('marketing-pricing-plan-enterprise')
+    );
+    expect(enterprise.queryByRole('link')).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup?plan=free');
-    expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=pro');
-    expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=max');
-    expect(
-      screen.getAllByRole('link').map(link => link.getAttribute('href'))
-    ).not.toContain('/signup?plan=team');
-    expect(
-      screen.getAllByRole('link').map(link => link.getAttribute('href'))
-    ).not.toContain('/signup?plan=enterprise');
-    expect(screen.queryByRole('link', { name: 'Request Access' })).toBeNull();
-    expect(
-      screen.queryByRole('link', { name: 'Contact Sales' })
-    ).not.toBeInTheDocument();
+      enterprise.getByText('Sales contact details coming soon.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Max', { exact: true })).toBeNull();
+    expect(screen.queryByRole('link', { name: /trial/i })).toBeNull();
   });
 
   it('keeps default pricing plan cards neutral instead of plan-accented', () => {
@@ -57,7 +48,7 @@ describe('MarketingPricingPlans', () => {
       <MarketingPricingPlans mode='compact' variant='tier-cards-neutral' />
     );
 
-    for (const plan of ['free', 'pro', 'max']) {
+    for (const plan of ['free', 'pro', 'enterprise']) {
       expect(
         screen.getByTestId(`marketing-pricing-plan-${plan}`).className
       ).not.toMatch(/marketing-pricing-plan-card--(?:blue|pink|violet)/);
@@ -72,9 +63,10 @@ describe('MarketingPricingPlans', () => {
     expect(
       screen.getByTestId('marketing-pricing-plan-free').parentElement
     ).toHaveAttribute('data-marketing-variant', 'tier-cards-neutral');
-    for (const plan of ['free', 'pro', 'max']) {
+    for (const plan of ['free', 'pro', 'enterprise']) {
       const card = screen.getByTestId(`marketing-pricing-plan-${plan}`);
       expect(card).toHaveAttribute('data-recommended', 'false');
+      if (plan === 'enterprise') continue;
       const cta = within(card).getByRole('link');
       expect(cta).toHaveAttribute('data-variant', 'secondary');
       expect(cta).toHaveAttribute('data-size', 'lg');
@@ -96,9 +88,9 @@ describe('MarketingPricingPlans', () => {
       'data-variant',
       'primary'
     );
-    expect(within(proCard).getByText('Recommended')).toBeInTheDocument();
+    expect(within(proCard).getByText('Limited access')).toBeInTheDocument();
 
-    for (const plan of ['free', 'max']) {
+    for (const plan of ['free']) {
       const card = screen.getByTestId(`marketing-pricing-plan-${plan}`);
       expect(card).toHaveAttribute('data-recommended', 'false');
       expect(within(card).getByRole('link')).toHaveAttribute(
