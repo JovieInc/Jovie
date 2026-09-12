@@ -527,7 +527,21 @@ const nextConfig = {
     ];
 
     return {
-      beforeFiles: [],
+      beforeFiles: [
+        // Default /hud is a filesystem route outside /app/(shell). Intercept
+        // it before that page so Ops inherits sidebar + app chrome. Isolated
+        // query modes stay on /hud: fullscreen, kiosk token, packaged Mac.
+        {
+          source: '/hud',
+          missing: [
+            { type: 'query', key: 'fs', value: '1' },
+            { type: 'query', key: 'kiosk' },
+            { type: 'query', key: 'ovie', value: 'mac' },
+            { type: 'query', key: 'mode', value: 'kiosk' },
+          ],
+          destination: '/app/ov/hud',
+        },
+      ],
       // Run after concrete filesystem routes but before /[username]/[slug].
       // The catch-all resolver checks published, renamed, and unpublished
       // content before falling back to the legacy profile-mode redirect.

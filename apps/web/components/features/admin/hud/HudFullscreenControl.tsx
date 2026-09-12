@@ -1,11 +1,15 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 
-export function HudFullscreenControl() {
+export function HudFullscreenControl({
+  action = 'enter',
+}: {
+  readonly action?: 'enter' | 'exit';
+}) {
   const openFullscreen = useCallback(async () => {
     let token: string | null = null;
     try {
@@ -26,6 +30,24 @@ export function HudFullscreenControl() {
 
     window.location.assign(next.toString());
   }, []);
+
+  const exitFullscreen = useCallback(() => {
+    window.location.assign(APP_ROUTES.HUD);
+  }, []);
+
+  if (action === 'exit') {
+    return (
+      <Button
+        type='button'
+        variant='secondary'
+        size='sm'
+        onClick={exitFullscreen}
+      >
+        <Minimize2 className='h-3.5 w-3.5' aria-hidden='true' />
+        Exit fullscreen
+      </Button>
+    );
+  }
 
   return (
     <Button
