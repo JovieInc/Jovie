@@ -89,13 +89,6 @@ def validate_registry(data):
             raise ValueError(f"{mid}: invalid channel")
         if not isinstance(model["capabilities"], list) or not model["capabilities"]:
             raise ValueError(f"{mid}: capabilities required")
-        if model.get("provider") == "kimi" and (
-            not isinstance(model.get("useful_probe_argv"), list)
-            or not model.get("useful_probe_argv")
-            or not isinstance(model.get("useful_probe_marker"), str)
-            or not model.get("useful_probe_marker")
-        ):
-            raise ValueError(f"{mid}: useful Kimi recovery probe required")
         quality = model["quality"]
         if not isinstance(quality, (int, float)) or quality < 0 or quality > 100:
             raise ValueError(f"{mid}: quality must be 0-100")
@@ -214,30 +207,16 @@ def _pool_state(st, pool):
         pools[pool] = entry
     entry.setdefault("exhausted_until", 0)
     entry.setdefault("uses", 0)
-    entry.setdefault("recovery_required", False)
     return entry
 
 
 def pool_exhausted(st, pool, now):
     if not pool:
         return False
-    entry = _pool_state(st, pool)
-    return bool(entry.get("recovery_required")) or float(entry.get("exhausted_until") or 0) > now
+    return float(_pool_state(st, pool).get("exhausted_until") or 0) > now
 
 
-def pool_recovery_required(st, pool):
-    return bool(pool and _pool_state(st, pool).get("recovery_required"))
-
-
-def mark_pool_exhausted(
-    st,
-    pool,
-    seconds,
-    now=None,
-    *,
-    reason="quota_signal",
-    require_useful_probe=False,
-):
+def mark_pool_exhausted(st, pool, seconds, now=None):
     if not pool:
         return
     now = time.time() if now is None else now
@@ -245,23 +224,6 @@ def mark_pool_exhausted(
     def mutate(latest):
         entry = _pool_state(latest, pool)
         entry["exhausted_until"] = max(float(entry["exhausted_until"] or 0), until)
-        entry["last_failure"] = reason
-        entry["recovery_required"] = bool(require_useful_probe) or bool(
-            entry.get("recovery_required")
-        )
-    update_state(st, mutate)
-
-
-def mark_pool_recovered(st, pool, now=None, *, proof):
-    if not pool or proof != "useful_turn":
-        return
-    now = time.time() if now is None else now
-    def mutate(latest):
-        entry = _pool_state(latest, pool)
-        entry["exhausted_until"] = 0
-        entry["recovery_required"] = False
-        entry["recovered_at"] = now
-        entry["recovery_proof"] = proof
     update_state(st, mutate)
 
 
@@ -278,15 +240,11 @@ def _quota_signal(text):
     return bool(text and QUOTA_RE.search(text))
 
 
-def probe(m, timeout=20, st=None, now=None, *, useful=False):
+def probe(m, timeout=20, st=None, now=None):
     exe = executable(m)
     resolved = exe if pathlib.Path(exe).is_absolute() else shutil.which(exe)
     if not resolved: return False, "executable_missing"
-    key = "useful_probe_argv" if useful else "probe_argv"
-    template = m.get(key)
-    if not isinstance(template, list) or not all(isinstance(value, str) for value in template):
-        return False, "useful_probe_missing" if useful else "probe_missing"
-    argv = [x.format(executable=resolved, model=m["model"]) for x in template]
+    argv = [x.format(executable=resolved, model=m["model"]) for x in m["probe_argv"]]
     try:
         result = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
         out = (result.stdout or "") + "\n" + (result.stderr or "")
@@ -299,19 +257,8 @@ def probe(m, timeout=20, st=None, now=None, *, useful=False):
             return False, "auth_or_runtime_failed"
         if _quota_signal(out):
             if st is not None:
-                mark_pool_exhausted(
-                    st,
-                    m.get("pool"),
-                    m.get("pool_cooldown_seconds") or m.get("cooldown_seconds") or 1800,
-                    now,
-                    reason="quota_signal",
-                    require_useful_probe=useful,
-                )
+                mark_pool_exhausted(st, m.get("pool"), m.get("pool_cooldown_seconds") or m.get("cooldown_seconds") or 1800, now)
             return False, "pool_exhausted"
-        if useful:
-            marker = m.get("useful_probe_marker")
-            ready = result.returncode == 0 and isinstance(marker, str) and marker in out
-            return ready, "useful_turn_ready" if ready else "useful_probe_failed"
         if m.get("probe_mode") == "exit-zero":
             return (result.returncode == 0, "ready" if result.returncode == 0 else "probe_failed")
         if m.get("probe_mode") == "json-model-key":
@@ -483,26 +430,7 @@ def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pool
         if until > now:
             candidates.append({"id": mid, "status": "cooldown", "until": until})
             continue
-        pool = m.get("pool")
-        if pool_recovery_required(st, pool):
-            until = float(_pool_state(st, pool).get("exhausted_until") or 0)
-            if until > now:
-                candidates.append({"id": mid, "status": "unavailable", "reason": "pool_exhausted", "pool": pool})
-                continue
-            ok, reason = probe(m, st=st, now=now, useful=True)
-            if not ok:
-                mark_pool_exhausted(
-                    st,
-                    pool,
-                    m.get("pool_cooldown_seconds") or m.get("cooldown_seconds") or 1800,
-                    now,
-                    reason=reason,
-                    require_useful_probe=True,
-                )
-                candidates.append({"id": mid, "status": "unavailable", "reason": reason, "pool": pool})
-                continue
-            mark_pool_recovered(st, pool, now, proof="useful_turn")
-        elif pool_exhausted(st, pool, now):
+        if pool_exhausted(st, m.get("pool"), now):
             candidates.append({"id": mid, "status": "unavailable", "reason": "pool_exhausted", "pool": m.get("pool")})
             continue
         ok, reason = probe(m, st=st, now=now)
@@ -534,25 +462,7 @@ def main():
     c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--include-id", action="append", default=[]); c.add_argument("--config")
     p = sub.add_parser("probe"); p.add_argument("--config")
     v = sub.add_parser("validate"); v.add_argument("--config")
-    exhausted = sub.add_parser("mark-exhausted")
-    exhausted.add_argument("--model-id", required=True)
-    exhausted.add_argument("--reason", required=True)
     args = ap.parse_args(); cfg, config_path = load(getattr(args, "config", None))
-    if args.cmd == "mark-exhausted":
-        model = model_map(cfg).get(args.model_id)
-        if model is None:
-            print(json.dumps({"ok": False, "reason": "model_missing"}))
-            return 2
-        st = state()
-        mark_pool_exhausted(
-            st,
-            model.get("pool"),
-            model.get("pool_cooldown_seconds") or model.get("cooldown_seconds") or 1800,
-            reason=args.reason,
-            require_useful_probe=True,
-        )
-        print(json.dumps({"ok": True, "pool": model.get("pool"), "recoveryRequired": True}))
-        return 0
     if args.cmd == "probe":
         results = {}
         for model in cfg["models"]:

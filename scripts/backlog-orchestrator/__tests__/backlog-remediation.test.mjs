@@ -200,40 +200,23 @@ describe('official Symphony backlog remediation', () => {
   });
 
   it('honors an explicit engineering implementation admission while unresolved founder decisions remain blocked', () => {
-    const approvedDescription = `Admission classification — engineering implementation.
-
-Admission class: engineering-implementation
-
-The sole remaining blocker is executable implementation/delivery proof. The preview-exception contract is fixed; earlier founder steering is resolved.
-
-${SAFE_DESCRIPTION}`;
+    const description = `Admission class: engineering-implementation\n\n${SAFE_DESCRIPTION}`;
     const approved = classifyRemediationCandidate(
-      issue('JOV-5995', {
-        title: 'Admission classification — engineering implementation',
-        description: approvedDescription,
-      }),
+      issue('JOV-5995', { description }),
       { now: NOW }
     );
     assert.equal(approved.selected, true);
     assert.equal(approved.reason, 'bounded-isolated-code-shippable');
 
     const unresolved = classifyRemediationCandidate(
-      issue('JOV-5996', {
-        title: 'Admission classification — engineering implementation',
-        description: approvedDescription,
-        labels: ['needs-decision'],
-      }),
+      issue('JOV-5996', { description, labels: ['needs-decision'] }),
       { now: NOW }
     );
     assert.equal(unresolved.selected, true);
     assert.equal(unresolved.reason, 'bounded-isolated-code-shippable');
 
     const deadLetter = classifyRemediationCandidate(
-      issue('JOV-5997', {
-        title: 'Admission classification — engineering implementation',
-        description: approvedDescription,
-        labels: ['no-symphony'],
-      }),
+      issue('JOV-5997', { description, labels: ['no-symphony'] }),
       { now: NOW }
     );
     assert.equal(deadLetter.selected, false);

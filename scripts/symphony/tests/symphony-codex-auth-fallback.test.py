@@ -191,53 +191,44 @@ class FallbackTerminalContract(unittest.TestCase):
             "validLease": False,
         }
 
-    def test_already_in_progress_no_pr_failure_is_compensable(self):
+    def test_compensation_blockers_cover_clear_drift_and_vetoes(self):
         self.assertEqual(
             self.module.compensation_blockers(
                 self.expected, self.observed, self.clear
             ),
             [],
         )
-
-    def test_revision_and_owner_drift_veto_compensation(self):
-        changed = dict(self.observed, updatedAt="rev-2", assignee={"id": "owner-2"})
+        drifted = dict(self.observed, updatedAt="rev-2", assignee={"id": "owner-2"})
         self.assertEqual(
-            self.module.compensation_blockers(self.expected, changed, self.clear),
+            self.module.compensation_blockers(self.expected, drifted, self.clear),
             ["issue_revision_changed", "owner_changed"],
         )
-
-    def test_live_process_lease_and_pr_each_veto_compensation(self):
-        reasons = {
-            "prExists": "pr_exists",
-            "officialProcess": "official_process_active",
-            "fallbackProcess": "fallback_process_active",
-            "validLease": "valid_lease_active",
+        vetoes = {
+            "prExists": ("pr_exists", "pr_unverifiable"),
+            "officialProcess": (
+                "official_process_active",
+                "official_process_unverifiable",
+            ),
+            "fallbackProcess": (
+                "fallback_process_active",
+                "fallback_process_unverifiable",
+            ),
+            "validLease": ("valid_lease_active", "valid_lease_unverifiable"),
         }
-        for key, reason in reasons.items():
-            with self.subTest(key=key):
-                evidence = dict(self.clear, **{key: True})
+        for key, (active, unknown) in vetoes.items():
+            with self.subTest(key=key, kind="active"):
                 self.assertEqual(
                     self.module.compensation_blockers(
-                        self.expected, self.observed, evidence
+                        self.expected, self.observed, dict(self.clear, **{key: True})
                     ),
-                    [reason],
+                    [active],
                 )
-
-    def test_unverifiable_absence_each_vetoes_compensation(self):
-        reasons = {
-            "prExists": "pr_unverifiable",
-            "officialProcess": "official_process_unverifiable",
-            "fallbackProcess": "fallback_process_unverifiable",
-            "validLease": "valid_lease_unverifiable",
-        }
-        for key, reason in reasons.items():
-            with self.subTest(key=key):
-                evidence = dict(self.clear, **{key: None})
+            with self.subTest(key=key, kind="unknown"):
                 self.assertEqual(
                     self.module.compensation_blockers(
-                        self.expected, self.observed, evidence
+                        self.expected, self.observed, dict(self.clear, **{key: None})
                     ),
-                    [reason],
+                    [unknown],
                 )
 
     def test_terminal_finalize_restores_safe_state_with_readback(self):
