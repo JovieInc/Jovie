@@ -92,8 +92,10 @@ export function StatefulAssetSlot({
         data-testid={`${testIdPrefix}-dropzone`}
         data-asset-slot-mode='acquisition'
       >
-        <button
+        <Button
           type='button'
+          data-testid={`${testIdPrefix}-dropzone-button`}
+          disabled={disabled || !onFile}
           onClick={pick}
           onDragEnter={drag(true)}
           onDragOver={drag(true)}
@@ -103,26 +105,27 @@ export function StatefulAssetSlot({
             setDragging(false);
             takeFile(event.dataTransfer.files?.[0]);
           }}
-          disabled={disabled || !onFile}
           className={cn(
             PANEL,
-            'flex min-h-30 w-full flex-col items-center justify-center border-dashed py-4 text-center',
+            'h-auto min-h-30 w-full border-dashed py-0 text-center',
             dragging && 'border-default bg-surface-1',
             !disabled &&
               onFile &&
               'hover:border-default hover:bg-surface-1 focus-ring-themed'
           )}
         >
-          <Upload className='h-5 w-5 text-tertiary-token' aria-hidden />
-          <span className='mt-2 text-xs font-medium text-primary-token'>
-            {acquireLabel}
-          </span>
-          {acquireHint ? (
-            <span className='mt-1 text-2xs text-tertiary-token'>
-              {acquireHint}
+          <span className='flex min-h-30 w-full flex-col items-center justify-center py-4'>
+            <Upload className='h-5 w-5 text-tertiary-token' aria-hidden />
+            <span className='mt-2 text-xs font-medium text-primary-token'>
+              {acquireLabel}
             </span>
-          ) : null}
-        </button>
+            {acquireHint ? (
+              <span className='mt-1 text-2xs text-tertiary-token'>
+                {acquireHint}
+              </span>
+            ) : null}
+          </span>
+        </Button>
         {fileInput}
       </div>
     );

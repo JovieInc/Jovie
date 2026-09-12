@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { uploadPresigned } from '@vercel/blob/client';
 import { FileAudio2, Loader2, Upload } from 'lucide-react';
 import {
@@ -386,15 +387,17 @@ export function ReleaseAudioAssetPanel({
           </p>
         </div>
         {isEditable && presentation.replaceAction === 'secondary' ? (
-          <button
+          <Button
             type='button'
-            onClick={openFilePicker}
+            size='sm'
+            variant='ghost'
             tabIndex={disabledTabIndex}
-            className='focus-ring-themed rounded-md px-2 py-1 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
+            className='rounded-md px-2 py-1 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
             data-testid={`${testIdPrefix}-audio-replace`}
+            onClick={openFilePicker}
           >
             Replace
-          </button>
+          </Button>
         ) : null}
       </div>
       <input
