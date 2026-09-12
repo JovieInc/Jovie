@@ -321,6 +321,18 @@ def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any
         or any((service.get(name) or {}).get("matches") is not True
                for name in ("workflow", "unit", "policy", "gate", "closureHealth"))):
         raise ValueError("official service attestation invalid")
+    observed = contract.v2_parse_time(service.get("observedAt"))
+    if observed is None or not 0 <= (now - observed).total_seconds() <= 600:
+        raise ValueError("official service attestation stale or invalid observation time")
+    live_input = {"binaryPath": str(binary.resolve()), "workflowPath": str(workflow.resolve())}
+    attested_runtime = service.get("runtime")
+    if (service.get("service") != contract.V2_OFFICIAL_RUNTIME_SERVICE
+        or not isinstance(attested_runtime, dict)
+        or attested_runtime.get("workflowPath") != live_input["workflowPath"]
+        or attested_runtime.get("executableSha256") != trust.digest(binary)
+        or service["workflow"].get("installedSha256") != trust.digest(workflow)
+        or attested_runtime.get("generation") != trust.live_runtime(live_input)):
+        raise ValueError("official service attestation runtime binding mismatch")
     prior = None
     try:
         prior = trust.load_context(now, context_path)
@@ -354,7 +366,7 @@ def refresh_context(context_path: Path, receipts: list[tuple[Path, dict[str, Any
         "contractSha256": trust.digest(Path(contract.__file__)),
     }
     value = {"runtime": runtime, "sourceRoot": str(source_root.resolve()), "binaryPath": str(binary.resolve()),
-             "workflowPath": str(workflow.resolve()), "observedAt": now.isoformat(), "accounts": accounts,
+             "workflowPath": str(workflow.resolve()), "observedAt": observed.isoformat(), "accounts": accounts,
              "attestationDir": str(attestation_dir.resolve())}
     if prior and prior.get("codexPath") is not None:
         value.update(codexPath=str(prior["codexPath"]), codexSha256=prior["codexSha256"])

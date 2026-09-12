@@ -45,7 +45,11 @@ class AcceptedCompletionTests(unittest.TestCase):
         self.service = self.root / "service.json"
         self.service.write_text(json.dumps({"schema": "gem-service-attestation/v1",
             "sourceRevision": F.RUNTIME["sourceRevision"], "active": True, "healthy": True,
-            **{name: {"matches": True} for name in ("workflow", "unit", "policy", "gate", "closureHealth")}}))
+            "service": C.V2_OFFICIAL_RUNTIME_SERVICE, "observedAt": self.now.isoformat(),
+            "runtime": {"generation": F.GENERATION, "executableSha256": T.digest(F.RUNTIME_BINARY),
+                        "workflowPath": str(F.SOURCE / "scripts/symphony/WORKFLOW.md")},
+            **{name: {"matches": True} for name in ("unit", "policy", "gate", "closureHealth")},
+            "workflow": {"matches": True, "installedSha256": T.digest(F.SOURCE / "scripts/symphony/WORKFLOW.md")}}))
     def add_completion(self, *, issue, issue_revision, lease_identity, base_head, head,
                        pr_number, observed_at, auth_state=None):
         auth_state = auth_state or self.auth_state
@@ -118,6 +122,50 @@ class AcceptedCompletionTests(unittest.TestCase):
         self.assertEqual(len(self.ledger.read_text().splitlines()), 1)
         provider = json.loads(self.provider_capacity.read_text())["providers"]["cursor"]
         self.assertEqual((provider["limit"], provider["usefulCompletions"]), (1, 1))
+    def test_refresh_rejects_stale_future_missing_or_malformed_service_observation(self):
+        service = json.loads(self.service.read_text())
+        for observed in (None, "invalid", (self.now - timedelta(seconds=601)).isoformat(),
+                         (self.now + timedelta(seconds=1)).isoformat()):
+            with self.subTest(observed=observed):
+                self.service.write_text(json.dumps({**service, "observedAt": observed}))
+                self.context.write_bytes(b"existing context must survive")
+                with self.assertRaisesRegex(ValueError, "service attestation"):
+                    A.reconcile(self.args(), github=self.github, now=self.now)
+                self.assertEqual(self.context.read_bytes(), b"existing context must survive")
+                self.assertFalse(self.ledger.exists())
+                self.assertFalse(self.capacity.exists())
+
+    def test_refresh_preserves_service_observation_age_at_600_second_boundary(self):
+        service = json.loads(self.service.read_text())
+        observed = self.now - timedelta(seconds=600)
+        service["observedAt"] = observed.isoformat()
+        self.service.write_text(json.dumps(service))
+        A.reconcile(self.args(), github=self.github, now=self.now)
+        self.assertEqual(json.loads(self.context.read_text())["observedAt"], observed.isoformat())
+        before = self.context.read_bytes()
+        with self.assertRaisesRegex(ValueError, "service attestation"):
+            A.reconcile(self.args(), github=self.github, now=self.now + timedelta(seconds=1))
+        self.assertEqual(self.context.read_bytes(), before)
+
+    def test_refresh_rejects_service_identity_or_runtime_changed_since_observation(self):
+        service = json.loads(self.service.read_text())
+        changes = [
+            {"service": "retired.service"},
+            {"runtime": None},
+            *({"runtime": {**service["runtime"], key: value}} for key, value in (
+                ("generation", "0" * 64), ("executableSha256", "0" * 64),
+                ("workflowPath", str(self.root / "different-workflow.md")))),
+            {"workflow": {"matches": True, "installedSha256": "0" * 64}},
+        ]
+        for change in changes:
+            with self.subTest(change=change):
+                self.service.write_text(json.dumps({**service, **change}))
+                self.context.write_bytes(b"existing context must survive")
+                with self.assertRaisesRegex(ValueError, "service attestation"):
+                    A.reconcile(self.args(), github=self.github, now=self.now)
+                self.assertEqual(self.context.read_bytes(), b"existing context must survive")
+                self.assertFalse(self.ledger.exists())
+
     def test_required_ci_failure_never_writes_completion(self):
         self.pr["statusCheckRollup"][1]["state"] = "FAILURE"
         result = A.reconcile(self.args(), github=self.github, now=self.now)
