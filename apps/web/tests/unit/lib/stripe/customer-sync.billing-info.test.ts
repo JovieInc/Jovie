@@ -82,6 +82,7 @@ describe('getUserBillingInfo', () => {
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         stripePriceId: null,
+        trialEndsAt: null,
         billingVersion: null,
         lastBillingEventAt: null,
       },
@@ -98,9 +99,38 @@ describe('getUserBillingInfo', () => {
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         stripePriceId: null,
+        trialEndsAt: null,
         billingVersion: 1,
         lastBillingEventAt: null,
       },
+    });
+  });
+
+  it('preserves trial expiry from the full billing query', async () => {
+    const trialEndsAt = new Date('2026-10-15T00:00:00.000Z');
+    mockFetchUserBillingDataWithAuth.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'user_trial',
+        email: 'trial@example.com',
+        isAdmin: false,
+        isPro: false,
+        plan: 'trial',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripePriceId: null,
+        trialEndsAt,
+        billingVersion: 1,
+        lastBillingEventAt: null,
+      },
+    });
+
+    const result = await getUserBillingInfo();
+
+    expect(result.success).toBe(true);
+    expect(result.data?.trialEndsAt).toEqual(trialEndsAt);
+    expect(mockFetchUserBillingDataWithAuth).toHaveBeenCalledWith({
+      fields: BILLING_FIELDS_FULL,
     });
   });
 
@@ -113,6 +143,7 @@ describe('getUserBillingInfo', () => {
         isPro: true,
         stripeCustomerId: 'cus_clerk',
         stripeSubscriptionId: 'sub_clerk',
+        trialEndsAt: new Date('2026-10-01T00:00:00.000Z'),
         billingVersion: null,
         lastBillingEventAt: null,
       },
@@ -126,6 +157,7 @@ describe('getUserBillingInfo', () => {
         isPro: true,
         stripeCustomerId: 'cus_clerk',
         stripeSubscriptionId: 'sub_clerk',
+        trialEndsAt: new Date('2026-10-01T00:00:00.000Z'),
         billingVersion: 1,
         lastBillingEventAt: null,
       },

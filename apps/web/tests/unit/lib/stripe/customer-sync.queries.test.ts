@@ -140,8 +140,11 @@ describe('fetchUserBillingData - Queries', () => {
         email: 'test@example.com',
         isAdmin: false,
         isPro: true,
+        plan: 'pro',
         stripeCustomerId: 'cus_123',
         stripeSubscriptionId: 'sub_456',
+        stripePriceId: 'price_123',
+        trialEndsAt: new Date('2024-01-25'),
         billingVersion: 2,
         lastBillingEventAt: new Date('2024-01-15'),
       };
@@ -162,6 +165,9 @@ describe('fetchUserBillingData - Queries', () => {
       expect(result.data).toEqual(mockUser);
       expect(result.error).toBeUndefined();
       expect(mockDbSelect).toHaveBeenCalledTimes(1);
+      expect(mockDbSelect).toHaveBeenCalledWith(
+        expect.objectContaining({ trialEndsAt: mockUsersTable.trialEndsAt })
+      );
     });
 
     it('returns all fields with explicit BILLING_FIELDS_FULL', async () => {
@@ -170,8 +176,11 @@ describe('fetchUserBillingData - Queries', () => {
         email: 'pro@example.com',
         isAdmin: true,
         isPro: true,
+        plan: 'pro',
         stripeCustomerId: 'cus_789',
         stripeSubscriptionId: 'sub_012',
+        stripePriceId: 'price_012',
+        trialEndsAt: new Date('2024-03-01'),
         billingVersion: 5,
         lastBillingEventAt: new Date('2024-02-20'),
       };

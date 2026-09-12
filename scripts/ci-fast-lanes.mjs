@@ -290,7 +290,6 @@ const BILLING_PROVENANCE_COVERAGE_PATHS = [
 const FAN_SEND_SAFETY_COVERAGE_PATHS = [
   'apps/web/app/api/cron/send-release-notifications/**',
   'apps/web/lib/notifications/**',
-  'apps/web/lib/stripe/customer-sync/types.ts',
   'apps/web/tests/lib/notifications/**',
   'apps/web/tests/unit/api/cron/send-release-notifications.test.ts',
   'apps/web/tests/unit/api/cron/schedule-release-notifications.test.ts',

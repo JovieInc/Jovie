@@ -230,11 +230,10 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     isPro,
     plan: dbPlan,
     stripePriceId,
+    trialEndsAt: rawTrialEndsAt,
   } = billing.data;
   const effectiveEmail = emailFromDb || userEmail;
 
-  const rawTrialEndsAt = (billing.data as Record<string, unknown>)
-    .trialEndsAt as Date | null;
   const normalized = normalizeBillingPlan({
     rawPlan: dbPlan,
     isPro,
