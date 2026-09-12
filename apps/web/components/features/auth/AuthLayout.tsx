@@ -90,7 +90,7 @@ function AuthFormColumn({
     >
       {showLogo && isSplashB ? (
         <div
-          className='mb-4 flex h-5 shrink-0 items-center justify-center'
+          className='mb-4 flex h-8 shrink-0 items-center justify-center'
           data-auth-splash-logo-slot
         >
           <Link
@@ -99,11 +99,12 @@ function AuthFormColumn({
               'inline-flex items-center justify-center text-white dark:text-white transition-[color,opacity] duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
               isKeyboardVisible && 'pointer-events-none opacity-0'
             )}
+            // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
             aria-label='Go to homepage'
             aria-hidden={isKeyboardVisible}
             tabIndex={isKeyboardVisible ? -1 : undefined}
           >
-            <BrandLogo size={BRAND_MARK_SIZE.chrome} tone='white' aria-hidden />
+            <BrandLogo size={BRAND_MARK_SIZE.splash} tone='white' aria-hidden />
           </Link>
         </div>
       ) : null}
@@ -262,6 +263,7 @@ export function AuthLayout({
           <Link
             href={APP_ROUTES.HOME}
             className='inline-flex size-5 shrink-0 items-center justify-center text-white/45 dark:text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+            // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible ? -1 : undefined}
           >

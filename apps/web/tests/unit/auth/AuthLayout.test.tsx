@@ -216,7 +216,7 @@ describe('AuthLayout', () => {
 
     const slot = container.querySelector('[data-auth-splash-logo-slot]');
     expect(slot).not.toBeNull();
-    expect(slot).toHaveClass('h-5');
+    expect(slot).toHaveClass('h-8');
     const logoLink = container.querySelector('[data-auth-splash-logo-slot] a');
     expect(logoLink).not.toBeNull();
     expect(logoLink).toHaveAttribute('aria-hidden', 'true');
