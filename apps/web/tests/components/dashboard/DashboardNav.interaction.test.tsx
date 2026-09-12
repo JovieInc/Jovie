@@ -27,8 +27,6 @@ const PRIMARY_LABELS = [
   'New Chat',
   'Library',
   'Contacts',
-  'Calendar',
-  'Tasks',
   'Presence',
 ] as const;
 
@@ -45,7 +43,7 @@ describe('DashboardNav interactions', () => {
     for (const label of PRIMARY_LABELS) {
       const link = screen.getByRole('link', { name: label });
       expect(link.querySelector('svg')).toBeTruthy();
-      expect(link.querySelector('span.truncate')).toHaveTextContent(label);
+      expect(link).toHaveAccessibleName(label);
     }
   });
 
@@ -61,20 +59,17 @@ describe('DashboardNav interactions', () => {
     );
     const inbox = screen.getByRole('link', { name: 'Inbox' });
 
-    expect(newChat).toHaveClass('w-fit', 'rounded-full');
-    expect(newChat).toHaveClass('bg-sidebar-accent/40');
+    expect(newChat).toHaveClass(
+      'size-6',
+      'rounded-full',
+      'bg-foreground',
+      'text-(--color-bg-base)'
+    );
     expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
-    expect(newChat.querySelector('svg')).toHaveClass('text-accent-teal!');
-    expect(searchSlot).toHaveClass('mt-1.5', 'mb-4', 'h-7', 'shrink-0');
+    expect(searchSlot).toHaveClass('h-9', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
-    expect(
-      inbox.compareDocumentPosition(searchSlot!) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(
-      searchSlot!.compareDocumentPosition(newChat) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(searchSlot).toContainElement(inbox);
+    expect(searchSlot).toContainElement(newChat);
   });
 
   it('wires a plain nav click to one canonical privacy-safe activation', async () => {
@@ -157,7 +152,7 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
-    expect(screen.getByText('Recent')).toBeInTheDocument();
+    expect(screen.getByText('EARLIER')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
       'href',
       '/app/chat/thread-newer'
@@ -234,12 +229,12 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Calendar' }));
+    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Contacts' }));
     expect(prefetchForRouteMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
 
     expect(prefetchForRouteMock).toHaveBeenCalledWith(
-      'calendar',
+      'contacts',
       expect.anything(),
       'profile_123'
     );
@@ -250,12 +245,12 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({ renderFn: render });
 
-    const calendarLink = screen.getByRole('link', { name: 'Calendar' });
-    expect(calendarLink).toHaveAttribute('href', APP_ROUTES.CALENDAR);
+    const calendarLink = screen.getByRole('link', { name: 'Contacts' });
+    expect(calendarLink).toHaveAttribute('href', APP_ROUTES.CONTACTS);
     await user.click(calendarLink);
 
     expect(mockToastInfo).toHaveBeenCalledWith(
-      'Calendar is not available in demo mode'
+      'Contacts is not available in demo mode'
     );
   });
 });

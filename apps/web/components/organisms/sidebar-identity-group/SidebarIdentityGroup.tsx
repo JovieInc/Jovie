@@ -15,6 +15,7 @@ export const SIDEBAR_IDENTITY_GROUP_TEST_ID = 'sidebar-identity-group';
 export const SIDEBAR_USER_PANEL_TEST_ID = 'sidebar-user-panel';
 
 export interface SidebarIdentityGroupProps {
+  readonly calm?: boolean;
   readonly profileHref: string | undefined;
 }
 
@@ -43,6 +44,7 @@ export function publicProfileAccessibleName(
  * two top-level rows.
  */
 export function SidebarIdentityGroup({
+  calm = false,
   profileHref,
 }: SidebarIdentityGroupProps) {
   const pathname = usePathname();
@@ -58,13 +60,17 @@ export function SidebarIdentityGroup({
       data-testid={SIDEBAR_USER_PANEL_TEST_ID}
       data-identity-group=''
       data-active={isPublicProfileActive ? 'true' : undefined}
-      className='m-0 min-w-0 border-0 px-2.5 py-1.5'
+      className={cn(
+        'm-0 min-w-0 border-0',
+        calm ? 'px-3 py-0' : 'px-2.5 py-1.5'
+      )}
     >
       <div
         data-sidebar='identity-group'
         data-testid={SIDEBAR_IDENTITY_GROUP_TEST_ID}
         className={cn(
           'relative flex items-center rounded-lg px-0.5 py-0.5',
+          calm && 'p-0',
           'transition-colors duration-fast ease-interactive',
           'hover:bg-sidebar-accent',
           isPublicProfileActive && 'bg-sidebar-accent-active',
@@ -78,11 +84,12 @@ export function SidebarIdentityGroup({
         )}
       >
         <UserButton
+          calm={calm}
           profileHref={profileHref}
           settingsHref={APP_ROUTES.SETTINGS}
           showUserInfo
         />
-        {profileHref && profileDisplayHref ? (
+        {!calm && profileHref && profileDisplayHref ? (
           <Tooltip label={profileDisplayHref} side='right'>
             <Link
               href={profileHref}
