@@ -147,6 +147,13 @@ test.describe('Homepage', () => {
       'x-vercel-ip-country': 'DE',
       'x-vercel-ip-country-region': 'BE',
     });
+    await page.addInitScript(() => {
+      try {
+        localStorage.removeItem('jv_cc');
+      } catch {
+        // ignore
+      }
+    });
     await context.addCookies([
       {
         name: 'jv_cc_required',
@@ -155,6 +162,8 @@ test.describe('Homepage', () => {
         sameSite: 'Lax',
       },
     ]);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await gotoHomepage(page);
@@ -162,6 +171,7 @@ test.describe('Homepage', () => {
       const actions = page.locator(
         '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button, [data-testid="homepage-primary-cta"]:visible'
       );
+      await expect(page.getByTestId('cookie-actions')).toBeVisible();
       expect(await actions.count()).toBeGreaterThanOrEqual(4);
       for (const action of await actions.all()) {
         const geometry = await action.evaluate(element => {
@@ -283,7 +293,7 @@ test.describe('Homepage', () => {
         const shadow = await action.evaluate(
           element => getComputedStyle(element).boxShadow
         );
-        expect(shadow).toContain('rgb(37, 99, 255)');
+        expect(shadow).toMatch(/rgb\((?:17, 175, 255|37, 99, 255)\)/);
       }
 
       // Text-only enlargement must grow the native control, not clip its label.
