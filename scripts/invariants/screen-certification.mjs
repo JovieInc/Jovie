@@ -89,6 +89,7 @@ web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,m
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investors/page.tsx|desktop,mobile
+web.pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
