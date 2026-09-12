@@ -488,7 +488,6 @@ export function TrackSidebar({
                 ? `, ${track.providerConfidenceSummary.unknown} unknown`
                 : ''}
             </div>
-
           </div>
         </DrawerSurfaceCard>
       ) : activeTab === 'links' && track ? (

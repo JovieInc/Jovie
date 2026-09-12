@@ -86,8 +86,8 @@ import {
   InspectorRow,
   InspectorSection,
   InspectorShell,
-  isDspQuietListScope,
   type InspectorTabId,
+  isDspQuietListScope,
   LIBRARY_INSPECTOR_TABS,
 } from '@/components/molecules/inspector';
 
