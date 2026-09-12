@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { findChromeOverrideViolations } from '../../../../../scripts/component-ownership-check.mjs';
+import { evaluateSharedSearchGeometry } from '../../../../../scripts/component-rendered-invariant-policy.mjs';
+import { HOMEPAGE_AURA_PIERCE_RED_CSS } from './homepage-eight-invariants-fixtures';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
@@ -67,6 +70,32 @@ describe('homepage-optical-polish-v1', () => {
     expect(read('components/features/home/InputAuraFrame.css')).not.toContain(
       'rotate-[442deg]'
     );
+
+    const close = read('components/homepage/HomepageClose.tsx');
+    expect(close).toContain('HeroSpotifySearch');
+    expect(close).toContain("appearance='editorial'");
+    expect(
+      findChromeOverrideViolations(
+        'apps/web/app/(home)/home.css',
+        HOMEPAGE_AURA_PIERCE_RED_CSS
+      ).some(item => item.family === 'search-aura')
+    ).toBe(true);
+    expect(
+      evaluateSharedSearchGeometry({
+        hero: {
+          treatment: 'editorial',
+          fieldHeight: 44,
+          fieldBackground: 'shared',
+          consumerAuraPierce: false,
+        },
+        close: {
+          treatment: 'editorial',
+          fieldHeight: 44,
+          fieldBackground: 'shared',
+          consumerAuraPierce: false,
+        },
+      }).ok
+    ).toBe(true);
   });
 
   it('keeps the 28px action concentrically inset and the field interior calm', () => {

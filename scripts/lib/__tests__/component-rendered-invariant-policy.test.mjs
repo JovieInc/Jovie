@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  evaluateAcceptanceEvidence,
+  evaluateRelationalGrid,
   evaluateRenderedFamily,
   evaluateRenderedSnapshots,
+  evaluateSharedSearchGeometry,
 } from '../../component-rendered-invariant-policy.mjs';
 
 // biome-ignore format: compact fixture keeps this source-PR under the hard size cap
@@ -80,5 +83,101 @@ describe('rendered component invariant policy', () => {
       results: [{ family: 'Priority status', ok: true }],
     });
     expect(evaluateRenderedSnapshots([])).toEqual({ ok: false, results: [] });
+  });
+});
+
+const GRID_CONTEXT = {
+  candidateRevision: 'abc123def456',
+  route: '/',
+  viewport: { width: 1440, height: 900 },
+  state: 'idle',
+  theme: 'light',
+};
+function gridElements(xs) {
+  return xs.map((x, index) => ({
+    id: index === 0 ? 'connected' : 'text-only',
+    column: '7 / span 6',
+    align: 'end',
+    role: 'copy',
+    hasMedia: index === 0,
+    box: { x, y: 200 + index * 320, width: 420, height: 180 },
+  }));
+}
+function searchField(treatment, height, background, pierce = false) {
+  return {
+    treatment,
+    fieldHeight: height,
+    fieldBackground: background,
+    consumerAuraPierce: pierce,
+  };
+}
+
+describe('design-eight-invariants-v1 ROI detectors', () => {
+  it('accepts exact-candidate evidence and shared-column neighbors', () => {
+    expect(
+      evaluateAcceptanceEvidence({
+        ...GRID_CONTEXT,
+        sourceTokensPass: true,
+        rendered: { aligned: true, boxes: gridElements([720, 720]) },
+        screenshotBaselineUpdated: false,
+      })
+    ).toEqual({ ok: true, issues: [] });
+    expect(
+      evaluateRelationalGrid({
+        ...GRID_CONTEXT,
+        sourceTokensPass: true,
+        elements: gridElements([720, 720]),
+      })
+    ).toEqual({ ok: true, issues: [] });
+    expect(
+      evaluateSharedSearchGeometry({
+        hero: searchField('editorial', 44, 'oklab(0.2 0 0)'),
+        close: searchField('editorial', 44, 'oklab(0.2 0 0)'),
+      })
+    ).toEqual({ ok: true, issues: [] });
+  });
+
+  it('rejects source-only acceptance, drifted copy, and aura-pierce search', () => {
+    const acceptance = evaluateAcceptanceEvidence({
+      ...GRID_CONTEXT,
+      sourceTokensPass: true,
+      rendered: { aligned: false, boxes: gridElements([720, 600]) },
+      screenshotBaselineUpdated: true,
+      tasteNote: 'looks fine in the screenshot',
+    });
+    expect(acceptance.ok).toBe(false);
+    expect(acceptance.issues.map(issue => issue.rule)).toEqual(
+      expect.arrayContaining([
+        'rendered-evidence-rejected',
+        'source-only-acceptance',
+        'baseline-bump-is-not-acceptance',
+        'taste-note-is-not-acceptance',
+      ])
+    );
+    const grid = evaluateRelationalGrid({
+      ...GRID_CONTEXT,
+      sourceTokensPass: true,
+      elements: gridElements([720, 600]),
+    });
+    expect(grid.ok).toBe(false);
+    expect(grid.issues.map(issue => issue.rule)).toEqual(
+      expect.arrayContaining([
+        'column-assignment-drift',
+        'source-tokens-without-rendered-alignment',
+      ])
+    );
+    const search = evaluateSharedSearchGeometry({
+      hero: searchField('editorial', 48, 'oklab(0.2 0 0)', true),
+      close: searchField('default', 40, 'oklab(0.9 0 0)'),
+    });
+    expect(search.ok).toBe(false);
+    expect(search.issues.map(issue => issue.rule)).toEqual(
+      expect.arrayContaining([
+        'shared-search-treatment-drift',
+        'shared-search-aura-pierce',
+        'shared-search-geometry-drift',
+        'shared-search-surface-drift',
+      ])
+    );
   });
 });

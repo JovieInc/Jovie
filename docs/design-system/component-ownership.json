@@ -27,7 +27,13 @@
     "headers": {
       "owner": "apps/web/components/organisms/HeaderNav.tsx",
       "publicImport": "@/components/canonical",
-      "exports": ["HeaderNav"]
+      "exports": ["HeaderNav"],
+      "ownerFiles": [
+        "apps/web/components/organisms/HeaderNav.tsx",
+        "apps/web/components/organisms/HeaderNav.css",
+        "apps/web/components/site/MarketingHeader.tsx"
+      ],
+      "internalPrefixes": ["marketing-glass-header__"]
     },
     "cards": {
       "owner": "packages/ui/atoms/card.tsx",
@@ -49,7 +55,19 @@
     "form-fields-and-buttons": {
       "owner": "packages/ui/atoms/index.ts",
       "publicImport": "@jovie/ui",
-      "exports": ["Button", "IconButton", "Input", "Label", "Field", "Textarea"]
+      "exports": [
+        "Button",
+        "IconButton",
+        "Input",
+        "Label",
+        "Field",
+        "Textarea"
+      ],
+      "ownerFiles": [
+        "packages/ui/atoms/index.ts",
+        "packages/ui/atoms/button.tsx",
+        "packages/ui/atoms/icon-button.tsx"
+      ]
     },
     "dialogs-and-drawers": {
       "owner": "apps/web/components/organisms/Dialog.tsx",
@@ -70,6 +88,65 @@
       "owner": "apps/web/components/feedback/index.ts",
       "publicImport": "@/components/canonical",
       "exports": ["Banner", "FeedbackProvider", "toast", "JovieOverlay"]
+    },
+    "search-aura": {
+      "owner": "apps/web/components/features/home/InputAuraFrame.tsx",
+      "publicImport": "@/components/features/home/InputAuraFrame",
+      "exports": ["InputAuraFrame"],
+      "ownerFiles": [
+        "apps/web/components/features/home/InputAuraFrame.tsx",
+        "apps/web/components/features/home/InputAuraFrame.css"
+      ],
+      "internals": [
+        "input-aura-frame__illumination",
+        "input-aura-frame--editorial"
+      ],
+      "contracts": ["illumination", "editorial-variant"]
+    },
+    "footers": {
+      "owner": "apps/web/components/site/MarketingFooter.tsx",
+      "publicImport": "@/components/site/MarketingFooter",
+      "exports": ["MarketingFooter"],
+      "ownerFiles": [
+        "apps/web/components/site/MarketingFooter.tsx",
+        "apps/web/components/site/MarketingFooter.css"
+      ],
+      "internals": [
+        "mf-mark-tagline",
+        "mf-eyebrow",
+        "mf-eyebrow--caps",
+        "mf-baseband"
+      ]
+    },
+    "device-frames": {
+      "owner": "apps/web/components/marketing/artist-profile/ArtistProfilePhoneFrame.tsx",
+      "publicImport": "@/components/marketing/artist-profile/ArtistProfilePhoneFrame",
+      "exports": ["ArtistProfilePhoneFrame"],
+      "ownerFiles": [
+        "apps/web/components/marketing/artist-profile/ArtistProfilePhoneFrame.tsx",
+        "apps/web/components/marketing/artist-profile/ArtistProfilePhoneFrame.css"
+      ],
+      "internals": [
+        "ap-phone-frame__notch",
+        "ap-phone-frame__overlay",
+        "ap-phone-frame__screen",
+        "ap-phone-frame__viewport"
+      ]
+    },
+    "logos": {
+      "owner": "apps/web/components/atoms/Logo.tsx",
+      "publicImport": "@/components/atoms/Logo",
+      "exports": ["Logo"],
+      "ownerFiles": ["apps/web/components/atoms/Logo.tsx"]
     }
-  }
+  },
+  "chromePierceAllowlist": [
+    "apps/web/app/(home)/home.css:ap-phone-frame__notch",
+    "apps/web/app/(home)/home.css:ap-phone-frame__overlay",
+    "apps/web/app/(home)/home.css:mf-baseband",
+    "apps/web/app/(home)/home.css:mf-eyebrow",
+    "apps/web/app/(home)/home.css:mf-mark-tagline",
+    "apps/web/components/marketing/artist-profile/ArtistProfileHero.css:ap-phone-frame__screen",
+    "apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.css:marketing-glass-header__cta"
+  ]
 }
