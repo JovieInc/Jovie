@@ -1,19 +1,19 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
-  DEFAULT_PROCESS_TIMEOUT_MS,
-  runBoundedProcess,
   type BoundedProcessResult,
+  DEFAULT_PROCESS_TIMEOUT_MS,
   type RunBoundedProcessInput,
+  runBoundedProcess,
 } from './bounded-process';
 import {
+  type DesktopAppEnv,
   desktopBundlePathFromExecutable,
   NIGHTLY_UPDATE_HOUR,
   nightlyUpdateLaunchAgentLabel,
   nightlyUpdateMinute,
   renderNightlyUpdateLaunchAgentPlist,
   shouldScheduleDesktopAutoUpdate,
-  type DesktopAppEnv,
 } from './desktop-auto-update';
 
 export const LAUNCHCTL_TIMEOUT_MS = DEFAULT_PROCESS_TIMEOUT_MS;
@@ -42,7 +42,8 @@ export type NightlyLaunchAgentInstallResult =
   | { readonly ok: false; readonly reason: string };
 
 const defaultIo: NightlyLaunchAgentIo = {
-  mkdir: dirPath => fs.mkdir(dirPath, { recursive: true }).then(() => undefined),
+  mkdir: dirPath =>
+    fs.mkdir(dirPath, { recursive: true }).then(() => undefined),
   writeFile: (filePath, data) => fs.writeFile(filePath, data, 'utf8'),
 };
 
@@ -60,9 +61,7 @@ function shouldInstall(input: NightlyLaunchAgentInstallInput): boolean {
 
 async function runLaunchctl(
   args: readonly string[],
-  runProcess: (
-    input: RunBoundedProcessInput
-  ) => Promise<BoundedProcessResult>
+  runProcess: (input: RunBoundedProcessInput) => Promise<BoundedProcessResult>
 ): Promise<BoundedProcessResult> {
   return runProcess({
     command: 'launchctl',

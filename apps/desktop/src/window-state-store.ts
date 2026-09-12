@@ -2,8 +2,8 @@ import { promises as fs } from 'node:fs';
 import type { DesktopSecurityReporter } from './desktop-security-reporting';
 import {
   DEFAULT_WINDOW_STATE,
-  sanitizeWindowState,
   type DisplayBounds,
+  sanitizeWindowState,
   type WindowState,
 } from './window-state';
 

@@ -1,8 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { expect, test, vi } from 'vitest';
 import {
-  runBoundedProcess,
   type BoundedProcessSpawn,
+  runBoundedProcess,
 } from '../src/bounded-process.ts';
 
 class FakeChild extends EventEmitter {

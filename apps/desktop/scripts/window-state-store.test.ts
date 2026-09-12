@@ -68,9 +68,10 @@ test('disk failure during save is nonfatal and leaves latest in memory', async (
     },
   });
 
-  await expect(
-    store.load({ displayBounds: PRIMARY })
-  ).resolves.toMatchObject({ width: 900, height: 700 });
+  await expect(store.load({ displayBounds: PRIMARY })).resolves.toMatchObject({
+    width: 900,
+    height: 700,
+  });
   store.scheduleSave({ x: 8, y: 8, width: 1000, height: 800 });
   await vi.waitFor(() => {
     expect(store.needsFlush()).toBe(false);

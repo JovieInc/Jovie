@@ -1,4 +1,8 @@
-import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import {
+  type ChildProcess,
+  type SpawnOptions,
+  spawn,
+} from 'node:child_process';
 
 export const DEFAULT_PROCESS_TIMEOUT_MS = 3_000;
 export const OPERATOR_SPAWN_TIMEOUT_MS = 2_000;
@@ -29,7 +33,9 @@ export type BoundedProcessFailure = {
   readonly stderr: string;
 };
 
-export type BoundedProcessResult = BoundedProcessSuccess | BoundedProcessFailure;
+export type BoundedProcessResult =
+  | BoundedProcessSuccess
+  | BoundedProcessFailure;
 
 export type BoundedProcessSpawn = (
   command: string,

@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
-import { installNightlyUpdateLaunchAgent } from '../src/nightly-update-launch-agent.ts';
 import type { RunBoundedProcessInput } from '../src/bounded-process.ts';
+import { installNightlyUpdateLaunchAgent } from '../src/nightly-update-launch-agent.ts';
 
 test('skips unpackaged, local, and non-darwin shells', async () => {
   const runProcess = vi.fn();
@@ -59,9 +59,7 @@ test('writes the LaunchAgent plist then bootstraps launchctl', async () => {
   });
 
   expect(result).toEqual({ ok: true });
-  expect(io.mkdir).toHaveBeenCalledWith(
-    '/Users/tim/Library/LaunchAgents'
-  );
+  expect(io.mkdir).toHaveBeenCalledWith('/Users/tim/Library/LaunchAgents');
   expect(io.writeFile).toHaveBeenCalledTimes(1);
   const [plistPath, plist] = io.writeFile.mock.calls[0] ?? [];
   expect(plistPath).toBe(
