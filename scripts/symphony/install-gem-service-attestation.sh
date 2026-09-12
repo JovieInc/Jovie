@@ -73,6 +73,7 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
     --provenance "${SYMPHONY_RELEASE_PROVENANCE}" \
     --source-root "${JOVIE_CONFIGURATION_SOURCE_ROOT}" \
     --source-revision "${JOVIE_CONFIGURATION_SOURCE_REVISION}" \
+    --profile "${JOVIE_CONFIGURATION_PROFILE:-canonical}" \
     --gem-root "${GEM_ROOT}" \
     --check
   status=$?
@@ -114,6 +115,7 @@ python3 "${GEM_ROOT}/scripts/emit-gem-service-attestation.py" \
   --provenance "${SYMPHONY_RELEASE_PROVENANCE}" \
   --source-root "${JOVIE_CONFIGURATION_SOURCE_ROOT}" \
   --source-revision "${JOVIE_CONFIGURATION_SOURCE_REVISION}" \
+  --profile "${JOVIE_CONFIGURATION_PROFILE:-canonical}" \
   --gem-root "${GEM_ROOT}" \
   --check
 check_status=$?
@@ -138,6 +140,7 @@ python3 "${GEM_ROOT}/scripts/emit-gem-service-attestation.py" \
   --provenance "${SYMPHONY_RELEASE_PROVENANCE}" \
   --source-root "${JOVIE_CONFIGURATION_SOURCE_ROOT}" \
   --source-revision "${JOVIE_CONFIGURATION_SOURCE_REVISION}" \
+  --profile "${JOVIE_CONFIGURATION_PROFILE:-canonical}" \
   --gem-root "${GEM_ROOT}"
 publish_status=$?
 set -e

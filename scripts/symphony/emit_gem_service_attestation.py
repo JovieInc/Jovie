@@ -31,6 +31,11 @@ SURFACES = {
     "closureHealth": "scripts/symphony/closure_health.py",
     "workflow": "scripts/symphony/WORKFLOW.md",
 }
+BOUNDED_PROFILE = "scripts/symphony/profiles/governor-bounded"
+BOUNDED_OVERRIDES = {
+    "90-symphony-safe-restart-guard.conf", "build-pin.conf",
+    "cursor-executable.conf", "summer-bottleneck-signing.conf", "governor-restricted.conf",
+}
 
 
 def digest(data: bytes) -> str:
@@ -62,15 +67,18 @@ def compare_source(root: Path, revision: str, relative: str, installed: Path) ->
             "matches": expected is not None and expected == actual}
 
 
-def compare_workflow(root: Path, revision: str, installed: Path) -> dict:
-    result = compare_source(root, revision, SURFACES["workflow"], installed)
-    source = source_bytes(root, revision, SURFACES["workflow"]).decode()
+def compare_workflow(root: Path, revision: str, installed: Path, profile: str = "canonical") -> dict:
+    relative = SURFACES["workflow"] if profile == "canonical" else BOUNDED_PROFILE + "/WORKFLOW.md"
+    result = compare_source(root, revision, relative, installed)
+    source = source_bytes(root, revision, relative).decode()
     target = installed.read_text()
     # Preserve the pressure controller's existing one-scalar overlay contract.
     pattern = re.compile(r"^(\s*max_concurrent_agents:\s*)([1-9][0-9]*)(\s*)$", re.MULTILINE)
     before, after = list(pattern.finditer(source)), list(pattern.finditer(target))
     same = (len(before) == len(after) == 1 and
             pattern.sub(r"\1<runtime>\3", source) == pattern.sub(r"\1<runtime>\3", target))
+    if profile == "governor-bounded":
+        same = same and int(after[0].group(2)) <= int(before[0].group(2))
     result.update(matches=same, matchMode="exact" if same and source == target else
                   "bounded_concurrency_overlay" if same else "invalid",
                   sourceMaxConcurrentAgents=int(before[0].group(2)) if len(before) == 1 else None,
@@ -80,7 +88,9 @@ def compare_workflow(root: Path, revision: str, installed: Path) -> dict:
 
 def observe(provenance: Path, source_root: Path, source_revision: str,
             binary: Path, gem_root: Path, *, proc_root: Path = Path("/proc"),
-            now: datetime | None = None) -> dict:
+            now: datetime | None = None, profile: str = "canonical") -> dict:
+    if profile not in {"canonical", "governor-bounded"}:
+        raise ValueError("unknown operator-selected configuration profile")
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None or not SHA.fullmatch(source_revision):
         raise ValueError("invalid observation clock or configuration revision")
@@ -136,12 +146,15 @@ def observe(provenance: Path, source_root: Path, source_revision: str,
     }
     artifacts = {name: compare_source(source_root, source_revision, relative, installed[name])
                  for name, relative in SURFACES.items()}
-    artifacts["workflow"] = compare_workflow(source_root, source_revision, workflow)
+    artifacts["workflow"] = compare_workflow(source_root, source_revision, workflow, profile)
     overrides = []
     for name in fields.get("DropInPaths", "").split():
         path = Path(name)
-        relative = "scripts/symphony/systemd/symphony-elixir.service.d/" + path.name
+        directory = ("scripts/symphony/systemd/symphony-elixir.service.d" if profile == "canonical"
+                     else BOUNDED_PROFILE + "/systemd")
+        relative = directory + "/" + path.name
         overrides.append({"name": path.name, **compare_source(source_root, source_revision, relative, path)})
+    profile_complete = profile == "canonical" or {item["name"] for item in overrides} == BOUNDED_OVERRIDES
     # Reobserve after file and API reads to reject restarts and concurrent updates.
     if (service_fields() != fields or trust.live_runtime(live_input) != generation
         or digest(binary.read_bytes()) != package_digest
@@ -154,9 +167,10 @@ def observe(provenance: Path, source_root: Path, source_revision: str,
     return {
         "schema": "gem-service-attestation/v1", "observedAt": now.isoformat(),
         "sourceRevision": revision, "configurationSourceRevision": source_revision,
+        "configurationProfile": profile,
         "service": SERVICE, "active": True, "daemonReloaded": fields.get("NeedDaemonReload") == "no",
         "healthy": fields.get("NeedDaemonReload") == "no" and all(item["matches"] for item in artifacts.values())
-                   and all(item["matches"] for item in overrides),
+                   and profile_complete and all(item["matches"] for item in overrides),
         "listener": {"port": 4041, "pid": listener_pid, "wrapperPid": int(pid),
                      "controlGroup": group, "boundToService": True},
         "runtime": {"workflowPath": str(workflow), "packageSha256": package_digest, "executableSha256": executable_digest,
@@ -191,11 +205,14 @@ def main() -> int:
     parser.add_argument("--provenance", type=Path, required=True)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--source-revision", required=True)
+    parser.add_argument("--profile", choices=("canonical", "governor-bounded"),
+                        default=os.environ.get("JOVIE_CONFIGURATION_PROFILE", "canonical"))
     parser.add_argument("--binary", type=Path, default=Path.home() / ".local/bin/symphony")
     parser.add_argument("--gem-root", type=Path, default=Path.home() / "gem-workspace")
     parser.add_argument("--check", action="store_true", help="Observe without publishing")
     args = parser.parse_args()
-    observe_once = lambda: observe(args.provenance, args.source_root, args.source_revision, args.binary, args.gem_root)
+    observe_once = lambda: observe(args.provenance, args.source_root, args.source_revision, args.binary, args.gem_root,
+                                  profile=args.profile)
     try:
         receipt = observe_once() if args.check else publish(args.gem_root / "state/gem-service-attestation.json", observe_once)
         print(json.dumps(receipt, sort_keys=True))

@@ -135,6 +135,77 @@ class PublisherTests(unittest.TestCase):
         )
         self.assertTrue(all(item["matches"] for item in result["unitOverrides"]))
 
+    def bounded_observation(self):
+        return E.observe(self.sidecar, self.root, CONFIG, self.package, self.gem,
+                         proc_root=self.proc, now=NOW, profile="governor-bounded")
+
+    def install_bounded_fixture(self):
+        source_root = Path(E.__file__).parent / "profiles/governor-bounded"
+        workflow = (source_root / "WORKFLOW.md").read_bytes()
+        self.sources[E.BOUNDED_PROFILE + "/WORKFLOW.md"] = workflow
+        self.workflow.write_bytes(workflow)
+        paths = []
+        for name in sorted(E.BOUNDED_OVERRIDES):
+            body = (source_root / "systemd" / name).read_bytes()
+            self.sources[E.BOUNDED_PROFILE + "/systemd/" + name] = body
+            target = self.root / name
+            target.write_bytes(body)
+            paths.append(str(target))
+        self.fields["DropInPaths"] = " ".join(paths)
+        return workflow
+
+    def test_bounded_profile_requires_explicit_selection_and_all_reviewed_overrides(self):
+        self.install_bounded_fixture()
+        self.assertFalse(self.observe()["healthy"])
+        result = self.bounded_observation()
+        self.assertTrue(result["healthy"])
+        self.assertEqual(result["configurationProfile"], "governor-bounded")
+        for path in self.fields["DropInPaths"].split():
+            with self.subTest(missing=path):
+                with mock.patch.dict(self.fields, DropInPaths=self.fields["DropInPaths"].replace(path, "")):
+                    self.assertFalse(self.bounded_observation()["healthy"])
+        with self.assertRaises(ValueError):
+            E.observe(self.sidecar, self.root, CONFIG, self.package, self.gem, profile="arbitrary")
+
+    def test_bounded_profile_rejects_enrollment_provider_hook_and_restart_drift(self):
+        original = self.install_bounded_fixture()
+        for before, after in [
+            (b"agents: 5", b"agents: 6"),
+            (b"symphony-five-pr-repair-20260908", b"symphony"),
+            (b"project_slug:", b"other_project:"),
+            (b"command: /usr/bin/false", b"command: codex app-server"),
+            (b"native-preflight", b"skip-preflight"),
+        ]:
+            with self.subTest(change=after):
+                self.workflow.write_bytes(original.replace(before, after))
+                self.assertFalse(self.bounded_observation()["healthy"])
+        self.workflow.write_bytes(original.replace(b"agents: 5", b"agents: 1"))
+        self.assertTrue(self.bounded_observation()["healthy"])
+        self.workflow.write_bytes(original)
+        unit = self.root / "governor-restricted.conf"
+        body = unit.read_bytes()
+        for before, after in [(b"RestartSec=20", b"RestartSec=0"),
+                              (b"Restart=always", b"Restart=no")]:
+            unit.write_bytes(body.replace(before, after))
+            self.assertFalse(self.bounded_observation()["healthy"])
+
+    def test_review_candidate_preserves_restrictions_and_uses_continuous_service(self):
+        original = self.install_bounded_fixture()
+        config = original.decode().split("---", 2)[1]
+        for restriction in [
+            '    project_slug: "symphony-ui-pilot-96d6b9c5b2d5"',
+            '  required_labels:\n    - symphony-five-pr-repair-20260908',
+            '  root: /home/timwhite/codex-qualification',
+            '  max_concurrent_agents: 5', '  max_retry_attempts: 1',
+            '  command: /usr/bin/false',
+            'native-preflight "${PWD##*/}" --before-run',
+        ]:
+            self.assertIn(restriction, config)
+        unit = (self.root / "governor-restricted.conf").read_text().splitlines()
+        self.assertIn("Restart=always", unit)
+        self.assertIn("RestartSec=20", unit)
+        self.assertIn("RuntimeMaxSec=infinity", unit)
+
     def test_only_existing_concurrency_overlay_is_accepted(self):
         for value in [1, 41, 128]:
             self.workflow.write_bytes(WORKFLOW.replace(b"agents: 5", f"agents: {value}".encode()))
@@ -219,6 +290,17 @@ class PublisherTests(unittest.TestCase):
         with mock.patch.object(sys, 'argv', args), mock.patch.object(E, 'observe', side_effect=ValueError('secret text')), mock.patch('builtins.print') as output:
             self.assertEqual(E.main(), 78)
             self.assertNotIn('secret text', str(output.call_args))
+
+    def test_operator_profile_environment_and_explicit_override_reach_observer(self):
+        args = ['publisher', '--provenance', str(self.sidecar), '--source-root', str(self.root),
+                '--source-revision', CONFIG, '--check']
+        for extra, expected in [([], 'governor-bounded'), (['--profile', 'canonical'], 'canonical')]:
+            with mock.patch.dict(E.os.environ, JOVIE_CONFIGURATION_PROFILE='governor-bounded'), \
+                 mock.patch.object(sys, 'argv', args + extra), \
+                 mock.patch.object(E, 'observe', return_value={'healthy': False}) as observer, \
+                 mock.patch('builtins.print'):
+                self.assertEqual(E.main(), 2)
+                self.assertEqual(observer.call_args.kwargs['profile'], expected)
 
 
 if __name__ == '__main__':
