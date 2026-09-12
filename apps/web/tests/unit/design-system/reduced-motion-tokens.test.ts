@@ -101,6 +101,27 @@ describe('reduced-motion zeroes ALL duration tokens', () => {
     ).toHaveLength(0);
   });
 
+  it('never uses the 0.01ms near-zero hack (Chromium serializes it as 1e-05s)', () => {
+    const offenders: string[] = [];
+    for (const file of CSS_FILES) {
+      const css = readFileSync(file, 'utf8');
+      for (const rule of extractRules(css)) {
+        if (!REDUCED_MOTION.test(rule.atContext)) continue;
+        for (const [name, value] of rule.declarations) {
+          if (value.trim() === '0.01ms') {
+            offenders.push(
+              `${name}: ${value.trim()} (${file.replace(WEB_ROOT, 'apps/web')})`
+            );
+          }
+        }
+      }
+    }
+    expect(
+      offenders,
+      'Reduced-motion durations must be exact 0s/0ms. 0.01ms serializes as 1e-05s and fails the public-profile-smoke JOV-4911 assertion.'
+    ).toEqual([]);
+  });
+
   it('the raw --duration-* scale is explicitly zeroed (regression guard for the original bug)', () => {
     const designSystemZeroed = zeroedByFile.get(CSS_FILES[0]);
     for (const token of [

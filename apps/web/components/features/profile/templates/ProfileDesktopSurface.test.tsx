@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -267,12 +268,34 @@ describe('ProfileDesktopSurface', () => {
     );
 
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
+    const navigation = screen.getByRole('navigation', {
+      name: 'Profile Navigation',
+    });
+    expect(navigation).toHaveAttribute(
+      'data-public-profile-nav',
+      'profile,listen,tour,about'
+    );
     expect(
-      screen.queryByRole('button', { name: 'Events' })
+      within(navigation).getByRole('button', { name: 'Home' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('button', { name: 'Music' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('button', { name: 'Shows' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('button', { name: 'About' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).queryByRole('button', { name: 'Events' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
+    expect(
+      within(navigation).queryByRole('button', { name: 'Alerts' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(navigation).queryByRole('button', { name: 'Get updates' })
+    ).not.toBeInTheDocument();
     const listenCta = screen.getByRole('button', { name: 'Listen' });
     expect(listenCta).toHaveClass('h-7');
     expect(listenCta.className).toContain('before:h-11');
@@ -332,9 +355,9 @@ describe('ProfileDesktopSurface', () => {
 
     const listenGrid = screen.getByTestId('profile-listen-desktop-grid');
     expect(listenGrid).toHaveClass(PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME);
-    expect(screen.getByTestId('profile-primary-tab-releases')).toHaveClass(
-      PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME
-    );
+    expect(
+      screen.getByTestId('profile-primary-tab-artist-streaming')
+    ).toHaveClass(PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME);
     expect(screen.getByTestId('profile-listen-dsp-column')).toHaveClass(
       PROFILE_LISTEN_DSP_COLUMN_CLASSNAME
     );
@@ -432,61 +455,8 @@ describe('ProfileDesktopSurface', () => {
     ).toHaveAttribute('href', 'https://x.com/timwhite');
   });
 
-  // Dead-control regression (JOV-6124 desktop hydrated-beat cert): the Alerts
-  // card preference switches rendered `checked={contentPrefs[key]}` but routed
-  // activation to the subscribe flow, so a role="switch" never changed state —
-  // for subscribed visitors the template's real mutation handler was dropped.
-  describe('Alerts card preference switches', () => {
-    const renderAlertsCard = (props: {
-      readonly onTogglePref: (key: NotificationContentType) => void;
-    }) =>
-      render(
-        <ProfileDesktopSurface
-          artist={artist}
-          socialLinks={[]}
-          contacts={contacts}
-          photoDownloadSizes={[]}
-          drawerOpen={false}
-          drawerView='menu'
-          activeMode='profile'
-          onModeSelect={vi.fn()}
-          onDrawerOpenChange={vi.fn()}
-          onDrawerViewChange={vi.fn()}
-          onOpenMenu={vi.fn()}
-          onPlayClick={vi.fn()}
-          profileHref='/timwhite'
-          isSubscribed
-          contentPrefs={contentPrefs}
-          onTogglePref={props.onTogglePref}
-          onUnsubscribe={vi.fn()}
-        />
-      );
-
-    it('routes activation to the template preference mutation when subscribed', () => {
-      const onTogglePref = vi.fn<(key: NotificationContentType) => void>();
-      renderAlertsCard({ onTogglePref });
-
-      const merchSwitch = screen.getByRole('switch', { name: 'Merch' });
-      expect(merchSwitch).toHaveAttribute('data-state', 'unchecked');
-      merchSwitch.click();
-
-      expect(onTogglePref).toHaveBeenCalledTimes(1);
-      expect(onTogglePref).toHaveBeenCalledWith('merch');
-    });
-
-    it('keeps the switch state owned by contentPrefs when subscribed', () => {
-      renderAlertsCard({ onTogglePref: vi.fn() });
-      expect(screen.getByRole('switch', { name: 'New Music' })).toHaveAttribute(
-        'data-state',
-        'checked'
-      );
-      expect(screen.getByRole('switch', { name: 'Shows' })).toHaveAttribute(
-        'data-state',
-        'unchecked'
-      );
-    });
-
-    it('routes activation to the subscribe flow for unsubscribed visitors', () => {
+  describe('Home alerts honesty (JOV-6197)', () => {
+    it('shows one Get updates invitation before signup and no preference switches', () => {
       const onModeSelect = vi.fn();
       const onTogglePref = vi.fn();
       render(
@@ -512,14 +482,66 @@ describe('ProfileDesktopSurface', () => {
         />
       );
 
-      const newMusicSwitch = screen.getByRole('switch', {
-        name: 'New Music',
-      });
-      expect(newMusicSwitch).toHaveAttribute('data-state', 'unchecked');
-      newMusicSwitch.click();
+      expect(screen.getByTestId('profile-desktop-get-updates')).toBeVisible();
+      expect(screen.getAllByText('Get updates').length).toBeGreaterThanOrEqual(
+        1
+      );
+      expect(
+        screen.queryByRole('switch', { name: 'New Music' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('switch', { name: 'Shows' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('switch', { name: 'Merch' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'View Shows' })
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('No live shows listed.')).toBeVisible();
+      expect(screen.queryByText('No upcoming shows.')).not.toBeInTheDocument();
 
+      screen.getByTestId('profile-desktop-get-updates').click();
       expect(onModeSelect).toHaveBeenCalledWith('subscribe');
       expect(onTogglePref).not.toHaveBeenCalled();
+    });
+
+    it('keeps preference switches inside Manage after signup', () => {
+      const onTogglePref = vi.fn<(key: NotificationContentType) => void>();
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode='subscribe'
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+          allowFanCapture
+          isSubscribed
+          contentPrefs={contentPrefs}
+          onTogglePref={onTogglePref}
+          onUnsubscribe={vi.fn()}
+        />
+      );
+
+      expect(
+        screen.getByTestId('profile-desktop-manage-settings')
+      ).toBeVisible();
+      const merchSwitch = screen.getByRole('switch', { name: 'Merch' });
+      expect(merchSwitch).toHaveAttribute('aria-checked', 'false');
+      merchSwitch.click();
+      expect(onTogglePref).toHaveBeenCalledWith('merch');
+      expect(screen.getByRole('switch', { name: 'New Music' })).toHaveAttribute(
+        'aria-checked',
+        'true'
+      );
     });
   });
   // Regression: hero social labels must use registry brand casing
@@ -562,5 +584,129 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
     ).toBeNull();
+  });
+
+  it('offers View Shows only when upcoming dates exist', () => {
+    const onModeSelect = vi.fn();
+    const upcomingShow = {
+      id: 'show-1',
+      profileId: artist.id,
+      externalId: null,
+      provider: 'manual',
+      eventType: 'tour',
+      confirmationStatus: 'confirmed',
+      reviewedAt: '2026-01-01T00:00:00.000Z',
+      title: null,
+      venueName: 'The Echo',
+      city: 'Los Angeles',
+      region: 'CA',
+      country: 'US',
+      startDate: '2026-10-20',
+      startTime: null,
+      timezone: null,
+      latitude: null,
+      longitude: null,
+      ticketUrl: 'https://tickets.example.com/show-1',
+      ticketStatus: 'available',
+      lastSyncedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } satisfies TourDateViewModel;
+
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        tourDates={[upcomingShow]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={onModeSelect}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    screen.getByRole('button', { name: 'View Shows' }).click();
+    expect(onModeSelect).toHaveBeenCalledWith('tour');
+  });
+
+  it('keeps Home release rows as release-scoped links without decorative controls', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        releases={[
+          {
+            id: 'release-1',
+            title: 'Training Season',
+            slug: 'training-season',
+            releaseType: 'single',
+            releaseDate: '2026-04-24',
+            artworkUrl: null,
+            artistNames: ['Tim White'],
+          },
+        ]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    const releaseLink = screen.getByRole('link', { name: /Training Season/ });
+    expect(releaseLink).toHaveAttribute('href', '/timwhite/training-season');
+    expect(within(releaseLink).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('does not render artist-generic Listen beside an imported catalog', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        releases={[
+          {
+            id: 'release-1',
+            title: 'Training Season',
+            slug: 'training-season',
+            releaseType: 'single',
+            releaseDate: '2026-04-24',
+            artworkUrl: null,
+            artistNames: ['Tim White'],
+          },
+        ]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='listen'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    expect(screen.getByTestId('profile-primary-tab-releases')).toBeVisible();
+    expect(
+      screen.queryByTestId('profile-primary-tab-artist-streaming')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-static-listen-interface')
+    ).not.toBeInTheDocument();
   });
 });

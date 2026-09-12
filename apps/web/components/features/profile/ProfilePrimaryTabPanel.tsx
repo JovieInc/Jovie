@@ -5,6 +5,7 @@ import { Bell, CheckCircle2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { AboutSection } from '@/features/profile/AboutSection';
+import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
@@ -13,7 +14,15 @@ import type {
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
+import {
+  PUBLIC_MUSIC_EMPTY_DESCRIPTION,
+  PUBLIC_MUSIC_EMPTY_HEADING,
+  PUBLIC_MUSIC_ERROR_DESCRIPTION,
+  PUBLIC_MUSIC_ERROR_HEADING,
+  resolvePublicMusicSurface,
+} from '@/features/profile/profile-surface-state';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
@@ -48,6 +57,7 @@ interface ProfilePrimaryTabPanelProps {
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: readonly TourDateViewModel[];
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly alertSourceContext?: NotificationSourceContext;
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
   readonly onFlowClosed?: () => void;
@@ -293,154 +303,40 @@ function ProfileMusicEmptyState({
 
   return (
     <EmptyState
-      heading='No Music'
-      description='Get a note when the first release lands.'
+      heading={PUBLIC_MUSIC_EMPTY_HEADING}
+      description={PUBLIC_MUSIC_EMPTY_DESCRIPTION}
       actionSlot={<div className='w-full max-w-xs'>{action}</div>}
       testId='profile-primary-tab-music-empty'
     />
   );
 }
 
-function SettingsToggle({
-  checked,
-  disabled,
+function ProfileMusicErrorState({
+  renderMode,
 }: Readonly<{
-  checked: boolean;
-  disabled?: boolean;
+  renderMode: ProfileRenderMode;
 }>) {
   return (
-    <span
-      className={cn(
-        'relative h-7 w-11 shrink-0 rounded-full border p-0.5 transition-colors duration-subtle',
-        checked
-          ? 'border-white/40 bg-white dark:bg-surface-1'
-          : 'border-white/14 bg-white/[0.08]',
-        disabled && 'opacity-45'
-      )}
-      aria-hidden='true'
-    >
-      <span
-        className={cn(
-          'block h-6 w-6 rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle',
-          checked
-            ? 'translate-x-4 bg-black dark:bg-black'
-            : 'translate-x-0 bg-white dark:bg-surface-1'
-        )}
-      />
-    </span>
-  );
-}
-
-function AlertsSettingsRow({
-  label,
-  description,
-  checked,
-  disabled,
-  onClick,
-}: Readonly<{
-  label: string;
-  description: string;
-  checked: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}>) {
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      disabled={disabled}
-      role='switch'
-      aria-checked={checked}
-      className='flex min-h-15 w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
-    >
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-medium tracking-[-0.005em] text-white dark:text-white'>
-          {label}
-        </p>
-        <p className='truncate text-2xs leading-4 text-white/50'>
-          {description}
-        </p>
-      </div>
-      <SettingsToggle checked={checked} disabled={disabled} />
-    </button>
-  );
-}
-
-function AlertsSettingsView({
-  isSubscribed,
-  contentPrefs,
-  onTogglePref,
-  onUnsubscribe,
-  isUnsubscribing,
-}: Readonly<{
-  isSubscribed: boolean;
-  contentPrefs: Record<NotificationContentType, boolean>;
-  onTogglePref: (key: NotificationContentType) => void;
-  onUnsubscribe: () => void;
-  isUnsubscribing: boolean;
-}>) {
-  const disabled = !isSubscribed;
-
-  return (
-    <div
-      className={NATIVE_PANEL_CLASS_NAME}
-      data-testid='profile-alerts-settings'
-    >
-      <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-        <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-          Alerts
-        </h2>
-        <span className='text-app font-medium text-white/52'>
-          {isSubscribed ? 'On' : 'Off'}
-        </span>
-      </div>
-
-      <div className='border-y border-white/[0.075]'>
-        <AlertsSettingsRow
-          label='New Music'
-          description='Singles, albums, and videos.'
-          checked={contentPrefs.newMusic}
-          disabled={disabled}
-          onClick={() => onTogglePref('newMusic')}
-        />
-        <AlertsSettingsRow
-          label='Events'
-          description='Tour dates and ticket updates.'
-          checked={contentPrefs.tourDates}
-          disabled={disabled}
-          onClick={() => onTogglePref('tourDates')}
-        />
-        <AlertsSettingsRow
-          label='Merch'
-          description='Drops, restocks, and low-stock updates.'
-          checked={contentPrefs.merch}
-          disabled={disabled}
-          onClick={() => onTogglePref('merch')}
-        />
-        <AlertsSettingsRow
-          label='General'
-          description='Occasional artist updates.'
-          checked={contentPrefs.general}
-          disabled={disabled}
-          onClick={() => onTogglePref('general')}
-        />
-      </div>
-
-      {isSubscribed ? (
-        <button
-          type='button'
-          onClick={onUnsubscribe}
-          disabled={isUnsubscribing}
-          className='mt-5 w-full px-4 py-3 text-center text-sm font-semibold text-white/72 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:text-white/36'
-        >
-          {isUnsubscribing ? 'Turning off...' : 'Turn off alerts'}
-        </button>
-      ) : (
-        <p className='px-4 pt-4 text-xs leading-5 text-white/42'>
-          Alert preferences appear here after alerts are enabled.
-        </p>
-      )}
-    </div>
+    <EmptyState
+      heading={PUBLIC_MUSIC_ERROR_HEADING}
+      description={PUBLIC_MUSIC_ERROR_DESCRIPTION}
+      variant='error'
+      action={
+        renderMode === 'preview'
+          ? {
+              label: 'Try again',
+              onClick: () => {},
+              disabled: true,
+            }
+          : {
+              label: 'Try again',
+              onClick: () => {
+                globalThis.location.reload();
+              },
+            }
+      }
+      testId='profile-primary-tab-music-error'
+    />
   );
 }
 
@@ -449,6 +345,7 @@ export function ProfilePrimaryTabPanel({
   renderMode = 'interactive',
   artist,
   notificationsPortalContainer,
+  dsps = [],
   subscribeTwoStep = false,
   alertOptInVariant,
   isSubscribed,
@@ -461,6 +358,7 @@ export function ProfilePrimaryTabPanel({
   allowPhotoDownloads = false,
   tourDates = [],
   releases = [],
+  catalogLoadFailed = false,
   alertSourceContext,
   previewNotificationsState,
   onFlowClosed,
@@ -511,9 +409,13 @@ export function ProfilePrimaryTabPanel({
     };
 
   if (mode === 'listen') {
-    const visibleReleases = releases.filter(release => Boolean(release.slug));
+    const musicSurface = resolvePublicMusicSurface({
+      releases,
+      hasPlayableDestinations: dsps.length > 0,
+      catalogLoadFailed,
+    });
 
-    if (visibleReleases.length > 0) {
+    if (musicSurface.kind === 'catalog') {
       return (
         <div
           className='-mx-4 space-y-4 pb-2'
@@ -526,7 +428,7 @@ export function ProfilePrimaryTabPanel({
               </h2>
             </div>
             <ReleasesView
-              releases={visibleReleases}
+              releases={musicSurface.visibleReleases}
               artistId={artist.id}
               artistHandle={artist.handle}
               artistName={artist.name}
@@ -546,11 +448,29 @@ export function ProfilePrimaryTabPanel({
             Music
           </h2>
         </div>
-        <ProfileMusicEmptyState
-          artist={artist}
-          renderMode={renderMode}
-          sourceContext={musicEmptySourceContext}
-        />
+        {musicSurface.kind === 'error' ? (
+          <ProfileMusicErrorState renderMode={renderMode} />
+        ) : musicSurface.kind === 'artist-streaming' ? (
+          <div
+            className='px-4 pb-4'
+            data-testid='profile-primary-tab-artist-streaming'
+          >
+            <StaticListenInterface
+              artist={artist}
+              handle={artist.handle}
+              dspsOverride={dsps}
+              containerClassName='max-w-none'
+              hideHelpText
+              renderMode={renderMode}
+            />
+          </div>
+        ) : (
+          <ProfileMusicEmptyState
+            artist={artist}
+            renderMode={renderMode}
+            sourceContext={musicEmptySourceContext}
+          />
+        )}
       </div>
     );
   }
@@ -563,7 +483,7 @@ export function ProfilePrimaryTabPanel({
       >
         <div className='px-4 pb-2 pt-3'>
           <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-            Events
+            Shows
           </h2>
         </div>
         <TourDrawerContent
@@ -600,7 +520,7 @@ export function ProfilePrimaryTabPanel({
 
   return (
     <div className={PANEL_CLASS_NAME} data-testid='profile-primary-tab-about'>
-      <SectionIntro title='Profile' />
+      <SectionIntro title='About' />
       <div
         className={cn(
           'text-white/80',

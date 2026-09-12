@@ -23,10 +23,10 @@ Routes rendered inside the compact profile surface, showing the bottom tab bar.
 | `/{username}` | Home | Profile root; canonical primary surface |
 | `/{username}?mode=profile` | Home | Alias — same as root |
 | `/{username}?mode=listen` | Music | DSP list in tab panel / drawer |
-| `/{username}?mode=tour` | Events | Shown only when `hasTourDates === true`; omitted from tab bar otherwise |
-| `/{username}?mode=subscribe` | Alerts | Inline subscribe flow within tab panel |
-| `/{username}?mode=releases` | Music | Releases drawer overlay; Music tab stays active |
-| `/{username}?mode=about` | Home | About drawer overlay; Home tab stays active |
+| `/{username}?mode=tour` | Shows | Always a destination. Empty vs no-surface copy is Wave 1 (JOV-6197). |
+| `/{username}?mode=subscribe` | Home | Get updates is an action, not an equal-weight destination. Home stays active. |
+| `/{username}?mode=releases` | Music | Releases overlay; Music destination stays active |
+| `/{username}?mode=about` | About | First-class destination on compact and wide |
 | `/{username}?mode=contact` | Home | Contact drawer overlay; Home tab stays active |
 | `/{username}?mode=pay` | Home | Pay drawer on mobile; panel on desktop; Home tab stays active |
 
@@ -84,18 +84,21 @@ Routes that represent loading, empty, error, or unavailable states, not product 
 
 ## 2. Bottom Tab Bar Contract
 
-### 2.1 Canonical Tab Definitions
+### 2.1 Canonical Destinations (JOV-6198)
 
-Exactly four tabs. Order is fixed. Labels and icons are fixed. No exceptions.
+Exactly four equal-weight destinations. Order, labels, availability, active
+state, and fallbacks are owned by `apps/web/lib/profile/route-config.ts`.
+Devices may arrange; they must not independently decide what exists.
 
-| Position | Mode | Label | Icon (Lucide) |
-|---|---|---|---|
-| 1 | `profile` | Home | `UserRound` |
-| 2 | `listen` | Music | `Music2` |
-| 3 | `tour` | Events | `CalendarDays` |
-| 4 | `subscribe` | Alerts | `Bell` |
+| Position | Mode | Label | Compact | Wide |
+|---|---|---|---|---|
+| 1 | `profile` | Home | bottom bar | top nav |
+| 2 | `listen` | Music | bottom bar | top nav |
+| 3 | `tour` | Shows | bottom bar | top nav |
+| 4 | `about` | About | bottom bar | top nav |
 
-A fifth "More" menu item appears after the four tabs when `hideMoreMenu` is `false`. More is not a tab — it opens the `menu` drawer.
+Get updates (`subscribe`) is an action, not a destination. Claimed-only
+fan-capture still gates the action. More remains a menu trigger, not a tab.
 
 ### 2.2 Tab Bar Visibility Rules
 
@@ -109,32 +112,35 @@ A fifth "More" menu item appears after the four tabs when `hideMoreMenu` is `fal
 
 Implementation note: `showBottomNav` is currently hardcoded to `true` in `ProfileCompactSurface`. This is correct for Category 1 routes. It is not exposed as a prop. JOV-2024 may add conditional logic — do not change this before that issue is in progress.
 
-### 2.3 Conditional Tab: Events
+### 2.3 Shows availability
 
-The Events tab is omitted from the tab bar when `hasTourDates === false`. When omitted:
-- The `tour` mode is not accessible via the tab bar.
-- The grid column count decreases by one (4 tabs + More → 3 tabs + More).
-- Entering `/{username}?mode=tour` directly redirects the active tab highlight to `profile` (Home) — the tab bar renders without the tour entry active.
-
-No other tabs are conditional. Home, Music, and Alerts appear for all artists.
+Shows is always a destination. Compact and wide must not hide it when there
+are no upcoming dates. Wave 1 (JOV-6197) owns empty-surface vs no-upcoming
+copy and notify. Do not invent a second empty-Events or Alerts story here.
 
 ### 2.4 Active State Determination
 
-Active state is determined by `resolveActivePrimaryTab()` in `ProfileCompactSurface`. Rules:
-- The `mode` query param maps directly to a `ProfilePrimaryTab` value.
-- If the mode is `tour` and `hasTourDates === false`, the active tab falls back to `profile`.
-- Drawer modes (`releases`, `about`, `contact`, `pay`) do not change the active tab — the tab that was active before the drawer opened remains active.
-- On the profile root (`/{username}` with no `?mode=`), the active tab is `profile`.
+Active destination is `resolvePublicProfileActiveDestination()` in
+`apps/web/lib/profile/route-config.ts`. Both shells must consume it.
+
+- `tour` stays Shows even when no dates exist.
+- `about` selects About.
+- `subscribe` / notifications overlay keeps Home active and marks Get updates
+  as the active action.
+- `releases` keeps Music active.
+- `contact` / `pay` / `menu` keep Home active.
+- Unknown modes fall back to Home.
 
 ### 2.5 Behavior on Direct Load / Refresh / Deep Link / Back
 
 | Scenario | Behavior |
 |---|---|
-| Direct load of `/{username}` | Tab bar renders; Home tab active; profile data fetched server-side (ISR after JOV-2023 fix) |
-| Direct load of `/{username}?mode=listen` | Tab bar renders; Music tab active; drawer or tab panel opens to DSP list |
-| Direct load of `/{username}?mode=subscribe` | Tab bar renders; Alerts tab active; inline subscribe form visible |
-| Direct load of `/{username}?mode=tour` | Tab bar renders; Events tab active if `hasTourDates === true`; otherwise falls back to Home |
-| Direct load of `/{username}?mode=releases` | Tab bar renders; Music tab active; releases drawer opens |
+| Direct load of `/{username}` | Destinations render; Home active; profile data fetched server-side (ISR after JOV-2023 fix) |
+| Direct load of `/{username}?mode=listen` | Destinations render; Music active; drawer or tab panel opens to DSP list |
+| Direct load of `/{username}?mode=subscribe` | Destinations render; Home active; Get updates action/flow visible when fan-capture is allowed |
+| Direct load of `/{username}?mode=tour` | Destinations render; Shows active |
+| Direct load of `/{username}?mode=about` | Destinations render; About active |
+| Direct load of `/{username}?mode=releases` | Destinations render; Music active; releases overlay opens |
 | Browser refresh on any `?mode=` | Page reloads; the same mode is restored from the URL (no state is lost) |
 | Browser back from a drawer mode | Returns to the previous `?mode=` in the browser history stack (via `history.pushState`). If the drawer was opened from Home, back returns to Home. |
 | Browser back from `/{username}/alerts` | Returns to the referring page (external or profile root); does not return to the tab bar |
@@ -154,16 +160,18 @@ Content that does not apply this padding will be obscured by the tab bar on devi
 |---|---|
 | < 768px (mobile) | Tab bar renders at the bottom of the viewport-locked surface |
 | 768–1179px (tablet / compact mode) | Tab bar renders; profile card is inset inside the page; safe area padding still applies |
-| ≥ 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses its own navigation and panel composition instead of a bottom drawer. The compact surface and bottom tab bar do not render. |
+| ≥ 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses its own navigation and panel composition instead of a bottom drawer. The compact surface and bottom tab bar do not render. Desktop arranges the same four destinations in top chrome. It must not invent Alerts/Events-only destinations or hide Shows when empty. |
 | ≥ 1180px (explicit embedded preview) | The compact surface may render only inside a labeled preview frame with a keyboard-operable exit to the full profile. |
 
 Optimization contract: `apps/web/data/publicProfileDesktopOptimization.ts` (JOV-INV-012). Exposure and outcome reuse existing `profile_claim_banner_impression` / `profile_claim_banner_click` analytics; do not add a parallel stack.
 
-Desktop tab behavior is owned by JOV-2024. This spec records the current behavior; JOV-2024 may modify it.
+Desktop and compact share one destination/action contract (JOV-6198).
 
-### 2.8 Maximum Tabs Before Overflow
+### 2.8 Maximum Destinations Before Overflow
 
-The tab bar supports a maximum of **4 primary tabs plus one More item**. When the Events tab is visible, the grid is `5 columns` (4 tabs + More). When Events is hidden, the grid is `4 columns` (3 tabs + More). No additional tabs may be added to the primary tab bar without human product approval. If a future tab exceeds this count, the overflow belongs in the More drawer menu.
+The shared contract has exactly **four destinations**. Compact uses a 4-column
+bottom bar. Wide uses top-nav chips. More is not a destination. Get updates
+must not be added as a fifth equal-weight slot.
 
 ---
 
@@ -310,8 +318,9 @@ The inline form (`ProfileInlineNotificationsCTA` via `ArtistNotificationsCTA`) a
 |---|---|
 | Profile / Home | Home |
 | Listen / Music | Music |
-| Tour / Events | Events |
-| Subscribe / Alerts | Alerts |
+| Tour / Shows | Shows |
+| About | About |
+| Get updates action | Get updates |
 | More menu trigger | More |
 
 These labels are not translated in the initial implementation. Internationalization is out of scope for JOV-2021..JOV-2027.

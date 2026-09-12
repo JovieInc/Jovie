@@ -73,14 +73,14 @@ export const PROFILE_MATRIX_ROUTES: readonly ProfileMatrixRoute[] = [
   {
     id: 'subscribe',
     path: `/${MUSIC_HANDLE}?mode=subscribe`,
-    expectedActiveTab: 'subscribe',
+    expectedActiveTab: 'profile',
     readySelectors: ['[data-testid="profile-primary-tab-subscribe"]'],
     showsBottomTabBar: true,
   },
   {
     id: 'about',
     path: `/${MUSIC_HANDLE}?mode=about`,
-    expectedActiveTab: null,
+    expectedActiveTab: 'about',
     readySelectors: ['[data-testid="profile-primary-tab-about"]'],
     showsBottomTabBar: true,
   },
@@ -101,7 +101,7 @@ export const PROFILE_MATRIX_ROUTES: readonly ProfileMatrixRoute[] = [
   {
     id: 'notifications-legacy',
     path: `/${TIP_HANDLE}/notifications`,
-    expectedActiveTab: 'subscribe',
+    expectedActiveTab: 'profile',
     readySelectors: ['[data-testid="profile-primary-tab-subscribe"]'],
     showsBottomTabBar: true,
   },

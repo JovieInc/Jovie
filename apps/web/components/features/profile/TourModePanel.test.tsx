@@ -82,7 +82,7 @@ describe('TourModePanel', () => {
     render(<TourModePanel artist={PROFILE_STORY_ARTIST} tourDates={[]} />);
 
     expect(screen.getByTestId('tour-drawer-content')).toBeInTheDocument();
-    expect(screen.getByText('No Events')).toBeInTheDocument();
+    expect(screen.getByText('No upcoming shows')).toBeInTheDocument();
     expect(screen.queryByTestId('tour-drawer-list')).not.toBeInTheDocument();
     expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
     expect(screen.queryByText('Releases')).not.toBeInTheDocument();

@@ -1,0 +1,52 @@
+{
+  "$comment": "Measured inventory only. Activation is a separate change after this baseline is trusted on main; preserve approved component styling.",
+  "$provenance": {
+    "sourceSha": "75034f8539e0b039fb2ec8ff33c0102598d86198",
+    "detectorSha256": "f3366e5b40737f5233787c55efe00459b9d98fab40ee4c2d826bd9f7cea62b87"
+  },
+  "conservative": {
+    "armed": false,
+    "count": 747,
+    "perFamily": {
+      "marketing": 113,
+      "web-shell": 296,
+      "web-other": 327,
+      "packages/ui": 11
+    },
+    "perUtility": {
+      "gap-2.5": 92,
+      "gap-3.5": 15,
+      "gap-x-2.5": 1,
+      "mb-2.5": 9,
+      "mt-2.5": 23,
+      "mt-3.5": 3,
+      "mx-2.5": 1,
+      "my-2.5": 1,
+      "p-2.5": 33,
+      "p-3.5": 33,
+      "pb-2.5": 14,
+      "pb-3.5": 1,
+      "pl-2.5": 2,
+      "pl-3.5": 2,
+      "pr-2.5": 3,
+      "pr-3.5": 2,
+      "pt-2.5": 9,
+      "px-2.5": 251,
+      "px-3.5": 48,
+      "py-2.5": 132,
+      "py-3.5": 34,
+      "space-y-2.5": 35,
+      "space-y-3.5": 3
+    }
+  },
+  "strict": {
+    "armed": false,
+    "count": 2380,
+    "perFamily": {
+      "marketing": 301,
+      "web-shell": 919,
+      "web-other": 1101,
+      "packages/ui": 59
+    }
+  }
+}

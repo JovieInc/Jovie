@@ -120,7 +120,76 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     );
   });
 
-  it('renders a cardless no-music alert empty state without release leakage', () => {
+  it('renders a cardless no-releases empty state without implying no music exists', () => {
+    render(
+      <ProfilePrimaryTabPanel
+        mode='listen'
+        artist={artist}
+        dsps={[]}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+        isUnsubscribing={false}
+        releases={[]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-primary-tab-music-empty')).toBeVisible();
+    const heading = screen.getByText('No releases listed yet');
+    expect(heading).toHaveClass('text-secondary-token');
+    expect(screen.getByTestId('profile-primary-tab-music-empty').tagName).toBe(
+      'OUTPUT'
+    );
+    expect(screen.queryByText('No Music')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Turn On Music Alerts' })
+    ).toHaveAttribute('data-source', 'music_empty_state');
+    expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
+    expect(screen.queryByText('Releases')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mock-releases-view')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-static-listen-interface')
+    ).not.toBeInTheDocument();
+  });
+
+  it('falls back to artist streaming when the catalog is empty but destinations exist', () => {
+    render(
+      <ProfilePrimaryTabPanel
+        mode='listen'
+        artist={artist}
+        dsps={dsps}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+        isUnsubscribing={false}
+        releases={[
+          {
+            id: 'release-without-slug',
+            title: 'Unlisted Cut',
+            slug: '',
+            releaseType: 'single',
+            releaseDate: '2026-04-24',
+            artworkUrl: null,
+            artistNames: ['Dua Lipa'],
+          },
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByTestId('profile-primary-tab-artist-streaming')
+    ).toBeVisible();
+    expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
+    expect(
+      screen.queryByTestId('profile-primary-tab-music-empty')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('No Music')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mock-releases-view')).not.toBeInTheDocument();
+  });
+
+  it('treats a catalog load failure as a recoverable error, not an empty catalog', () => {
     render(
       <ProfilePrimaryTabPanel
         mode='listen'
@@ -132,21 +201,21 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
         onUnsubscribe={vi.fn()}
         isUnsubscribing={false}
         releases={[]}
+        catalogLoadFailed
       />
     );
 
-    expect(screen.getByTestId('profile-primary-tab-music-empty')).toBeVisible();
-    const heading = screen.getByText('No Music');
-    expect(heading).toHaveClass('text-secondary-token');
-    expect(screen.getByTestId('profile-primary-tab-music-empty').tagName).toBe(
-      'OUTPUT'
-    );
+    expect(screen.getByTestId('profile-primary-tab-music-error')).toBeVisible();
+    expect(screen.getByText("Couldn't load releases")).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Turn On Music Alerts' })
-    ).toHaveAttribute('data-source', 'music_empty_state');
-    expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
-    expect(screen.queryByText('Releases')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('mock-releases-view')).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Try again' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-primary-tab-music-empty')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-primary-tab-artist-streaming')
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the preview music CTA at 28px inside a 44px target', () => {
@@ -154,7 +223,7 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
       <ProfilePrimaryTabPanel
         mode='listen'
         artist={artist}
-        dsps={dsps}
+        dsps={[]}
         isSubscribed={false}
         contentPrefs={contentPrefs}
         onTogglePref={vi.fn()}
