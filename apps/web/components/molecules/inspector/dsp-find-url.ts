@@ -12,5 +12,9 @@ export function buildDspFindUrl(
   const template = entry?.searchUrlTemplate;
   if (!template) return null;
 
-  return template.replace('{query}', encodeURIComponent(trimmed));
+  // Templates may carry a storefront segment (e.g. Apple Music). Default to
+  // the US storefront — the search page redirects by locale from there.
+  return template
+    .replaceAll('{storefront}', 'us')
+    .replace('{query}', encodeURIComponent(trimmed));
 }

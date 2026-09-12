@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -16,7 +17,7 @@ export interface DspQuietRowProps {
 }
 
 const DSP_QUIET_ROW_CLASS =
-  'group flex min-h-8 items-center gap-2 rounded-md px-2 transition-[background-color] duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)';
+  'group flex min-h-8 items-center gap-2 rounded-md px-2 transition-colors duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55';
 
 /** Track/release DSP row: name + ↗, or Find when the provider is not found. */
 export function DspQuietRow({
@@ -69,14 +70,15 @@ export function DspQuietRow({
         {label}
       </span>
       {onFind ? (
-        <button
+        <Button
           type='button'
+          variant='link'
           onClick={onFind}
           tabIndex={closedTabIndex}
-          className='shrink-0 text-2xs font-medium text-secondary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+          className='shrink-0 text-2xs font-medium text-secondary-token hover:text-primary-token focus-visible:ring-2 focus-visible:ring-ring/55'
         >
           {findLabel}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

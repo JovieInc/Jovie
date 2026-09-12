@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -31,15 +32,16 @@ export function DisclosureRow({
       data-disclosure-level='l3'
       data-testid={testId}
     >
-      <button
+      <Button
         type='button'
+        variant='link'
         aria-expanded={open}
         aria-controls={contentId}
         onClick={() => setOpen(current => !current)}
         className={cn(
-          'flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-left',
-          'transition-[background-color] duration-subtle hover:bg-surface-1',
-          'focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+          'flex w-full min-h-8 items-center gap-2 rounded-md px-2 text-left',
+          'transition-colors duration-subtle hover:bg-surface-1',
+          'focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-ring/55'
         )}
       >
         <span className='min-w-0 flex-1 truncate text-xs font-medium text-primary-token'>
@@ -57,7 +59,7 @@ export function DisclosureRow({
           )}
           aria-hidden='true'
         />
-      </button>
+      </Button>
       {open ? (
         <div id={contentId} className='px-2 pb-2 pt-1'>
           {children}
