@@ -141,6 +141,26 @@ describe('SidebarIdentityGroup', () => {
     );
   });
 
+  it('omits public-profile access when no profile is available', () => {
+    render(<SidebarIdentityGroup profileHref={undefined} />);
+    expect(screen.getByRole('button', { name: /Tim White/i })).toBeEnabled();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('reveals the public-profile URL on keyboard focus without opening the account menu', async () => {
+    const user = userEvent.setup();
+    render(<SidebarIdentityGroup profileHref={PROFILE_HREF} />);
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole('link', { name: PROFILE_LINK_NAME })).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      PROFILE_DISPLAY_HREF
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: PROFILE_LINK_NAME })).toHaveFocus();
+  });
+
   it('keeps one enclosing boundary for hover, focus-visible, selected, spacing, and border', () => {
     pathnameMock.mockReturnValue(PROFILE_HREF);
     const { container } = render(
@@ -156,7 +176,7 @@ describe('SidebarIdentityGroup', () => {
 
     expect(getIdentityGroups(container)).toHaveLength(1);
     expect(group).toHaveAttribute('data-active', 'true');
-    expect(group).toHaveClass('border-t');
+    expect(group).not.toHaveClass('border-t');
     expect(composition).toHaveClass(
       'hover:bg-sidebar-accent',
       'bg-sidebar-accent-active'
