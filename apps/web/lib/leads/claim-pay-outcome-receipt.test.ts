@@ -38,11 +38,11 @@ describe('inspectClaimPayOutcomeReceipt', () => {
     expect(CLAIM_PAY_FALSE_GREEN_WEBHOOK_FIXTURE.webhookReturnedSuccess).toBe(
       true
     );
-    expect(
-      CLAIM_PAY_FALSE_GREEN_WEBHOOK_FIXTURE.events.some(
-        event => event.eventType === CLAIM_PAY_PAID_EVENT
-      )
-    ).toBe(false);
+    const redEventTypes: readonly string[] =
+      CLAIM_PAY_FALSE_GREEN_WEBHOOK_FIXTURE.events.map(
+        event => event.eventType
+      );
+    expect(redEventTypes).not.toContain(CLAIM_PAY_PAID_EVENT);
     expect(receipt).toEqual({
       status: 'false_green_webhook',
       observable: true,
