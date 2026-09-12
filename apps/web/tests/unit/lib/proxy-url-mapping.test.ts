@@ -98,6 +98,8 @@ describe('proxy routing helpers', () => {
         true
       );
       expect(categorizePath(APP_ROUTES.START).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.HUD).needsNonce).toBe(true);
+      expect(categorizePath(APP_ROUTES.HUD).isProtectedPath).toBe(false);
       expect(categorizePath('/pricing').needsNonce).toBe(false);
     });
 

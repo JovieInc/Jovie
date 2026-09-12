@@ -28,6 +28,7 @@ describe('app shell mode', () => {
   it.each([
     APP_ROUTES.OV,
     `${APP_ROUTES.OV}/ops`,
+    APP_ROUTES.HUD,
   ])('resolves %s to OV mode', pathname => {
     expect(resolveAppShellMode(pathname)).toBe('ov');
   });

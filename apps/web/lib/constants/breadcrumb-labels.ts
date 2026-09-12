@@ -29,6 +29,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
 
   // Admin routes
   admin: 'Admin',
+  hud: 'Ops',
   people: 'People',
   growth: 'Growth',
   waitlist: 'Waitlist',
