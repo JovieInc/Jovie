@@ -617,6 +617,44 @@ function resolveOwnedRepairController(environment = process.env) {
   return { command: launcher, args: manifest.arguments };
 }
 
+/**
+ * Minimal controller child-process surface the executor actually consumes.
+ * Structural (not ChildProcess) so test fakes remain assignable.
+ *
+ * @typedef {object} OwnedRepairControllerProcess
+ * @property {{ on(event: string, listener: (chunk: any) => void): void }=} stdout
+ * @property {{ on(event: string, listener: (chunk: any) => void): void }=} stderr
+ * @property {{ end(input: string): void }=} stdin
+ * @property {((...args: any[]) => unknown)=} kill
+ * @property {(event: string, listener: (...args: any[]) => void) => void} once
+ */
+
+/**
+ * Injection points for the owned-repair executor. Both keys are optional;
+ * tests inject exactly one. Omit both to run the real controller launcher
+ * through node:child_process spawn.
+ *
+ * - `run` — synchronous spawnSync-shaped injection
+ *   `(binary, args, options) => { status, stdout, error? }`; the executor
+ *   passes the task JSON as `options.input`.
+ * - `spawnProcess` — async spawn-shaped injection
+ *   `(binary, args, options) => controllerProcess`; the executor pipes
+ *   `JSON.stringify(task)` to `stdin.end` and parses the collected stdout.
+ *
+ * @typedef {object} OwnedRepairExecutorOptions
+ * @property {((binary: string, args: string[], options: {
+ *   input: string, encoding: string, timeout: number, maxBuffer: number
+ * }) => { status: number | null, stdout: string, error?: Error })=} run
+ *   Synchronous controller invocation override.
+ * @property {((binary: string, args: readonly string[] | undefined, options: import('node:child_process').SpawnOptions | undefined) => OwnedRepairControllerProcess)=} spawnProcess
+ *   Asynchronous controller spawn override.
+ */
+
+/**
+ * @param {unknown} task
+ * @param {((binary: string, args: readonly string[] | undefined, options: import('node:child_process').SpawnOptions | undefined) => OwnedRepairControllerProcess)=} spawnProcess
+ * @returns {Promise<unknown>}
+ */
 function runOwnedRepairController(task, spawnProcess = spawn) {
   return new Promise((resolve, reject) => {
     let command;
@@ -684,6 +722,10 @@ function runOwnedRepairController(task, spawnProcess = spawn) {
 }
 
 /** Existing host controller owns qualification and the shared lease. */
+
+/**
+ * @param {OwnedRepairExecutorOptions=} executorOptions
+ */
 export function createOwnedRepairExecutor({ run, spawnProcess = spawn } = {}) {
   return {
     async execute(task) {

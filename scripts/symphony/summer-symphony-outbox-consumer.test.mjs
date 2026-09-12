@@ -1275,7 +1275,12 @@ describe('existing owned repair transport', () => {
       assert.equal((await executor.execute(taskV3())).status, 'held');
       assert.equal(calls, 1);
 
-      const child = new EventEmitter();
+      const child = /** @type {import('node:events').EventEmitter & {
+        stdout: import('node:events').EventEmitter,
+        stderr: import('node:events').EventEmitter,
+        stdin: { end(input: string): void },
+        kill(signal?: string): void
+      }} */ (/** @type {unknown} */ (new EventEmitter()));
       child.stdout = new EventEmitter();
       child.stderr = new EventEmitter();
       child.stdin = {
