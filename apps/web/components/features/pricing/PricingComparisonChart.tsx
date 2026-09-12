@@ -63,7 +63,7 @@ function DesktopFeatureRow({
         <CellValue value={feature.pro} />
       </td>
       <td className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'>
-        <CellValue value={feature.enterprise} comingSoon={feature.comingSoon} />
+        <CellValue value={feature.enterprise} />
       </td>
     </tr>
   );
