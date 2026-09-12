@@ -1480,6 +1480,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # this branch resumes qualified promotion. Do not mint hold-intake from
         # a weaker fallback: consumers now require exact-main review and those
         # bounded reasons, and a rejectable receipt fails the fleet projector.
+        # A parked controller (Codex usage-limit cooldown; :4041 connection
+        # refused) is that same capacity shape, not a crash — live 2026-09-04
+        # 01:20Z — so promotion of already-green PRs continues in hold-intake.
         promotion_mode = "hold-intake"
     elif controller_repair_allowed:
         promotion_mode = "controller-repair-only"
