@@ -116,6 +116,7 @@ function createFixture() {
       'Tim-gated',
       'vercel-react-best-practices',
       'vercel-composition-patterns',
+      'PUBLIC_SKILL_REGISTRY',
     ].join('\n')
   );
   const uiDoc = 'pinned web interface handbook\n';

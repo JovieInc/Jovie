@@ -168,6 +168,13 @@ empty/error/loading states.
 | Unscoped `react-view-transitions` | "Implement all applicable patterns" authorizes app-wide animation. Defer until a named interaction. Never authorize app-wide animation |
 | `writing-guidelines` as a product skill | Optional docs-only later. Preserve Jovie voice |
 
+## Product catalog (out of scope)
+
+Do not edit `PUBLIC_SKILL_REGISTRY` / `SKILL_REGISTRY`, `skills_catalog`,
+featured-vs-silent product catalog, chat tool inventory, or
+`apps/web/lib/agents/registry.ts`. JOV-6188 is engineering agent-skills
+governance only.
+
 ## Rails
 
 Protect JovieInc/Jovie#17453. HOLD #17156. Leave #17511 and #17521. No Tim

@@ -96,6 +96,7 @@ const REQUIRED_COVERAGE_MAP_PHRASES = [
   'Tim-gated',
   'vercel-react-best-practices',
   'vercel-composition-patterns',
+  'PUBLIC_SKILL_REGISTRY',
 ];
 
 const REQUIRED_HANDBOOK_PINS = [
