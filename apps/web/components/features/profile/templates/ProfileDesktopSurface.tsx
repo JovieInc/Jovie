@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Disc3,
   House,
   Mail,
   MapPin,
@@ -21,7 +22,6 @@ import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
-import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type {
@@ -34,10 +34,7 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
-  PUBLIC_EVENTS_NO_SURFACE,
   resolveProfileSurfaceState,
-  resolvePublicMusicSurface,
-  shouldOfferPublicEventsDestination,
   shouldShowPublicProfileBackChevron,
   subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
@@ -115,7 +112,6 @@ interface ProfileDesktopSurfaceProps {
   readonly tourDates?: TourDateViewModel[];
   readonly viewerCountryCode?: string | null;
   readonly releases?: readonly PublicRelease[];
-  readonly catalogLoadFailed?: boolean;
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly activeMode?: ProfileMode;
@@ -271,7 +267,6 @@ export function ProfileDesktopSurface({
   tourDates = [],
   viewerCountryCode,
   releases = [],
-  catalogLoadFailed = false,
   drawerOpen,
   drawerView,
   activeMode = 'profile',
@@ -319,11 +314,8 @@ export function ProfileDesktopSurface({
   );
   const baseActivePrimaryTab = getDesktopBaseMode(activeMode);
   const hasTourDates = tourDates.length > 0;
-  const hasEventsDestination = shouldOfferPublicEventsDestination(
-    tourDates.length
-  );
   const activePrimaryTab =
-    (baseActivePrimaryTab === 'tour' && !hasEventsDestination) ||
+    (baseActivePrimaryTab === 'tour' && !hasTourDates) ||
     (baseActivePrimaryTab === 'subscribe' && !allowFanCapture)
       ? 'profile'
       : baseActivePrimaryTab;
@@ -351,11 +343,9 @@ export function ProfileDesktopSurface({
         isSubscribed,
         activeSubtitle: latestRelease?.title ?? 'Artist profile',
         viewerCountryCode,
-        catalogLoadFailed,
       }),
     [
       artist,
-      catalogLoadFailed,
       isSubscribed,
       latestRelease,
       mergedDSPs.length,
@@ -381,11 +371,6 @@ export function ProfileDesktopSurface({
     hasReleases,
     emptyState,
   } = surfaceState;
-  const musicSurface = resolvePublicMusicSurface({
-    releases: visibleReleases,
-    hasPlayableDestinations: mergedDSPs.length > 0,
-    catalogLoadFailed,
-  });
   const shareContext = useMemo(
     () =>
       buildProfileShareContext({
@@ -570,10 +555,8 @@ export function ProfileDesktopSurface({
         >
           <DesktopSurfaceCard
             title='Events'
-            actionLabel={hasEventsDestination ? 'View Events' : undefined}
-            onAction={
-              hasEventsDestination ? () => onModeSelect('tour') : undefined
-            }
+            actionLabel='View Events'
+            onAction={() => onModeSelect('tour')}
           >
             <div className='space-y-2'>
               {upcomingTourDates.length > 0 ? (
@@ -611,23 +594,15 @@ export function ProfileDesktopSurface({
                   </div>
                 ))
               ) : (
-                <EmptySurfaceBlock>
-                  {PUBLIC_EVENTS_NO_SURFACE}
-                </EmptySurfaceBlock>
+                <EmptySurfaceBlock>{emptyState.tour}</EmptySurfaceBlock>
               )}
             </div>
           </DesktopSurfaceCard>
 
           <DesktopSurfaceCard
             title='All Releases'
-            actionLabel={
-              musicSurface.kind === 'catalog' ? 'View all releases' : undefined
-            }
-            onAction={
-              musicSurface.kind === 'catalog'
-                ? () => onModeSelect('listen')
-                : undefined
-            }
+            actionLabel='View all releases'
+            onAction={() => onModeSelect('listen')}
           >
             <div className='space-y-2'>
               {visibleReleases.length > 0 ? (
@@ -639,7 +614,7 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
                       <ImageWithFallback
@@ -662,6 +637,14 @@ export function ProfileDesktopSurface({
                         )}
                       </p>
                     </div>
+                    <span className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-black/28 text-white dark:text-white'>
+                      <Play className='ml-0.5 h-4 w-4 fill-current' />
+                    </span>
+                    <span className='flex items-center gap-1 text-white/30'>
+                      <span className='h-1 w-1 rounded-full bg-current' />
+                      <span className='h-1 w-1 rounded-full bg-current' />
+                      <span className='h-1 w-1 rounded-full bg-current' />
+                    </span>
                   </a>
                 ))
               ) : (
@@ -687,30 +670,83 @@ export function ProfileDesktopSurface({
           className={allowFanCapture ? undefined : 'hidden'}
         >
           <div className='space-y-4'>
-            <button
-              type='button'
-              onClick={() => onModeSelect('subscribe')}
-              data-testid={
-                isSubscribed
-                  ? 'profile-desktop-manage-updates'
-                  : 'profile-desktop-get-updates'
-              }
-              className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
-            >
-              <span className='min-w-0'>
-                <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
-                  {isSubscribed ? 'Updates on' : 'Get updates'}
+            {!isSubscribed ? (
+              <button
+                type='button'
+                onClick={() => onModeSelect('subscribe')}
+                className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
+              >
+                <span className='min-w-0'>
+                  <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
+                    Release Alerts
+                  </span>
+                  <span className='block truncate text-xs leading-5 text-white/48'>
+                    New music, shows, and merch.
+                  </span>
                 </span>
-                <span className='block truncate text-xs leading-5 text-white/48'>
-                  {isSubscribed
-                    ? 'Manage what you hear about.'
-                    : 'New music, shows, and merch.'}
-                </span>
-              </span>
-              <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
-                {isSubscribed ? 'Manage' : 'Get updates'}
-              </span>
-            </button>
+                {alertOptInVariant === 'toggle' ? (
+                  <span
+                    className='relative h-7 w-11 shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
+                    aria-hidden='true'
+                  >
+                    <span className='block h-6 w-6 rounded-full bg-white dark:bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
+                  </span>
+                ) : (
+                  <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
+                    Get alerts
+                  </span>
+                )}
+              </button>
+            ) : null}
+            <div className='space-y-3'>
+              {[
+                { key: 'newMusic', label: 'New Music', icon: Music2 },
+                { key: 'tourDates', label: 'Shows', icon: CalendarDays },
+                { key: 'merch', label: 'Merch', icon: Disc3 },
+              ].map(item => {
+                const Icon = item.icon;
+                const checked = Boolean(
+                  contentPrefs[item.key as NotificationContentType]
+                );
+                return (
+                  <div
+                    key={item.key}
+                    className='flex items-center justify-between gap-4'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <Icon className='size-4 text-white/62' />
+                      <span className='text-sm font-medium tracking-[-0.015em] text-white/84'>
+                        {item.label}
+                      </span>
+                    </div>
+                    {isSubscribed ? (
+                      // Subscribed visitors manage preferences in place: the
+                      // template's onTogglePref runs the real optimistic
+                      // mutation and rolls back on error.
+                      <Switch
+                        checked={checked}
+                        onCheckedChange={() =>
+                          onTogglePref(item.key as NotificationContentType)
+                        }
+                        aria-label={item.label}
+                        className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
+                      />
+                    ) : (
+                      // Unsubscribed visitors have no notification identity yet
+                      // (the prefs API requires an email/phone), so the row
+                      // routes into the subscribe flow instead — it must not
+                      // render a switch that flips and springs back.
+                      <Switch
+                        checked={false}
+                        onCheckedChange={() => onModeSelect('subscribe')}
+                        aria-label={item.label}
+                        className='data-[state=unchecked]:bg-white/14'
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
             {showArtistEmailRow ? (
               <>
                 <div className='h-px bg-white/8' />
@@ -747,58 +783,8 @@ export function ProfileDesktopSurface({
     </div>
   );
 
-  const catalogListenSidebar = (
-    <div
-      className={PROFILE_LISTEN_DSP_COLUMN_CLASSNAME}
-      data-testid='profile-listen-dsp-column'
-    >
-      <DesktopSurfaceCard title='Latest Release'>
-        <div className='space-y-4'>
-          <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
-            <ImageWithFallback
-              src={latestVisibleRelease?.artworkUrl}
-              alt={latestVisibleRelease?.title ?? artist.name}
-              fill
-              sizes='320px'
-              priority
-              className='object-cover'
-              fallbackVariant='release'
-            />
-          </div>
-          <div>
-            <p className='text-xl font-semibold tracking-[-0.03em] text-white dark:text-white'>
-              {latestVisibleRelease?.title ?? 'Latest release'}
-            </p>
-            <p className='mt-1 text-sm text-white/48'>
-              {formatReleaseMeta(
-                latestVisibleRelease?.releaseType,
-                latestVisibleRelease?.releaseDate
-              )}
-            </p>
-          </div>
-        </div>
-      </DesktopSurfaceCard>
-      {hasTip ? (
-        <DesktopSurfaceCard
-          title='Pay'
-          actionLabel='Open Pay'
-          onAction={() => onDrawerViewChange('pay')}
-        >
-          <button
-            type='button'
-            onClick={() => onDrawerViewChange('pay')}
-            className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
-          >
-            Pay {artist.name}
-          </button>
-        </DesktopSurfaceCard>
-      ) : null}
-    </div>
-  );
-
-  let listenTabContent: React.ReactNode;
-  if (musicSurface.kind === 'catalog') {
-    listenTabContent = (
+  const nonHomeContent =
+    activePrimaryTab === 'listen' ? (
       <div
         className={PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME}
         data-testid='profile-listen-desktop-grid'
@@ -808,79 +794,78 @@ export function ProfileDesktopSurface({
           className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
           testId='profile-primary-tab-releases'
         >
-          <ReleasesView
-            releases={musicSurface.visibleReleases}
-            artistId={artist.id}
-            artistHandle={artist.handle}
-            artistName={artist.name}
-          />
+          {visibleReleases.length > 0 ? (
+            <ReleasesView
+              releases={visibleReleases}
+              artistId={artist.id}
+              artistHandle={artist.handle}
+              artistName={artist.name}
+            />
+          ) : (
+            <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
+          )}
         </DesktopSurfaceCard>
-        {catalogListenSidebar}
+        <div
+          className={PROFILE_LISTEN_DSP_COLUMN_CLASSNAME}
+          data-testid='profile-listen-dsp-column'
+        >
+          <DesktopSurfaceCard
+            title='Listen'
+            className='min-w-0 overflow-hidden'
+          >
+            <StaticListenInterface
+              artist={artist}
+              handle={artist.handle}
+              dspsOverride={mergedDSPs}
+              containerClassName='max-w-none'
+              providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white dark:text-white hover:bg-white/[0.08]'
+              emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
+              hideHelpText
+            />
+          </DesktopSurfaceCard>
+          <DesktopSurfaceCard title='Latest Release'>
+            <div className='space-y-4'>
+              <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
+                <ImageWithFallback
+                  src={latestVisibleRelease?.artworkUrl}
+                  alt={latestVisibleRelease?.title ?? artist.name}
+                  fill
+                  sizes='320px'
+                  priority
+                  className='object-cover'
+                  fallbackVariant='release'
+                />
+              </div>
+              <div>
+                <p className='text-xl font-semibold tracking-[-0.03em] text-white dark:text-white'>
+                  {latestVisibleRelease?.title ?? 'Latest release'}
+                </p>
+                <p className='mt-1 text-sm text-white/48'>
+                  {formatReleaseMeta(
+                    latestVisibleRelease?.releaseType,
+                    latestVisibleRelease?.releaseDate
+                  )}
+                </p>
+              </div>
+            </div>
+          </DesktopSurfaceCard>
+          {hasTip ? (
+            <DesktopSurfaceCard
+              title='Pay'
+              actionLabel='Open Pay'
+              onAction={() => onDrawerViewChange('pay')}
+            >
+              <button
+                type='button'
+                onClick={() => onDrawerViewChange('pay')}
+                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
+              >
+                Pay {artist.name}
+              </button>
+            </DesktopSurfaceCard>
+          ) : null}
+        </div>
       </div>
-    );
-  } else if (musicSurface.kind === 'artist-streaming') {
-    const artistStreamingListen = (
-      <DesktopSurfaceCard
-        title='Listen'
-        className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
-        testId='profile-primary-tab-artist-streaming'
-      >
-        <StaticListenInterface
-          artist={artist}
-          handle={artist.handle}
-          dspsOverride={mergedDSPs}
-          containerClassName='max-w-none'
-          providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white dark:text-white hover:bg-white/[0.08]'
-          emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
-          hideHelpText
-        />
-      </DesktopSurfaceCard>
-    );
-    listenTabContent = latestVisibleRelease ? (
-      <div
-        className={PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME}
-        data-testid='profile-listen-desktop-grid'
-      >
-        {artistStreamingListen}
-        {catalogListenSidebar}
-      </div>
-    ) : (
-      artistStreamingListen
-    );
-  } else {
-    listenTabContent = (
-      <DesktopSurfaceCard
-        title='Releases'
-        className='flex-1'
-        testId={
-          musicSurface.kind === 'error'
-            ? 'profile-primary-tab-music-error'
-            : 'profile-primary-tab-listen'
-        }
-      >
-        <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
-      </DesktopSurfaceCard>
-    );
-  }
-
-  const nonHomeContent =
-    activePrimaryTab === 'listen' ? (
-      listenTabContent
-    ) : activePrimaryTab === 'subscribe' && isSubscribed && allowFanCapture ? (
-      <DesktopSurfaceCard
-        title='Manage updates'
-        className='flex-1'
-        testId='profile-desktop-manage-settings'
-      >
-        <AlertsSettingsView
-          presentation='embedded'
-          isSubscribed={isSubscribed}
-          contentPrefs={contentPrefs}
-          onTogglePref={onTogglePref}
-          onUnsubscribe={onUnsubscribe}
-          isUnsubscribing={isUnsubscribing}
-        />
-      </DesktopSurfaceCard>
     ) : activePrimaryTab === 'tour' ? (
       <DesktopSurfaceCard
         title='Events'
@@ -1022,9 +1007,7 @@ export function ProfileDesktopSurface({
           </div>
         </div>
 
-        {allowFanCapture &&
-        activePrimaryTab === 'subscribe' &&
-        !isSubscribed ? (
+        {allowFanCapture && activePrimaryTab === 'subscribe' ? (
           <ProfileInlineNotificationsCTA
             artist={artist}
             presentation='modal'
