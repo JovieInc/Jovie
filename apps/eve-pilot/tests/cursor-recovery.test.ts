@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   assertRecoveryAdmission,
+  buildGemDarkExerciseReport,
   createIsolatedRecoveryJob,
   CURSOR_CLOUD_RECOVERY_ROUTE,
+  disposeGemDarkRecovery,
   launchCursorRecoveryAgent,
   RecoveryAdmissionDeniedError,
   reconcileCursorRecoveryRun,
@@ -50,6 +52,65 @@ describe('Summer Cursor recovery lane (E3/E4)', () => {
         requestsLiveMutationOrTakeover: false,
       })
     ).toThrow(/recovery grant|Gem dark/i);
+  });
+
+  it('denies permission self-expansion (E4)', () => {
+    const disposition = disposeGemDarkRecovery({
+      ...gemDarkContext,
+      requestsPermissionSelfExpansion: true,
+    });
+    expect(disposition).toMatchObject({
+      status: 'deny',
+      code: 'permission-self-expansion',
+    });
+    const report = buildGemDarkExerciseReport({ disposition });
+    expect(report.permissionSelfExpansionDenied).toBe(true);
+    expect(report.isolatedRecoveryAdmitted).toBe(false);
+    expect(report.remainingHumanDecision).toMatch(/Blocked|authorize|restore Gem/i);
+  });
+
+  it('does not duplicate uncertain live jobs (E4)', () => {
+    const disposition = disposeGemDarkRecovery({
+      ...gemDarkContext,
+      uncertainLiveJobIds: ['live-job-1'],
+      requestsLiveMutationOrTakeover: true,
+    });
+    expect(disposition).toMatchObject({
+      status: 'deny',
+      code: 'uncertain-live-job-duplication',
+    });
+    const report = buildGemDarkExerciseReport({ disposition });
+    expect(report.uncertainLiveJobDuplicated).toBe(false);
+  });
+
+  it('holds Gem-dependent live mutation with named gap (E4)', () => {
+    const disposition = disposeGemDarkRecovery({
+      ...gemDarkContext,
+      liveOwnershipResolved: true,
+      requestsGemDependentLiveMutation: true,
+    });
+    expect(disposition).toMatchObject({
+      status: 'hold',
+      namedGap: 'gem-dependent-live-mutation-requires-gem',
+    });
+    const report = buildGemDarkExerciseReport({ disposition });
+    expect(report.gemDependentLiveMutationHeld).toBe(true);
+    expect(report.namedGap).toBe('gem-dependent-live-mutation-requires-gem');
+    expect(report.remainingHumanDecision).toMatch(/Gem restore|live-mutation/i);
+    // Report carries remaining human decision only — no next-action checklist.
+    expect(report).not.toHaveProperty('nextActions');
+  });
+
+  it('admits isolated recovery while uncertain live jobs remain untouched (E4)', () => {
+    const disposition = disposeGemDarkRecovery({
+      ...gemDarkContext,
+      uncertainLiveJobIds: ['live-job-1'],
+      requestsLiveMutationOrTakeover: false,
+    });
+    expect(disposition.status).toBe('admit');
+    const report = buildGemDarkExerciseReport({ disposition });
+    expect(report.isolatedRecoveryAdmitted).toBe(true);
+    expect(report.uncertainLiveJobDuplicated).toBe(false);
   });
 
   it('launches and reconciles to a terminal receipt with artifact (E3)', async () => {

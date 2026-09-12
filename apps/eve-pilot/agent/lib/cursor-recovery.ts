@@ -22,7 +22,35 @@ export type RecoveryAdmissionContext = {
   readonly preauthorizedRecovery: boolean;
   readonly liveOwnershipResolved: boolean;
   readonly requestsLiveMutationOrTakeover: boolean;
+  /** Summer attempted to grant itself a closed capability. */
+  readonly requestsPermissionSelfExpansion?: boolean;
+  /** Caller wants a live Gem service mutation (restart/heal/deploy). */
+  readonly requestsGemDependentLiveMutation?: boolean;
+  /** Known live job ids whose ownership is unresolved. */
+  readonly uncertainLiveJobIds?: readonly string[];
 };
+
+export type RecoveryDisposition =
+  | {
+      readonly status: 'admit';
+      readonly lane: 'cursor-cloud';
+      readonly reason: string;
+    }
+  | {
+      readonly status: 'deny';
+      readonly code:
+        | 'live-takeover-without-ownership'
+        | 'no-recovery-grant'
+        | 'permission-self-expansion'
+        | 'uncertain-live-job-duplication';
+      readonly message: string;
+    }
+  | {
+      readonly status: 'hold';
+      readonly namedGap: 'gem-dependent-live-mutation-requires-gem';
+      readonly remainingHumanDecision: string;
+      readonly message: string;
+    };
 
 export type CursorLaunchAcceptance = {
   readonly agentId: string;
@@ -55,7 +83,9 @@ export class RecoveryAdmissionDeniedError extends Error {
     readonly code:
       | 'gem-available-use-normal-route'
       | 'live-takeover-without-ownership'
-      | 'no-recovery-grant',
+      | 'no-recovery-grant'
+      | 'permission-self-expansion'
+      | 'uncertain-live-job-duplication',
     message: string
   ) {
     super(message);
@@ -87,25 +117,87 @@ export const CURSOR_CLOUD_RECOVERY_ROUTE: RouteCandidate = {
   maxRiskTier: 'high',
 };
 
-export function assertRecoveryAdmission(
+/**
+ * Gem-dark failure disposition (E4).
+ * Isolated recovery may admit; live mutation/takeover/self-expansion do not.
+ */
+export function disposeGemDarkRecovery(
   context: RecoveryAdmissionContext
-): void {
+): RecoveryDisposition {
+  if (context.requestsPermissionSelfExpansion) {
+    return {
+      status: 'deny',
+      code: 'permission-self-expansion',
+      message:
+        'Summer cannot expand its own permissions (privileged-gbrain-write / symphony-heal remain closed)',
+    };
+  }
+
+  if (
+    (context.uncertainLiveJobIds?.length ?? 0) > 0 &&
+    context.requestsLiveMutationOrTakeover
+  ) {
+    return {
+      status: 'deny',
+      code: 'uncertain-live-job-duplication',
+      message:
+        'Refusing to duplicate or take over uncertain live jobs without ownership reconciliation',
+    };
+  }
+
   if (
     context.requestsLiveMutationOrTakeover &&
     !context.liveOwnershipResolved
   ) {
-    throw new RecoveryAdmissionDeniedError(
-      'live-takeover-without-ownership',
-      'Cannot take over or mutate a live job without authoritative ownership reconciliation'
-    );
+    return {
+      status: 'deny',
+      code: 'live-takeover-without-ownership',
+      message:
+        'Cannot take over or mutate a live job without authoritative ownership reconciliation',
+    };
+  }
+
+  if (context.requestsGemDependentLiveMutation) {
+    return {
+      status: 'hold',
+      namedGap: 'gem-dependent-live-mutation-requires-gem',
+      remainingHumanDecision:
+        'Authorize Gem restore or approve an explicit live-mutation runbook; isolated Cursor recovery cannot mutate Gem services',
+      message:
+        'Gem-dependent live mutation held — Gem is required for live service mutation',
+    };
   }
 
   if (!context.gemDark && !context.preauthorizedRecovery) {
+    return {
+      status: 'deny',
+      code: 'no-recovery-grant',
+      message:
+        'Cursor recovery requires Gem dark or an explicit preauthorized recovery grant',
+    };
+  }
+
+  return {
+    status: 'admit',
+    lane: 'cursor-cloud',
+    reason: context.gemDark
+      ? 'Gem dark — isolated Cursor recovery admitted'
+      : 'Preauthorized recovery grant — isolated Cursor recovery admitted',
+  };
+}
+
+export function assertRecoveryAdmission(
+  context: RecoveryAdmissionContext
+): void {
+  const disposition = disposeGemDarkRecovery(context);
+  if (disposition.status === 'admit') return;
+  if (disposition.status === 'hold') {
     throw new RecoveryAdmissionDeniedError(
       'no-recovery-grant',
-      'Cursor recovery requires Gem dark or an explicit preauthorized recovery grant'
+      `${disposition.namedGap}: ${disposition.message}`
     );
   }
+  throw new RecoveryAdmissionDeniedError(disposition.code, disposition.message);
 }
 
 export function routeIsolatedRecoveryJob(
@@ -337,4 +429,43 @@ export async function requestCursorIsolatedRecovery(input: {
     sleep: input.sleep,
   });
   return { route, launch, receipt };
+}
+
+/** Durable E4 Gem-dark exercise report — remaining human decision only. */
+export function buildGemDarkExerciseReport(input: {
+  readonly disposition: RecoveryDisposition;
+  readonly recoveryReceipt?: CursorRecoveryReceipt;
+  readonly observedAt?: string;
+}): {
+  readonly schema: 'jovie.summer.gem-dark-exercise/v1';
+  readonly isolatedRecoveryAdmitted: boolean;
+  readonly uncertainLiveJobDuplicated: false;
+  readonly permissionSelfExpansionDenied: boolean;
+  readonly gemDependentLiveMutationHeld: boolean;
+  readonly namedGap?: string;
+  readonly remainingHumanDecision: string;
+  readonly observedAt: string;
+} {
+  const d = input.disposition;
+  const remainingHumanDecision =
+    d.status === 'hold'
+      ? d.remainingHumanDecision
+      : (input.recoveryReceipt?.remainingHumanDecision ??
+        (d.status === 'deny'
+          ? `Blocked (${d.code}) — human must authorize an alternate or restore Gem`
+          : 'Review isolated recovery artifact and approve any runtime install still required'));
+
+  return {
+    schema: 'jovie.summer.gem-dark-exercise/v1',
+    isolatedRecoveryAdmitted: d.status === 'admit',
+    uncertainLiveJobDuplicated: false,
+    permissionSelfExpansionDenied:
+      d.status === 'deny' && d.code === 'permission-self-expansion',
+    gemDependentLiveMutationHeld:
+      d.status === 'hold' &&
+      d.namedGap === 'gem-dependent-live-mutation-requires-gem',
+    ...(d.status === 'hold' ? { namedGap: d.namedGap } : {}),
+    remainingHumanDecision,
+    observedAt: input.observedAt ?? new Date().toISOString(),
+  };
 }
