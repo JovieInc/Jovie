@@ -215,7 +215,11 @@ export function evaluateRunnerSourceAttestation(
   receipt: unknown,
   nowMs: number = Date.now()
 ): RunnerSourceAttestationProbe {
-  if (receipt == null || typeof receipt !== 'object' || Array.isArray(receipt)) {
+  if (
+    receipt == null ||
+    typeof receipt !== 'object' ||
+    Array.isArray(receipt)
+  ) {
     return { status: 'unavailable', reason: 'missing' };
   }
   const value = receipt as Record<string, unknown>;
@@ -262,7 +266,10 @@ export type GemDarkTriggerDecision =
     }
   | {
       readonly dark: false;
-      readonly reason: 'explicit-env-live' | 'attestation-fresh' | 'unknown-fail-closed';
+      readonly reason:
+        | 'explicit-env-live'
+        | 'attestation-fresh'
+        | 'unknown-fail-closed';
       readonly attestation?: RunnerSourceAttestationProbe;
     };
 

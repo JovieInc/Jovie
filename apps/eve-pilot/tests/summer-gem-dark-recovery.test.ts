@@ -4,13 +4,13 @@ import type {
   SummerBottleneckStore,
 } from '../agent/lib/summer-bottleneck-loop';
 import {
-  type GemDarkRecoveryDependencies,
   evaluateRunnerSourceAttestation,
+  type GemDarkRecoveryDependencies,
   gemDarkAdmissionContext,
   loadRunnerSourceAttestationFromEnvironment,
   persistCursorRecoveryOutbox,
-  resolveGemDarkTrigger,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
+  resolveGemDarkTrigger,
   runGemDarkRecoveryCycle,
 } from '../agent/lib/summer-gem-dark-recovery';
 
@@ -294,7 +294,10 @@ describe('Runner-source attestation → Gem-dark trigger (JOV-6163 bridge)', () 
 
   it('loadRunnerSourceAttestationFromEnvironment returns null for missing PATH', async () => {
     const receipt = await loadRunnerSourceAttestationFromEnvironment(
-      { SUMMER_RUNNER_SOURCE_ATTESTATION_PATH: '/tmp/does-not-exist-attestation.json' },
+      {
+        SUMMER_RUNNER_SOURCE_ATTESTATION_PATH:
+          '/tmp/does-not-exist-attestation.json',
+      },
       async () => {
         throw new Error('ENOENT');
       }
@@ -317,7 +320,10 @@ describe('Runner-source attestation → Gem-dark trigger (JOV-6163 bridge)', () 
       },
       nowMs,
     });
-    expect(trigger).toMatchObject({ dark: false, reason: 'unknown-fail-closed' });
+    expect(trigger).toMatchObject({
+      dark: false,
+      reason: 'unknown-fail-closed',
+    });
   });
 
   it('inline JSON attestation drives live/dark without PATH', () => {
@@ -342,5 +348,4 @@ describe('Runner-source attestation → Gem-dark trigger (JOV-6163 bridge)', () 
       reason: 'runner-source-attestation-unavailable',
     });
   });
-
 });

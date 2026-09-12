@@ -1,13 +1,13 @@
 import { defineSchedule } from 'eve/schedules';
 import {
+  reconcileMissedSummerBottleneckEvents,
+  type SummerBottleneckDependencies,
+} from '../lib/summer-bottleneck-loop';
+import {
   loadRunnerSourceAttestationFromEnvironment,
   resolveGemDarkTrigger,
   runGemDarkRecoveryCycle,
 } from '../lib/summer-gem-dark-recovery';
-import {
-  reconcileMissedSummerBottleneckEvents,
-  type SummerBottleneckDependencies,
-} from '../lib/summer-bottleneck-loop';
 import { createVercelBlobBottleneckDependencies } from '../lib/vercel-blob-bottleneck-runtime';
 
 export async function runSummerBottleneckHeartbeat(
