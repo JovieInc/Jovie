@@ -24,7 +24,7 @@ import {
 const inter = localFont({
   src: '../public/fonts/Inter-Latin.woff2',
   variable: '--font-inter',
-  display: 'optional',
+  display: 'swap',
   weight: '100 900',
 });
 
@@ -218,7 +218,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = 'font-sans antialiased bg-base text-primary-token';
 
   const content = (
     <>
@@ -234,7 +234,7 @@ export default async function RootLayout({
   return (
     <html
       lang='en'
-      className='dark'
+      className={`dark ${inter.variable} ${satoshi.variable}`}
       data-auth-mock={authMockEnabled ? '1' : undefined}
       data-auth-proxy-disabled={authProxyDisabled ? '1' : undefined}
       data-e2e-mode={

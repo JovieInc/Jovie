@@ -65,8 +65,20 @@ describe('MarketingPosterHero', () => {
     expect(primaryLink).toHaveAttribute('href', '/signup');
     expect(primaryLink).toHaveAttribute('data-size', 'marketing');
     expect(primaryLink).toHaveAttribute('data-variant', 'primary');
-    expect(primaryLink).toHaveClass('h-7', 'text-sm', 'rounded-full');
-    expect(primaryLink).toHaveClass('before:h-11', 'before:min-w-11');
+    expect(primaryLink).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'text-sm',
+      'rounded-full'
+    );
+    expect(primaryLink).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-7', 'h-11', 'h-11!', 'h-12']) {
+      expect(primaryLink).not.toHaveClass(fixedHeight);
+    }
     expect(primaryLink).toHaveClass('homepage-poster-hero__action-button');
     expect(primaryLink).not.toHaveClass('active:scale-[0.98]');
 

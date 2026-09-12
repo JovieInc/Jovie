@@ -297,8 +297,12 @@ describe('ProfileDesktopSurface', () => {
       within(navigation).queryByRole('button', { name: 'Get updates' })
     ).not.toBeInTheDocument();
     const listenCta = screen.getByRole('button', { name: 'Listen' });
-    expect(listenCta).toHaveClass('h-7');
-    expect(listenCta.className).toContain('before:h-11');
+    expect(listenCta).toHaveClass('h-auto', 'min-h-7');
+    expect(listenCta).toHaveClass(
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
     expect(listenCta.className).toContain('before:min-w-11');
     const profileHeader = screen.getByTestId('profile-header');
     expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');

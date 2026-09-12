@@ -53,7 +53,10 @@ describe('CookieActions', () => {
       screen.getByRole('button', { name: 'Accept all' }),
     ];
     for (const action of actions) {
-      expect(action).toHaveStyle({ height: '44px' });
+      expect(action).toHaveAttribute('data-size', 'marketing');
+      expect(action).toHaveAttribute('data-variant', 'secondary');
+      expect(action.style.height).toBe('');
+      expect(action.className.split(' ')).toContain('my-2');
       fireEvent.click(action);
     }
     expect(onRejectAll).toHaveBeenCalledOnce();
@@ -79,6 +82,11 @@ describe('CookieActions', () => {
     expect(layer).toContainElement(rejectAll);
     expect(layer).toContainElement(customize);
     expect(layer).toContainElement(acceptAll);
+    // Consent choices are neutral actions; neither acceptance nor rejection
+    // becomes the screen's preferred primary action.
+    for (const action of [rejectAll, acceptAll, customize]) {
+      expect(action).toHaveAttribute('data-variant', 'secondary');
+    }
     expect(rejectAll).toHaveTextContent('Reject all');
     expect(acceptAll).toHaveTextContent('Accept all');
     expect(customize).toHaveTextContent('Customize');
@@ -102,6 +110,27 @@ describe('CookieActions', () => {
     }
     expect(rejectAll).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
     expect(customize).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
+  });
+
+  it('does not dispatch disabled consent actions in either layout', () => {
+    for (const compact of [true, false]) {
+      const callback = vi.fn();
+      const { unmount } = render(
+        <CookieActions
+          compact={compact}
+          disabled
+          onAcceptAll={callback}
+          onRejectAll={callback}
+          onCustomize={callback}
+        />
+      );
+      for (const action of screen.getAllByRole('button')) {
+        expect(action).toBeDisabled();
+        fireEvent.click(action);
+      }
+      expect(callback).not.toHaveBeenCalled();
+      unmount();
+    }
   });
 
   it('keeps standard action spacing on canonical design tokens', () => {
@@ -205,8 +234,11 @@ describe('CookieBannerSection', () => {
     expect(
       screen.getByRole('button', { name: 'Reject all' })
     ).toBeInTheDocument();
+    // Action geometry belongs to the canonical Button; browser coverage verifies
+    // the 28px face and the larger owned target, which jsdom cannot measure.
     for (const button of screen.getAllByRole('button')) {
-      expect(button).toHaveStyle({ height: '44px' });
+      expect(button).toHaveAttribute('data-size', 'marketing');
+      expect(button.style.height).toBe('');
     }
     // Privacy link present (condensed legal text)
     expect(banner.textContent).toContain(

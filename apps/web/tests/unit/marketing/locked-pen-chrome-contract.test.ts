@@ -35,9 +35,10 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(marketingLayout).toContain('<PublicPageShell');
   });
 
-  it('moves header chrome onto GTcgO / eoUUU optical-grid atoms without editing HeaderNav', () => {
+  it('keeps GTcgO / eoUUU header geometry with canonical CTA sizing', () => {
     const headerCss = readWebSource('components/site/MarketingHeader.css');
     const headerNavCss = readWebSource('components/organisms/HeaderNav.css');
+    const headerNav = readWebSource('components/organisms/HeaderNav.tsx');
     const header = readWebSource('components/site/MarketingHeader.tsx');
 
     expect(headerCss).toContain('--marketing-glass-height: 2.75rem');
@@ -47,7 +48,29 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(headerCss).toContain('var(--space-2-5)');
     expect(headerCss).toContain('var(--space-6)');
     expect(header).toContain("? 'sm'");
-    expect(headerNavCss).toContain('min-height: 2rem');
+    const primaryAuthLink = headerNav.match(
+      /function HeaderPrimaryAuthLink\([\s\S]*?(?=function GlassAuthActions)/
+    )?.[0];
+    const glassAuthActions = headerNav.match(
+      /function GlassAuthActions\([\s\S]*?(?=function HeaderNavLink)/
+    )?.[0];
+    const ctaRule = headerNavCss.match(
+      /\.marketing-glass-header__cta\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(headerNav).toContain("import { Button } from '@jovie/ui'");
+    expect(primaryAuthLink).toContain("size = 'marketing'");
+    expect(primaryAuthLink).toMatch(
+      /<Button\s+asChild\s+size=\{size\}\s+variant='primary'/
+    );
+    expect(glassAuthActions).toMatch(
+      /<HeaderPrimaryAuthLink\s+href=\{publicCta.href\}\s+label=\{publicCta.label\}\s+className='marketing-glass-header__cta'/
+    );
+    // The shared Button owns the 28px minimum and native text growth.
+    expect(ctaRule).toBeDefined();
+    expect(ctaRule).not.toMatch(
+      /(?:^|;)\s*(?:height|min-height|max-height)\s*:/
+    );
     expect(header).not.toContain("from '@/components/organisms/HeaderNav.css'");
 
     const ownership = readFileSync(

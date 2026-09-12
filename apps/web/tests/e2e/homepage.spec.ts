@@ -137,6 +137,182 @@ test.describe('Homepage', () => {
     ).toHaveAttribute('href', 'https://jov.ie/waitlist');
   });
 
+  test('canonical homepage controls grow natively and trust artwork stays in its slots', async ({
+    page,
+    context,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    // Match the consent fixture: middleware refreshes this flag from geo headers.
+    await page.setExtraHTTPHeaders({
+      'x-vercel-ip-country': 'DE',
+      'x-vercel-ip-country-region': 'BE',
+    });
+    await page.addInitScript(() => {
+      try {
+        localStorage.removeItem('jv_cc');
+      } catch {
+        // ignore
+      }
+    });
+    await context.addCookies([
+      {
+        name: 'jv_cc_required',
+        value: '1',
+        url: process.env.BASE_URL ?? 'http://localhost:3100',
+        sameSite: 'Lax',
+      },
+    ]);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+      const actions = page.locator(
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button, [data-testid="homepage-primary-cta"]:visible'
+      );
+      await expect(page.getByTestId('cookie-actions')).toBeVisible();
+      expect(await actions.count()).toBeGreaterThanOrEqual(4);
+      for (const action of await actions.all()) {
+        const geometry = await action.evaluate(element => {
+          const face = element.getBoundingClientRect();
+          const target = getComputedStyle(element, '::before');
+          return {
+            height: face.height,
+            targetHeight: Number.parseFloat(target.height),
+            targetWidth: Number.parseFloat(target.width),
+          };
+        });
+        expect(geometry.height).toBeCloseTo(28, 0);
+        expect(geometry.targetHeight).toBeGreaterThanOrEqual(44);
+        expect(geometry.targetWidth).toBeGreaterThanOrEqual(44);
+      }
+
+      const ink = await page
+        .locator('.homepage-trust-logo-slot:visible')
+        .evaluateAll(slots =>
+          slots.map(slot => {
+            const svg = slot.querySelector('svg');
+            if (!svg) throw new Error('Trust logo SVG missing');
+            const matrix = svg.getScreenCTM();
+            if (!matrix) throw new Error('Trust logo transform missing');
+            const bounds = svg.getBBox();
+            const leftTop = new DOMPoint(bounds.x, bounds.y).matrixTransform(
+              matrix
+            );
+            const rightBottom = new DOMPoint(
+              bounds.x + bounds.width,
+              bounds.y + bounds.height
+            ).matrixTransform(matrix);
+            const frame = slot.getBoundingClientRect();
+            return {
+              left: leftTop.x,
+              right: rightBottom.x,
+              top: leftTop.y,
+              bottom: rightBottom.y,
+              frameLeft: frame.left,
+              frameRight: frame.right,
+              frameTop: frame.top,
+              frameBottom: frame.bottom,
+            };
+          })
+        );
+      expect(ink.length).toBeGreaterThanOrEqual(4);
+      for (const logo of ink) {
+        expect(logo.left).toBeGreaterThanOrEqual(logo.frameLeft - 1);
+        expect(logo.right).toBeLessThanOrEqual(logo.frameRight + 1);
+        expect(logo.top).toBeGreaterThanOrEqual(logo.frameTop - 1);
+        expect(logo.bottom).toBeLessThanOrEqual(logo.frameBottom + 1);
+        expect(logo.left).toBeGreaterThanOrEqual(0);
+        expect(logo.right).toBeLessThanOrEqual(width);
+      }
+
+      const consentAndHeader = page.locator(
+        '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button'
+      );
+      const assertTargets = async () => {
+        const targets = await consentAndHeader.evaluateAll(elements =>
+          elements.map(element => {
+            const face = element.getBoundingClientRect();
+            const pseudo = getComputedStyle(element, '::before');
+            const width = Math.max(face.width, Number.parseFloat(pseudo.width));
+            const height = Math.max(
+              face.height,
+              Number.parseFloat(pseudo.height)
+            );
+            const left = face.x + (face.width - width) / 2;
+            const top = face.y + (face.height - height) / 2;
+            const points = [
+              [left + width / 2, top + 2],
+              [left + width / 2, top + height - 2],
+              [left + 2, top + height / 2],
+              [left + width - 2, top + height / 2],
+            ];
+            return {
+              left,
+              right: left + width,
+              top,
+              bottom: top + height,
+              owned: points.every(([x, y]) => {
+                const hit = document.elementFromPoint(x, y);
+                return (
+                  hit === element || (hit !== null && element.contains(hit))
+                );
+              }),
+            };
+          })
+        );
+        for (let i = 0; i < targets.length; i += 1) {
+          expect(targets[i].owned, '44px target must hit its own control').toBe(
+            true
+          );
+          for (const other of targets.slice(i + 1)) {
+            const target = targets[i];
+            expect(
+              target.right <= other.left ||
+                other.right <= target.left ||
+                target.bottom <= other.top ||
+                other.bottom <= target.top
+            ).toBe(true);
+          }
+        }
+      };
+      await assertTargets();
+      for (const action of await consentAndHeader.all()) {
+        await page.keyboard.press('Tab');
+        await action.focus();
+        await page.evaluate(
+          () =>
+            new Promise<void>(resolve => {
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve())
+              );
+            })
+        );
+        await expect(action).toBeFocused();
+        const shadow = await action.evaluate(
+          element => getComputedStyle(element).boxShadow
+        );
+        expect(shadow).toContain('rgb(17, 175, 255)');
+      }
+
+      // Text-only enlargement must grow the native control, not clip its label.
+      for (const action of await actions.all()) {
+        await action.evaluate(element => {
+          element.style.fontSize = '40px';
+        });
+        const grown = await action.evaluate(element => ({
+          height: element.getBoundingClientRect().height,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+        }));
+        expect(grown.height).toBeGreaterThan(28);
+        expect(grown.scrollHeight).toBeLessThanOrEqual(grown.clientHeight);
+      }
+      await assertTargets();
+    }
+  });
+
   test('canonical header has no flyout menus', async ({ page }) => {
     const header = page.getByTestId('header-nav');
     const toolsFlyout = page.locator('#marketing-header-flyout-tools');

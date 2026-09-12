@@ -156,7 +156,7 @@ describe('Button', () => {
     const btn = screen.getByRole('button');
     expect(btn).toHaveAttribute('data-variant', 'primary');
     expect(btn).toHaveAttribute('data-size', 'md');
-    expect(btn.className).toContain('h-7');
+    expect(btn.className).toContain('min-h-7');
     expect(btn.className).toContain('text-xs');
     expect(btn.className).toContain('bg-btn-primary');
   });
@@ -169,10 +169,10 @@ describe('Button', () => {
     );
     const btn = screen.getByRole('button');
     expect(btn.className).toContain('bg-btn-secondary');
-    expect(btn.className).toContain('h-7');
+    expect(btn.className).toContain('min-h-7');
   });
 
-  it('locks ActionButton at 28 visible / 44 mobile hit, 510, radius 999', () => {
+  it('locks the ActionButton contract while allowing native text growth', () => {
     const source = readFileSync(path.join(process.cwd(), 'atoms/button.tsx'), {
       encoding: 'utf8',
     });
@@ -187,14 +187,15 @@ describe('Button', () => {
       /const TEXT_BUTTON_CLASSES =\s*'([^']+)'/
     )?.[1];
     expect(textContract).toBeTruthy();
-    expect(textContract).toContain('h-7');
-    expect(textContract).toContain('max-sm:before:h-11');
-    expect(textContract).toContain('max-sm:before:min-w-11');
-    expect(textContract).not.toMatch(/\bh-8\b/);
+    expect(textContract).toContain('h-auto');
+    expect(textContract).toContain('min-h-7');
+    expect(textContract).toContain('before:h-full');
+    expect(textContract).toContain('before:min-h-11');
+    expect(textContract).toContain('before:min-w-11');
     expect(textContract).not.toMatch(/\bh-8\b|\bmin-h-8\b/);
   });
 
-  it('keeps the marketing text contract at 28px visible inside a 44px mobile hit', () => {
+  it('keeps the marketing text contract at 28px visible inside a 44px target', () => {
     render(
       <Button variant='primary' size='marketing'>
         Join the waitlist
@@ -203,15 +204,16 @@ describe('Button', () => {
 
     const btn = screen.getByRole('button', { name: 'Join the waitlist' });
     expect(btn).toHaveAttribute('data-size', 'marketing');
-    expect(btn.className).toContain('h-7');
-    expect(btn.className).toContain('before:h-11');
+    expect(btn.className.split(' ')).toContain('h-auto');
+    expect(btn.className.split(' ')).not.toContain('h-7');
+    expect(btn.className).toContain('before:h-full');
+    expect(btn.className).toContain('min-h-7');
+    expect(btn.className).toContain('before:min-h-11');
     expect(btn.className).toContain('before:min-w-11');
     expect(btn.className).toContain('before:w-full');
-    expect(btn.className).toContain('max-sm:before:h-11');
-    expect(btn.className).toContain('max-sm:before:min-w-11');
     expect(btn.className).toContain('rounded-full');
-    expect(btn.className).not.toMatch(/(?:^|\s)h-8(?:\s|$)/);
     expect(btn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+    expect(btn.className).not.toMatch(/(?:^|\s)h-8(?:\s|$)/);
   });
 
   it('makes every text size an equivalent control for primary and secondary', () => {
@@ -226,11 +228,10 @@ describe('Button', () => {
       const controls = screen.getAllByRole('button');
       expect(new Set(controls.map(control => control.className)).size).toBe(1);
       for (const control of controls) {
-        expect(control.className).toContain('h-7');
+        expect(control.className).toContain('min-h-7');
         expect(control.className).toContain('px-2.5');
         expect(control.className).toContain('text-xs');
-        expect(control.className).toContain('before:h-11');
-        expect(control.className).toContain('max-sm:before:h-11');
+        expect(control.className).toContain('before:min-h-11');
       }
       unmount();
     }
@@ -241,10 +242,8 @@ describe('Button', () => {
       const { unmount } = render(<Button size={size}>Action {size}</Button>);
       const btn = screen.getByRole('button', { name: `Action ${size}` });
 
-      expect(btn.className).toContain('before:h-11');
+      expect(btn.className).toContain('before:min-h-11');
       expect(btn.className).toContain('before:min-w-11');
-      expect(btn.className).toContain('max-sm:before:h-11');
-      expect(btn.className).toContain('max-sm:before:min-w-11');
       unmount();
     }
   });
@@ -441,25 +440,22 @@ describe('Button', () => {
     expect(btn.className).toContain('bg-error-subtle');
   });
 
-  it.each([
-    'primary',
-    'secondary',
-    'tertiary',
-    'ghost',
-    'link',
-  ] as const)('applies destructive styling to the %s variant through a prop', variant => {
-    render(
-      <Button variant={variant} destructive>
-        Delete
-      </Button>
-    );
-    const btn = screen.getByRole('button');
-    expect(btn).toHaveAttribute('data-variant', variant);
-    expect(btn).toHaveAttribute('data-destructive', 'true');
-    expect(btn.className).toContain(
-      variant === 'primary' ? 'bg-error' : 'text-error'
-    );
-  });
+  it.each(['primary', 'secondary', 'tertiary', 'ghost', 'link'] as const)(
+    'applies destructive styling to the %s variant through a prop',
+    variant => {
+      render(
+        <Button variant={variant} destructive>
+          Delete
+        </Button>
+      );
+      const btn = screen.getByRole('button');
+      expect(btn).toHaveAttribute('data-variant', variant);
+      expect(btn).toHaveAttribute('data-destructive', 'true');
+      expect(btn.className).toContain(
+        variant === 'primary' ? 'bg-error' : 'text-error'
+      );
+    }
+  );
 
   it('forwards refs', () => {
     const ref = React.createRef<HTMLButtonElement>();
@@ -476,26 +472,26 @@ describe('Button', () => {
     expect(screen.getByRole('link')).toBeInTheDocument();
   });
 
-  it.each([
-    'disabled',
-    'loading',
-  ] as const)('prevents child and wrapper activation while asChild is %s', state => {
-    const onClick = vi.fn();
-    const onChildClick = vi.fn();
-    render(
-      <Button asChild {...{ [state]: true }} onClick={onClick}>
-        <a href='/destination' onClick={onChildClick}>
-          Continue
-        </a>
-      </Button>
-    );
-    const link = screen.getByRole('link', { name: 'Continue' });
-    // Keyboard and assistive technologies synthesize clicks independently
-    // of pointer-events. The default action must be cancelled as well.
-    expect(fireEvent.click(link, { detail: 0 })).toBe(false);
-    expect(onClick).not.toHaveBeenCalled();
-    expect(onChildClick).not.toHaveBeenCalled();
-  });
+  it.each(['disabled', 'loading'] as const)(
+    'prevents child and wrapper activation while asChild is %s',
+    state => {
+      const onClick = vi.fn();
+      const onChildClick = vi.fn();
+      render(
+        <Button asChild {...{ [state]: true }} onClick={onClick}>
+          <a href='/destination' onClick={onChildClick}>
+            Continue
+          </a>
+        </Button>
+      );
+      const link = screen.getByRole('link', { name: 'Continue' });
+      // Keyboard and assistive technologies synthesize clicks independently
+      // of pointer-events. The default action must be cancelled as well.
+      expect(fireEvent.click(link, { detail: 0 })).toBe(false);
+      expect(onClick).not.toHaveBeenCalled();
+      expect(onChildClick).not.toHaveBeenCalled();
+    }
+  );
 
   it('restores composed activation after leaving the disabled state', () => {
     const onClick = vi.fn();

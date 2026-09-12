@@ -133,7 +133,7 @@ function CookiePreferencesSaveButton({
     <Button
       type='button'
       variant='primary'
-      size='sm'
+      size='marketing'
       onClick={onSave}
       disabled={isSaving}
       className={className}
@@ -211,21 +211,21 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
             />
           </div>
 
-          <SheetFooter className='mt-4 flex-row gap-3'>
+          <SheetFooter className='mt-4 flex-row flex-wrap gap-3'>
             <Button
               type='button'
               variant='secondary'
-              size='sm'
+              size='marketing'
               onClick={onClose}
               disabled={isSaving}
-              className='min-h-12 flex-1'
+              className='my-2 min-w-max flex-1'
             >
               Cancel
             </Button>
             <CookiePreferencesSaveButton
               isSaving={isSaving}
               onSave={save}
-              className='min-h-12 flex-1'
+              className='my-2 min-w-max flex-1'
             />
           </SheetFooter>
           {saveError ? (
@@ -270,21 +270,21 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         ) : null}
       </DialogBody>
 
-      <DialogActions className='mt-3'>
+      <DialogActions className='mt-3 flex-wrap'>
         <Button
           type='button'
           variant='secondary'
-          size='sm'
+          size='marketing'
           onClick={onClose}
           disabled={isSaving}
-          className='min-h-12'
+          className='my-2 min-w-max'
         >
           Cancel
         </Button>
         <CookiePreferencesSaveButton
           isSaving={isSaving}
           onSave={save}
-          className='min-h-12'
+          className='my-2 min-w-max'
         />
       </DialogActions>
     </Dialog>
