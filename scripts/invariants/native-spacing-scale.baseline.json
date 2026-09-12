@@ -1,11 +1,11 @@
 {
-  "$comment": "Measured native inventory only. Conservative and strict activation remain disabled in this prerequisite.",
+  "$comment": "Trusted main native inventory; conservative enforcement is active and source reductions must lower the floor. Strict inventory remains report-only.",
   "$provenance": {
     "sourceSha": "75034f8539e0b039fb2ec8ff33c0102598d86198",
     "detectorSha256": "89b88e62447528691ce4e1795416d524aa4b4f56082a3d8ae7d6cb6a48c9667b"
   },
   "armed": {
-    "conservative": false,
+    "conservative": true,
     "strict": false
   },
   "surfaces": {
