@@ -10,6 +10,7 @@ vi.mock('@/lib/stripe/customer-sync/queries', () => ({
 }));
 
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
+import { BILLING_FIELDS_FULL } from '@/lib/stripe/customer-sync/types';
 
 describe('getUserBillingInfo', () => {
   beforeEach(() => {
@@ -41,6 +42,25 @@ describe('getUserBillingInfo', () => {
     expect(result).toEqual({
       success: false,
       error: 'Failed to retrieve billing data',
+    });
+  });
+
+  it('preserves subscription price provenance for entitlement resolution', async () => {
+    mockFetchUserBillingDataWithAuth.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'user_1',
+        plan: 'pro',
+        isPro: true,
+        stripePriceId: 'price_legacy',
+      },
+    });
+
+    const result = await getUserBillingInfo();
+
+    expect(result.data?.stripePriceId).toBe('price_legacy');
+    expect(mockFetchUserBillingDataWithAuth).toHaveBeenCalledWith({
+      fields: BILLING_FIELDS_FULL,
     });
   });
 });
