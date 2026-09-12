@@ -10,13 +10,13 @@ import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import {
   AUTH_TROUBLE_SIGNING_IN_LABEL,
+  type AuthShellBackLink,
+  type AuthShellIntent,
+  type AuthShellMode,
   getAuthShellHeading,
   normalizeAuthClaimHandle,
   resolveAuthShellBackLink,
   resolveAuthShellIntent,
-  type AuthShellBackLink,
-  type AuthShellIntent,
-  type AuthShellMode,
 } from '@/lib/auth/auth-shell-intent';
 import {
   buildAuthRouteUrl,
@@ -173,7 +173,8 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     []
   );
   const claimHandle = useMemo(
-    () => normalizeAuthClaimHandle(claimHandleProp ?? searchParams.get('handle')),
+    () =>
+      normalizeAuthClaimHandle(claimHandleProp ?? searchParams.get('handle')),
     [claimHandleProp, searchParams]
   );
   const intent = resolveAuthShellIntent({ mode, claimHandle });
@@ -349,10 +350,7 @@ function getAuthStartErrorMessage(mode: AuthShellMode): string {
     : 'Could not start sign-in. Please try again.';
 }
 
-function AuthQuietBackLink({
-  href,
-  label,
-}: Readonly<AuthShellBackLink>) {
+function AuthQuietBackLink({ href, label }: Readonly<AuthShellBackLink>) {
   return (
     <Link
       href={href}
@@ -496,15 +494,18 @@ function AuthOAuthStartSurface({
 
 function AuthMethodDivider() {
   return (
-    <div
-      data-auth-method-divider
-      className='mb-4 flex items-center gap-3'
-    >
-      <span className='h-px flex-1 bg-(--linear-border-subtle)' aria-hidden='true' />
+    <div data-auth-method-divider className='mb-4 flex items-center gap-3'>
+      <span
+        className='h-px flex-1 bg-(--linear-border-subtle)'
+        aria-hidden='true'
+      />
       <span className='text-2xs uppercase tracking-wide text-secondary-token'>
         or use email
       </span>
-      <span className='h-px flex-1 bg-(--linear-border-subtle)' aria-hidden='true' />
+      <span
+        className='h-px flex-1 bg-(--linear-border-subtle)'
+        aria-hidden='true'
+      />
     </div>
   );
 }

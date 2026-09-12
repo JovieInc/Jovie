@@ -324,7 +324,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     );
   });
 
-
   it('keeps Trouble signing in on support when oppositeModeUrl is a signup return', () => {
     render(
       <AuthShell
