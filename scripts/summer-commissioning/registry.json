@@ -242,24 +242,35 @@
       "capability": "Linear read and explicit durable work update",
       "canonicalPath": [
         "explicit founder intent -> Summer policy -> Linear durable issue mutation -> readback receipt",
-        "apps/web/app/api/webhooks/linear/route.ts"
+        "apps/web/lib/ovie/linear-coordination.ts",
+        "apps/web/lib/ovie/mcp/tools.ts"
       ],
-      "implementationState": "in_flight",
-      "status": "blocked",
+      "implementationState": "implemented",
+      "status": "certified_local",
       "critical": true,
       "evidence": [
         {
-          "kind": "in_flight",
-          "ref": "https://github.com/JovieInc/Jovie/pull/16396",
-          "summary": "Durable provider delivery and bounded Linear-to-Symphony dispatch remain open."
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/linear-coordination.ts",
+          "summary": "Bounded Linear create/update with founder intent, provenance, and mandatory readback; executionCompleted and deliveryAccepted stay false."
+        },
+        {
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/mcp/tools.ts",
+          "summary": "coordinate_linear_work MCP tool gated by linear-coordination-write."
+        },
+        {
+          "kind": "test",
+          "ref": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
+          "summary": "Unit coverage for create/update readback, denial paths, and Summer-only capability grant."
         },
         {
           "kind": "policy",
           "ref": "apps/eve-pilot/identities/summer/instructions.md",
-          "summary": "Eve Summer currently refuses Linear writes."
+          "summary": "Summer instructions allow bounded Linear create/update with readback; not execution/delivery."
         }
       ],
-      "lastVerified": "2026-09-01T22:57:22Z",
+      "lastVerified": "2026-09-12T16:34:53Z",
       "invalidationCondition": "Linear mutation policy, delivery identity, explicit-intent gate, or durable readback contract changes.",
       "ownerRemediation": {
         "owner": "Summer durable intake",
@@ -267,20 +278,25 @@
       },
       "probe": {
         "id": "summer.work.linear-read-update",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "fixture": "linear-explicit-update-reversible-fixture/v1",
         "expectedState": "durable_linear_readback_observed",
-        "requiresRuntimeReceipt": true,
+        "requiresRuntimeReceipt": false,
         "sourceAssertions": [
           {
             "kind": "file_contains",
             "path": "apps/web/lib/ovie/isolation.ts",
-            "value": "'create_or_update_linear_issue'"
+            "value": "'coordinate_linear_work'"
           },
           {
             "kind": "file_contains",
-            "path": "apps/web/app/api/webhooks/linear/route.ts",
-            "value": "providerDeliveryId"
+            "path": "apps/web/lib/ovie/linear-coordination.ts",
+            "value": "executionCompleted: false"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/tests/unit/ovie/linear-coordination.test.ts",
+            "value": "code: 'readback-missing'"
           }
         ]
       }
@@ -357,7 +373,7 @@
         {
           "kind": "exact_packaged_runtime",
           "ref": "source:b31537204a4a8dfeaeb8c55061bd1c1cfeecc470:/app/ov/chat",
-          "summary": "Summer claimed and completed one real worker job and the persisted UI rendered: SUMMER_LOOP_OK The number-one shipping bottleneck is Symphony stay-up on Gem — idle factory means Linear work does not land."
+          "summary": "Summer claimed and completed one real worker job and the persisted UI rendered: SUMMER_LOOP_OK The number-one shipping bottleneck is Symphony stay-up on Gem \u2014 idle factory means Linear work does not land."
         },
         {
           "kind": "in_flight",
@@ -805,7 +821,7 @@
           {
             "kind": "file_contains",
             "path": "apps/web/tests/journey-auditor/README.md",
-            "value": "production bug → scout reproduction → product promise → deterministic test → fix"
+            "value": "production bug \u2192 scout reproduction \u2192 product promise \u2192 deterministic test \u2192 fix"
           }
         ]
       }
