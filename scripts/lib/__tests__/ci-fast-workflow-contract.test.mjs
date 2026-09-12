@@ -13,8 +13,11 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  BILLING_COVERAGE_COMMAND,
+  BILLING_PROVENANCE_COVERAGE_COMMAND,
   CERTIFICATION_KERNEL_COMMAND,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
+  FAN_SEND_SAFETY_COVERAGE_COMMAND,
   LANE_COMMANDS,
   LANE_GROUPS,
   MARKETING_CERTIFICATION_COMMAND,
@@ -274,6 +277,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
     expect(new Set(laneIds).size).toBe(laneIds.length);
     expect([...laneIds].sort()).toEqual([
+      'billing-coverage',
       'biome',
       'design-conformance',
       'design-exception-registry',
@@ -625,6 +629,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-conformance',
       'ios-fast',
       'profile-admission',
+      'billing-coverage',
       'structural',
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
@@ -651,6 +656,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+      'billing-coverage': BILLING_COVERAGE_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -691,6 +697,20 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(LANE_COMMANDS['design-exception-registry']).toBe(
       'pnpm design:exception-registry:check'
+    );
+    expect(LANE_GROUPS.remaining).toContain('billing-coverage');
+    expect(LANE_COMMANDS['billing-coverage']).toBe(BILLING_COVERAGE_COMMAND);
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      'tests/unit/lib/entitlements/creator-plan.test.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      '--coverage.thresholds.perFile=true'
+    );
+    expect(FAN_SEND_SAFETY_COVERAGE_COMMAND).toContain(
+      'tests/lib/notifications/service.test.ts'
+    );
+    expect(FAN_SEND_SAFETY_COVERAGE_COMMAND).toContain(
+      '--coverage.thresholds.lines=70'
     );
     expect(LANE_COMMANDS['design-exception-registry']).not.toMatch(
       /vitest|playwright|e2e/i

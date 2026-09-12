@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockFetchUserBillingDataWithAuth } = vi.hoisted(() => ({
-  mockFetchUserBillingDataWithAuth: vi.fn(),
-}));
+const { mockFetchUserBillingDataWithAuth, mockFetchUserBillingData } =
+  vi.hoisted(() => ({
+    mockFetchUserBillingDataWithAuth: vi.fn(),
+    mockFetchUserBillingData: vi.fn(),
+  }));
 
 vi.mock('@/lib/stripe/customer-sync/queries', () => ({
   fetchUserBillingDataWithAuth: mockFetchUserBillingDataWithAuth,
-  fetchUserBillingData: vi.fn(),
+  fetchUserBillingData: mockFetchUserBillingData,
 }));
 
-import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
+import {
+  getUserBillingInfo,
+  getUserBillingInfoByClerkId,
+  userHasProFeatures,
+} from '@/lib/stripe/customer-sync/billing-info';
 import { BILLING_FIELDS_FULL } from '@/lib/stripe/customer-sync/types';
 
 describe('getUserBillingInfo', () => {
@@ -62,5 +68,91 @@ describe('getUserBillingInfo', () => {
     expect(mockFetchUserBillingDataWithAuth).toHaveBeenCalledWith({
       fields: BILLING_FIELDS_FULL,
     });
+  });
+
+  it('normalizes nullable billing fields while retaining the price field', async () => {
+    mockFetchUserBillingDataWithAuth.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'user_defaults',
+        email: null,
+        isAdmin: null,
+        isPro: null,
+        plan: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripePriceId: null,
+        billingVersion: null,
+        lastBillingEventAt: null,
+      },
+    });
+
+    await expect(getUserBillingInfo()).resolves.toEqual({
+      success: true,
+      data: {
+        userId: 'user_defaults',
+        email: '',
+        isAdmin: false,
+        isPro: false,
+        plan: 'free',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripePriceId: null,
+        billingVersion: 1,
+        lastBillingEventAt: null,
+      },
+    });
+  });
+
+  it('loads billing data by Clerk ID and forwards query failures', async () => {
+    mockFetchUserBillingData.mockResolvedValueOnce({
+      success: true,
+      data: {
+        id: 'user_clerk',
+        email: null,
+        isPro: true,
+        stripeCustomerId: 'cus_clerk',
+        stripeSubscriptionId: 'sub_clerk',
+        billingVersion: null,
+        lastBillingEventAt: null,
+      },
+    });
+
+    await expect(getUserBillingInfoByClerkId('clerk_user')).resolves.toEqual({
+      success: true,
+      data: {
+        id: 'user_clerk',
+        email: '',
+        isPro: true,
+        stripeCustomerId: 'cus_clerk',
+        stripeSubscriptionId: 'sub_clerk',
+        billingVersion: 1,
+        lastBillingEventAt: null,
+      },
+    });
+    expect(mockFetchUserBillingData).toHaveBeenCalledWith({
+      clerkUserId: 'clerk_user',
+      fields: BILLING_FIELDS_FULL,
+    });
+
+    mockFetchUserBillingData.mockResolvedValueOnce({ success: false });
+    await expect(getUserBillingInfoByClerkId('missing_user')).resolves.toEqual({
+      success: false,
+      error: 'Failed to retrieve billing information',
+    });
+  });
+
+  it('reports Pro status through the convenience helper', async () => {
+    mockFetchUserBillingDataWithAuth.mockResolvedValueOnce({
+      success: true,
+      data: { id: 'user_pro', isPro: true },
+    });
+    await expect(userHasProFeatures()).resolves.toBe(true);
+
+    mockFetchUserBillingDataWithAuth.mockResolvedValueOnce({
+      success: true,
+      data: { id: 'user_free', isPro: false },
+    });
+    await expect(userHasProFeatures()).resolves.toBe(false);
   });
 });

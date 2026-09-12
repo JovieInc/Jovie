@@ -43,6 +43,13 @@ export const CERTIFICATION_KERNEL_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/agent-os/certification.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/agent-os/certification.ts --coverage.thresholds.lines=94 --coverage.thresholds.statements=93 --coverage.thresholds.branches=84 --coverage.thresholds.functions=96';
 export const ACQUISITION_CERTIFICATION_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --pool=forks --maxWorkers=1 lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/acquisition/certification-store.ts --coverage.include=lib/agent-os/certification-cas.ts --coverage.include=lib/agent-os/certification-adapter.ts --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 --coverage.reportsDirectory=coverage/jov-5603-acquisition';
+export const BILLING_PROVENANCE_COVERAGE_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
+export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
+  'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts --hookTimeout=30000 tests/lib/notifications/service.test.ts tests/lib/notifications/trial-fan-quota.test.ts tests/unit/api/cron/send-release-notifications.test.ts tests/unit/api/cron/schedule-release-notifications.test.ts tests/unit/lib/entitlements-state-transitions.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=app/api/cron/send-release-notifications/route.ts --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/notifications/quota.ts --coverage.include=lib/notifications/service.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/customer-sync/types.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-fan-send-safety-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.lines=70 --coverage.thresholds.statements=70 --coverage.thresholds.branches=60 --coverage.thresholds.functions=70';
+export const BILLING_COVERAGE_COMMAND = Object.freeze(
+  `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
+);
 export const DESKTOP_RELEASE_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
 
@@ -119,6 +126,12 @@ const LANES = [
     run: runProfileAdmission,
   },
   {
+    id: 'billing-coverage',
+    name: 'Billing and fan-send coverage',
+    nextLocalCommand: BILLING_COVERAGE_COMMAND,
+    run: runBillingCoverage,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -154,6 +167,7 @@ export const LANE_GROUPS = Object.freeze({
     'design-conformance',
     'ios-fast',
     'profile-admission',
+    'billing-coverage',
     'structural',
   ]),
 });
@@ -264,6 +278,71 @@ function changedFiles(patterns) {
     .split('\n')
     .map(line => line.trim())
     .filter(Boolean);
+}
+
+const BILLING_PROVENANCE_COVERAGE_PATHS = [
+  'apps/web/lib/entitlements/**',
+  'apps/web/lib/stripe/customer-sync/**',
+  'apps/web/tests/unit/lib/entitlements/**',
+  'apps/web/tests/unit/lib/stripe/customer-sync.billing-info.test.ts',
+];
+
+const FAN_SEND_SAFETY_COVERAGE_PATHS = [
+  'apps/web/app/api/cron/send-release-notifications/**',
+  'apps/web/lib/notifications/**',
+  'apps/web/lib/stripe/customer-sync/types.ts',
+  'apps/web/tests/lib/notifications/**',
+  'apps/web/tests/unit/api/cron/send-release-notifications.test.ts',
+  'apps/web/tests/unit/api/cron/schedule-release-notifications.test.ts',
+  'apps/web/tests/unit/lib/entitlements-state-transitions.test.ts',
+  'apps/web/tests/unit/lib/stripe/customer-sync.queries.test.ts',
+];
+
+export function runBillingCoverage() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const provenanceFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(BILLING_PROVENANCE_COVERAGE_PATHS);
+  const fanSendFiles =
+    event === 'workflow_dispatch'
+      ? null
+      : changedFiles(FAN_SEND_SAFETY_COVERAGE_PATHS);
+  const commands = [];
+
+  // An unreadable diff fails closed and runs both focused suites. On a normal
+  // PR, each suite runs only when its production/test surface changed.
+  if (
+    event === 'workflow_dispatch' ||
+    provenanceFiles === null ||
+    provenanceFiles.length > 0
+  ) {
+    commands.push(BILLING_PROVENANCE_COVERAGE_COMMAND);
+  }
+  if (
+    event === 'workflow_dispatch' ||
+    fanSendFiles === null ||
+    fanSendFiles.length > 0
+  ) {
+    commands.push(FAN_SEND_SAFETY_COVERAGE_COMMAND);
+  }
+
+  if (commands.length === 0) {
+    return {
+      code: 0,
+      output:
+        'Billing coverage skipped (no billing or fan-send files changed)\n',
+      skipped: true,
+    };
+  }
+
+  let combined = '';
+  for (const command of commands) {
+    const result = shell(command);
+    combined += result.output;
+    if (result.code !== 0) return { code: result.code, output: combined };
+  }
+  return { code: 0, output: combined };
 }
 
 function listAllChangedFiles() {
