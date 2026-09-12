@@ -266,14 +266,21 @@ The source export is preparatory; deployment and commissioning require separate 
           '../vendor/agent-transport-contracts/index'
         )
     );
-    for (const path of ['index.ts', 'package.json'])
-      put(
-        `vendor/agent-transport-contracts/${path}`,
-        readFileSync(
-          resolve(pilot, '../../packages/agent-transport-contracts', path),
-          'utf8'
-        )
+    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json']) {
+      let contents = readFileSync(
+        resolve(pilot, '../../packages/agent-transport-contracts', path),
+        'utf8'
       );
+      if (
+        path === 'index.ts' &&
+        !contents.includes("from './symphony-outage.js'")
+      ) {
+        // Workspace index stays bundler-safe for Next typecheck/Turbopack.
+        // Isolated NodeNext copies re-export the health module with .js.
+        contents = `${contents.trimEnd()}\n\nexport * from './symphony-outage.js';\n`;
+      }
+      put(`vendor/agent-transport-contracts/${path}`, contents);
+    }
   }
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: source,
@@ -289,6 +296,7 @@ The source export is preparatory; deployment and commissioning require separate 
     'scripts/templates/application-boundary.ts',
     'scripts/templates/application-boundary.test.ts',
     '../../packages/agent-transport-contracts/index.ts',
+    '../../packages/agent-transport-contracts/symphony-outage.ts',
     '../../packages/agent-transport-contracts/package.json',
   ];
   const provenance = {
