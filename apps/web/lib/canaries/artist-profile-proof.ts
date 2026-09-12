@@ -48,12 +48,10 @@ export function inspectArtistProfile(input: {
     value => value?.['@id'] === `${profileUrl}#musicgroup`
   );
   const rawMentions: unknown = entity?.mentions;
-  const mentions: unknown[] =
-    rawMentions === undefined
-      ? []
-      : Array.isArray(rawMentions)
-        ? rawMentions
-        : [rawMentions];
+  let mentions: unknown[] = [];
+  if (rawMentions !== undefined) {
+    mentions = Array.isArray(rawMentions) ? rawMentions : [rawMentions];
+  }
   const mentionSchema = z.object({
     '@type': z.union([z.string(), z.array(z.string())]),
     name: z.string(),
@@ -104,14 +102,11 @@ export function inspectArtistProfile(input: {
     pass: boolean,
     evidence: string[],
     known = available
-  ) => ({
-    id,
-    status: (known ? (pass ? 'pass' : 'fail') : 'unknown') as
-      | 'pass'
-      | 'fail'
-      | 'unknown',
-    evidence,
-  });
+  ) => {
+    let status: 'pass' | 'fail' | 'unknown' = 'unknown';
+    if (known) status = pass ? 'pass' : 'fail';
+    return { id, status, evidence };
+  };
   return {
     checks: [
       check('profile-available', available, [`HTTP ${input.httpStatus}`], true),
@@ -156,7 +151,7 @@ export function inspectArtistProfile(input: {
           }
         })
       ),
-    ].sort(),
+    ].sort((left, right) => left.localeCompare(right)),
   };
 }
 
