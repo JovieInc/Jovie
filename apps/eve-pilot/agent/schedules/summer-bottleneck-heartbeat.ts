@@ -3,12 +3,12 @@ import {
   reconcileMissedSummerBottleneckEvents,
   type SummerBottleneckDependencies,
 } from '../lib/summer-bottleneck-loop';
-import { dispatchSummerGovernedRequest } from '../lib/summer-governed-dispatch';
 import {
+  type GemDarkRecoveryCycleResult,
   loadRunnerSourceAttestationFromEnvironment,
   runGemDarkRecoveryCycle,
-  type GemDarkRecoveryCycleResult,
 } from '../lib/summer-gem-dark-recovery';
+import { dispatchSummerGovernedRequest } from '../lib/summer-governed-dispatch';
 import { createVercelBlobBottleneckDependencies } from '../lib/vercel-blob-bottleneck-runtime';
 
 /** Heartbeat decision job for JOV-6163 governed routing. */

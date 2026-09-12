@@ -18,12 +18,12 @@ import type {
   SummerBottleneckRecord,
   SummerBottleneckStore,
 } from '../agent/lib/summer-bottleneck-loop';
-import { dispatchSummerGovernedRequest } from '../agent/lib/summer-governed-dispatch';
 import {
   evaluateRunnerSourceAttestation,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
   runGemDarkRecoveryCycle,
 } from '../agent/lib/summer-gem-dark-recovery';
+import { dispatchSummerGovernedRequest } from '../agent/lib/summer-governed-dispatch';
 
 function memoryStore(): SummerBottleneckStore & {
   readonly records: Map<string, SummerBottleneckRecord>;
@@ -48,7 +48,9 @@ function memoryStore(): SummerBottleneckStore & {
   };
 }
 
-function acceptanceDecisionJob(overrides: Partial<DecisionJob> = {}): DecisionJob {
+function acceptanceDecisionJob(
+  overrides: Partial<DecisionJob> = {}
+): DecisionJob {
   return {
     kind: 'decision',
     id: 'acceptance-gem-down-1',

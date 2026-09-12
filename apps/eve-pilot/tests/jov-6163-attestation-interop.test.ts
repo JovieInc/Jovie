@@ -8,8 +8,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   evaluateRunnerSourceAttestation,
-  resolveGemDarkTrigger,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
+  resolveGemDarkTrigger,
 } from '../agent/lib/summer-gem-dark-recovery';
 
 /** Minimal receipt matching emit_gem_service_attestation.py output fields. */

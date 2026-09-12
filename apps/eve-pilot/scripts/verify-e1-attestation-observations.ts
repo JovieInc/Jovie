@@ -32,7 +32,9 @@ async function main() {
     const pathA = process.env.E1_OBS_A_PATH;
     const pathB = process.env.E1_OBS_B_PATH;
     if (!pathA || !pathB) {
-      console.error('E1_OBS_A_PATH and E1_OBS_B_PATH are required in live mode');
+      console.error(
+        'E1_OBS_A_PATH and E1_OBS_B_PATH are required in live mode'
+      );
       process.exit(78);
     }
     observationA = JSON.parse(await readFile(pathA, 'utf8')) as unknown;

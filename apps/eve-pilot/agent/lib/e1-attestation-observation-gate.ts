@@ -5,12 +5,13 @@
  * This does not install on Gem. It is the post-install proof command and the
  * local self-check that Summer's close-path is ready when observations exist.
  */
+
+import type { DecisionJob } from './governor-route';
 import {
   evaluateRunnerSourceAttestation,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
 } from './summer-gem-dark-recovery';
 import { dispatchSummerGovernedRequest } from './summer-governed-dispatch';
-import type { DecisionJob } from './governor-route';
 
 export const E1_OBSERVATION_GATE_SCHEMA =
   'jovie.summer.e1-attestation-observations/v1' as const;

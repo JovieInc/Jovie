@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DecisionJob } from '../agent/lib/governor-route';
-import { dispatchSummerGovernedRequest } from '../agent/lib/summer-governed-dispatch';
 import { RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS } from '../agent/lib/summer-gem-dark-recovery';
+import { dispatchSummerGovernedRequest } from '../agent/lib/summer-governed-dispatch';
 
 function decisionJob(overrides: Partial<DecisionJob> = {}): DecisionJob {
   return {
@@ -61,9 +61,7 @@ describe('Summer governed dispatch (request outcome → router launches)', () =>
     });
     expect(result.outcome).toBe('cursor-recovery-request');
     if (result.outcome !== 'cursor-recovery-request') return;
-    expect(result.trigger.reason).toBe(
-      'runner-source-attestation-unavailable'
-    );
+    expect(result.trigger.reason).toBe('runner-source-attestation-unavailable');
     expect(result.route.selectedRoute.tuple.provider).toBe('cursor-cloud');
     expect(result.route.selectedRoute.tuple.provider).not.toBe('gem');
     expect(result.route.selectedRoute.tuple.provider).not.toBe('symphony');
