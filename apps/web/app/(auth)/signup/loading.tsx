@@ -6,10 +6,9 @@ import { AuthPageSkeleton } from '@/features/auth';
 export default function SignUpLoading() {
   return (
     <AuthPageSkeleton
-      formTitle='Create your account'
+      formTitle='Continue to Jovie'
       showFormTitle={false}
       layoutVariant='stack'
-      chrome='splash-b'
     />
   );
 }

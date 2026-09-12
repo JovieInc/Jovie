@@ -13,7 +13,7 @@ import { page, track } from '@/lib/analytics';
 /**
  * Unauthenticated /waitlist handoff (JOV-5334 / JOV-5376).
  *
- * Splash B chrome: centered 32 mark, empty field, sign-up shell.
+ * Shared auth shell: chrome-20 mark, Continue to Jovie, email + providers.
  * Get started on marketing pages lands here instead of unfinished /start chat.
  * Auth completion continues into /start.
  */
@@ -27,11 +27,10 @@ export function WaitlistPublicLanding() {
   return (
     <AuthenticatedAuthEntryGuard>
       <AuthLayout
-        formTitle='Get started'
+        formTitle='Continue to Jovie'
         showFormTitle={false}
         showFooterPrompt={false}
         layoutVariant='stack'
-        chrome='splash-b'
       >
         <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
         <AuthShell

@@ -65,12 +65,12 @@ describe('auth front-door contract', () => {
   });
 
   it('keeps first-party auth copy aligned with the canonical cross-links', () => {
-    expect(authCopy.signUp.start.title).toBe('Create your account');
+    expect(authCopy.signUp.start.title).toBe('Continue to Jovie');
     expect(authCopy.signUp.start.actionText).toBe('Have an account?');
     expect(authCopy.signUp.start.actionLink).toBe('Sign in');
 
-    expect(authCopy.signIn.start.title).toBe('Welcome back');
-    expect(authCopy.signIn.start.actionText).toBe('No account?');
-    expect(authCopy.signIn.start.actionLink).toBe('Create your account');
+    expect(authCopy.signIn.start.title).toBe('Log in to Jovie');
+    expect(authCopy.signIn.start.actionText).toBe('Trouble signing in?');
+    expect(authCopy.signIn.start.actionLink).toBe('Get help');
   });
 });

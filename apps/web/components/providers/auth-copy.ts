@@ -10,10 +10,10 @@ export const authCopy = {
   socialButtonsBlockButtonManyInView: CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE,
   signIn: {
     start: {
-      title: 'Welcome back',
+      title: 'Log in to Jovie',
       subtitle: '',
-      actionText: 'No account?',
-      actionLink: 'Create your account',
+      actionText: 'Trouble signing in?',
+      actionLink: 'Get help',
     },
     password: {
       title: 'Enter your password.',
@@ -37,7 +37,7 @@ export const authCopy = {
   },
   signUp: {
     start: {
-      title: 'Create your account',
+      title: 'Continue to Jovie',
       subtitle: '',
       actionText: 'Have an account?',
       actionLink: 'Sign in',

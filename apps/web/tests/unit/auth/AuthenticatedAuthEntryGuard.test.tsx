@@ -84,6 +84,23 @@ describe('AuthenticatedAuthEntryGuard', () => {
     expect(replaceMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 
+  it('preserves a paid plan handoff into checkout instead of dropping it on the dashboard', async () => {
+    authState.isSignedIn = true;
+    searchParamsState.value = 'plan=pro&interval=annual&artist_name=Motion';
+
+    render(
+      <AuthenticatedAuthEntryGuard>
+        <div>Sign-in form</div>
+      </AuthenticatedAuthEntryGuard>
+    );
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(
+        `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=annual&artist_name=Motion`
+      );
+    });
+  });
+
   it('preserves a safe redirect_url for authenticated users', async () => {
     authState.isSignedIn = true;
     searchParamsState.value = 'redirect_url=%2Fapp%2Fsettings';

@@ -1,10 +1,13 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/auth/AuthenticatedAuthEntryGuard.test.tsx
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
 import { hasClientAuthSession } from '@/lib/auth/auth-session-cookies';
+import { persistAuthOfferFromSearchParams } from '@/lib/auth/auth-shell-offer';
 
 interface AuthenticatedAuthEntryGuardProps {
   readonly children: ReactNode;
@@ -49,6 +52,7 @@ export function AuthenticatedAuthEntryGuard({
     }
 
     if (clerkSignedIn) {
+      persistAuthOfferFromSearchParams(searchParams);
       setIsRedirecting(true);
       router.replace(getClientAuthenticatedAuthEntryRedirect(searchParams));
       return;

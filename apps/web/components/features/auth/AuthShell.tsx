@@ -3,10 +3,27 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { getClientAuthenticatedAuthEntryRedirect } from '@/lib/auth/access-route-redirect';
+import {
+  AUTH_TROUBLE_SIGNING_IN_LABEL,
+  type AuthShellBackLink,
+  type AuthShellIntent,
+  type AuthShellMode,
+  getAuthShellHeading,
+  normalizeAuthClaimHandle,
+  resolveAuthShellBackLink,
+  resolveAuthShellIntent,
+} from '@/lib/auth/auth-shell-intent';
+import {
+  type AuthOfferSummary,
+  persistAuthOfferFromSearchParams,
+  readAuthOfferHandoff,
+  resolveAuthOfferSummary,
+} from '@/lib/auth/auth-shell-offer';
 import {
   buildAuthRouteUrl,
   getDefaultSignUpFallbackRedirectUrl,
@@ -20,7 +37,7 @@ import { logger } from '@/lib/utils/logger';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 import { GoogleOneTap } from './GoogleOneTap';
 
-export type AuthShellMode = 'sign-in' | 'sign-up';
+export type { AuthShellIntent, AuthShellMode };
 
 const AUTH_LEGAL_FALLBACK_HREFS = {
   privacy: APP_ROUTES.LEGAL_PRIVACY,
@@ -38,13 +55,25 @@ function resolveLegalHref(value: string | undefined, fallback: string) {
  * mode-aware so a denied-at-Google lands back on the right auth page with
  * `?error=` for the `SignInOauthErrorBanner` to classify (audit row 19).
  */
-function getCallbackUrl(mode: AuthShellMode): string {
-  return mode === 'sign-up' ? APP_ROUTES.SIGNUP : APP_ROUTES.SIGNIN;
+function getCallbackUrl(
+  mode: AuthShellMode,
+  searchParams: Pick<URLSearchParams, 'get'>
+): string {
+  return buildAuthRouteUrl(
+    mode === 'sign-up' ? APP_ROUTES.SIGNUP : APP_ROUTES.SIGNIN,
+    searchParams
+  );
 }
 
-function getErrorCallbackUrl(mode: AuthShellMode, callbackURL: string): string {
-  const base = getCallbackUrl(mode);
-  const errorUrl = new URL(base, 'https://jov.ie');
+function getErrorCallbackUrl(
+  mode: AuthShellMode,
+  callbackURL: string,
+  searchParams: Pick<URLSearchParams, 'get'>
+): string {
+  const errorUrl = new URL(
+    getCallbackUrl(mode, searchParams),
+    'https://jov.ie'
+  );
   const callback = new URL(callbackURL, 'https://jov.ie');
   if (callback.pathname === '/auth/callback') {
     const state = callback.searchParams.get('state');
@@ -97,6 +126,10 @@ interface AuthShellProps {
    * Email prefill for the email-code form (e.g. `?email=` deep links).
    */
   readonly initialValues?: { readonly emailAddress?: string };
+  /** Claim handle for "Claim @handle". Falls back to `?handle=`. */
+  readonly claimHandle?: string;
+  /** Quiet unboxed back. Compact/modal callers own their own back. */
+  readonly back?: AuthShellBackLink | null;
 }
 
 /**
@@ -124,6 +157,8 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     oppositeModeUrl,
     forceOppositeModeHardNavigation = false,
     compact = false,
+    claimHandle: claimHandleProp,
+    back: backProp,
   } = props;
   const searchParams = useSearchParams();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
@@ -155,6 +190,26 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     () => getEnabledAuthOAuthProviders(),
     []
   );
+  const claimHandle = useMemo(
+    () =>
+      normalizeAuthClaimHandle(claimHandleProp ?? searchParams.get('handle')),
+    [claimHandleProp, searchParams]
+  );
+  const intent = resolveAuthShellIntent({ mode, claimHandle });
+  const back = compact
+    ? null
+    : (backProp ?? resolveAuthShellBackLink(searchParams));
+  const offer = useMemo(
+    () =>
+      resolveAuthOfferSummary({
+        handoff: readAuthOfferHandoff(searchParams),
+      }),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    persistAuthOfferFromSearchParams(searchParams);
+  }, [searchParams]);
 
   useEffect(() => {
     setHasHydrated(true);
@@ -184,8 +239,13 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       // (staging OAuth runtime proof / real users on slow first paint).
       if (!hasHydrated || pendingProvider) return;
 
-      const callbackURL = fallbackRedirectUrl ?? getCallbackUrl(mode);
-      const errorCallbackURL = getErrorCallbackUrl(mode, callbackURL);
+      const callbackURL =
+        fallbackRedirectUrl ?? getCallbackUrl(mode, searchParams);
+      const errorCallbackURL = getErrorCallbackUrl(
+        mode,
+        callbackURL,
+        searchParams
+      );
       const newUserCallbackURL = fallbackRedirectUrl ?? getNewUserCallbackUrl();
       const attempt = ++oauthAttemptRef.current;
 
@@ -232,7 +292,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         );
       }
     },
-    [fallbackRedirectUrl, hasHydrated, mode, pendingProvider]
+    [fallbackRedirectUrl, hasHydrated, mode, pendingProvider, searchParams]
   );
 
   if (hasHydrated && isAuthLoaded && isSignedIn) {
@@ -252,6 +312,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     return (
       <div
         data-auth-shell-mode={mode}
+        data-auth-shell-intent={intent}
         data-auth-shell-compact={compact ? 'true' : undefined}
         data-auth-shell-ready='true'
         data-auth-shell-hydrated={hasHydrated ? 'true' : 'false'}
@@ -260,6 +321,10 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       >
         <AuthOAuthStartSurface
           mode={mode}
+          intent={intent}
+          claimHandle={claimHandle}
+          back={back}
+          offer={offer}
           oppositeModeUrl={crossLinkUrl}
           forceHardNavigation={forceOppositeModeHardNavigation}
           providers={enabledOAuthProviders}
@@ -278,6 +343,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   return (
     <div
       data-auth-shell-mode={mode}
+      data-auth-shell-intent={intent}
       data-auth-shell-compact={compact ? 'true' : undefined}
       data-auth-shell-ready='true'
       data-auth-shell-hydrated={hasHydrated ? 'true' : 'false'}
@@ -295,6 +361,10 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       />
       <AuthOAuthStartSurface
         mode={mode}
+        intent={intent}
+        claimHandle={claimHandle}
+        back={back}
+        offer={offer}
         oppositeModeUrl={crossLinkUrl}
         forceHardNavigation={forceOppositeModeHardNavigation}
         providers={enabledOAuthProviders}
@@ -316,20 +386,75 @@ function getAuthStartErrorMessage(mode: AuthShellMode): string {
     : 'Could not start sign-in. Please try again.';
 }
 
-function AuthShellTitle({ mode }: Readonly<{ mode: AuthShellMode }>) {
-  const isSignUp = mode === 'sign-up';
-
+function AuthQuietBackLink({ href, label }: Readonly<AuthShellBackLink>) {
   return (
-    <div className='mb-4 text-center'>
-      <p className='text-2xl font-semibold leading-tight tracking-normal text-primary-token'>
-        {isSignUp ? 'Create your account' : 'Welcome back'}
-      </p>
+    <Link
+      href={href}
+      data-auth-shell-back
+      className='mb-4 self-start rounded-sm text-sm text-secondary-token underline-offset-2 transition-colors hover:text-primary-token hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+    >
+      {label}
+    </Link>
+  );
+}
+
+function AuthShellOfferSummary({
+  offer,
+}: Readonly<{ offer: AuthOfferSummary }>) {
+  return (
+    <p
+      data-auth-offer-summary
+      data-auth-offer-kind={offer.kind}
+      className='mt-2 text-sm leading-5 text-secondary-token'
+    >
+      <span className='block font-medium text-primary-token'>
+        {offer.title}
+      </span>
+      {'detail' in offer ? (
+        <span className='mt-0.5 block'>{offer.detail}</span>
+      ) : null}
+    </p>
+  );
+}
+
+function AuthShellIdentity({
+  intent,
+  claimHandle,
+  back,
+  offer,
+}: Readonly<{
+  intent: AuthShellIntent;
+  claimHandle?: string;
+  back: AuthShellBackLink | null;
+  offer: AuthOfferSummary | null;
+}>) {
+  return (
+    <div
+      data-auth-shell-identity
+      className='mb-6 flex flex-col items-center text-center'
+    >
+      {back ? <AuthQuietBackLink href={back.href} label={back.label} /> : null}
+      <Link
+        href={APP_ROUTES.HOME}
+        aria-label='Go to homepage'
+        className='mb-4 inline-flex rounded-sm text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+      >
+        <BrandLogo size='chrome' tone='white' aria-hidden />
+      </Link>
+      <h1 className='text-xl font-semibold leading-tight tracking-tight text-primary-token'>
+        {getAuthShellHeading(intent, claimHandle)}
+      </h1>
+      {offer ? <AuthShellOfferSummary offer={offer} /> : null}
     </div>
   );
 }
 
 function AuthOAuthStartSurface({
   mode,
+  intent,
+  claimHandle,
+  back,
+  offer,
   oppositeModeUrl,
   forceHardNavigation,
   providers,
@@ -342,6 +467,10 @@ function AuthOAuthStartSurface({
   onOtpStepChange,
 }: Readonly<{
   mode: AuthShellMode;
+  intent: AuthShellIntent;
+  claimHandle?: string;
+  back: AuthShellBackLink | null;
+  offer: AuthOfferSummary | null;
   oppositeModeUrl: string;
   forceHardNavigation: boolean;
   providers: readonly PrimaryAuthOAuthProvider[];
@@ -362,7 +491,12 @@ function AuthOAuthStartSurface({
 
   return (
     <div data-auth-sso-surface>
-      <AuthShellTitle mode={mode} />
+      <AuthShellIdentity
+        intent={intent}
+        claimHandle={claimHandle}
+        back={back}
+        offer={offer}
+      />
 
       {hasProviders ? (
         <fieldset
@@ -421,16 +555,18 @@ function AuthOAuthStartSurface({
 
 function AuthMethodDivider() {
   return (
-    <div
-      data-auth-method-divider
-      className='mb-4 flex items-center gap-3'
-      aria-hidden='true'
-    >
-      <span className='h-px flex-1 bg-(--linear-border-subtle)' />
+    <div data-auth-method-divider className='mb-4 flex items-center gap-3'>
+      <span
+        className='h-px flex-1 bg-(--linear-border-subtle)'
+        aria-hidden='true'
+      />
       <span className='text-2xs uppercase tracking-wide text-secondary-token'>
-        or
+        or use email
       </span>
-      <span className='h-px flex-1 bg-(--linear-border-subtle)' />
+      <span
+        className='h-px flex-1 bg-(--linear-border-subtle)'
+        aria-hidden='true'
+      />
     </div>
   );
 }
@@ -445,29 +581,39 @@ function AuthModeSwitchLink({
   forceHardNavigation: boolean;
 }>) {
   const isSignUp = mode === 'sign-up';
-  // Sign-in side: generic Need help link (no waitlist dead-end for returnees).
-  // Sign-up side: still cross-links to /signin for the "have an account" case.
-  const prompt = isSignUp ? 'Have an account?' : 'Need help?';
-  const label = isSignUp ? 'Sign in' : 'Get help';
   const className =
-    'focus-ring-themed rounded-md text-primary-token underline underline-offset-2';
+    'focus-ring-themed rounded-sm text-primary-token underline underline-offset-2';
+  const troubleHref = APP_ROUTES.SUPPORT;
 
   return (
-    <span
+    <div
       data-auth-mode-switch
-      className='mt-5 block text-center text-app text-secondary-token'
+      className='mt-5 flex flex-col items-center gap-2 text-center text-app text-secondary-token'
     >
-      {prompt}{' '}
+      {isSignUp ? (
+        <span>
+          Have an account?{' '}
+          {forceHardNavigation ? (
+            <a href={oppositeModeUrl} className={className}>
+              Sign in
+            </a>
+          ) : (
+            <Link href={oppositeModeUrl} className={className}>
+              Sign in
+            </Link>
+          )}
+        </span>
+      ) : null}
       {forceHardNavigation ? (
-        <a href={oppositeModeUrl} className={className}>
-          {label}
+        <a href={troubleHref} className={className}>
+          {AUTH_TROUBLE_SIGNING_IN_LABEL}
         </a>
       ) : (
-        <Link href={oppositeModeUrl} className={className}>
-          {label}
+        <Link href={troubleHref} className={className}>
+          {AUTH_TROUBLE_SIGNING_IN_LABEL}
         </Link>
       )}
-    </span>
+    </div>
   );
 }
 
