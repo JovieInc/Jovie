@@ -76,9 +76,23 @@ Gem-dark recovery cycle:
 5. PATH alone (without loading the file) does **not** imply dark — avoids
    accidental Cursor spend; the heartbeat always loads first.
 
+**Required for the bridge to arm:** set
+`SUMMER_RUNNER_SOURCE_ATTESTATION_PATH` (or `_JSON`) on the Summer runtime to
+the live Gem attestation file. If neither probe is configured, Summer
+fail-closes to “not dark” (no Cursor spend). A configured path whose file is
+missing/unreadable counts as unavailable → Cursor outbox.
+
 Schema match (must equal Symphony concurrency controller):
 `gem-service-attestation/v1` + `sourceRevision` (40 hex) + `observedAt` +
 `active`/`healthy` + `listener.port===4041` + `listener.boundToService===true`.
+
+Local Gem-down acceptance narrative (does not close E1):
+
+```bash
+pnpm --dir apps/eve-pilot exec vitest run --config vitest.config.ts \
+  tests/summer-bounded-operator-acceptance.test.ts
+# writes /opt/cursor/artifacts/summer-bounded-operator-acceptance-receipt.json
+```
 
 ## Named external blocker
 

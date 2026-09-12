@@ -73,6 +73,25 @@ run(
 );
 
 run(
+  'E4 heartbeat attestation→Cursor bridge',
+  'pnpm',
+  ['exec', 'vitest', 'run', 'tests/summer-bottleneck-heartbeat.test.ts'],
+  { cwd: resolve(root, 'apps/eve-pilot'), requirePassed: true }
+);
+
+run(
+  'Acceptance: Gem-down → alternate → recovery → ownership → human decision',
+  'pnpm',
+  [
+    'exec',
+    'vitest',
+    'run',
+    'tests/summer-bounded-operator-acceptance.test.ts',
+  ],
+  { cwd: resolve(root, 'apps/eve-pilot'), requirePassed: true }
+);
+
+run(
   'E5 identity packs',
   'pnpm',
   [
