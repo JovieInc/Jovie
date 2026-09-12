@@ -9,10 +9,8 @@ import { primeVercelBypassCookie } from './vercel-preview';
 // Better Auth test helper (Clerk → Better Auth migration, commit ⑩)
 // ============================================================================
 // Replaces the 1354-line `clerk-auth.ts` with a <400-line BA-native helper.
-// Export names are preserved (`signInUser`/`ensureSignedInUser`/
-// `setTestAuthBypassSession`/`isAuthenticated`/`signOutUser`/
-// `setupAuthenticatedTest`/`hasClerkCredentials`/`hasAdminCredentials`/
-// `ClerkTestError`/etc.) so the 51 spec importers don't churn.
+// First-class names are Better Auth (`hasTestAuthCredentials` /
+// `TestAuthError`). Clerk-era aliases remain so existing specs do not churn.
 //
 // Under Better Auth the E2E auth path is:
 //   1. Navigate to `/api/dev/test-auth/enter?persona=creator&redirect=/app`
@@ -26,15 +24,18 @@ import { primeVercelBypassCookie } from './vercel-preview';
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 60_000;
 
-export class ClerkTestError extends Error {
+export class TestAuthError extends Error {
   constructor(
     message: string,
     readonly code: string
   ) {
     super(message);
-    this.name = 'ClerkTestError';
+    this.name = 'TestAuthError';
   }
 }
+
+/** @deprecated Use `TestAuthError`. */
+export const ClerkTestError = TestAuthError;
 
 function isTestAuthBypassEnabled(): boolean {
   return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
@@ -50,14 +51,14 @@ export function isTestingEnvironment(): boolean {
 }
 
 /**
- * Under Better Auth there are no Clerk credentials to check — the dev bypass
- * route is the auth path. Kept for source compat with specs that gate on
- * `hasClerkCredentials()`. Returns `true` when the test bypass is enabled
- * (the BA equivalent of "credentials are configured").
+ * Returns `true` when the Better Auth test bypass is enabled.
  */
-export function hasClerkCredentials(): boolean {
+export function hasTestAuthCredentials(): boolean {
   return isTestAuthBypassEnabled();
 }
+
+/** @deprecated Use `hasTestAuthCredentials`. */
+export const hasClerkCredentials = hasTestAuthCredentials;
 
 export function hasAdminCredentials(): boolean {
   return isTestAuthBypassEnabled();
@@ -73,9 +74,12 @@ export function getAdminCredentials(): {
   };
 }
 
-export function isClerkTestEmail(email: string): boolean {
+export function isTestAuthEmail(email: string): boolean {
   return /\+(e2e|clerk_test)(\+[^@]*)?@/i.test(email);
 }
+
+/** @deprecated Use `isTestAuthEmail`. */
+export const isClerkTestEmail = isTestAuthEmail;
 
 export function isClerkHandshakeUrl(url: string): boolean {
   // Under BA there's no Clerk handshake URL. Always false.
@@ -119,7 +123,7 @@ export function resolveBypassFallbackUserId(
       process.env.E2E_CLERK_ADMIN_USERNAME
     );
   }
-  throw new ClerkTestError(
+  throw new TestAuthError(
     'E2E_BETTER_AUTH_USER_ID or persona is required for test auth bypass.',
     'MISSING_CREDENTIALS'
   );
@@ -157,7 +161,7 @@ async function enableTestAuthBypass(
       .locator('body')
       .innerText()
       .catch(() => '');
-    throw new ClerkTestError(
+    throw new TestAuthError(
       `Test auth enter did not redirect (url=${page.url()}, status=${response?.status() ?? 'n/a'}): ${body.slice(0, 240)}`,
       'CLERK_SETUP_FAILED'
     );
@@ -173,7 +177,7 @@ async function enableTestAuthBypass(
       { timeout: AUTH_BOOTSTRAP_TIMEOUT_MS }
     );
   } catch {
-    throw new ClerkTestError(
+    throw new TestAuthError(
       `Test auth enter timed out waiting for /app|/start (url=${page.url()})`,
       'CLERK_SETUP_FAILED'
     );
@@ -228,7 +232,7 @@ export async function setTestAuthBypassSession(
   } | null;
 
   if (!response.ok() || body?.success !== true || !body.userId) {
-    throw new ClerkTestError(
+    throw new TestAuthError(
       `Better Auth test session provisioning failed (${response.status()}).`,
       'CLERK_SETUP_FAILED'
     );
@@ -434,7 +438,7 @@ export async function signInUser(
 
   // No bypass enabled — under BA there's no Clerk testing token path.
   // The caller must enable E2E_USE_TEST_AUTH_BYPASS=1.
-  throw new ClerkTestError(
+  throw new TestAuthError(
     'E2E_USE_TEST_AUTH_BYPASS=1 is required for Better Auth E2E tests.',
     'MISSING_CREDENTIALS'
   );

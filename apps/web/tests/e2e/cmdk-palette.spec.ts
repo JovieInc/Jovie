@@ -14,7 +14,7 @@
 
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
+import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 import {
   smokeNavigateWithRetry,
   waitForHydration,

@@ -6,7 +6,7 @@ import {
   hasClerkCredentials,
   setTestAuthBypassSession,
   signInUser,
-} from '../../helpers/clerk-auth';
+} from '../../helpers/auth';
 import type { DashboardRouteDescriptor } from '../utils/dashboard-route-matrix';
 import { DASHBOARD_ROUTE_MATRIX } from '../utils/dashboard-route-matrix';
 import {

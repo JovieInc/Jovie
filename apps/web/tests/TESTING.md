@@ -228,22 +228,20 @@ E2E tests authenticate using Clerk's official testing library (`@clerk/testing/p
 
 ### Required Doppler Environment Variables
 
-All E2E auth credentials are stored in Doppler (`jovie-web` project, `dev` config):
+Local/E2E auth is Better Auth test-auth bypass. Clerk testing tokens are retired.
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `E2E_CLERK_USER_USERNAME` | Yes | Test user email (must contain `+clerk_test`) |
-| `E2E_CLERK_USER_PASSWORD` | No | Not needed for `+clerk_test` emails |
-| `CLERK_SECRET_KEY` | Yes | Server-side Clerk API key |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Client-side Clerk key |
+| `E2E_USE_TEST_AUTH_BYPASS` | Yes | Enable `/api/dev/test-auth/enter` session minting |
+| `E2E_TEST_AUTH_PERSONA` | No | `creator`, `creator-ready`, or `admin` |
 | `DATABASE_URL` | Yes | For seeding test data |
 
 ### Auth Flow in Tests
 
-1. **`global-setup.ts`**: Loads env vars, calls `clerkSetup()` to get testing token, seeds test data
-2. **`auth.setup.ts`**: Navigates to `/signin`, signs in via `clerk.signIn()` with `email_code` strategy, saves session to `tests/.auth/user.json`
-3. **Screenshot/E2E specs**: Use `signInUser(page)` from `helpers/clerk-auth.ts` which detects `+clerk_test` emails and uses the correct auth strategy
-4. **`shouldSkipAuth()`**: Guards authenticated specs — skips if credentials missing or Clerk setup failed. `+clerk_test` emails do NOT require a password.
+1. **`global-setup.ts`**: Loads env vars, marks test-auth setup ready, seeds test data
+2. **`auth.setup.ts`**: Calls `signInUser(page)` from `helpers/auth.ts` (bypass enter route), saves session to `tests/.auth/user.json`
+3. **Screenshot/E2E specs**: Import helpers from `helpers/auth.ts` and use `E2E_USE_TEST_AUTH_BYPASS=1`
+4. **`hasTestAuthCredentials()`**: Guards authenticated specs — true when the bypass is enabled
 
 ### Product Screenshots
 

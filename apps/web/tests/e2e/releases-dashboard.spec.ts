@@ -3,7 +3,7 @@ import {
   ClerkTestError,
   hasClerkCredentials,
   signInUser,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 
 /**
  * Timeout constants for E2E tests.

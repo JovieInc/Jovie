@@ -2,7 +2,7 @@
 
 import { expect, type Page, type Request, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { resolveChatConversationPath } from './utils/dashboard-route-resolvers';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 

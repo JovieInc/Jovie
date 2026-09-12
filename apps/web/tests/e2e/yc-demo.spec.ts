@@ -24,7 +24,7 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import {
   setTestAuthBypassSession,
   waitForAuthenticatedHealth,
-} from '@/tests/helpers/clerk-auth';
+} from '@/tests/helpers/auth';
 import {
   getDemoUserHandle,
   getTopDemoReleasesForUser,

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { hasAdminCredentials } from '../helpers/clerk-auth';
+import { hasAdminCredentials } from '../helpers/auth';
 import {
   ADMIN_FAST_HEALTH_SURFACES,
   ADMIN_RENDER_SURFACES,

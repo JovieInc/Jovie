@@ -9,7 +9,7 @@
  */
 
 import { expect, type Page, test } from '@playwright/test';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 
 const UNAVAILABLE_MESSAGE =
   'Album art generation is temporarily unavailable. I can still help you draft a cover concept, album-art brief, or visual direction you can use with a designer or generator.';

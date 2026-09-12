@@ -15,7 +15,7 @@ import {
   getAdminCredentials as getSharedAdminCredentials,
   hasAdminCredentials as hasSharedAdminCredentials,
   setTestAuthBypassSession,
-} from '../../helpers/clerk-auth';
+} from '../../helpers/auth';
 
 // ============================================================================
 // Admin Credentials

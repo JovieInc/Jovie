@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 

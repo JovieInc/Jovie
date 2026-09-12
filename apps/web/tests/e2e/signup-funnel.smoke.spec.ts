@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import {
   isClerkRedirectUrl,
   RETRY_CONFIG,

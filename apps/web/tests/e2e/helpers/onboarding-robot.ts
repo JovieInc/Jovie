@@ -5,7 +5,7 @@ import {
   ONBOARDING_FUNNEL_EVENTS,
   type OnboardingFunnelEvent,
 } from '@/lib/onboarding/funnel-events';
-import { waitForAuthenticatedHealth } from '@/tests/helpers/clerk-auth';
+import { waitForAuthenticatedHealth } from '@/tests/helpers/auth';
 import {
   type OnboardingRobotEnv,
   onboardingRobotEnv,

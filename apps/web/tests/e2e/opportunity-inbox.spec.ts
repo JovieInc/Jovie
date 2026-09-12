@@ -9,7 +9,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   fillControlledInputUntilEnabled,
   setTestAuthBypassSession,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import { installAppFlagOverrides } from './helpers/app-flag-overrides';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 

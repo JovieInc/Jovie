@@ -4,7 +4,7 @@ import {
   getAdminCredentials,
   hasAdminCredentials,
   setTestAuthBypassSession,
-} from '../helpers/clerk-auth';
+} from '../helpers/auth';
 import {
   ADMIN_MOBILE_SNAPSHOT_SURFACES,
   ADMIN_RENDER_SURFACES,

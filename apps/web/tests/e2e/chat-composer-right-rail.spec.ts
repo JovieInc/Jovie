@@ -41,7 +41,7 @@
  */
 
 import { expect, type Page, test } from '@playwright/test';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/auth';
 import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
 
 const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
