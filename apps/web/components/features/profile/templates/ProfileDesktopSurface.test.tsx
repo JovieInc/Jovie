@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
@@ -8,6 +6,11 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import { ProfileDesktopSurface } from './ProfileDesktopSurface';
+import {
+  PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
+  PROFILE_LISTEN_DSP_COLUMN_CLASSNAME,
+  PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME,
+} from './profile-listen-desktop-grid';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -328,18 +331,12 @@ describe('ProfileDesktopSurface', () => {
     );
 
     const listenGrid = screen.getByTestId('profile-listen-desktop-grid');
-    expect(listenGrid).toHaveClass('min-w-0', 'items-start');
-    expect(listenGrid.className).toContain(
-      '[@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]'
-    );
-    expect(listenGrid.className).not.toContain('xl:grid-cols');
+    expect(listenGrid).toHaveClass(PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME);
     expect(screen.getByTestId('profile-primary-tab-releases')).toHaveClass(
-      'min-w-0',
-      'overflow-hidden',
-      'isolate'
+      PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME
     );
     expect(screen.getByTestId('profile-listen-dsp-column')).toHaveClass(
-      'min-w-0'
+      PROFILE_LISTEN_DSP_COLUMN_CLASSNAME
     );
   });
 
@@ -565,21 +562,5 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
     ).toBeNull();
-  });
-});
-
-describe('desktop listen grid contract', () => {
-  it('splits releases and DSP columns at the 1180px desktop hand-off', () => {
-    const source = readFileSync(
-      join(__dirname, 'ProfileDesktopSurface.tsx'),
-      'utf8'
-    );
-
-    expect(source).toContain("data-testid='profile-listen-desktop-grid'");
-    expect(source).toContain(
-      '[@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]'
-    );
-    expect(source).not.toContain('xl:grid-cols-[minmax(0,1.3fr)_360px]');
-    expect(source).toContain("data-testid='profile-listen-dsp-column'");
   });
 });

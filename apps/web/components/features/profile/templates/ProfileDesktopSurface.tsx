@@ -59,6 +59,11 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
+import {
+  PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
+  PROFILE_LISTEN_DSP_COLUMN_CLASSNAME,
+  PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME,
+} from './profile-listen-desktop-grid';
 
 const PRIMARY_TABS: ReadonlyArray<{
   mode: ProfilePrimaryTab;
@@ -772,12 +777,12 @@ export function ProfileDesktopSurface({
   const nonHomeContent =
     activePrimaryTab === 'listen' ? (
       <div
-        className='grid min-h-0 min-w-0 flex-1 items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]'
+        className={PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME}
         data-testid='profile-listen-desktop-grid'
       >
         <DesktopSurfaceCard
           title='Releases'
-          className='min-h-0 min-w-0 overflow-hidden isolate'
+          className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
           testId='profile-primary-tab-releases'
         >
           {visibleReleases.length > 0 ? (
@@ -792,7 +797,7 @@ export function ProfileDesktopSurface({
           )}
         </DesktopSurfaceCard>
         <div
-          className='grid min-w-0 gap-3.5'
+          className={PROFILE_LISTEN_DSP_COLUMN_CLASSNAME}
           data-testid='profile-listen-dsp-column'
         >
           <DesktopSurfaceCard
