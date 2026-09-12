@@ -67,7 +67,19 @@ function isExtractableHref(normalized: string): boolean {
  * 2. href attributes for external links
  * 3. JSON-LD structured data (if present)
  */
-export function extractLinktree(html: string): ExtractionResult {
+export interface ExtractLinktreeOptions {
+  /**
+   * Whether to inspect the document for contact email addresses.
+   * Public requalification runs must leave this disabled so a public-only
+   * refresh cannot read or persist private contact data.
+   */
+  includeContactEmail?: boolean;
+}
+
+export function extractLinktree(
+  html: string,
+  options: ExtractLinktreeOptions = {}
+): ExtractionResult {
   const nextData = extractScriptJson<LinktreePageProps>(html, '__NEXT_DATA__');
 
   const nextDisplayName =
@@ -203,14 +215,19 @@ export function extractLinktree(html: string): ExtractionResult {
     extractMetaContent(html, 'og:description') ??
     null;
 
-  // Extract contact email from bio, HTML, and link titles
-  const linkTitles = links.map(l => l.title).filter((t): t is string => !!t);
-  const extractedEmails = extractAndRankEmails({
-    bio,
-    html,
-    linkTitles,
-  });
-  const contactEmail = getBestContactEmail(extractedEmails);
+  // Email extraction is deliberately opt-out for legacy ingestion callers and
+  // opt-in for public-only refreshes. This keeps the privacy boundary explicit
+  // at the extraction call site instead of relying on callers to discard data.
+  const contactEmail =
+    options.includeContactEmail === false
+      ? null
+      : getBestContactEmail(
+          extractAndRankEmails({
+            bio,
+            html,
+            linkTitles: links.map(l => l.title).filter((t): t is string => !!t),
+          })
+        );
 
   const result = createExtractionResult(
     links,
