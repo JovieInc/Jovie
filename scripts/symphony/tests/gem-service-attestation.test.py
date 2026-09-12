@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import fcntl
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -301,6 +302,52 @@ class PublisherTests(unittest.TestCase):
                  mock.patch('builtins.print'):
                 self.assertEqual(E.main(), 2)
                 self.assertEqual(observer.call_args.kwargs['profile'], expected)
+
+    def test_installer_verify_accepts_git_mirror_and_forwards_selected_profile(self):
+        repo = self.root / 'installer-source'
+        repo.mkdir()
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(HOME=str(self.root), GEM_SERVICE_ATTESTATION_VERIFY_ONLY='true')
+        subprocess.run(['git', 'init', '-q', str(repo)], env=env, check=True)
+        base = repo / 'scripts/symphony'
+        (base / 'systemd').mkdir(parents=True)
+        for name in ['emit_gem_service_attestation.py', 'symphony_proof_context.py',
+                     'gem_gate_contract.py', 'systemd/gem-service-attestation.service']:
+            (base / name).write_text('fixture\n')
+        subprocess.run(['git', '-C', str(repo), 'add', '.'], env=env, check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'],
+                       env=env, check=True)
+        mirror = self.root / 'mirror.git'
+        subprocess.run(['git', 'clone', '-q', '--bare', str(repo), str(mirror)], env=env, check=True)
+        config = self.root / '.config/symphony'
+        config.mkdir(parents=True)
+        (config / 'runner-source.env').write_text(
+            f'SYMPHONY_RELEASE_PROVENANCE={self.sidecar}\n'
+            f'JOVIE_CONFIGURATION_SOURCE_ROOT={mirror}\n'
+            f'JOVIE_CONFIGURATION_SOURCE_REVISION={CONFIG}\n'
+            'JOVIE_CONFIGURATION_PROFILE=governor-bounded\n')
+        bins = self.root / 'test-bin'
+        bins.mkdir()
+        (bins / 'systemctl').write_text('#!/bin/sh\nexit 0\n')
+        (bins / 'python3').write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        for executable in bins.iterdir(): executable.chmod(0o755)
+        env['PATH'] = str(bins) + os.pathsep + env['PATH']
+        installer = Path(E.__file__).with_name('install-gem-service-attestation.sh')
+        result = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('--profile\ngovernor-bounded\n', result.stdout)
+        self.assertIn('--source-root\n' + str(mirror) + '\n', result.stdout)
+        self.assertIn('--check\n', result.stdout)
+        self.assertFalse((self.root / 'gem-workspace/scripts/emit-gem-service-attestation.py').exists())
+        not_repo = self.root / 'not-a-repository'
+        not_repo.mkdir()
+        inputs = config / 'runner-source.env'
+        inputs.write_text(inputs.read_text().replace(str(mirror), str(not_repo)))
+        rejected = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn('not a git repository', rejected.stderr)
+        self.assertEqual(rejected.stdout, '')
 
 
 if __name__ == '__main__':

@@ -60,8 +60,8 @@ done
   printf 'SYMPHONY_RELEASE_PROVENANCE not found: %s\n' "${SYMPHONY_RELEASE_PROVENANCE}" >&2
   exit 2
 }
-[[ -d "${JOVIE_CONFIGURATION_SOURCE_ROOT}/.git" ]] || {
-  printf 'JOVIE_CONFIGURATION_SOURCE_ROOT is not a git checkout: %s\n' "${JOVIE_CONFIGURATION_SOURCE_ROOT}" >&2
+git -C "${JOVIE_CONFIGURATION_SOURCE_ROOT}" rev-parse --git-dir >/dev/null 2>&1 || {
+  printf 'JOVIE_CONFIGURATION_SOURCE_ROOT is not a git repository: %s\n' "${JOVIE_CONFIGURATION_SOURCE_ROOT}" >&2
   exit 2
 }
 
