@@ -85,6 +85,124 @@ class RepairTests(unittest.TestCase):
         self.stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
         self.stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
 
+    def isolated_fixture(self):
+        self.issue["assignee"] = {"id": OWNER}
+        self.spec.update(executionMode="isolated-cli", ownerId=OWNER, issueRevision=REVISION,
+                         expiresAt=int(time.time()) + 300)
+        payload = self.authorize()
+        target = {key: payload[key] for key in ("identifier", "issueId", "ownerId", "issueRevision", "repository", "pr", "head", "workspace", "writerUnit")}
+        target.update(mode="isolated-cli", assignmentDigest=repair.assignment_digest(payload),
+                      expiresAt=repair.datetime.fromtimestamp(payload["expiresAt"], repair.timezone.utc).isoformat())
+        task = {"schema": "jovie-symphony-repair-task/v3", "taskKey": "a" * 64, "decisionFingerprint": "a" * 64,
+                "action": "execute-existing-owned-repair", "authority": "host-assigned-isolated-repair-only", "existingRepair": target}
+        eligibility = {"qualified": True, "provider": "fixture-local", "model": "fixture-task-model", "funding": "included-local",
+                       "taskAppropriate": True, "costAppropriate": True, "delegationPolicyBound": True,
+                       "expiresAt": payload["expiresAt"], "authPoolIdentity": "b" * 64}
+        executor = mock.Mock()
+        executor.qualify.return_value = eligibility
+        executor.execute.return_value = {"status": "succeeded", "detail": "fixture execution"}
+        return task, executor
+
+    def run_isolated(self, task, executor=None):
+        return repair.execute_isolated(task, controller.__file__, lambda _: self.issue, lambda _: [self.pr], executor=executor)
+
+    def test_existing_controller_consumes_v3_without_generic_dispatch_or_tracker_write(self):
+        task, executor = self.isolated_fixture()
+        with mock.patch.object(controller.sys, "stdin", io.StringIO(json.dumps(task))), \
+             mock.patch.object(controller, "reconcile") as generic, \
+             mock.patch.object(controller, "_control") as control:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(controller.owned_repair_command(), 0)
+            self.assertEqual(json.loads(output.getvalue())["status"], "held")
+            generic.assert_not_called()
+            control.assert_not_called()
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+
+    def test_isolated_mode_never_enters_native_or_generic_fallback(self):
+        task, executor = self.isolated_fixture()
+        with self.assertRaisesRegex(ValueError, "assignment-schema-invalid"):
+            repair.load(IDENT, controller.__file__)
+        self.assertEqual(controller.check_admission(IDENT), 1)
+        self.assertEqual(self.run_isolated(task)["reason"], "qualified-isolated-repair-executor-unavailable")
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        executor.execute.assert_not_called()
+
+    def test_isolated_repair_claims_once_under_real_shared_lease(self):
+        task, executor = self.isolated_fixture()
+        def execute(*args, lease_fd):
+            self.assertEqual(lease_fd, 9)
+            self.assertEqual(os.fstat(9).st_ino, (self.leases / f"{IDENT}.lock").stat().st_ino)
+            code = "import fcntl,sys; f=open(sys.argv[1],'a'); fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)"
+            self.assertNotEqual(subprocess.run(["python3", "-c", code, str(self.leases / f"{IDENT}.lock")], capture_output=True).returncode, 0)
+            return {"status": "succeeded"}
+        executor.execute.side_effect = execute
+        self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
+        self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_isolated_repair_keeps_unknown_outcome_claim_after_executor_crash(self):
+        task, executor = self.isolated_fixture()
+        executor.execute.side_effect = OSError("uncertain executor result")
+        with self.assertRaises(OSError):
+            self.run_isolated(task, executor)
+        self.assertEqual(self.run_isolated(task, executor)["reason"], "isolated-repair-claimed-outcome-unknown")
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_isolated_repair_rejects_competing_lease_and_does_not_claim(self):
+        task, executor = self.isolated_fixture()
+        with (self.leases / f"{IDENT}.lock").open("r") as held:
+            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaises(BlockingIOError):
+                self.run_isolated(task, executor)
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        executor.execute.assert_not_called()
+
+    def test_isolated_repair_refuses_scope_owner_and_router_drift_before_claim(self):
+        task, executor = self.isolated_fixture()
+        for key, value in (("workspace", str(self.tmp)), ("head", "f" * 40), ("writerUnit", "other.service")):
+            with self.subTest(key=key):
+                changed = copy.deepcopy(task)
+                changed["existingRepair"][key] = value
+                with self.assertRaisesRegex(ValueError, "mismatch"):
+                    self.run_isolated(changed, executor)
+        self.issue["assignee"] = {"id": ISSUE_ID}
+        with self.assertRaisesRegex(ValueError, "tracker-changed"):
+            self.run_isolated(task, executor)
+        self.issue["assignee"] = {"id": OWNER}
+        executor.qualify.side_effect = [executor.qualify.return_value, {**executor.qualify.return_value, "authPoolIdentity": "c" * 64}]
+        with self.assertRaisesRegex(ValueError, "router-changed"):
+            self.run_isolated(task, executor)
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+
+    def test_isolated_repair_requires_cost_task_and_delegation_eligibility(self):
+        task, executor = self.isolated_fixture()
+        baseline = executor.qualify.return_value
+        for changes in ({"provider": "codex"}, {"funding": "paid-api"}, {"costAppropriate": False},
+                        {"taskAppropriate": False}, {"delegationPolicyBound": False},
+                        {"provider": "anthropic", "model": "router-selected-model"},
+                        {"provider": "anthropic", "model": "router-selected-model",
+                         "policyException": repair.ANTHROPIC_LAST_RESORT_POLICY_EXCEPTION},
+                        {"provider": "anthropic", "model": "router-selected-model",
+                         "lastResortEscalation": True}, {"expiresAt": 0}):
+            executor.qualify.return_value = {**baseline, **changes}
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, "qualification-required"):
+                self.run_isolated(task, executor)
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        executor.execute.assert_not_called()
+
+    def test_isolated_repair_accepts_explicit_anthropic_last_resort_policy_binding(self):
+        task, executor = self.isolated_fixture()
+        executor.qualify.return_value = {
+            **executor.qualify.return_value,
+            "provider": "anthropic",
+            "model": "router-selected-model",
+            "policyException": repair.ANTHROPIC_LAST_RESORT_POLICY_EXCEPTION,
+            "lastResortEscalation": True,
+        }
+        self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
+        executor.execute.assert_called_once()
+
     def test_early_preflight_never_consumes_assignment_and_final_gate_is_fresh(self):
         self.authorize()
         self.assertEqual(controller.pickup_check_command(IDENT, preflight=True, inherited=False), 0)
