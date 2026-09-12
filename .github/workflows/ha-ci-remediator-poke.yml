@@ -9,12 +9,16 @@ name: HA CI remediator poke
 #   runner access, no local systemd, no Symphony port pokes.
 # removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
 # idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA.
-#   - Workflow-level concurrency serializes same-key runs (FIFO, no cancel), so
-#     a redelivery storm can never race the webhook POST below.
-#   - The job-level filter fails closed: only CI failures on pull_request/merge_group
-#     for non-excluded PRs are forwarded.
-#   - Successful runs are the durable dedup record (GitHub Actions run history);
-#     no external state, so restarts cannot lose ownership of a key.
+#   - run-name ha-poke-<pr>-<sha> is the durable execution key in Actions history.
+#   - Workflow-level concurrency serializes same-key runs (FIFO, no cancel).
+#   - The gate skips when a remediator poke is already in flight, already
+#     delivered, or recently poked for the same SHA; also pr/global rate-limit.
+#   - Missing poke history fails closed (no POST). Cancelled/success CI never poke.
+#   - Successful runs remain the durable dedup record; no external state.
+#   - Gate skip reasons: ci_conclusion_ignored, excluded_pr, missing_pr_or_sha,
+#     poke_history_unproven, remediator_in_flight, already_poked_sha,
+#     recently_poked_sha, pr_rate_limit, global_rate_limit.
+run-name: ha-poke-${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}-${{ github.event.workflow_run.head_sha || github.sha }}
 on:
   workflow_run:
     workflows: ['CI']
@@ -40,12 +44,16 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.pr_number != '16419') ||
       (
         github.event.workflow_run.conclusion == 'failure' &&
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        github.event.workflow_run.conclusion != 'success' &&
         contains(fromJSON('["pull_request","merge_group"]'), github.event.workflow_run.event) &&
         github.event.workflow_run.pull_requests[0].number != 16419
       )
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    permissions: {}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Poke Hyperagent CI remediator
         env:
@@ -56,12 +64,50 @@ jobs:
           RUN_URL: ${{ github.event.workflow_run.html_url || inputs.run_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event.workflow_run.event || 'workflow_dispatch' }}
+          EVENT_NAME: ${{ github.event_name }}
+          CI_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
           if [ -z "${WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
             echo "::error::HYPERAGENT_CI_WEBHOOK_URL and HYPERAGENT_CI_WEBHOOK_SECRET are required. Refusing an unauthenticated Hyperagent poke (ha-webhook-auth-only-v1)."
             exit 1
+          fi
+
+          if ! gh api \
+            -H "Accept: application/vnd.github.raw" \
+            "repos/${REPO}/contents/scripts/ha-ci-remediator-poke-gate.py?ref=${GITHUB_SHA}" \
+            > /tmp/ha-ci-remediator-poke-gate.py; then
+            echo "::notice::Skipping Hyperagent poke; poke_history_unproven (gate script)."
+            exit 0
+          fi
+
+          if ! gh api \
+            "repos/${REPO}/actions/workflows/ha-ci-remediator-poke.yml/runs?per_page=100" \
+            > /tmp/ha-poke-runs.json; then
+            echo "::notice::Skipping Hyperagent poke; poke_history_unproven."
+            exit 0
+          fi
+
+          decision_json=$(python3 /tmp/ha-ci-remediator-poke-gate.py \
+            --pr-number "$PR_NUMBER" \
+            --head-sha "$HEAD_SHA" \
+            --ci-conclusion "$CI_CONCLUSION" \
+            --event-name "$EVENT_NAME" \
+            --force "$FORCE" \
+            --current-run-id "$CURRENT_RUN_ID" \
+            --now-epoch "$(date -u +%s)" \
+            --runs-json /tmp/ha-poke-runs.json)
+          echo "$decision_json"
+          decision=$(printf '%s' "$decision_json" | jq -r .decision)
+          reason=$(printf '%s' "$decision_json" | jq -r .reason)
+          if [ "$decision" != "poke" ]; then
+            echo "::notice::Skipping Hyperagent poke; ${reason}."
+            exit 0
           fi
 
           payload=$(jq -n \
