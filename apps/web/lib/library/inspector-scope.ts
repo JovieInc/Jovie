@@ -110,10 +110,13 @@ export function deriveInspectorScope(input: {
   readonly category?: InspectorScopeCategory;
   readonly primitive?: InspectorPrimitive;
   readonly blocksSelectedObject?: boolean;
-}): Pick<
-  ScopedInspectorItem,
-  'scopeType' | 'scopeId' | 'category' | 'primitive' | 'blocksSelectedObject'
-> {
+}): {
+  readonly scopeType: InspectorScopeType;
+  readonly scopeId: string;
+  readonly category: InspectorScopeCategory;
+  readonly primitive: InspectorPrimitive;
+  readonly blocksSelectedObject: boolean;
+} {
   return {
     scopeType: input.scopeType ?? mapSubjectTypeToScopeType(input.subjectType),
     scopeId: input.scopeId ?? input.subjectId,
