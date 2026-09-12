@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const mockUsePathname = vi.fn<string | null, []>(() => '/about');
 
@@ -40,6 +41,11 @@ describe('MarketingHeader', () => {
   it('renders marketing center navigation when the center-nav flag is enabled', () => {
     render(<MarketingHeader />);
 
+    expect(screen.getByTestId('header-nav')).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.header
+    );
+    expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'

@@ -8,6 +8,7 @@ import {
   HeaderNav,
   type HeaderNavCta,
 } from '@/components/organisms/HeaderNav';
+import './MarketingHeader.css';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
@@ -166,7 +167,9 @@ export function MarketingHeader({
     <HeaderNav
       penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}
       className={isArtistProfiles ? 'artist-profiles-home-header' : undefined}
-      logoSize={isArtistProfiles ? 'sm' : logoSize}
+      logoSize={
+        presentation === 'marketing-glass' || isArtistProfiles ? 'sm' : logoSize
+      }
       logoVariant={resolvedLogoVariant}
       authMode='public-static'
       hideNav={isMinimal}
