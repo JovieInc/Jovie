@@ -21,6 +21,7 @@ import {
   validateAudioUpload,
 } from '@/lib/audio/constants';
 import type { AudioSnippet } from '@/lib/audio/snippet';
+import { resolveStatefulAssetSlot } from '@/lib/library/stateful-asset-slot';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 import { AudioWaveformEditor } from './AudioWaveformEditor';
@@ -246,7 +247,13 @@ export function ReleaseAudioAssetPanel({
     [onSnippetSaved, releaseId]
   );
 
-  if (!localPreviewUrl) {
+  const presentation = resolveStatefulAssetSlot({
+    occupancy: localPreviewUrl ? 'populated' : 'empty',
+    cardinality: 'single',
+    acquireMode: 'file',
+  });
+
+  if (!localPreviewUrl || presentation.showAcquisitionDropZone) {
     const formats = SUPPORTED_AUDIO_FORMAT_LABELS.join(', ');
     return (
       <div data-testid={dropzoneTestId}>
@@ -361,12 +368,16 @@ export function ReleaseAudioAssetPanel({
   }
 
   return (
-    <div className='space-y-3' data-testid={readyTestId}>
+    <div
+      className='space-y-3'
+      data-testid={readyTestId}
+      data-asset-slot-mode='object'
+    >
       <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-3 py-3'>
         <span className='grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface-1 text-secondary-token'>
           <FileAudio2 className='h-4 w-4' strokeWidth={2.25} />
         </span>
-        <div className='min-w-0'>
+        <div className='min-w-0 flex-1'>
           <p className='truncate text-xs font-medium text-primary-token'>
             Audio attached
           </p>
@@ -374,7 +385,28 @@ export function ReleaseAudioAssetPanel({
             Preview, scrub, and trim a promo snippet for drops.
           </p>
         </div>
+        {isEditable && presentation.replaceAction === 'secondary' ? (
+          <button
+            type='button'
+            onClick={openFilePicker}
+            tabIndex={disabledTabIndex}
+            className='focus-ring-themed rounded-md px-2 py-1 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
+            data-testid={`${testIdPrefix}-audio-replace`}
+          >
+            Replace
+          </button>
+        ) : null}
       </div>
+      <input
+        ref={inputRef}
+        type='file'
+        accept={AUDIO_FILE_ACCEPT}
+        onChange={handleInputChange}
+        disabled={!isEditable || isUploading}
+        tabIndex={disabledTabIndex}
+        className='sr-only'
+        aria-label={`Replace audio for ${releaseTitle}`}
+      />
 
       <AudioWaveformEditor
         audioUrl={localPreviewUrl}
