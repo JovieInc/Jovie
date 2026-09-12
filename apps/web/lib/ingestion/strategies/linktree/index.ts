@@ -10,7 +10,7 @@ export { ExtractionError } from '../base';
 
 // Re-export configuration
 export { LINKTREE_CONFIG, SKIP_HOSTS, SUPPRESSED_PIXEL_IDS } from './config';
-
+export type { ExtractLinktreeOptions } from './extraction';
 // Re-export extraction function
 export { extractLinktree } from './extraction';
 
