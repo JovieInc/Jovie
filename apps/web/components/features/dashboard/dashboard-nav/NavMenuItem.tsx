@@ -20,6 +20,7 @@ import { toast } from '@/components/feedback';
 import { SidebarMenuItem } from '@/components/organisms/Sidebar';
 import {
   getSidebarNavIconClassName,
+  getSidebarNavLabelClassName,
   getSidebarNavRowClassName,
 } from '@/components/shell/SidebarNavItem';
 import { Tooltip } from '@/components/shell/Tooltip';
@@ -307,21 +308,13 @@ export function NavMenuItem({
         />
       )}
       <span
-        className={cn(
-          'min-w-0 w-full justify-self-stretch truncate overflow-hidden whitespace-nowrap text-left',
-          // A terminal fade reads as intentional truncation only on a
-          // full-width label track (long destinations fade instead of hard
-          // cropping). Compact w-fit create rows (New Chat, primary tone) hug
-          // the text in an auto track — the same fade there sheared the
-          // trailing glyph with rail space free (JOV-6181).
-          item.tone !== 'primary' && item.tone !== 'secondary'
-            ? '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]'
-            : null,
-          item.tone !== 'primary' && item.tone !== 'secondary'
-            ? '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]'
-            : null,
-          'group-data-[collapsible=icon]:hidden'
-        )}
+        className={getSidebarNavLabelClassName({
+          tone: item.tone,
+          className: cn(
+            'w-full truncate',
+            'group-data-[collapsible=icon]:hidden'
+          ),
+        })}
       >
         {item.name}
       </span>

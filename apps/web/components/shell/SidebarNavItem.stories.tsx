@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { House, SquarePen } from 'lucide-react';
+import { expect } from 'storybook/test';
 import { SidebarNavItem } from './SidebarNavItem';
 
 const meta: Meta<typeof SidebarNavItem> = {
@@ -35,10 +36,18 @@ export const ActiveCollapsed: Story = {
 // Elevated create treatment for the New Chat primary action (canonical
 // composition used by the shell + dashboard rail consumers).
 export const EnabledPrimaryCreate: Story = {
-  render: () => (
-    <SidebarNavItem
-      collapsed={false}
-      item={{ label: 'New Chat', icon: SquarePen }}
-    />
-  ),
+  args: {
+    collapsed: false,
+    tone: 'primary',
+    item: { label: 'New Chat', icon: SquarePen },
+  },
+  play: async ({ canvasElement }) => {
+    const label = canvasElement.querySelector('button span');
+    await expect(label).toBeInTheDocument();
+    await expect(label).toHaveTextContent('New Chat');
+    await expect(label?.className).not.toContain('mask-image:linear-gradient');
+    await expect(label?.className).not.toContain(
+      '-webkit-mask-image:linear-gradient'
+    );
+  },
 };
