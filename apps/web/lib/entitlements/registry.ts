@@ -7,7 +7,7 @@
  * Pricing amounts are derived from plan-prices.ts (the canonical source).
  */
 
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES } from '@/lib/config/plan-prices';
 
 // ---------------------------------------------------------------------------
 // Plan IDs
@@ -136,7 +136,7 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
 
 const PRO_FEATURES: readonly string[] = [
   'All Free features +',
-  'Release notifications to fans',
+  'Fan sends separately metered; paid sending unavailable',
   'Pre-save campaigns',
   'Pre-release & countdown pages',
   'Extended analytics (180 days)',
@@ -239,11 +239,12 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     limits: { ...PRO_LIMITS },
     marketing: {
       displayName: 'Pro',
-      tagline: 'Turn on fan notifications once. We handle the rest.',
+      tagline:
+        'Continuous visibility monitoring, prioritized opportunities, and agentic fixes.',
       features: PRO_FEATURES,
       price: {
         monthly: PLAN_PRICES.pro.monthly,
-        yearly: PLAN_PRICES.pro.yearly,
+        yearly: null,
       },
     },
   },
@@ -335,7 +336,8 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
 } as const;
 
 /** 50 notification recipients total during trial period. */
-export const TRIAL_NOTIFICATION_RECIPIENT_LIMIT = 50;
+export const TRIAL_NOTIFICATION_RECIPIENT_LIMIT =
+  ARTIST_VISIBILITY_OFFER.fanSends.freeTrialEmailAllowance;
 
 // ---------------------------------------------------------------------------
 // Pricing comparison chart data
