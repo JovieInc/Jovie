@@ -283,17 +283,22 @@ describe('fast-track policy', () => {
       { why: false },
       'missing fast-track UI eligibility audit trail in PR body',
     ],
-  ])('denies UI fast-track when %s is missing', (_name, bodyOptions, blocker) => {
-    const policy = uiFastTrackPolicy({
-      headRefName: 'codex/jov-3894-text-token-fix',
-      labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
-      changedFiles: ['apps/web/components/features/profile/ProfileHeader.tsx'],
-      body: buildUiFastTrackBody(bodyOptions),
-    });
+  ])(
+    'denies UI fast-track when %s is missing',
+    (_name, bodyOptions, blocker) => {
+      const policy = uiFastTrackPolicy({
+        headRefName: 'codex/jov-3894-text-token-fix',
+        labels: [{ name: 'ui' }, { name: 'fast-track-ui' }],
+        changedFiles: [
+          'apps/web/components/features/profile/ProfileHeader.tsx',
+        ],
+        body: buildUiFastTrackBody(bodyOptions),
+      });
 
-    expect(policy.eligible).toBe(false);
-    expect(policy.blockers).toContain(blocker);
-  });
+      expect(policy.eligible).toBe(false);
+      expect(policy.blockers).toContain(blocker);
+    }
+  );
 
   it('ignores negated evidence claims in the fast-track UI section', () => {
     const policy = uiFastTrackPolicy({
@@ -1024,9 +1029,13 @@ describe('absolute update-branch subprocess deadline', () => {
         process.execPath,
         [
           '-e',
-          'process.stdout.write(String(process.pid)); setInterval(() => {}, 1000)',
+          'process.stdout.write(`${process.pid}\n`, () => setInterval(() => {}, 1000))',
         ],
-        { encoding: 'utf8', timeout: 150 }
+        // Node startup exceeded 150ms under the complete structural cluster,
+        // so the fixture was killed before emitting its PID. The production
+        // deadline is unchanged; this bound only makes the kill assertion
+        // synchronize on a realistically started child.
+        { encoding: 'utf8', timeout: 1000 }
       );
     } catch (error) {
       failure = error;
@@ -2533,18 +2542,18 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     },
   ];
 
-  it.each(stampCases)('evaluates a recognized stamp with $name', ({
-    members,
-    expected,
-  }) => {
-    expect(
-      changelogGroupCollisionDecision({
-        candidateFiles: ['CHANGELOG.md', 'package.json'],
-        queuedMemberFiles: members,
-        branch: stampBranch,
-      })
-    ).toEqual(expected);
-  });
+  it.each(stampCases)(
+    'evaluates a recognized stamp with $name',
+    ({ members, expected }) => {
+      expect(
+        changelogGroupCollisionDecision({
+          candidateFiles: ['CHANGELOG.md', 'package.json'],
+          queuedMemberFiles: members,
+          branch: stampBranch,
+        })
+      ).toEqual(expected);
+    }
+  );
 
   it('does not claim a clear queue from missing or malformed stamp evidence', () => {
     for (const members of [
@@ -2708,14 +2717,12 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     }
   }
 
-  it.each(
-    stampCases
-  )('runs the canonical shell and CLI for a stamp with $name', ({
-    members,
-    expected,
-  }) => {
-    expect(runDrainChangelogDecision({ members })).toEqual(expected);
-  });
+  it.each(stampCases)(
+    'runs the canonical shell and CLI for a stamp with $name',
+    ({ members, expected }) => {
+      expect(runDrainChangelogDecision({ members })).toEqual(expected);
+    }
+  );
 
   it('keeps implementation rejection and unavailable candidate evidence through the real drain caller', () => {
     expect(

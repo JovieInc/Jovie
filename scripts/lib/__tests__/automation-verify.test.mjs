@@ -617,15 +617,18 @@ describe('automation-verify affected scope', () => {
   it.each([
     '.github/workflows/unknown-production-release.yml',
     'scripts/unknown-production-release.mjs',
-  ])('fails closed when the production workflow contract includes unknown automation %s', unknownAutomation => {
-    expect(
-      buildAffectedTestPlan([
-        '.github/workflows/production-release.yml',
-        'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-        unknownAutomation,
-      ]).mode
-    ).toBe('full');
-  });
+  ])(
+    'fails closed when the production workflow contract includes unknown automation %s',
+    unknownAutomation => {
+      expect(
+        buildAffectedTestPlan([
+          '.github/workflows/production-release.yml',
+          'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+          unknownAutomation,
+        ]).mode
+      ).toBe('full');
+    }
+  );
 
   it('keeps directly changed Playwright specs out of the Vitest exemption', () => {
     expect(
@@ -684,6 +687,14 @@ describe('automation-verify affected scope', () => {
     expect(script).not.toContain('turbo-local.mjs test --affected');
   });
 
+  it('runs the coverage ownership contract before expensive V8 collection', () => {
+    expect(runner).toContain('CI_CONTROL_WEB_TESTS');
+    expect(runner).toContain(
+      'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts'
+    );
+    expect(runner).toContain('...CI_CONTROL_WEB_TESTS.map');
+  });
+
   it('routes the exact JOV-5006 ops diff to focused infrastructure contracts', () => {
     const plan = buildAffectedTestPlan(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST);
 
@@ -701,6 +712,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
         'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/changed-test-coverage.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
@@ -733,6 +745,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
         'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
         'scripts/lib/__tests__/actions-cache-gc.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
         'scripts/lib/__tests__/setup-worktree-health.test.mjs',
@@ -1496,16 +1509,19 @@ describe('automation-verify affected scope', () => {
     expect(plan.selectedTests).toEqual(MERGE_GROUP_ADMISSION_WEB_TESTS);
   });
 
-  it.each(
-    MERGE_GROUP_ADMISSION_INPUTS
-  )('maps the merge-group admission input %s independently', input => {
-    const plan = buildAffectedTestPlan([input]);
+  it.each(MERGE_GROUP_ADMISSION_INPUTS)(
+    'maps the merge-group admission input %s independently',
+    input => {
+      const plan = buildAffectedTestPlan([input]);
 
-    expect(plan.mode).toBe('selected');
-    expect(plan.scriptVitestTests).toEqual(MERGE_GROUP_ADMISSION_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual([]);
-    expect(plan.selectedTests).toEqual(MERGE_GROUP_ADMISSION_WEB_TESTS);
-  });
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(
+        MERGE_GROUP_ADMISSION_SCRIPT_TESTS
+      );
+      expect(plan.pythonTests).toEqual([]);
+      expect(plan.selectedTests).toEqual(MERGE_GROUP_ADMISSION_WEB_TESTS);
+    }
+  );
 
   it('fails closed when merge-group admission changes include unknown automation', () => {
     expect(
@@ -1516,19 +1532,22 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
-  it.each(
-    MERGE_QUEUE_CONTROLLER_INPUTS
-  )('maps the merge-queue controller input %s independently', input => {
-    const plan = buildAffectedTestPlan([input]);
+  it.each(MERGE_QUEUE_CONTROLLER_INPUTS)(
+    'maps the merge-queue controller input %s independently',
+    input => {
+      const plan = buildAffectedTestPlan([input]);
 
-    expect(plan.mode).toBe('selected');
-    expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual([
-      'scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'scripts/symphony/tests/test_fleet_admission_receipt.py',
-      'scripts/tests/test_gh_retry.py',
-    ]);
-  });
+      expect(plan.mode).toBe('selected');
+      expect(plan.scriptVitestTests).toEqual(
+        MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS
+      );
+      expect(plan.pythonTests).toEqual([
+        'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+        'scripts/symphony/tests/test_fleet_admission_receipt.py',
+        'scripts/tests/test_gh_retry.py',
+      ]);
+    }
+  );
 
   it('fails closed when merge-queue controller changes include unknown automation', () => {
     expect(
@@ -1604,39 +1623,49 @@ describe('automation-verify affected scope', () => {
     );
   });
 
-  it.each(
-    PREREQUISITE_TRAIN_CORNERS
-  )('fails closed when the prerequisite train cornerstone %s is standalone', cornerstone => {
-    expect(buildAffectedTestPlan([cornerstone]).mode).toBe('full');
-  });
+  it.each(PREREQUISITE_TRAIN_CORNERS)(
+    'fails closed when the prerequisite train cornerstone %s is standalone',
+    cornerstone => {
+      expect(buildAffectedTestPlan([cornerstone]).mode).toBe('full');
+    }
+  );
 
   it.each([
     '.github/workflows/ci.yml',
     'apps/web/tests/seed-test-data.ts',
     'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
     'apps/web/tests/e2e/golden-path.spec.ts',
-  ])('fails closed when the prerequisite train global input %s is standalone', input => {
-    expect(buildAffectedTestPlan([input]).mode).toBe('full');
-  });
+  ])(
+    'fails closed when the prerequisite train global input %s is standalone',
+    input => {
+      expect(buildAffectedTestPlan([input]).mode).toBe('full');
+    }
+  );
 
-  it.each(
-    PREREQUISITE_TRAIN_CORNERS
-  )('fails closed when the prerequisite train is missing %s', missingCornerstone => {
-    expect(
-      buildAffectedTestPlan(
-        PREREQUISITE_TRAIN_MANIFEST.filter(file => file !== missingCornerstone)
-      ).mode
-    ).toBe('full');
-  });
+  it.each(PREREQUISITE_TRAIN_CORNERS)(
+    'fails closed when the prerequisite train is missing %s',
+    missingCornerstone => {
+      expect(
+        buildAffectedTestPlan(
+          PREREQUISITE_TRAIN_MANIFEST.filter(
+            file => file !== missingCornerstone
+          )
+        ).mode
+      ).toBe('full');
+    }
+  );
 
   it.each([
     'apps/web/lib/unknown-prerequisite.ts',
     '.github/actions/unknown-prerequisite/action.yml',
-  ])('fails closed when the prerequisite train includes unknown peer %s', peer => {
-    expect(
-      buildAffectedTestPlan([...PREREQUISITE_TRAIN_MANIFEST, peer]).mode
-    ).toBe('full');
-  });
+  ])(
+    'fails closed when the prerequisite train includes unknown peer %s',
+    peer => {
+      expect(
+        buildAffectedTestPlan([...PREREQUISITE_TRAIN_MANIFEST, peer]).mode
+      ).toBe('full');
+    }
+  );
 
   it('splits the full web suite into bounded-memory shards', () => {
     const commands = buildFullSuiteCommands('2', 2);
@@ -1718,30 +1747,38 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
-  it.each(
-    VERCEL_CONGESTION_CONTROL_MANIFEST
-  )('fails closed when the Vercel congestion-control input %s is standalone', input => {
-    expect(buildAffectedTestPlan([input]).mode).toBe('full');
-  });
+  it.each(VERCEL_CONGESTION_CONTROL_MANIFEST)(
+    'fails closed when the Vercel congestion-control input %s is standalone',
+    input => {
+      expect(buildAffectedTestPlan([input]).mode).toBe('full');
+    }
+  );
 
-  it.each(
-    VERCEL_CONGESTION_CONTROL_MANIFEST
-  )('fails closed when the Vercel congestion-control diff is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        VERCEL_CONGESTION_CONTROL_MANIFEST.filter(file => file !== missingInput)
-      ).mode
-    ).toBe('full');
-  });
+  it.each(VERCEL_CONGESTION_CONTROL_MANIFEST)(
+    'fails closed when the Vercel congestion-control diff is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          VERCEL_CONGESTION_CONTROL_MANIFEST.filter(
+            file => file !== missingInput
+          )
+        ).mode
+      ).toBe('full');
+    }
+  );
 
   it.each([
     '.github/scripts/unknown-vercel-control.mjs',
     'scripts/tests/test_unknown_vercel_control.py',
-  ])('fails closed when the Vercel congestion-control diff includes unknown peer %s', peer => {
-    expect(
-      buildAffectedTestPlan([...VERCEL_CONGESTION_CONTROL_MANIFEST, peer]).mode
-    ).toBe('full');
-  });
+  ])(
+    'fails closed when the Vercel congestion-control diff includes unknown peer %s',
+    peer => {
+      expect(
+        buildAffectedTestPlan([...VERCEL_CONGESTION_CONTROL_MANIFEST, peer])
+          .mode
+      ).toBe('full');
+    }
+  );
 
   it('selects the selector regression for the exact selector implementation pair', () => {
     const plan = buildAffectedTestPlan(AFFECTED_TEST_SELECTOR_MANIFEST);
@@ -1872,16 +1909,19 @@ describe('automation-verify affected scope', () => {
     }
   });
 
-  it.each(
-    AUTHENTICATED_A11Y_REPAIR_CORE
-  )('fails closed when the authenticated accessibility repair is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan([
-        ...AUTHENTICATED_A11Y_REPAIR_CORE.filter(file => file !== missingInput),
-        ...AFFECTED_TEST_SELECTOR_MANIFEST,
-      ]).mode
-    ).toBe('full');
-  });
+  it.each(AUTHENTICATED_A11Y_REPAIR_CORE)(
+    'fails closed when the authenticated accessibility repair is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan([
+          ...AUTHENTICATED_A11Y_REPAIR_CORE.filter(
+            file => file !== missingInput
+          ),
+          ...AFFECTED_TEST_SELECTOR_MANIFEST,
+        ]).mode
+      ).toBe('full');
+    }
+  );
 
   it('keeps persisted auth fixture repairs on focused non-retryable coverage', () => {
     const plan = buildAffectedTestPlan(PERSISTED_AUTH_FIXTURE_REPAIR_DIFF);
@@ -1903,11 +1943,12 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
-  it.each(
-    AFFECTED_TEST_SELECTOR_MANIFEST
-  )('fails closed when the affected-test selector input %s is standalone', input => {
-    expect(buildAffectedTestPlan([input]).mode).toBe('full');
-  });
+  it.each(AFFECTED_TEST_SELECTOR_MANIFEST)(
+    'fails closed when the affected-test selector input %s is standalone',
+    input => {
+      expect(buildAffectedTestPlan([input]).mode).toBe('full');
+    }
+  );
 
   it('fails closed when the affected-test selector diff includes an unknown peer', () => {
     expect(
@@ -1958,21 +1999,23 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
-  it.each(
-    PR_SIZE_GUARD_MANIFEST
-  )('fails closed when the PR size guard input %s is standalone', input => {
-    expect(buildAffectedTestPlan([input]).mode).toBe('full');
-  });
+  it.each(PR_SIZE_GUARD_MANIFEST)(
+    'fails closed when the PR size guard input %s is standalone',
+    input => {
+      expect(buildAffectedTestPlan([input]).mode).toBe('full');
+    }
+  );
 
-  it.each(
-    PR_SIZE_GUARD_MANIFEST
-  )('fails closed when the PR size guard signature is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        PR_SIZE_GUARD_MANIFEST.filter(file => file !== missingInput)
-      ).mode
-    ).toBe('full');
-  });
+  it.each(PR_SIZE_GUARD_MANIFEST)(
+    'fails closed when the PR size guard signature is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          PR_SIZE_GUARD_MANIFEST.filter(file => file !== missingInput)
+        ).mode
+      ).toBe('full');
+    }
+  );
 
   it('fails closed when the PR size guard signature includes an unknown peer', () => {
     expect(
@@ -2033,77 +2076,81 @@ describe('automation-verify affected scope', () => {
   it.each([
     { manifest: PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST },
     { manifest: PERFORMANCE_PROFILER_REPAIR_MANIFEST },
-  ])('selects bounded profiler and Gem regressions for an exact repair signature', ({
-    manifest,
-  }) => {
-    const plan = buildAffectedTestPlan(manifest);
+  ])(
+    'selects bounded profiler and Gem regressions for an exact repair signature',
+    ({ manifest }) => {
+      const plan = buildAffectedTestPlan(manifest);
 
-    expect(plan.mode).toBe('selected');
-    expect(plan.selectedTests).toEqual([
-      'apps/web/scripts/test-performance-profiler.test.ts',
-      'apps/web/tests/unit/app/exp-drift-lint-guard.test.ts',
-      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
-      'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
-    ]);
-    expect(plan.scriptVitestTests).toEqual([
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-      ...(manifest.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.length
-        ? ['scripts/lib/__tests__/automation-verify.test.mjs']
-        : []),
-    ]);
-  });
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual([
+        'apps/web/scripts/test-performance-profiler.test.ts',
+        'apps/web/tests/unit/app/exp-drift-lint-guard.test.ts',
+        'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+        'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+        'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
+      ]);
+      expect(plan.scriptVitestTests).toEqual([
+        'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+        ...(manifest.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.length
+          ? ['scripts/lib/__tests__/automation-verify.test.mjs']
+          : []),
+      ]);
+    }
+  );
 
   it.each([
     { manifest: SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST },
     { manifest: SCANNER_LOAD_REPAIR_MANIFEST },
-  ])('selects scanner-load and Gem regressions for an exact repair signature', ({
-    manifest,
-  }) => {
-    const plan = buildAffectedTestPlan(manifest);
+  ])(
+    'selects scanner-load and Gem regressions for an exact repair signature',
+    ({ manifest }) => {
+      const plan = buildAffectedTestPlan(manifest);
 
-    expect(plan.mode).toBe('selected');
-    expect(plan.selectedTests).toEqual([
-      'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
-      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
-      'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
-    ]);
-    expect(plan.scriptVitestTests).toEqual([
-      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
-      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
-      ...(manifest.length === SCANNER_LOAD_REPAIR_MANIFEST.length
-        ? ['scripts/lib/__tests__/automation-verify.test.mjs']
-        : []),
-    ]);
-  });
+      expect(plan.mode).toBe('selected');
+      expect(plan.selectedTests).toEqual([
+        'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+        'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+        'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+        'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+      ]);
+      expect(plan.scriptVitestTests).toEqual([
+        'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+        'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+        ...(manifest.length === SCANNER_LOAD_REPAIR_MANIFEST.length
+          ? ['scripts/lib/__tests__/automation-verify.test.mjs']
+          : []),
+      ]);
+    }
+  );
 
-  it.each(
-    SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST
-  )('fails closed when the scanner-load repair is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.filter(
-          file => file !== missingInput
-        )
-      ).mode
-    ).toBe('full');
-    expect(
-      buildAffectedTestPlan(
-        SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
-      ).mode
-    ).toBe('full');
-  });
+  it.each(SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST)(
+    'fails closed when the scanner-load repair is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.filter(
+            file => file !== missingInput
+          )
+        ).mode
+      ).toBe('full');
+      expect(
+        buildAffectedTestPlan(
+          SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
+        ).mode
+      ).toBe('full');
+    }
+  );
 
-  it.each(
-    AFFECTED_TEST_SELECTOR_MANIFEST
-  )('fails closed when the scanner-load repair is missing selector input %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
-      ).mode
-    ).toBe('full');
-  });
+  it.each(AFFECTED_TEST_SELECTOR_MANIFEST)(
+    'fails closed when the scanner-load repair is missing selector input %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
+        ).mode
+      ).toBe('full');
+    }
+  );
 
   it('keeps the Layout Guard contract repair on its focused cross-runtime regressions', () => {
     const plan = buildAffectedTestPlan(LAYOUT_GUARD_CONTRACT_MANIFEST);
@@ -2131,15 +2178,16 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
-  it.each(
-    NEON_ATTEMPT_ARTIFACT_MANIFEST
-  )('fails closed when the Neon rerun artifact repair is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        NEON_ATTEMPT_ARTIFACT_MANIFEST.filter(file => file !== missingInput)
-      ).mode
-    ).toBe('full');
-  });
+  it.each(NEON_ATTEMPT_ARTIFACT_MANIFEST)(
+    'fails closed when the Neon rerun artifact repair is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          NEON_ATTEMPT_ARTIFACT_MANIFEST.filter(file => file !== missingInput)
+        ).mode
+      ).toBe('full');
+    }
+  );
 
   it('fails closed when the Neon rerun artifact repair includes an unknown peer', () => {
     expect(
@@ -2150,27 +2198,29 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
-  it.each(
-    LAYOUT_GUARD_CONTRACT_MANIFEST
-  )('fails closed when the Layout Guard contract repair is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        LAYOUT_GUARD_CONTRACT_MANIFEST.filter(file => file !== missingInput)
-      ).mode
-    ).toBe('full');
-  });
+  it.each(LAYOUT_GUARD_CONTRACT_MANIFEST)(
+    'fails closed when the Layout Guard contract repair is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          LAYOUT_GUARD_CONTRACT_MANIFEST.filter(file => file !== missingInput)
+        ).mode
+      ).toBe('full');
+    }
+  );
 
-  it.each(
-    MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
-  )('fails closed when the mobile overflow navigation repair is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.filter(
-          file => file !== missingInput
-        )
-      ).mode
-    ).toBe('full');
-  });
+  it.each(MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST)(
+    'fails closed when the mobile overflow navigation repair is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.filter(
+            file => file !== missingInput
+          )
+        ).mode
+      ).toBe('full');
+    }
+  );
 
   it('fails closed when the mobile overflow navigation repair includes an unknown peer', () => {
     expect(
@@ -2258,17 +2308,18 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
-  it.each(
-    RUNNER_PREREQUISITE_CONTRACT_MANIFEST
-  )('fails closed when the runner prerequisite contract is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        RUNNER_PREREQUISITE_CONTRACT_MANIFEST.filter(
-          file => file !== missingInput
-        )
-      ).mode
-    ).toBe('full');
-  });
+  it.each(RUNNER_PREREQUISITE_CONTRACT_MANIFEST)(
+    'fails closed when the runner prerequisite contract is missing %s',
+    missingInput => {
+      expect(
+        buildAffectedTestPlan(
+          RUNNER_PREREQUISITE_CONTRACT_MANIFEST.filter(
+            file => file !== missingInput
+          )
+        ).mode
+      ).toBe('full');
+    }
+  );
 
   it('fails closed when the runner prerequisite contract includes an unknown peer', () => {
     expect(
@@ -2337,75 +2388,76 @@ describe('automation-verify affected scope', () => {
     expect(runner).toContain('--diff-filter=ACDMR');
   });
 
-  it.each([
-    'SIGINT',
-    'SIGTERM',
-  ])('terminates the owned child process group on %s', async signal => {
-    if (process.platform === 'win32') return;
-    const dir = mkdtempSync(resolve(tmpdir(), 'affected-process-group-'));
-    const pidFile = resolve(dir, 'grandchild.pid');
-    const childCode = `
+  it.each(['SIGINT', 'SIGTERM'])(
+    'terminates the owned child process group on %s',
+    async signal => {
+      if (process.platform === 'win32') return;
+      const dir = mkdtempSync(resolve(tmpdir(), 'affected-process-group-'));
+      const pidFile = resolve(dir, 'grandchild.pid');
+      const childCode = `
         const { spawn } = require('node:child_process');
         const { writeFileSync } = require('node:fs');
         const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
         writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid));
         setInterval(() => {}, 1000);
       `;
-    const wrapperCode = `
+      const wrapperCode = `
         import { runCommand } from ${JSON.stringify(
           new URL('../../run-affected-tests.mjs', import.meta.url).href
         )};
         await runCommand(process.execPath, ['-e', ${JSON.stringify(childCode)}]);
       `;
-    const wrapper = spawn(
-      process.execPath,
-      ['--input-type=module', '-e', wrapperCode],
-      { stdio: 'ignore' }
-    );
-    let grandchildPid;
-    try {
-      const deadline = Date.now() + 5000;
-      while (Date.now() < deadline) {
-        try {
-          const candidatePid = Number(readFileSync(pidFile, 'utf8'));
-          if (Number.isInteger(candidatePid) && candidatePid > 0) {
-            grandchildPid = candidatePid;
-            break;
+      const wrapper = spawn(
+        process.execPath,
+        ['--input-type=module', '-e', wrapperCode],
+        { stdio: 'ignore' }
+      );
+      let grandchildPid;
+      try {
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+          try {
+            const candidatePid = Number(readFileSync(pidFile, 'utf8'));
+            if (Number.isInteger(candidatePid) && candidatePid > 0) {
+              grandchildPid = candidatePid;
+              break;
+            }
+            await new Promise(resolveWait => setTimeout(resolveWait, 25));
+          } catch {
+            await new Promise(resolveWait => setTimeout(resolveWait, 25));
           }
-          await new Promise(resolveWait => setTimeout(resolveWait, 25));
-        } catch {
-          await new Promise(resolveWait => setTimeout(resolveWait, 25));
         }
-      }
-      expect(grandchildPid).toBeGreaterThan(0);
-      wrapper.kill(signal);
-      await Promise.race([
-        new Promise(resolveExit => wrapper.once('exit', resolveExit)),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('wrapper did not exit')), 5000)
-        ),
-      ]);
-      const exitDeadline = Date.now() + 5000;
-      let alive = true;
-      while (alive && Date.now() < exitDeadline) {
-        try {
-          process.kill(grandchildPid, 0);
-          await new Promise(resolveWait => setTimeout(resolveWait, 25));
-        } catch {
-          alive = false;
+        expect(grandchildPid).toBeGreaterThan(0);
+        wrapper.kill(signal);
+        await Promise.race([
+          new Promise(resolveExit => wrapper.once('exit', resolveExit)),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('wrapper did not exit')), 5000)
+          ),
+        ]);
+        const exitDeadline = Date.now() + 5000;
+        let alive = true;
+        while (alive && Date.now() < exitDeadline) {
+          try {
+            process.kill(grandchildPid, 0);
+            await new Promise(resolveWait => setTimeout(resolveWait, 25));
+          } catch {
+            alive = false;
+          }
         }
+        expect(alive).toBe(false);
+      } finally {
+        if (wrapper.exitCode === null) wrapper.kill('SIGKILL');
+        if (grandchildPid) {
+          try {
+            process.kill(grandchildPid, 'SIGKILL');
+          } catch {}
+        }
+        rmSync(dir, { recursive: true, force: true });
       }
-      expect(alive).toBe(false);
-    } finally {
-      if (wrapper.exitCode === null) wrapper.kill('SIGKILL');
-      if (grandchildPid) {
-        try {
-          process.kill(grandchildPid, 'SIGKILL');
-        } catch {}
-      }
-      rmSync(dir, { recursive: true, force: true });
-    }
-  }, 15000);
+    },
+    15000
+  );
 
   it('fails closed with a timeout and progress diagnostics for a stalled shard', async () => {
     const diagnostics = [];

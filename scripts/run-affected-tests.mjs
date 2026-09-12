@@ -285,6 +285,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
   'scripts/lib/__tests__/ci-harness.test.mjs',
+  'scripts/lib/__tests__/changed-test-coverage.test.mjs',
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
@@ -317,6 +318,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
@@ -364,6 +366,12 @@ const MERGE_GROUP_ADMISSION_LANE = new Set([
 ]);
 const MERGE_GROUP_ADMISSION_WEB_TESTS = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+// Run 32547855063 spent 3180.55s collecting V8 coverage before this static
+// ownership contract failed. Keep it in the cheap structural selector so
+// coverage-lane drift fails before an expensive changed-surface collection.
+const CI_CONTROL_WEB_TESTS = [
+  'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
 ];
 const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -2416,6 +2424,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '--coverage.thresholds.lines=85',
       '--coverage.thresholds.branches=75',
       '--coverage.thresholds.functions=82',
+    ]);
+    await runCommand('pnpm', [
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'vitest',
+      'run',
+      ...CI_CONTROL_WEB_TESTS.map(file => file.replace(/^apps\/web\//, '')),
+      '--maxWorkers',
+      '1',
     ]);
   }
   const base = argValue(args, '--base', 'origin/main');
