@@ -1,5 +1,9 @@
 {
   "schema": "jovie.design-system-source-identity/v1",
-  "identities": [],
-  "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value. Prefer deleting the debt over adding an escape."
+  "identities": [
+    "apps/web/lib/design/optical-grid-scanners.ts\tarbitrary-value\tp-[13px]",
+    "apps/web/lib/design/optical-grid-scanners.ts\tarbitrary-value\tradius-[a-z0-9-]",
+    "apps/web/lib/design/optical-grid-scanners.ts\tarbitrary-value\tspace-[a-z0-9-]"
+  ],
+  "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value. Prefer deleting the debt over adding an escape.\n\nJOV-5865 (PR #17523, remediator 2026-09-12): optical-grid-scanners.ts is the JOV-5865 detector module itself, not styled UI. p-[13px] appears only in a doc comment exemplifying off-grid drift the scanner flags; radius-[a-z0-9-] / space-[a-z0-9-] are the scanner's own functional-utility regex fragments (ARBITRARY_RADIUS / seam-token matching) - they are detection logic, not Tailwind classes, and cannot be reworded without changing behavior."
 }
