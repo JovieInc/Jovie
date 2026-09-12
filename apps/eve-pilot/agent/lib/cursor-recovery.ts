@@ -78,10 +78,19 @@ export type CursorRecoveryReceipt = {
   readonly observedAt: string;
 };
 
+export type CursorRecoveryOutboxRecord = {
+  readonly schema: 'jovie.eve.cursor-recovery-outbox/v1';
+  readonly destination: 'cursor-cloud';
+  readonly idempotencyKey: string;
+  readonly status: 'ready';
+  readonly job: ExecutionJob;
+  readonly route: RouteReceipt;
+  readonly admissionReason: string;
+};
+
 export class RecoveryAdmissionDeniedError extends Error {
   constructor(
     readonly code:
-      | 'gem-available-use-normal-route'
       | 'live-takeover-without-ownership'
       | 'no-recovery-grant'
       | 'permission-self-expansion'
@@ -243,6 +252,43 @@ export function createIsolatedRecoveryJob(input: {
   };
 }
 
+/**
+ * Build a durable outbox record for governor-selected Cursor recovery.
+ * Destination is always cursor-cloud — never symphony/gem.
+ */
+export function buildCursorRecoveryOutbox(input: {
+  readonly job: ExecutionJob;
+  readonly context: RecoveryAdmissionContext;
+  readonly idempotencyKey: string;
+}): CursorRecoveryOutboxRecord {
+  const disposition = disposeGemDarkRecovery(input.context);
+  if (disposition.status !== 'admit') {
+    if (disposition.status === 'hold') {
+      throw new RecoveryAdmissionDeniedError(
+        'no-recovery-grant',
+        `${disposition.namedGap}: ${disposition.message}`
+      );
+    }
+    throw new RecoveryAdmissionDeniedError(
+      disposition.code,
+      disposition.message
+    );
+  }
+  const route = routeIsolatedRecoveryJob(input.job, input.context);
+  if (route.selectedRoute.tuple.provider !== 'cursor-cloud') {
+    throw new Error('isolated recovery must route to cursor-cloud');
+  }
+  return {
+    schema: 'jovie.eve.cursor-recovery-outbox/v1',
+    destination: 'cursor-cloud',
+    idempotencyKey: input.idempotencyKey,
+    status: 'ready',
+    job: input.job,
+    route,
+    admissionReason: disposition.reason,
+  };
+}
+
 function cursorAuthHeader(apiKey: string): string {
   return `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`;
 }
@@ -339,7 +385,11 @@ export async function reconcileCursorRecoveryRun(input: {
 
     const statusRaw = (body.status ?? 'running').toLowerCase();
     let status: CursorRecoveryStatus = 'running';
-    if (statusRaw.includes('complete') || statusRaw === 'finished') {
+    if (
+      statusRaw.includes('complete') ||
+      statusRaw === 'finished' ||
+      statusRaw === 'done'
+    ) {
       status = 'completed';
     } else if (statusRaw.includes('fail') || statusRaw.includes('error')) {
       status = 'failed';

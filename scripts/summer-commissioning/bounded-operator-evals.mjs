@@ -66,6 +66,13 @@ run(
 );
 
 run(
+  'E4 gem-dark outbox wiring',
+  'pnpm',
+  ['exec', 'vitest', 'run', 'tests/summer-gem-dark-recovery.test.ts'],
+  { cwd: resolve(root, 'apps/eve-pilot'), requirePassed: true }
+);
+
+run(
   'E5 identity packs',
   'pnpm',
   [

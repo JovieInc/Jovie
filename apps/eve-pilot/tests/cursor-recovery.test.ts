@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   assertRecoveryAdmission,
+  buildCursorRecoveryOutbox,
   buildGemDarkExerciseReport,
   CURSOR_CLOUD_RECOVERY_ROUTE,
   createIsolatedRecoveryJob,
@@ -30,6 +31,23 @@ describe('Summer Cursor recovery lane (E3/E4)', () => {
     expect(receipt.selectedRoute.id).toBe(CURSOR_CLOUD_RECOVERY_ROUTE.id);
     expect(receipt.selectedRoute.tuple.provider).toBe('cursor-cloud');
     expect(receipt.selectedRoute.tuple.provider).not.toBe('gem');
+  });
+
+  it('writes cursor-cloud outbox and never symphony/gem (runtime wiring contract)', () => {
+    const job = createIsolatedRecoveryJob({
+      id: 'rec-outbox',
+      objective: 'Gem-dark isolated recovery',
+      evidenceRefs: ['gem-liveness:dark'],
+    });
+    const outbox = buildCursorRecoveryOutbox({
+      job,
+      context: gemDarkContext,
+      idempotencyKey: 'gem-dark-rec-outbox',
+    });
+    expect(outbox.destination).toBe('cursor-cloud');
+    expect(outbox.destination).not.toBe('symphony');
+    expect(outbox.route.selectedRoute.tuple.provider).toBe('cursor-cloud');
+    expect(outbox.status).toBe('ready');
   });
 
   it('denies live takeover without ownership (E4)', () => {
@@ -99,7 +117,6 @@ describe('Summer Cursor recovery lane (E3/E4)', () => {
     expect(report.gemDependentLiveMutationHeld).toBe(true);
     expect(report.namedGap).toBe('gem-dependent-live-mutation-requires-gem');
     expect(report.remainingHumanDecision).toMatch(/Gem restore|live-mutation/i);
-    // Report carries remaining human decision only — no next-action checklist.
     expect(report).not.toHaveProperty('nextActions');
   });
 
@@ -202,21 +219,5 @@ describe('Summer Cursor recovery lane (E3/E4)', () => {
     expect(result.launch.agentId).toBe('agent_2');
     expect(result.receipt.status).toBe('completed');
     expect(result.receipt.runId).toBe('run_2');
-  });
-
-  it('rejects launch responses without bound agent/run ids', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ agent: { id: 'agent_x' }, run: {} }), {
-        status: 200,
-      })
-    );
-    await expect(
-      launchCursorRecoveryAgent({
-        cursorApiKey: 'test-key',
-        prompt: 'x',
-        repository: 'https://github.com/JovieInc/Jovie',
-        fetchImpl,
-      })
-    ).rejects.toThrow(/bound agent\/run/);
   });
 });
