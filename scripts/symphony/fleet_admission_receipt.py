@@ -432,6 +432,7 @@ def _validate_controller_repair_projection(projected: dict[str, Any]) -> None:
     if not closure_allowed:
         raise AdmissionProjectionError("controller repair closure evidence is unsafe")
 
+
 def _project_closure_admission(value: object) -> dict[str, Any]:
     admission = _require_mapping(value, "closureAdmission")
     intake = _require_bool(

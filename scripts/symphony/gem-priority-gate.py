@@ -1439,11 +1439,13 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and valid_commit_sha(production.get("deployedSha"))
     )
     controller_repair_reason_codes = {reason["code"] for reason in reasons}
+    closure_reasons = set(closure_health.get("reasons") or [])
     closure_allows_controller_repair = (
         closure_health.get("status") == "healthy"
         or (
             closure_health.get("status") in {"grace", "red"}
-            and closure_reasons <= REPAIR_FEED_REASONS            and closure_health.get("newIssueIntakeAllowed") is False
+            and closure_reasons <= REPAIR_FEED_REASONS
+            and closure_health.get("newIssueIntakeAllowed") is False
         )
     )
     controller_repair_allowed = (

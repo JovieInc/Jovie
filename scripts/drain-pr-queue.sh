@@ -913,7 +913,8 @@ record_controller_repair_queue_receipt() {  # <pr> <expected-head>
 
 record_queue_reentry_receipt() {  # <pr> <expected-head> <observed-entry-id> <enqueued-at>
   local n="$1" expected_head="$2" entry_id="$3" enqueued_at="$4" live_head target_url checkpoint description reuse=0
-  if [[ ! "$n" =~ ^[1-9][0-9]*$ || ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then    echo "    !! cannot record queue re-entry receipt for #$n without an exact head" >&2
+  if [[ ! "$n" =~ ^[1-9][0-9]*$ || ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! cannot record queue re-entry receipt for #$n without an exact head" >&2
     return 1
   fi
   if [[ "$DRY_RUN" == "1" ]]; then

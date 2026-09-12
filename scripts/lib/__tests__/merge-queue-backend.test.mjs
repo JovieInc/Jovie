@@ -3099,7 +3099,8 @@ describe('native dequeue', () => {
         prState(),
       ],
     });
-    const mutationRunner = createNativeRunner();    const write = vi.fn();
+    const mutationRunner = createNativeRunner();
+    const write = vi.fn();
 
     await expect(
       runCli(['dequeue-ineligible', '14359', HEAD], {
@@ -3136,7 +3137,8 @@ describe('native dequeue', () => {
       mutationRunner.mock.calls.some(([args]) =>
         queryText(args).includes('disablePullRequestAutoMerge')
       )
-    ).toBe(true);    expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({
+    ).toBe(true);
+    expect(JSON.parse(write.mock.calls[0][0])).toMatchObject({
       changed: true,
       state: { headRefOid: HEAD, isInMergeQueue: false },
     });
@@ -3253,7 +3255,8 @@ describe('native dequeue', () => {
         queryText(args).includes('disablePullRequestAutoMerge')
       )
     ).toBe(false);
-  });});
+  });
+});
 
 describe('exact-head queue receipt proof', () => {
   const selectorRow = {

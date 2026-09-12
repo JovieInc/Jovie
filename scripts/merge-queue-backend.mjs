@@ -1506,16 +1506,6 @@ export async function dequeuePullRequest({
   }
 
   if (dequeuePostcondition(current)) {
-    if (
-      expectedHead !== null &&
-      String(current.headRefOid ?? '').toLowerCase() !== expectedHead
-    ) {
-      throw backendError(
-        'dequeue_head_raced',
-        `PR #${parsedNumber} head changed during expected-head compensation`,
-        { expectedHeadOid: expectedHead, state: current }
-      );
-    }
     return {
       backend: resolvedBackend,
       changed: true,
