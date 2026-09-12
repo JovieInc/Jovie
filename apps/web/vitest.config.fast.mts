@@ -181,6 +181,7 @@ export default defineConfig({
           branches: 95,
           lines: 100,
         },
+        'lib/ovie/summer-admissions.ts': { branches: 95, lines: 100 },
         'lib/ovie/summer-product-paths.ts': { branches: 100, lines: 100 },
         'lib/ovie/summer-shadow-client.ts': { branches: 100, lines: 100 },
       },
