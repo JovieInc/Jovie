@@ -74,6 +74,11 @@
     },
     "apps/web/lib/utils/url-encryption.server.ts": {
       "scryptSync": 2
+    },
+    "apps/web/lib/design/optical-grid-scanners.ts": {
+      "readFileSync": 2,
+      "readdirSync": 1,
+      "existsSync": 1
     }
   }
 }
