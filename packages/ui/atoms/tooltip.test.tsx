@@ -45,6 +45,28 @@ const TestTooltip = ({
   </TooltipProvider>
 );
 
+describe('tooltip theme contrast', () => {
+  it('pairs the tooltip surface with its dedicated foreground', () => {
+    render(
+      <TooltipProvider>
+        <Tooltip open>
+          <TooltipTrigger>
+            <button type='button'>Recent chat</button>
+          </TooltipTrigger>
+          <TooltipContent>A truncated recent chat title</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+    const content = screen.getByTestId('tooltip-content');
+    expect(content).toHaveClass(
+      'bg-surface-tooltip',
+      'text-tooltip-foreground',
+      'shadow-sm'
+    );
+    expect(content).not.toHaveClass('text-primary-token', 'shadow-popover');
+  });
+});
+
 describe('Tooltip', () => {
   describe('Basic Functionality', () => {
     it('renders trigger element', () => {
@@ -204,9 +226,9 @@ describe('Tooltip', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('bg-surface-tooltip');
-      expect(content.className).toContain('text-primary-token');
+      expect(content.className).toContain('text-tooltip-foreground');
       expect(content.className).toContain('border-default');
-      expect(content.className).toContain('shadow-popover');
+      expect(content.className).toContain('shadow-sm');
     });
 
     it('keeps compact labels on the shared rounded-rectangle contract', () => {

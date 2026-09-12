@@ -12,6 +12,7 @@
 }
 
 .group[data-collapsible="icon"] [data-sidebar="identity-group"] {
+  flex-direction: column;
   align-items: center;
   gap: 0.125rem;
 }

@@ -173,3 +173,99 @@ test.describe('surface elevation matrix', () => {
     expect(styles.boxShadow).not.toBe('none');
   });
 });
+
+// The existing elevation lane exercises the actual theme CSS and portaled
+// overlays; jsdom cannot prove contrast or sidebar geometry.
+test.describe('sidebar account and tooltip regressions', () => {
+  for (const theme of THEMES) {
+    test(`tooltip contrast [${theme}]`, async ({ page }, testInfo) => {
+      await openStory(page, 'ui-atoms-tooltip--sidebar-long-title', theme);
+      const tooltip = page.getByTestId('tooltip-content');
+      await expect(tooltip).toBeVisible();
+      const contrast = await tooltip.evaluate(element => {
+        const style = getComputedStyle(element);
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext('2d')!;
+        const luminance = (color: string) => {
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          const rgb = Array.from(context.getImageData(0, 0, 1, 1).data)
+            .slice(0, 3)
+            .map(value => {
+              const channel = value / 255;
+              return channel <= 0.04045
+                ? channel / 12.92
+                : ((channel + 0.055) / 1.055) ** 2.4;
+            });
+          return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+        };
+        const fg = luminance(style.color);
+        const bg = luminance(style.backgroundColor);
+        return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+      });
+      expect(contrast).toBeGreaterThanOrEqual(4.5);
+      await testInfo.attach(`tooltip-${theme}`, {
+        body: await page.screenshot(),
+        contentType: 'image/png',
+      });
+    });
+
+    for (const state of ['expanded', 'narrow', 'collapsed']) {
+      test(`compact account ${state} [${theme}]`, async ({
+        page,
+      }, testInfo) => {
+        await openStory(
+          page,
+          `organisms-sidebaridentitygroup--${state}`,
+          theme
+        );
+        const panel = page.getByTestId('sidebar-user-panel');
+        const account = panel.getByRole('button');
+        const profile = panel.getByRole('link', {
+          name: 'Public Profile jov.ie/timwhite',
+        });
+        await expect(account).toBeVisible();
+        await expect(profile).toHaveAttribute('href', '/timwhite');
+        const initial = (await panel.boundingBox())!;
+        const accountBox = (await account.boundingBox())!;
+        const profileBox = (await profile.boundingBox())!;
+        if (state !== 'collapsed') {
+          expect(
+            Math.abs(
+              accountBox.y +
+                accountBox.height / 2 -
+                profileBox.y -
+                profileBox.height / 2
+            )
+          ).toBeLessThan(1);
+          expect(initial.height).toBeLessThanOrEqual(52);
+        }
+        expect(profileBox.x).toBeGreaterThanOrEqual(initial.x);
+        expect(profileBox.x + profileBox.width).toBeLessThanOrEqual(
+          initial.x + initial.width
+        );
+        await account.focus();
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('menu')).toBeVisible();
+        await expect(
+          page.getByRole('menuitem', { name: /Settings/ }).first()
+        ).toBeVisible();
+        expect(await panel.boundingBox()).toEqual(initial);
+        await page.keyboard.press('Escape');
+        await expect(account).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(profile).toBeFocused();
+        await expect(page.getByRole('tooltip')).toContainText(
+          'jov.ie/timwhite'
+        );
+        expect(await panel.boundingBox()).toEqual(initial);
+        await page.keyboard.press('Escape');
+        await testInfo.attach(`account-${state}-${theme}`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+      });
+    }
+  }
+});
