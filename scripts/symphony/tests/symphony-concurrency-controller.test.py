@@ -684,6 +684,14 @@ class SystemdActivationTests(unittest.TestCase):
         self.assertIn('.bounds.policy == "empirical-additive-probe"', text)
         self.assertIn('.sourceRevision == $sha', text)
         self.assertIn('symphony concurrency receipt is stale or from the future', text)
+        # JOV-6163 publisher: Jovie tip is configurationSourceRevision; Symphony
+        # release SHA stays in sourceRevision (see emit_gem_service_attestation.py).
+        self.assertIn('install-gem-service-attestation.sh', text)
+        self.assertIn('.configurationSourceRevision == $sha', text)
+        self.assertIn(
+            '(.sourceRevision | type == "string" and test("^[0-9a-f]{40}$"))',
+            text,
+        )
 
 
 

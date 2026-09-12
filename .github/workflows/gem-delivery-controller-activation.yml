@@ -185,6 +185,10 @@ jobs:
           bash scripts/symphony/update-symphony-burrito.sh --managed-controller-only
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh
+          # JOV-6163 publisher: install onto the existing attestation timer path.
+          # Fail-closed when runner-source.env is missing or --check is unhealthy.
+          GEM_WORKSPACE=/home/timwhite/gem-workspace \
+            bash scripts/symphony/install-gem-service-attestation.sh "$GITHUB_WORKSPACE"
           install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"
           install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.service "$HOME/.config/systemd/user/symphony-concurrency-controller.service"
           install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.timer "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
@@ -202,9 +206,12 @@ jobs:
           PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          # sourceRevision is the Symphony release SHA; the Jovie production tip is
+          # configurationSourceRevision (emit_gem_service_attestation.py after #17725).
           jq -e --arg sha "$PRODUCTION_SHA" '
             .schema == "gem-service-attestation/v1" and
-            .sourceRevision == $sha and
+            (.sourceRevision | type == "string" and test("^[0-9a-f]{40}$")) and
+            .configurationSourceRevision == $sha and
             .daemonReloaded == true and
             .service == "symphony-elixir.service" and
             .active == true and

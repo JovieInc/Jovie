@@ -26,12 +26,23 @@ reads nor writes the current attestation. Exit 0 means the measured inputs match
 exit 2 reports an observed but unhealthy configuration; exit 78 means observation
 could not be verified. None of these is a worker-completion receipt.
 
-After the source change passes the normal review and delivery path, install
-`emit_gem_service_attestation.py` at the existing
+After the source change passes the normal review and delivery path, prefer the
+checked-in installer (also invoked from Gem delivery-controller activation):
+
+```bash
+# Requires ~/.config/symphony/runner-source.env and a healthy --check first.
+# Exit 2 = observed unhealthy config (do not pin around drift); exit 78 = unverified.
+GEM_WORKSPACE="$HOME/gem-workspace" bash scripts/symphony/install-gem-service-attestation.sh
+```
+
+Manual equivalent: install `emit_gem_service_attestation.py` at the existing
 `~/gem-workspace/scripts/emit-gem-service-attestation.py` path along with its
 `symphony_proof_context.py` and `gem_gate_contract.py` dependencies. Install the
 checked-in `systemd/gem-service-attestation.service` over that same existing user
-unit. Its required `~/.config/symphony/runner-source.env` contains these nonsecret,
+unit. Activation verifies `configurationSourceRevision` against the Jovie
+production tip; `sourceRevision` is the Symphony release SHA.
+
+Its required `~/.config/symphony/runner-source.env` contains these nonsecret,
 operator-selected values:
 
 ```text
