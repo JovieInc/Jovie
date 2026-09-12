@@ -1623,21 +1623,31 @@ def _draft_qualification(pr: dict[str, Any], now: datetime) -> dict[str, Any]:
         "authoritativeApproval": False,
     }
     body = pr.get("body")
+    body = body if isinstance(body, str) else ""
+    starts = re.findall(r"<!--\s*draft-qualification:", body)
     markers = re.findall(
         r"<!--\s*draft-qualification:([\s\S]*?)-->",
-        body if isinstance(body, str) else "",
+        body,
     )
-    if not markers:
+    if not starts:
         return result
     result.update(
         evidenceStatus="invalid-or-stale",
         nextAction="refresh-exact-head-agent-qualification",
     )
-    if len(markers) != 1 or pr.get("isCrossRepository") is not False:
+    if len(starts) != 1 or len(markers) != 1 or pr.get("isCrossRepository") is not False:
         return result
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("duplicate qualification key")
+            value[key] = item
+        return value
+
     try:
-        receipt = json.loads(markers[0])
-    except ValueError:
+        receipt = json.loads(markers[0], object_pairs_hook=unique_object)
+    except (ValueError, RecursionError):
         return result
     if not isinstance(receipt, dict):
         return result

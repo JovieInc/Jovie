@@ -339,6 +339,42 @@ class DraftQualificationTests(unittest.TestCase):
                 row["body"] = body
                 self.assertEqual(self.project(row)["owner"], "UNKNOWN")
 
+    def test_duplicate_json_keys_cannot_overwrite_superseded_evidence(self):
+        row = pr(17523, title="draft", draft=True)
+        current = self.receipt(row)
+        for prefix in [
+            '"state":"superseded",',
+            '"owner":"other-owner",',
+            '"extra":{"state":"superseded","state":"pending-agent-review"},',
+        ]:
+            with self.subTest(prefix=prefix):
+                row["body"] = current.replace("{", "{" + prefix, 1)
+                item = self.project(row)
+                self.assertEqual(item["state"], "unknown")
+                self.assertEqual(item["owner"], "UNKNOWN")
+
+    def test_unclosed_marker_is_invalid_and_cannot_hide_replacement(self):
+        row = pr(17523, title="draft", draft=True)
+        current = self.receipt(row)
+        unfinished = '<!-- draft-qualification:{"state":"superseded"}'
+        for body in [unfinished, current + unfinished, unfinished + current]:
+            with self.subTest(body=body):
+                row["body"] = body
+                item = self.project(row)
+                self.assertEqual(item["owner"], "UNKNOWN")
+                self.assertEqual(item["evidenceStatus"], "invalid-or-stale")
+
+    def test_json_depth_failure_is_contained_to_one_draft(self):
+        row = pr(17523, title="draft", draft=True)
+        row["body"] = '<!-- draft-qualification:' + '[' * 10000 + '0' + ']' * 10000 + ' -->'
+        other = pr(17542, title="draft", draft=True)
+        other["body"] = self.receipt(other)
+        result = MODULE.classify_open_prs([row, other], NOW)
+        self.assertEqual(result["draftQualifications"][0]["owner"], "UNKNOWN")
+        self.assertEqual(result["draftQualifications"][1]["state"], "pending-agent-review")
+        self.assertEqual(result["counts"]["promote"], 0)
+        self.assertTrue(all(item["state"] == "held" for item in result["dispositions"]))
+
     def test_foreign_metadata_and_non_drafts_cannot_assert_qualification(self):
         row = pr(17523, title="draft", draft=True, cross_repository=True)
         row["body"] = self.receipt(row)
