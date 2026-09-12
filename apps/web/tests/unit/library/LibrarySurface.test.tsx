@@ -1249,13 +1249,19 @@ describe('LibrarySurface', () => {
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
     expect(overflowButton.className).toContain('focus-visible:ring-ring');
+    expect(previewButton.className).toContain(
+      'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+    );
+    expect(previewButton.className).toContain(
+      'focus-visible:ring-offset-(--app-shell-content-surface)'
+    );
+    // DSP quiet rows are new surfaces on the canonical ring token (the
+    // source-identity ratchet bars the --linear-border-focus identity there)
+    // and render without a ring offset — focus-visible:bg-surface-1 replaces it.
+    expect(providerLink.className).toContain(
+      'focus-visible:ring-2 focus-visible:ring-ring/55'
+    );
     for (const element of [previewButton, providerLink]) {
-      expect(element.className).toContain(
-        'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
-      );
-      expect(element.className).toContain(
-        'focus-visible:ring-offset-(--app-shell-content-surface)'
-      );
       expect(element.className).not.toContain('focus-visible:shadow');
     }
   });
