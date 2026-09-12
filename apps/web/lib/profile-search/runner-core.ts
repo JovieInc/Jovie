@@ -78,7 +78,11 @@ function failureDetails(error: unknown) {
 
 export async function runProfileSearchBatch(
   dependencies: ProfileSearchRunnerDependencies,
-  options: { readonly deadlineAt: number; readonly now?: () => number }
+  options: {
+    readonly deadlineAt: number;
+    readonly now?: () => number;
+    readonly singleAttempt?: boolean;
+  }
 ): Promise<ProfileSearchRunnerStats> {
   const now = options.now ?? Date.now;
   const rolloutEnabled = await dependencies.isRolloutEnabled();
@@ -96,7 +100,7 @@ export async function runProfileSearchBatch(
   };
   if (!stats.enabled) return stats;
 
-  while (stats.claimed < MAX_SCHEDULED_RUNS) {
+  while (stats.claimed < (options.singleAttempt ? 1 : MAX_SCHEDULED_RUNS)) {
     if (options.deadlineAt - now() < STOP_CLAIMING_MARGIN_MS) {
       stats.stoppedForDeadline = true;
       break;
@@ -148,6 +152,7 @@ export async function runProfileSearchBatch(
         });
         await dependencies.markProviderFailure(failure.code);
         const canRetry =
+          !options.singleAttempt &&
           failure.retryable &&
           stats.retried < MAX_RETRY_ATTEMPTS &&
           options.deadlineAt - now() >= STOP_CLAIMING_MARGIN_MS;
