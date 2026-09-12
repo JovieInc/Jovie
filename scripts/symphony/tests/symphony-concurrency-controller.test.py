@@ -335,7 +335,7 @@ class EvidenceTests(unittest.TestCase):
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
-    def test_run_applies_only_future_concurrency_and_preserves_workflow(self):
+    def test_operator_runtime_workflow_applies_only_future_concurrency_and_preserves_workflow(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             workflow = root / "WORKFLOW.md"
@@ -349,7 +349,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
                 "healthy": True,
                 "listener": {"port": 4041, "boundToService": True},
             }))
-            with mock.patch.object(sys, "argv", ["controller", "--workflow", str(workflow), "--state", str(root / "state.json"), "--receipt", str(root / "receipt.json"), "--source-attestation", str(attestation), "--proc-root", str(root / "proc")]):
+            with mock.patch.dict(MODULE.os.environ, {"SYMPHONY_RUNTIME_WORKFLOW": str(workflow)}), mock.patch.object(sys, "argv", ["controller", "--state", str(root / "state.json"), "--receipt", str(root / "receipt.json"), "--source-attestation", str(attestation), "--proc-root", str(root / "proc")]):
                 args = MODULE.parse_args()
             for name in ("cpu", "memory", "io"):
                 path = args.proc_root / "pressure" / name
@@ -611,9 +611,11 @@ class SystemdActivationTests(unittest.TestCase):
     def test_service_invokes_controller_with_fail_closed_defaults(self):
         text = SERVICE_UNIT.read_text(encoding="utf-8")
         self.assertEqual(ini_value(text, "Type"), "oneshot")
-        # Exactly the binary, no flags: every policy input stays at its
-        # fail-closed default (missing telemetry or integrity evidence pins
-        # concurrency to MIN_CONCURRENCY).
+        # Runtime path inputs share the observer configuration. Policy remains
+        # fail-closed: missing telemetry or integrity evidence pins concurrency
+        # to MIN_CONCURRENCY. Explicit CLI overrides remain available.
+        self.assertEqual(ini_value(text, "EnvironmentFile"),
+                         "-%h/.config/symphony/runner-source.env")
         self.assertEqual(
             ini_value(text, "ExecStart"),
             "%h/.local/bin/symphony-concurrency-controller",

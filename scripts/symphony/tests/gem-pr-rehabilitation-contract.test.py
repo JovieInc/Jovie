@@ -173,6 +173,10 @@ class DeploymentContractTests(unittest.TestCase):
             "EnvironmentFile=-%h/.config/symphony/summer-bottleneck.env",
             service,
         )
+        self.assertIn(
+            "EnvironmentFile=-%h/.config/symphony/runner-source.env",
+            service,
+        )
         self.assertNotIn("/home/timwhite/Jovie/", service)
 
     def test_jovie_producer_refreshes_once_even_when_jovie_drain_is_disabled(self):
