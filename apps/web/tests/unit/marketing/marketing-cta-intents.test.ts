@@ -1,13 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import {
+  getHomepageFrontDoorCtaContract,
+  PUBLIC_WAITLIST_URL,
+} from '@/data/homepageFrontDoorCta';
+import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import {
   buildClaimProfileStartHref,
   getClaimProfileIntent,
   MARKETING_CTA_INTENTS,
 } from '@/data/marketingCtaIntents';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('marketing CTA intent registry', () => {
+  it('opens the canonical live artist from both public proof intents', () => {
+    const homepage = getHomepageFrontDoorCtaContract(false);
+    expect(MARKETING_CTA_INTENTS.seeLiveProfile.href).toBe(
+      TIM_WHITE_PROFILE.publicProfilePath
+    );
+    expect(homepage.secondary?.href).toBe(TIM_WHITE_PROFILE.publicProfilePath);
+    expect(homepage.secondary?.href).not.toBe(APP_ROUTES.ARTIST_PROFILES);
+    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
+      TIM_WHITE_PROFILE.publicProfilePath
+    );
+    expect(getHomepageFrontDoorCtaContract(true).secondary).toBeNull();
+  });
+
+  it('preserves empty handles at the open auth entry', () => {
+    expect(buildClaimProfileStartHref(undefined, false)).toBe(APP_ROUTES.START);
+    expect(buildClaimProfileStartHref(' @ ', false)).toBe(APP_ROUTES.START);
+  });
+
   it('keeps claim-profile waitlist-first Get started truthful', () => {
     const intent = getClaimProfileIntent();
 

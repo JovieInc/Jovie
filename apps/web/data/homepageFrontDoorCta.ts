@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
@@ -61,7 +62,7 @@ export function getHomepageFrontDoorCtaContract(
     },
     secondary: {
       label: 'See a live profile',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: TIM_WHITE_PROFILE.publicProfilePath,
     },
     fallbackSupport: 'Free forever. No credit card.',
   };

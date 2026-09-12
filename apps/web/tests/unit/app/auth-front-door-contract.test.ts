@@ -5,6 +5,7 @@ import {
   getHomepageFrontDoorCtaContract,
   PUBLIC_WAITLIST_URL,
 } from '@/data/homepageFrontDoorCta';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
   it('keeps waitlist-on homepage CTAs in request-access mode', () => {
@@ -29,7 +30,7 @@ describe('auth front-door contract', () => {
     });
     expect(contract.secondary).toEqual({
       label: 'See a live profile',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: TIM_WHITE_PROFILE.publicProfilePath,
     });
     expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
   });
