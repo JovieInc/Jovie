@@ -263,8 +263,8 @@ The source export is preparatory; deployment and commissioning require separate 
         'utf8'
       );
       if (path === 'index.ts') {
-        // Workspace source uses a bundler specifier so Next/Turbopack can
-        // consume the package. Isolated NodeNext copies need the .js target.
+        // Workspace uses .ts so Next and scripts typecheck resolve the
+        // module; isolated NodeNext copies need the .js target.
         contents = contents.replace(
           /from ['"]\.\/symphony-outage(?:\.ts)?['"]/gu,
           "from './symphony-outage.js'"
