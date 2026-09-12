@@ -11,12 +11,15 @@
  * - Enterprise: 25,000 daily / 250,000 monthly
  */
 
-import { sql as drizzleSql, eq, lt } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gt, gte, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import {
   type CreatorEmailQuota,
   creatorEmailQuotas,
 } from '@/lib/db/schema/sender';
+import { getCreatorOwnerUserId } from '@/lib/entitlements/creator-plan';
+import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry';
 import { logger } from '@/lib/utils/logger';
 
 /** Quota limits by plan tier */
@@ -309,4 +312,36 @@ export async function getQuotaSummary(creatorProfileId: string): Promise<{
       monthly: quota.monthlyResetAt,
     },
   };
+}
+
+/**
+ * Reserve one lifetime trial email before contacting the provider. No reset and
+ * no paid overage. Failed/uncertain sends retain the reservation conservatively:
+ * releasing an uncertain provider outcome could permit more than the allowance.
+ */
+export async function reserveTrialFanEmail(
+  creatorProfileId: string
+): Promise<boolean> {
+  const ownerUserId = await getCreatorOwnerUserId(creatorProfileId);
+  if (!ownerUserId) return false;
+  const now = new Date();
+  const allowance = TRIAL_NOTIFICATION_RECIPIENT_LIMIT;
+  const [reserved] = await db
+    .update(users)
+    .set({
+      trialNotificationsSent: drizzleSql`${users.trialNotificationsSent} + 1`,
+      billingVersion: drizzleSql`${users.billingVersion} + 1`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(users.id, ownerUserId),
+        eq(users.plan, 'trial'),
+        gt(users.trialEndsAt, now),
+        gte(users.trialNotificationsSent, 0),
+        lt(users.trialNotificationsSent, allowance)
+      )
+    )
+    .returning({ id: users.id });
+  return Boolean(reserved);
 }

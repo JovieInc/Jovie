@@ -1,3 +1,5 @@
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
 import { EMAIL_REPLY_TO } from '@/lib/notifications/config';
 import {
@@ -7,7 +9,11 @@ import {
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms';
 import type { SendSmsResult } from '@/lib/notifications/providers/sms/twilio-sender';
-import { checkQuota, incrementQuota } from '@/lib/notifications/quota';
+import {
+  checkQuota,
+  incrementQuota,
+  reserveTrialFanEmail,
+} from '@/lib/notifications/quota';
 import { checkReputation, recordSend } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
 import {
@@ -69,6 +75,44 @@ const buildErrorResult = (
   status: 'error',
   error,
 });
+
+/** Paid fan sends remain unavailable until pricing and spend approval exist. */
+async function checkFanSendAccess(
+  message: NotificationMessage,
+  channel: 'email' | 'sms'
+): Promise<NotificationChannelResult | null> {
+  const sender = message.senderContext;
+  if (
+    !sender ||
+    (sender.emailType !== 'release_notification' &&
+      sender.emailType !== 'marketing')
+  ) {
+    return null;
+  }
+
+  // Legacy paid contracts retain established channel/quota behavior. The resolver
+  // grants paid capability only for verified legacy price IDs, never new/unknown.
+  try {
+    const { plan, entitlements } = await getCreatorEntitlements(
+      sender.creatorProfileId
+    );
+    if (plan !== 'trial' && entitlements.booleans.canSendNotifications)
+      return null;
+    if (
+      channel === 'email' &&
+      plan === 'trial' &&
+      TRIAL_NOTIFICATION_RECIPIENT_LIMIT > 0 &&
+      (await reserveTrialFanEmail(sender.creatorProfileId))
+    )
+      return null;
+  } catch (error) {
+    logger.error('[notifications] Fan-send eligibility unavailable', { error });
+  }
+  return buildErrorResult(
+    channel,
+    'Paid fan sends are unavailable. No spend is authorized.'
+  );
+}
 
 /**
  * Build the "From" address with dynamic sender name.
@@ -245,6 +289,9 @@ async function handleEmailChannel(
   const replyTo =
     message.replyTo ?? senderContext?.replyToEmail ?? EMAIL_REPLY_TO;
 
+  const fanSendBlock = await checkFanSendAccess(message, 'email');
+  if (fanSendBlock) return fanSendBlock;
+
   const emailResult = await emailProvider.sendEmail({
     to,
     subject: message.subject,
@@ -302,6 +349,9 @@ async function handleSmsChannel(
     });
     return buildSkippedResult('sms', detail);
   }
+
+  const fanSendBlock = await checkFanSendAccess(message, 'sms');
+  if (fanSendBlock) return fanSendBlock;
 
   const body = message.text.trim();
   const result = await smsProvider({ to, body });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sendPendingNotifications } from '@/app/api/cron/send-release-notifications/route';
 
 const {
   mockDbSelect,
@@ -159,7 +160,6 @@ function createWhereResolvedChain(result: unknown) {
 describe('sendPendingNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
 
     mockDbUpdate.mockReturnValue({
       set: mockDbUpdateSet,
@@ -210,10 +210,6 @@ describe('sendPendingNotifications', () => {
   });
 
   it('throws so the cron can retry when entitlements lookup fails', async () => {
-    const { sendPendingNotifications } = await import(
-      '@/app/api/cron/send-release-notifications/route'
-    );
-
     await expect(sendPendingNotifications()).rejects.toThrow(
       'Creator entitlements lookup failed while sending release notifications'
     );
@@ -236,10 +232,6 @@ describe('sendPendingNotifications', () => {
     // those queries entirely so node-postgres never sees an empty UUID array.
     mockDbSelect.mockReset();
     mockDbSelect.mockReturnValueOnce(createPendingNotificationsChain([]));
-
-    const { sendPendingNotifications } = await import(
-      '@/app/api/cron/send-release-notifications/route'
-    );
 
     const result = await sendPendingNotifications();
 
@@ -267,10 +259,6 @@ describe('sendPendingNotifications', () => {
       ])
     );
 
-    const { sendPendingNotifications } = await import(
-      '@/app/api/cron/send-release-notifications/route'
-    );
-
     const result = await sendPendingNotifications();
     expect(result).toBeDefined();
     expect(mockGetBatchCreatorEntitlements).toHaveBeenCalledWith(['creator_1']);
@@ -281,7 +269,7 @@ describe('sendPendingNotifications', () => {
     );
   });
 
-  it('marks notification as sent when the email dispatch succeeds', async () => {
+  it('marks trial email as sent without incrementing the shared sender reservation again', async () => {
     // Full happy-path chain: pending notification -> release -> creator ->
     // email subscriber -> streaming link (required for eligibility's
     // hasSmartLink check), then a successful sendNotification dispatch.
@@ -352,7 +340,7 @@ describe('sendPendingNotifications', () => {
         [
           'creator_1',
           {
-            plan: 'pro',
+            plan: 'trial',
             entitlements: {
               booleans: { canSendNotifications: true },
               limits: {},
@@ -379,10 +367,6 @@ describe('sendPendingNotifications', () => {
       errors: [],
     });
 
-    const { sendPendingNotifications } = await import(
-      '@/app/api/cron/send-release-notifications/route'
-    );
-
     const result = await sendPendingNotifications();
 
     expect(result).toEqual({ sent: 1, failed: 0, skipped: 0, processed: 1 });
@@ -401,6 +385,9 @@ describe('sendPendingNotifications', () => {
         error: null,
       })
     );
+    for (const [changes] of mockDbUpdateSet.mock.calls) {
+      expect(changes).not.toHaveProperty('trialNotificationsSent');
+    }
   });
 
   it('marks notification as failed with the delivery error when the email dispatch fails', async () => {
@@ -501,10 +488,6 @@ describe('sendPendingNotifications', () => {
         },
       ],
     });
-
-    const { sendPendingNotifications } = await import(
-      '@/app/api/cron/send-release-notifications/route'
-    );
 
     const result = await sendPendingNotifications();
 
@@ -666,10 +649,6 @@ describe('sendPendingNotifications', () => {
       skipped: [],
       errors: [],
     });
-
-    const { sendPendingNotifications } = await import(
-      '@/app/api/cron/send-release-notifications/route'
-    );
 
     const result = await sendPendingNotifications();
 

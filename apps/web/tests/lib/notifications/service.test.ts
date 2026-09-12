@@ -5,6 +5,10 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/lib/entitlements/creator-plan', () => ({
+  getCreatorEntitlements: vi.fn(),
+}));
+
 // Mock dependencies
 vi.mock('@/lib/notifications/preferences', () => ({
   getNotificationPreferences: vi.fn(),
@@ -54,6 +58,7 @@ vi.mock('@/lib/notifications/providers/sms/outbound-sms', () => ({
 vi.mock('@/lib/notifications/quota', () => ({
   checkQuota: vi.fn(),
   incrementQuota: vi.fn(),
+  reserveTrialFanEmail: vi.fn(),
 }));
 
 vi.mock('@/lib/notifications/reputation', () => ({
@@ -61,12 +66,14 @@ vi.mock('@/lib/notifications/reputation', () => ({
   recordSend: vi.fn(),
 }));
 
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
 import { sendOutboundSms } from '@/lib/notifications/providers/sms/outbound-sms';
-import { checkQuota } from '@/lib/notifications/quota';
+import { checkQuota, reserveTrialFanEmail } from '@/lib/notifications/quota';
 import { checkReputation } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
 import {
@@ -90,6 +97,11 @@ import type {
 describe('Notification Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(reserveTrialFanEmail).mockResolvedValue(true);
+    vi.mocked(getCreatorEntitlements).mockResolvedValue({
+      plan: 'trial',
+      entitlements: getEntitlements('trial'),
+    });
 
     // Default mock for preferences
     vi.mocked(getNotificationPreferences).mockResolvedValue({
@@ -691,5 +703,164 @@ describe('Notification Service', () => {
         })
       );
     });
+  });
+  describe('fan sends preserve trial allowance and legacy contracts', () => {
+    const fanMessage: NotificationMessage = {
+      subject: 'Release',
+      text: 'Listen now',
+      category: 'marketing',
+      senderContext: {
+        creatorProfileId: 'artist-1',
+        displayName: 'Artist',
+        emailType: 'release_notification',
+      },
+    };
+    const target = { email: 'fan@example.com', phone: '+15555550123' };
+    const sendEmail = vi.fn();
+    beforeEach(() => {
+      sendEmail.mockReset().mockResolvedValue({
+        channel: 'email',
+        status: 'sent',
+        detail: 'msg-1',
+      });
+      setEmailProvider({ provider: 'resend', sendEmail });
+    });
+
+    it.each(['free', 'pro', 'max'] as const)(
+      'blocks %s fan email before provider invocation',
+      async plan => {
+        vi.mocked(getCreatorEntitlements).mockResolvedValue({
+          plan,
+          entitlements: {
+            ...getEntitlements(plan),
+            booleans: {
+              ...getEntitlements(plan).booleans,
+              canSendNotifications: false,
+            },
+          },
+        });
+        const result = await sendNotification(
+          { ...fanMessage, channels: ['email'] },
+          target
+        );
+        expect(result.errors).toHaveLength(1);
+        expect(sendEmail).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['email', 'sms'] as const)(
+      'preserves existing legacy paid %s sending',
+      async channel => {
+        vi.mocked(getCreatorEntitlements).mockResolvedValue({
+          plan: 'pro',
+          entitlements: getEntitlements('pro'),
+        });
+        const result = await sendNotification(
+          { ...fanMessage, channels: [channel] },
+          target
+        );
+        expect(result.delivered).toEqual([channel]);
+        expect(reserveTrialFanEmail).not.toHaveBeenCalled();
+      }
+    );
+
+    it('blocks an exhausted trial before delivery', async () => {
+      vi.mocked(reserveTrialFanEmail).mockResolvedValueOnce(false);
+      const result = await sendNotification(
+        { ...fanMessage, channels: ['email'] },
+        target
+      );
+      expect(result.errors).toHaveLength(1);
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('blocks when reservation persistence fails', async () => {
+      vi.mocked(reserveTrialFanEmail).mockRejectedValueOnce(
+        new Error('database offline')
+      );
+      const result = await sendNotification(
+        { ...fanMessage, channels: ['email'] },
+        target
+      );
+      expect(result.errors).toHaveLength(1);
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('preserves existing trial email sending', async () => {
+      const result = await sendNotification(
+        { ...fanMessage, channels: ['email'] },
+        target
+      );
+      expect(result.delivered).toEqual(['email']);
+      expect(sendEmail).toHaveBeenCalledOnce();
+    });
+
+    it('denies fan email when entitlement lookup fails', async () => {
+      vi.mocked(getCreatorEntitlements).mockRejectedValueOnce(
+        new Error('offline')
+      );
+      const result = await sendNotification(
+        { ...fanMessage, channels: ['email'] },
+        target
+      );
+      expect(result.errors).toHaveLength(1);
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('reserves before provider invocation and retains the reservation on provider failure', async () => {
+      sendEmail.mockResolvedValueOnce({
+        channel: 'email',
+        status: 'error',
+        error: 'unknown delivery outcome',
+      });
+      const result = await sendNotification(
+        { ...fanMessage, channels: ['email'] },
+        target
+      );
+      expect(result.errors).toHaveLength(1);
+      expect(reserveTrialFanEmail).toHaveBeenCalledOnce();
+      expect(
+        vi.mocked(reserveTrialFanEmail).mock.invocationCallOrder[0]
+      ).toBeLessThan(sendEmail.mock.invocationCallOrder[0]);
+    });
+
+    it('does not turn trial email allowance into SMS credit', async () => {
+      const result = await sendNotification(
+        { ...fanMessage, channels: ['sms'] },
+        target
+      );
+      expect(result.errors).toHaveLength(1);
+      expect(sendOutboundSms).not.toHaveBeenCalled();
+    });
+
+    it('preserves consent before checking allowance', async () => {
+      vi.mocked(isEmailSuppressed).mockResolvedValueOnce({
+        suppressed: true,
+        reason: 'user_request',
+      });
+      const result = await sendNotification(
+        { ...fanMessage, channels: ['email'] },
+        target
+      );
+      expect(result.skipped).toHaveLength(1);
+      expect(getCreatorEntitlements).not.toHaveBeenCalled();
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it.each(['claim_invite', 'transactional', 'product_update'] as const)(
+      'does not gate %s on artist billing',
+      async emailType => {
+        const result = await sendNotification(
+          {
+            ...fanMessage,
+            channels: ['email'],
+            senderContext: { ...fanMessage.senderContext!, emailType },
+          },
+          target
+        );
+        expect(result.delivered).toEqual(['email']);
+        expect(getCreatorEntitlements).not.toHaveBeenCalled();
+      }
+    );
   });
 });
