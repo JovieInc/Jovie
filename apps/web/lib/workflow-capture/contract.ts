@@ -32,6 +32,8 @@ export type CreateWorkflowCaptureRequestInput = z.input<
 
 export const WorkflowCaptureRequestPayloadSchema = z.object({
   schemaVersion: z.literal(WORKFLOW_CAPTURE_SCHEMA_VERSION),
+  // Initiator identity is not audience: creator-initiated captures also live in Ovie.
+  audience: z.literal('ovie').optional(),
   requestingTaskId: z.string().min(1),
   requestKey: z.string().min(1),
   title: z.string().min(1),

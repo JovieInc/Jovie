@@ -8,13 +8,16 @@
  * Does NOT insert a workflow_runs row — rejection requires no follow-up work.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
-import { YOUTUBE_THUMBNAIL_CANDIDATE_KIND } from '@/lib/connectors/suggested-action-kinds';
+import {
+  WORKFLOW_CAPTURE_REQUEST_KIND,
+  YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
+} from '@/lib/connectors/suggested-action-kinds';
 import { parseYouTubeThumbnailCandidate } from '@/lib/connectors/youtube-thumbnail-candidate';
 import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
@@ -56,7 +59,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       })
       .from(suggestedActions)
       .where(
-        and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+        and(
+          eq(suggestedActions.id, id),
+          eq(suggestedActions.userId, userId),
+          ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
+        )
       )
       .limit(1);
     if (!candidate) {
@@ -97,7 +104,8 @@ export async function POST(request: Request, { params }: RouteParams) {
         and(
           eq(suggestedActions.id, id),
           eq(suggestedActions.userId, userId),
-          eq(suggestedActions.status, 'pending')
+          eq(suggestedActions.status, 'pending'),
+          ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
         )
       )
       .returning({ id: suggestedActions.id, kind: suggestedActions.kind });
@@ -107,7 +115,11 @@ export async function POST(request: Request, { params }: RouteParams) {
         .select({ status: suggestedActions.status })
         .from(suggestedActions)
         .where(
-          and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+          and(
+            eq(suggestedActions.id, id),
+            eq(suggestedActions.userId, userId),
+            ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
+          )
         )
         .limit(1);
       if (existing?.status === 'rejected') {
