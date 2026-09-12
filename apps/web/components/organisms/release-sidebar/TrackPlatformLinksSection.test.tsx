@@ -31,7 +31,7 @@ describe('TrackPlatformLinksSection', () => {
     const user = userEvent.setup();
     const openSpy = vi
       .spyOn(globalThis, 'open')
-      .mockReturnValue(null as never as Window);
+      .mockImplementation(() => null);
 
     render(
       <TrackPlatformLinksSection
