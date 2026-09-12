@@ -31,8 +31,8 @@ export const CHAT_COMPOSER_STOP_ARIA_LABEL = 'Stop generating';
 /** Attach menu trigger accessible name. */
 export const CHAT_COMPOSER_ATTACH_ARIA_LABEL = 'Attachment options';
 
-/** Plus-menu item for uploading a song from the new-chat composer. */
-export const CHAT_COMPOSER_UPLOAD_SONG_LABEL = 'Upload Song';
+/** Shared palette action for the existing supported-audio upload path. */
+export const CHAT_COMPOSER_UPLOAD_AUDIO_LABEL = 'Upload audio';
 
-/** Supported audio formats shown next to the song-upload action. */
-export const CHAT_COMPOSER_UPLOAD_SONG_HINT = 'MP3, WAV, FLAC, AAC';
+/** Supported audio formats shown next to the audio-upload action. */
+export const CHAT_COMPOSER_UPLOAD_AUDIO_HINT = 'MP3, WAV, FLAC, AAC';

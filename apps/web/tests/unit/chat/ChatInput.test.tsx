@@ -247,11 +247,9 @@ describe('ChatInput', () => {
     await user.click(getByRole('button', { name: /Attachment options/i }));
 
     // Dropdown menu receives focus when opened (standard Radix behavior)
-    expect(getByRole('menu')).toBeInTheDocument();
-    expect(
-      getByRole('menuitem', { name: /Attach Files/i })
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Attachments')).not.toBeInTheDocument();
+    expect(getByRole('listbox')).toBeInTheDocument();
+    expect(getByRole('option', { name: /Attach Files/i })).toBeInTheDocument();
+    expect(screen.getByText('Attachments')).toBeInTheDocument();
     expect(
       screen.queryByText('Drop images anywhere in chat.')
     ).not.toBeInTheDocument();
@@ -651,6 +649,11 @@ describe('ChatInput', () => {
       );
     });
     expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
+    expect(screen.getByTestId('chat-composer-surface')).not.toContainElement(
+      screen.getByRole('alert')
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('never starts Web Speech in stale Electron and points at system dictation instead', async () => {
