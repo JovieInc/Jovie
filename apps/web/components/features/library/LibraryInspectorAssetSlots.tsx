@@ -82,11 +82,13 @@ export function LibraryInspectorAssetSlots({
   asset,
   downloads,
   disabled = false,
+  defaultSectionOpen = false,
   onArtworkUploaded,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly downloads: readonly LibraryDownloadView[];
   readonly disabled?: boolean;
+  readonly defaultSectionOpen?: boolean;
   readonly onArtworkUploaded?: (assetId: string, artworkUrl: string) => void;
 }) {
   const releaseId = releaseIdForAsset(asset);
@@ -139,7 +141,7 @@ export function LibraryInspectorAssetSlots({
             sectionId={section.kind}
             surface='card'
             title={section.title}
-            defaultOpen={false}
+            defaultOpen={defaultSectionOpen}
           >
             <StatefulAssetSlot
               kind={section.kind}
