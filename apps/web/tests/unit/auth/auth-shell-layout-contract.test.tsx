@@ -194,113 +194,113 @@ describe('auth shell layout contract', () => {
     expect(handoff).not.toContain('data-auth-modal-shell');
   });
 
-  it.each(
-    AUTH_LAYOUT_VIEWPORTS
-  )('$name ($width) editorial visibility matches the contract', ({ width }) => {
-    expect(editorialCardExpectedVisible('signin-full-route', width)).toBe(
-      false
-    );
-    expect(editorialCardVisibleFromCss(productionCssInspection, width)).toBe(
-      width >= AUTH_SPLIT_MIN_WIDTH_PX
-    );
+  it.each(AUTH_LAYOUT_VIEWPORTS)(
+    '$name ($width) editorial visibility matches the contract',
+    ({ width }) => {
+      expect(editorialCardExpectedVisible('signin-full-route', width)).toBe(
+        false
+      );
+      expect(editorialCardVisibleFromCss(productionCssInspection, width)).toBe(
+        width >= AUTH_SPLIT_MIN_WIDTH_PX
+      );
 
-    expect(
-      editorialCardExpectedVisible('signin-intercepted-modal', width)
-    ).toBe(false);
-    expect(editorialCardExpectedVisible('desktop-return-handoff', width)).toBe(
-      false
-    );
-  });
+      expect(
+        editorialCardExpectedVisible('signin-intercepted-modal', width)
+      ).toBe(false);
+      expect(
+        editorialCardExpectedVisible('desktop-return-handoff', width)
+      ).toBe(false);
+    }
+  );
 
-  it.each(
-    AUTH_LAYOUT_VIEWPORTS
-  )('$name ($width) desktop split route mounts the editorial card behind desktop-only CSS', ({
-    width,
-  }) => {
-    const { container, unmount } = render(
-      <AuthLayout formTitle='Sign In' layoutVariant='split'>
-        <div>Auth form body</div>
-      </AuthLayout>
-    );
+  it.each(AUTH_LAYOUT_VIEWPORTS)(
+    '$name ($width) desktop split route mounts the editorial card behind desktop-only CSS',
+    ({ width }) => {
+      const { container, unmount } = render(
+        <AuthLayout formTitle='Sign In' layoutVariant='split'>
+          <div>Auth form body</div>
+        </AuthLayout>
+      );
 
-    const shell = container.querySelector('[data-auth-shell]');
-    const editorial = screen.getByTestId(AUTH_EDITORIAL_CARD_TEST_ID);
-    const wrapper = container.querySelector(
-      `[data-auth-editorial-card='desktop-only']`
-    );
+      const shell = container.querySelector('[data-auth-shell]');
+      const editorial = screen.getByTestId(AUTH_EDITORIAL_CARD_TEST_ID);
+      const wrapper = container.querySelector(
+        `[data-auth-editorial-card='desktop-only']`
+      );
 
-    expect(shell).toHaveAttribute(
-      'data-auth-shell-kind',
-      AUTH_SHELL_KIND.desktopSplitRoute
-    );
-    expect(shell).toHaveAttribute('data-auth-layout-variant', 'split');
-    expect(wrapper).toHaveClass(AUTH_DESKTOP_ONLY_CLASS);
-    expect(editorial).toBeInTheDocument();
-    expect(editorialCardVisibleFromCss(productionCssInspection, width)).toBe(
-      width >= AUTH_SPLIT_MIN_WIDTH_PX
-    );
+      expect(shell).toHaveAttribute(
+        'data-auth-shell-kind',
+        AUTH_SHELL_KIND.desktopSplitRoute
+      );
+      expect(shell).toHaveAttribute('data-auth-layout-variant', 'split');
+      expect(wrapper).toHaveClass(AUTH_DESKTOP_ONLY_CLASS);
+      expect(editorial).toBeInTheDocument();
+      expect(editorialCardVisibleFromCss(productionCssInspection, width)).toBe(
+        width >= AUTH_SPLIT_MIN_WIDTH_PX
+      );
 
-    unmount();
-  });
+      unmount();
+    }
+  );
 
-  it.each(
-    AUTH_LAYOUT_VIEWPORTS
-  )('$name ($width) intercepted modal never mounts the editorial card or a fallback split shell', ({
-    width,
-  }) => {
-    const { container, unmount } = render(
-      <AuthModalShell ariaLabel='Sign in to Jovie'>
-        <div>Modal auth form</div>
-      </AuthModalShell>
-    );
+  it.each(AUTH_LAYOUT_VIEWPORTS)(
+    '$name ($width) intercepted modal never mounts the editorial card or a fallback split shell',
+    ({ width }) => {
+      const { container, unmount } = render(
+        <AuthModalShell ariaLabel='Sign in to Jovie'>
+          <div>Modal auth form</div>
+        </AuthModalShell>
+      );
 
-    expect(container.querySelector('[data-auth-modal-shell]')).toHaveAttribute(
-      'data-auth-shell-kind',
-      AUTH_SHELL_KIND.interceptedModal
-    );
-    expect(
-      container.querySelector('[data-auth-layout-variant]')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId(AUTH_EDITORIAL_CARD_TEST_ID)
-    ).not.toBeInTheDocument();
-    expect(
-      container.querySelector('[data-auth-editorial-card]')
-    ).not.toBeInTheDocument();
-    expect(
-      editorialCardExpectedVisible('signin-intercepted-modal', width)
-    ).toBe(false);
+      expect(
+        container.querySelector('[data-auth-modal-shell]')
+      ).toHaveAttribute(
+        'data-auth-shell-kind',
+        AUTH_SHELL_KIND.interceptedModal
+      );
+      expect(
+        container.querySelector('[data-auth-layout-variant]')
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(AUTH_EDITORIAL_CARD_TEST_ID)
+      ).not.toBeInTheDocument();
+      expect(
+        container.querySelector('[data-auth-editorial-card]')
+      ).not.toBeInTheDocument();
+      expect(
+        editorialCardExpectedVisible('signin-intercepted-modal', width)
+      ).toBe(false);
 
-    unmount();
-  });
+      unmount();
+    }
+  );
 
-  it.each(
-    AUTH_LAYOUT_VIEWPORTS
-  )('$name ($width) desktop-return handoff never mounts the editorial card or a fallback auth shell', ({
-    width,
-  }) => {
-    const { container, unmount } = render(<DesktopAuthRouteHandoff />);
+  it.each(AUTH_LAYOUT_VIEWPORTS)(
+    '$name ($width) desktop-return handoff never mounts the editorial card or a fallback auth shell',
+    ({ width }) => {
+      const { container, unmount } = render(<DesktopAuthRouteHandoff />);
 
-    const handoff = screen.getByTestId('desktop-auth-route-handoff');
-    expect(handoff).toHaveAttribute(
-      'data-auth-shell-kind',
-      AUTH_SHELL_KIND.desktopReturnHandoff
-    );
-    expect(
-      container.querySelector('[data-auth-shell]')
-    ).not.toBeInTheDocument();
-    expect(
-      container.querySelector('[data-auth-modal-shell]')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId(AUTH_EDITORIAL_CARD_TEST_ID)
-    ).not.toBeInTheDocument();
-    expect(editorialCardExpectedVisible('desktop-return-handoff', width)).toBe(
-      false
-    );
+      const handoff = screen.getByTestId('desktop-auth-route-handoff');
+      expect(handoff).toHaveAttribute(
+        'data-auth-shell-kind',
+        AUTH_SHELL_KIND.desktopReturnHandoff
+      );
+      expect(
+        container.querySelector('[data-auth-shell]')
+      ).not.toBeInTheDocument();
+      expect(
+        container.querySelector('[data-auth-modal-shell]')
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(AUTH_EDITORIAL_CARD_TEST_ID)
+      ).not.toBeInTheDocument();
+      expect(
+        editorialCardExpectedVisible('desktop-return-handoff', width)
+      ).toBe(false);
 
-    unmount();
-  });
+      unmount();
+    }
+  );
 
   it('does not mount the editorial card on splash-B stack chrome', () => {
     const { container } = render(

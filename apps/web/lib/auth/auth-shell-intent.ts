@@ -45,7 +45,10 @@ export function normalizeAuthClaimHandle(
   value: string | null | undefined
 ): string | undefined {
   const handle = value?.trim().replace(/^@/, '').toLowerCase() ?? '';
-  if (handle.length < USERNAME_MIN_LENGTH || handle.length > USERNAME_MAX_LENGTH) {
+  if (
+    handle.length < USERNAME_MIN_LENGTH ||
+    handle.length > USERNAME_MAX_LENGTH
+  ) {
     return undefined;
   }
   return USERNAME_PATTERN.test(handle) ? handle : undefined;

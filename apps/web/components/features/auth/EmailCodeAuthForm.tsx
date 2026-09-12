@@ -13,8 +13,8 @@ import {
   AUTH_EMAIL_INVALID_ERROR,
   AUTH_EMAIL_SEND_LABEL,
   AUTH_EMAIL_SENDING_LABEL,
-  isAuthEmailAddress,
   type AuthShellMode,
+  isAuthEmailAddress,
 } from '@/lib/auth/auth-shell-intent';
 import { authClient } from '@/lib/auth/client';
 import { AUTH_CLASSES } from '@/lib/auth/constants';

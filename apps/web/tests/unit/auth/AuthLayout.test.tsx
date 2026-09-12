@@ -252,9 +252,11 @@ describe('AuthLayout', () => {
       </AuthLayout>
     );
 
-    expect(container.querySelector('[data-auth-form-column]')?.className).toContain(
-      '[&_[data-auth-shell-identity]]:hidden'
-    );
-    expect(screen.getByRole('button', { name: 'Send sign-in code' })).toBeVisible();
+    expect(
+      container.querySelector('[data-auth-form-column]')?.className
+    ).toContain('[&_[data-auth-shell-identity]]:hidden');
+    expect(
+      screen.getByRole('button', { name: 'Send sign-in code' })
+    ).toBeVisible();
   });
 });
