@@ -179,20 +179,19 @@ describe('AuthModalShell', () => {
     expect(document.documentElement.style.overscrollBehavior).toBe('');
   });
 
-  it.each([
-    '',
-    '   ',
-    '\t\n',
-  ])('falls back to "Back to homepage" when backButtonLabel is whitespace-only (%j)', emptyish => {
-    // Guards the render-time fallback added in c9ae3ce. An empty or
-    // whitespace-only aria-label would otherwise leave the button
-    // unlabeled for assistive tech.
-    render(
-      <AuthModalShell backButtonLabel={emptyish}>
-        <div>body</div>
-      </AuthModalShell>
-    );
+  it.each(['', '   ', '\t\n'])(
+    'falls back to "Back to homepage" when backButtonLabel is whitespace-only (%j)',
+    emptyish => {
+      // Guards the render-time fallback added in c9ae3ce. An empty or
+      // whitespace-only aria-label would otherwise leave the button
+      // unlabeled for assistive tech.
+      render(
+        <AuthModalShell backButtonLabel={emptyish}>
+          <div>body</div>
+        </AuthModalShell>
+      );
 
-    expect(screen.getByLabelText('Back to homepage')).toBeInTheDocument();
-  });
+      expect(screen.getByLabelText('Back to homepage')).toBeInTheDocument();
+    }
+  );
 });

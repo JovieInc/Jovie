@@ -73,13 +73,18 @@ describe('AuthProviderButtonSlots', () => {
         <AuthProviderButtonSlot disabled={false} provider='google' />
       </>
     );
-    for (const name of ['Continue with Apple', 'Continue with Google'] as const) {
+    for (const name of [
+      'Continue with Apple',
+      'Continue with Google',
+    ] as const) {
       const className = screen.getByRole('button', { name }).className;
       expect(className).toContain('h-7');
       expect(className).toContain('before:h-11');
       expect(className).toContain('bg-transparent');
     }
-    expect(container.querySelector('[data-auth-google-icon="full-color"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-auth-google-icon="full-color"]')
+    ).not.toBeNull();
     expect(container.querySelector('path[fill="#4285F4"]')).not.toBeNull();
   });
 });

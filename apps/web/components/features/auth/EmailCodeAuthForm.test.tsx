@@ -177,11 +177,17 @@ describe('EmailCodeAuthForm', () => {
 
   it('validates email on submit without disabling the send button', async () => {
     renderForm();
-    const form = screen.getByLabelText(/email/i).closest('form') as HTMLFormElement;
-    expect(screen.getByRole('button', { name: /send sign-in code/i })).toBeEnabled();
+    const form = screen
+      .getByLabelText(/email/i)
+      .closest('form') as HTMLFormElement;
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeEnabled();
     fireEvent.submit(form);
     expect(await screen.findByText(/enter your email address/i)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'x' } });
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'x' },
+    });
     fireEvent.submit(form);
     expect(await screen.findByText(/doesn.t look right/i)).toBeTruthy();
     expect(sendVerificationOtp).not.toHaveBeenCalled();
@@ -191,7 +197,9 @@ describe('EmailCodeAuthForm', () => {
     renderForm();
     await reachCodeStep();
     expect(screen.getByText(/artist@example.com/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /change email/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /change email/i })
+    ).toBeInTheDocument();
     expect(screen.getByText(/resend in 30s/i)).toBeInTheDocument();
   });
 

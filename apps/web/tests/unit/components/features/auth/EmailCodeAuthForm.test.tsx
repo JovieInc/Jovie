@@ -100,10 +100,7 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
         screen.getByRole('button', { name: /send sign-in code/i })
       );
@@ -127,10 +124,7 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
         screen.getByRole('button', { name: /send sign-in code/i })
       );
@@ -147,10 +141,7 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
         screen.getByRole('button', { name: /send sign-in code/i })
       );
@@ -167,10 +158,7 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
         screen.getByRole('button', { name: /send sign-in code/i })
       );
