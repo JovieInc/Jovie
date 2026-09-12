@@ -103,7 +103,7 @@ export function getSidebarNavRowClassName({
     getToneClassName({ active, nested, tone }),
     calm &&
       !collapsed &&
-      'h-9 rounded-lg grid-cols-[15px_minmax(0,1fr)] gap-x-2.5 text-[13px] border border-transparent after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
+      'h-9 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-2.5 text-(length:--text-app) border border-transparent after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
     calm && active && 'border-subtle font-semibold',
     className
   );
@@ -131,7 +131,7 @@ export function getSidebarNavIconClassName({
       : active && tone !== 'secondary'
         ? 'text-accent-teal!'
         : inactiveIconColor,
-    calm && 'size-[15px]',
+    calm && 'size-(--app-shell-sidebar-icon-size)',
     className
   );
 }

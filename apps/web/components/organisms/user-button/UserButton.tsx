@@ -580,13 +580,15 @@ export function UserButton({
             title={displayName}
             className={cn(
               'truncate text-sidebar-item-foreground',
-              calm ? 'text-[11px] font-semibold' : 'text-app font-normal'
+              calm
+                ? 'text-(length:--text-2xs) font-semibold'
+                : 'text-app font-normal'
             )}
           >
             {displayName}
           </p>
           {calm ? (
-            <p className='truncate text-[10px] text-sidebar-muted/50'>
+            <p className='truncate text-(length:--text-3xs) text-sidebar-muted/50'>
               Jovie workspace
             </p>
           ) : null}

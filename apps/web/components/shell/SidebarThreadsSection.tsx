@@ -209,7 +209,8 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       trailingOverlay: Boolean(onThreadContextMenu),
     }),
     'text-left',
-    calm && 'h-9 grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg text-[12.5px]',
+    calm &&
+      'h-9 grid-cols-(--app-shell-sidebar-history-grid) gap-2 rounded-lg text-(length:--app-shell-sidebar-history-font-size)',
     active ? undefined : unread ? 'text-primary-token' : 'text-secondary-token'
   );
   const rowContent = (
@@ -234,7 +235,9 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
           // fade (with the WebKit property for every supported shell) makes
           // truncation read as intentional rather than a hard crop.
           'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
-          calm ? 'text-[12.5px]' : 'text-xs',
+          calm
+            ? 'text-(length:--app-shell-sidebar-history-font-size)'
+            : 'text-xs',
           unread && 'font-medium'
         )}
       >
@@ -244,7 +247,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         <time
           aria-hidden='true'
           dateTime={thread.updatedAt}
-          className='shrink-0 text-[11px] text-tertiary-token'
+          className='shrink-0 text-(length:--text-2xs) text-tertiary-token'
         >
           {formatSidebarThreadTime(thread.updatedAt)}
         </time>
@@ -375,7 +378,7 @@ export function SidebarThreadsSection({
         <span
           className={
             calm
-              ? 'text-[10px] font-bold tracking-widest text-sidebar-muted'
+              ? 'text-(length:--text-3xs) font-bold tracking-widest text-sidebar-muted'
               : 'text-xs font-caption tracking-normal text-sidebar-muted/90'
           }
         >
@@ -491,7 +494,7 @@ export function SidebarThreadsSection({
               new Date(t.updatedAt).toDateString() !== today &&
               new Date(visible[index - 1].updatedAt).toDateString() ===
                 today ? (
-                <div className='px-2.5 pb-2 pt-6 text-[10px] font-bold tracking-widest text-sidebar-muted'>
+                <div className='px-2.5 pb-2 pt-6 text-(length:--text-3xs) font-bold tracking-widest text-sidebar-muted'>
                   EARLIER
                 </div>
               ) : null}
@@ -516,7 +519,9 @@ export function SidebarThreadsSection({
                 active: allThreadsActive,
                 tight,
               }),
-              calm ? 'mt-3 h-9 flex justify-end text-[12.5px]' : 'text-left'
+              calm
+                ? 'mt-3 h-9 flex justify-end text-(length:--app-shell-sidebar-history-font-size)'
+                : 'text-left'
             )}
           >
             <Icon

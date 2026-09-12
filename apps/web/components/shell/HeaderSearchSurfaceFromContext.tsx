@@ -53,7 +53,8 @@ export function HeaderSearchSurfaceFromContext({
       className={cn(
         getSidebarNavRowClassName({}),
         'grid-cols-[18px_minmax(0,1fr)_auto] text-left',
-        calm && 'h-9 min-w-0 flex-1 rounded-full pl-3.5 pr-0 text-[13px]',
+        calm &&
+          'h-9 min-w-0 flex-1 rounded-full pl-3.5 pr-0 text-(length:--text-app)',
         className
       )}
       aria-label='Search Jovie'
