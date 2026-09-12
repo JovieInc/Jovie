@@ -12,10 +12,12 @@ Linear leases.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import fcntl
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -87,6 +89,28 @@ SEVERE_REASONS = {
 }
 DEFAULT_GEM_CONCURRENCY = 4
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
+# JOV-5913: production-unbound is a deploy hold only (deploymentsAllowed stays
+# False). Unbound-repair concurrency follows live Grok/Kimi OAuth seats, never
+# Codex account state: an exhausted Codex pool must not serialize the fallback
+# lanes (symphony-concurrency-autoscale-v1 / prod-unbound-is-deploy-hold-v1).
+FALLBACK_SEAT_SCHEMA = "gem-fallback-seats/v1"
+FALLBACK_SEAT_PROVIDERS = ("grok", "kimi")
+# One live OAuth seat safely runs four workers on Gem (16c/62GB), matching the
+# historical DEFAULT_GROK_MAX worker budget. Codex-exhausted.py no longer
+# pins a provider ceiling; this budget is local to unbound-repair admission.
+FALLBACK_SEAT_WORKER_BUDGET = 4
+UNBOUND_REPAIR_MIN_CONCURRENCY = 1
+# Same incident-only receipt ceiling as fleet_admission_receipt.py.
+UNBOUND_REPAIR_MAX_CONCURRENCY = 40
+DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS = 20.0
+MAX_FALLBACK_PROBE_TIMEOUT_SECONDS = 30.0
+# Keep in sync with model-router.py QUOTA_RE.
+FALLBACK_QUOTA_RE = re.compile(
+    r"(429|402|rate.?limit|quota|usage (limit|exceeded|cap)|too many requests|"
+    r"insufficient (credit|quota)|weekly usage|limit reached|can only afford|"
+    r"max_tokens)",
+    re.I,
+)
 CONTROL_PLANE_PREFIXES = (
     "canon/",
     "scripts/backlog-orchestrator/",
@@ -659,6 +683,246 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
     return {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
 
 
+def _fallback_probe_timeout() -> float:
+    try:
+        value = float(
+            os.environ.get(
+                "GEM_FALLBACK_PROBE_TIMEOUT_SECONDS",
+                DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS,
+            )
+        )
+    except (TypeError, ValueError):
+        return DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS
+    if value <= 0:
+        return DEFAULT_FALLBACK_PROBE_TIMEOUT_SECONDS
+    return min(value, MAX_FALLBACK_PROBE_TIMEOUT_SECONDS)
+
+
+def _fallback_registry_path(configured: Path | None) -> Path | None:
+    env_value = os.environ.get("GEM_MODEL_REGISTRY")
+    explicit = configured or (Path(env_value).expanduser() if env_value else None)
+    if explicit is not None:
+        return explicit if explicit.is_file() else None
+    script_dir = Path(__file__).resolve().parent
+    candidates = [
+        script_dir / "config" / "model-registry.json",
+        script_dir / "model-registry.json",
+        # Installed Symphony fallback bundle on the Gem host.
+        Path.home()
+        / ".local/bin/.symphony-codex-auth-fallback/current/model-registry.json",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _resolve_seat_executable(model: dict[str, Any]) -> str | None:
+    candidates: list[str] = []
+    env_key = model.get("executable_env")
+    if isinstance(env_key, str) and env_key:
+        explicit = os.environ.get(env_key)
+        if explicit:
+            candidates.append(explicit)
+    if model.get("provider") == "grok":
+        alias = os.environ.get("GEM_GROK_BIN")
+        if alias:
+            candidates.append(alias)
+        home = Path.home()
+        candidates.extend([str(home / ".local/bin/grok"), str(home / ".grok/bin/grok")])
+    default = model.get("executable_default")
+    if isinstance(default, str) and default:
+        candidates.append(default)
+    for candidate in candidates:
+        expanded = Path(candidate).expanduser()
+        resolved = (
+            str(expanded) if expanded.is_absolute() else shutil.which(candidate)
+        )
+        if resolved and os.access(resolved, os.X_OK):
+            return resolved
+    return None
+
+
+def _probe_fallback_seat(model: dict[str, Any], timeout: float) -> tuple[bool, str]:
+    """Prove one fallback OAuth seat with the registry's own probe definition."""
+    executable = _resolve_seat_executable(model)
+    if executable is None:
+        return False, "executable-missing"
+    argv_template = model.get("probe_argv")
+    if (
+        not isinstance(argv_template, list)
+        or not argv_template
+        or not all(isinstance(part, str) for part in argv_template)
+    ):
+        return False, "probe-undefined"
+    argv = [
+        part.format(executable=executable, model=model["model"])
+        for part in argv_template
+    ]
+    try:
+        result = subprocess.run(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False, "probe-failed"
+    raw = (result.stdout or b"") + b"\n" + (result.stderr or b"")
+    output = raw.decode(errors="replace")
+    lowered = output.lower()
+    forbidden = [
+        pattern.lower()
+        for pattern in (model.get("probe_forbidden_patterns") or [])
+        if isinstance(pattern, str) and pattern
+    ]
+    if any(pattern in lowered for pattern in forbidden):
+        return False, "auth-or-runtime-failed"
+    if FALLBACK_QUOTA_RE.search(output):
+        return False, "pool-quota-exhausted"
+    if model.get("probe_mode") == "json-model-key":
+        try:
+            payload = json.loads(result.stdout.decode(errors="replace"))
+        except (ValueError, UnicodeDecodeError):
+            return False, "probe-invalid-json"
+        models = payload.get("models") if isinstance(payload, dict) else None
+        if result.returncode != 0 or not isinstance(models, dict) or model["model"] not in models:
+            return False, "model-unlisted"
+        return True, "ready"
+    if result.returncode != 0:
+        return False, "probe-failed"
+    if model.get("provider") == "grok" and model["model"] not in output:
+        return False, "model-unlisted"
+    return True, "ready"
+
+
+def _unavailable_fallback_seats(reason: str) -> dict[str, Any]:
+    return {
+        "schema": FALLBACK_SEAT_SCHEMA,
+        "availableSeats": 0,
+        "providers": {},
+        "reason": reason,
+    }
+
+
+def observe_fallback_seats(
+    now: datetime, registry_path: Path | None = None
+) -> dict[str, Any]:
+    """Count live Grok/Kimi OAuth seats from the model registry probes.
+
+    Observation only: a missing registry, an unresolvable executable, or a
+    failed probe degrades the seat to unavailable and the receipt falls back
+    to the fail-closed floor. Codex account state is never consulted, so a
+    Codex outage cannot shrink fallback repair capacity.
+    """
+    path = _fallback_registry_path(registry_path)
+    if path is None:
+        return _unavailable_fallback_seats("model-registry-missing")
+    try:
+        registry = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return _unavailable_fallback_seats("model-registry-malformed")
+    models = registry.get("models") if isinstance(registry, dict) else None
+    if not isinstance(models, list):
+        return _unavailable_fallback_seats("model-registry-malformed")
+    selected: dict[str, dict[str, Any]] = {}
+    for model in models:
+        provider = model.get("provider") if isinstance(model, dict) else None
+        if (
+            provider in FALLBACK_SEAT_PROVIDERS
+            and provider not in selected
+            and isinstance(model.get("model"), str)
+        ):
+            selected[provider] = model
+    missing = [name for name in FALLBACK_SEAT_PROVIDERS if name not in selected]
+    if missing:
+        return _unavailable_fallback_seats(
+            f"fallback-providers-missing:{','.join(missing)}"
+        )
+    timeout = _fallback_probe_timeout()
+    providers: dict[str, dict[str, Any]] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(selected)) as pool:
+        futures = {
+            pool.submit(_probe_fallback_seat, model, timeout): name
+            for name, model in selected.items()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            name = futures[future]
+            try:
+                available, reason = future.result()
+            except Exception:
+                available, reason = False, "probe-error"
+            providers[name] = {"available": available, "reason": reason}
+    return {
+        "schema": FALLBACK_SEAT_SCHEMA,
+        "observedAt": isoformat(now),
+        "providers": providers,
+        "availableSeats": sum(
+            1 for entry in providers.values() if entry["available"]
+        ),
+    }
+
+
+def normalize_fallback_seats(value: object) -> dict[str, Any]:
+    """Fail-closed normalization of the fallback seat signal."""
+    if not isinstance(value, dict) or value.get("schema") != FALLBACK_SEAT_SCHEMA:
+        return _unavailable_fallback_seats("fallback-seat-evidence-unavailable")
+    providers = value.get("providers")
+    if not isinstance(providers, dict):
+        return _unavailable_fallback_seats("fallback-seat-evidence-malformed")
+    normalized: dict[str, dict[str, Any]] = {}
+    for name in FALLBACK_SEAT_PROVIDERS:
+        entry = providers.get(name)
+        if not isinstance(entry, dict) or not isinstance(entry.get("available"), bool):
+            return _unavailable_fallback_seats("fallback-seat-evidence-malformed")
+        normalized[name] = {
+            "available": entry["available"],
+            "reason": str(entry.get("reason") or "unknown"),
+        }
+    result: dict[str, Any] = {
+        "schema": FALLBACK_SEAT_SCHEMA,
+        "providers": normalized,
+        "availableSeats": sum(
+            1 for entry in normalized.values() if entry["available"]
+        ),
+    }
+    observed_at = value.get("observedAt")
+    if isinstance(observed_at, str) and observed_at:
+        result["observedAt"] = observed_at
+    return result
+
+
+def unbound_repair_concurrency(seats: dict[str, Any]) -> int:
+    """Seat-derived unbound-repair concurrency.
+
+    Missing or malformed seat evidence fails closed to the floor. Host
+    pressure is enforced separately at the worker launch layer, so this
+    admission never re-introduces a Codex-exhaustion cap on Grok/Kimi.
+    """
+    available = seats.get("availableSeats")
+    if not isinstance(available, int) or isinstance(available, bool) or available < 0:
+        return UNBOUND_REPAIR_MIN_CONCURRENCY
+    derived = available * FALLBACK_SEAT_WORKER_BUDGET
+    return max(
+        UNBOUND_REPAIR_MIN_CONCURRENCY,
+        min(UNBOUND_REPAIR_MAX_CONCURRENCY, derived),
+    )
+
+
+def unbound_repair_slots(seats: dict[str, Any], gem_concurrency: int) -> int:
+    """Prefer live Grok/Kimi OAuth seats; else useful-turn scale; else 1."""
+    if seats.get("schema") == FALLBACK_SEAT_SCHEMA and seats.get("reason") is None:
+        return unbound_repair_concurrency(seats)
+    if (
+        isinstance(gem_concurrency, int)
+        and not isinstance(gem_concurrency, bool)
+        and gem_concurrency >= 1
+    ):
+        return min(gem_concurrency, UNBOUND_REPAIR_MAX_CONCURRENCY)
+    return UNBOUND_REPAIR_MIN_CONCURRENCY
+
+
 def validate_independent_review(
     receipt: object, expected_head_sha: object, now: datetime
 ) -> dict[str, Any]:
@@ -1200,11 +1464,13 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "reason": capacity_reason,
         "acceptedEvidence": capacity_proofs,
     }
+    fallback_seats = normalize_fallback_seats(signals.get("fallbackSeats"))
     normalized_signals = {
         **signals,
         "closureHealth": closure_health,
         "productClosureHealth": product_closures,
         "concurrencyEvidence": concurrency_evidence,
+        "fallbackSeats": fallback_seats,
     }
     review = validate_independent_review(
         signals.get("independentReview"),
@@ -1370,7 +1636,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     capacity_fresh = capacity_fresh and gem_concurrency == measured_target
     remediation_concurrency = gem_concurrency
-    unbound_repair_concurrency = min(gem_concurrency, 40)
+    # JOV-5913: live Grok/Kimi OAuth seats scale unbound repair. Useful-turn
+    # proofs remain the gem dispatch authority and a fallback scale when seat
+    # evidence is missing. Codex exhaustion cannot cap this lane.
+    unbound_repair_max_concurrent = unbound_repair_slots(
+        fallback_seats, gem_concurrency
+    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1433,8 +1704,6 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and controller.get("status") == "green"
         and production_unbound
         and review_allowed
-        and capacity_fresh
-        and gem_concurrency >= 1
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
     )
@@ -1608,7 +1877,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": unbound_repair_concurrency if unbound_repair_allowed else 0,
+            # Seat-derived when live Grok/Kimi OAuth evidence exists; never 1
+            # by fiat and never reduced by Codex exhaustion. Deployments stay
+            # forbidden: unbound is a deploy hold, not a repair blocker.
+            "maxConcurrent": (
+                unbound_repair_max_concurrent if unbound_repair_allowed else 0
+            ),
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },
@@ -2006,6 +2280,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--integrity-receipt", type=Path)
     parser.add_argument("--concurrency-evidence", type=Path)
     parser.add_argument("--independent-review-receipt", type=Path)
+    parser.add_argument("--model-registry", type=Path)
     return parser.parse_args()
 
 
@@ -2051,6 +2326,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             now,
         ),
         "concurrencyEvidence": concurrency,
+        "fallbackSeats": observe_fallback_seats(
+            now, registry_path=getattr(args, "model_registry", None)
+        ),
         "independentReview": refresh_independent_review_receipt(
             review_path, main, now
         ),
