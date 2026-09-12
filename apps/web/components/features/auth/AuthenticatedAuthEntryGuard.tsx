@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/auth/AuthenticatedAuthEntryGuard.test.tsx
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
