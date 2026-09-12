@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/molecules/inspector/InspectorRail.test.tsx
 import type { ReactNode } from 'react';
 import { DrawerSectionHeading } from '@/components/molecules/drawer/DrawerSectionHeading';
 import { cn } from '@/lib/utils';

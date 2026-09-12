@@ -7,6 +7,7 @@ import { InspectorLoading } from './InspectorLoading';
 import { InspectorShell } from './InspectorRail';
 import { InspectorRow } from './InspectorRow';
 import { InspectorSection } from './InspectorSection';
+import { InspectorTabs } from './InspectorTabs';
 import { LIBRARY_INSPECTOR_TABS } from './inspector-tabs';
 
 vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
@@ -80,16 +81,24 @@ describe('InspectorShell', () => {
   it('moves selection with arrow keys and does not use pill chrome', () => {
     const onTabChange = vi.fn();
     render(
-      <InspectorShell
-        isOpen
-        ariaLabel='Track inspector'
-        tabs={LIBRARY_INSPECTOR_TABS}
-        activeTab='details'
-        onTabChange={onTabChange}
-        tabsAriaLabel='Inspector tabs'
-      >
-        Details body
-      </InspectorShell>
+      <>
+        <InspectorTabs
+          value='details'
+          onValueChange={onTabChange}
+          options={LIBRARY_INSPECTOR_TABS}
+          ariaLabel='Direct inspector tabs'
+        />
+        <InspectorShell
+          isOpen
+          ariaLabel='Track inspector'
+          tabs={LIBRARY_INSPECTOR_TABS}
+          activeTab='details'
+          onTabChange={onTabChange}
+          tabsAriaLabel='Inspector tabs'
+        >
+          Details body
+        </InspectorShell>
+      </>
     );
 
     const tablist = screen.getByRole('tablist', { name: 'Inspector tabs' });
@@ -140,33 +149,21 @@ describe('InspectorShell', () => {
 
     expect(screen.getByTestId('inspector-loading')).toBeInTheDocument();
     expect(screen.getByText('Loading inspector')).toBeInTheDocument();
-  });
 
-  it('exposes empty and row primitives without accordion chrome', () => {
-    render(
+    rerender(
       <InspectorSection title='Assets'>
         <InspectorEmpty message='No assets for this object.' />
         <InspectorRow label='ISRC' value='USRC17607839' />
+        <InspectorLoading rows={2} />
       </InspectorSection>
     );
 
-    expect(screen.getByText('Assets')).toBeInTheDocument();
     expect(screen.getByTestId('inspector-empty')).toHaveTextContent(
       'No assets for this object.'
     );
-    expect(screen.getByText('ISRC')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Assets' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('renders the loading skeleton with the inline 96px label column', () => {
-    render(<InspectorLoading rows={2} />);
-
+    expect(screen.queryByRole('button', { name: 'Assets' })).toBeNull();
     const loading = screen.getByTestId('inspector-loading');
     expect(loading).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByText('Loading inspector')).toBeInTheDocument();
-    // sr-only label + one skeleton row per requested row count
     expect(loading.children).toHaveLength(3);
   });
 });

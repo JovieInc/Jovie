@@ -4,12 +4,7 @@ import { InspectorEmpty } from './InspectorEmpty';
 const meta = {
   title: 'Molecules/Inspector/InspectorEmpty',
   component: InspectorEmpty,
-  parameters: {
-    layout: 'centered',
-  },
-  args: {
-    message: 'No assets for this object.',
-  },
+  args: { message: 'No assets for this object.' },
 } satisfies Meta<typeof InspectorEmpty>;
 
 export default meta;

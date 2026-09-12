@@ -5,9 +5,6 @@ import { LIBRARY_INSPECTOR_TABS } from './inspector-tabs';
 const meta = {
   title: 'Molecules/Inspector/InspectorTabs',
   component: InspectorTabs,
-  parameters: {
-    layout: 'centered',
-  },
   args: {
     value: 'details' as const,
     onValueChange: () => undefined,
@@ -15,13 +12,6 @@ const meta = {
     ariaLabel: 'Inspector tabs',
     panelId: 'inspector-tab-panel',
   },
-  decorators: [
-    Story => (
-      <div className='w-80'>
-        <Story />
-      </div>
-    ),
-  ],
 } satisfies Meta<typeof InspectorTabs>;
 
 export default meta;

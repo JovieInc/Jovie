@@ -4,12 +4,7 @@ import { InspectorLoading } from './InspectorLoading';
 const meta = {
   title: 'Molecules/Inspector/InspectorLoading',
   component: InspectorLoading,
-  parameters: {
-    layout: 'centered',
-  },
-  args: {
-    rows: 4,
-  },
+  args: { rows: 4 },
 } satisfies Meta<typeof InspectorLoading>;
 
 export default meta;
