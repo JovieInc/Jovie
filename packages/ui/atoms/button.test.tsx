@@ -4,7 +4,13 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
-import { BUTTON_PEN_CONTRACT } from './button-contract';
+import {
+  ACTION_BUTTON_LABEL_WEIGHT,
+  ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+  ACTION_BUTTON_RADIUS_PX,
+  ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+  BUTTON_PEN_CONTRACT,
+} from './button-contract';
 
 describe('Button', () => {
   afterEach(() => {
@@ -166,6 +172,29 @@ describe('Button', () => {
     expect(btn.className).toContain('min-h-7');
   });
 
+  it('locks the ActionButton contract while allowing native text growth', () => {
+    const source = readFileSync(path.join(process.cwd(), 'atoms/button.tsx'), {
+      encoding: 'utf8',
+    });
+
+    expect(ACTION_BUTTON_VISIBLE_HEIGHT_PX).toBe(28);
+    expect(ACTION_BUTTON_MOBILE_HIT_TARGET_PX).toBe(44);
+    expect(ACTION_BUTTON_LABEL_WEIGHT).toBe(510);
+    expect(ACTION_BUTTON_RADIUS_PX).toBe(999);
+    expect(source).toContain('[font-weight:var(--font-weight-medium)]');
+    expect(source).toContain('rounded-full');
+    const textContract = source.match(
+      /const TEXT_BUTTON_CLASSES =\s*'([^']+)'/
+    )?.[1];
+    expect(textContract).toBeTruthy();
+    expect(textContract).toContain('h-auto');
+    expect(textContract).toContain('min-h-7');
+    expect(textContract).toContain('before:h-full');
+    expect(textContract).toContain('before:min-h-11');
+    expect(textContract).toContain('before:min-w-11');
+    expect(textContract).not.toMatch(/\bh-8\b|\bmin-h-8\b/);
+  });
+
   it('keeps the marketing text contract at 28px visible inside a 44px target', () => {
     render(
       <Button variant='primary' size='marketing'>
@@ -182,7 +211,9 @@ describe('Button', () => {
     expect(btn.className).toContain('before:min-h-11');
     expect(btn.className).toContain('before:min-w-11');
     expect(btn.className).toContain('before:w-full');
+    expect(btn.className).toContain('rounded-full');
     expect(btn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+    expect(btn.className).not.toMatch(/(?:^|\s)h-8(?:\s|$)/);
   });
 
   it('makes every text size an equivalent control for primary and secondary', () => {

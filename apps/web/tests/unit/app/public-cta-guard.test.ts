@@ -171,6 +171,9 @@ describe('public CTA guard', () => {
       "<MarketingSignInLink variant='ghost' label={minimalLabel} />"
     );
     expect(headerNav).toContain('focus-ring-themed shrink-0 whitespace-nowrap');
+    expect(headerNav).toContain('max-w-public-content lg:px-0');
+    expect(headerNav).not.toContain('max-w-linear-content');
+    expect(headerNav).not.toContain('linear-content-max');
     expect(headerNav).toContain('function HeaderPrimaryAuthLink');
     expect(headerNav).toContain(
       "cn('focus-ring-themed shrink-0 whitespace-nowrap', className)"
