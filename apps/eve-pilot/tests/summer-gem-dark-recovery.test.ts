@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  gemDarkAdmissionContext,
-  persistCursorRecoveryOutbox,
-  runGemDarkRecoveryCycle,
-  type GemDarkRecoveryDependencies,
-} from '../agent/lib/summer-gem-dark-recovery';
 import type {
   SummerBottleneckRecord,
   SummerBottleneckStore,
 } from '../agent/lib/summer-bottleneck-loop';
+import {
+  type GemDarkRecoveryDependencies,
+  gemDarkAdmissionContext,
+  persistCursorRecoveryOutbox,
+  runGemDarkRecoveryCycle,
+} from '../agent/lib/summer-gem-dark-recovery';
 
 function memoryStore(): SummerBottleneckStore & {
   readonly records: Map<string, SummerBottleneckRecord>;

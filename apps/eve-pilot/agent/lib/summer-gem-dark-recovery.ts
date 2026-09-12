@@ -9,12 +9,12 @@
 import {
   buildCursorRecoveryOutbox,
   buildGemDarkExerciseReport,
-  createIsolatedRecoveryJob,
-  disposeGemDarkRecovery,
-  requestCursorIsolatedRecovery,
   type CursorRecoveryOutboxRecord,
   type CursorRecoveryReceipt,
+  createIsolatedRecoveryJob,
+  disposeGemDarkRecovery,
   type RecoveryAdmissionContext,
+  requestCursorIsolatedRecovery,
 } from './cursor-recovery';
 import type {
   SummerBottleneckRecord,
