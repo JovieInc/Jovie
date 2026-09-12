@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ACQUISITION_CERTIFICATION_COMMAND,
   CERTIFICATION_KERNEL_COMMAND,
   DESKTOP_RELEASE_COVERAGE_COMMAND,
   LANE_COMMANDS,
@@ -215,6 +216,38 @@ describe('ci-fast bounded parallel workflow', () => {
         input: 'apps/web/lib/agent-os/certification.ts\n',
       }).status
     ).toBe(0);
+  });
+
+  it('admits acquisition-only and shared CAS edits to measured structural tests', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeDefined();
+    for (const path of [
+      'apps/web/lib/acquisition/certification-store.ts',
+      'apps/web/lib/acquisition/certification-store.test.ts',
+      'apps/web/lib/agent-os/certification-cas.ts',
+      'apps/web/lib/agent-os/certification-adapter.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], { input: `${path}\n` }).status,
+        path
+      ).toBe(0);
+    }
+    expect(LANE_COMMANDS.structural).toContain(
+      ACQUISITION_CERTIFICATION_COMMAND
+    );
+    expect(ACQUISITION_CERTIFICATION_COMMAND).toContain(
+      'lib/acquisition/certification-store.test.ts lib/agent-os/certification-adapter.test.ts'
+    );
+    expect(ACQUISITION_CERTIFICATION_COMMAND).toContain(
+      '--coverage.thresholds.perFile=true'
+    );
+    expect(ACQUISITION_CERTIFICATION_COMMAND).not.toContain(
+      '--passWithNoTests'
+    );
+    const webParts = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const webParts = [')
+    );
+    expect(webParts).toContain('ACQUISITION_CERTIFICATION_COMMAND,');
   });
 
   it('covers every lane exactly once across the explicit hosted groups', () => {
@@ -605,6 +638,8 @@ describe('ci-fast bounded parallel workflow', () => {
         MARKETING_CERTIFICATION_COMMAND +
         ' && ' +
         CERTIFICATION_KERNEL_COMMAND +
+        ' && ' +
+        ACQUISITION_CERTIFICATION_COMMAND +
         ' && ' +
         DESKTOP_RELEASE_COVERAGE_COMMAND,
     });
