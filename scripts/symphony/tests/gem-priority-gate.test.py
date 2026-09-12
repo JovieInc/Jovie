@@ -1020,6 +1020,8 @@ class FallbackSeatPathTests(unittest.TestCase):
         script_dir = pathlib.Path(MODULE.__file__).resolve().parent
         expected = script_dir / "config" / "model-registry.json"
         if expected.is_file():
+            # _fallback_registry_path rebuilds the candidate Path, so equality
+            # (not identity) is the contract when the default registry exists.
             self.assertEqual(found, expected)
         else:
             self.assertIsNone(found)
