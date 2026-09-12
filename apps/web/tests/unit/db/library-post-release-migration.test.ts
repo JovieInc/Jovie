@@ -6,6 +6,10 @@ const postReleaseMigration = join(
   process.cwd(),
   'drizzle/migrations/0098_regular_puff_adder.sql'
 );
+const scopeMigration = join(
+  process.cwd(),
+  'drizzle/migrations/0102_presence_finding_scope.sql'
+);
 const snapshot = join(
   process.cwd(),
   'drizzle/migrations/meta/0098_snapshot.json'
@@ -34,6 +38,28 @@ describe('library post-release private migration', () => {
       snapshotJson.tables['public.promo_downloads'].columns
         .rights_control_attested
     ).toMatchObject({ default: false, notNull: true });
+    // JOV-6170: explicit rendering scope on presence findings.
+    expect(schema).toContain("text('scope_type')");
+    expect(schema).toContain("text('scope_id')");
+    expect(schema).toContain("text('category')");
+  });
+
+  it('adds inspector scope columns without touching seeded rows (JOV-6170)', async () => {
+    const sql = await readFile(scopeMigration, 'utf8');
+    expect(sql).toContain(
+      'ALTER TABLE "library_presence_findings" ADD COLUMN "scope_type" text'
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "library_presence_findings" ADD COLUMN "scope_id" text'
+    );
+    expect(sql).toContain(
+      'ALTER TABLE "library_presence_findings" ADD COLUMN "category" text'
+    );
+    expect(sql).toContain('"library_presence_findings_scope_idx"');
+    // Scope columns are nullable — the seeded queue must keep rendering via
+    // subject fallback, so no backfill, no NOT NULL, no data rewrite.
+    expect(sql).not.toContain('UPDATE ');
+    expect(sql).not.toContain('SET NOT NULL');
   });
 
   it('forces private access and evidence truthfulness for post-release data', async () => {
