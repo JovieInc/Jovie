@@ -2601,6 +2601,8 @@ describe('canary health gate workflow', () => {
     ['environment-stays-wrong', 1, 5],
     ['invalid-json', 1, 1],
     ['untrusted-fields', 1, 1],
+    ['embedded-newline-sha', 1, 1],
+    ['trailing-newline-sha', 1, 1],
     ['html', 1, 1],
     ['redirect', 1, 1],
     ['unauthorized', 22, 1],
@@ -2703,6 +2705,8 @@ case "$url" in
       sha-stays-wrong) sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ;;
       environment-stays-wrong) environment=production ;;
       untrusted-fields) sha='SECRET_SENTINEL'; environment='SECRET_SENTINEL' ;;
+      embedded-newline-sha) sha=$'SECRET_SENTINEL\\n'"$EXPECTED_COMMIT_SHA"$'\\nSECRET_SENTINEL' ;;
+      trailing-newline-sha) sha="$EXPECTED_COMMIT_SHA"$'\\n' ;;
       html) content_type='text/html; SECRET_SENTINEL' ;;
       redirect) status=302 ;;
       unauthorized) status=401; curl_status=22 ;;

@@ -1382,7 +1382,7 @@ jobs:
             # Never print response bodies, arbitrary headers, or unchecked
             # field values. Only canonical SHAs and environment enums escape.
             observed_sha="$(jq -er '
-              .commitSha | select(type == "string") | select(test("^[0-9a-f]{40}$"))
+              .commitSha | select(type == "string") | select(length == 40) | select(test("^[0-9a-f]{40}$"))
             ' "$build_info_path" 2>/dev/null)" || observed_sha=invalid
             observed_environment="$(jq -er '
               .environment | select(. == "preview" or . == "production" or . == "development")
