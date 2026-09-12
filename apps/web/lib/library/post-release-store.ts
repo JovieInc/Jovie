@@ -20,15 +20,16 @@ import {
   libraryPostReleaseVariantIdentity,
   parseOptimizationVariantKeys,
 } from './post-release-optimization';
-import type {
-  LibraryPostReleaseBundle,
-  LibraryPresenceFindingView,
+import {
+  type LibraryPostReleaseBundle,
+  type LibraryPresenceFindingView,
+  withInspectorScope,
 } from './post-release-types';
 
 function toFindingView(
   finding: typeof libraryPresenceFindings.$inferSelect
 ): LibraryPresenceFindingView {
-  return {
+  return withInspectorScope({
     id: finding.id,
     subjectType: finding.subjectType,
     subjectId: finding.subjectId,
@@ -42,7 +43,7 @@ function toFindingView(
     status: finding.status,
     collisionDisposition: finding.collisionDisposition,
     draftRequest: finding.draftRequest,
-  };
+  });
 }
 
 function toLibraryEntityType(
