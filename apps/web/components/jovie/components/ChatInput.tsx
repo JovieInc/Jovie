@@ -3,6 +3,7 @@
 // @coverage-via apps/web/tests/unit/chat/ChatInput.test.tsx
 
 import { Button } from '@jovie/ui';
+import { FileAudio2, Paperclip } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   forwardRef,
@@ -12,6 +13,7 @@ import {
   useId,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -33,6 +35,8 @@ import { cn } from '@/lib/utils';
 import {
   CHAT_COMPOSER_FORM_ARIA_LABEL,
   CHAT_COMPOSER_INPUT_ARIA_LABEL,
+  CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+  CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
 } from '../chat-composer-copy';
 import { CHAT_COMPOSER_MAX_WIDTH } from '../chat-layout';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -206,7 +210,7 @@ function DictationStatusBanner({
         role='alert'
         className='flex items-center justify-between gap-3 px-3 py-2 text-xs text-tertiary-token'
       >
-        <span>{dictationErrorMessage(error)}</span>
+        <span className='min-w-0 flex-1'>{dictationErrorMessage(error)}</span>
         <Button
           type='button'
           variant='ghost'
@@ -259,7 +263,7 @@ function DictationStatusBanner({
         size='sm'
         onClick={onCancel}
         className={DICTATION_BANNER_BUTTON_CLASS}
-        aria-label='Cancel dictation'
+        aria-label='Cancel Dictation'
       >
         Cancel
       </Button>
@@ -317,7 +321,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         setComposerFocused(false);
       };
     }, [setComposerFocused]);
-    const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+    const [pickerFromPlus, setPickerFromPlus] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [isViewportNarrow, setIsViewportNarrow] = useState(false);
     // Stable id for the slash picker listbox; used for textarea ARIA wiring
@@ -427,10 +431,26 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handlePickerClose = useCallback(() => {
       onPickerOpenChange?.(false);
       picker.close();
+      setPickerFromPlus(false);
       // Closing the slash picker can reflow the hero row and blur the textarea.
       // Queue focus after the picker state commit so typing can continue.
       scheduleTextareaRefocus();
     }, [onPickerOpenChange, picker, scheduleTextareaRefocus]);
+
+    const setPlusMenuOpen = useCallback(
+      (open: boolean) => {
+        if (!open) {
+          handlePickerClose();
+          return;
+        }
+        const caret =
+          internalTextareaRef.current?.selectionStart ?? value.length;
+        setPickerFromPlus(true);
+        onPickerOpenChange?.(true);
+        picker.openRoot(caret, '');
+      },
+      [handlePickerClose, onPickerOpenChange, picker, value.length]
+    );
 
     // Slash trigger detection: open root picker when `/` follows a word
     // boundary; switch to entity picker when a skill commit demands it; or
@@ -477,19 +497,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const stripSlashQuery = useCallback((): number => {
       if (picker.state.status === 'closed') return value.length;
       const startIdx = picker.state.startIdx;
+      if (pickerFromPlus) return startIdx;
       const el = internalTextareaRef.current;
       const caret = el?.selectionStart ?? value.length;
       const nextValue = value.slice(0, startIdx) + value.slice(caret);
       onChange(nextValue);
       return startIdx;
-    }, [onChange, picker.state, value]);
+    }, [onChange, picker.state, pickerFromPlus, value]);
 
     const replaceSlashQueryWithToken = useCallback(
       (token: string): number => {
         if (picker.state.status === 'closed') return value.length;
         const startIdx = picker.state.startIdx;
         const el = internalTextareaRef.current;
-        const caret = el?.selectionStart ?? value.length;
+        const caret = pickerFromPlus
+          ? startIdx
+          : (el?.selectionStart ?? value.length);
         const before = value.slice(0, startIdx);
         const after = value.slice(caret);
         const leadingSpace =
@@ -505,7 +528,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         }, 0);
         return nextCaret;
       },
-      [onChange, picker.state, value]
+      [onChange, picker.state, pickerFromPlus, value]
     );
 
     const handleSelectSkill = useCallback(
@@ -583,6 +606,56 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       },
       [handlePickerClose, onQuickActionSelect, stripSlashQuery]
     );
+
+    const attachmentActions = useMemo<
+      import('./picker-rows').PickerActionItem[]
+    >(() => {
+      if (isFileProcessing) return [];
+      return [
+        ...(onFileAttach
+          ? [
+              {
+                kind: 'action' as const,
+                action: {
+                  id: 'attach-files',
+                  label: 'Attach Files',
+                  description: 'Drop or browse',
+                  icon: Paperclip,
+                  onSelect: () => {
+                    stripSlashQuery();
+                    handlePickerClose();
+                    onFileAttach();
+                  },
+                },
+              },
+            ]
+          : []),
+        ...(onAudioAttach
+          ? [
+              {
+                kind: 'action' as const,
+                action: {
+                  id: 'upload-audio',
+                  label: CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
+                  description: CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+                  icon: FileAudio2,
+                  onSelect: () => {
+                    stripSlashQuery();
+                    handlePickerClose();
+                    onAudioAttach();
+                  },
+                },
+              },
+            ]
+          : []),
+      ];
+    }, [
+      isFileProcessing,
+      onFileAttach,
+      onAudioAttach,
+      stripSlashQuery,
+      handlePickerClose,
+    ]);
 
     const {
       isSupported: isDictationSupported,
@@ -794,11 +867,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Attachment chips render above the composer in ChatComposerSurface;
     // only typed draft text should expand the inline field geometry.
     const hasText = Boolean(value.trim());
-    const isExpanded = plusMenuOpen || isListening || hasText || isFocused;
+    const isExpanded = isPickerOpen || isListening || hasText || isFocused;
     let surfaceMode: SurfaceMode = 'empty';
     if (picker.state.status === 'entity') surfaceMode = 'entity';
     else if (picker.state.status === 'root') surfaceMode = 'root';
-    else if (hasText || plusMenuOpen || isListening) surfaceMode = 'typing';
+    else if (hasText || isPickerOpen || isListening) surfaceMode = 'typing';
 
     const hasInlineContent = Boolean(value.trim()) || hasChips;
     const hasOnlyRootSlashQuery =
@@ -856,12 +929,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       reducedMotion,
       isNearLimit,
       hasAttachButton,
-      onFileAttach,
-      onAudioAttach,
       isFileProcessing,
       isLoading,
       isSubmitting,
-      plusMenuOpen,
+      plusMenuOpen: isPickerOpen,
       setPlusMenuOpen,
       handlePreserveFocus,
       dictationEnabled,
@@ -886,7 +957,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       isRootPickerOpen,
       pickerListId,
       pickerActiveRowId,
-      attachDisabledForPicker: isPickerOpen,
       isHero,
     } satisfies Omit<InputRowProps, 'hasBorderTop'>;
 
@@ -899,37 +969,51 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         <div className={dockClass}>
           {/* ROOT inline picker is absolutely positioned so it does not alter
               the composer surface height and cause layout shift when it opens. */}
-          {showInlinePicker ? (
+          {showInlinePicker || showDictationBanner ? (
             <div
+              data-chat-composer-overlay='true'
               className={cn(
                 reserveInlinePickerSpace
-                  ? 'relative z-[80] flex w-full justify-center'
-                  : 'absolute bottom-full left-0 right-0 z-[80] flex justify-center',
+                  ? 'relative z-[80] flex w-full flex-col items-center gap-2'
+                  : 'absolute bottom-full left-0 right-0 z-[80] flex flex-col items-center gap-2',
                 statusBanner ? 'mb-9' : 'mb-4'
               )}
             >
-              <div
-                style={{
-                  width: geometry.width,
-                  maxWidth: geometry.maxWidth,
-                }}
-                className='system-b-chat-composer-picker-shell isolate max-h-[min(340px,calc(100vh-12rem))] overflow-hidden'
-              >
-                <SlashCommandMenu
-                  profileId={pickerProfileId}
-                  state={picker.state}
-                  onSelectSkill={handleSelectSkill}
-                  onSelectEntity={handleSelectEntity}
-                  onSetSelected={picker.setSelected}
-                  onMoveSelected={picker.moveSelected}
-                  onClose={handlePickerClose}
-                  variant='inline'
-                  listIdProp={pickerListId}
-                  onActiveRowChange={setPickerActiveRowId}
-                  promptActions={quickActions}
-                  onSelectPrompt={handleSelectPromptAction}
-                />
-              </div>
+              {showInlinePicker ? (
+                <div
+                  style={{
+                    width: geometry.width,
+                    maxWidth: geometry.maxWidth,
+                  }}
+                  className='system-b-chat-composer-picker-shell isolate max-h-[min(340px,calc(100vh-12rem))] overflow-hidden'
+                >
+                  <SlashCommandMenu
+                    profileId={pickerProfileId}
+                    state={picker.state}
+                    onSelectSkill={handleSelectSkill}
+                    onSelectEntity={handleSelectEntity}
+                    onSetSelected={picker.setSelected}
+                    onMoveSelected={picker.moveSelected}
+                    onClose={handlePickerClose}
+                    variant='inline'
+                    listIdProp={pickerListId}
+                    onActiveRowChange={setPickerActiveRowId}
+                    attachmentActions={attachmentActions}
+                    onQueryChange={pickerFromPlus ? picker.setQuery : undefined}
+                    promptActions={quickActions}
+                    onSelectPrompt={handleSelectPromptAction}
+                  />
+                </div>
+              ) : null}
+              {showDictationBanner && hasDictationAffordance ? (
+                <div
+                  data-testid='dictation-status-overlay'
+                  style={{ width: geometry.width, maxWidth: geometry.maxWidth }}
+                  className='rounded-lg border border-subtle bg-surface-elevated shadow-sm'
+                >
+                  {dictationBanner}
+                </div>
+              ) : null}
             </div>
           ) : null}
           <motion.div
@@ -973,6 +1057,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     onSetSelected={picker.setSelected}
                     onMoveSelected={picker.moveSelected}
                     onClose={handlePickerClose}
+                    onQueryChange={pickerFromPlus ? picker.setQuery : undefined}
                     variant='rail'
                     listIdProp={pickerListId}
                     onActiveRowChange={setPickerActiveRowId}
@@ -992,25 +1077,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {statusBanner}
                     </div>
                   ) : null}
-                  {/* Grid accordion reserves height while animating dictation
-                      banner in/out — avoids the ~64px jump (JOV-11948). */}
-                  {hasDictationAffordance ? (
-                    <div
-                      className={cn(
-                        'grid transition-[grid-template-rows] duration-subtle ease-in-out',
-                        showDictationBanner
-                          ? 'grid-rows-[1fr]'
-                          : 'grid-rows-[0fr]'
-                      )}
-                      aria-hidden={!showDictationBanner}
-                    >
-                      <div className='overflow-hidden'>
-                        <div className='system-b-chat-composer-seam border-t'>
-                          {dictationBanner}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
+
                   <div className='system-b-chat-composer-seam border-t'>
                     <InputRow {...inputRowProps} />
                   </div>
@@ -1030,6 +1097,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         onSetSelected={picker.setSelected}
                         onMoveSelected={picker.moveSelected}
                         onClose={handlePickerClose}
+                        onQueryChange={
+                          pickerFromPlus ? picker.setQuery : undefined
+                        }
                         variant='rail'
                         listIdProp={pickerListId}
                         onActiveRowChange={setPickerActiveRowId}
@@ -1046,26 +1116,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 {statusBanner ? (
                   <div className='system-b-chat-composer-seam border-b'>
                     {statusBanner}
-                  </div>
-                ) : null}
-
-                {/* Grid accordion reserves height while animating dictation
-                    banner in/out — avoids the ~64px jump (JOV-11948). */}
-                {hasDictationAffordance ? (
-                  <div
-                    className={cn(
-                      'grid transition-[grid-template-rows] duration-subtle ease-in-out',
-                      showDictationBanner
-                        ? 'grid-rows-[1fr]'
-                        : 'grid-rows-[0fr]'
-                    )}
-                    aria-hidden={!showDictationBanner}
-                  >
-                    <div className='overflow-hidden'>
-                      <div className='system-b-chat-composer-seam border-b'>
-                        {dictationBanner}
-                      </div>
-                    </div>
                   </div>
                 ) : null}
 
@@ -1118,8 +1168,6 @@ interface InputRowProps {
   readonly reducedMotion: boolean | null;
   readonly isNearLimit: boolean;
   readonly hasAttachButton: boolean;
-  readonly onFileAttach?: () => void;
-  readonly onAudioAttach?: () => void;
   readonly isFileProcessing: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
@@ -1156,8 +1204,6 @@ interface InputRowProps {
   readonly pickerListId: string;
   /** Active row id for `aria-activedescendant`; null when no row is active. */
   readonly pickerActiveRowId: string | null;
-  /** Disable the attach dropdown trigger while the picker owns the keyboard. */
-  readonly attachDisabledForPicker: boolean;
   readonly isHero: boolean;
 }
 
@@ -1175,8 +1221,6 @@ function InputRow({
   reducedMotion,
   isNearLimit,
   hasAttachButton,
-  onFileAttach,
-  onAudioAttach,
   isFileProcessing,
   isLoading,
   isSubmitting,
@@ -1206,7 +1250,6 @@ function InputRow({
   isRootPickerOpen,
   pickerListId,
   pickerActiveRowId,
-  attachDisabledForPicker,
   isHero,
 }: InputRowProps) {
   const hasInlineContent = Boolean(value.trim()) || (chips?.length ?? 0) > 0;
@@ -1236,12 +1279,9 @@ function InputRow({
         {useHeroPill && hasAttachButton ? (
           <ComposerAttachButton
             isFileProcessing={isFileProcessing}
-            disabled={attachDisabledForPicker}
             plusMenuOpen={plusMenuOpen}
             onOpenChange={setPlusMenuOpen}
             onMouseDown={handlePreserveFocus}
-            onFileAttach={onFileAttach ?? (() => undefined)}
-            onAudioAttach={onAudioAttach}
           />
         ) : null}
         <div
@@ -1324,12 +1364,9 @@ function InputRow({
             {!useHeroPill && hasAttachButton ? (
               <ComposerAttachButton
                 isFileProcessing={isFileProcessing}
-                disabled={attachDisabledForPicker}
                 plusMenuOpen={plusMenuOpen}
                 onOpenChange={setPlusMenuOpen}
                 onMouseDown={handlePreserveFocus}
-                onFileAttach={onFileAttach ?? (() => undefined)}
-                onAudioAttach={onAudioAttach}
               />
             ) : null}
           </div>
