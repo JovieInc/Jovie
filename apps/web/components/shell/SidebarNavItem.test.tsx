@@ -55,6 +55,34 @@ describe('SidebarNavItem active chrome', () => {
     expect(label.className).toContain('text-clip');
     expect(label.className).toContain('justify-self-stretch');
     expect(label.className).not.toContain('justify-self-start');
-    expect(label.className).toContain('mask-image:linear-gradient');
+    // JOV-6181: even long labels no longer fade on these rows — truncation
+    // stays handled by overflow clipping alone.
+    expect(label.className).not.toContain('mask-image');
+  });
+
+  // JOV-6181 regression: these rows have no trailing overlay, so the old
+  // unconditional terminal mask-image fade sheared the trailing glyph on the
+  // compact w-fit New Chat primary pill ("Chat" rendered as "Cha").
+  it('never applies a terminal fade to the New Chat primary pill label', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+
+    render(
+      <SidebarNavItem
+        item={{ icon: TestIcon, label: 'New Chat' }}
+        collapsed={false}
+      />
+    );
+
+    const label = screen.getByText('New Chat');
+    expect(label.className).not.toContain('mask-image');
+    expect(label.className).toContain('overflow-hidden');
+    expect(label.className).toContain('text-clip');
+  });
+
+  it('keeps primary-tone create rows on the compact w-fit grid', () => {
+    const row = getSidebarNavRowClassName({ tone: 'primary' });
+
+    expect(row).toContain('w-fit');
+    expect(row).not.toContain('w-full');
   });
 });
