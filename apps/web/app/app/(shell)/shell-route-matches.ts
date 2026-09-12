@@ -135,8 +135,14 @@ export function isInsightsShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isHudShellRoute(pathname: string | null): boolean {
+  return matchesExactRoute(pathname, APP_ROUTES.HUD);
+}
+
 export function isAdminShellRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.ADMIN);
+  return (
+    matchesRoutePrefix(pathname, APP_ROUTES.ADMIN) || isHudShellRoute(pathname)
+  );
 }
 
 export function isProfileShellRoute(pathname: string | null): boolean {
@@ -178,7 +184,9 @@ export function isCalendarShellRoute(pathname: string | null): boolean {
 }
 
 export function isOvShellRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.OV);
+  return (
+    matchesRoutePrefix(pathname, APP_ROUTES.OV) || isHudShellRoute(pathname)
+  );
 }
 
 function isDashboardSubRoute(pathname: string | null): boolean {

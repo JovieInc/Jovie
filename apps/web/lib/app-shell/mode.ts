@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import type { AppShellMode } from '@/types/app-shell';
 
 /**
@@ -7,12 +8,21 @@ import type { AppShellMode } from '@/types/app-shell';
  */
 export const APP_SHELL_MODE_HEADER = 'x-jovie-app-shell-mode';
 
+export function isOvieAppShellPathname(
+  pathname: string | null | undefined
+): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.HUD ||
+    pathname === APP_ROUTES.OV ||
+    pathname.startsWith(`${APP_ROUTES.OV}/`)
+  );
+}
+
 export function resolveAppShellModeFromPathname(
   pathname: string | null | undefined
 ): AppShellMode {
-  return pathname === '/app/ov' || pathname?.startsWith('/app/ov/')
-    ? 'ov'
-    : 'customer';
+  return isOvieAppShellPathname(pathname) ? 'ov' : 'customer';
 }
 
 export function parseTrustedAppShellMode(

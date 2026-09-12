@@ -203,6 +203,8 @@ describe('/hud page auth', () => {
     expect(dashboardElement?.props?.density).toBe('shell');
     expect(dashboardElement?.props?.presentationMode).toBe('shell');
     expect(getFounderFunnelDataMock).toHaveBeenCalledWith('30d');
+    expect(findElementByName(result, 'StandaloneProductPage')).toBeNull();
+    expect(findElementByName(result, 'AdminPage')).not.toBeNull();
   });
 
   it('uses kiosk density for fullscreen on the same HudDashboardClient', async () => {
@@ -228,6 +230,11 @@ describe('/hud page auth', () => {
     expect(dashboardElement?.props?.density).toBe('kiosk');
     expect(dashboardElement?.props?.presentationMode).toBe('shell');
     expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
+    expect(findElementByName(result, 'AdminPage')).toBeNull();
+    expect(findElementByName(result, 'StandaloneProductPage')).toBeNull();
+    expect(
+      findElementByName(result, 'HudFullscreenControl')?.props?.action
+    ).toBe('exit');
   });
 
   it('renders the three-metric Mac HUD instead of the seven-band dashboard', async () => {

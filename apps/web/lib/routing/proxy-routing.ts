@@ -209,6 +209,7 @@ export function categorizePath(pathname: string): PathCategory {
     pathname === APP_ROUTES.AUTH_NATIVE_RETURN ||
     pathname === APP_ROUTES.AUTH_IOS_COMPLETE;
   const isStartPath = pathname === APP_ROUTES.START;
+  const isHudPath = matchesRoute(pathname, APP_ROUTES.HUD);
 
   const isProtectedPath =
     isAppShellPath ||
@@ -227,7 +228,8 @@ export function categorizePath(pathname: string): PathCategory {
     isNativeAuthCompletePath ||
     isOnboardingPath ||
     isStartPath ||
-    isWaitlistPath;
+    isWaitlistPath ||
+    isHudPath;
 
   const publicProfileCandidate = getPublicProfileCandidate(pathname);
 
