@@ -1,13 +1,13 @@
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
+import { coordinateLinearWork } from '@/lib/ovie/linear-coordination';
+import { createLiveLinearCoordinationDeps } from '@/lib/ovie/linear-coordination-live';
 import {
   commitOperationalMemory,
   isOperationalMemoryKind,
   type OperationalMemoryRecord,
 } from '@/lib/ovie/operational-memory';
-import { coordinateLinearWork } from '@/lib/ovie/linear-coordination';
-import { createLiveLinearCoordinationDeps } from '@/lib/ovie/linear-coordination-live';
 import { initiativeAckView } from '@/lib/ovie/persist';
 import { getPage, putPage, searchPages } from '@/lib/wiki/gbrain-client';
 import { CreateWorkflowCaptureRequestSchema } from '@/lib/workflow-capture/contract';
@@ -131,12 +131,7 @@ function toolInputSchema(name: OvieMcpToolName): Record<string, unknown> {
         body: { type: 'string', minLength: 1, maxLength: 20000 },
         kind: {
           type: 'string',
-          enum: [
-            'observed',
-            'inference',
-            'proposal',
-            'approved-decision',
-          ],
+          enum: ['observed', 'inference', 'proposal', 'approved-decision'],
         },
         source_refs: {
           type: 'array',
@@ -561,7 +556,6 @@ async function getGbrainPage(args: Record<string, unknown>) {
   const page = await getPage(slug);
   return { slug, write: false, found: Boolean(page), page };
 }
-
 
 async function coordinateLinearWorkTool(args: Record<string, unknown>) {
   const actionRaw = stringOpt(args.action);

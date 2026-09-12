@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 import {
   assertOperationalMemorySlugAllowed,
   buildOperationalMemoryRecord,
@@ -6,7 +7,6 @@ import {
   OPERATIONAL_MEMORY_SLUG_PREFIX,
   OperationalMemoryDeniedError,
 } from '@/lib/ovie/operational-memory';
-import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 
 describe('Summer operational memory (E2/E5)', () => {
   it('builds a provenance-complete ops/summer record', () => {
@@ -73,9 +73,9 @@ describe('Summer operational memory (E2/E5)', () => {
     );
     expect(written.status).toBe('written');
     if (written.status === 'written') {
-      expect(written.gbrainSlug.startsWith(OPERATIONAL_MEMORY_SLUG_PREFIX)).toBe(
-        true
-      );
+      expect(
+        written.gbrainSlug.startsWith(OPERATIONAL_MEMORY_SLUG_PREFIX)
+      ).toBe(true);
     }
 
     const buffered = await commitOperationalMemory(

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 import {
   coordinateLinearWork,
   LINEAR_COORDINATION_SCHEMA,
   type LinearCoordinationDeps,
 } from '@/lib/ovie/linear-coordination';
-import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 
 function depsWith(
   overrides: Partial<LinearCoordinationDeps> = {}

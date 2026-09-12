@@ -8,9 +8,9 @@
 
 import {
   type ExecutionJob,
+  NoCertifiedRouteError,
   type RouteCandidate,
   type RouteReceipt,
-  NoCertifiedRouteError,
   routeByExpectedCost,
 } from './governor-route';
 

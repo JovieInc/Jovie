@@ -26,11 +26,18 @@ function run(label, command, args, options = {}) {
     console.error(`FAIL: ${label}`);
     process.exit(result.status ?? 1);
   }
-  if (options.requirePassed && !/\b(Test Files|PASS).*passed\b/i.test(combined) && !/\bTests\s+\d+\s+passed\b/i.test(combined)) {
+  if (
+    options.requirePassed &&
+    !/\b(Test Files|PASS).*passed\b/i.test(combined) &&
+    !/\bTests\s+\d+\s+passed\b/i.test(combined)
+  ) {
     console.error(`FAIL: ${label} (no passing vitest summary)`);
     process.exit(1);
   }
-  if (options.forbidNoMatch && /No projects matched the filters/i.test(combined)) {
+  if (
+    options.forbidNoMatch &&
+    /No projects matched the filters/i.test(combined)
+  ) {
     console.error(`FAIL: ${label} (package filter matched nothing)`);
     process.exit(1);
   }
@@ -71,7 +78,6 @@ run(
   ],
   { requirePassed: true, forbidNoMatch: true }
 );
-
 
 run(
   'E5 linear coordination',

@@ -16,8 +16,7 @@ export const OPERATIONAL_MEMORY_KINDS = [
   'approved-decision',
 ] as const;
 
-export type OperationalMemoryKind =
-  (typeof OPERATIONAL_MEMORY_KINDS)[number];
+export type OperationalMemoryKind = (typeof OPERATIONAL_MEMORY_KINDS)[number];
 
 export const OPERATIONAL_MEMORY_SLUG_PREFIX = 'ops/summer/' as const;
 
@@ -107,8 +106,7 @@ export function isDeniedOperationalMemorySlug(slug: string): boolean {
   const normalized = slug.trim().toLowerCase();
   return DENIED_SLUG_PREFIXES.some(
     prefix =>
-      normalized === prefix.replace(/\/$/, '') ||
-      normalized.startsWith(prefix)
+      normalized === prefix.replace(/\/$/, '') || normalized.startsWith(prefix)
   );
 }
 
@@ -149,13 +147,7 @@ export function buildOperationalMemoryRecord(
   const title = input.title.trim();
   const body = input.body.trim();
 
-  if (
-    sourceRefs.length === 0 ||
-    !observedAt ||
-    !author ||
-    !title ||
-    !body
-  ) {
+  if (sourceRefs.length === 0 || !observedAt || !author || !title || !body) {
     throw new OperationalMemoryDeniedError(
       'missing-provenance',
       'sourceRefs, observedAt, author, title, and body are required'

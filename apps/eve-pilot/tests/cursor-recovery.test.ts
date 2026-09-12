@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   assertRecoveryAdmission,
   buildGemDarkExerciseReport,
-  createIsolatedRecoveryJob,
   CURSOR_CLOUD_RECOVERY_ROUTE,
+  createIsolatedRecoveryJob,
   disposeGemDarkRecovery,
   launchCursorRecoveryAgent,
   RecoveryAdmissionDeniedError,
@@ -66,7 +66,9 @@ describe('Summer Cursor recovery lane (E3/E4)', () => {
     const report = buildGemDarkExerciseReport({ disposition });
     expect(report.permissionSelfExpansionDenied).toBe(true);
     expect(report.isolatedRecoveryAdmitted).toBe(false);
-    expect(report.remainingHumanDecision).toMatch(/Blocked|authorize|restore Gem/i);
+    expect(report.remainingHumanDecision).toMatch(
+      /Blocked|authorize|restore Gem/i
+    );
   });
 
   it('does not duplicate uncertain live jobs (E4)', () => {
