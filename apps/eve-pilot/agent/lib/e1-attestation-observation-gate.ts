@@ -22,7 +22,8 @@ function governedDispatchOutcomeForAttestation(
   const probe = evaluateRunnerSourceAttestation(receipt, nowMs);
   if (probe.status === 'fresh') return 'symphony-route';
   // No receipt configured → hold (mirrors unknown-fail-closed; no Cursor spend).
-  if (probe.status === 'unavailable' && probe.reason === 'missing') return 'hold';
+  if (probe.status === 'unavailable' && probe.reason === 'missing')
+    return 'hold';
   // Present but unusable/stale → Cursor recovery lane (never Gem).
   return 'cursor-recovery-request';
 }
@@ -67,7 +68,6 @@ export type E1ObservationGateResult =
       readonly remainingHumanDecision: string;
       readonly reason: string;
     };
-
 
 export function verdictForObservation(
   receipt: unknown,
