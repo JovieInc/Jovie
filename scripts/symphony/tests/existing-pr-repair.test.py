@@ -315,8 +315,24 @@ class RepairTests(unittest.TestCase):
 
     def test_native_guard_preflight_preserves_tombstone_and_terminal_fences(self):
         state_dir = self.tmp / "guard"
-        normalized = {"identifier": IDENT, "state": "In Review", "updatedAt": REVISION, "updatedAtEpoch": 100.0}
-        with mock.patch.dict(os.environ, {"SYMPHONY_LEASE_GUARD_STATE_DIR": str(state_dir)}), \
+        workflow = self.tmp / "WORKFLOW.md"
+        workflow.write_text(
+            "---\n"
+            "tracker:\n"
+            "  provider:\n"
+            "    team_key: \"JOV\"\n"
+            "  active_states:\n"
+            "    - Todo\n"
+            "    - In Progress\n"
+            "    - Rework\n"
+            "    - Merging\n"
+            "  terminal_states:\n"
+            "    - Done\n"
+            "---\n"
+            "prompt\n"
+        )
+        normalized = {"identifier": IDENT, "teamKey": "JOV", "state": "In Review", "updatedAt": REVISION, "updatedAtEpoch": 100.0}
+        with mock.patch.dict(os.environ, {"SYMPHONY_LEASE_GUARD_STATE_DIR": str(state_dir), "SYMPHONY_WORKFLOW_PATH": str(workflow)}), \
              mock.patch.object(guard, "_fetch_issue", return_value=normalized), \
              mock.patch.object(guard, "_active_states", return_value=frozenset({"todo", "in review"})), \
              mock.patch.object(guard, "_existing_repair_preflight", return_value=True):

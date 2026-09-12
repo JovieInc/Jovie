@@ -1,8 +1,15 @@
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
+import { coordinateLinearWork } from '@/lib/ovie/linear-coordination';
+import { createLiveLinearCoordinationDeps } from '@/lib/ovie/linear-coordination-live';
+import {
+  commitOperationalMemory,
+  isOperationalMemoryKind,
+  type OperationalMemoryRecord,
+} from '@/lib/ovie/operational-memory';
 import { initiativeAckView } from '@/lib/ovie/persist';
-import { getPage, searchPages } from '@/lib/wiki/gbrain-client';
+import { getPage, putPage, searchPages } from '@/lib/wiki/gbrain-client';
 import { CreateWorkflowCaptureRequestSchema } from '@/lib/workflow-capture/contract';
 import {
   createWorkflowCaptureRequest,
@@ -101,6 +108,75 @@ function toolInputSchema(name: OvieMcpToolName): Record<string, unknown> {
       },
     };
   }
+  if (name === 'record_operational_memory') {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'slug',
+        'title',
+        'body',
+        'kind',
+        'source_refs',
+        'observed_at',
+        'author',
+      ],
+      properties: {
+        slug: {
+          type: 'string',
+          minLength: 1,
+          description: 'Must start with ops/summer/',
+        },
+        title: { type: 'string', minLength: 1, maxLength: 200 },
+        body: { type: 'string', minLength: 1, maxLength: 20000 },
+        kind: {
+          type: 'string',
+          enum: ['observed', 'inference', 'proposal', 'approved-decision'],
+        },
+        source_refs: {
+          type: 'array',
+          minItems: 1,
+          items: { type: 'string', minLength: 1 },
+        },
+        observed_at: { type: 'string', minLength: 1 },
+        author: { type: 'string', minLength: 1 },
+        supersedes: { type: 'string', minLength: 1 },
+      },
+    };
+  }
+  if (name === 'coordinate_linear_work') {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'action',
+        'title',
+        'body',
+        'team_id',
+        'founder_intent_ref',
+        'source_refs',
+        'author',
+      ],
+      properties: {
+        action: { type: 'string', enum: ['create', 'update'] },
+        title: { type: 'string', minLength: 1, maxLength: 200 },
+        body: { type: 'string', minLength: 1, maxLength: 20000 },
+        team_id: { type: 'string', minLength: 1 },
+        issue_id: {
+          type: 'string',
+          minLength: 1,
+          description: 'Required when action is update',
+        },
+        founder_intent_ref: { type: 'string', minLength: 1 },
+        source_refs: {
+          type: 'array',
+          minItems: 1,
+          items: { type: 'string', minLength: 1 },
+        },
+        author: { type: 'string', minLength: 1 },
+      },
+    };
+  }
   return { type: 'object', additionalProperties: true };
 }
 
@@ -128,6 +204,10 @@ function toolDescription(name: OvieMcpToolName): string {
       return 'Read-only gbrain search. Does not write memory.';
     case 'get_gbrain_page':
       return 'Read-only gbrain page by slug. Does not write memory.';
+    case 'coordinate_linear_work':
+      return 'Create or update a Linear issue under explicit founder intent, then read it back. Never claims execution completion or delivery acceptance.';
+    case 'record_operational_memory':
+      return 'Append a Summer-owned operational-memory record under ops/summer/* with provenance. Buffers when GBrain is unavailable. Not authority/policy writes, not Linear acceptance, not execution completion.';
   }
 }
 
@@ -144,9 +224,21 @@ export async function callOvieMcpTool(
   if (!authz.ok) return authz;
 
   const turn = bindEveIdentityForTurn(OVIE_MCP_IDENTITY);
-  if (isOvieWriteTool(name)) turn.require('ingest-ack');
+  if (
+    isOvieWriteTool(name) &&
+    name !== 'record_operational_memory' &&
+    name !== 'coordinate_linear_work'
+  ) {
+    turn.require('ingest-ack');
+  }
   if (name === 'search_gbrain' || name === 'get_gbrain_page') {
     turn.require('gbrain-read');
+  }
+  if (name === 'record_operational_memory') {
+    turn.require('operational-gbrain-write');
+  }
+  if (name === 'coordinate_linear_work') {
+    turn.require('linear-coordination-write');
   }
 
   switch (name) {
@@ -178,6 +270,16 @@ export async function callOvieMcpTool(
       return { ok: true, result: await searchGbrain(args) };
     case 'get_gbrain_page':
       return { ok: true, result: await getGbrainPage(args) };
+    case 'record_operational_memory':
+      return {
+        ok: true,
+        result: await recordOperationalMemory(store, args),
+      };
+    case 'coordinate_linear_work':
+      return {
+        ok: true,
+        result: await coordinateLinearWorkTool(args),
+      };
     default:
       return { ok: false, message: `Unknown tool: ${name}` };
   }
@@ -453,4 +555,93 @@ async function getGbrainPage(args: Record<string, unknown>) {
   if (!slug) throw new Error('slug is required');
   const page = await getPage(slug);
   return { slug, write: false, found: Boolean(page), page };
+}
+
+async function coordinateLinearWorkTool(args: Record<string, unknown>) {
+  const actionRaw = stringOpt(args.action);
+  if (actionRaw !== 'create' && actionRaw !== 'update') {
+    throw new Error("action must be 'create' or 'update'");
+  }
+  const result = await coordinateLinearWork(
+    {
+      action: actionRaw,
+      title: stringOpt(args.title) ?? '',
+      body: stringOpt(args.body) ?? '',
+      teamId: stringOpt(args.team_id) ?? '',
+      issueId: stringOpt(args.issue_id),
+      founderIntentRef: stringOpt(args.founder_intent_ref) ?? '',
+      sourceRefs: stringList(args.source_refs) ?? [],
+      author: stringOpt(args.author) ?? '',
+    },
+    createLiveLinearCoordinationDeps()
+  );
+  return {
+    ...result,
+    identities: {
+      knowledgeWrite: false,
+      linearAccepted: result.status === 'ok',
+      executionCompleted: false,
+      deliveryAccepted: false,
+    },
+  };
+}
+
+async function recordOperationalMemory(
+  store: OperatingStore,
+  args: Record<string, unknown>
+) {
+  const kindRaw = stringOpt(args.kind);
+  if (!isOperationalMemoryKind(kindRaw)) {
+    throw new Error(
+      'kind must be observed, inference, proposal, or approved-decision'
+    );
+  }
+  const sourceRefs = stringList(args.source_refs) ?? [];
+  const result = await commitOperationalMemory(
+    {
+      slug: stringOpt(args.slug) ?? '',
+      title: stringOpt(args.title) ?? '',
+      body: stringOpt(args.body) ?? '',
+      kind: kindRaw,
+      sourceRefs,
+      observedAt: stringOpt(args.observed_at) ?? '',
+      author: stringOpt(args.author) ?? '',
+      supersedes: stringOpt(args.supersedes),
+    },
+    {
+      writeGbrainPage: putPage,
+      bufferRecord: async (record: OperationalMemoryRecord) => {
+        const bufferId = newRecordId('dec');
+        await store.putDecision({
+          id: bufferId,
+          kind: 'decision',
+          decided: `[ops-memory-buffered] ${record.title}`,
+          why: JSON.stringify(record),
+          provenance: `buffered:${record.slug}`,
+          constraints: [
+            'not-gbrain-written',
+            'not-linear-acceptance',
+            'not-execution-receipt',
+          ],
+          affected: [record.slug],
+          createdAt: record.createdAt,
+        });
+        return { bufferId };
+      },
+    }
+  );
+
+  if (result.status === 'denied') {
+    throw new Error(`${result.code}: ${result.message}`);
+  }
+
+  return {
+    ...result,
+    identities: {
+      knowledgeWrite:
+        result.status === 'written' || result.status === 'buffered',
+      linearAccepted: false,
+      executionCompleted: false,
+    },
+  };
 }

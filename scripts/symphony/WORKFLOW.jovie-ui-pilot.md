@@ -1,14 +1,12 @@
 ---
 tracker:
   kind: linear
-  project_slug: "team:JOV"
-  required_labels:
-    # This is a derived lease marker, not a manual readiness toll. The
-    # event-driven intake controller writes it only after its deterministic
-    # plan, routing, and admission receipts have been verified. `before_run`
-    # independently re-verifies the routing receipt before an agent can use a
-    # workspace or model slot.
-    - symphony
+  provider:
+    team_key: "JOV"
+    api_key: $LINEAR_API_KEY
+  required_labels: []
+  excluded_labels:
+    - no-symphony
   # Ownership boundary (JOV-4973): Symphony owns implementation only, through
   # a ready-but-held PR and the transition to In Review. Once an issue reaches
   # In Review, its lane must stop and release its slot, so In Review is NOT an active
@@ -19,6 +17,8 @@ tracker:
   active_states:
     - Todo
     - In Progress
+    - Rework
+    - Merging
   terminal_states:
     - Done
     - Canceled
@@ -144,7 +144,7 @@ The `plan-approved`, `admission-approved`, and `symphony` labels are indexes onl
 5. Never merge or deploy manually. A ready PR normally requires fresh `GREEN`. Under the sole production-red/main-green exception, one UI/docs PR may become ready only after `scripts/lib/isolated-ui-docs-policy.mjs evaluate-live` allows its exact current base/head/full diff and required checks. Labels and path-only classification are not eligibility evidence. The canonical native controller rechecks before enrollment; production remains frozen.
 6. By end of turn 2, have either a real non-empty commit on `codex/<issue>-fix` plus a ready-but-held PR, or a `BLOCKER.md` with the exact reason. Do not force-push or use the GitHub Contents API as a transport.
 7. Use default pre-push parallelism and allow the repository gate to finish. If an unrelated test fails after targeted validation, record the exact failure, leave the issue In Progress, and stop without pushing.
-8. Only active machine holds such as `hold`, `blocked`, and `manual-incident` stop execution. Legacy human-review, no-auto, decision, and taste labels are inert. Resolve taste before opening the PR or land disabled behind a feature flag for post-landing certification.
+8. Only active machine holds such as `hold`, `blocked`, `manual-incident`, and `no-symphony` stop execution. Legacy human-review, no-auto, decision, and taste labels are inert. Resolve taste before opening the PR or land disabled behind a feature flag for post-landing certification.
 9. If auth or secrets are unavailable after safe fallbacks, record the blocker without exposing credentials.
 
 ## Linear workpad

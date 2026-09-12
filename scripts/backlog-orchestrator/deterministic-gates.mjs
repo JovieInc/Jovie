@@ -28,6 +28,13 @@ export const TEAM_ROUTES = Object.freeze({
 const PROHIBITED_TEXT =
   /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive|synthetic|bundle|workstream|batch|epic-only/i;
 const MAX_CANDIDATE_AGE_DAYS = 60;
+export const ADMISSION_INTENT_STATES = Object.freeze([
+  'Todo',
+  'In Progress',
+  'Rework',
+  'Merging',
+]);
+const ADMISSION_INTENT_STATE_SET = new Set(ADMISSION_INTENT_STATES);
 
 export function teamRouteForIssue(issue) {
   const key =
@@ -294,8 +301,7 @@ export function selectDeterministicPlanCandidate(
 
 export function admissionIntentLoad(issues) {
   const active = issues.filter(issue => {
-    if (!['Todo', 'In Progress', 'In Review'].includes(issue.state?.name))
-      return false;
+    if (!ADMISSION_INTENT_STATE_SET.has(issue.state?.name)) return false;
     if (hasProtectedAdmissionLabel(issue)) return false;
     return Boolean(admissionGateReceipt(issue));
   });

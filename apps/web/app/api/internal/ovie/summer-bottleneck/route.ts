@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
+import { summerAdmissionsSchema } from '@/lib/ovie/summer-admissions';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
@@ -144,6 +145,7 @@ const unsignedSnapshotSchema = z
           .strict(),
         ciAudit: ciAuditSchema.nullable(),
         productPaths: summerProductPathsSchema.optional(),
+        admissions: summerAdmissionsSchema.optional(),
       })
       .strict(),
   })

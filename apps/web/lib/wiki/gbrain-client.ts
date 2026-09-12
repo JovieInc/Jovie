@@ -132,3 +132,30 @@ export async function searchPages(
   if (!result.ok) return [];
   return result.data;
 }
+
+/**
+ * Narrow upsert for Summer operational-memory pages.
+ * Soft-fails when GBrain is down or rejects the method — callers must buffer.
+ */
+export async function putPage(input: {
+  readonly slug: string;
+  readonly title: string;
+  readonly body: string;
+}): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const slug = input.slug.trim();
+  const title = input.title.trim();
+  const body = input.body.trim();
+  if (!slug || !title || !body) {
+    return { ok: false, reason: 'slug, title, and body are required' };
+  }
+  return mcpCall<unknown>('page/put', {
+    slug,
+    title,
+    content: body,
+    body,
+  }).then(result =>
+    result.ok
+      ? { ok: true as const }
+      : { ok: false as const, reason: result.reason }
+  );
+}

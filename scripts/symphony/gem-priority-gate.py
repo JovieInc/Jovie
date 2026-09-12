@@ -1624,7 +1624,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "deployedSha": production.get("deployedSha")
             if controller_repair_allowed
             else None,
-            "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+            "scope": "github-approved-exact-repository-pr-head-main-path-set",
             "maxConcurrent": 1 if controller_repair_allowed else 0,
             "deploymentsAllowed": False,
             "runtimeActivationAllowed": False,
