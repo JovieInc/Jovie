@@ -9,7 +9,10 @@ export type EvePilotCapability =
   | 'symphony-heal'
   | 'symphony-bounded-dispatch'
   | 'gbrain-read'
-  | 'ingest-ack';
+  | 'ingest-ack'
+  | 'governor-admit'
+  | 'governor-route'
+  | 'governor-enforce';
 
 export type EvePilotPack = {
   readonly id: EvePilotIdentityId;
@@ -19,6 +22,9 @@ export type EvePilotPack = {
   readonly canDispatchBoundedSymphonyRepair: boolean;
   readonly canIngestAck: boolean;
   readonly canReadGbrain: boolean;
+  readonly canGovernorAdmit: boolean;
+  readonly canGovernorRoute: boolean;
+  readonly canGovernorEnforce: boolean;
 };
 
 export class EvePilotCapabilityDeniedError extends Error {
@@ -41,6 +47,9 @@ const JOVIE_PACK: EvePilotPack = {
   canDispatchBoundedSymphonyRepair: false,
   canIngestAck: false,
   canReadGbrain: false,
+  canGovernorAdmit: false,
+  canGovernorRoute: false,
+  canGovernorEnforce: false,
 };
 
 const SUMMER_SHADOW_PACK: EvePilotPack = {
@@ -51,7 +60,25 @@ const SUMMER_SHADOW_PACK: EvePilotPack = {
   canDispatchBoundedSymphonyRepair: true,
   canIngestAck: false,
   canReadGbrain: false,
+  canGovernorAdmit: true,
+  canGovernorRoute: true,
+  canGovernorEnforce: false,
 };
+
+export function summerGovernorEnforceEnabled(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  return environment.SUMMER_GOVERNOR_ENFORCE_ENABLED?.trim() === 'true';
+}
+
+function buildSummerShadowPack(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): EvePilotPack {
+  return {
+    ...SUMMER_SHADOW_PACK,
+    canGovernorEnforce: summerGovernorEnforceEnabled(environment),
+  };
+}
 
 function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
   switch (capability) {
@@ -65,11 +92,21 @@ function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
       return pack.canReadGbrain;
     case 'ingest-ack':
       return pack.canIngestAck;
+    case 'governor-admit':
+      return pack.canGovernorAdmit;
+    case 'governor-route':
+      return pack.canGovernorRoute;
+    case 'governor-enforce':
+      return pack.canGovernorEnforce;
   }
 }
 
-export function bindEvePilotIdentity(id: EvePilotIdentityId) {
-  const pack = id === 'summer' ? SUMMER_SHADOW_PACK : JOVIE_PACK;
+export function bindEvePilotIdentity(
+  id: EvePilotIdentityId,
+  environment: Readonly<Record<string, string | undefined>> = process.env
+) {
+  const pack =
+    id === 'summer' ? buildSummerShadowPack(environment) : JOVIE_PACK;
   const instructionPath = resolve(root, 'identities', id, 'instructions.md');
   const instructions = existsSync(instructionPath)
     ? readFileSync(instructionPath, 'utf8')

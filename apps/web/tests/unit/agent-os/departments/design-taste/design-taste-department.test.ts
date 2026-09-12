@@ -91,7 +91,18 @@ describe('design-taste department', () => {
     if (parsed.success) {
       expect(parsed.data.kind).toBe('design_review');
       expect(parsed.data.metadata.department).toBe('design-taste');
-      expect(parsed.data.humanApprovalRequired).toBe(true);
+      expect(parsed.data.status).toBe('blocked');
+      expect(parsed.data.humanApprovalRequired).toBe(false);
+      expect(parsed.data.humanGate.status).toBe('not_required');
+      expect(parsed.data.verificationGates).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'gstack.review',
+            required: true,
+            status: 'failed',
+          }),
+        ])
+      );
     }
 
     const prComment = await readFile(result.prCommentPath!, 'utf8');

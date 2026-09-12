@@ -126,10 +126,6 @@ const TooltipContent = React.forwardRef<
         )}
         // Accessibility: ensure proper collision avoidance
         avoidCollisions={true}
-        // Pointer safety: prevent tooltip from triggering when cursor passes over it
-        onPointerDownOutside={event => {
-          event.preventDefault();
-        }}
         {...props}
       >
         {children}

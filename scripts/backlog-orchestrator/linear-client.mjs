@@ -5,7 +5,11 @@
  * No SDK — bare fetch with the team's API key env var.
  */
 
+import { createHash, randomUUID } from 'node:crypto';
 import { setDefaultResultOrder } from 'node:dns';
+import * as fs from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 // Gem hosts may have an unreachable IPv6 route while IPv4 reaches Linear.
 // Prefer IPv4 so the bounded fetch/retry policy handles application failures,
@@ -20,6 +24,7 @@ export const LINEAR_MAX_ATTEMPTS = 3;
 export const LINEAR_RETRY_BASE_MS = 100;
 export const LINEAR_MAX_ERROR_BODY_LENGTH = 256;
 export const LINEAR_PAGE_SIZE = 50;
+export const LINEAR_FLEET_CLOSURE_PAGE_SIZE = 250;
 export const LINEAR_MIN_PAGE_SIZE = 6;
 export const LINEAR_MAX_PAGES = 1000;
 // Linear rejects queries whose static complexity exceeds this ceiling with
@@ -97,6 +102,34 @@ export class LinearPaginationError extends Error {
     if (attempts !== undefined) this.attempts = attempts;
     if (resetAt !== undefined) this.resetAt = resetAt;
   }
+}
+
+/**
+ * Recover the active shared-budget deadline through transport/pagination error
+ * wrapping. Only a typed RATE_LIMITED cause authorizes a deferred retry.
+ * @param {unknown} error
+ * @param {number} [nowMs]
+ */
+export function activeLinearCooldown(error, nowMs = Date.now()) {
+  const seen = new Set();
+  let current = error;
+  let rateLimited = false;
+  let resetAt = 0;
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    const record =
+      /** @type {{ code?: string, resetAt?: number, metadata?: { resetAt?: number }, cause?: unknown }} */ (
+        current
+      );
+    if (record.code === 'RATE_LIMITED') rateLimited = true;
+    for (const candidate of [record.resetAt, record.metadata?.resetAt]) {
+      if (typeof candidate === 'number' && Number.isSafeInteger(candidate))
+        resetAt = Math.max(resetAt, candidate);
+    }
+    current = record.cause;
+  }
+  if (!rateLimited || resetAt <= nowMs) return null;
+  return { resetAt, retryAt: new Date(resetAt).toISOString() };
 }
 
 function paginationCoverage({
@@ -335,7 +368,7 @@ const RATE_LIMIT_RESET_HEADERS = [
 /**
  * True only when a 400/429 response body marks the failure as shared-budget
  * exhaustion (GraphQL error extensions code RATELIMITED, with statusCode 429
- * embedded). A bare 429 without that code stays on the generic transient path.
+ * embedded). HTTP 429 is handled before body parsing in the transport.
  * @param {number} status @param {any} data
  */
 function isRateLimitedBody(status, data) {
@@ -411,6 +444,123 @@ export function classifyGraphQLErrors(errors) {
 }
 
 /**
+ * Immutable cooldown records compose by maximum deadline. Separate writers never
+ * overwrite (or shorten) another writer's reset, and a process restart retains
+ * the credential budget. Only hashes and timestamps reach this private store.
+ * A fixed runner should retain this directory; it is not an inventory cache.
+ * @param {string} key @param {string} root
+ */
+function credentialBackoff(key, root) {
+  const scope = createHash('sha256').update(`${API_URL}\0${key}`).digest('hex');
+  const directory = join(root, scope);
+  const stateError = () =>
+    new LinearTransportError(
+      'Linear credential backoff state is unavailable or malformed',
+      {
+        code: 'BACKOFF_STATE_INVALID',
+        attempts: 0,
+        metadata: { retryable: false },
+      }
+    );
+  /** @param {string} path */
+  function privateDirectory(path) {
+    fs.mkdirSync(path, { recursive: true, mode: 0o700 });
+    const stat = fs.lstatSync(path);
+    if (
+      !stat.isDirectory() ||
+      (stat.mode & 0o077) !== 0 ||
+      (process.getuid && stat.uid !== process.getuid())
+    )
+      throw stateError();
+  }
+  /** @param {number} nowMs */
+  function read(nowMs) {
+    try {
+      privateDirectory(root);
+      privateDirectory(directory);
+      const names = fs.readdirSync(directory);
+      if (names.length > 1000) throw stateError();
+      let resetAt = 0;
+      for (const name of names) {
+        // A crashed/in-progress publication is unknown budget state: fail closed.
+        if (name.startsWith('.pending-')) throw stateError();
+        if (!/^\d+-[0-9a-f-]+\.json$/.test(name)) throw stateError();
+        const path = join(directory, name);
+        let record;
+        try {
+          const stat = fs.lstatSync(path);
+          if (
+            !stat.isFile() ||
+            stat.size > 256 ||
+            (stat.mode & 0o077) !== 0 ||
+            (process.getuid && stat.uid !== process.getuid())
+          )
+            throw stateError();
+          record = JSON.parse(fs.readFileSync(path, 'utf8'));
+        } catch (error) {
+          if (/** @type {any} */ (error)?.code === 'ENOENT') continue; // Another reader expired it.
+          throw error;
+        }
+        if (
+          record?.schema !== 1 ||
+          !Number.isSafeInteger(record.resetAt) ||
+          record.resetAt <= 0 ||
+          !name.startsWith(`${record.resetAt}-`)
+        )
+          throw stateError();
+        if (record.resetAt > nowMs) resetAt = Math.max(resetAt, record.resetAt);
+        else {
+          try {
+            fs.unlinkSync(path);
+          } catch (error) {
+            if (/** @type {any} */ (error)?.code !== 'ENOENT') throw error;
+          }
+        }
+      }
+      return resetAt;
+    } catch {
+      throw stateError();
+    }
+  }
+  /** @param {number} resetAt */
+  function publish(resetAt) {
+    const id = randomUUID();
+    const staging = join(directory, `.pending-${id}`);
+    try {
+      if (!Number.isSafeInteger(resetAt) || resetAt <= 0) throw stateError();
+      const fd = fs.openSync(staging, 'wx', 0o600);
+      try {
+        fs.writeFileSync(fd, JSON.stringify({ schema: 1, resetAt }));
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
+      fs.renameSync(staging, join(directory, `${resetAt}-${id}.json`));
+      const dir = fs.openSync(directory, 'r');
+      try {
+        fs.fsyncSync(dir);
+      } finally {
+        fs.closeSync(dir);
+      }
+    } catch {
+      throw stateError();
+    }
+  }
+  return { read, publish };
+}
+
+/** @param {ReturnType<typeof credentialBackoff>} store @param {number} nowMs */
+function enforceBackoff(store, nowMs) {
+  const resetAt = store.read(nowMs);
+  if (resetAt > nowMs)
+    throw new LinearTransportError('Linear credential budget is cooling down', {
+      code: 'RATE_LIMITED',
+      attempts: 0,
+      metadata: { retryable: false, resetAt },
+    });
+}
+
+/**
  * Bounded, retrying GraphQL transport. Only the API key is sent as the
  * normal Linear `Authorization` header; it is never logged or exposed in an
  * error. Retry is bounded to network, malformed responses, 429, and 5xx.
@@ -432,13 +582,18 @@ export async function graphql(
     rateLimitBaseMs = LINEAR_RATE_LIMIT_BASE_MS,
     rateLimitMaxTotalWaitMs = LINEAR_RATE_LIMIT_MAX_TOTAL_WAIT_MS,
     randomImpl = Math.random,
+    nowImpl = Date.now,
+    backoffStateDir = process.env.LINEAR_BACKOFF_STATE_DIR ||
+      join(homedir(), '.local', 'state', 'jovie-linear-backoff'),
   } = {}
 ) {
   const key = requireKey();
+  const backoff = credentialBackoff(key, backoffStateDir);
   let lastError;
   let rateLimitAttempts = 0;
   let rateLimitWaitedMs = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    enforceBackoff(backoff, nowImpl());
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -452,11 +607,20 @@ export async function graphql(
         signal: controller.signal,
       });
       const contentType = resp?.headers?.get?.('content-type') || '';
+      const metadata = responseMetadata(resp, attempt);
+      // HTTP 429 is authoritative even when its body cannot be read or parsed.
+      if (resp?.status === 429) {
+        throw Object.assign(new Error('Linear HTTP error (429)'), {
+          code: 'RATE_LIMITED',
+          rateLimited: true,
+          metadata,
+          ...rateLimitHints(resp, nowImpl()),
+        });
+      }
       const rawBody =
         typeof resp?.text === 'function'
           ? await resp.text()
           : JSON.stringify(await resp.json());
-      const metadata = responseMetadata(resp, attempt);
       if (contentType && !JSON_CONTENT_TYPE.test(contentType)) {
         const error = /** @type {any} */ (
           new Error('Linear response was not JSON')
@@ -493,7 +657,7 @@ export async function graphql(
         error.retryable = rateLimited || RETRYABLE_STATUS.has(resp.status);
         if (rateLimited) {
           error.rateLimited = true;
-          Object.assign(error, rateLimitHints(resp));
+          Object.assign(error, rateLimitHints(resp, nowImpl()));
         }
         throw Object.assign(error, { metadata, body: rawBody });
       }
@@ -529,6 +693,8 @@ export async function graphql(
           err.retryAfterMs ?? 0,
           exponentialMs + jitterMs
         );
+        err.resetAt = Math.ceil(nowImpl() + delayMs);
+        backoff.publish(err.resetAt);
         if (
           rateLimitAttempts >= rateLimitMaxAttempts ||
           delayMs > rateLimitMaxTotalWaitMs - rateLimitWaitedMs
@@ -723,13 +889,54 @@ export async function fetchTeamActiveIssueSnapshot(
 
 /**
  * @param {string} teamId
- * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
+ * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[], initialPageSize?: number }} [options]
  */
 export async function fetchTeamFleetClosureIssueSnapshot(teamId, options = {}) {
-  return fetchTeamActiveIssueSnapshot(teamId, {
-    ...options,
-    stateNames: options.stateNames ?? LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
-  });
+  const {
+    graphqlImpl = graphql,
+    maxPages = LINEAR_MAX_PAGES,
+    stateNames = LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
+    initialPageSize = LINEAR_FLEET_CLOSURE_PAGE_SIZE,
+  } = options;
+  const stateNameFilter = [...stateNames];
+  return collectLinearConnectionPages(
+    async (cursor, pageSize) => {
+      const data = await graphqlImpl(
+        `
+      query($teamId: String!, $cursor: String, $pageSize: Int!, $stateNames: [String!]!) {
+        team(id: $teamId) {
+          issues(
+            first: $pageSize,
+            after: $cursor,
+            filter: { state: { name: { in: $stateNames } } }
+          ) {
+            nodes {
+              id
+              identifier
+              title
+              description
+              state { id name type }
+              attachments(first: 50) {
+                nodes { id title subtitle url sourceType metadata }
+              }
+              relations(first: 50) {
+                nodes { type relatedIssue { id identifier title } }
+              }
+              comments(first: 50) {
+                nodes { id body createdAt }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    `,
+        { teamId, cursor, pageSize, stateNames: stateNameFilter }
+      );
+      return data?.team?.issues;
+    },
+    { maxPages, initialPageSize }
+  );
 }
 
 /** Fetch only the issues while retaining exhaustive snapshot semantics. */

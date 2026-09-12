@@ -7,7 +7,7 @@
  * menu button top-right, streaming platform buttons below.
  */
 
-import { Share2, Sparkles, Users } from 'lucide-react';
+import { Download, Share2, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
@@ -30,6 +30,10 @@ import {
   SmartLinkShell,
 } from '@/features/release/SmartLinkShell';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
+import {
+  formatReleaseArtistLine,
+  formatReleaseArtistLineParts,
+} from '@/lib/discography/formatting';
 import type {
   PreviewSource,
   PreviewVerification,
@@ -73,7 +77,8 @@ interface ReleaseLandingPageProps
       readonly handle: string | null;
       readonly avatarUrl: string | null;
     };
-    readonly featuredArtists?: FeaturedArtist[];
+    readonly primaryArtists?: readonly FeaturedArtist[];
+    readonly featuredArtists?: readonly FeaturedArtist[];
     readonly providers: Provider[];
     readonly credits?: SmartLinkCreditGroup[];
     readonly artworkSizes?: Record<string, string> | null;
@@ -220,12 +225,32 @@ function SmartLinkClaimBanner({
   );
 }
 
+function SmartLinkCreditName({
+  name,
+  handle,
+}: Readonly<{ name: string; handle: string | null }>) {
+  if (handle) {
+    return (
+      <Link
+        href={`/${handle}`}
+        className='text-white/70 transition-colors hover:text-white/90'
+      >
+        {name}
+      </Link>
+    );
+  }
+
+  return <span className='text-white/70'>{name}</span>;
+}
+
 function SmartLinkArtistLine({
   artist,
+  primaryArtists,
   featuredArtists,
 }: Readonly<{
   artist: { name: string; handle: string | null };
-  featuredArtists?: FeaturedArtist[];
+  primaryArtists?: readonly FeaturedArtist[];
+  featuredArtists?: readonly FeaturedArtist[];
 }>) {
   const hasFeatured = featuredArtists && featuredArtists.length > 0;
   const featuredArtistKeyCounts = new Map<string, number>();
@@ -236,48 +261,58 @@ function SmartLinkArtistLine({
     return count === 0 ? base : `${base}-${count + 1}`;
   };
 
-  const primaryName = artist.handle ? (
-    <Link
-      href={`/${artist.handle}`}
-      className='text-white/70 transition-colors hover:text-white/90'
-    >
-      {artist.name}
-    </Link>
-  ) : (
-    <span className='text-white/70'>{artist.name}</span>
+  const bylineArtists =
+    primaryArtists && primaryArtists.length > 0 ? primaryArtists : [artist];
+  const artistByHandle = new Map(
+    bylineArtists.map(entry => [entry.name, entry])
   );
-
-  if (!hasFeatured) {
-    return (
-      <p className='mt-1 text-sm font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
-        {primaryName}
-      </p>
-    );
-  }
+  const bylineParts = formatReleaseArtistLineParts(
+    bylineArtists.map(entry => entry.name)
+  );
+  const bylinePartKeys = new Map<string, number>();
+  const getBylinePartKey = (type: string, value: string) => {
+    const base = `${type}:${value}`;
+    const count = bylinePartKeys.get(base) ?? 0;
+    bylinePartKeys.set(base, count + 1);
+    return count === 0 ? base : `${base}-${count + 1}`;
+  };
 
   return (
-    <p className='mt-1 text-sm font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'>
-      {primaryName}
-      <span className='text-white/40'> feat. </span>
-      {featuredArtists.map((fa, i) => (
-        <span key={getFeaturedArtistKey(fa.name, fa.handle)}>
-          {i > 0 && (
-            <span className='text-white/40'>
-              {i === featuredArtists.length - 1 ? ' & ' : ', '}
+    <p
+      className='mt-1 text-sm font-book [text-shadow:0_1px_8px_rgba(0,0,0,0.3)]'
+      data-testid='smart-link-artist-byline'
+    >
+      {bylineParts.map(part =>
+        part.type === 'element' ? (
+          <SmartLinkCreditName
+            key={getBylinePartKey(part.type, part.value)}
+            name={part.value}
+            handle={artistByHandle.get(part.value)?.handle ?? null}
+          />
+        ) : (
+          <span
+            key={getBylinePartKey(part.type, part.value)}
+            className='text-white/70'
+          >
+            {part.value}
+          </span>
+        )
+      )}
+      {hasFeatured ? (
+        <>
+          <span className='text-white/40'> feat. </span>
+          {featuredArtists.map((fa, i) => (
+            <span key={getFeaturedArtistKey(fa.name, fa.handle)}>
+              {i > 0 && (
+                <span className='text-white/40'>
+                  {i === featuredArtists.length - 1 ? ' & ' : ', '}
+                </span>
+              )}
+              <SmartLinkCreditName name={fa.name} handle={fa.handle} />
             </span>
-          )}
-          {fa.handle ? (
-            <Link
-              href={`/${fa.handle}`}
-              className='text-white/70 transition-colors hover:text-white/90'
-            >
-              {fa.name}
-            </Link>
-          ) : (
-            <span className='text-white/70'>{fa.name}</span>
-          )}
-        </span>
-      ))}
+          ))}
+        </>
+      ) : null}
     </p>
   );
 }
@@ -285,6 +320,7 @@ function SmartLinkArtistLine({
 export function ReleaseLandingPage({
   release,
   artist,
+  primaryArtists,
   featuredArtists,
   providers,
   credits,
@@ -316,13 +352,18 @@ export function ReleaseLandingPage({
   // All providers rendered as a flat list — no canonical/fallback distinction for fans
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
   const hasCredits = credits?.some(group => group.entries.length > 0);
+  const artistByline =
+    formatReleaseArtistLine(
+      (primaryArtists ?? []).map(entry => entry.name),
+      artist.name
+    ) ?? artist.name;
   const shareSlug = tracking?.smartLinkSlug ?? 'release';
   const sharePathname = getReleaseSharePathname(artist.handle, shareSlug);
   const shareContext = useMemo(
     () =>
       createReleaseShareContext({
         artistHandle: artist.handle,
-        artistName: artist.name,
+        artistName: artistByline,
         releaseTitle: release.title,
         artworkUrl: release.artworkUrl,
         shareSlug,
@@ -330,7 +371,7 @@ export function ReleaseLandingPage({
       }),
     [
       artist.handle,
-      artist.name,
+      artistByline,
       release.artworkUrl,
       release.title,
       sharePathname,
@@ -394,6 +435,7 @@ export function ReleaseLandingPage({
             <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
             <SmartLinkArtistLine
               artist={artist}
+              primaryArtists={primaryArtists}
               featuredArtists={featuredArtists}
             />
           </div>
@@ -402,7 +444,7 @@ export function ReleaseLandingPage({
               <SmartLinkAudioPreview
                 contentId={tracking?.contentId ?? release.title}
                 title={release.title}
-                artistName={artist.name}
+                artistName={artistByline}
                 artworkUrl={release.artworkUrl}
                 previewUrl={release.previewUrl ?? null}
                 isrc={release.isrc}
@@ -418,8 +460,8 @@ export function ReleaseLandingPage({
       <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-3'>
         <p className='sr-only'>
           {parentRelease
-            ? `${release.title} by ${artist.name}, from ${parentRelease.title}. Choose a streaming service.`
-            : `${release.title} by ${artist.name}. Choose a streaming service.`}
+            ? `${release.title} by ${artistByline}, from ${parentRelease.title}. Choose a streaming service.`
+            : `${release.title} by ${artistByline}. Choose a streaming service.`}
         </p>
         <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
           {claimBanner && (
@@ -430,16 +472,28 @@ export function ReleaseLandingPage({
           )}
 
           <div className='space-y-2'>
-            {clickableProviders.map(provider => {
+            {clickableProviders.map((provider, index) => {
               const logoConfig = DSP_LOGO_CONFIG[provider.key];
+              const isStreamNow = index === 0;
               return (
                 <SmartLinkProviderButton
                   key={provider.key}
                   href={appendUTMParamsToUrl(provider.url, resolvedUtmParams)}
                   onClick={() => handleProviderClick(provider.key)}
-                  label={logoConfig?.name ?? provider.label}
+                  label={
+                    isStreamNow
+                      ? 'Stream Now'
+                      : (logoConfig?.name ?? provider.label)
+                  }
                   iconPath={logoConfig?.iconPath}
                   iconColor={logoConfig?.color}
+                  ariaLabel={
+                    isStreamNow
+                      ? `Stream Now on ${logoConfig?.name ?? provider.label}`
+                      : undefined
+                  }
+                  providerKey={provider.key}
+                  primary={isStreamNow}
                 />
               );
             })}
@@ -521,6 +575,16 @@ export function ReleaseLandingPage({
               <Users className={SMART_LINK_MENU_ICON_CLASS} />
               Credits
             </button>
+          ) : null}
+          {downloadUrl ? (
+            <Link
+              href={appendUTMParamsToUrl(downloadUrl, resolvedUtmParams)}
+              className={SMART_LINK_MENU_ITEM_CLASS}
+              onClick={() => setMenuOpen(false)}
+            >
+              <Download className={SMART_LINK_MENU_ICON_CLASS} />
+              Download
+            </Link>
           ) : null}
           {soundsUrl ? (
             <Link

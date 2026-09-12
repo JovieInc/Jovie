@@ -63,13 +63,30 @@ describe('intake readiness classifier', () => {
     );
   });
 
-  it('routes explicit human holds as decision-required', () => {
-    for (const label of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ]) {
+  it('ignores legacy human labels and preserves machine incident holds', () => {
+    for (const label of ['needs-human', 'decision-required', 'no-auto']) {
+      const result = classifyIntakeReadiness(
+        issue({ labels: { nodes: [{ name: label }] } })
+      );
+      assert.equal(result.disposition, 'mechanical-ready');
+      assert.equal(result.requiresHumanDecision, false);
+    }
+
+    const founderSteered = classifyIntakeReadiness(
+      issue({
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+        labels: { nodes: [{ name: 'needs:taste' }] },
+      })
+    );
+    assert.equal(founderSteered.disposition, 'mechanical-ready');
+    assert.equal(
+      founderSteered.permittedNextAction,
+      'propose-readiness-receipt'
+    );
+    assert.equal(founderSteered.requiresHumanDecision, false);
+
+    for (const label of ['held', 'manual-incident']) {
       const result = classifyIntakeReadiness(
         issue({ labels: { nodes: [{ name: label }] } })
       );

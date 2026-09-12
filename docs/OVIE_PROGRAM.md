@@ -23,7 +23,7 @@ Machine-checked contract: `apps/web/lib/ovie/program.ts`.
 | **Symphony** | Sole coding orchestrator | A host or persona |
 | **Gem** | Ubuntu execution host | An agent or persona |
 
-Coding provenance names `orchestrator=symphony`, `execution_host=gem`, and the identified worker/run. GitHub's native merge queue remains merge authority. Summer stays on the currently authoritative Mac runtime through M1.
+Coding provenance names `orchestrator=symphony`, `execution_host=gem`, and the identified worker/run. GitHub's native merge queue remains merge authority. Summer's conversation path is Eve-only; source integration does not commission it. It remains unavailable until the exact deployment, identity, persistence, failure, and recurrence receipts pass.
 
 ## First milestone (M1)
 

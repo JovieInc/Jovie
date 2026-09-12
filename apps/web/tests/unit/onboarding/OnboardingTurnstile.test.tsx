@@ -212,6 +212,28 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(onToken).not.toHaveBeenCalled();
   });
 
+  it('bypasses verification when NEXT_PUBLIC_AUTH_MOCK is enabled', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const onToken = vi.fn();
+    const onStateChange = vi.fn();
+    const { render: renderMock } = mockTurnstile();
+
+    render(
+      <OnboardingTurnstile onToken={onToken} onStateChange={onStateChange} />
+    );
+
+    expect(screen.queryByTestId('next-script')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(onToken).toHaveBeenCalledWith('local-dev-turnstile-bypass')
+    );
+    expect(renderMock).not.toHaveBeenCalled();
+    expect(onStateChange).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'bypassed' })
+    );
+  });
+
   it('bypasses verification in runtime E2E mode (no script, no UI)', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');

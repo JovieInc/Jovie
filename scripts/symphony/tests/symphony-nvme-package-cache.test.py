@@ -108,7 +108,22 @@ class Fixture:
             "printf '%s\\n' \"$*\" >> \"$PNPM_LOG\"\n"
             "if [ \"${1:-}\" = fetch ]; then\n"
             "  if [ \"${PNPM_FETCH_EXIT:-0}\" -ne 0 ]; then exit \"$PNPM_FETCH_EXIT\"; fi\n"
-            "  if [ \"${PNPM_REQUIRE_PATCH:-0}\" = 1 ] && [ ! -f patches/test.patch ]; then exit 44; fi\n"
+            "  if [ \"${PNPM_REQUIRE_PATCH:-0}\" = 1 ]; then\n"
+            "    python3 - <<'PY' || exit $?\n"
+            "import json\n"
+            "import pathlib\n"
+            "import sys\n"
+            "package_path = pathlib.Path('package.json')\n"
+            "if not package_path.is_file():\n"
+            "    print('ERR_PNPM_PATCH_FILE_PATH_MISSING package.json is missing', file=sys.stderr)\n"
+            "    raise SystemExit(44)\n"
+            "package = json.loads(package_path.read_text())\n"
+            "patch = package.get('pnpm', {}).get('patchedDependencies', {}).get('eslint-plugin-react@7.37.5')\n"
+            "if patch != 'patches/eslint-plugin-react@7.37.5.patch' or not pathlib.Path(patch).is_file():\n"
+            "    print('ERR_PNPM_PATCH_FILE_PATH_MISSING Cannot apply patch eslint-plugin-react', file=sys.stderr)\n"
+            "    raise SystemExit(44)\n"
+            "PY\n"
+            "  fi\n"
             "  store=\n"
             "  while [ $# -gt 0 ]; do\n"
             "    if [ \"$1\" = --store-dir ]; then store=\"$2\"; break; fi\n"
@@ -253,10 +268,25 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         self.assertTrue(sibling.is_dir())
         self.assertFalse(list(fx.cache_root.glob("*.tar")))
 
-    def test_warm_stages_checked_in_patch_inputs_without_mutating_source(self) -> None:
+    def test_warm_stages_patched_dependency_metadata_and_file_without_mutating_source(self) -> None:
         fx = self.fixture()
         (fx.workspace / "patches").mkdir()
-        (fx.workspace / "patches/test.patch").write_text("checked-in patch input\n")
+        patch_path = fx.workspace / "patches/eslint-plugin-react@7.37.5.patch"
+        patch_path.write_text("checked-in patch input\n")
+        package_path = fx.workspace / "package.json"
+        package = json.loads(package_path.read_text())
+        package["pnpm"] = {
+            "patchedDependencies": {
+                "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
+            }
+        }
+        package_path.write_text(json.dumps(package))
+        (fx.workspace / "pnpm-lock.yaml").write_text(
+            "lockfileVersion: '9.0'\n"
+            "patchedDependencies:\n"
+            "  eslint-plugin-react@7.37.5:\n"
+            "    path: patches/eslint-plugin-react@7.37.5.patch\n"
+        )
         result = fx.run(
             "warm",
             extra_env={
@@ -268,7 +298,7 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((fx.workspace / "node_modules").exists())
         self.assertEqual(
-            (fx.workspace / "patches/test.patch").read_text(),
+            patch_path.read_text(),
             "checked-in patch input\n",
         )
 

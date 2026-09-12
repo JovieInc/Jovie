@@ -161,7 +161,11 @@ import {
   assertOvieDoorDoesNotUseArtistJovieGeneration,
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
-import { bindCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
+import { bindEveSummerSpeaker } from '@/lib/ovie/summer-eve-speaker';
+import {
+  authorizeFounderSummerUser,
+  founderPrincipalHash,
+} from '@/lib/ovie/summer-founder-auth';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -2475,6 +2479,26 @@ export async function POST(req: Request) {
       { status: 403, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
+  const summerTransportRequested =
+    chatMode === 'ov' && isSummerTransportEnabled();
+  if (summerTransportRequested) {
+    const founderAuthorization = authorizeFounderSummerUser(userId);
+    if (founderAuthorization !== 'authorized') {
+      return NextResponse.json(
+        {
+          error:
+            founderAuthorization === 'unconfigured'
+              ? 'Founder Summer identity is not configured'
+              : 'Founder Summer access required',
+          requestId,
+        },
+        {
+          status: founderAuthorization === 'unconfigured' ? 503 : 403,
+          headers: { ...corsHeaders, 'x-request-id': requestId },
+        }
+      );
+    }
+  }
 
   // Validate that either profileId or artistContext is provided
   if (
@@ -2487,11 +2511,12 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
+  const clientTurnId = normalizeClientId(body.clientTurnId);
   // JOV-5215/5216/5214: bind Eve pack + persist/ack dump to Summer Kanban
   // before any model. OV door must not fall through to artist Jovie chat.
   const ovieStore = getOvieOperatingStore();
-  if (chatMode === 'ov' && isSummerTransportEnabled()) {
-    bindCurrentSummerQueueSpeaker(ovieStore);
+  if (summerTransportRequested) {
+    bindEveSummerSpeaker();
   }
   const {
     eveTurn,
@@ -2501,7 +2526,6 @@ export async function POST(req: Request) {
     store: ovieStore,
   });
   assertOvieDoorDoesNotUseArtistJovieGeneration(chatMode, generation.kind);
-  const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
   const toolIntent = normalizeToolIntent(body.toolIntent);
@@ -2768,8 +2792,14 @@ export async function POST(req: Request) {
     const summerLive =
       summerSession !== null &&
       generation.state === 'fresh' &&
-      isSummerTransportEnabled() &&
+      summerTransportRequested &&
       speaker !== null;
+    if (summerLive && !clientTurnId) {
+      return NextResponse.json(
+        { error: 'clientTurnId is required for live OV chat', requestId },
+        { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
+      );
+    }
     if (summerLive && speaker && summerSession) {
       const firstReceipt = ovieIngestReceipts[0];
       return createSummerAssistantStreamResponse({
@@ -2780,6 +2810,7 @@ export async function POST(req: Request) {
           store: ovieStore,
           signal: req.signal,
           clientTurnId,
+          principalHash: founderPrincipalHash(userId),
         }),
         requestId,
         corsHeaders,

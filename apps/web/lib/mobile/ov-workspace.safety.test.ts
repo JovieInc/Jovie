@@ -10,6 +10,53 @@ import {
 describe('mobile Ovie Summer safety', () => {
   beforeEach(resetSummerMocks);
 
+  it.each([
+    ['unconfigured', 503, 'SUMMER_FOUNDER_IDENTITY_UNCONFIGURED'],
+    ['forbidden', 403, 'SUMMER_FOUNDER_ACCESS_REQUIRED'],
+  ] as const)('rejects a %s founder identity before reserving or dispatching work', async (authorization, status, errorCode) => {
+    h.authorizeFounderSummerUser.mockReturnValueOnce(authorization);
+
+    const response = await handleMobileOvChatTurn(ovInput);
+
+    expect(response.status).toBe(status);
+    expect(await response.text()).toContain(errorCode);
+    expect(h.reserveChatTurn).not.toHaveBeenCalled();
+    expect(h.bindEveSummerSpeaker).not.toHaveBeenCalled();
+    expect(h.runOvieSummerTurn).not.toHaveBeenCalled();
+  });
+
+  it('binds the Eve speaker and hashes the authenticated founder into the durable turn', async () => {
+    const response = await handleMobileOvChatTurn(ovInput);
+    await response.text();
+
+    expect(h.bindEveSummerSpeaker).toHaveBeenCalledOnce();
+    expect(h.founderPrincipalHash).toHaveBeenCalledWith('u1');
+    expect(h.runOvieSummerTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientTurnId: 't1',
+        principalHash: 'founder_hash',
+        userText: 'Need a taste decision',
+      })
+    );
+  });
+
+  it('replays a completed mobile retry without rebinding or redispatching Eve', async () => {
+    h.reserveChatTurn.mockResolvedValueOnce({
+      outcome: 'duplicate_completed',
+      conversationId: 'conv_ov',
+      turn: { id: 'turn_ov', status: 'completed' },
+      messages: [{ role: 'assistant', content: 'Prior durable Summer reply' }],
+    });
+
+    const response = await handleMobileOvChatTurn(ovInput);
+    const body = await response.text();
+
+    expect(body).toContain('Prior durable Summer reply');
+    expect(h.bindEveSummerSpeaker).not.toHaveBeenCalled();
+    expect(h.prepareOvieChatTurn).not.toHaveBeenCalled();
+    expect(h.runOvieSummerTurn).not.toHaveBeenCalled();
+  });
+
   it('reports retry contention with the canonical in-progress contract', async () => {
     h.reserveChatTurn.mockResolvedValueOnce({
       outcome: 'duplicate_completed',

@@ -6,9 +6,7 @@ import {
   CODEX_SOURCE_LABEL,
   EPIC_LABEL,
   type GithubIssue,
-  HUMAN_REVIEW_LABEL,
   labelNames,
-  NO_AUTO_LABEL,
 } from './codex-issue-shipper';
 
 export const PIPELINE_SCOREBOARD_SCHEMA_VERSION = 4;
@@ -998,8 +996,6 @@ function funnelCounts(issues: ReadonlyArray<GithubIssue>) {
     return (
       !labels.has(CODEX_CLAIM_LABEL) &&
       !labels.has(CODEX_BLOCKED_LABEL) &&
-      !labels.has(HUMAN_REVIEW_LABEL) &&
-      !labels.has(NO_AUTO_LABEL) &&
       !labels.has(EPIC_LABEL)
     );
   }).length;

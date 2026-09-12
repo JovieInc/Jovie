@@ -1,0 +1,8 @@
+{
+  "schema": "gem-ship-hud-activation/v1",
+  "observedAt": "2026-09-06T17:58:00.000Z",
+  "pid": 12345,
+  "service": "gem-ship-hud.service",
+  "activeState": "active",
+  "subState": "running"
+}

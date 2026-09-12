@@ -94,7 +94,7 @@ The `agent-landing-sweep.yml` workflow is manual-only. When explicitly dispatche
 - All required source contexts passed
 - No unknown non-advisory terminal-red check
 - No sensitive files changed (auth, billing, migrations, CI, etc.)
-- No `needs-human` label
+- No active machine gate or terminal-red required check
 - Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
 - Queue pressure below threshold (12 PRs already queued)
 

@@ -29,8 +29,8 @@ describe('LogoLoader', () => {
   });
 
   it('applies a custom size to the brand mark', () => {
-    const { container } = render(<LogoLoader size={48} />);
-    expect(container.querySelector('svg')).toHaveAttribute('width', '48');
+    const { container } = render(<LogoLoader size='control' />);
+    expect(container.querySelector('svg')).toHaveAttribute('width', '24');
   });
 
   it('has no a11y violations', async () => {

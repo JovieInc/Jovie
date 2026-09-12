@@ -25,7 +25,7 @@ Workflow code must not merge, deploy, mutate Linear, bypass CI, or grant itself 
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| Linear | Issue source of truth, owner, priority, human-review labels | Hidden agent state |
+| Linear | Issue source of truth, owner, priority, and machine gate evidence | Hidden agent state |
 | Admin Ops | Private operator surface for run state, approvals, and gate evidence | Customer-facing workflow UX in v1 |
 | Vercel Workflow/WDK | Durable dry-run coordination, steps, retries, status emission | Merge/deploy authority |
 | Hermes/Ruflo | Bounded agent execution behind allowed paths and HOT ZONE claims | Source of truth, direct merge, direct deploy |
@@ -46,7 +46,7 @@ Minimum fields:
 - `modelRoute`: `deterministic | openrouter-free | ai-sdk-gateway | claude-code | codex-cli`
 - `allowedActions`
 - `forbiddenActions`
-- `humanApprovalRequired`
+- `postLandCertificationRequired`
 - `linearIssueId`
 - `pullRequestUrl`
 - `adminSurface`
@@ -116,7 +116,7 @@ Duplicates linked during this ADR:
 | JOV-1910 `VELOCITY: Agent OS Cost + Duplication Control` | JOV-1858 |
 | JOV-1913 `OPS: create daily runway cron / no_agent report` | JOV-1861 |
 
-Human-review-required canonical issues remain untouched.
+Legacy human-review labels are ignored and removed; actionable work continues.
 
 ## Verification Policy
 
@@ -128,7 +128,9 @@ Every implementation PR after this ADR must run the narrowest relevant local che
 4. `/ship`.
 5. Release conductor runs `/land-and-deploy` after CI and bot-review gates pass.
 
-Workflow, GitHub Actions, Hermes, and WDK PRs require `needs-human` if compile behavior, runner availability, or gate publication is ambiguous.
+Ambiguous compile behavior, runner availability, or gate publication fails the
+relevant automated check and stays in autonomous remediation. It never creates
+a human-review PR hold.
 
 ## Hermes-Air Node (always-on orchestration)
 

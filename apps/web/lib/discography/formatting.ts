@@ -33,6 +33,10 @@ export function parseReleaseDate(date: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+export type ReleaseArtistLinePart =
+  | { readonly type: 'element'; readonly value: string }
+  | { readonly type: 'literal'; readonly value: string };
+
 export function formatReleaseArtistLine(
   artistNames: string[] | undefined,
   fallbackArtistName: string | null | undefined
@@ -47,6 +51,25 @@ export function formatReleaseArtistLine(
 
   const fallback = fallbackArtistName?.trim();
   return fallback ?? null;
+}
+
+export function formatReleaseArtistLineParts(
+  artistNames: readonly string[] | undefined
+): ReleaseArtistLinePart[] {
+  const normalizedNames = (artistNames ?? [])
+    .map(name => name.trim())
+    .filter(Boolean);
+
+  if (normalizedNames.length === 0) {
+    return [];
+  }
+
+  return releaseArtistListFormatter
+    .formatToParts(normalizedNames)
+    .map(part => ({
+      type: part.type === 'element' ? 'element' : 'literal',
+      value: part.value,
+    }));
 }
 
 export function formatCompactReleaseArtistLine(

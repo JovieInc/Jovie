@@ -1,0 +1,514 @@
+#!/usr/bin/env python3
+"""Fail-closed Hyperagent MCP lifecycle adapter.
+
+This module validates dispatches and classifies structured provider observations.
+It never calls Hyperagent, resolves an approval, sends a message, or starts work.
+The canonical Symphony router remains the only dispatch-selection owner.
+The classify CLI is diagnostic and cannot certify terminal success; journal-bound
+Python callers must provide the persisted expected job.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
+
+SCHEMA = "symphony-hyperagent-lifecycle/v1"
+MAX_OBSERVATION_AGE_SECONDS = 300
+MAX_LIVE_FACT_AGE_SECONDS = 900
+TERMINAL_STATES = frozenset(
+    {"useful_success", "terminal_failed", "declined", "cancelled"}
+)
+PROVIDER_ACTIONS = {
+    401: "authorized_reconnect_required",
+    402: "billing_hold",
+    403: "inspect_scope_or_policy",
+    429: "honor_shared_cooldown",
+}
+
+
+class LifecycleError(ValueError):
+    pass
+
+
+def _valid_sha256(value):
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _parse_time(value):
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _money(value):
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return False
+    return parsed.is_finite() and parsed >= 0
+
+
+def _decimal_money(value):
+    if not _money(value):
+        return None
+    try:
+        return Decimal(str(value))
+    except InvalidOperation:
+        return None
+
+
+def _codes(reasons):
+    return [{"code": code, "field": field} for code, field in reasons]
+
+
+def _valid_job_identity(job):
+    return isinstance(job, dict) and all(
+        isinstance(job.get(field), str) and job[field]
+        for field in ("thread_id", "idempotency_key")
+    )
+
+
+def _terminal_authority_matches(observation, expected_job):
+    if not _valid_job_identity(expected_job):
+        return False
+    identity_fields = (
+        "thread_id", "idempotency_key", "account_alias", "destination", "model_id"
+    )
+    if not all(
+        isinstance(expected_job.get(field), str)
+        and expected_job[field]
+        and observation.get(field) == expected_job[field]
+        for field in identity_fields
+    ):
+        return False
+    cost = _decimal_money(observation.get("cost_usd"))
+    run_cap = _decimal_money(expected_job.get("per_query_cap_usd"))
+    period_cap = _decimal_money(expected_job.get("period_cap_usd"))
+    period_spend = _decimal_money(expected_job.get("period_spend_usd"))
+    return (
+        None not in (cost, run_cap, period_cap, period_spend)
+        and cost <= run_cap
+        and period_spend + cost <= period_cap
+    )
+
+
+def _interaction_matches_dispatch(interaction, observed_job, expected_job):
+    if not _valid_job_identity(expected_job) or observed_job != {
+        "thread_id": expected_job["thread_id"],
+        "idempotency_key": expected_job["idempotency_key"],
+    }:
+        return False
+    if not all(
+        isinstance(expected_job.get(field), str)
+        and expected_job[field]
+        and interaction.get(field) == expected_job[field]
+        for field in ("account_alias", "destination")
+    ):
+        return False
+    requested_cap = _decimal_money(interaction.get("per_query_cap_usd"))
+    admitted_cap = _decimal_money(expected_job.get("per_query_cap_usd"))
+    return (
+        requested_cap is not None
+        and admitted_cap is not None
+        and requested_cap <= admitted_cap
+    )
+
+
+def validate_dispatch(envelope, now=None):
+    """Validate live routing/account/cost evidence before an MCP create call."""
+    now = now or datetime.now(timezone.utc)
+    reasons = []
+    if not isinstance(envelope, dict) or envelope.get("schema") != SCHEMA:
+        return {"decision": "HOLD", "reasons": _codes([("invalid_schema", "schema")])}
+    required_text = (
+        "account_alias",
+        "expected_account_alias",
+        "workspace_id",
+        "agent_id",
+        "agent_name",
+        "model_id",
+        "runtime",
+        "paying_org",
+        "expected_paying_org",
+        "idempotency_key",
+        "request_sha256",
+        "useful_outcome",
+        "destination",
+        "expected_destination",
+        "balance_checked_at",
+        "model_checked_at",
+        "credits_expire_at",
+    )
+    for field in required_text:
+        if not isinstance(envelope.get(field), str) or not envelope[field]:
+            reasons.append(("unknown_live_fact", field))
+    if envelope.get("provider") != "hyperagent":
+        reasons.append(("route_mismatch", "provider"))
+    if envelope.get("route_selected") is not True:
+        reasons.append(("route_unselected", "route_selected"))
+    if envelope.get("authenticated") is not True:
+        reasons.append(("authentication_unproven", "authenticated"))
+    if envelope.get("account_alias") != envelope.get("expected_account_alias"):
+        reasons.append(("account_mismatch", "account_alias"))
+    if envelope.get("paying_org") != envelope.get("expected_paying_org"):
+        reasons.append(("payer_mismatch", "paying_org"))
+    if envelope.get("destination") != envelope.get("expected_destination"):
+        reasons.append(("destination_mismatch", "destination"))
+    scopes = envelope.get("oauth_scopes")
+    if (
+        not isinstance(scopes, list)
+        or not all(isinstance(scope, str) and scope for scope in scopes)
+        or not {"threads:read", "threads:write"}.issubset(scopes)
+    ):
+        reasons.append(("thread_scopes_unproven", "oauth_scopes"))
+    if envelope.get("invocation_surface") != "mcp":
+        reasons.append(("surface_mismatch", "invocation_surface"))
+    if envelope.get("agent_mode") == "ask_first":
+        reasons.append(("ask_first_mcp_incompatible", "agent_mode"))
+    elif envelope.get("agent_mode") != "auto":
+        reasons.append(("agent_mode_unknown", "agent_mode"))
+    if envelope.get("runtime_compatible") is not True:
+        reasons.append(("runtime_incompatible", "runtime_compatible"))
+    timeout = envelope.get("turn_timeout_seconds")
+    if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
+        reasons.append(("invalid_timeout", "turn_timeout_seconds"))
+    for field in ("tools", "integrations", "delegation_allowlist"):
+        value = envelope.get(field)
+        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+            reasons.append(("unknown_live_fact", field))
+    if not _valid_sha256(envelope.get("request_sha256")):
+        reasons.append(("invalid_sha256", "request_sha256"))
+    for field in (
+        "model_price_usd", "balance_usd", "per_query_cap_usd",
+        "period_cap_usd", "period_spend_usd",
+    ):
+        if not _money(envelope.get(field)):
+            reasons.append(("invalid_money", field))
+    balance = envelope.get("balance_usd")
+    run_cap = envelope.get("per_query_cap_usd")
+    period_cap = envelope.get("period_cap_usd")
+    period_spend = envelope.get("period_spend_usd")
+    decimal_balance = _decimal_money(balance)
+    decimal_run_cap = _decimal_money(run_cap)
+    decimal_period_cap = _decimal_money(period_cap)
+    decimal_period_spend = _decimal_money(period_spend)
+    if decimal_balance is not None and decimal_run_cap is not None and decimal_run_cap > decimal_balance:
+        reasons.append(("insufficient_balance", "per_query_cap_usd"))
+    if _money(run_cap) and run_cap <= 0:
+        reasons.append(("invalid_cap", "per_query_cap_usd"))
+    if _money(period_cap) and period_cap <= 0:
+        reasons.append(("invalid_cap", "period_cap_usd"))
+    model_price = envelope.get("model_price_usd")
+    if _money(model_price) and _money(run_cap) and model_price > run_cap:
+        reasons.append(("model_price_exceeds_cap", "model_price_usd"))
+    if _money(model_price) and _money(balance) and model_price > balance:
+        reasons.append(("insufficient_balance", "model_price_usd"))
+    if None not in (decimal_period_cap, decimal_period_spend, decimal_run_cap):
+        if decimal_period_spend + decimal_run_cap > decimal_period_cap:
+            reasons.append(("period_cap_exceeded", "period_cap_usd"))
+    if envelope.get("auto_recharge_enabled") is not False:
+        reasons.append(("auto_recharge_not_proven_off", "auto_recharge_enabled"))
+    for field in ("balance_checked_at", "model_checked_at"):
+        checked = _parse_time(envelope.get(field))
+        if checked is None or checked > now or (now - checked).total_seconds() > MAX_LIVE_FACT_AGE_SECONDS:
+            reasons.append(("stale_live_fact", field))
+    expiry = _parse_time(envelope.get("credits_expire_at"))
+    if expiry is None or expiry <= now:
+        reasons.append(("credit_expiry_invalid", "credits_expire_at"))
+    return {"decision": "PROCEED" if not reasons else "HOLD", "reasons": _codes(reasons)}
+
+
+def classify_observation(observation, now=None, expected_job=None):
+    """Classify structured provider evidence without guessing from prose."""
+    now = now or datetime.now(timezone.utc)
+    if not isinstance(observation, dict) or observation.get("schema") != SCHEMA:
+        return {"state": "unknown", "reason": "invalid_schema"}
+    if not all(
+        isinstance(observation.get(field), str) and observation[field]
+        for field in ("thread_id", "idempotency_key")
+    ):
+        return {"state": "unknown", "reason": "missing_job_identity"}
+    job = {
+        "thread_id": observation["thread_id"],
+        "idempotency_key": observation["idempotency_key"],
+    }
+    if expected_job is not None and (
+        not _valid_job_identity(expected_job)
+        or job != {
+            "thread_id": expected_job["thread_id"],
+            "idempotency_key": expected_job["idempotency_key"],
+        }
+    ):
+        return {"state": "unknown", "reason": "observation_job_mismatch"}
+    observed_at = _parse_time(observation.get("observed_at"))
+    if observed_at is None or observed_at > now:
+        return {"state": "unknown", "reason": "invalid_observed_at"}
+    if (now - observed_at).total_seconds() > MAX_OBSERVATION_AGE_SECONDS:
+        return {"state": "stale_status", "reason": "observation_expired", "job": job}
+    transport_lost = observation.get("transport_lost")
+    if "transport_lost" in observation and not isinstance(transport_lost, bool):
+        return {"state": "unknown", "reason": "transport_state_unknown"}
+    if transport_lost is True:
+        return {"state": "transport_unknown", "reason": "reconcile_original_thread", "job": job}
+    provider_error = observation.get("provider_error")
+    if "provider_error" in observation and (
+        not isinstance(provider_error, int) or isinstance(provider_error, bool)
+    ):
+        return {"state": "unknown", "reason": "provider_error_unknown"}
+    if isinstance(provider_error, int) and not isinstance(provider_error, bool):
+        if provider_error == 429:
+            retry_after = observation.get("retry_after_seconds")
+            if not isinstance(retry_after, int) or isinstance(retry_after, bool) or retry_after <= 0:
+                return {"state": "unknown", "reason": "retry_timing_unknown"}
+        if provider_error in PROVIDER_ACTIONS:
+            action = PROVIDER_ACTIONS[provider_error]
+        elif provider_error >= 500:
+            action = "reconcile_original_thread"
+        else:
+            action = "inspect_provider_failure"
+        result = {
+            "state": "provider_failure", "provider_error": provider_error,
+            "action": action, "job": job,
+        }
+        if provider_error == 429:
+            result["retry_after_seconds"] = observation["retry_after_seconds"]
+        return result
+
+    interaction = observation.get("interaction")
+    if "interaction" in observation and not isinstance(interaction, dict):
+        return {"state": "unknown", "reason": "interaction_unknown"}
+    if isinstance(interaction, dict):
+        kind = interaction.get("kind")
+        if kind == "approval":
+            if not all(
+                isinstance(interaction.get(field), str) and interaction[field]
+                for field in ("id", "fingerprint", "account_alias", "destination")
+            ) or not _money(interaction.get("per_query_cap_usd")) or interaction.get("state") != "pending":
+                return {"state": "unknown", "reason": "malformed_approval"}
+            surface = interaction.get("resolution_surface")
+            if not isinstance(surface, str) or surface not in {"mcp", "web_only"}:
+                return {"state": "unknown", "reason": "approval_surface_unknown"}
+            if not _interaction_matches_dispatch(interaction, job, expected_job):
+                return {"state": "unknown", "reason": "interaction_dispatch_mismatch"}
+            return {"state": "approval_required", "interaction": interaction, "job": job}
+        if kind == "input":
+            if (
+                not _valid_sha256(interaction.get("prompt_sha256"))
+                or not all(
+                    isinstance(interaction.get(field), str) and interaction[field]
+                    for field in ("account_alias", "destination")
+                )
+                or not _money(interaction.get("per_query_cap_usd"))
+            ):
+                return {"state": "unknown", "reason": "malformed_input_request"}
+            if not _interaction_matches_dispatch(interaction, job, expected_job):
+                return {"state": "unknown", "reason": "interaction_dispatch_mismatch"}
+            return {"state": "input_required", "interaction": interaction, "job": job}
+        if kind == "memory_decision":
+            if not isinstance(interaction.get("id"), str) or not interaction["id"]:
+                return {"state": "unknown", "reason": "malformed_memory_decision"}
+            return {
+                "state": "memory_decision_required", "interaction": interaction, "job": job
+            }
+        if kind == "sandbox_domain":
+            if not isinstance(interaction.get("domain"), str) or not interaction["domain"]:
+                return {"state": "unknown", "reason": "malformed_domain_approval"}
+            return {"state": "approval_required", "interaction": interaction, "job": job}
+        return {"state": "unknown", "reason": "interaction_kind_unknown"}
+
+    running = observation.get("is_running")
+    if running is True:
+        return {"state": "running", "reason": "poll_same_thread", "job": job}
+    if running is not False:
+        return {"state": "unknown", "reason": "running_state_unknown"}
+    terminal = observation.get("terminal_state")
+    if terminal not in (None, "declined", "cancelled", "failed", "completed"):
+        return {"state": "unknown", "reason": "terminal_state_unknown"}
+    terminal_job_matches = _valid_job_identity(expected_job) and job == {
+        "thread_id": expected_job["thread_id"],
+        "idempotency_key": expected_job["idempotency_key"],
+    }
+    if terminal in {"declined", "cancelled", "failed", "completed"} and not terminal_job_matches:
+        return {"state": "terminal_unverified", "reason": "terminal_job_mismatch", "job": job}
+    if terminal in {"declined", "cancelled"}:
+        return {"state": terminal, "reason": "provider_terminal", "job": job}
+    if terminal == "failed":
+        return {"state": "terminal_failed", "reason": "provider_terminal", "job": job}
+    if (
+        terminal == "completed"
+        and observation.get("useful_outcome_verified") is True
+        and _valid_sha256(observation.get("final_output_sha256"))
+        and _valid_sha256(observation.get("usage_receipt_sha256"))
+        and _money(observation.get("cost_usd"))
+        and _terminal_authority_matches(observation, expected_job)
+    ):
+        return {
+            "state": "useful_success", "reason": "terminal_receipts_verified",
+            "job": job, "cost_usd": observation["cost_usd"],
+        }
+    return {
+        "state": "terminal_unverified",
+        "reason": "useful_identity_or_cost_receipt_missing",
+        "job": job,
+    }
+
+
+def _job_authority_matches(classification, authority):
+    job = classification.get("job") or {}
+    return _valid_job_identity(job) and _valid_job_identity(authority) and all(
+        authority.get(field) == job.get(field)
+        for field in ("thread_id", "idempotency_key")
+    )
+
+
+def _authority_matches(classification, authority):
+    interaction = classification.get("interaction") or {}
+    if not isinstance(authority, dict):
+        return False
+    fields = (
+        "interaction_id", "fingerprint", "account_alias", "destination",
+        "per_query_cap_usd",
+    )
+    return (
+        _job_authority_matches(classification, authority)
+        and authority.get("user_authorized") is True
+        and all(
+            authority.get(field)
+            == (interaction.get("id") if field == "interaction_id" else interaction.get(field))
+            for field in fields
+        )
+    )
+
+
+def plan_resolution(classification, authority=None, oauth_scopes=()):
+    """Describe one next action; mutations require a durable journal reservation."""
+    state = classification.get("state") if isinstance(classification, dict) else None
+    if not isinstance(state, str):
+        return {"action": "hold_unknown", "execute": False}
+    if not isinstance(oauth_scopes, (list, tuple, set, frozenset)) or not all(
+        isinstance(scope, str) for scope in oauth_scopes
+    ):
+        oauth_scopes = ()
+    if state == "approval_required":
+        interaction = classification.get("interaction") or {}
+        if interaction.get("kind") == "sandbox_domain":
+            return {"action": "surface_domain_approval", "execute": False}
+        if not _authority_matches(classification, authority):
+            return {"action": "surface_exact_approval", "execute": False}
+        if interaction.get("resolution_surface") == "mcp" and "approvals:write" in oauth_scopes:
+            return {
+                "action": "resolve_approval_once", "execute": False,
+                "requires_journal_reservation": True, "id": interaction["id"],
+            }
+        if interaction.get("resolution_surface") == "web_only" and authority.get("attended_browser") is True:
+            return {
+                "action": "open_attended_thread_once", "execute": False,
+                "requires_journal_reservation": True, "id": interaction["id"],
+            }
+        return {"action": "surface_exact_approval", "execute": False}
+    if state == "input_required":
+        interaction = classification.get("interaction") or {}
+        if (
+            isinstance(authority, dict)
+            and _job_authority_matches(classification, authority)
+            and authority.get("input_authorized") is True
+            and authority.get("prompt_sha256") == interaction.get("prompt_sha256")
+            and all(
+                authority.get(field) == interaction.get(field)
+                for field in ("account_alias", "destination", "per_query_cap_usd")
+            )
+            and _valid_sha256(authority.get("response_sha256"))
+            and "threads:write" in oauth_scopes
+        ):
+            return {
+                "action": "send_message_once", "execute": False,
+                "requires_journal_reservation": True,
+                "id": interaction["prompt_sha256"],
+            }
+        return {"action": "surface_required_input", "execute": False}
+    if state == "memory_decision_required":
+        interaction = classification.get("interaction") or {}
+        if (
+            isinstance(authority, dict)
+            and _job_authority_matches(classification, authority)
+            and authority.get("memory_decision_authorized") is True
+            and authority.get("interaction_id") == interaction.get("id")
+            and authority.get("decision") in {"approve", "reject"}
+        ):
+            return {
+                "action": "record_memory_decision_once", "execute": False,
+                "requires_journal_reservation": True, "id": interaction["id"],
+            }
+        return {"action": "surface_memory_decision", "execute": False}
+    if state in {"stale_status", "transport_unknown"}:
+        if not _valid_job_identity(classification.get("job")):
+            return {"action": "hold_unknown", "execute": False}
+        return {
+            "action": "reconcile_original_thread_once", "execute": False,
+            "requires_journal_reservation": True,
+        }
+    if state == "provider_failure":
+        action = classification.get("action", "hold_unknown")
+        result = {"action": action, "execute": False}
+        if action == "reconcile_original_thread":
+            if not _valid_job_identity(classification.get("job")):
+                return {"action": "hold_unknown", "execute": False}
+            result["requires_journal_reservation"] = True
+        return result
+    if state == "running":
+        return {"action": "observe_same_thread", "execute": False, "read_only": True}
+    if state in TERMINAL_STATES:
+        if not _valid_job_identity(classification.get("job")):
+            return {"action": "hold_unknown", "execute": False}
+        return {
+            "action": "record_terminal_receipt", "execute": False,
+            "requires_journal_reservation": True,
+        }
+    if state == "terminal_unverified":
+        if not _valid_job_identity(classification.get("job")):
+            return {"action": "hold_unknown", "execute": False}
+        return {
+            "action": "reconcile_terminal_receipts_once", "execute": False,
+            "requires_journal_reservation": True,
+        }
+    return {"action": "hold_unknown", "execute": False}
+
+
+def main():  # pragma: no cover - exercised by subprocess contract tests
+    parser = argparse.ArgumentParser()
+    subcommands = parser.add_subparsers(dest="command", required=True)
+    preflight = subcommands.add_parser("preflight")
+    preflight.add_argument("--envelope", required=True)
+    classify = subcommands.add_parser("classify")
+    classify.add_argument("--observation", required=True)
+    args = parser.parse_args()
+    if args.command == "preflight":
+        path = pathlib.Path(args.envelope)
+    else:
+        path = pathlib.Path(args.observation)
+    payload = json.loads(path.read_text())
+    if args.command == "preflight":
+        result = validate_dispatch(payload)
+    else:
+        result = classify_observation(payload)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    if args.command == "preflight":
+        return 0 if result["decision"] == "PROCEED" else 2
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - subprocess entry point
+    raise SystemExit(main())

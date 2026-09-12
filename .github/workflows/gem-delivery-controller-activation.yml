@@ -1,4 +1,9 @@
 name: Activate Gem Delivery Controller
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# Runtime owner task: 01a070af-20da-7c33-b1ec-0cf4d5ddd564; this workflow is the sole installer.
+# necessary-trust-boundary: Hosted production proof authorizes the exact source revision; only the fixed Gem runner can install and attest its local user-systemd runtime.
+# removal-trigger: Remove this handoff when the production owner can perform the same exact-revision Gem installation and runtime attestation within its existing trusted job.
 
 # A production receipt is the only authority to replace Gem's local controller
 # configuration. The installer refuses a dirty or mismatched source revision,
@@ -11,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: gem-delivery-controller-activation
@@ -41,8 +47,114 @@ jobs:
           test "$(git rev-parse HEAD)" = "$PRODUCTION_SHA"
           # A later main commit cannot invalidate this immutable successful
           # Production Controller receipt. The exact checkout and installer
-          # revision fence remain the activation authority.
+          # revision fence remain the activation authority. A producer that
+          # coalesced into a newer main head preserves no marker by design;
+          # the marker gate below skips that no-op instead of failing.
+      - name: Set up Node for the existing production marker verifier
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.2'
+      - name: Authorize exact production marker
+        id: marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
+          PRODUCTION_CONTROLLER_RUN: ${{ github.event.workflow_run.id }}
+          PRODUCTION_CONTROLLER_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          workflow_json="$(gh api "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          workflow_id="$(jq -er '
+            select(.name == "Production Controller" and
+              .path == ".github/workflows/production-controller.yml" and .state == "active") |
+            .id | select(type == "number" and . > 0)
+          ' <<< "$workflow_json")"
+          # The verifier is a read-only evidence classifier: always run the
+          # default-branch copy so verifier fixes apply to every activation,
+          # including activations for producers that predate them. The
+          # installed controller revision stays pinned to this exact producer
+          # checkout; only the gate code follows main (same trust surface as
+          # the workflow definition itself, which is already default-branch).
+          verifier_dir="$(mktemp -d)"
+          verifier="$verifier_dir/production-marker-state.mjs"
+          gh api -H "Accept: application/vnd.github.raw" \
+            "repos/$REPOSITORY/contents/.github/scripts/production-marker-state.mjs?ref=main" \
+            > "$verifier"
+          node --check "$verifier"
+          marker_json="$(node "$verifier" \
+            --sha "$PRODUCTION_SHA" --repo "$REPOSITORY" \
+            --controller-workflow-id "$workflow_id" \
+            --producer-run-id "$PRODUCTION_CONTROLLER_RUN" \
+            --producer-attempt "$PRODUCTION_CONTROLLER_ATTEMPT")"
+          output_file="${GITHUB_OUTPUT:-/dev/null}"
+          if jq -e --argjson run "$PRODUCTION_CONTROLLER_RUN" \
+            --argjson attempt "$PRODUCTION_CONTROLLER_ATTEMPT" '
+            .state == "verified" and
+            (.controllerRun | tonumber) == $run and
+            (.controllerAttempt | tonumber) == $attempt
+          ' <<< "$marker_json" >/dev/null; then
+            echo "superseded=false" >> "$output_file"
+            exit 0
+          fi
+          # A producer that coalesced into a newer main head intentionally
+          # preserves no marker; a newer controller run for a newer head
+          # (successful, in flight, or otherwise past startup) already owns
+          # the activation path for the newest revision. Both skip paths are
+          # proven by production-marker-state.mjs from live evidence and fail
+          # closed.
+          if [[ "$(jq -r '.coalesced // false' <<< "$marker_json")" == "true" ]]; then
+            echo "superseded=true" >> "$output_file"
+            echo "::notice::Producer run $PRODUCTION_CONTROLLER_RUN coalesced into a newer main head and intentionally preserved no marker; the newest production-proven generation owns activation. Skipping."
+            exit 0
+          fi
+          superseded_by="$(jq -r '(.supersededBy.run // "") | tostring' <<< "$marker_json")"
+          if [[ -n "$superseded_by" ]]; then
+            echo "superseded=true" >> "$output_file"
+            echo "::notice::Producer run $PRODUCTION_CONTROLLER_RUN has no exact verified marker; newer Production Controller run $superseded_by for a newer main head owns the activation path. Skipping."
+            exit 0
+          fi
+          echo "::error::Activation requires this exact producer attempt's verified production marker."
+          exit 1
+      - name: Generate read-only Jovie Bot token for the canonical gate refresh
+        id: gate-token
+        if: steps.marker.outputs.superseded != 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+      - name: Refresh canonical fleet gate receipt
+        id: gate-refresh
+        if: steps.marker.outputs.superseded != 'true'
+        uses: ./.github/actions/evaluate-fleet-gate
+        with:
+          github-token: ${{ steps.gate-token.outputs.token }}
+          dry-run: 'false'
+      - name: Check candidate closure startup compatibility
+        if: steps.marker.outputs.superseded != 'true'
+        run: |
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "scripts/symphony")
+          from symphony_official_runtime import ClosureStopLine, _read_stop_line
+          # The enforcing wrapper waits before spawning its child on a hold.
+          # Refuse before changing any installed files instead of replacing a
+          # live listener with a process that cannot yet expose its API.
+          # Controller installation is the repair path: a grace/red closure
+          # whose reasons are all repair-feed signals feeds this installer
+          # instead of stopping it; every other violation still holds.
+          verdict = _read_stop_line(ClosureStopLine(purpose="controller-activation"))
+          if verdict["hold"]:
+              print("::error::Candidate startup is held by the existing closure validator: " + verdict["reason"])
+              raise SystemExit(76)
+          if verdict["reason"] == "closure-health-repair-feed":
+              print("::notice::Closure repair-feed reasons feed the installed controller instead of stopping activation: " + ",".join(verdict.get("repairFeedReasons") or []))
+          PY
       - name: Establish lingering user-systemd session
+        if: steps.marker.outputs.superseded != 'true'
         run: |
           set -euo pipefail
           uid="$(id -u)"
@@ -60,19 +172,31 @@ jobs:
             printf 'GEM_SYSTEMD_REQUIRE_BUS_SOCKET=1\n'
           } >> "${GITHUB_ENV}"
       - name: Install and attest the exact controller configuration
+        if: steps.marker.outputs.superseded != 'true'
         env:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          bash scripts/symphony/update-symphony-burrito.sh --skip-binary
+          # Preserve the managed provider generation boundary. The next installer
+          # owns the exact workflow/service-unit overlay, and the explicit installs
+          # below own the adaptive controller; provider-only is not the whole activation.
+          bash scripts/symphony/symphony-elixir-safe-restart --prepare-stop-guard
+          bash scripts/symphony/update-symphony-burrito.sh --provider-runtime-only
+          bash scripts/symphony/update-symphony-burrito.sh --managed-controller-only
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh
+          install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"
+          install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.service "$HOME/.config/systemd/user/symphony-concurrency-controller.service"
+          install -D -m 0644 scripts/symphony/systemd/symphony-concurrency-controller.timer "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
           install -D -m 0755 scripts/symphony/gem-disk-reclaim.py "$HOME/.local/bin/gem-disk-reclaim"
           install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.service "$HOME/.config/systemd/user/gem-disk-reclaim.service"
           install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.timer "$HOME/.config/systemd/user/gem-disk-reclaim.timer"
           systemctl --user daemon-reload
+          systemctl --user enable --now symphony-concurrency-controller.timer
+          systemctl --user start symphony-concurrency-controller.service
           systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
+        if: steps.marker.outputs.superseded != 'true'
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
           PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -93,7 +217,13 @@ jobs:
             .unit.matches == true
           ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
           curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state \
-            | jq -e '.counts | has("running") and has("retrying") and has("blocked")' >/dev/null
+            | jq -e '
+                ((.generated_at // .observedAt) | type == "string") and
+                (.running | type == "array") and
+                (.retrying | type == "array") and
+                (.blocked | type == "array") and
+                (.counts | has("running") and has("retrying") and has("blocked"))
+              ' >/dev/null
           jq -e --arg sha "$PRODUCTION_SHA" '
             .schema == "gem-pr-rehabilitation-attestation/v1" and
             .sourceRevision == $sha and
@@ -104,6 +234,36 @@ jobs:
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
           systemctl --user is-enabled --quiet gem-pr-drain.timer
           systemctl --user is-active --quiet gem-pr-drain.timer
+          cmp -s scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"
+          cmp -s scripts/symphony/systemd/symphony-concurrency-controller.service "$HOME/.config/systemd/user/symphony-concurrency-controller.service"
+          cmp -s scripts/symphony/systemd/symphony-concurrency-controller.timer "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
+          systemctl --user is-enabled --quiet symphony-concurrency-controller.timer
+          systemctl --user is-active --quiet symphony-concurrency-controller.timer
+          test "$(systemctl --user show symphony-concurrency-controller.timer --property=FragmentPath --value)" \
+            = "$HOME/.config/systemd/user/symphony-concurrency-controller.timer"
+          "$HOME/.local/bin/symphony-concurrency-controller" \
+            --verify-workflow-overlay scripts/symphony/WORKFLOW.md "$HOME/.config/symphony/WORKFLOW.md"
+          jq -e --arg sha "$PRODUCTION_SHA" '
+            .schema == "symphony-concurrency/v1" and
+            .sourceRevision == $sha and
+            .mode == "applied" and
+            .target >= 1 and
+            .bounds.min == 1 and
+            .bounds.max == null and
+            .bounds.policy == "empirical-additive-probe"
+          ' "$GEM_WORKSPACE/state/symphony-concurrency.json" >/dev/null
+          python3 - "$GEM_WORKSPACE/state/symphony-concurrency.json" <<'PY'
+          import datetime
+          import json
+          import pathlib
+          import sys
+
+          receipt = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          observed = datetime.datetime.fromisoformat(receipt["observedAt"].replace("Z", "+00:00"))
+          age = (datetime.datetime.now(datetime.timezone.utc) - observed).total_seconds()
+          if not 0 <= age <= 120:
+              raise SystemExit("symphony concurrency receipt is stale or from the future")
+          PY
           bash scripts/symphony/update-symphony-burrito.sh --check
           systemctl --user is-enabled --quiet symphony-elixir.service
           systemctl --user is-active --quiet symphony-elixir.service

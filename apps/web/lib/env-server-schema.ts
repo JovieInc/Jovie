@@ -75,14 +75,8 @@ export const ServerEnvSchema = z.object({
    */
   E2E_TEST_MODE: z.string().optional(),
 
-  // Clerk server-side configuration
-  CLERK_SECRET_KEY: z.string().optional(),
-  CLERK_WEBHOOK_SECRET: z.string().optional(),
-  CLERK_PUBLISHABLE_KEY_STAGING: z.string().optional(),
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
-
-  // Better Auth (self-hosted auth — Clerk cutover in flight; optional until
-  // the flip commit adds preview/prod fail-fast validation rules)
+  // Better Auth (self-hosted). Preview/prod fail-fast lives in
+  // env-validation-rules.ts (BETTER_AUTH_SECRET ≥32).
   BETTER_AUTH_SECRET: z.string().optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
   AUTH_GOOGLE_CLIENT_ID: z.string().optional(),
@@ -136,6 +130,19 @@ export const ServerEnvSchema = z.object({
   BLOB_WEBHOOK_PUBLIC_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
+  OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
+  OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN: z
+    .string()
+    .url()
+    .regex(
+      /^https:\/\/jovie-eve-shadow-[a-z0-9]+-jovie\.vercel\.app$/u,
+      'Must be an immutable jovie-eve-shadow deployment URL'
+    )
+    .optional(),
+  OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID: z
+    .string()
+    .regex(/^dpl_[A-Za-z0-9]+$/u)
+    .optional(),
 
   // Telegram Bot (for asset ingestion webhook)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -454,10 +461,6 @@ export const ENV_KEYS = [
   'PUBLIC_NOAUTH_SMOKE',
   'CHAT_LLM_FAILURE_INJECTION',
   'E2E_TEST_MODE',
-  'CLERK_SECRET_KEY',
-  'CLERK_WEBHOOK_SECRET',
-  'CLERK_PUBLISHABLE_KEY_STAGING',
-  'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'BETTER_AUTH_SECRET',
   'BETTER_AUTH_URL',
   'AUTH_GOOGLE_CLIENT_ID',
@@ -494,6 +497,9 @@ export const ENV_KEYS = [
   'BLOB_WEBHOOK_PUBLIC_KEY',
   'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
   'SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID',
+  'OVIE_SUMMER_FOUNDER_APP_USER_ID',
+  'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
+  'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',

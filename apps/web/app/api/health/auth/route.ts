@@ -17,19 +17,21 @@ export const dynamic = 'force-dynamic';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function resolveDevFastAuthHealthContext() {
-  const clerkMockEnabled = process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
-  const clerkProxyDisabled =
+  const authMockEnabled =
+    process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+    process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
+  const authProxyDisabled =
+    process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1' ||
     process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
   const testAuthBypassEnabled = isTestAuthBypassEnabled();
-  const active =
-    clerkMockEnabled || clerkProxyDisabled || testAuthBypassEnabled;
+  const active = authMockEnabled || authProxyDisabled || testAuthBypassEnabled;
 
   return {
     active,
-    clerkMockEnabled,
-    clerkProxyDisabled,
+    authMockEnabled,
+    authProxyDisabled,
     testAuthBypassEnabled,
-    clerkMiddleware: active ? ('bypassed' as const) : ('active' as const),
+    authMiddleware: active ? ('bypassed' as const) : ('active' as const),
   };
 }
 
@@ -113,7 +115,7 @@ export async function GET() {
         devFast,
         message: devFast.active
           ? 'Dev-fast auth bypass + Drizzle auth validation successful'
-          : 'Clerk + Drizzle auth validation successful',
+          : 'Better Auth + Drizzle auth validation successful',
       },
       { headers: NO_STORE_HEADERS }
     );

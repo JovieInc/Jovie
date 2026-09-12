@@ -161,6 +161,16 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
     'https://y.qq.com/n/ryqq/singer/...',
     { name: 'Tencent Music', category: 'dsp', icon: 'qq', color: '12B7F5' }
   ),
+  line_music: createPlatformInfo(
+    'line_music',
+    'https://music.line.me/webapp/artist/...',
+    {
+      name: 'LINE MUSIC',
+      category: 'dsp',
+      icon: 'line',
+      color: '00B900',
+    }
+  ),
   netease: createPlatformInfo(
     'netease',
     'https://music.163.com/#/artist?id=...',
@@ -314,6 +324,9 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   },
 
   // Detection-only platforms
+  // LINE MUSIC must be matched before the generic line.me rule — the
+  // messenger pattern otherwise swallows music.line.me artist URLs.
+  { pattern: /music\.line\.me/i, platformId: 'line_music' },
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
   { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
   { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },

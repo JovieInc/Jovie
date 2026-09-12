@@ -50,7 +50,7 @@ export function StepCard({
     >
       {/* Connection line */}
       {showConnectionLine && (
-        <div className='absolute left-1/2 top-8 max-md:hidden h-px w-full -translate-x-1/2 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-500/30' />
+        <div className='absolute left-1/2 top-8 max-md:hidden h-px w-full -translate-x-1/2 bg-gradient-to-r from-accent/30 via-info/30 to-accent/30' />
       )}
 
       <div className='relative'>
@@ -62,13 +62,13 @@ export function StepCard({
         >
           <div className='text-center'>
             {/* Icon circle */}
-            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white dark:text-white shadow-lg'>
+            <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent text-on-accent shadow-lg'>
               {icon}
             </div>
 
             <div className='mt-6'>
               {/* Step number */}
-              <div className='text-xs font-semibold uppercase tracking-wider text-blue-500 dark:text-blue-400'>
+              <div className='text-xs font-semibold uppercase tracking-wider text-accent'>
                 Step {stepNumber}
               </div>
 

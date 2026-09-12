@@ -12,6 +12,10 @@ const STAGING_SEMVER_PATTERN =
   /^([0-9]+)\.([0-9]+)\.([0-9]+)-staging\.([1-9][0-9]*)\.([1-9][0-9]*)$/;
 const STAGING_ASSET_PATTERN =
   /^Jovie-Staging-([0-9]+\.[0-9]+\.[0-9]+-staging\.[1-9][0-9]*\.[1-9][0-9]*)-universal\.(?:dmg|zip)(?:\.blockmap)?$/;
+const STAGING_DRAFT_NAME_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+-staging\./;
+const UNTAGGED_RELEASE_PATTERN = /^untagged-[0-9a-f]{20}$/;
+const RELEASE_PAGE_SIZE = 100;
+const MAX_RELEASE_PAGES = 20;
 const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
 
@@ -65,6 +69,85 @@ function releaseSpec(environment, version) {
   };
 }
 
+export function releaseMetadataUpdate({ environment, releaseSha, version }) {
+  const spec = releaseSpec(environment, version);
+  return {
+    name: version,
+    prerelease: spec.prerelease,
+    tag_name: spec.tag,
+    target_commitish: releaseSha,
+  };
+}
+
+export function selectRecoverableStagingDraft(releases) {
+  invariant(Array.isArray(releases), 'GitHub releases are malformed.');
+  const candidates = releases.filter(
+    release =>
+      UNTAGGED_RELEASE_PATTERN.test(release?.tag_name || '') &&
+      STAGING_DRAFT_NAME_PATTERN.test(release?.name || '')
+  );
+  invariant(
+    candidates.length <= 1,
+    'Multiple recoverable staging drafts exist.'
+  );
+  const release = candidates[0] || null;
+  if (!release) return null;
+  invariant(
+    Number.isInteger(release.id) && release.id > 0,
+    'Recoverable staging draft ID is malformed.'
+  );
+  invariant(
+    STAGING_SEMVER_PATTERN.test(release.name),
+    'Recoverable staging draft version is malformed.'
+  );
+  invariant(
+    SHA_PATTERN.test(release.target_commitish),
+    'Recoverable staging draft target is malformed.'
+  );
+  invariant(
+    release.draft === true &&
+      release.prerelease === true &&
+      release.published_at === null,
+    'Recoverable staging release must be a private prerelease draft.'
+  );
+  invariant(
+    Array.isArray(release.assets) && release.assets.length === 0,
+    'Recoverable staging draft must be empty.'
+  );
+  return release;
+}
+
+export async function fetchRecoverableStagingDraft(
+  request,
+  { maxPages = MAX_RELEASE_PAGES, pageSize = RELEASE_PAGE_SIZE } = {}
+) {
+  invariant(typeof request === 'function', 'GitHub request is missing.');
+  invariant(
+    Number.isInteger(maxPages) && maxPages > 0,
+    'GitHub release page limit is invalid.'
+  );
+  invariant(
+    Number.isInteger(pageSize) && pageSize > 0 && pageSize <= 100,
+    'GitHub release page size is invalid.'
+  );
+  const releases = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    const batch = await request(`?per_page=${pageSize}&page=${page}`);
+    invariant(Array.isArray(batch), 'GitHub releases are malformed.');
+    invariant(
+      batch.length <= pageSize,
+      'GitHub release page exceeds the requested size.'
+    );
+    releases.push(...batch);
+    if (batch.length < pageSize) {
+      return selectRecoverableStagingDraft(releases);
+    }
+  }
+  throw new Error(
+    `GitHub release inventory exceeds the ${maxPages}-page safety bound.`
+  );
+}
+
 export function expectedDesktopAssetNames(version, environment = 'production') {
   const spec = releaseSpec(environment, version);
   return [
@@ -114,6 +197,68 @@ export function assertStagingVersionTransition({
       `Staging desktop version ${version} is not newer than current feed ${currentFeedVersion}.`
     );
   }
+}
+
+export function assertMainlineAncestorCompare({
+  comparison,
+  currentMainSha,
+  releaseSha,
+}) {
+  invariant(SHA_PATTERN.test(releaseSha), 'Release SHA is malformed.');
+  invariant(SHA_PATTERN.test(currentMainSha), 'Current main SHA is malformed.');
+  const identical =
+    currentMainSha === releaseSha &&
+    comparison?.status === 'identical' &&
+    comparison.ahead_by === 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.length === 0;
+  const advanced =
+    currentMainSha !== releaseSha &&
+    comparison?.status === 'ahead' &&
+    Number.isInteger(comparison.ahead_by) &&
+    comparison.ahead_by > 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.at(-1)?.sha === currentMainSha;
+  invariant(
+    comparison &&
+      (identical || advanced) &&
+      comparison.base_commit?.sha === releaseSha &&
+      comparison.merge_base_commit?.sha === releaseSha &&
+      Number.isInteger(comparison.behind_by) &&
+      comparison.behind_by === 0,
+    'Desktop generation is not a trusted ancestor of current main.'
+  );
+}
+
+export function assertCommitDescendantCompare({
+  ancestorSha,
+  comparison,
+  descendantSha,
+}) {
+  invariant(SHA_PATTERN.test(ancestorSha), 'Ancestor SHA is malformed.');
+  invariant(SHA_PATTERN.test(descendantSha), 'Descendant SHA is malformed.');
+  const identical =
+    descendantSha === ancestorSha &&
+    comparison?.status === 'identical' &&
+    comparison.ahead_by === 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.length === 0;
+  const advanced =
+    descendantSha !== ancestorSha &&
+    comparison?.status === 'ahead' &&
+    Number.isInteger(comparison.ahead_by) &&
+    comparison.ahead_by > 0 &&
+    Array.isArray(comparison.commits) &&
+    comparison.commits.at(-1)?.sha === descendantSha;
+  invariant(
+    comparison &&
+      (identical || advanced) &&
+      comparison.base_commit?.sha === ancestorSha &&
+      comparison.merge_base_commit?.sha === ancestorSha &&
+      Number.isInteger(comparison.behind_by) &&
+      comparison.behind_by === 0,
+    'Desktop staging source would move backward or leave its published lineage.'
+  );
 }
 
 export function parseLatestMacYaml(contents) {
@@ -509,6 +654,12 @@ class GitHubClient {
     return matches[0] || null;
   }
 
+  async recoverableStagingDraft() {
+    return fetchRecoverableStagingDraft(path =>
+      this.request(`/repos/${this.repository}/releases${path}`)
+    );
+  }
+
   async releaseById(releaseId) {
     return this.request(`/repos/${this.repository}/releases/${releaseId}`);
   }
@@ -532,6 +683,29 @@ class GitHubClient {
     const commit = await this.request(`/repos/${this.repository}/commits/main`);
     invariant(SHA_PATTERN.test(commit?.sha), 'Current main SHA is malformed.');
     return commit.sha;
+  }
+
+  async assertMainlineAncestor(releaseSha) {
+    const currentMainSha = await this.currentMainSha();
+    const comparison = await this.request(
+      `/repos/${this.repository}/compare/${releaseSha}...${currentMainSha}`
+    );
+    assertMainlineAncestorCompare({
+      comparison,
+      currentMainSha,
+      releaseSha,
+    });
+  }
+
+  async assertCommitDescendant(ancestorSha, descendantSha) {
+    const comparison = await this.request(
+      `/repos/${this.repository}/compare/${ancestorSha}...${descendantSha}`
+    );
+    assertCommitDescendantCompare({
+      ancestorSha,
+      comparison,
+      descendantSha,
+    });
   }
 
   async uploadAsset(release, name, buffer) {
@@ -581,14 +755,11 @@ class GitHubClient {
   }
 
   async updateReleaseMetadata({ environment, releaseId, releaseSha, version }) {
-    const spec = releaseSpec(environment, version);
     return this.request(`/repos/${this.repository}/releases/${releaseId}`, {
       method: 'PATCH',
-      body: JSON.stringify({
-        name: version,
-        prerelease: spec.prerelease,
-        target_commitish: releaseSha,
-      }),
+      body: JSON.stringify(
+        releaseMetadataUpdate({ environment, releaseSha, version })
+      ),
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -779,6 +950,23 @@ export async function prepare({
   let release = await client.releaseOrDraftByTag(spec.tag, true);
   if (environment === 'staging') {
     assertStagingVersionTransition({ installedVersion, version });
+    if (!release) {
+      const recoverable = await client.recoverableStagingDraft();
+      if (recoverable) {
+        await updateRelease(
+          client,
+          recoverable,
+          environment,
+          releaseSha,
+          version
+        );
+        release = await client.releaseById(recoverable.id);
+        invariant(
+          Array.isArray(release.assets) && release.assets.length === 0,
+          'Recovered staging draft is not empty.'
+        );
+      }
+    }
     if (release) {
       release = await removeStagingStarterAssets(client, release);
       validateRollingStagingRelease(release);
@@ -847,31 +1035,33 @@ async function rollPublishedStaging({
   client,
   localBuffers,
   output,
+  previous,
   release,
   releaseSha,
   version,
 }) {
   const channelFile = 'staging-mac.yml';
-  const previous = {
-    tagSha: await client.resolveTagCommit('desktop-staging'),
-    targetCommitish: release.target_commitish,
-    version: release.name,
-  };
   invariant(
     SHA_PATTERN.test(previous.tagSha) &&
-      typeof previous.targetCommitish === 'string' &&
-      previous.targetCommitish.length > 0 &&
+      previous.targetCommitish === previous.tagSha &&
       STAGING_SEMVER_PATTERN.test(previous.version),
     'Staging release identity has malformed provenance.'
   );
+  invariant(
+    (await client.resolveTagCommit('desktop-staging')) === previous.tagSha &&
+      release.target_commitish === previous.targetCommitish,
+    'Staging release changed after publication authorization.'
+  );
+  await client.assertCommitDescendant(previous.tagSha, releaseSha);
+  await client.assertMainlineAncestor(releaseSha);
   for (const [name, buffer] of localBuffers) {
     if (name !== channelFile) {
       await uploadOrVerifyAsset(client, release, name, buffer);
     }
   }
   invariant(
-    (await client.currentMainSha()) === releaseSha,
-    'Desktop generation was superseded before release publication.'
+    (await client.resolveTagCommit('desktop-staging')) === previous.tagSha,
+    'Staging release changed during publication.'
   );
   await client.updateTagCommit('desktop-staging', releaseSha);
   try {
@@ -969,10 +1159,7 @@ async function rollPublishedStaging({
     (await client.resolveTagCommit('desktop-staging')) === releaseSha,
     'Published staging release tag does not target the authorized commit.'
   );
-  invariant(
-    (await client.currentMainSha()) === releaseSha,
-    'Desktop generation was superseded before release receipt.'
-  );
+  await client.assertMainlineAncestor(releaseSha);
   await writeOutputs(output, {
     asset_count: release.assets.length,
     release_id: release.id,
@@ -995,6 +1182,21 @@ export async function uploadAndPublish({
   let release = await client.releaseOrDraftByTag(tag);
   const localBuffers = await readLocalBuffers(dist, environment, version);
   if (environment === 'staging') {
+    let previous = null;
+    if (!release.draft) {
+      previous = {
+        tagSha: await client.resolveTagCommit('desktop-staging'),
+        targetCommitish: release.target_commitish,
+        version: release.name,
+      };
+      invariant(
+        SHA_PATTERN.test(previous.tagSha) &&
+          previous.targetCommitish === previous.tagSha &&
+          STAGING_SEMVER_PATTERN.test(previous.version),
+        'Staging release identity has malformed provenance.'
+      );
+      await client.assertCommitDescendant(previous.tagSha, releaseSha);
+    }
     release = await removeStagingStarterAssets(client, release);
     validateRollingStagingRelease(release);
     assertStagingCandidate({
@@ -1007,6 +1209,7 @@ export async function uploadAndPublish({
         client,
         localBuffers,
         output,
+        previous,
         release,
         releaseSha,
         version,
@@ -1055,10 +1258,14 @@ export async function uploadAndPublish({
     version,
     draft: true,
   });
-  invariant(
-    (await client.currentMainSha()) === releaseSha,
-    'Desktop generation was superseded before release publication.'
-  );
+  if (environment === 'staging') {
+    await client.assertMainlineAncestor(releaseSha);
+  } else {
+    invariant(
+      (await client.currentMainSha()) === releaseSha,
+      'Desktop generation was superseded before release publication.'
+    );
+  }
 
   release = await client.publishRelease(release.id, environment, version);
   validateReleaseAssets({
@@ -1074,10 +1281,7 @@ export async function uploadAndPublish({
     'Published release tag does not target the authorized commit.'
   );
   if (environment === 'staging') {
-    invariant(
-      (await client.currentMainSha()) === releaseSha,
-      'Desktop generation was superseded before release receipt.'
-    );
+    await client.assertMainlineAncestor(releaseSha);
   }
 
   await writeOutputs(output, {

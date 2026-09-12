@@ -649,6 +649,7 @@ warm_cache() {
     tmp_checksum="$tmp_dir/$(basename "$checksum_path")"
     trap cleanup_warm_tmp EXIT
     install -d -m 0755 "$store_dir"
+    install -m 0644 "$workspace/package.json" "$tmp_dir/package.json"
     install -m 0644 "$workspace/pnpm-lock.yaml" "$tmp_dir/pnpm-lock.yaml"
     if [ -f "$workspace/pnpm-workspace.yaml" ]; then
       install -m 0644 "$workspace/pnpm-workspace.yaml" "$tmp_dir/pnpm-workspace.yaml"

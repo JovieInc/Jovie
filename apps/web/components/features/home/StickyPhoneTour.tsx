@@ -30,12 +30,12 @@ function StickyPhoneTourFallback({
         <PhoneTourDivider />
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-screen'
+          className='pointer-events-none absolute inset-x-0 top-0 h-svh'
           style={{ background: 'var(--linear-hero-backdrop)' }}
         />
         <div
           aria-hidden='true'
-          className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-screen'
+          className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-svh'
         />
 
         <div className='sticky top-0 z-10 flex h-dvh items-center justify-center'>

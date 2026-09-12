@@ -136,6 +136,13 @@ import {
   PITCH_GRILL_PROCEDURE,
 } from '@/lib/services/pitch/curator-checklist';
 import {
+  evaluateAllReleasePitchRuleCases,
+  evaluateReleasePitchRuleCase,
+  RELEASE_PITCH_RULE_CASE_IDS,
+  RELEASE_PITCH_RULES,
+  type ReleasePitchRuleCaseId,
+} from '@/lib/services/pitch/pitch-rules';
+import {
   buildPitchDraftSystemPrompt,
   buildPitchDraftUserPrompt,
   buildSystemPrompt as buildPlaylistPitchSystemPrompt,
@@ -143,6 +150,13 @@ import {
 } from '@/lib/services/pitch/prompts';
 import { resolvePitchDestination } from '@/lib/services/pitch/targets';
 import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
+import {
+  evaluateAllRetouchRuleCases,
+  evaluateRetouchRuleCase,
+  RETOUCH_IDENTITY_RULES,
+  RETOUCH_RULE_CASE_IDS,
+  type RetouchRuleCaseId,
+} from '@/lib/services/retouching/identity-rules';
 import { buildRetouchPrompt } from '@/lib/services/retouching/style';
 import {
   evaluateAllSmartLinkSwitchRuleCases,
@@ -5924,7 +5938,8 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       'ONE missing field',
     ]),
     incompleteChecklistRefusesSilentDraft:
-      incompleteChecklist.allResolved === false,
+      incompleteChecklist.allResolved === false &&
+      incompleteChecklist.draftable === false,
     playlistSystemIncludesPlatformLimits: Object.values(PLATFORM_LIMITS).every(
       limit => playlistSystemPrompt.includes(String(limit))
     ),
@@ -5941,7 +5956,33 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     ]),
     promptAvoidsPrivateContactLeak:
       promptLeakPatterns(combinedPitchPrompt).length === 0,
+    noDraftUntilChecklistResolved: textIncludesAll(RELEASE_PITCH_RULES, [
+      'Do not draft until the curator checklist',
+      'Never invent a listen URL',
+    ]),
+    unresolvedChecklistHoldsDraft: false,
+    inventedContactRefused: false,
   };
+  const releasePitchRuleCases = evaluateAllReleasePitchRuleCases();
+  const requestedReleasePitchRuleCase =
+    typeof vars.releasePitchRuleCase === 'string' &&
+    (RELEASE_PITCH_RULE_CASE_IDS as readonly string[]).includes(
+      vars.releasePitchRuleCase
+    )
+      ? (vars.releasePitchRuleCase as ReleasePitchRuleCaseId)
+      : null;
+  const requestedReleasePitchRule = requestedReleasePitchRuleCase
+    ? evaluateReleasePitchRuleCase(requestedReleasePitchRuleCase)
+    : null;
+  const retouchRuleCases = evaluateAllRetouchRuleCases();
+  const requestedRetouchRuleCase =
+    typeof vars.retouchRuleCase === 'string' &&
+    (RETOUCH_RULE_CASE_IDS as readonly string[]).includes(vars.retouchRuleCase)
+      ? (vars.retouchRuleCase as RetouchRuleCaseId)
+      : null;
+  const requestedRetouchRule = requestedRetouchRuleCase
+    ? evaluateRetouchRuleCase(requestedRetouchRuleCase)
+    : null;
   const packagingRuleCases = evaluateAllPackagingRuleCases();
   const requestedPackagingRuleCase =
     typeof vars.packagingRuleCase === 'string' &&
@@ -6170,6 +6211,21 @@ function evaluateSkillPromptContract(vars: EvalVars) {
         item => item.id === 'only-resolved-dsps-cited'
       )?.passed === true,
   };
+  releasePitchPromptFacts.unresolvedChecklistHoldsDraft =
+    releasePitchRuleCases.find(
+      item => item.id === 'unresolved-checklist-holds-draft'
+    )?.passed === true;
+  releasePitchPromptFacts.inventedContactRefused =
+    releasePitchRuleCases.find(item => item.id === 'invented-contact-refused')
+      ?.passed === true;
+  const retouchPromptFacts = {
+    safeRefusalOnAmbiguousIdentity: textIncludesAll(RETOUCH_IDENTITY_RULES, [
+      'safe refusal instead of guessing',
+    ]),
+    ambiguousIdentityRefused:
+      retouchRuleCases.find(item => item.id === 'ambiguous-identity-refused')
+        ?.passed === true,
+  };
   const retouchGuardrails = [
     "Preserve the person's identity",
     'Do not change protected or sensitive attributes',
@@ -6201,6 +6257,9 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const missingSmartLinkSwitchPromptFacts = Object.entries(
     smartLinkSwitchPromptFacts
   )
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  const missingRetouchPromptFacts = Object.entries(retouchPromptFacts)
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingRetouchGenerationFacts = [
@@ -6255,6 +6314,12 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       facts: releasePitchPromptFacts,
       missingFacts: missingReleasePitchPromptFacts,
       leakPatterns: promptLeakPatterns(combinedPitchPrompt),
+      ruleCases: releasePitchRuleCases,
+      ruleCase: requestedReleasePitchRule?.id ?? null,
+      ruleCasePassed: requestedReleasePitchRule
+        ? requestedReleasePitchRule.passed
+        : releasePitchRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedReleasePitchRule?.reason ?? null,
     },
     packaging: {
       skillId: 'analyzePackaging',
@@ -6310,6 +6375,14 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       requiredGuardrails: retouchGuardrails,
       missingGuardrails: missingRetouchGuardrails,
       missingGenerationFacts: missingRetouchGenerationFacts,
+      facts: retouchPromptFacts,
+      missingFacts: missingRetouchPromptFacts,
+      ruleCases: retouchRuleCases,
+      ruleCase: requestedRetouchRule?.id ?? null,
+      ruleCasePassed: requestedRetouchRule
+        ? requestedRetouchRule.passed
+        : retouchRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedRetouchRule?.reason ?? null,
     },
     toolCalls: [],
     toolResults: [],

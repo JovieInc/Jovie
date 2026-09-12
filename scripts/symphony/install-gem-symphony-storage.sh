@@ -17,10 +17,14 @@ helper_source="$source_root/jovie-symphony-workspace"
 wrapper_source="$source_root/jovie-symphony-workspace-create"
 cache_source="$source_root/symphony-nvme-package-cache.sh"
 boot_simulation_source="$source_root/gem-symphony-workspace-boot-simulate"
+reclaimer_source="$source_root/gem-disk-reclaim.py"
+migration_source="$source_root/gem-workspace-migrate.py"
 helper_target="/usr/local/sbin/jovie-symphony-workspace"
 wrapper_target="/home/$owner/.local/bin/jovie-symphony-workspace-create"
 cache_target="/home/$owner/.local/bin/symphony-nvme-package-cache"
 boot_simulation_target="/home/$owner/.local/bin/gem-symphony-workspace-boot-simulate"
+reclaimer_target="/home/$owner/.local/bin/gem-disk-reclaim"
+migration_target="/usr/local/sbin/gem-workspace-migrate"
 node_target="/home/$owner/.nvm/versions/node/v22.23.2/bin/node"
 node_link="/home/$owner/.local/bin/node"
 pnpm_target="/home/$owner/.nvm/versions/node/v22.23.2/bin/pnpm"
@@ -30,18 +34,26 @@ systemd_source="$source_root/systemd"
 user_dropin_dir="/home/$owner/.config/systemd/user/symphony-elixir.service.d"
 
 for path in "$helper_source" "$wrapper_source" "$cache_source" "$boot_simulation_source" \
+  "$reclaimer_source" \
+  "$migration_source" \
   "$systemd_source/jovie-symphony-workspace-mounts.service" \
   "$systemd_source/jovie-symphony-workspace-cleanup.service" \
   "$systemd_source/jovie-symphony-workspace-cleanup.timer" \
+  "$systemd_source/gem-disk-reclaim.service" \
+  "$systemd_source/gem-disk-reclaim.timer" \
   "$systemd_source/symphony-elixir-workspace-mounts.conf"; do
   [[ -f "$path" && ! -L "$path" ]] || { echo "missing or unsafe source artifact: $path" >&2; exit 65; }
 done
 
 bash -n "$helper_source" "$wrapper_source" "$cache_source" "$boot_simulation_source"
+python3 -c 'import ast,pathlib,sys; [ast.parse(pathlib.Path(path).read_text(encoding="utf-8"), filename=path) for path in sys.argv[1:]]' \
+  "$reclaimer_source" "$migration_source"
 systemd-analyze verify \
   "$systemd_source/jovie-symphony-workspace-mounts.service" \
   "$systemd_source/jovie-symphony-workspace-cleanup.service" \
-  "$systemd_source/jovie-symphony-workspace-cleanup.timer"
+  "$systemd_source/jovie-symphony-workspace-cleanup.timer" \
+  "$systemd_source/gem-disk-reclaim.service" \
+  "$systemd_source/gem-disk-reclaim.timer"
 
 for mount_path in /srv/worktrees /srv/models /srv/cache /srv/scratch /srv/git; do
   mountpoint -q "$mount_path" || { echo "required mount missing: $mount_path" >&2; exit 66; }
@@ -88,9 +100,13 @@ backup_if_present "$helper_target" jovie-symphony-workspace
 backup_if_present "$wrapper_target" jovie-symphony-workspace-create
 backup_if_present "$cache_target" symphony-nvme-package-cache
 backup_if_present "$boot_simulation_target" gem-symphony-workspace-boot-simulate
+backup_if_present "$reclaimer_target" gem-disk-reclaim
+backup_if_present "$migration_target" gem-workspace-migrate
 backup_if_present /etc/systemd/system/jovie-symphony-workspace-mounts.service jovie-symphony-workspace-mounts.service
 backup_if_present /etc/systemd/system/jovie-symphony-workspace-cleanup.service jovie-symphony-workspace-cleanup.service
 backup_if_present /etc/systemd/system/jovie-symphony-workspace-cleanup.timer jovie-symphony-workspace-cleanup.timer
+backup_if_present "/home/$owner/.config/systemd/user/gem-disk-reclaim.service" gem-disk-reclaim.service
+backup_if_present "/home/$owner/.config/systemd/user/gem-disk-reclaim.timer" gem-disk-reclaim.timer
 backup_if_present "$user_dropin_dir/workspace-mounts.conf" workspace-mounts.conf
 backup_if_present "$node_link" node-link
 backup_if_present "$pnpm_link" pnpm-link
@@ -107,9 +123,13 @@ atomic_install "$helper_source" "$helper_target" 0755 root root
 atomic_install "$wrapper_source" "$wrapper_target" 0755 "$owner" "$owner"
 atomic_install "$cache_source" "$cache_target" 0755 "$owner" "$owner"
 atomic_install "$boot_simulation_source" "$boot_simulation_target" 0755 "$owner" "$owner"
+atomic_install "$reclaimer_source" "$reclaimer_target" 0755 "$owner" "$owner"
+atomic_install "$migration_source" "$migration_target" 0755 root root
 atomic_install "$systemd_source/jovie-symphony-workspace-mounts.service" /etc/systemd/system/jovie-symphony-workspace-mounts.service 0644 root root
 atomic_install "$systemd_source/jovie-symphony-workspace-cleanup.service" /etc/systemd/system/jovie-symphony-workspace-cleanup.service 0644 root root
 atomic_install "$systemd_source/jovie-symphony-workspace-cleanup.timer" /etc/systemd/system/jovie-symphony-workspace-cleanup.timer 0644 root root
+atomic_install "$systemd_source/gem-disk-reclaim.service" "/home/$owner/.config/systemd/user/gem-disk-reclaim.service" 0644 "$owner" "$owner"
+atomic_install "$systemd_source/gem-disk-reclaim.timer" "/home/$owner/.config/systemd/user/gem-disk-reclaim.timer" 0644 "$owner" "$owner"
 atomic_install "$systemd_source/symphony-elixir-workspace-mounts.conf" "$user_dropin_dir/workspace-mounts.conf" 0644 "$owner" "$owner"
 
 install_symlink() {
@@ -131,6 +151,7 @@ install_symlink "$pnpm_target" "$pnpm_link"
 systemctl daemon-reload
 "${user_systemctl[@]}" daemon-reload
 systemctl enable jovie-symphony-workspace-mounts.service jovie-symphony-workspace-cleanup.timer >/dev/null
+"${user_systemctl[@]}" enable --now gem-disk-reclaim.timer >/dev/null
 
 service_state_after="$("${user_systemctl[@]}" show symphony-elixir.service -p ActiveState --value)"
 service_pid_after="$("${user_systemctl[@]}" show symphony-elixir.service -p MainPID --value)"
@@ -170,6 +191,7 @@ receipt="$receipt_root/${timestamp}-gem-symphony-storage-installed.txt"
   printf 'workspace_status_after_sha256=%s\n' "$(printf '%s' "$workspace_status_after" | sha256sum | awk '{print $1}')"
   printf 'mount_restore_enabled=%s\n' "$(systemctl is-enabled jovie-symphony-workspace-mounts.service)"
   printf 'cleanup_timer_enabled=%s\n' "$(systemctl is-enabled jovie-symphony-workspace-cleanup.timer)"
+  printf 'disk_reclaim_timer_enabled=%s\n' "$("${user_systemctl[@]}" is-enabled gem-disk-reclaim.timer)"
   printf 'backup_root=%s\n' "$backup_root"
   printf 'restart_performed=false\n'
   printf 'fstab_changed=false\n'

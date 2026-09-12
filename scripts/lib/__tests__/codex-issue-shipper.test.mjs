@@ -35,7 +35,6 @@ import {
   isUiUxDesignIssue,
   loadShipperConfig,
   MAX_RETRY_RELEASES,
-  NO_AUTO_LABEL,
   parseAgentChain,
   parseCreatedPrNumber,
   parseDirtyPaths,
@@ -136,11 +135,11 @@ describe('codex issue shipper planner', () => {
     expect(buildDispatchPlans([], config)).toEqual([]);
   });
 
-  it('filters no-auto, claimed, blocked, epic, and invalid issues before dispatch', () => {
+  it('ignores legacy human holds while filtering machine blockers, epics, and invalid issues', () => {
     const ready = issue({ number: 1, title: 'Fix docs typo' });
     const noAuto = issue({
       number: 2,
-      labels: [{ name: 'codex' }, { name: NO_AUTO_LABEL }],
+      labels: [{ name: 'codex' }, { name: 'no-auto' }],
     });
     const claimed = issue({
       number: 3,
@@ -178,13 +177,20 @@ describe('codex issue shipper planner', () => {
         epic,
         invalidMisroute,
       ])
-    ).toEqual([ready]);
+    ).toEqual([ready, noAuto]);
     expect(
       buildDispatchPlans(
         [ready, noAuto, claimed, blocked, epic, invalidMisroute],
         config
       )
-    ).toHaveLength(1);
+    ).toHaveLength(2);
+
+    const humanReview = issue({
+      number: 7,
+      body: 'This issue requires human review',
+      labels: [{ name: 'codex' }, { name: 'human-review-required' }],
+    });
+    expect(eligibleCodexIssues([humanReview])).toEqual([humanReview]);
   });
 
   it('does not require codex-approved before dispatching codex-labeled issues', () => {

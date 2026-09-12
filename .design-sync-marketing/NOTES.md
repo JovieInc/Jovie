@@ -85,8 +85,8 @@ These are all build-time constants (no API calls). Safe in the preview sandbox.
 
 ## Bundle probe
 
-`prebuild.mjs` IS the bundle step (and the canonical stub mapping — `@clerk/nextjs/server`
-→ `.storybook/clerk-server-mock.js`, sentry → `sentry-passthrough.tsx`). Run it to verify the
+`prebuild.mjs` IS the bundle step (and the canonical stub mapping — sentry →
+`sentry-passthrough.tsx`). Run it to verify the
 landing tree bundles clean for the browser; it writes `dist/landing.mjs` and prints size + error
 count. The scoped landing bundle is ~1,020 KB.
 

@@ -62,10 +62,6 @@ const strykerConfig = {
     'app/api/verification/request/route.ts',
     'app/api/pre-save/apple/route.ts',
     'app/api/wrap-link/route.ts',
-    // FAPI host decoding + Clerk env key resolution — broken auth here
-    // locks out every user across all three Clerk environments.
-    'lib/auth/decode-fapi-host.ts',
-    'lib/auth/staging-clerk-keys.ts',
     'lib/auth/test-mode.ts',
     // Dev test-auth bypass (RED 35.7 per TEST_RISK_REGISTER.md + HEATMAP mutation warning).
     // High trust E2E surface: must fail closed on prod (NODE_ENV+VERCEL_ENV), spoofed headers,

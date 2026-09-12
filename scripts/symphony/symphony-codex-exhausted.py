@@ -8,6 +8,7 @@ import base64
 import calendar
 import fcntl
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -33,10 +34,6 @@ MAX_GROK_CANARY_TIMEOUT_SECONDS = 60.0
 DEFAULT_GROK_SURVIVAL_SECONDS = 90.0
 MAX_GROK_SURVIVAL_SECONDS = 120.0
 CONTROL_TIMEOUT_SECONDS = 10.0
-DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
-MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
-DEFAULT_KIMI_MAX = 4  # independent Max Kimi OAuth chairs; SYMPHONY_GROK_MAX must not consume these
-MAX_KIMI_MAX = 10
 STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 min; 45 min would recycle live work
 # Unlocked leftover JOV-*.lock files older than this cannot keep pickup idle.
 # Held live implement/remount locks are never TTL-expired.
@@ -55,6 +52,7 @@ DONE_LOCK_STATES = frozenset(("done", "canceled", "cancelled", "duplicate", "clo
 TYPED_PICKUP_REFUSE_REASONS = frozenset(
     (
         "open_pr_inflight",
+        "open_pr_inventory_unknown",
         "issue_in_review",
         "issue_done",
         "issue_canceled",
@@ -94,6 +92,12 @@ RUNTIME_NAMES = (
     "cursor-agent-std",
     "model-router.py",
     "model-registry.json",
+    "provider_capacity.py",
+    "existing_pr_repair.py",
+    "writer-owned-pr-promote.sh",
+    "writer-owned-pr-promotion.mjs",
+    "queue-deferral-receipt.mjs",
+    "upsert-pr-comment.sh",
 )
 LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
 # Labels are derived audit evidence, never independent admission blockers.
@@ -102,17 +106,11 @@ REQUIRED_ADMISSION_LABELS = frozenset()
 ADMISSION_GATE_PREFIX = "<!-- admission-gate/v1 -->"
 ADMISSION_GATE_SUFFIX = "<!--/admission-gate-->"
 ADMISSION_GATE_SCHEMA = "admission-gate/v1"
-# Single source of truth for the Grok sidecar admission predicate. `blocked` is
-# included because human-review flags (needs-human / needs:human / blocked / hold)
-# must gate out of auto-ship; reconcile and grok-ship-one both use this set.
+# Single source of truth for the Grok sidecar admission predicate. Only active
+# machine, incident, and dead-letter holds gate dispatch. Legacy human-review,
+# taste, decision, and no-auto labels are inert (JOV-INV-028).
 BLOCKED_ADMISSION_LABELS = frozenset(
     (
-        "human-review-required",
-        "needs:human",
-        "needs-human",
-        "needs:decision",
-        "needs-decision",
-        "decision-required",
         "held",
         "hold",
         "manual-incident",
@@ -201,11 +199,11 @@ REMEDIATOR_RE = re.compile(
     r"failing checks?|create-bounded-ci-repair|bounded[- ]ci[- ]repair)\b",
     re.I,
 )
-OAUTH_PROVIDERS = ("grok", "kimi")
 REMEDIATOR_MODEL_IDS = {
     "grok": "grok-4.6",
     "kimi": "kimi-k3",
 }
+_PROVIDER_CAPACITY_MODULE = None
 GH_TIMEOUT_SECONDS = 20.0
 JOV_REPO = "JovieInc/Jovie"
 LYB_REPO = "JovieInc/LogYourBody"
@@ -323,7 +321,12 @@ def _grok_canary_ready() -> tuple[bool, str]:
 def _bundle_revision() -> str | None:
     try:
         digest = hashlib.sha256()
-        for name in ("symphony-codex-exhausted.py", "model-router.py", "model-registry.json"):
+        for name in (
+            "symphony-codex-exhausted.py",
+            "model-router.py",
+            "model-registry.json",
+            "provider_capacity.py",
+        ):
             path = pathlib.Path(__file__).resolve().parent / name
             if name == "model-registry.json" and not path.is_file():
                 path = path.parent / "config" / name
@@ -331,6 +334,60 @@ def _bundle_revision() -> str | None:
         return digest.hexdigest()
     except OSError:
         return None
+
+
+def _provider_capacity():
+    """Load the source sibling used by isolated fallback workers."""
+    global _PROVIDER_CAPACITY_MODULE
+    if _PROVIDER_CAPACITY_MODULE is not None:
+        return _PROVIDER_CAPACITY_MODULE
+    path = pathlib.Path(__file__).resolve().with_name("provider_capacity.py")
+    try:
+        spec = importlib.util.spec_from_file_location("symphony_provider_capacity", path)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _PROVIDER_CAPACITY_MODULE = module
+        return module
+    except (ImportError, OSError, TypeError, ValueError):
+        return None
+
+
+def _registry_models() -> list[dict]:
+    root = pathlib.Path(__file__).resolve().parent
+    path = root / "model-registry.json"
+    if not path.is_file():
+        path = root / "config" / "model-registry.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return []
+    models = payload.get("models") if isinstance(payload, dict) else None
+    return [model for model in models if isinstance(model, dict)] if isinstance(models, list) else []
+
+
+def _fallback_provider_models() -> dict[str, list[dict]]:
+    """Return subscription CLI executors, excluding the official Codex lane."""
+    providers: dict[str, list[dict]] = {}
+    capacity_module = _provider_capacity()
+    supported = getattr(capacity_module, "PROVIDERS", ())
+    for model in _registry_models():
+        provider = model.get("provider")
+        if (
+            model.get("channel") != "subscription"
+            or provider == "codex"
+            or not isinstance(provider, str)
+            or not isinstance(model.get("agent_argv"), list)
+            or (supported and provider not in supported)
+        ):
+            continue
+        providers.setdefault(provider, []).append(model)
+    return providers
+
+
+def _fallback_provider_names() -> tuple[str, ...]:
+    return tuple(sorted(_fallback_provider_models()))
 
 
 def _model_router_selection(
@@ -409,21 +466,26 @@ def _model_router_selection(
     return payload, "model_router_ready"
 
 
-def _oauth_fallback_selections() -> tuple[dict[str, dict] | None, str]:
-    """Ready grok-4.6 and kimi-k3 selections from live OAuth, independently."""
+def _fallback_selections() -> tuple[dict[str, dict] | None, str]:
+    """Select one isolated CLI executor per registry-derived provider."""
     selections: dict[str, dict] = {}
     last_reason = "model_router_no_fallback"
-    for provider, model_id in REMEDIATOR_MODEL_IDS.items():
+    for provider, models in _fallback_provider_models().items():
+        model_ids = tuple(
+            model["id"] for model in models if isinstance(model.get("id"), str)
+        )
+        if not model_ids:
+            continue
         payload, reason = _model_router_selection(
-            workflow="remediation", include_ids=(model_id,)
+            workflow="remediation", include_ids=model_ids
         )
         last_reason = reason
         selected = (payload or {}).get("selected") if payload else None
         if (
             payload is not None
             and isinstance(selected, dict)
-            and selected.get("id") == model_id
             and selected.get("provider") == provider
+            and selected.get("id") in model_ids
         ):
             selections[provider] = payload
     if not selections:
@@ -432,14 +494,17 @@ def _oauth_fallback_selections() -> tuple[dict[str, dict] | None, str]:
         if payload is None or not isinstance(selected, dict) or not selected.get("id"):
             return None, reason
         provider = selected.get("provider")
-        if provider in OAUTH_PROVIDERS:
+        if provider in _fallback_provider_names():
             selections[provider] = payload
         else:
-            # Leftover included Cursor/etc. still drains; remediator work
-            # refuses this payload because the model id is not grok-4.6/kimi-k3.
-            selections["grok"] = payload
+            return None, "model_router_no_fallback"
         return selections, "oauth_ready"
     return selections, "oauth_ready"
+
+
+# Existing callers use the old name; keep the alias while the implementation
+# derives providers from the canonical registry.
+_oauth_fallback_selections = _fallback_selections
 
 
 def _fleet_gate_allows_isolated() -> tuple[bool, str]:
@@ -466,14 +531,18 @@ def _fleet_gate_allows_isolated() -> tuple[bool, str]:
     return True, f"fleet_gate_{state.lower()}"
 
 
-def _closure_intake_allowed() -> bool:
-    """Mirror grok-ship-one's new-work gate: closureAdmission.newIssueIntakeAllowed.
+def _product_id_for_identifier(identifier: str | None) -> str:
+    if isinstance(identifier, str) and identifier.startswith("LYB-"):
+        return "logyourbody"
+    return "jovie"
 
-    The sidecar must not lease NEW fallback work while the Summer closure
-    stop-line is closed — the leased worker would only die on grok-ship-one's
-    own stop-line check, burning a lease, Linear calls, and a unit launch for
-    nothing (live 2026-09-03: JOV-3583 exit 1 churn). Fail-closed when the
-    receipt is unreadable, matching grok-ship-one.
+
+def _closure_intake_allowed(identifier: str | None = None) -> bool:
+    """Mirror grok-ship-one's new-work gate, scoped by gem-repo-registry id.
+
+    Jovie MQ red (issue-blocked) must not freeze LYB/Ovie new leases.
+    Missing or unreadable receipts stay systems-down and fail closed.
+    Remounts skip this helper entirely.
     """
     path = pathlib.Path(
         os.path.expanduser(
@@ -488,7 +557,33 @@ def _closure_intake_allowed() -> bool:
     except (OSError, TypeError, ValueError):
         return False
     closure = receipt.get("closureAdmission")
-    return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+    signals = receipt.get("signals") if isinstance(receipt.get("signals"), dict) else {}
+    shared = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if not isinstance(shared, dict) and isinstance(closure, dict):
+        shared = closure
+    products = None
+    if isinstance(closure, dict) and isinstance(closure.get("products"), dict):
+        products = closure["products"]
+    elif isinstance(signals, dict) and isinstance(signals.get("productClosureHealth"), dict):
+        products = signals["productClosureHealth"]
+    product_id = _product_id_for_identifier(identifier)
+    helper_dir = pathlib.Path(__file__).resolve().parent
+    if str(helper_dir) not in sys.path:
+        sys.path.insert(0, str(helper_dir))
+    try:
+        from closure_health import product_intake_allowed
+    except ImportError:
+        if product_id == "jovie":
+            return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+        reasons = closure.get("reasons") if isinstance(closure, dict) else None
+        systems = {
+            "closure-health-receipt-missing-or-malformed",
+            "gate-evaluation-failed",
+        }
+        return not (
+            isinstance(reasons, list) and any(reason in systems for reason in reasons)
+        )
+    return product_intake_allowed(shared, product_id, products=products)
 
 
 def _grok_units_after_survival_window() -> list[str] | None:
@@ -630,6 +725,8 @@ def _unit_provider(unit: str) -> str:
     )
     if result is not None and result.returncode == 0:
         text = result.stdout.decode(errors="replace")
+        if "SYMPHONY_FALLBACK_PROVIDER=cursor" in text:
+            return "cursor"
         if "SYMPHONY_FALLBACK_PROVIDER=kimi" in text:
             return "kimi"
         if "SYMPHONY_FALLBACK_PROVIDER=grok" in text:
@@ -638,7 +735,7 @@ def _unit_provider(unit: str) -> str:
 
 
 def _active_provider_counts(active: list[str]) -> dict[str, int]:
-    counts = {"grok": 0, "kimi": 0}
+    counts = {provider: 0 for provider in _fallback_provider_names()}
     for unit in active:
         provider = _unit_provider(unit)
         if provider in counts:
@@ -653,13 +750,10 @@ def _started_counts(
     default_provider: str = "grok",
 ) -> tuple[int, int]:
     living = launched.intersection(survived)
-    fallback = default_provider if default_provider in OAUTH_PROVIDERS else "grok"
-    grok_started = sum(
-        1 for unit in living if unit_providers.get(unit, fallback) == "grok"
-    )
-    kimi_started = sum(
-        1 for unit in living if unit_providers.get(unit, fallback) == "kimi"
-    )
+    providers = _fallback_provider_names()
+    fallback = default_provider if default_provider in providers else (providers[0] if providers else "")
+    grok_started = sum(1 for unit in living if unit_providers.get(unit, fallback) == "grok")
+    kimi_started = sum(1 for unit in living if unit_providers.get(unit, fallback) == "kimi")
     return grok_started, kimi_started
 
 
@@ -792,17 +886,23 @@ def _grok_ship_one_executable() -> str | None:
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
-def _env_seat_cap(name: str, default: int, hard_max: int) -> int:
-    try:
-        value = int(os.environ.get(name, default))
-    except (TypeError, ValueError):
-        return default
-    return max(0, min(value, hard_max))
-
-
-def _kimi_limit() -> int:
-    # Independent Max Kimi OAuth chairs; SYMPHONY_GROK_MAX must not consume these.
-    return _env_seat_cap("SYMPHONY_KIMI_MAX", DEFAULT_KIMI_MAX, MAX_KIMI_MAX)
+def _observed_capacity_override(provider: str) -> int | None:
+    """Read a provider-local observation without imposing a scheduler ceiling."""
+    names = (
+        f"SYMPHONY_{provider.upper()}_OBSERVED_CAPACITY",
+        # Compatibility for existing hosts: MAX is interpreted as the latest
+        # observation and is no longer clamped to a hidden global maximum.
+        f"SYMPHONY_{provider.upper()}_MAX",
+    )
+    for name in names:
+        raw = os.environ.get(name)
+        if raw is None or raw == "":
+            continue
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def _oidc_seat(entry: object) -> bool:
@@ -831,27 +931,24 @@ def _kimi_oauth_seats() -> int | None:
     return 1 if _oidc_seat(payload) else 0
 
 
-def _live_oauth_seats() -> int | None:
-    """Live Max Grok + Max Kimi OAuth chairs from local credential files."""
-    grok = _grok_oauth_seats()
-    kimi = _kimi_oauth_seats()
-    if grok is None and kimi is None:
-        return None
-    return (grok or 0) + (kimi or 0)
-
-
 def _grok_limit() -> int:
-    raw = os.environ.get("SYMPHONY_GROK_MAX")
-    if raw is not None:
-        try:
-            return max(0, min(int(raw), MAX_GROK_MAX))
-        except (TypeError, ValueError):
-            return DEFAULT_GROK_MAX
-    seats = _live_oauth_seats()
-    if seats is None or seats <= 0:
-        # Missing Grok/Kimi files, or Codex-only exhaustion, must not serial-pin.
-        return DEFAULT_GROK_MAX
-    return max(1, min(MAX_GROK_MAX, max(DEFAULT_GROK_MAX, seats)))
+    observed = _observed_capacity_override("grok")
+    if observed is not None:
+        return observed
+    seats = _grok_oauth_seats()
+    if seats is not None:
+        return seats
+    return 1 if _grok_executable() else 0
+
+
+def _kimi_limit() -> int:
+    observed = _observed_capacity_override("kimi")
+    if observed is not None:
+        return observed
+    seats = _kimi_oauth_seats()
+    if seats is not None:
+        return seats
+    return 1 if _kimi_executable() else 0
 
 
 def _parse_oauth_seats(payload: object) -> int | None:
@@ -877,9 +974,9 @@ def _parse_oauth_seats(payload: object) -> int | None:
 
 def _probe_oauth_seats(provider: str) -> int | None:
     """Per-provider live OAuth chairs via env pin or CLI probe. None means unverifiable."""
-    env_key = (
-        "SYMPHONY_GROK_OAUTH_SEATS" if provider == "grok" else "SYMPHONY_KIMI_OAUTH_SEATS"
-    )
+    if provider not in {"grok", "kimi"}:
+        return None
+    env_key = f"SYMPHONY_{provider.upper()}_OAUTH_SEATS"
     raw = os.environ.get(env_key)
     if raw is not None and raw != "":
         try:
@@ -918,11 +1015,108 @@ def _probe_oauth_seats(provider: str) -> int | None:
 
 
 def _provider_seat_limit(provider: str) -> int:
-    env_cap = _grok_limit() if provider == "grok" else _kimi_limit()
     oauth = _probe_oauth_seats(provider)
-    if oauth is None:
-        return env_cap
-    return min(env_cap, oauth)
+    if oauth is not None:
+        return oauth
+    if provider == "grok":
+        return _grok_limit()
+    if provider == "kimi":
+        return _kimi_limit()
+    return 0
+
+
+def _provider_measured_capacity(provider: str) -> int:
+    """Read one provider's current measured budget without a global cap."""
+    if provider in {"grok", "kimi"}:
+        return _provider_seat_limit(provider)
+    observed = _observed_capacity_override(provider)
+    if observed is not None:
+        return observed
+    if provider == "cursor":
+        # The registry proves the CLI executor, while one installed Cursor
+        # session is the only portable seat observation available here.
+        return 1 if _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") else 0
+    return 0
+
+
+def _provider_capacity_state() -> tuple[object | None, pathlib.Path]:
+    module = _provider_capacity()
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_PROVIDER_CAPACITY_STATE",
+                "~/.local/state/symphony-fallback/provider-capacity.json",
+            )
+        )
+    )
+    if module is None:
+        return None, path
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    try:
+        state = module.read_state(path, now)
+        changed = False
+        for provider in _fallback_provider_names():
+            observed_capacity = _provider_measured_capacity(provider)
+            current = state["providers"].get(provider)
+            if (
+                isinstance(current, dict)
+                and current.get("observedCapacity") == observed_capacity
+            ):
+                continue
+            state = module.apply_observation(
+                state,
+                provider=provider,
+                kind="capacity_observed",
+                event_id=f"capacity:{provider}:{observed_capacity}:{now}",
+                observed_at=now,
+                observed_capacity=observed_capacity,
+            )
+            changed = True
+        if changed:
+            module.write_state(path, state)
+        return state, path
+    except (OSError, TypeError, ValueError):
+        return None, path
+
+
+def _lane_capacity_receipt() -> dict | None:
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_LANE_CAPACITY_RECEIPT",
+                os.environ.get(
+                    "GEM_FLEET_GATE_RECEIPT",
+                    "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+                ),
+            )
+        )
+    )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    receipt = payload.get("laneCapacity")
+    if isinstance(receipt, dict):
+        return receipt
+    queue = payload.get("queue")
+    receipt = queue.get("laneCapacity") if isinstance(queue, dict) else None
+    return receipt if isinstance(receipt, dict) else None
+
+
+def _lane_allows_provider(provider: str, *, remediator: bool) -> bool:
+    lane = os.environ.get("SYMPHONY_FALLBACK_LANE", "").strip()
+    if not lane:
+        return True
+    module = _provider_capacity()
+    receipt = _lane_capacity_receipt()
+    return bool(
+        module
+        and module.lane_allows(
+            receipt, provider=provider, lane=lane, remediation=remediator
+        )
+    )
 
 
 def _is_remediator_work(issue: dict | None, pr_verdict: str) -> bool:
@@ -1034,8 +1228,8 @@ def admission_decision(
     pre-launch verification, and grok-ship-one's check-admission command.
 
     An issue is admitted only when a current admission-gate/v1 receipt matches
-    this revision and no blocked/human-review label is present. Labels are
-    derived audit evidence, never a second waitlist.
+    this revision and no active machine or incident hold is present. Legacy
+    human-review labels are audit residue, never a second waitlist.
     """
     if not IDENTIFIER.fullmatch(identifier):
         return False, "invalid_identifier"
@@ -1317,6 +1511,9 @@ def check_admission(identifier: str, *, remount: bool = False) -> int:
     remount=True skips the admission-gate/v1 receipt so a DIRTY/CI-red
     autonomous head can continue after the receipt list went empty.
     """
+    if any(a["identifier"] == identifier for a in _repair_assignments()):
+        print("not admitted:existing_pr_repair_reserved_for_native_writer", file=sys.stderr)
+        return 1
     issue = _fetch_single_issue(identifier)
     if issue is None:
         print("not admitted:admission_unverifiable", file=sys.stderr)
@@ -1347,8 +1544,8 @@ def _repo_for_identifier(identifier: str) -> str | None:
     return None
 
 
-def _gh_json(command: list[str]) -> object | None:
-    result = _captured(command, GH_TIMEOUT_SECONDS)
+def _gh_json(command: list[str], timeout: float = GH_TIMEOUT_SECONDS) -> object | None:
+    result = _captured(command, timeout)
     if result is None or result.returncode != 0:
         return None
     try:
@@ -1357,65 +1554,120 @@ def _gh_json(command: list[str]) -> object | None:
         return None
 
 
-def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str, dict]:
-    """Map identifier -> {number, head, repo} for open autonomous heads.
+class OpenPrIndex(dict):
+    """Only complete repository inventories can establish absence of work."""
 
-    identifiers=None lists every matching symphony/grok/fallback head so a
-    remount scan can find DIRTY work even when Linear's receipt list is empty.
-    Listing failure is fail-open (empty): better to risk a duplicate than to
-    starve leftover Todo work because `gh` blipped.
-    """
-    # Unit tests set SYMPHONY_OPEN_PR_INDEX=empty so reconcile never calls live gh.
+    def __init__(self):
+        super().__init__()
+        self.unknown_repos: set[str] = set()
+
+
+OPEN_PR_QUERY = """query($owner:String!,$name:String!,$cursor:String){
+  repository(owner:$owner,name:$name){pullRequests(first:100,states:OPEN,after:$cursor){
+    nodes{number headRefName headRefOid body headRepository{nameWithOwner} mergeStateStatus mergeable}
+    pageInfo{hasNextPage endCursor}
+  }}
+}"""
+
+
+def _complete_open_prs(repo: str) -> list[dict] | None:
+    """Bound all pages to one request budget; partial results never prove absence."""
+    owner, name = repo.split("/", 1)
+    deadline = time.monotonic() + GH_TIMEOUT_SECONDS
+    cursor = None
+    seen_cursors = set()
+    seen_numbers = set()
+    result = []
+    for _ in range(100):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        command = ["gh", "api", "graphql", "-f", f"query={OPEN_PR_QUERY}",
+                   "-f", f"owner={owner}", "-f", f"name={name}"]
+        if cursor is not None:
+            command.extend(["-f", f"cursor={cursor}"])
+        payload = _gh_json(command, timeout=remaining)
+        if not isinstance(payload, dict) or payload.get("errors"):
+            return None
+        try:
+            connection = payload["data"]["repository"]["pullRequests"]
+            nodes, page = connection["nodes"], connection["pageInfo"]
+            more = page["hasNextPage"]
+        except (KeyError, TypeError):
+            return None
+        if not isinstance(nodes, list) or not isinstance(more, bool):
+            return None
+        for pr in nodes:
+            if (not isinstance(pr, dict) or type(pr.get("number")) is not int
+                    or pr["number"] <= 0 or not isinstance(pr.get("headRefName"), str)
+                    or pr["number"] in seen_numbers):
+                return None
+            seen_numbers.add(pr["number"])
+        result.extend(nodes)
+        if not more:
+            return result
+        cursor = page.get("endCursor")
+        if not isinstance(cursor, str) or not cursor or cursor in seen_cursors:
+            return None
+        seen_cursors.add(cursor)
+    return None
+
+
+def _repair_module():
+    path = pathlib.Path(__file__).resolve().with_name("existing_pr_repair.py")
+    spec = importlib.util.spec_from_file_location("symphony_existing_pr_repair", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _repair_assignments():
+    try:
+        return _repair_module().candidates(__file__)
+    except (OSError, ValueError, ImportError):
+        return []
+
+
+def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str, dict]:
+    """Preserve sibling heads and repository-scoped unknown discovery evidence."""
+    index = OpenPrIndex()
+    # Hermetic tests explicitly opt out of live GitHub discovery.
     if os.environ.get("SYMPHONY_OPEN_PR_INDEX") == "empty":
-        return {}
-    index: dict[str, dict] = {}
+        return index
     wanted = set(identifiers) if identifiers is not None else None
-    if wanted is not None:
-        repos = {repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
-        if not repos:
-            return {}
-    else:
-        repos = {JOV_REPO, LYB_REPO}
-    for repo in repos:
-        payload = _gh_json(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--state",
-                "open",
-                "--limit",
-                "100",
-                "--json",
-                "number,headRefName,mergeStateStatus,mergeable",
-            ]
-        )
-        if not isinstance(payload, list):
+    assignments = _repair_assignments()
+    repos = ({repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
+             if identifiers is not None else {JOV_REPO, LYB_REPO})
+    for repo in sorted(repos):
+        payload = _complete_open_prs(repo)
+        if payload is None:
+            index.unknown_repos.add(repo)
             continue
         for pr in payload:
-            if not isinstance(pr, dict):
-                continue
-            head = pr.get("headRefName") or ""
-            if not isinstance(head, str):
-                continue
+            head = pr["headRefName"]
             match = AUTONOMOUS_HEAD_RE.fullmatch(head)
-            if match is None:
+            mapped = [a["identifier"] for a in assignments
+                      if a["repository"] == repo
+                      and a["identifier"] in _repair_module().marker_identifiers(pr)]
+            if match is None and not mapped:
                 continue
-            # Group 2 covers the lowercase codex-lane identifier; normalize to
-            # the canonical JOV-/LYB- form used everywhere downstream.
-            ident = (match.group(1) or match.group(2)).upper()
+            ident = (match.group(1) or match.group(2)).upper() if match else mapped[0]
             if wanted is not None and ident not in wanted:
                 continue
-            if ident not in index:
-                index[ident] = {
-                    "number": pr.get("number"),
-                    "head": head,
-                    "repo": repo,
-                    "mergeStateStatus": pr.get("mergeStateStatus"),
-                    "mergeable": pr.get("mergeable"),
-                }
+            entry = {
+                "number": pr["number"], "head": head, "repo": repo,
+                "operatorRepairOnly": bool(mapped),
+                "repairHeadMatches": any(_repair_module().matches(a, repo, pr) for a in assignments),
+                "headRefOid": pr.get("headRefOid"), "body": pr.get("body"),
+                "headRepository": pr.get("headRepository"),
+                "mergeStateStatus": pr.get("mergeStateStatus"),
+                "mergeable": pr.get("mergeable"),
+            }
+            if ident in index:
+                siblings = index[ident].setdefault("siblings", [dict(index[ident])])
+                siblings.append(entry)
+            else:
+                index[ident] = entry
     return index
 
 
@@ -1425,7 +1677,7 @@ def _github_remount_identifiers() -> list[str]:
     remounts: list[str] = []
     for ident in index:
         verdict, _pr = _open_pr_verdict(ident, index)
-        if verdict == "remount" and ident not in remounts:
+        if verdict == "remount" and not (_pr or {}).get("operatorRepairOnly") and ident not in remounts:
             remounts.append(ident)
     return remounts
 
@@ -1505,10 +1757,16 @@ def _pr_has_product_failure_tombstone(repo: str, number: int) -> bool:
 
 
 def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:
-    """Return (none|skip|remount, pr). skip = inflight green/pending open PR."""
+    """Return (none|skip|remount|unknown, pr); unknown never authorizes a writer."""
+    if _repo_for_identifier(identifier) in getattr(index, "unknown_repos", set()):
+        return "unknown", None
     pr = index.get(identifier)
     if pr is None:
         return "none", None
+    if pr.get("operatorRepairOnly") and not pr.get("repairHeadMatches"):
+        return "unknown", pr
+    if len(pr.get("siblings", [])) > 1:
+        return "unknown", pr
     repo = pr.get("repo")
     number = pr.get("number")
     if not isinstance(repo, str) or not isinstance(number, int):
@@ -1550,8 +1808,10 @@ def open_pr_verdict_command(identifier: str) -> int:
         payload["head"] = pr.get("head")
         payload["repo"] = pr.get("repo")
         payload["mergeStateStatus"] = pr.get("mergeStateStatus")
+        if "siblings" in pr:
+            payload["siblings"] = pr["siblings"]
     print(json.dumps(payload))
-    return 0
+    return 75 if verdict == "unknown" else 0
 
 
 def _fallback_lease_dir() -> pathlib.Path:
@@ -1604,7 +1864,8 @@ def _iter_fallback_locks() -> list[pathlib.Path]:
 
 def _fallback_lock_count() -> int | None:
     try:
-        return len(_iter_fallback_locks())
+        held = [_lock_held(path) for path in _iter_fallback_locks()]
+        return None if any(value is None for value in held) else sum(held)
     except OSError:
         return None
 
@@ -1633,6 +1894,20 @@ def _lock_held(path: pathlib.Path) -> bool | None:
         os.close(descriptor)
 
 
+def _inherited_issue_lease_held(path: pathlib.Path) -> bool:
+    """Only a matching inherited kernel claim can exempt its own pickup."""
+    if os.environ.get("SYMPHONY_ISSUE_LEASE_FD") != "9":
+        return False
+    try:
+        descriptor, current = os.fstat(9), path.stat()
+        if (descriptor.st_dev, descriptor.st_ino) != (current.st_dev, current.st_ino):
+            return False
+        fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
 def _lock_age_seconds(path: pathlib.Path, now: float) -> float | None:
     try:
         age = now - path.stat().st_mtime
@@ -1652,16 +1927,12 @@ def expire_fallback_lock_decision(
     """Pure GC verdict: expire | keep | unknown, plus a typed reason."""
     if held is None:
         return "unknown", "lock_held_unverified"
+    if held:
+        return "keep", "live_remount" if pr_verdict == "remount" else "live_holder"
     if pr_verdict == "skip":
         return "expire", "open_pr_inflight"
     state = (state_name or "").strip().lower()
     if state in DONE_LOCK_STATES:
-        # A live remount of a done/closed issue keeps its lease: the open
-        # DIRTY/CI-red PR proves the work never landed, and expiring the lock
-        # mid-remount would admit a second writer. Canceled/duplicate locks
-        # still expire — those are deliberate kills.
-        if held and pr_verdict == "remount" and state in {"done", "closed"}:
-            return "keep", "live_remount"
         return "expire", {
             "done": "issue_done",
             "closed": "issue_done",
@@ -1671,21 +1942,11 @@ def expire_fallback_lock_decision(
         }[state]
     if state == "in review" and pr_verdict != "remount":
         return "expire", "issue_in_review"
-    if held and pr_verdict == "remount":
-        return "keep", "live_remount"
-    if held and state in {"todo", "in progress"}:
-        return "keep", "live_holder"
-    if not held:
-        if age_seconds is not None and age_seconds > ttl_seconds:
-            return "expire", "ttl_expired"
-        if age_seconds is None and state_name is None and pr_verdict is None:
-            return "unknown", "lock_age_unverified"
-        return "keep", "ttl_unexpired"
-    if state_name is None and pr_verdict is None:
-        return "unknown", "lock_owner_unverified"
-    if state == "in review":
-        return "expire", "issue_in_review"
-    return "keep", "live_holder"
+    if age_seconds is not None and age_seconds > ttl_seconds:
+        return "expire", "ttl_expired"
+    if age_seconds is None and state_name is None and pr_verdict is None:
+        return "unknown", "lock_age_unverified"
+    return "keep", "ttl_unexpired"
 
 
 def _issue_state_name(issue: dict | None) -> str | None:
@@ -1756,13 +2017,13 @@ def gc_fallback_locks(
     now: float | None = None,
     fetch_issue=None,
 ) -> dict:
-    """Expire leftover fallback locks that can permanently own pickup.
+    """Observe lease slots without unlinking the shared lock inode.
 
-    Unlink is the only mutation. Live implement/remount holders are kept.
-    Missing observations fail closed (keep the file).
+    A free flock is immediately reusable. Neither tracker state nor an idle
+    observation permits unlink: a waiter may already have opened that inode.
+    Legacy observer arguments remain accepted, but GC makes no remote reads.
     """
     observed = time.time() if now is None else now
-    fetch = fetch_issue or _fetch_single_issue
     expired: list[dict] = []
     kept: list[dict] = []
     unknown: list[dict] = []
@@ -1787,40 +2048,21 @@ def gc_fallback_locks(
             flush=True,
         )
         return receipt
-    if locks and open_prs is None:
-        open_prs = _autonomous_open_pr_index(None)
-    if open_prs is None:
-        open_prs = {}
-    for path in locks:
+    held_before = [_lock_held(path) for path in locks]
+    for path, held in zip(locks, held_before):
         identifier = _lock_identifier(path)
         if identifier is None:
             unknown.append({"path": path.name, "reason": "malformed_lock"})
             continue
-        held = _lock_held(path)
         age = _lock_age_seconds(path, observed)
-        verdict, _pr = _open_pr_verdict(identifier, open_prs)
-        # Skip Linear when TTL or an inflight PR already proves the lock is stale.
-        state_name = None
-        needs_issue = not (
-            verdict == "skip" or (held is False and age is not None and age > FALLBACK_LEASE_TTL_SECONDS)
-        )
-        if needs_issue:
-            state_name = _issue_state_name(fetch(identifier))
         action, reason = expire_fallback_lock_decision(
             held=held,
-            state_name=state_name,
-            pr_verdict=verdict,
+            state_name=None,
+            pr_verdict=None,
             age_seconds=age,
         )
-        record = {"identifier": identifier, "reason": reason, "held": held, "ageSeconds": None if age is None else int(age)}
+        record = {"identifier": identifier, "reason": reason, "held": held, "ageSeconds": None if age is None else int(age), "inodeRetained": True}
         if action == "expire":
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
-            except OSError:
-                unknown.append({**record, "reason": "lock_unlink_failed"})
-                continue
             expired.append(record)
             continue
         if action == "unknown":
@@ -1832,7 +2074,8 @@ def gc_fallback_locks(
         "schema": FALLBACK_GC_SCHEMA,
         "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(observed)),
         "ttlSeconds": FALLBACK_LEASE_TTL_SECONDS,
-        "lockCountBefore": len(locks),
+        "lockCountBefore": None if any(value is None for value in held_before) else sum(held_before),
+        "retainedLockFiles": len(locks),
         "lockCountAfter": after,
         "expired": expired,
         "kept": kept,
@@ -1859,14 +2102,17 @@ def pickup_refuse_reason(
     pr_verdict: str,
     held: bool | None,
     codex_writer: bool = False,
+    existing_pr_repair: bool = False,
 ) -> str | None:
     """Typed reason to refuse a new writer. None means the issue may start.
 
-    Codex is never a second writer on In Review (lease-guard + router). The
-    sidecar may continue an In Review remount or receipt-less claimed head.
+    Codex In Review requires a validated exact-PR repair and its actual lease.
+    The sidecar retains its existing autonomous remount policy.
     """
     if not IDENTIFIER.fullmatch(identifier):
         return "malformed_identifier"
+    if pr_verdict == "unknown":
+        return "open_pr_inventory_unknown"
     if pr_verdict == "skip":
         return "open_pr_inflight"
     state = (_issue_state_name(issue) or "").strip().lower()
@@ -1888,12 +2134,130 @@ def pickup_refuse_reason(
         return "fallback_lease_held"
     if held is None:
         return "lock_gc_unverifiable"
-    if state == "in review" and (codex_writer or pr_verdict == "skip"):
+    if state == "in review" and (codex_writer or pr_verdict == "skip") and not (
+        existing_pr_repair and pr_verdict == "remount"
+    ):
         return "issue_in_review"
     return None
 
 
-def pickup_check_command(identifier: str) -> int:
+def _validated_existing_pr_repair(identifier, issue, verdict, pr, *, inherited):
+    """An operator assignment may continue an existing head, never admit new work."""
+    module = _repair_module()
+    payload = module.load(identifier, __file__)
+    module.require(verdict == "remount" and isinstance(pr, dict)
+                   and module.matches(payload, _repo_for_identifier(identifier), pr),
+                   "assignment-pr-mismatch")
+    module.require(isinstance(issue, dict) and issue.get("identifier") == identifier
+                   and issue.get("id") == payload["issueId"], "assignment-tracker-mismatch")
+    module.require((_issue_state_name(issue) or "").strip().lower() == "in review",
+                   "assignment-state-not-in-review")
+    # Remount metadata still enforces team, held labels, and real workflow IDs.
+    ok, reason, meta = _issue_meta(issue, identifier, require_receipt=False, remount=True)
+    module.require(ok and meta is not None, f"assignment-admission-refused:{reason}")
+    module.check_workspace(payload, pr)
+    module.check_writer(payload, inherited=inherited)
+    return payload
+
+
+def repair_preflight_command(identifier, issue_revision):
+    try:
+        issue = _fetch_single_issue(identifier)
+        if not issue or issue.get("updatedAt") != issue_revision:
+            raise ValueError("assignment-tracker-revision-mismatch")
+        verdict, pr = _open_pr_verdict(identifier, _autonomous_open_pr_index([identifier]))
+        inherited = os.environ.get("SYMPHONY_ISSUE_LEASE_FD") == "9"
+        lease = _fallback_lease_dir() / f"{identifier}.lock"
+        if inherited and (not _lock_held(lease) or not _inherited_issue_lease_held(lease)):
+            raise ValueError("assignment-writer-lease-mismatch")
+        _validated_existing_pr_repair(identifier, issue, verdict, pr, inherited=inherited)
+    except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError) as exc:
+        print(f"REPAIR_REFUSED reason={exc}", file=sys.stderr)
+        return 78
+    print(f"REPAIR_PREFLIGHT_ADMITTED identifier={identifier}")
+    return 0
+
+
+def repair_assign_command(spec_path):
+    try:
+        spec = json.loads(pathlib.Path(spec_path).read_text())
+        identifier = spec["identifier"]
+        module = _repair_module()
+        payload = module.authorize(spec, __file__, _fetch_single_issue(identifier) or {},
+                                   _complete_open_prs(_repo_for_identifier(identifier)))
+    except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError) as exc:
+        print(f"REPAIR_ASSIGNMENT_REFUSED reason={exc}", file=sys.stderr)
+        return 78
+    print(json.dumps(payload, sort_keys=True))
+    return 0
+
+
+def _native_dispatch_prerequisite(identifier, issue, repair, *, inherited=True):
+    """Bind fresh tracker/workspace identity to the installed strict gate CLI.
+
+    This does not claim the assignment, reserve capacity, or authorize a push.
+    """
+    repo = _repo_for_identifier(identifier)
+    if (not re.fullmatch(r"(?:JOV|LYB)-[1-9][0-9]*", identifier) or repo is None
+            or not isinstance(issue, dict) or issue.get("identifier") != identifier
+            or not isinstance(issue.get("id"), str)
+            or not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", issue["id"])
+            or not isinstance(issue.get("team"), dict)
+            or issue["team"].get("key") != identifier.split("-")[0]
+            or not isinstance(issue.get("updatedAt"), str) or not issue["updatedAt"]):
+        return "native_identity_unverifiable"
+    connection = issue.get("labels")
+    if not isinstance(connection, dict) or not isinstance(connection.get("nodes"), list):
+        return "native_labels_unverifiable"
+    labels = connection["nodes"]
+    if any(not isinstance(node, dict) or not isinstance(node.get("name"), str)
+           or not node["name"].strip() for node in labels):
+        return "native_labels_unverifiable"
+    # Native WORKFLOW excludes only the mechanical dead-letter label.
+    if any(node["name"].strip().lower() == "no-symphony" for node in labels):
+        return "native_issue_excluded"
+    if repair is None and (_issue_state_name(issue) or "").lower() not in {
+            "todo", "in progress", "rework", "merging"}:
+        return "native_state_not_admitted"
+    lease = _fallback_lease_dir() / f"{identifier}.lock"
+    if inherited and (not _lock_held(lease) or not _inherited_issue_lease_held(lease)):
+        return "native_issue_lease_missing"
+    workspace = pathlib.Path.cwd().resolve()
+    if pathlib.Path(os.environ.get("SYMPHONY_WORKSPACE", str(workspace))).resolve() != workspace:
+        return "native_workspace_mismatch"
+    if repair is None and workspace.name != identifier:
+        return "native_workspace_issue_mismatch"
+    try:
+        def git(*args):
+            return subprocess.run(["git", "-C", str(workspace), *args], check=True,
+                                  capture_output=True, text=True, timeout=10).stdout.strip()
+        if (git("rev-parse", "--show-toplevel") != str(workspace)
+                or git("remote", "get-url", "origin") not in {
+                    f"https://github.com/{repo}.git", f"https://github.com/{repo}", f"git@github.com:{repo}.git"}):
+            return "native_repository_mismatch"
+        mode = "existing-pr-repair" if repair is not None else "new-work"
+        product = "jovie" if repo == JOV_REPO else "logyourbody"
+        installed = pathlib.Path.home() / ".local/bin"
+        checked = subprocess.run([str(installed / "symphony-official-runtime"), "dispatch-preflight",
+                                  "--mode", mode, "--product-id", product],
+                                 capture_output=True, text=True, timeout=CONTROL_TIMEOUT_SECONDS)
+        gate = json.loads(checked.stdout)
+        if (checked.returncode or not isinstance(gate, dict) or gate.get("allowed") is not True
+                or gate.get("reason") != "dispatch-gate-prerequisite-passed"
+                or gate.get("mode") != mode or gate.get("productId") != product
+                or type(gate.get("maxConcurrent")) is not int or gate["maxConcurrent"] <= 0):
+            return "dispatch_gate_closed"
+        # Preserve monotonic terminal fences, including operator-assigned repairs.
+        checked = subprocess.run([str(installed / "symphony-lease-guard"), "check", identifier],
+                                 capture_output=True, text=True, timeout=45, pass_fds=(9,) if inherited else ())
+        if checked.returncode:
+            return "native_lease_refused"
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return "dispatch_admission_unavailable"
+    return None
+
+
+def pickup_check_command(identifier: str, *, preflight=False, inherited=True) -> int:
     """Router preflight: GC this issue's stale lock, then fail closed with a typed reason."""
     if not IDENTIFIER.fullmatch(identifier):
         print(
@@ -1903,15 +2267,54 @@ def pickup_check_command(identifier: str) -> int:
         )
         return 78
     open_prs = _autonomous_open_pr_index([identifier])
-    gc_fallback_locks(open_prs=_autonomous_open_pr_index(None))
-    issue = _fetch_single_issue(identifier)
     verdict, _pr = _open_pr_verdict(identifier, open_prs)
+    if verdict == "unknown":
+        print(
+            "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+            "class=pr-inventory-unknown retryable=true "
+            f'reason="open_pr_inventory_unknown {identifier}"',
+            file=sys.stderr,
+        )
+        return 75
+    if not preflight:
+        gc_fallback_locks()
+    issue = _fetch_single_issue(identifier)
     lock_path = _fallback_lease_dir() / f"{identifier}.lock"
     held = _lock_held(lock_path) if lock_path.is_file() else False
+    if _inherited_issue_lease_held(lock_path):
+        held = False
+    repair = None
+    repair_error = None
+    reserved = (_pr or {}).get("operatorRepairOnly")
+    if reserved or (_issue_state_name(issue) or "").strip().lower() == "in review":
+        try:
+            repair = _validated_existing_pr_repair(identifier, issue, verdict, _pr, inherited=inherited)
+        except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError):
+            repair_error = "existing_pr_repair_unauthorized"
     reason = pickup_refuse_reason(
-        identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True
-    )
-    lock_count = _fallback_lock_count()
+        identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True,
+        existing_pr_repair=repair is not None,
+    ) or repair_error
+    if reason is None:
+        reason = _native_dispatch_prerequisite(identifier, issue, repair, inherited=inherited)
+    if reason is None and repair is not None and not preflight:
+        try:
+            # Fresh complete inventory closes the discovery-to-claim head race.
+            fresh_verdict, fresh_pr = _open_pr_verdict(identifier, _autonomous_open_pr_index([identifier]))
+            fresh_issue = _fetch_single_issue(identifier)
+            fresh = _validated_existing_pr_repair(identifier, fresh_issue, fresh_verdict, fresh_pr, inherited=True)
+            _repair_module().require(fresh == repair, "assignment-replaced")
+            gate_reason = _native_dispatch_prerequisite(identifier, fresh_issue, fresh)
+            if gate_reason is not None:
+                reason = gate_reason
+            else:
+                _repair_module().claim(fresh, __file__)
+        except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError):
+            reason = "existing_pr_repair_claim_refused"
+    if preflight and reason is None:
+        print(f"PICKUP_PREFLIGHT_ADMITTED identifier={identifier}")
+        return 0
+    lock_count = _fallback_lock_count() if not preflight else None
     if reason is not None:
         _emit_pickup(
             "refuse",
@@ -1923,11 +2326,11 @@ def pickup_check_command(identifier: str) -> int:
         failure_class = "fallback-lease-held" if reason == "fallback_lease_held" else "pickup-refused"
         print(
             "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
-            f"class={failure_class} retryable=false maxAttempts=1 "
+            f"class={failure_class} retryable={str(reason.startswith('dispatch_')).lower()} "
             f'reason="{reason} owns {identifier}"',
             file=sys.stderr,
         )
-        return 78
+        return 75 if reason.startswith("dispatch_") else 78
     _emit_pickup(
         "lease_start",
         reason="lease_start",
@@ -1944,7 +2347,7 @@ def _selection_provider(selection: dict | None) -> str | None:
     if not isinstance(selected, dict):
         return None
     provider = selected.get("provider")
-    if provider in OAUTH_PROVIDERS:
+    if provider in _fallback_provider_names():
         return provider
     model_id = str(selected.get("id") or "").lower()
     if model_id.startswith("kimi"):
@@ -1958,17 +2361,20 @@ def _pick_provider(
     remaining: dict[str, int],
     selections: dict[str, dict],
     remediator: bool,
+    allowed: set[str] | None = None,
 ) -> str | None:
     eligible = [
         provider
-        for provider in OAUTH_PROVIDERS
+        for provider in _fallback_provider_names()
         if remaining.get(provider, 0) > 0 and provider in selections
+        and (allowed is None or provider in allowed)
     ]
     if remediator:
         preferred = [
             provider
             for provider in eligible
-            if (selections[provider].get("selected") or {}).get("id")
+            if provider in REMEDIATOR_MODEL_IDS
+            and (selections[provider].get("selected") or {}).get("id")
             == REMEDIATOR_MODEL_IDS[provider]
         ]
         if preferred:
@@ -2001,10 +2407,22 @@ def _launch_fallback_workers(
     if fallback_provider and fallback_provider not in provider_selections:
         provider_selections[fallback_provider] = selection
     counts = _active_provider_counts(sorted(active_units))
-    remaining = {
-        "grok": max(0, _provider_seat_limit("grok") - counts["grok"]),
-        "kimi": max(0, _provider_seat_limit("kimi") - counts["kimi"]),
-    }
+    capacity_state, _capacity_path = _provider_capacity_state()
+    capacity_module = _provider_capacity()
+    remaining: dict[str, int] = {}
+    if capacity_module is None or capacity_state is None:
+        return set(), 0
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    for provider in _fallback_provider_names():
+        try:
+            remaining[provider] = capacity_module.admitted_limit(
+                capacity_state,
+                provider,
+                active=counts.get(provider, 0),
+                now=now,
+            )
+        except (TypeError, ValueError):
+            remaining[provider] = 0
     capacity_used = counts["grok"] + counts["kimi"]
     launched_units: set[str] = set()
     lock_count = _fallback_lock_count()
@@ -2012,11 +2430,11 @@ def _launch_fallback_workers(
     first_lease: str | None = None
     # Mirror grok-ship-one's new-work stop-line so the sidecar never leases
     # fresh work it would only launch into a refusal. Remounts of existing
-    # open PRs are continuation and stay exempt.
-    closure_intake_open = _closure_intake_allowed()
+    # open PRs are continuation and stay exempt. Intake is per-product: Jovie
+    # MQ red does not freeze LYB/Ovie.
     for identifier in identifiers:
         if len(launched_units) >= max(0, limit) or (
-            remaining["grok"] <= 0 and remaining["kimi"] <= 0
+            not any(value > 0 for value in remaining.values())
         ):
             if next_eligible == "":
                 next_eligible = identifier
@@ -2033,7 +2451,11 @@ def _launch_fallback_workers(
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
             continue
         verdict, _pr = _open_pr_verdict(identifier, open_prs)
-        if verdict != "remount" and not closure_intake_open:
+        if (_pr or {}).get("operatorRepairOnly"):
+            _emit_pickup("skip", reason="existing_pr_repair_reserved", identifier=identifier,
+                         lock_count=_fallback_lock_count(), next_issue="")
+            continue
+        if verdict != "remount" and not _closure_intake_allowed(identifier):
             _emit_pickup(
                 "refuse",
                 reason="closure_stop_line",
@@ -2107,7 +2529,14 @@ def _launch_fallback_workers(
             print(f"fallback skip {identifier} {skip_label}", file=sys.stderr, flush=True)
             continue
         remediator = _is_remediator_work(issue, verdict)
-        provider = _pick_provider(remaining, provider_selections, remediator)
+        allowed = {
+            candidate
+            for candidate in provider_selections
+            if _lane_allows_provider(candidate, remediator=remediator)
+        }
+        provider = _pick_provider(
+            remaining, provider_selections, remediator, allowed=allowed
+        )
         if provider is None:
             if next_eligible == "":
                 next_eligible = identifier
@@ -2176,6 +2605,7 @@ def _grok_command(
     unit = _fallback_unit(identifier, issue_revision)
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     kimi_exe = _kimi_executable() or str(pathlib.Path.home() / ".local/bin/kimi")
+    cursor_exe = _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") or "cursor-agent"
     provider = _selection_provider(selection) or "grok"
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
@@ -2186,6 +2616,7 @@ def _grok_command(
         "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=GEM_KIMI_EXECUTABLE={kimi_exe}",
         "-p", f"Environment=GEM_KIMI_BIN={kimi_exe}",
+        "-p", f"Environment=GEM_CURSOR_EXECUTABLE={cursor_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_PROVIDER={provider}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
         "-p", f"Environment=SYMPHONY_FALLBACK_ISSUE_REVISION={issue_revision}",
@@ -2289,16 +2720,18 @@ def _drain_included_pools(
     selections, selection_reason = _oauth_fallback_selections()
     if selections is None:
         return f"drain_skipped={selection_reason}"
-    grok_limit = _grok_limit()
-    kimi_limit = _kimi_limit()
-    if grok_limit <= 0 and kimi_limit <= 0:
-        return "drain_skipped=grok_capacity_zero"
+    measured_limits = {
+        provider: _provider_measured_capacity(provider)
+        for provider in _fallback_provider_names()
+    }
+    if not any(value > 0 for value in measured_limits.values()):
+        return "drain_skipped=provider_capacity_zero"
     bundle_revision = _bundle_revision()
     if bundle_revision is None:
         return "drain_skipped=bundle_revision_unavailable"
-    limit = 1 if target_identifier is not None else grok_limit + kimi_limit
+    limit = 1 if target_identifier is not None else sum(measured_limits.values())
     if limit <= 0:
-        return "drain_skipped=grok_capacity_zero"
+        return "drain_skipped=provider_capacity_zero"
     unit_providers: dict[str, str] = {}
     primary = next(iter(selections.values()))
     launched, _used = _launch_fallback_workers(
@@ -2407,12 +2840,14 @@ def _continue_exhausted_reconcile(
             file=sys.stderr,
         )
         return 0
-    grok_limit = _grok_limit()
-    kimi_limit = _kimi_limit()
-    limit = 1 if target_identifier is not None else grok_limit + kimi_limit
-    if grok_limit <= 0 and kimi_limit <= 0 and not active:
+    measured_limits = {
+        provider: _provider_measured_capacity(provider)
+        for provider in _fallback_provider_names()
+    }
+    limit = 1 if target_identifier is not None else sum(measured_limits.values())
+    if not any(value > 0 for value in measured_limits.values()) and not active:
         print(
-            f"codex_exhausted {reason} grok_capacity_zero symphony_unchanged",
+            f"codex_exhausted {reason} provider_capacity_zero symphony_unchanged",
             file=sys.stderr,
         )
         return EXIT_SAFE_FAIL_CLOSED
@@ -2579,9 +3014,29 @@ def _artifacts() -> dict[str, pathlib.Path]:
     registry = root / "model-registry.json"
     if not registry.is_file():
         registry = root / "config" / "model-registry.json"
+    scripts = root.parent
+
+    def packaged_or_source(name: str, source: pathlib.Path) -> pathlib.Path:
+        packaged = root / name
+        return packaged if packaged.is_file() else source
+
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py")},
         "model-registry.json": registry,
+        "writer-owned-pr-promote.sh": packaged_or_source(
+            "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"
+        ),
+        "writer-owned-pr-promotion.mjs": packaged_or_source(
+            "writer-owned-pr-promotion.mjs",
+            scripts / "lib" / "writer-owned-pr-promotion.mjs",
+        ),
+        "queue-deferral-receipt.mjs": packaged_or_source(
+            "queue-deferral-receipt.mjs",
+            scripts / "lib" / "queue-deferral-receipt.mjs",
+        ),
+        "upsert-pr-comment.sh": packaged_or_source(
+            "upsert-pr-comment.sh", scripts / "lib" / "upsert-pr-comment.sh"
+        ),
     }
 
 
@@ -2646,9 +3101,27 @@ def _valid_bundle_file(name: str, path: pathlib.Path) -> bool:
             return not path.is_symlink() and path.is_file() and payload.get("schema_version") == 1
         except (OSError, TypeError, ValueError):
             return False
-    if name == "model-router.py":
+    if name in {"model-router.py", "existing_pr_repair.py"}:
         try:
             return not path.is_symlink() and path.is_file() and path.read_bytes().startswith(b"#!")
+        except OSError:
+            return False
+    if name == "writer-owned-pr-promotion.mjs":
+        try:
+            return (
+                not path.is_symlink()
+                and path.is_file()
+                and b"jovie-writer-pr-proof/v1" in path.read_bytes()
+            )
+        except OSError:
+            return False
+    if name == "queue-deferral-receipt.mjs":
+        try:
+            return (
+                not path.is_symlink()
+                and path.is_file()
+                and b"jovie-queue-deferral/v1" in path.read_bytes()
+            )
         except OSError:
             return False
     return _valid_runtime_file(path)
@@ -2732,7 +3205,12 @@ def install(destination_root: str | None) -> int:
         _fsync_directory(state)
         release = pathlib.Path(tempfile.mkdtemp(prefix=".install-", dir=releases))
         for name, data in contents.items():
-            if name in ("model-router.py", "model-registry.json"):
+            if name in (
+                "model-router.py",
+                "existing_pr_repair.py",
+                "model-registry.json",
+                "writer-owned-pr-promotion.mjs",
+            ):
                 (release / name).write_bytes(data)
                 os.chmod(release / name, 0o644)
             else:
@@ -2762,17 +3240,27 @@ def main() -> int:
             "open-pr-verdict",
             "gc-fallback-locks",
             "pickup-check",
+            "native-preflight",
+            "repair-preflight",
+            "repair-assign",
         ),
         default=default,
     )
     parser.add_argument("identifier", nargs="?")
     parser.add_argument("--destination-root")
+    parser.add_argument("--issue-revision")
+    parser.add_argument("--assignment-spec")
+    parser.add_argument("--before-run", action="store_true")
     parser.add_argument(
         "--remount",
         action="store_true",
         help="Skip admission-gate/v1 receipt (DIRTY/CI-red remount only)",
     )
     args = parser.parse_args()
+    if args.command == "repair-preflight":
+        return repair_preflight_command(args.identifier, args.issue_revision)
+    if args.command == "repair-assign":
+        return repair_assign_command(args.assignment_spec)
     if args.command == "install":
         return install(args.destination_root)
     if args.command == "reconcile":
@@ -2794,6 +3282,10 @@ def main() -> int:
         receipt = gc_fallback_locks()
         print(json.dumps(receipt, indent=2, sort_keys=True))
         return 2 if receipt.get("red") else 0
+    if args.command == "native-preflight":
+        if not args.identifier:
+            return 2
+        return pickup_check_command(args.identifier, preflight=True, inherited=not args.before_run)
     if args.command == "pickup-check":
         if not args.identifier:
             print("pickup-check requires an issue identifier", file=sys.stderr)

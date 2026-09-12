@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { signSummerBottleneckSnapshot } from '../../web/lib/ovie/summer-bottleneck-producer';
+import { signSummerBottleneckSnapshot } from '../../../packages/agent-transport-contracts/index';
 import {
   handleSummerBottleneckRequest,
   JOVIE_PRODUCTION_OIDC_SUBJECT,
@@ -73,9 +73,17 @@ function validSnapshot() {
       },
       runner: {
         schema: 'jovie.eve.summer-runner-projection/v1',
-        sourceSchema: 'symphony-lease-guard-report/v1',
+        sourceSchema: 'symphony-runner-projection/v1',
         ...source('4'),
         blockedSince: null,
+        capacitySource: {
+          schema: 'symphony-lease-guard-report/v1',
+          ...source('6'),
+        },
+        workSource: {
+          schema: 'symphony-runtime-state/v1',
+          ...source('7'),
+        },
         capacityAvailable: 1,
         queuedWork: 0,
       },
@@ -154,6 +162,32 @@ describe('Summer bottleneck OIDC boundary', () => {
         new Map([[PRODUCER_KEY_ID, PRODUCER_PUBLIC_KEY]])
       )
     ).toBe(true);
+  });
+
+  it('accepts the exact signed producer output through Eve ingress', async () => {
+    const { producerAttestation: _ignored, ...unsigned } = validSnapshot();
+    const signed = signSummerBottleneckSnapshot(
+      unsigned,
+      PRODUCER_PRIVATE_KEY,
+      PRODUCER_KEY_ID
+    );
+    const response = await handleSummerBottleneckRequest(
+      new Request('https://eve.example.com/ovie/v1/summer-bottleneck/events', {
+        method: 'POST',
+        body: JSON.stringify(signed),
+      }),
+      {
+        authenticate: vi.fn(async () => ({})),
+        createRuntime: runtime,
+        requireDispatchAuthority: vi.fn(),
+      }
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      receipt: { eventId: 'evt_channel_0001' },
+    });
   });
 
   it('pins the only accepted external subject to Jovie production', () => {

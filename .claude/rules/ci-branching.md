@@ -1,3 +1,7 @@
+---
+paths: [".github/**", "scripts/ci-*", "scripts/lib/ci-*"]
+---
+
 # CI Branching (24/7 Agent Development)
 
 > **Default is small sibling PRs straight to `main`** — see the canonical

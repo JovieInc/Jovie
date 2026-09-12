@@ -1,0 +1,73 @@
+{
+  "schema": "jovie-latency-sensitive-execution-allowlist/v1",
+  "checkClass": "thread-blocking",
+  "siblingCheckClass": "route-response-latency",
+  "note": "Existing request-path thread-blocking calls. Counts may only decrease. Not a route-response-latency budget.",
+  "entries": {
+    "apps/web/app/(marketing)/changelog/feed.xml/route.ts": {
+      "existsSync": 1,
+      "readFileSync": 1
+    },
+    "apps/web/app/api/health/build-info/route.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/components/features/home/RecentlyShippedSection.tsx": {
+      "existsSync": 1,
+      "readFileSync": 1
+    },
+    "apps/web/lib/a11y-gates/contrast-engine.ts": {
+      "readFileSync": 2
+    },
+    "apps/web/lib/a11y-gates/touch-target-engine.ts": {
+      "readdirSync": 1,
+      "spawnSync": 1,
+      "readFileSync": 1
+    },
+    "apps/web/lib/changelog-source.ts": {
+      "existsSync": 1,
+      "readFileSync": 1
+    },
+    "apps/web/lib/chat/knowledge/topics.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/eval/calibration.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/hud/ovie-mac-hud.server.ts": {
+      "existsSync": 1,
+      "readFileSync": 1
+    },
+    "apps/web/lib/hud/shipper-state.ts": {
+      "existsSync": 5,
+      "readFileSync": 3
+    },
+    "apps/web/lib/hud/symphony-codex-accounts.server.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/library-share/passphrase.ts": {
+      "scryptSync": 2
+    },
+    "apps/web/lib/merch/artwork.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/ovie/identity.ts": {
+      "existsSync": 1,
+      "readFileSync": 1
+    },
+    "apps/web/lib/ovie/mcp/artist-profile-inventory.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/seo/ratchet.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/testing/quarantine-ledger.server.ts": {
+      "readFileSync": 1
+    },
+    "apps/web/lib/utils/pii-encryption.ts": {
+      "scryptSync": 1
+    },
+    "apps/web/lib/utils/url-encryption.server.ts": {
+      "scryptSync": 2
+    }
+  }
+}

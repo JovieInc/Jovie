@@ -227,6 +227,46 @@ describe('Form', () => {
       // Should include both description and message ids
       expect(describedBy.split(' ').length).toBeGreaterThanOrEqual(2);
     });
+
+    it('preserves generated field semantics over conflicting control props', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(
+        <TestForm>
+          <FormField
+            name='username'
+            rules={{ required: 'Username is required' }}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Username</FormLabel>
+                <FormControl
+                  id='custom-id'
+                  aria-describedby='external-help'
+                  aria-invalid={false}
+                >
+                  <input {...field} />
+                </FormControl>
+                <FormDescription>Public display name.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </TestForm>
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+      const input = await screen.findByRole('textbox', { name: 'Username' });
+      expect(input).not.toHaveAttribute('id', 'custom-id');
+      expect(input).toHaveAttribute(
+        'id',
+        screen.getByText('Username').getAttribute('for')
+      );
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(input.getAttribute('aria-describedby')).toContain('external-help');
+      expect(input.getAttribute('aria-describedby')).toContain(
+        `${input.id}-message`
+      );
+    });
   });
 
   describe('FormDescription', () => {

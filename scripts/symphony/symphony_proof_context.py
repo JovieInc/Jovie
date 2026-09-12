@@ -39,11 +39,39 @@ def profile_identity(path: Path) -> str:
     return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
 
 
+def executor_identity(provider: str, model: str, path: Path) -> str:
+    """Bind a CLI-backed seat to the exact executable, without claiming app-server compatibility."""
+    if (not contract.V2_PROVIDER_ID.fullmatch(provider)
+        or not contract.V2_MODEL_ID.fullmatch(model)
+        or path.is_symlink() or not path.is_file() or not os.access(path, os.X_OK)):
+        raise ValueError("invalid provider executor")
+    parts = [provider, model, str(path.resolve()), digest(path)]
+    return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
+
+
+def provider_pool_identity(provider: str, model: str, executor: Path, auth_state: Path) -> str:
+    """Bind a CLI completion to the exact local auth pool without claiming a chair."""
+    info = auth_state.stat() if not auth_state.is_symlink() and auth_state.is_file() else None
+    if (auth_state.is_symlink() or not auth_state.is_file()
+        or info is None or info.st_uid != os.getuid() or info.st_mode & 0o022):
+        raise ValueError("invalid provider auth pool")
+    parts = [executor_identity(provider, model, executor), str(auth_state.resolve()), digest(auth_state)]
+    return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
+
+
+def executor_state(row: dict) -> str:
+    path = Path(row["executorPath"])
+    auth_state = Path(row["authStatePath"])
+    value = [row["provider"], row["profile"], row["model"], str(path.resolve()), digest(path),
+             str(auth_state.resolve()), digest(auth_state), row["authPoolIdentity"]]
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+
 PROC_ROOT = Path("/proc")
 
 
 def service_identity() -> tuple[int, str]:
-    result = subprocess.run(["systemctl", "--user", "show", contract.V2_OFFICIAL_RUNTIME_SERVICE,
+    result = subprocess.run(["/usr/bin/systemctl", "--user", "show", contract.V2_OFFICIAL_RUNTIME_SERVICE,
         "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
     fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
     if fields.get("ActiveState") != "active" or int(fields.get("MainPID", 0)) <= 0:
@@ -126,16 +154,18 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
     runtime = contract.v2_validate_runtime_identity(value.get("runtime"))
     if runtime is None or runtime["contractSha256"] != digest(Path(contract.__file__)):
         raise ValueError("imported contract mismatch")
-    revision = subprocess.run(["git", "-C", value["sourceRoot"], "rev-parse", "HEAD"],
+    revision = subprocess.run(["/usr/bin/git", "-C", value["sourceRoot"], "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True, timeout=5).stdout.strip()
     if (revision != runtime["sourceRevision"]
         or digest(Path(value["binaryPath"])) != runtime["binarySha256"]
         or digest(Path(value["workflowPath"])) != runtime["workflowSha256"]):
         raise ValueError("runtime build mismatch")
     generation = live_runtime(value)
-    runner = Path(value["codexPath"])
-    if runner.is_symlink() or not runner.is_file() or not os.access(runner, os.X_OK) or digest(runner) != value["codexSha256"]:
-        raise ValueError("untrusted completion executable")
+    runner = None
+    if "codexPath" in value or "codexSha256" in value:
+        runner = Path(value["codexPath"])
+        if runner.is_symlink() or not runner.is_file() or not os.access(runner, os.X_OK) or digest(runner) != value["codexSha256"]:
+            raise ValueError("untrusted completion executable")
     observed = contract.v2_parse_time(value.get("observedAt"))
     if observed is None or not 0 <= (now - observed).total_seconds() <= 600:
         raise ValueError("stale enrollment")
@@ -148,16 +178,31 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
         if not isinstance(row, dict):
             raise ValueError("malformed enrollment")
         provider, profile, model = (row.get(k) for k in ("provider", "profile", "model"))
+        identity_type = row.get("identityType", "codex-account")
         if (not isinstance(provider, str) or not contract.V2_PROVIDER_ID.fullmatch(provider)
             or not isinstance(model, str) or not contract.V2_MODEL_ID.fullmatch(model)
-            or profile != profile_identity(Path(row["accountPath"]))
             or row.get("agentProfile") != "coder"):
+            raise ValueError("enrollment identity mismatch")
+        if identity_type == "codex-account":
+            if profile != profile_identity(Path(row["accountPath"])):
+                raise ValueError("enrollment identity mismatch")
+            account_binding = account_state(row, now)
+        elif identity_type == "provider-executor":
+            executor = Path(row["executorPath"])
+            auth_state = Path(row["authStatePath"])
+            if (profile != provider_pool_identity(provider, model, executor, auth_state)
+                or row.get("executorSha256") != digest(executor)
+                or row.get("authStateSha256") != digest(auth_state)
+                or row.get("authPoolIdentity") != profile):
+                raise ValueError("enrollment identity mismatch")
+            account_binding = executor_state(row)
+        else:
             raise ValueError("enrollment identity mismatch")
         seat = (provider, profile)
         if seat in seats:
             raise ValueError("duplicate enrollment")
         seats.add(seat)
-        enrolled.append({**row, "accountStateSha256": account_state(row, now)})
+        enrolled.append({**row, "accountStateSha256": account_binding})
     artifacts = Path(value["attestationDir"])
     info = artifacts.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
@@ -169,12 +214,17 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
         try:
             proof = private_json(artifact)
             seat = next((row for row in enrolled if row["profile"] == proof.get("profile") and row["provider"] == proof.get("provider")), None)
+            executable_matches = (
+                proof.get("codexSha256") == value.get("codexSha256")
+                if proof.get("producer") == contract.V2_PROOF_SOURCE
+                else proof.get("executorSha256") == seat.get("executorSha256") if seat is not None else False
+            )
             if (seat is not None and proof.get("accountStateSha256") == seat["accountStateSha256"]
-                and proof.get("runtimeGeneration") == generation and proof.get("codexSha256") == value["codexSha256"]):
+                and proof.get("runtimeGeneration") == generation and executable_matches):
                 attestations[artifact.stem] = proof
         except (OSError, ValueError, AttributeError):
             continue
-    return {"runtimeGeneration": generation, "codexPath": runner.resolve(), "codexSha256": value["codexSha256"], "runtime": runtime, "accounts": enrolled, "attestations": attestations,
+    return {"runtimeGeneration": generation, "codexPath": runner.resolve() if runner else None, "codexSha256": value.get("codexSha256"), "runtime": runtime, "accounts": enrolled, "attestations": attestations,
             "attestationDir": artifacts, "contextPath": path}
 
 

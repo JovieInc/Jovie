@@ -69,10 +69,9 @@ export interface ButtonPenMaster {
  * Receipts (canonical active Pen file, native save + CLI readback):
  * - `button/primary/lg/idle` → master `g3IC1`, label `iqbJo`; production refs
  *   `NRxLZ` (/download) and `w0wvCh` (footer) persist with independent label
- *   overrides. Terminal marketing CTAs share that same master through
- *   `MarketingTerminalCta` (`MarketingFooterCta` cinematic +
- *   `MarketingFinalCTA` standard) with independent label overrides. Live Pen
- *   readback shows `g3IC1` has no leading-icon descendant, so no
+ *   overrides. This receipt covers the lg selection only: 28px semantic CTAs
+ *   use the marketing size and remain unmapped until an exact Pen master is
+ *   promoted. Live Pen readback shows `g3IC1` has no leading-icon descendant, so no
  *   `leadingIcon` slot is declared and leading-icon overrides fail closed
  *   until the Pen lane returns a verified same-root icon descendant.
  */
@@ -114,6 +113,19 @@ export function resolveButtonPenMaster({
 
 export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];
+
+/**
+ * ActionButton / product CTA lock (Tim KEEP 2026-09-10 ~1:26 PT).
+ * Visible pill is 28px. Mobile tap target is 44px wrapping that pill.
+ * Not 32-in-44 and not density-32 on every size.
+ */
+export const ACTION_BUTTON_VISIBLE_HEIGHT_PX = 28;
+export const ACTION_BUTTON_MOBILE_HIT_TARGET_PX = 44;
+export const ACTION_BUTTON_LABEL_WEIGHT = 510;
+export const ACTION_BUTTON_RADIUS_PX = 999;
+
+/** Semantic CTAs share the canonical 28px control with a 44px mobile hit. */
+export const CTA_BUTTON_SIZE = 'marketing' as const satisfies ButtonSize;
 
 export type DeprecatedButtonVariant =
   | 'accent'

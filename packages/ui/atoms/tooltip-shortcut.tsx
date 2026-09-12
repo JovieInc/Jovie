@@ -55,8 +55,17 @@ export function TooltipShortcut({
         side={side}
         className='flex items-center gap-2'
       >
-        <span>{visibleLabel}</span>
-        {visibleShortcut && <Kbd variant='tooltip'>{visibleShortcut}</Kbd>}
+        <span
+          data-testid='tooltip-label'
+          className={contentVariant === 'rich' ? 'min-w-0' : undefined}
+        >
+          {visibleLabel}
+        </span>
+        {visibleShortcut && (
+          <Kbd variant='tooltip' className='shrink-0'>
+            {visibleShortcut}
+          </Kbd>
+        )}
       </TooltipContent>
     </Tooltip>
   );

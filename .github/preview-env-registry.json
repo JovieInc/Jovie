@@ -150,13 +150,6 @@
       "kind": "staging",
       "ephemeral": false,
       "reason": "Standing staging (staging.jov.ie) and production (jov.ie) deployments are the default integrated surfaces, not exceptions; they are CLI-built and SHA-attested, never PR previews."
-    },
-    {
-      "id": "eve-pilot-shadow-standing",
-      "workflow": ".github/workflows/eve-pilot.yml",
-      "kind": "shadow",
-      "ephemeral": false,
-      "reason": "The jovie-eve-shadow Vercel project is a standing shadow endpoint aliased per release, not a PR preview."
     }
   ]
 }

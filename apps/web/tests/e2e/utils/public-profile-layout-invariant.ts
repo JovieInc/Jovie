@@ -1,12 +1,15 @@
 import type { Page } from '@playwright/test';
 
 type PublicProfileLayoutViolationCode =
+  | 'artist_name_clipped'
   | 'phantom_banner'
   | 'banner_reserved_geometry'
   | 'claim_cta_overflow'
   | 'claim_cta_wrap'
   | 'desktop_bottom_nav'
   | 'desktop_compact_shell'
+  | 'desktop_empty_side_rail'
+  | 'desktop_geometry_token'
   | 'horizontal_overflow'
   | 'layout_surface_count'
   | 'target_under_44'
@@ -75,6 +78,60 @@ export async function auditPublicProfileLayout(page: Page) {
               'desktop-width compact shell lacks the explicit preview marker, visible label, or keyboard-operable exit',
           });
         }
+      }
+    }
+
+    if (isDesktopViewport) {
+      const frame = document.querySelector<HTMLElement>(
+        '.public-profile-layout-frame'
+      );
+      const contentMax = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          '--ds-public-content-max'
+        )
+      );
+      if (ownsDesktop && frame && Number.isFinite(contentMax)) {
+        const expectedWidth = Math.min(window.innerWidth, contentMax);
+        const actualWidth = frame.getBoundingClientRect().width;
+        if (Math.abs(actualWidth - expectedWidth) > 1) {
+          violations.push({
+            code: 'desktop_geometry_token',
+            detail: `desktop frame width is ${actualWidth}px; expected ${expectedWidth}px from --ds-public-content-max`,
+          });
+        }
+      }
+    }
+
+    const homeOverview = visible(
+      '[data-testid="profile-desktop-home-overview"]'
+    )[0];
+    const sideRail = visible('[data-testid="profile-desktop-side-rail"]')[0];
+    if (
+      ownsDesktop &&
+      homeOverview?.dataset.sideRailEnabled === 'false' &&
+      sideRail
+    ) {
+      violations.push({
+        code: 'desktop_empty_side_rail',
+        detail: 'desktop overview reserved a visible side rail without content',
+      });
+    }
+
+    const desktopCover = visible('[data-testid="profile-desktop-cover"]')[0];
+    const artistName = desktopCover?.querySelector<HTMLElement>(
+      '[data-testid="profile-header"]'
+    );
+    if (ownsDesktop && desktopCover && isVisible(artistName ?? null)) {
+      const coverBox = desktopCover.getBoundingClientRect();
+      const nameBox = artistName.getBoundingClientRect();
+      if (
+        nameBox.left < coverBox.left - 1 ||
+        nameBox.right > coverBox.right + 1
+      ) {
+        violations.push({
+          code: 'artist_name_clipped',
+          detail: `artist name bounds ${nameBox.left.toFixed(1)}..${nameBox.right.toFixed(1)} escape cover ${coverBox.left.toFixed(1)}..${coverBox.right.toFixed(1)}`,
+        });
       }
     }
 

@@ -81,9 +81,9 @@ describe('@critical GET /api/health/auth', () => {
     expect(response.status).toBe(403);
   });
 
-  it('returns dev-fast health response when Clerk middleware is bypassed', async () => {
-    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
-    vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '1');
+  it('returns dev-fast health response when auth mock flags are set', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_PROXY_DISABLED', '1');
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     mockIsTestAuthBypassEnabled.mockReturnValue(true);
     mockGetOptionalAuth.mockResolvedValue({
@@ -102,10 +102,10 @@ describe('@critical GET /api/health/auth', () => {
         authenticated: false,
         devFast: expect.objectContaining({
           active: true,
-          clerkMockEnabled: true,
-          clerkProxyDisabled: true,
+          authMockEnabled: true,
+          authProxyDisabled: true,
           testAuthBypassEnabled: true,
-          clerkMiddleware: 'bypassed',
+          authMiddleware: 'bypassed',
         }),
         message: expect.stringContaining('dev-fast auth bypass active'),
       })

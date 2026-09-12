@@ -18,6 +18,38 @@ export const WEB_BIND_REASONS = Object.freeze({
   liveUnbound: 'live_unbound',
 });
 
+export const PRODUCTION_BASE_EVIDENCE = Object.freeze({
+  verifiedMarker: 'verified-marker',
+  canonicalBootstrap: 'canonical-live-bootstrap',
+});
+
+/**
+ * Classify the already-serving production checkpoint used as the lower bound
+ * of a new release range. A historical generation normally needs its durable
+ * verified marker. The sole bootstrap exception is an exact canonical live
+ * SHA that predates marker enforcement and differs from the new target. The
+ * caller must have read that SHA from canonical build-info; the new target
+ * still traverses the complete staging, canary, promotion, and verification
+ * path and receives its own marker.
+ */
+export function classifyProductionBaseEvidence({
+  markerState,
+  deployedSha,
+  currentSha,
+}) {
+  exactSha(deployedSha, 'deployedSha');
+  exactSha(currentSha, 'currentSha');
+  if (markerState === 'verified') {
+    return PRODUCTION_BASE_EVIDENCE.verifiedMarker;
+  }
+  if (markerState === 'none' && deployedSha !== currentSha) {
+    return PRODUCTION_BASE_EVIDENCE.canonicalBootstrap;
+  }
+  throw new Error(
+    `production base evidence is not admissible (${markerState || 'missing'})`
+  );
+}
+
 function exactSha(value, label) {
   if (!SHA_PATTERN.test(value ?? '')) {
     throw new Error(`${label} must be a full lowercase commit SHA`);
@@ -513,6 +545,11 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
       currentReceipt,
     });
   } else {
+    const baseEvidence = classifyProductionBaseEvidence({
+      markerState: args['deployed-marker-state'],
+      deployedSha: args['deployed-sha'],
+      currentSha: args['current-sha'],
+    });
     const gitRange = collectProductionGitRange(
       args['deployed-sha'],
       args['current-sha']
@@ -522,6 +559,7 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
       currentSha: args['current-sha'],
       ...gitRange,
     });
+    plan.productionBaseEvidence = baseEvidence;
   }
 
   let webEvidence = null;

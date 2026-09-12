@@ -1,10 +1,31 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+
+const previousBackoffDirectory = process.env.LINEAR_BACKOFF_STATE_DIR;
+const backoffDirectory = await mkdtemp(
+  resolve(tmpdir(), 'linear-client-suite-')
+);
+process.env.LINEAR_BACKOFF_STATE_DIR = backoffDirectory;
+after(async () => {
+  await rm(backoffDirectory, { recursive: true, force: true });
+  if (previousBackoffDirectory === undefined)
+    delete process.env.LINEAR_BACKOFF_STATE_DIR;
+  else process.env.LINEAR_BACKOFF_STATE_DIR = previousBackoffDirectory;
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCHESTRATOR_DIR = resolve(__dirname, '..');
@@ -35,6 +56,50 @@ describe('team production health contract', () => {
       /healthUrl: 'https:\/\/www\.logyourbody\.com\/robots\.txt'/
     );
     assert.doesNotMatch(source, /healthUrl: 'https:\/\/logyourbody\.com'/);
+  });
+});
+
+describe('remediation cooldown recovery', () => {
+  it('defers a shared Linear cooldown for the scheduled retry clock', async () => {
+    const executable = resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs');
+    const stateRoot = await mkdtemp(resolve(tmpdir(), 'linear-cooldown-cli-'));
+    const key = 'test-remediation-cooldown-key';
+    const resetAt = Date.now() + 60_000;
+    const scope = createHash('sha256')
+      .update(`https://api.linear.app/graphql\0${key}`)
+      .digest('hex');
+    const scopeDir = resolve(stateRoot, scope);
+    await mkdir(scopeDir, { recursive: true, mode: 0o700 });
+    await writeFile(
+      resolve(scopeDir, `${resetAt}-00000000-0000-4000-8000-000000000000.json`),
+      JSON.stringify({ schema: 1, resetAt }),
+      { mode: 0o600 }
+    );
+
+    try {
+      const result = await execFileAsync(
+        process.execPath,
+        [executable, 'remediate'],
+        {
+          env: {
+            ...process.env,
+            LINEAR_API_KEY: key,
+            LINEAR_BACKOFF_STATE_DIR: stateRoot,
+            XDG_CACHE_HOME: stateRoot,
+          },
+        }
+      );
+      const receipt = JSON.parse(
+        result.stderr.match(/Failure receipt: (\{.*\})/)?.[1] || '{}'
+      );
+      assert.equal(receipt.status, 'deferred');
+      assert.equal(receipt.code, 'RATE_LIMITED');
+      assert.equal(receipt.resetAt, resetAt);
+      assert.equal(receipt.retryAt, new Date(resetAt).toISOString());
+      assert.match(result.stderr, /scheduled remediation clock will retry/);
+    } finally {
+      await rm(stateRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -147,7 +212,7 @@ describe('classifier', () => {
     );
   });
 
-  it('excludes Tim-owned and protected machine-looking work', () => {
+  it('counts machine leases even when founder steering remains assigned', () => {
     const evidence = [
       {
         body: 'machine-agent running process: 123 workspace: /tmp/jovie branch: fix/JOV-1',
@@ -171,7 +236,7 @@ describe('classifier', () => {
         ],
         { now }
       ),
-      { healthy: true, count: 0 }
+      { healthy: true, count: 2 }
     );
   });
 
@@ -252,6 +317,9 @@ describe('reconciliation idempotency', () => {
     let nextUpdatedAt = issue.updatedAt;
     const calls = { comments: [] };
     const client = {
+      async fetchIssue() {
+        return reread();
+      },
       async addComment(issueId, body) {
         calls.comments.push({ issueId, body });
         issue.comments.nodes.push({
@@ -306,7 +374,7 @@ describe('deterministic triage routing', () => {
     );
   });
 
-  it('routes incidents, follow-ups, and ready work out of Triage', () => {
+  it('preserves protected incidents while routing unowned follow-ups and ready work', () => {
     const states = { backlogStateId: 'backlog-id', todoStateId: 'todo-id' };
     const classification = { category: 'triageable' };
     assert.equal(
@@ -315,7 +383,7 @@ describe('deterministic triage routing', () => {
         classification,
         states
       ).desiredStateId,
-      'todo-id'
+      null
     );
     const followup = triageRouter.routeTriageIssue(
       makeIssue({ description: '## Follow-up\nCurrent issue: JOV-42' }),
@@ -372,6 +440,9 @@ describe('deterministic triage routing', () => {
     const receipt = await reconcileIssues({
       issues: [issue],
       client: {
+        async fetchIssue() {
+          return structuredClone(issue);
+        },
         async transitionIssue(issueId, stateId) {
           transitions.push({ issueId, stateId });
         },
@@ -605,16 +676,37 @@ describe('stale lease guard', () => {
     };
   }
 
-  it('does not recover protected-label issues', async () => {
-    const client = fakeClient(staleIssue({ labels: ['needs-human'] }));
+  it('recovers stale leases carrying a legacy human-hold label', async () => {
+    const assignee = { id: 'tim', name: 'Tim White' };
+    const issue = staleIssue({ labels: ['needs-human'], assignee });
+    const recoveryComment = {
+      id: 'recovery',
+      createdAt: now,
+      body: staleLease.STALE_LEASE_RECOVERY_COMMENT,
+    };
+    const client = fakeClient(issue, {
+      rereads: [
+        staleIssue({
+          labels: ['needs-human'],
+          assignee,
+          comments: [terminalComment, recoveryComment],
+        }),
+        staleIssue({
+          labels: ['needs-human'],
+          assignee,
+          state: 'Todo',
+          comments: [terminalComment, recoveryComment],
+        }),
+      ],
+    });
     const result = await staleLease.sweepStaleLeases({
-      issues: [staleIssue({ labels: ['needs-human'] })],
+      issues: [issue],
       client,
       now,
     });
-    assert.equal(result.recovered.length, 0);
-    assert.equal(client.calls.transitions.length, 0);
-    assert.equal(result.skipped[0].reason, 'protected-label');
+    assert.equal(result.recovered.length, 1);
+    assert.equal(client.calls.transitions.length, 1);
+    assert.equal(result.skipped.length, 0);
   });
 
   it('does not recover issues with an active PR', async () => {
@@ -633,7 +725,9 @@ describe('stale lease guard', () => {
   });
 
   it('does not recover assigned or unknown leases', async () => {
-    const assigned = staleIssue({ assignee: { id: 'tim', name: 'Tim White' } });
+    const assigned = staleIssue({
+      assignee: { id: 'other', name: 'Other Owner' },
+    });
     const unknown = staleIssue({ comments: [] });
     const assignedResult = await staleLease.sweepStaleLeases({
       issues: [assigned],
@@ -1236,7 +1330,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
+  it('preserves the cohort for one controller repair when production is unbound', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         production: { status: 'green', deployedSha: 'bda0d88' },
@@ -1246,8 +1340,61 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
+    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, true);
+    assert.equal(fleetGate.alreadyAdmittedCohort.newIntakeAllowed, false);
+    assert.equal(fleetGate.controllerRepairAdmission.allowed, true);
+    assert.equal(fleetGate.controllerRepairAdmission.maxConcurrent, 1);
+  });
+
+  it('admits only one controller repair through the second fleet consumer', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({ controller: { status: 'failed' } }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'controller-repair-only');
+    assert.deepEqual(fleetGate.alreadyAdmittedCohort, {
+      preserve: true,
+      newIntakeAllowed: false,
+      semantics: 'preserve-cohort-and-admit-one-controller-repair',
+    });
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
+    assert.deepEqual(fleetGate.controllerRepairAdmission, {
+      allowed: true,
+      condition: 'controller-failure',
+      mainSha: fleetEvidence().main.sha,
+      deployedSha: fleetEvidence().production.deployedSha,
+      scope: 'trusted-comment-exact-repository-pr-head-main-path-set',
+      maxConcurrent: 1,
+      deploymentsAllowed: false,
+      runtimeActivationAllowed: false,
+      authority: 'canonical-merge-queue-controller',
+    });
+  });
+
+  it('denies controller repair when closure observation is unknown', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        controller: { status: 'failed' },
+        closureHealth: {
+          schema: 'jovie-closure-health/v1',
+          status: 'red',
+          authority: 'Summer',
+          newIssueIntakeAllowed: false,
+          promotionContinues: true,
+          remediationContinues: true,
+          reasons: ['closure-observation-unknown'],
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
     assert.equal(fleetGate.promotionMode, 'blocked');
-    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, false);
+    assert.equal(fleetGate.controllerRepairAdmission.allowed, false);
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
   });
 
   it('wires persisted main and deployment identities into lease admission', async () => {
@@ -2130,7 +2277,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.equal(result.admit[0].type, 'issue');
   });
 
-  it('excludes protected and Tim-owned issues', async () => {
+  it('admits founder-assigned work without a human ownership hold', async () => {
     const protectedIssue = admissionIssue({
       identifier: 'JOV-4513',
       labels: ['plan-approved', 'admission-approved', 'needs-human'],
@@ -2144,10 +2291,17 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       [],
       { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
-    assert.equal(result.admit.length, 0);
+    assert.equal(result.admit.length, 1);
+    assert.equal(result.admit[0].identifier, 'JOV-4396');
+    assert.equal(
+      result.admissionDecisions.find(
+        decision => decision.identifier === 'JOV-4396'
+      ).allowed,
+      true
+    );
   });
 
-  it('reports typed pre-admission holds before selecting an issue', async () => {
+  it('reports machine holds while legacy human labels remain eligible', async () => {
     const held = [
       'needs-human',
       'held',
@@ -2166,20 +2320,22 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
 
-    assert.equal(result.admit[0].identifier, 'JOV-4529');
-    for (const [index, label] of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ].entries()) {
+    assert.equal(result.admit[0].identifier, 'JOV-4520');
+    for (const [index, label] of ['held', 'manual-incident'].entries()) {
+      const issueIndex = index === 0 ? 1 : 3;
       const decision = result.admissionDecisions.find(
-        item => item.identifier === `JOV-${4520 + index}`
+        item => item.identifier === `JOV-${4520 + issueIndex}`
       );
       assert.equal(decision.allowed, false);
       assert.equal(decision.preAdmission.reason.code, 'protected-policy');
       assert.deepEqual(decision.preAdmission.matchedLabels, [label]);
       assert.equal(decision.preAdmission.reason.retryable, false);
+    }
+    for (const issueIndex of [0, 2]) {
+      const decision = result.admissionDecisions.find(
+        item => item.identifier === `JOV-${4520 + issueIndex}`
+      );
+      assert.equal(decision.allowed, true);
     }
   });
 
@@ -2296,5 +2452,308 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.equal(client.calls.labels.length, 1);
     assert.equal(client.calls.comments.length, 1);
     assert.equal(client.calls.rereads, 4);
+  });
+});
+
+describe('triage ownership fence', () => {
+  const states = { backlogStateId: 'backlog-id', todoStateId: 'todo-id' };
+  function fixture(overrides = {}) {
+    let live = makeIssue({
+      identifier: 'JOV-6034',
+      labels: ['agent-ready'],
+      ...overrides,
+    });
+    const writes = [];
+    const client = {
+      async fetchIssue() {
+        return structuredClone(live);
+      },
+      async addComment(_id, body) {
+        writes.push('comment');
+        live.comments.nodes.push({ body, createdAt: '2026-09-05T21:00:00Z' });
+        return { success: true };
+      },
+      async setIssueParent(_id, parentId) {
+        writes.push('parent');
+        live.parent = { id: parentId, identifier: 'JOV-42', title: 'Parent' };
+        return { success: true };
+      },
+      async transitionIssue(_id, id) {
+        writes.push('transition');
+        live.state = {
+          id,
+          name: id === 'todo-id' ? 'Todo' : 'Backlog',
+          type: 'unstarted',
+        };
+        return { success: true };
+      },
+    };
+    return {
+      client,
+      writes,
+      read: () => structuredClone(live),
+      change: patch => {
+        live = { ...live, ...patch };
+      },
+    };
+  }
+  async function run(f, snapshot = f.read()) {
+    return reconcileIssues({ issues: [snapshot], client: f.client, ...states });
+  }
+
+  for (const [name, overrides] of [
+    ['protected direct task', { labels: ['agent-ready', 'codex-in-progress'] }],
+    [
+      'assigned direct owner',
+      { assignee: { id: 'other', name: 'Other Owner' } },
+    ],
+    [
+      'canonical active claim',
+      {
+        state: 'In Progress',
+        labels: ['agent-ready', 'symphony', 'admission-approved'],
+      },
+    ],
+    [
+      'canonical queued claim',
+      { state: 'Todo', labels: ['symphony', 'admission-approved'] },
+    ],
+    ['ambiguous in-flight ownership', { state: 'In Progress' }],
+    ['review handoff', { state: 'In Review' }],
+    [
+      'active PR',
+      { pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/1' },
+    ],
+    ['terminal issue', { state: 'Done' }],
+  ]) {
+    it(`makes zero writes for ${name}`, async () => {
+      const f = fixture(overrides);
+      const receipt = await run(f);
+      assert.deepEqual(f.writes, []);
+      assert.equal(receipt.skipped, 1);
+      assert.equal(receipt.mutations, 0);
+      assert.equal(
+        triageRouter.routeTriageIssue(
+          f.read(),
+          { category: 'triageable' },
+          states
+        ).desiredStateId,
+        null
+      );
+    });
+  }
+
+  it('routes founder-assigned ready work as steering without a human hold', async () => {
+    const f = fixture({ assignee: { id: 'tim', name: 'Tim White' } });
+    const receipt = await run(f);
+
+    assert.deepEqual(f.writes, ['comment', 'transition']);
+    assert.equal(receipt.skipped, 0);
+    assert.equal(receipt.mutations, 1);
+    assert.equal(f.read().state.name, 'Todo');
+  });
+
+  it('does not mistake expired machine evidence or handoff prose for release authority', async () => {
+    const f = fixture({
+      state: 'In Progress',
+      updatedAt: '2026-09-03T12:00:00Z',
+      comments: [
+        {
+          body: 'machine-agent completed; process: 12 workspace: /work branch: codex/old; handoff to triage',
+          createdAt: '2026-08-01T00:00:00Z',
+        },
+      ],
+    });
+    assert.equal(
+      staleLease.classifyStaleLease(f.read(), { now: '2026-09-05T12:00:00Z' })
+        .eligible,
+      true
+    );
+    await run(f);
+    assert.deepEqual(f.writes, []);
+    // Existing recovery/owner actually released the Linear lease to Todo.
+    f.change({ state: { id: 'todo-id', name: 'Todo', type: 'unstarted' } });
+    await run(f);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+  });
+
+  it('rejects a newly claimed issue read immediately before the first write', async () => {
+    const f = fixture();
+    const snapshot = f.read();
+    f.change({ state: { id: 'active', name: 'In Progress' } });
+    const receipt = await run(f, snapshot);
+    assert.deepEqual(f.writes, []);
+    assert.equal(receipt.failed, 1);
+    assert.match(receipt.results[0].reason, /ownership/);
+  });
+
+  it('stops remaining writes when ownership changes after classification', async () => {
+    const f = fixture();
+    const add = f.client.addComment;
+    f.client.addComment = async (...args) => {
+      await add(...args);
+      f.change({ assignee: { id: 'direct-owner' } });
+      return { success: true };
+    };
+    const receipt = await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+    assert.equal(receipt.failed, 1);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+  });
+
+  it('rechecks this issue after parent resolution and never attaches a competing parent', async () => {
+    const f = fixture({ description: '## Follow-up\nCurrent issue: JOV-42' });
+    const read = f.client.fetchIssue;
+    f.client.fetchIssue = async id => {
+      if (id === 'JOV-42') {
+        f.change({ labels: { nodes: [{ name: 'codex-in-progress' }] } });
+        return {
+          ...makeIssue({ identifier: 'JOV-42', title: 'Parent' }),
+          id: 'parent-id',
+        };
+      }
+      return read();
+    };
+    const receipt = await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+    assert.equal(receipt.results[0].reason, 'protected-policy');
+  });
+
+  it('completes an unowned parent route once and does not rewrite provider instructions', async () => {
+    const f = fixture({
+      description:
+        '## Follow-up\nCurrent issue: JOV-42\nOld Ops triage: Grok/Kimi only',
+    });
+    const before = f.read().description;
+    const read = f.client.fetchIssue;
+    f.client.fetchIssue = async id =>
+      id === 'JOV-42'
+        ? {
+            ...makeIssue({ identifier: 'JOV-42', title: 'Parent' }),
+            id: 'parent-id',
+          }
+        : read();
+    const receipt = await run(f);
+    assert.equal(receipt.failed, 0);
+    assert.deepEqual(f.writes, ['comment', 'parent', 'transition']);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment', 'parent', 'transition']);
+    assert.equal(f.read().description, before);
+  });
+
+  for (const { name, reader } of [
+    {
+      name: 'unavailable',
+      reader: async () => {
+        throw new Error('read unavailable');
+      },
+    },
+    { name: 'missing', reader: async () => null },
+    {
+      name: 'wrong issue',
+      reader: async () => makeIssue({ identifier: 'JOV-999' }),
+    },
+  ]) {
+    it(`fails closed on ${name} ownership read`, async () => {
+      const f = fixture();
+      f.client.fetchIssue = reader;
+      assert.equal((await run(f)).failed, 1);
+      assert.deepEqual(f.writes, []);
+    });
+  }
+
+  it('rejects changed routing content even beyond the old classification fingerprint prefix', async () => {
+    const f = fixture({ description: 'x'.repeat(250) });
+    const snapshot = f.read();
+    f.change({ description: `${snapshot.description}\nCurrent issue: JOV-42` });
+    const receipt = await run(f, snapshot);
+    assert.equal(receipt.results[0].reason, 'reconciliation-snapshot-changed');
+    assert.deepEqual(f.writes, []);
+  });
+
+  it('uses fresh persisted classification to deduplicate a stale retry snapshot', async () => {
+    const f = fixture({ labels: [] });
+    const snapshot = f.read();
+    await run(f, snapshot);
+    await run(f, snapshot);
+    assert.deepEqual(f.writes, ['comment']);
+  });
+
+  it('makes zero writes when ownership evidence is known to be incomplete', async () => {
+    const f = fixture();
+    f.change({ comments: { nodes: [], pageInfo: { hasNextPage: true } } });
+    const receipt = await run(f);
+    assert.equal(receipt.results[0].reason, 'nested-evidence-incomplete');
+    assert.deepEqual(f.writes, []);
+  });
+
+  it('reconciles a lost comment acknowledgment without posting it twice', async () => {
+    const f = fixture();
+    const snapshot = f.read();
+    const add = f.client.addComment;
+    f.client.addComment = async (...args) => {
+      await add(...args);
+      throw new Error('response lost after persistence');
+    };
+    assert.equal((await run(f, snapshot)).failed, 1);
+    assert.deepEqual(f.writes, ['comment']);
+    assert.equal((await run(f, snapshot)).failed, 0);
+    assert.deepEqual(f.writes, ['comment', 'transition']);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment', 'transition']);
+  });
+
+  it('reports failed mutations and never continues into the next side effect', async () => {
+    const f = fixture();
+    f.client.addComment = async () => ({
+      success: false,
+      commentCreate: { success: false },
+    });
+    const receipt = await run(f);
+    assert.equal(receipt.failed, 1);
+    assert.equal(receipt.mutations, 0);
+    assert.deepEqual(f.writes, []);
+  });
+});
+
+describe('unowned triage routes preserve existing admission boundaries', () => {
+  const states = { todoStateId: 'todo-id', backlogStateId: 'backlog-id' };
+  it('routes an unprotected controller recovery and defers ready work with dependencies', () => {
+    assert.equal(
+      triageRouter.routeTriageIssue(
+        makeIssue({ title: '[production controller] manual recovery' }),
+        { category: 'triageable' },
+        states
+      ).reason,
+      'incident-lane'
+    );
+    const blocked = makeIssue({
+      labels: ['agent-ready'],
+      relations: [{ type: 'blocked_by' }],
+    });
+    assert.equal(
+      triageRouter.routeTriageIssue(blocked, { category: 'triageable' }, states)
+        .reason,
+      'blocked-by-relation'
+    );
+  });
+  it('routes duplicate and obsolete classifications without taking a protected epic', () => {
+    for (const category of ['duplicate', 'obsolete']) {
+      assert.equal(
+        triageRouter.routeTriageIssue(makeIssue(), { category }, states)
+          .desiredStateId,
+        'backlog-id'
+      );
+    }
+    assert.equal(
+      triageRouter.routeTriageIssue(
+        makeIssue({ labels: ['agent-ready', 'type:epic'] }),
+        { category: 'triageable' },
+        states
+      ).desiredStateId,
+      null
+    );
   });
 });

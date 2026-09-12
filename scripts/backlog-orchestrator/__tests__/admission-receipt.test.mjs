@@ -176,23 +176,31 @@ describe('revision-scoped admission receipt', () => {
     assert.equal(admitter.hasAdmissionEvidence(candidate).eligible, false);
   });
 
-  it('revokes admission when a human-review label appears', () => {
-    const protectedIssue = admitted({
-      labels: { nodes: [{ name: 'human-review-required' }] },
-    });
-    assert.equal(
-      admissionGate.validateAdmissionCandidate(protectedIssue),
-      'protected-or-human-review'
-    );
-    assert.equal(
-      admissionGate.admissionGateReceipt(protectedIssue, { now: NOW }),
-      null
-    );
-    assert.equal(admitter.hasAdmissionEvidence(protectedIssue).eligible, false);
-    assert.deepEqual(deterministicGates.admissionIntentLoad([protectedIssue]), {
-      count: 0,
-      identifiers: [],
-    });
+  it('keeps admission live when legacy human or taste labels appear', () => {
+    for (const label of [
+      'human-review-required',
+      'needs-human',
+      'needs:taste',
+      'needs-human-taste',
+      'no-auto',
+    ]) {
+      const labeledIssue = admitted({
+        labels: { nodes: [{ name: label }] },
+      });
+      assert.equal(
+        admissionGate.validateAdmissionCandidate(labeledIssue),
+        null
+      );
+      assert.notEqual(
+        admissionGate.admissionGateReceipt(labeledIssue, { now: NOW }),
+        null
+      );
+      assert.equal(admitter.hasAdmissionEvidence(labeledIssue).eligible, true);
+      assert.deepEqual(deterministicGates.admissionIntentLoad([labeledIssue]), {
+        count: 1,
+        identifiers: [labeledIssue.identifier],
+      });
+    }
   });
 
   it('recovers a missing derived label from an existing receipt', async () => {

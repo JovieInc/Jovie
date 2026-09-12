@@ -1,81 +1,96 @@
-# Auth (Clerk Proxy + E2E Bypass)
+---
+paths: ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"]
+---
 
-Read this before touching anything Clerk-related, the `proxy.ts` middleware, or local/E2E auth flows.
+# Auth (Better Auth + E2E Bypass)
 
-## Clerk Auth Proxy Architecture
+Read this before touching auth, `proxy.ts`, or local/E2E auth flows.
 
-**CRITICAL — read this before touching anything Clerk-related.**
+**Clerk is retired.** Do not import `@clerk/*`, do not add `CLERK_*` /
+`NEXT_PUBLIC_CLERK_*` env, do not create Clerk test users, and do not
+teach Clerk as the live auth path. Identity is Better Auth only.
 
-Jovie uses three distinct Clerk key pairs:
-- **Dev** (`dev`, account A development instance): local/dev worktrees use the `pk_test_...` + dev secret pair from Doppler `jovie-web/dev`
-- **Staging** (`stg`, account B production instance): `staging.jov.ie` uses `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
-- **Production** (`prd`, account A production instance): `jov.ie` uses `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
+## Better Auth Architecture
 
-The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Clerk JS requests go to `/__clerk/*` on the current origin. Dev mode doesn't use the proxy — ClerkProvider talks directly to Clerk.
+Jovie owns sessions on Neon + Drizzle + Upstash. Better Auth is configured in
+`apps/web/lib/auth/better-auth.ts` and served at `/api/auth/[...all]` via
+`toNextJsHandler`.
 
-### How the proxy works
-
-- Middleware in `proxy.ts` intercepts `/__clerk/*` and `/clerk/*` paths
-- Decodes the FAPI host from the active publishable key at runtime
-- Uses `fetch()` to proxy with the correct `Host` header set to the decoded FAPI host
-- Uses strict host routing: `staging.jov.ie` must use the staging key pair and must never fall back to production keys
+- **Server:** `auth.api.getSession({ headers })` — use this in pages, layouts,
+  actions, and API routes. Request-scoped wrappers: `getCachedAuth()`,
+  `getOptionalAuth()`, `getCachedCurrentUser()` in `apps/web/lib/auth/cached.ts`.
+- **Client:** `apps/web/lib/auth/client.ts` (`createAuthClient`). UI hooks live
+  in `apps/web/hooks/useJovieAuth.tsx` (`useJovieAuth` / `useUserSafe` /
+  `useAuthSafe` / `useSessionSafe`). New code imports from `useJovieAuth`.
+- **Proxy hot path:** cookie presence only (`getSessionCookie`). Public `/`
+  always passes through. Auth pages do **not** redirect in proxy — the page
+  runs a full `getSession` so stale cookies cannot loop.
+- **OAuth:** hardcoded allowlist in `apps/web/lib/auth/oauth-providers.ts`
+  (`apple` + `google`). Do **not** reintroduce env gates for which provider
+  buttons render. Console redirect URIs are Better Auth callbacks
+  (`/api/auth/callback/google`, `/api/auth/callback/apple`).
+- **Native handoff:** `/auth/callback` mints a one-time token; iOS exchanges
+  it for a bearer session. Do not reintroduce a Clerk publishable key on iOS.
 
 ### DO NOT
 
-- Use `NextResponse.rewrite()` for clerk paths — Vercel doesn't set the Host header correctly, causing Clerk 400 "Invalid host"
-- Use `vercel.json` rewrites as the primary mechanism — same Host header problem
-- Hardcode FAPI hosts — always decode from the resolved publishable key
-- Use `clerk.jov.ie` or `clerk.staging.jov.ie` as public-facing URLs — traffic goes through `/__clerk` path proxy only
-- Add satellite/custom proxy domains — they cost money and are unnecessary with the fetch proxy
+- Import `@clerk/nextjs`, `@clerk/backend`, `@clerk/testing`, or any `@clerk/*`
+- Add `CLERK_*`, `NEXT_PUBLIC_CLERK_*`, or `E2E_CLERK_*` env vars
+- Proxy `/__clerk` or decode a Clerk FAPI host
+- Create `+clerk_test` emails or call `setupClerkTestingToken`
+- Document Clerk dashboard / Clerk CLI as the operator path
 
-### If Clerk auth breaks
+### If auth breaks
 
-1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the resolved publishable key
-2. Check the active runtime exposes the correct key pair for that host:
-   - production uses `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY`
-   - staging uses `CLERK_PUBLISHABLE_KEY_STAGING` + `CLERK_SECRET_KEY_STAGING`
-3. Check CSP allows the decoded FAPI host in `connect-src`, `script-src`, `frame-src`
-4. If staging auth is broken, do not let `staging.jov.ie` fall back to production Clerk keys; fail closed to the auth-unavailable state instead
+1. Check `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` for the active host
+2. Check Google/Apple console redirect URIs match `/api/auth/callback/*`
+3. Check `/api/health/auth` — it reports Better Auth readiness, not Clerk keys
+4. For local/E2E, debug the bypass route first (`/api/dev/test-auth/enter`)
 
 ## OAuth Provider Button Enablement (Allowlist, Not Env)
 
-**Canonical:** `apps/web/lib/auth/oauth-providers.ts` — hardcoded allowlist (`apple` + `google`). Do **not** reintroduce `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` (or any env) gates for which provider buttons render. JOV-2131 investigated the 2026-05-10 incident: dynamic bracket access never inlines; static env lookups still left production sign-in empty when build-time truth diverged from dashboard state. Turbo + Next `NEXT_PUBLIC_*` inlining still works for normal public config — auth-provider enablement is a code-review control plane, not a Vercel toggle. Details: `docs/auth/next-public-oauth-flags.md`.
+**Canonical:** `apps/web/lib/auth/oauth-providers.ts` — hardcoded allowlist
+(`apple` + `google`). Do **not** reintroduce `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED`
+or any env gates for which provider buttons render.
 
 ## OAuth Console Redirect URIs (Google + Apple)
 
-Clerk hands Google/Apple a `redirect_uri` of `https://<fapi-host>/v1/oauth_callback`,
-where the FAPI host decodes from each instance's publishable key
-(`apps/web/lib/auth/decode-fapi-host.ts`). That URI **must** be registered in the
-Google OAuth client + Apple Service ID consoles, or sign-in fails with
-`Error 400: redirect_uri_mismatch` (the 2026-06-26 incident: the staging
-unification moved prod FAPI to `clerk.jov.ie` while the consoles still had the
-old `meetjovie` / `jov.ie/__clerk` callbacks).
+Better Auth hands Google/Apple `https://<host>/api/auth/callback/<provider>`.
+That URI **must** be registered in the Google OAuth client + Apple Service ID
+consoles.
 
-- **Single source of truth:** `apps/web/lib/auth/oauth-redirect-uris.expected.json`. Print/verify with `pnpm tsx scripts/auth-redirect-uris.ts [--verify prod|staging]`.
-- **These consoles have NO CLI/API.** To register/update redirect URIs, run the **`/auth-console-sync`** skill — it drives a logged-in browser. Do not ask the user to do it manually.
-- **If you change a Clerk instance / FAPI host** (unification, key rotation, new instance): update the snapshot JSON AND re-run `/auth-console-sync` **before shipping**. `apps/web/tests/unit/auth/fapi-host-snapshot.test.ts` fails on host drift to force this.
-- **Guardrails:** `apps/web/tests/e2e/oauth-providers.spec.ts` (`@production-smoke`) probes the Google/Apple authorize endpoints with the real redirect_uri. It runs in the canary (staging, pre-promote) and the `production-oauth-gate` (post-promote, **auto-rolls-back prod** on a confirmed rejection). Don't verify OAuth by clicking the in-app button — Clerk's invisible bot-protection gates automated clicks.
+- **Single source of truth:** `apps/web/lib/auth/oauth-redirect-uris.expected.json`.
+  Print/verify with `pnpm tsx scripts/auth-redirect-uris.ts [--verify prod|staging]`.
+- **These consoles have NO CLI/API.** To register/update redirect URIs, run the
+  **`/auth-console-sync`** skill. Do not ask the user to do it manually.
+- **Guardrails:** `apps/web/tests/e2e/oauth-providers.spec.ts` (`@production-smoke`)
+  probes the Google/Apple authorize endpoints with the real redirect_uri.
 
 ## Local Auth Bypass For Perf and E2E
 
-Local Playwright QA auth is bypass-first, not Clerk-form-first.
+Local Playwright QA auth is bypass-first.
 
-When local perf or E2E work needs an authenticated session on loopback/private hosts, prefer the repo's dev auth bypass before assuming Clerk bootstrap is required or broken.
+When local perf or E2E work needs an authenticated session on loopback/private
+hosts, use the repo's Better Auth test-auth bypass. Do not assume an external
+auth vendor bootstrap is required.
 
 - Enable `E2E_USE_TEST_AUTH_BYPASS=1` for local authenticated test runs.
 - Use `/api/dev/test-auth/session` to mint bypass cookies for programmatic flows.
-- Use `/api/dev/test-auth/enter?persona=...&redirect=/app` for browser bootstrap flows.
+- Use `/api/dev/test-auth/enter?persona=...&redirect=/app` for browser bootstrap.
 - Use `persona=creator` for the free, incomplete onboarding baseline.
 - Use `persona=creator-ready` for the Pro-entitled dashboard QA baseline.
-- Use `persona=admin` for the admin-shell baseline; it is **not** the paid creator baseline.
-- Validate the loopback host you are actually using (`localhost` vs `127.0.0.1`) — host-only cookies do not cross between them.
-- If auth bootstrap fails locally, debug the bypass route/cookie flow first instead of treating it as an expected limitation.
+- Use `persona=admin` for the admin-shell baseline; it is **not** the paid
+  creator baseline.
+- Validate the loopback host you are actually using (`localhost` vs
+  `127.0.0.1`) — host-only cookies do not cross between them.
 
-This path sets bypass cookies directly and does **not** require `NEXT_PUBLIC_E2E_MODE=1`.
+This path mints a **real Better Auth session** and does **not** require
+`NEXT_PUBLIC_E2E_MODE=1`.
 
 ## QA Authentication (Jovie-Specific)
 
-When running Playwright `/qa` against local Jovie, agents **MUST** use the built-in dev auth bootstrap. **Do NOT prompt the user for credentials.** `/browse` is removed.
+When running Playwright `/qa` against local Jovie, agents **MUST** use the
+built-in Better Auth bootstrap. **Do NOT prompt the user for credentials.**
 
 ### Local default flow (`localhost`, `127.0.0.1`, private dev IPs)
 
@@ -85,7 +100,7 @@ When running Playwright `/qa` against local Jovie, agents **MUST** use the built
    pnpm run dev:web:browse
    ```
 
-2. Authenticate via the bypass route or Clerk Playwright helpers:
+2. Authenticate via the bypass route:
 
    ```text
    /api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
@@ -99,122 +114,85 @@ When running Playwright `/qa` against local Jovie, agents **MUST** use the built
 
 ### What this does
 
-- sets the local auth-bypass cookies automatically
+- sets Better Auth session cookies automatically
 - provisions a stable creator persona by default
-- avoids Clerk sign-in, OTP entry, and cookie handoff
+- avoids OTP entry and cookie handoff
 - works without `NEXT_PUBLIC_E2E_MODE=1`
 
 ### Agent rules
 
-- local Playwright QA uses the dev auth bootstrap route above
+- local Playwright QA uses the Better Auth bootstrap route above
 - default persona is `creator`; `admin` is opt-in
-- solve auth yourself with this flow or `setupClerkTestingToken`
+- solve auth yourself with this flow or `E2E_USE_TEST_AUTH_BYPASS=1`
 - `scripts/browse-auth.ts` is a Playwright cookie helper for non-loopback hosts only
 
 ### Do NOT
 
 - prompt the user for credentials
-- fill the Clerk sign-in form manually for local QA
+- fill a vendor sign-in form manually for local QA
 - invoke `/browse` or `$B`
 - enable `NEXT_PUBLIC_E2E_MODE=1` just to make local QA auth work
+- create Clerk test users or use `@clerk/testing`
 
-## E2E Authentication with Clerk
+## E2E Authentication
 
-Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
+Use the Better Auth helpers in `apps/web/tests/helpers/auth.ts`.
 
-- Official docs: `https://clerk.com/docs/testing/playwright/test-helpers`
-- In this repo, `setupClerkTestingToken({ page })` must run **before** navigating to Clerk pages so the token is attached to Clerk FAPI calls.
-- Auth pages must include ClerkProvider, so start auth on `/signin` (not `/`).
+- Enable `E2E_USE_TEST_AUTH_BYPASS=1` (Playwright configs already do this locally).
+- Call `signInUser(page)` / `ensureSignedInUser(page)` / `setTestAuthBypassSession(page, persona)`.
+- Email OTP tests type the deterministic code `424242` (gated: `E2E_TEST_MODE=1`,
+  never `VERCEL_ENV=production`, test-email pattern only).
 
 ### Test user creation pattern (canonical)
 
-1. Create a unique test email with the Clerk testing suffix:
-   ```ts
-   const email = `e2e+clerk_test+${Date.now().toString(36)}@example.com`;
-   ```
-2. Call `setupClerkTestingToken({ page })`.
-3. Navigate to `/signin` and wait for `window.Clerk?.loaded`.
-4. Use `createOrReuseTestUserSession(page, email)` from `apps/web/tests/helpers/clerk-auth.ts`.
-5. Assert authenticated state before continuing the flow.
+1. Prefer a bypass persona. Do not invent vendor test-email suffixes.
+2. If an email OTP spec needs a unique address, use a Jovie test pattern
+   (`e2e+<id>@example.com`), never `+clerk_test`.
+3. Assert authenticated state before continuing the flow.
 
 ### Do NOT in E2E auth tests
 
-- Do **not** reuse auth sessions across tests. Each test that validates auth behavior must start from a fresh context/session.
-- Do **not** hardcode OTP codes in test code.
-- Do **not** use pre-authenticated Clerk tokens to skip sign-up/sign-in flows unless the test scope explicitly starts post-auth.
-- Do **not** mock Clerk auth in Playwright E2E tests.
+- Do **not** reuse auth sessions across tests that validate auth behavior.
+- Do **not** hardcode OTP codes other than the gated `424242` test OTP.
+- Do **not** import `@clerk/testing` or call `setupClerkTestingToken`.
+- Do **not** mock Better Auth in Playwright E2E tests.
 
 ### Golden path references
 
-- `apps/web/tests/e2e/onboarding.spec.ts` — canonical fresh-user Clerk-authenticated onboarding flow using `setupClerkTestingToken({ page })` plus `createOrReuseTestUserSession(page, email)`.
-- `apps/web/tests/e2e/auth.setup.ts` — canonical shared auth bootstrap that writes `tests/.auth/user.json`.
+- `apps/web/tests/e2e/onboarding.spec.ts` — fresh-user onboarding via Better Auth helpers.
+- `apps/web/tests/e2e/auth.setup.ts` — shared auth bootstrap that writes `tests/.auth/user.json`.
 
 ### Test user cleanup
 
-E2E users are tagged with metadata (`role: 'e2e'`).
-
-- Interactive cleanup: `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
-- Non-interactive (agents/CI): `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force`
-- Dry run: `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --dry-run`
-- Re-seed users: `doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
-
-**Agent cleanup requirement:** Agents **MUST** run cleanup after any session that creates test accounts via sign-up flows (E2E tests, `/qa` runs that trigger signup):
+E2E users are tagged in the app DB. Prefer the Better Auth / DB cleanup scripts
+over any vendor dashboard.
 
 ```bash
 doppler run --project jovie-web --config dev -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
 ```
 
-This deletes all Clerk users matching either `role: 'e2e'` metadata OR `+clerk_test` email pattern, AND their corresponding database records (cascading to related tables). Only works against test Clerk instances (`sk_test_` keys). Safe to run repeatedly.
-
-For manual browse auth outside Playwright, use:
+For manual browse auth outside Playwright:
 
 ```bash
 doppler run --project jovie-web --config dev -- pnpm tsx scripts/browse-auth.ts \
   --base-url http://localhost:3002 \
-  --output /tmp/browse-clerk-cookies.json \
+  --output /tmp/browse-auth-cookies.json \
   --persona creator
 ```
 
-Then import the exported cookies into browse.
-
 Full docs: `apps/web/tests/TESTING.md`.
 
-## Clerk CLI
+## Schema / identity
 
-Use the `clerk` CLI for user management, instance inspection, and auth debugging from the terminal. The `/clerk-cli` skill wraps common workflows.
+`users.better_auth_user_id` is the live link to `ba_users.id`. Prefer that
+(and `users.id`) in new code.
 
-Full reference: `docs/CLERK_CLI.md`.
+`users.clerk_id` remains nullable for one-release compatibility with historical
+rows only. Do not add a Clerk SDK to read it. Do not invent a bulk migration
+to drop the column in this change.
 
-**Quick one-liners:**
+## Operator tools
 
-```bash
-clerk whoami                            # confirm active instance before any write op
-clerk users list --query email@example  # find a user by email
-clerk users delete <user_id>            # delete a user (irreversible — confirm first)
-```
-
-**Account structure (two Clerk applications):**
-- Main application (Account A): dev (`pk_test_...`) + production (`pk_live_...`) → jov.ie
-- Staging application (Account B): staging (`pk_live_...`) → staging.jov.ie
-
-Always confirm `clerk whoami` shows the correct instance before running write operations. For bulk E2E test-user cleanup, prefer `apps/web/scripts/cleanup-e2e-users.ts` over direct CLI deletion.
-
-### Clerk config automation (agents)
-
-For inspecting or safely mutating Clerk instance settings (redirect URLs, OAuth/native apps, allowed origins, webhooks, JWT templates), use the Doppler-wrapped automation script — not manual dashboard edits:
-
-```bash
-# Pull + auth-key preview
-doppler run --project jovie-web --config dev -- \
-  pnpm tsx scripts/clerk-config.ts pull --instance dev
-
-# Diagnose iOS/native redirect gaps
-doppler run --project jovie-web --config dev -- \
-  pnpm tsx scripts/clerk-config.ts check-redirects --pattern "ie.jov.jovie|jovie://|jov.ie"
-
-# Preview a patch (mutations require --dry-run first)
-doppler run --project jovie-web --config dev -- \
-  pnpm tsx scripts/clerk-config.ts patch --dry-run --json '{"auth":{"redirect_urls":["..."]}}'
-```
-
-Safety: `whoami` + audit logging always; `sk_live_` / prod patches refused without `--allow-prod`; staging/prod patches need explicit human review. Invoke the `/clerk-cli` skill for full workflows. See `docs/CLERK_CLI.md` and `scripts/clerk-config.ts --help`.
+There is no Clerk CLI. Inspect Better Auth users in Neon (`ba_users`,
+`ba_sessions`, `users.better_auth_user_id`). Sync Google/Apple console
+redirect URIs with `/auth-console-sync`.

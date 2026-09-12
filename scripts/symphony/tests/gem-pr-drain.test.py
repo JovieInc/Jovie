@@ -80,6 +80,36 @@ def stale_capacity_receipt():
 
 
 class JovieOwnershipTests(unittest.TestCase):
+    def test_legacy_human_and_taste_labels_never_exclude_pr_remediation(self):
+        for label in (
+            "needs-human",
+            "needs-human-review",
+            "human-review-required",
+            "needs:taste",
+            "needs-human-taste",
+            "taste",
+            "no-auto",
+        ):
+            candidate = self._open_pr(
+                42, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
+            )
+            candidate["labels"] = [{"name": label}]
+            with self.subTest(label=label):
+                self.assertFalse(MODULE.excluded(candidate))
+                self.assertEqual(
+                    MODULE.priority_class(candidate), "existing_pr_remediation"
+                )
+
+    def test_machine_holds_still_exclude_pr_remediation(self):
+        for label in ("hold", "gated"):
+            candidate = self._open_pr(
+                43, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
+            )
+            candidate["labels"] = [{"name": label}]
+            with self.subTest(label=label):
+                self.assertTrue(MODULE.excluded(candidate))
+                self.assertEqual(MODULE.priority_class(candidate), "machine_hold")
+
     def test_jovie_and_legacy_alias_can_be_stabilized_when_allowlisted(self):
         for repo in ("JovieInc/Jovie", "itstimwhite/Jovie"):
             self.assertTrue(MODULE.is_jovie_repository(repo))
@@ -121,6 +151,35 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertEqual(exit_code, 0, document)
         self.assertEqual(document["capacity"], 0)
         self.assertEqual(document["selected"], [])
+        update_one.assert_not_called()
+        remote.assert_not_called()
+
+    def test_revoked_local_admission_stops_before_inventory_or_mutation(self):
+        receipt = stale_capacity_receipt()
+        receipt["remediationAdmission"]["localAllowed"] = False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = pathlib.Path(tmp)
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(MODULE, "STATE", state),
+                mock.patch.object(MODULE, "ARTIFACT", state / "latest.json"),
+                mock.patch.object(MODULE, "POLICY_ENABLED", True),
+                mock.patch.object(MODULE, "evaluate_remediation_gate", return_value=receipt),
+                mock.patch.object(MODULE, "capacity", return_value=8),
+                mock.patch.object(MODULE, "inventory") as inventory,
+                mock.patch.object(MODULE, "update_one") as update_one,
+                mock.patch.object(MODULE, "run") as remote,
+                mock.patch.object(MODULE.sys, "argv", [str(SOURCE)]),
+                redirect_stdout(stdout),
+            ):
+                exit_code = MODULE.main()
+
+        document = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0, document)
+        self.assertEqual(document["remediation_admission"], "blocked")
+        self.assertEqual(document["selected"], [])
+        inventory.assert_not_called()
         update_one.assert_not_called()
         remote.assert_not_called()
 

@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
+import { withRetry } from '@/lib/db/client';
 import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { waitlistSettings } from '@/lib/db/schema/waitlist';
 import { captureWarning } from '@/lib/error-tracking';
@@ -207,79 +208,100 @@ export function isMissingWaitlistSettingsTableError(error: unknown): boolean {
 async function ensureSettingsRow(
   dbOrTx: DbOrTransaction = db
 ): Promise<WaitlistGateSettings> {
-  try {
-    // Hot path: cheap SELECT first (matches previous behavior and keeps
-    // existing test mocks working without requiring full insert chain mocks).
-    const [existing] = await dbOrTx
-      .select()
-      .from(waitlistSettings)
-      .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
-      .limit(1);
+  // withRetry is only safe on the shared pooled client: each attempt can get
+  // a fresh connection. Callers inside a serializable transaction
+  // (access-request.ts, auto-accept.ts) pass the live tx down — retrying
+  // inside it would re-run queries on an already-aborted client and fail
+  // permanently instead of letting the caller's withSerializableRetry restart
+  // the whole transaction (JOV-6137). Drift is intercepted inside the
+  // operation so withRetry never logs it and the fail-soft below is the
+  // single signal (JOV-3353).
+  const isPooledClient = dbOrTx === db;
 
-    if (existing) {
-      return existing;
+  const readSettings = async (): Promise<WaitlistGateSettings> => {
+    try {
+      // Hot path: cheap SELECT first (matches previous behavior and keeps
+      // existing test mocks working without requiring full insert chain mocks).
+      const [existing] = await dbOrTx
+        .select()
+        .from(waitlistSettings)
+        .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
+        .limit(1);
+
+      if (existing) {
+        return existing;
+      }
+
+      const now = new Date();
+
+      // Miss path: single atomic upsert (INSERT ... ON CONFLICT DO UPDATE) creates
+      // the row if absent. On concurrent first callers, the loser takes the
+      // conflict path and still receives the row via RETURNING — no reload race,
+      // no throw ever.
+      const [row] = await dbOrTx
+        .insert(waitlistSettings)
+        .values({
+          id: SETTINGS_ROW_ID,
+          gateEnabled: true,
+          autoAcceptEnabled: false,
+          autoAcceptAfterDays: 7,
+          autoAcceptDailyLimit: 0,
+          autoAcceptedToday: 0,
+          autoAcceptResetsAt: getStartOfNextDayUTC(now),
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: waitlistSettings.id,
+          set: {
+            // Self-assignment is a deliberate no-op: ensures RETURNING yields the
+            // existing row on the conflict path without mutating data or timestamps.
+            updatedAt: drizzleSql`${waitlistSettings.updatedAt}`,
+          },
+        })
+        .returning();
+
+      if (row) {
+        return row;
+      }
+
+      // Defensive fallback (extremely rare). Plain select again, else safe defaults.
+      // Guarantees ensureSettingsRow (and therefore gate + auto-accept paths) never
+      // throws on reload.
+      const [reloaded] = await dbOrTx
+        .select()
+        .from(waitlistSettings)
+        .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
+        .limit(1);
+
+      if (reloaded) {
+        return reloaded;
+      }
+
+      return getDefaultWaitlistGateSettings(now);
+    } catch (error) {
+      // Migration drift (JOV-3353): degrade reads to the documented default
+      // gate state instead of 500-ing /start and /signin. Only the missing-
+      // relation class degrades; every other error still throws. Write paths
+      // (admin updates) surface the error from their own UPDATE statement.
+      //
+      // Intercepted inside the operation (before withRetry can see it) so the
+      // fail-soft captureWarning below is the single signal for this class —
+      // withRetry's terminal captureException would double-log it otherwise.
+      if (!isMissingWaitlistSettingsTableError(error)) {
+        throw error;
+      }
+      await captureWarning(
+        '[waitlist] waitlist_settings relation missing (migration drift); using default gate settings',
+        error
+      );
+      return getDefaultWaitlistGateSettings();
     }
+  };
 
-    const now = new Date();
-
-    // Miss path: single atomic upsert (INSERT ... ON CONFLICT DO UPDATE) creates
-    // the row if absent. On concurrent first callers, the loser takes the
-    // conflict path and still receives the row via RETURNING — no reload race,
-    // no throw ever.
-    const [row] = await dbOrTx
-      .insert(waitlistSettings)
-      .values({
-        id: SETTINGS_ROW_ID,
-        gateEnabled: true,
-        autoAcceptEnabled: false,
-        autoAcceptAfterDays: 7,
-        autoAcceptDailyLimit: 0,
-        autoAcceptedToday: 0,
-        autoAcceptResetsAt: getStartOfNextDayUTC(now),
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: waitlistSettings.id,
-        set: {
-          // Self-assignment is a deliberate no-op: ensures RETURNING yields the
-          // existing row on the conflict path without mutating data or timestamps.
-          updatedAt: drizzleSql`${waitlistSettings.updatedAt}`,
-        },
-      })
-      .returning();
-
-    if (row) {
-      return row;
-    }
-
-    // Defensive fallback (extremely rare). Plain select again, else safe defaults.
-    // Guarantees ensureSettingsRow (and therefore gate + auto-accept paths) never
-    // throws on reload.
-    const [reloaded] = await dbOrTx
-      .select()
-      .from(waitlistSettings)
-      .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
-      .limit(1);
-
-    if (reloaded) {
-      return reloaded;
-    }
-
-    return getDefaultWaitlistGateSettings(now);
-  } catch (error) {
-    // Migration drift (JOV-3353): degrade reads to the documented default
-    // gate state instead of 500-ing /start and /signin. Only the missing-
-    // relation class degrades; every other error still throws. Write paths
-    // (admin updates) surface the error from their own UPDATE statement.
-    if (!isMissingWaitlistSettingsTableError(error)) {
-      throw error;
-    }
-    await captureWarning(
-      '[waitlist] waitlist_settings relation missing (migration drift); using default gate settings',
-      error
-    );
-    return getDefaultWaitlistGateSettings();
-  }
+  const result = isPooledClient
+    ? await withRetry(readSettings, 'waitlist.ensureSettingsRow')
+    : await readSettings();
+  return result;
 }
 
 export async function getWaitlistSettings(

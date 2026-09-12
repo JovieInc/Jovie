@@ -39,6 +39,21 @@ const GATE_RECEIPTS = {
 
 const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   [
+    'shared-agent-transport',
+    'shared-contract',
+    ['web'],
+    /^packages\/agent-transport-contracts\//,
+  ],
+  [
+    // Classify before extraction (same pattern as #17271). The daily-post
+    // contract currently lives under apps/web/lib/release-communications; this
+    // rule lets a later workspace-package extraction pass Path Changes.
+    'shared-release-communications',
+    'shared-contract',
+    ['web'],
+    /^packages\/release-communications\//,
+  ],
+  [
     'shared-release-version',
     'shared-contract',
     PRODUCT_LANES,

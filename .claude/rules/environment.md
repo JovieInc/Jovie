@@ -1,3 +1,7 @@
+---
+paths: ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".node-version", "scripts/setup*", ".codex/**"]
+---
+
 # Environment Setup
 
 Local + cloud bootstrap, Doppler, database isolation, quick troubleshooting.

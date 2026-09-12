@@ -155,9 +155,40 @@ class ProofBoundaryTests(unittest.TestCase):
                 self.assertEqual(P.main(), 0)
             self.assertEqual(json.loads(output.read_text())["target"], 0)
 
+    def test_projector_default_state_root_follows_gem_workspace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = root / "state"
+            state.mkdir()
+            (state / "useful-turn-proofs.jsonl").write_text(json.dumps(self.proof) + "\n")
+            environment = {"GEM_WORKSPACE": str(root), "SYMPHONY_PROOF_CONTEXT": str(root / "missing")}
+            with mock.patch.dict(os.environ, environment), mock.patch.object(sys, "argv", ["projector"]), mock.patch("builtins.print"):
+                self.assertEqual(P.main(), 0)
+            receipt = json.loads((state / "concurrency.json").read_text())
+            self.assertEqual(receipt["schema"], "gem-concurrency-evidence/v1")
+            self.assertEqual(receipt["source"], "execution-proven-useful-turns")
+
 
 
 class LiveBindingTests(unittest.TestCase):
+    def test_context_git_measurement_ignores_hostile_path(self):
+        now = datetime.now(timezone.utc)
+        F.write_private(F.ROOT / "state.json", {"cooldowns": {}})
+        F.proof(now, "hostile-path")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker = root / "invoked"
+            for name in ("git", "systemctl"):
+                fake = root / name
+                fake.write_text("#!/bin/sh\nprintf invoked > '" + str(marker) + "'\nprintf forged\n")
+                fake.chmod(0o700)
+            with mock.patch.dict(os.environ, {"PATH": directory}):
+                self.assertEqual(T.load_context(now)["runtime"], F.RUNTIME)
+                with mock.patch.object(T.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "MainPID=123\nControlGroup=/system.slice/symphony-elixir.service\nActiveState=active", "")) as run:
+                    self.assertEqual(T.service_identity()[0], 123)
+                    self.assertEqual(run.call_args.args[0][:3], ["/usr/bin/systemctl", "--user", "show"])
+            self.assertFalse(marker.exists())
+
     def test_systemd_identity_requires_active_service(self):
         for output, valid in (("MainPID=123\nControlGroup=/system.slice/symphony-elixir.service\nActiveState=active", True), ("MainPID=0\nActiveState=active", False), ("MainPID=123\nActiveState=inactive", False)):
             with mock.patch.object(T.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, output, "")) as run:
@@ -165,7 +196,7 @@ class LiveBindingTests(unittest.TestCase):
                     self.assertEqual(T.service_identity()[0], 123)
                 else:
                     with self.assertRaises(ValueError): T.service_identity()
-                run.assert_called_once_with(["systemctl", "--user", "show", C.V2_OFFICIAL_RUNTIME_SERVICE, "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
+                run.assert_called_once_with(["/usr/bin/systemctl", "--user", "show", C.V2_OFFICIAL_RUNTIME_SERVICE, "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
 
     def test_live_runtime_requires_pid_cgroup_command_listener_and_stable_generation(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -241,7 +272,7 @@ class ProducerTests(unittest.TestCase):
         self.real_run = subprocess.run
 
     def fake(self, args, **kwargs):
-        if args[0] == "git":
+        if Path(args[0]).name == "git":
             return self.real_run(args, **kwargs)
         self.assertEqual(kwargs["env"]["CODEX_HOME"], str(self.account.resolve()))
         self.assertEqual(kwargs["env"]["JOVIE_AGENT_PROFILE"], "coder")
@@ -259,9 +290,48 @@ class ProducerTests(unittest.TestCase):
             p = PRODUCER.produce(F.CONTEXT, self.account, F.RUNNER)
         context = T.load_context(datetime.now(timezone.utc))
         self.assertEqual(context["attestations"][p["probeId"]], p)
+        ledger = F.CONTEXT.parent / "useful-turn-proofs.jsonl"
+        rows = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+        self.assertIn(p, rows)
         receipt = P.build_receipt([p], {}, datetime.now(timezone.utc), context=context)
         self.assertEqual(receipt["target"], 1)
         self.assertTrue(T.validate_local_receipt(receipt, datetime.now(timezone.utc))[0])
+
+    def test_ledger_append_is_replay_idempotent_and_conflict_refusing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            ledger.write_text("\nnot-json\n" + json.dumps({"probeId": "other"}) + "\n")
+            PRODUCER._append_ledger_row(ledger, self.p)
+            rows = [json.loads(line) for line in ledger.read_text().splitlines() if line.lstrip().startswith("{")]
+            self.assertIn(self.p, rows)
+            PRODUCER._append_ledger_row(ledger, self.p)
+            replayed = [json.loads(line) for line in ledger.read_text().splitlines() if line.lstrip().startswith("{")]
+            self.assertEqual(rows, replayed)
+            with self.assertRaisesRegex(ValueError, "conflicts"):
+                PRODUCER._append_ledger_row(ledger, {**self.p, "outputBytes": self.p["outputBytes"] + 1})
+
+    def test_ledger_append_creates_a_missing_ledger(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "absent" / "ledger.jsonl"
+            PRODUCER._append_ledger_row(ledger, self.p)
+            self.assertEqual(
+                [json.loads(line) for line in ledger.read_text().splitlines()],
+                [self.p],
+            )
+
+    def test_ledger_write_failure_rolls_back_the_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "ledger.jsonl"
+            ledger.write_text("")
+            ledger.chmod(0o400)
+            before = set(F.ARTIFACTS.iterdir())
+            try:
+                with mock.patch.object(subprocess, "run", side_effect=self.fake):
+                    with self.assertRaises(OSError):
+                        PRODUCER.produce(F.CONTEXT, self.account, F.RUNNER, ledger=ledger)
+            finally:
+                ledger.chmod(0o600)
+            self.assertEqual(before, set(F.ARTIFACTS.iterdir()))
 
     def test_caller_selected_fake_runner_is_rejected_before_execution(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -277,7 +347,7 @@ class ProducerTests(unittest.TestCase):
             fake.write_text("#!/bin/sh\nexit 0\n")
             fake.chmod(0o700)
             def invoke(args, **kwargs):
-                if args[0] != "git":
+                if Path(args[0]).name != "git":
                     self.assertEqual(args[0], str(F.RUNNER.resolve()))
                 return self.fake(args, **kwargs)
             previous = Path.cwd()
@@ -293,7 +363,7 @@ class ProducerTests(unittest.TestCase):
         before = set(F.ARTIFACTS.iterdir())
         for rc in (0, 78):
             def fake(args, **kwargs):
-                if args[0] == "git":
+                if Path(args[0]).name == "git":
                     return self.real_run(args, **kwargs)
                 return subprocess.CompletedProcess(args, rc, b"success", b"")
             with mock.patch.object(subprocess, "run", side_effect=fake), self.assertRaises(ValueError):
@@ -308,7 +378,7 @@ class ProducerTests(unittest.TestCase):
     def test_limiter_event_during_completion_wins(self):
         def fake(args, **kwargs):
             result = self.fake(args, **kwargs)
-            if args[0] != "git":
+            if Path(args[0]).name != "git":
                 F.write_private(self.account.parent / "state.json", {"cooldowns": {self.account.name: 9999999999}})
             return result
         before = set(F.ARTIFACTS.iterdir())
@@ -317,10 +387,12 @@ class ProducerTests(unittest.TestCase):
         self.assertEqual(before, set(F.ARTIFACTS.iterdir()))
 
     def test_cli_emits_only_verified_proof_or_terminal_failure(self):
-        args = ["probe", "--context", str(F.CONTEXT), "--account", str(self.account), "--codex", "fake"]
-        with mock.patch.object(sys, "argv", args), mock.patch.object(PRODUCER, "produce", return_value=self.p), mock.patch("builtins.print") as printed:
+        ledger = F.ROOT / "explicit-ledger.jsonl"
+        args = ["probe", "--context", str(F.CONTEXT), "--account", str(self.account), "--codex", "fake", "--ledger", str(ledger)]
+        with mock.patch.object(sys, "argv", args), mock.patch.object(PRODUCER, "produce", return_value=self.p) as produced, mock.patch("builtins.print") as printed:
             self.assertEqual(PRODUCER.main(), 0)
             self.assertEqual(json.loads(printed.call_args.args[0]), self.p)
+            self.assertEqual(produced.call_args.kwargs["ledger"], ledger)
         with mock.patch.object(sys, "argv", args), mock.patch.object(PRODUCER, "produce", side_effect=ValueError("untrusted")), mock.patch("builtins.print"):
             self.assertEqual(PRODUCER.main(), 78)
 

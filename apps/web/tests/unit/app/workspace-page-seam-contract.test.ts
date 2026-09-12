@@ -12,7 +12,6 @@ function read(relativePath: string) {
 
 describe('workspace page optical seam contract', () => {
   it.each([
-    'components/features/dashboard/organisms/DashboardHeader.tsx',
     'components/molecules/ContentSectionHeader.tsx',
     'components/organisms/table/molecules/PageToolbar.tsx',
     'components/organisms/table/table.styles.ts',
@@ -29,6 +28,16 @@ describe('workspace page optical seam contract', () => {
       return;
     }
     expect(source).toContain(WORKSPACE_SEAM_CLASS);
+  });
+
+  it('resolves the desktop dashboard header seam through the shared 12px token', () => {
+    const header = read(
+      'components/features/dashboard/organisms/DashboardHeader.tsx'
+    );
+    expect(header).toContain('sm:px-(--app-shell-header-padding-x)');
+    expect(read('styles/design-system.css')).toMatch(
+      /--app-shell-header-padding-x:\s*12px;/
+    );
   });
 
   it('does not let canonical table and toolbar primitives restore one-off x padding', () => {

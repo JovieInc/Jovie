@@ -63,7 +63,7 @@ export function ProfileNavButton({
             )}
           >
             <BrandLogo
-              size={22}
+              size='chrome'
               tone='auto'
               className={cn(
                 'opacity-72 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',

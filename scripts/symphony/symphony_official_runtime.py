@@ -6,6 +6,8 @@ the deployed service unit, workflow shape, request-budget math, closure
 stop-line admission, permanent-error dead-letter receipts, and rate-limit
 classification artifacts; OpenAI owns the binary itself. The selected Codex
 account remains host-owned configuration and is never pinned by this source.
+# JOV-INV-029: runtime admission is the draft-phase owner; activation requires
+# separate production proof and is never inferred from a green wrapper.
 """
 
 from __future__ import annotations
@@ -59,6 +61,9 @@ DEFAULT_RATE_LIMIT_GATE = (
 # Gem fleet gate receipt is the admission stop-line for new Symphony work.
 # "healthy" is the green admission state; grace/red, a missing receipt, a stale
 # receipt, or any schema/authority/consistency violation all fail closed.
+# Per-product intake is scoped by gem-repo-registry id. Jovie MQ
+# empty/UNMERGEABLE is issue-blocked and does not freeze LYB/Ovie leases.
+# Missing/malformed shared receipts remain systems-down for every product.
 FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 CLOSURE_HEALTH_AUTHORITY = "Summer"
@@ -66,6 +71,27 @@ CLOSURE_HEALTHY_STATUS = "healthy"
 CLOSURE_HEALTH_STATUSES = frozenset({"healthy", "grace", "red"})
 CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
 CLOSURE_HOLD_EXIT_CODE = 76
+# Closure stop-line purposes. "admission" (default) is the new-issue stop-line:
+# every non-healthy closure holds new work. "controller-activation" is the
+# startup check for installing the repair controller itself: a grace/red
+# product closure whose reasons are all repair-feed signals is a FEED for that
+# controller, not a stop — the installed controller is the writer that drains
+# them, so stopping its installation on them deadlocks the fleet. Every other
+# violation (missing/stale receipt, schema/authority/tamper, admission
+# disagreement, non-feed reasons) still holds in both purposes.
+CLOSURE_PURPOSE_ADMISSION = "admission"
+CLOSURE_PURPOSE_CONTROLLER_ACTIVATION = "controller-activation"
+CLOSURE_PURPOSES = frozenset(
+    {CLOSURE_PURPOSE_ADMISSION, CLOSURE_PURPOSE_CONTROLLER_ACTIVATION}
+)
+# Mirrors gem-priority-gate.REPAIR_FEED_REASONS (closure_allows_controller_repair).
+REPAIR_FEED_REASONS = frozenset(
+    {
+        "internally-repairable-prs-open",
+        "no-merge-progress-over-1h",
+        "queue-controller-red-over-10m",
+    }
+)
 DEFAULT_FLEET_GATE_RECEIPT = (
     pathlib.Path.home() / "gem-workspace/state/gem-priority-gate/latest.json"
 )
@@ -75,8 +101,10 @@ DEFAULT_CLOSURE_HOLD_RECEIPT = (
 DEFAULT_DEAD_LETTER_DIR = (
     pathlib.Path.home() / ".local/state/symphony-elixir/dead-letters"
 )
-# Mirrors gem-priority-gate.RECEIPT_STALE_AFTER; the receipt is regenerated
-# every minute on Gem, so a receipt older than this is a writer outage.
+# Mirrors gem-priority-gate.RECEIPT_STALE_AFTER. The canonical receipt is
+# refreshed event-driven by Fleet Gate Refresh, and the controller activation
+# installer refreshes it through the same writer path immediately before this
+# check; a receipt still older than this after that refresh is a writer outage.
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
@@ -89,7 +117,8 @@ LOG_ATTEMPT_PATTERN = re.compile(r"\battempt[=:\s]+(\d+)\b", re.IGNORECASE)
 ISSUE_IDENTIFIER_PATTERN = re.compile(r"\b([A-Z][A-Z0-9]*-\d+)\b")
 ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
 TERMINAL_STATES = ("Done", "Canceled", "Cancelled", "Duplicate", "Closed")
-EXCLUDED_LABELS = ("no-symphony", "needs-human")
+# JOV-INV-028: only a mechanical dead-letter excludes official dispatch.
+EXCLUDED_LABELS = ("no-symphony",)
 LINEAR_API_URL = "https://api.linear.app/graphql"
 OBSOLETE_TOKENS = (
     "symphony-burrito.service",
@@ -151,6 +180,8 @@ class ClosureStopLine:
     hold_receipt_path: pathlib.Path = DEFAULT_CLOSURE_HOLD_RECEIPT
     dead_letter_dir: pathlib.Path = DEFAULT_DEAD_LETTER_DIR
     max_receipt_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS
+    product_id: str = "jovie"
+    purpose: str = CLOSURE_PURPOSE_ADMISSION
 
 
 def _iso(value: dt.datetime) -> str:
@@ -518,8 +549,12 @@ def validate_source(
             )
         if workflow.server_port != OFFICIAL_PORT:
             errors.append(f"workflow_server_port:{workflow.server_port}")
-        if "git clone --depth 1 https://github.com/JovieInc/Jovie.git ." not in workflow.after_create:
-            errors.append("workflow_after_create_missing_https_clone")
+        if 'jovie-symphony-workspace-create" "$PWD"' not in workflow.after_create:
+            errors.append("workflow_after_create_missing_managed_wrapper")
+        if "git clone " in workflow.after_create:
+            errors.append("workflow_after_create_bypasses_managed_wrapper")
+        if 'jovie-symphony-workspace cleanup "$PWD"' not in workflow.after_create:
+            errors.append("workflow_before_remove_missing_managed_cleanup")
         if "git@" in workflow.after_create:
             errors.append("workflow_after_create_uses_ssh")
         if "mix " in workflow.after_create:
@@ -563,6 +598,8 @@ def validate_source(
             errors.append("unit_missing_rate_limit_sleep_bound")
         if "--closure-gate-file" not in unit:
             errors.append("unit_missing_closure_stop_line_gate")
+        if "--closure-observe-only" in unit:
+            errors.append("unit_closure_stop_line_observe_only")
         if "ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate" in unit:
             errors.append("unit_uses_tight_restart_rate_limit_gate")
         if (
@@ -576,6 +613,8 @@ def validate_source(
             errors.append("unit_hardcodes_codex_account")
         if "SuccessExitStatus=0 1" not in unit:
             errors.append("unit_missing_clean_beam_stop_status")
+        if "RefuseManualStop=yes" not in unit:
+            errors.append("unit_missing_refuse_manual_stop")
         for token in OBSOLETE_TOKENS:
             if token in unit:
                 errors.append(f"unit_obsolete_token:{token}")
@@ -852,12 +891,17 @@ def read_closure_stop_line(
     now: dt.datetime | None = None,
     *,
     max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+    product_id: str = "jovie",
+    purpose: str = CLOSURE_PURPOSE_ADMISSION,
 ) -> dict[str, Any]:
     """Fail-closed admission verdict from the freshest Gem fleet gate receipt.
 
     New issue admission is allowed only while Summer's closure health signal is
-    healthy (the green admission state). A missing, unreadable, stale,
-    future-dated, or internally inconsistent receipt holds new admission.
+    healthy for the requested gem-repo-registry product. A missing, unreadable,
+    stale, future-dated, or internally inconsistent receipt is systems-down and
+    holds every product. Jovie MQ empty/UNMERGEABLE is issue-blocked and does
+    not hold LYB/Ovie. purpose="controller-activation" relaxes only repair-feed
+    closure reasons (REPAIR_FEED_REASONS) for installing the repair controller.
     """
     observed_at = now or _now()
 
@@ -870,6 +914,49 @@ def read_closure_stop_line(
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         return hold(f"fleet-gate-receipt-invalid:{type(exc).__name__}")
+    return _closure_snapshot_verdict(payload, path, now=observed_at,
+                                     max_age_seconds=max_age_seconds, product_id=product_id,
+                                     purpose=purpose)
+
+
+def _repair_feed_reasons(closure_row: Any, *, purpose: str) -> list[str] | None:
+    """Repair-feed reason list when a grace/red closure row is controller feed.
+
+    Returns None unless the caller is installing the controller
+    (purpose="controller-activation") and every stated reason is in
+    REPAIR_FEED_REASONS. A non-list or non-string reasons field fails closed.
+    """
+    if purpose != CLOSURE_PURPOSE_CONTROLLER_ACTIVATION:
+        return None
+    if not isinstance(closure_row, dict):
+        return None
+    if closure_row.get("status") not in {"grace", "red"}:
+        return None
+    reasons = closure_row.get("reasons")
+    if not isinstance(reasons, list) or any(
+        not isinstance(reason, str) for reason in reasons
+    ):
+        return None
+    if not set(reasons) <= REPAIR_FEED_REASONS:
+        return None
+    return sorted(set(reasons))
+
+
+def _closure_snapshot_verdict(
+    payload: Any, path: pathlib.Path, *, now: dt.datetime,
+    max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+    product_id: str = "jovie",
+    purpose: str = CLOSURE_PURPOSE_ADMISSION,
+) -> dict[str, Any]:
+    """Evaluate the same parsed snapshot used for execution authority."""
+    observed_at = now
+
+    def hold(reason: str, **extra: Any) -> dict[str, Any]:
+        return {"hold": True, "reason": reason, "path": str(path), **extra}
+
+    if purpose not in CLOSURE_PURPOSES:
+        return hold("closure-purpose-unknown", closurePurpose=str(purpose))
+
     if not isinstance(payload, dict) or payload.get("schema") != FLEET_GATE_SCHEMA:
         return hold("fleet-gate-receipt-schema-mismatch")
     receipt_observed_raw = payload.get("observedAt")
@@ -881,13 +968,14 @@ def read_closure_stop_line(
         )
     except ValueError:
         receipt_observed = None
-    if receipt_observed is None:
+    if receipt_observed is None or receipt_observed.tzinfo is None:
         return hold("fleet-gate-receipt-observed-at-missing")
     age_seconds = math.ceil((observed_at - receipt_observed).total_seconds())
     details: dict[str, Any] = {
         "receiptObservedAt": _iso(receipt_observed),
         "receiptAgeSeconds": age_seconds,
         "maxReceiptAgeSeconds": max_age_seconds,
+        "closurePurpose": purpose,
     }
     if age_seconds < -FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS:
         return hold("fleet-gate-receipt-future", **details)
@@ -919,7 +1007,63 @@ def read_closure_stop_line(
     ):
         return hold("closure-admission-disagrees", **details)
     details["newIssueIntakeAllowed"] = intake
+    details["productId"] = str(product_id or "jovie")
+    if str(product_id or "jovie") != "jovie":
+        HERMES_DIR = pathlib.Path(__file__).resolve().parent
+        if str(HERMES_DIR) not in sys.path:
+            sys.path.insert(0, str(HERMES_DIR))
+        from closure_health import product_intake_allowed
+
+        product_rows = (
+            admission.get("products")
+            if isinstance(admission, dict)
+            else None
+        ) or (
+            signals.get("productClosureHealth")
+            if isinstance(signals, dict)
+            else None
+        )
+        product_intake = product_intake_allowed(
+            closure,
+            str(product_id or "jovie"),
+            products=product_rows,
+        )
+        details["newIssueIntakeAllowed"] = product_intake
+        details["sharedNewIssueIntakeAllowed"] = intake
+        if product_intake is True:
+            return {
+                "hold": False,
+                "reason": "closure-health-product-independent",
+                "path": str(path),
+                **details,
+            }
+        product_row = (
+            product_rows.get(str(product_id or "jovie"))
+            if isinstance(product_rows, dict)
+            else None
+        )
+        feed_reasons = _repair_feed_reasons(product_row, purpose=purpose)
+        if feed_reasons is not None:
+            return {
+                "hold": False,
+                "reason": "closure-health-repair-feed",
+                "notice": "product closure reasons are repair feed for the controller, not an activation stop",
+                "repairFeedReasons": feed_reasons,
+                "path": str(path),
+                **details,
+            }
+        return hold("closure-health-not-green", **details)
     if status != CLOSURE_HEALTHY_STATUS or intake is not True:
+        feed_reasons = _repair_feed_reasons(closure, purpose=purpose)
+        if feed_reasons is not None:
+            return {
+                "hold": False,
+                "reason": "closure-health-repair-feed",
+                "notice": "closure reasons are repair feed for the controller, not an activation stop",
+                "repairFeedReasons": feed_reasons,
+                "path": str(path),
+                **details,
+            }
         return hold("closure-health-not-green", **details)
     return {
         "hold": False,
@@ -927,6 +1071,82 @@ def read_closure_stop_line(
         "path": str(path),
         **details,
     }
+
+
+def read_dispatch_admission(
+    path: pathlib.Path, *, mode: str, product_id: str, now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Non-consuming gate prerequisite; never validates an issue or reserves a seat.
+
+    The controller must separately verify tracker/repository identity, exact
+    repair assignment and writer lease, and recheck before its one-use claim.
+    """
+    result = {"allowed": False, "reason": "dispatch-gate-invalid", "maxConcurrent": 0,
+              "mode": mode, "productId": product_id}
+    if (not isinstance(mode, str) or not isinstance(product_id, str)
+            or mode not in {"new-work", "existing-pr-repair"}
+            or product_id not in {"jovie", "ovie", "logyourbody"}):
+        return result
+    try:
+        # One read: closure and capacity must never come from different versions.
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        verdict = _closure_snapshot_verdict(payload, path, now=now or _now(), product_id=product_id)
+    except (OSError, ValueError, TypeError, ImportError):
+        return result
+    result["reason"] = verdict["reason"]
+    valid_reasons = {"closure-health-green", "closure-health-product-independent", "closure-health-not-green"}
+    if verdict["reason"] not in valid_reasons:
+        return result
+    result["observedAt"] = verdict["receiptObservedAt"]
+    concurrency = payload.get("concurrency")
+    gem = concurrency.get("gem") if isinstance(concurrency, dict) else None
+    maximum = gem.get("maxConcurrent") if isinstance(gem, dict) else None
+    if (not isinstance(payload.get("state"), str)
+            or payload["state"] not in {"GREEN", "AMBER"} or not isinstance(gem, dict)
+            or gem.get("evidenceAccepted") is not True or gem.get("newMutationAllowed") is not True
+            or type(maximum) is not int or maximum <= 0):
+        result["reason"] = "dispatch-capacity-unproven"
+        return result
+    if mode == "new-work":
+        work = payload.get("workAdmission")
+        products = work.get("productNewIssueLeaseAllowed") if isinstance(work, dict) else None
+        # The product map projects closure only. It cannot override an
+        # explicit execution hold from controller/repository/capacity policy.
+        product_ok = (products.get(product_id) is True if isinstance(products, dict)
+                      else isinstance(work, dict) and "productNewIssueLeaseAllowed" not in work)
+        if (verdict["hold"] or not isinstance(work, dict) or work.get("allowed") is not True
+                or work.get("newIssueLeaseAllowed") is not True
+                or work.get("newImplementationAllowed") is not True or not product_ok):
+            result["reason"] = "new-work-admission-closed"
+            return result
+    else:
+        repair = payload.get("remediationAdmission")
+        activities = repair.get("activities") if isinstance(repair, dict) else None
+        repair_max = repair.get("maxConcurrent") if isinstance(repair, dict) else None
+        if (not isinstance(repair, dict) or repair.get("allowed") is not True
+                or repair.get("localAllowed") is not True
+                or repair.get("authority") != "single-pr-writer-exact-head"
+                or not isinstance(activities, list) or "isolated-pr-repair" not in activities
+                or any(not isinstance(value, str) for value in activities)
+                or type(repair.get("pushAllowed")) is not bool
+                or type(repair_max) is not int or repair_max != maximum):
+            result["reason"] = "existing-pr-remediation-closed"
+            return result
+    result.update(allowed=True, reason="dispatch-gate-prerequisite-passed", maxConcurrent=maximum)
+    return result
+
+
+def _read_stop_line(
+    stop_line: ClosureStopLine,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    return read_closure_stop_line(
+        stop_line.receipt_path,
+        now=now,
+        max_age_seconds=stop_line.max_receipt_age_seconds,
+        product_id=stop_line.product_id,
+        purpose=stop_line.purpose,
+    )
 
 
 def write_closure_hold_receipt(
@@ -995,7 +1215,8 @@ def _closure_hold_wait(
 ) -> tuple[int, dict[str, Any]]:
     """Hold new admission in bounded chunks, re-reading the fleet receipt.
 
-    The fleet gate is regenerated every minute on Gem, so the hold re-reads the
+    The fleet gate is refreshed event-driven (Fleet Gate Refresh on push,
+    pull-request, and CI/controller completion), so the hold re-reads the
     receipt after every bounded chunk and releases as soon as closure health
     returns to healthy. Every hold decision rewrites the durable hold receipt.
     """
@@ -1016,9 +1237,7 @@ def _closure_hold_wait(
         if chunk <= 0:
             break
         sleep_used += _sleep_closure_hold(verdict, chunk)
-        verdict = read_closure_stop_line(
-            stop_line.receipt_path, max_age_seconds=stop_line.max_receipt_age_seconds
-        )
+        verdict = _read_stop_line(stop_line)
     return sleep_used, verdict
 
 
@@ -1219,11 +1438,16 @@ def record_linear_issue_error(
     return receipt
 
 
+class _ShutdownRequested(BaseException):
+    """Leave admission waits without closing the child's output pipe."""
+
+
 def run_official_binary_once(
     command: list[str],
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
+    closure_observe_only: bool,
     max_gate_sleep_seconds: int | None,
 ) -> int:
     process = subprocess.Popen(
@@ -1235,41 +1459,77 @@ def run_official_binary_once(
         bufsize=1,
     )
     rate_limited = False
+    stop_signal: int | None = None
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
     assert process.stdout is not None
-    for line in process.stdout:
-        print(line, end="", flush=True)
-        classification = classify_linear_log_line(line)
-        if classification and write_rate_limit_gate(gate_file, classification):
-            # The official scheduler may be supervising active agents. Record the
-            # reset gate and suspend only the scheduler process; do not
-            # terminate the process tree that may contain active Codex jobs.
-            rate_limited = True
-            gate = read_rate_limit_gate(gate_file)
-            _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
-        else:
-            issue_error = classify_linear_issue_error_log_line(line)
-            if issue_error is not None:
-                record_linear_issue_error(
-                    closure.dead_letter_dir,
-                    issue_error,
-                    issue_errors,
-                    dead_letter_noted,
-                )
-        monotonic_now = time.monotonic()
-        if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
-            last_closure_check = monotonic_now
-            verdict = read_closure_stop_line(
-                closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-            )
-            if verdict["hold"]:
-                _pause_child_for_closure_hold(
-                    process, closure, verdict, max_gate_sleep_seconds
-                )
-    returncode = process.wait()
-    return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
+    previous_handlers = {}
+
+    def request_shutdown(signum: int, _frame: Any) -> None:
+        nonlocal stop_signal
+        if stop_signal is not None:
+            return
+        stop_signal = signum
+        if process.poll() is None:
+            try:
+                process.send_signal(signum)
+                # A gate may have stopped the scheduler. It must run to handle TERM.
+                process.send_signal(signal.SIGCONT)
+            except ProcessLookupError:
+                pass
+        raise _ShutdownRequested()
+
+    try:
+        try:
+            for signum in (signal.SIGTERM, signal.SIGINT):
+                previous_handlers[signum] = signal.signal(signum, request_shutdown)
+            for line in process.stdout:
+                print(line, end="", flush=True)
+                classification = classify_linear_log_line(line)
+                if classification and write_rate_limit_gate(gate_file, classification):
+                    # The official scheduler may be supervising active agents. Record the
+                    # reset gate and suspend only the scheduler process; do not
+                    # terminate the process tree that may contain active Codex jobs.
+                    rate_limited = True
+                    gate = read_rate_limit_gate(gate_file)
+                    _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
+                else:
+                    issue_error = classify_linear_issue_error_log_line(line)
+                    if issue_error is not None:
+                        record_linear_issue_error(
+                            closure.dead_letter_dir,
+                            issue_error,
+                            issue_errors,
+                            dead_letter_noted,
+                        )
+                monotonic_now = time.monotonic()
+                if (
+                    not closure_observe_only
+                    and monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS
+                ):
+                    last_closure_check = monotonic_now
+                    verdict = _read_stop_line(closure)
+                    if verdict["hold"]:
+                        _pause_child_for_closure_hold(
+                            process, closure, verdict, max_gate_sleep_seconds
+                        )
+            returncode = process.wait()
+        except _ShutdownRequested:
+            # BEAM emits its final dashboard during Application.stop. Closing this
+            # pipe first can stall shutdown. Keep the reader alive, skip admission
+            # work, and let the existing systemd TimeoutStopSec/KillMode bound it.
+            for line in process.stdout:
+                print(line, end="", flush=True)
+            returncode = process.wait()
+        if stop_signal is not None:
+            # An interrupted rate-limit episode must never launch a replacement.
+            return 0 if returncode == 0 else 128 + stop_signal
+        return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
+    finally:
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
+        process.stdout.close()
 
 
 def run_official_binary(
@@ -1277,6 +1537,7 @@ def run_official_binary(
     *,
     gate_file: pathlib.Path,
     closure: ClosureStopLine,
+    closure_observe_only: bool = False,
     max_gate_sleep_seconds: int | None = DEFAULT_MAX_GATE_SLEEP_SECONDS,
 ) -> int:
     if not command:
@@ -1284,10 +1545,8 @@ def run_official_binary(
     gate_sleep_used = 0
     closure_sleep_used = 0
     while True:
-        verdict = read_closure_stop_line(
-            closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-        )
-        if verdict["hold"]:
+        verdict = _read_stop_line(closure)
+        if verdict["hold"] and not closure_observe_only:
             # The closure stop-line holds NEW admission only. Already-running
             # work belongs to a live scheduler process (or none has started
             # yet), so holding here never interrupts an active agent.
@@ -1359,6 +1618,7 @@ def run_official_binary(
             command,
             gate_file=gate_file,
             closure=closure,
+            closure_observe_only=closure_observe_only,
             max_gate_sleep_seconds=max_gate_sleep_seconds,
         )
         if returncode != RATE_LIMIT_EXIT_CODE:
@@ -1460,6 +1720,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     budget_parser.add_argument("--json", action="store_true")
 
+    dispatch_parser = sub.add_parser("dispatch-preflight")
+    dispatch_parser.add_argument("--gate-file", type=pathlib.Path, default=DEFAULT_FLEET_GATE_RECEIPT)
+    dispatch_parser.add_argument("--mode", choices=("new-work", "existing-pr-repair"), required=True)
+    dispatch_parser.add_argument("--product-id", choices=("jovie", "ovie", "logyourbody"), required=True)
+
     validate_parser = sub.add_parser("validate-source")
     validate_parser.add_argument("--repo-root", type=pathlib.Path, required=True)
     validate_parser.add_argument("--workflow", type=pathlib.Path, required=True)
@@ -1504,6 +1769,16 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_FLEET_GATE_RECEIPT,
     )
     run_parser.add_argument(
+        "--closure-observe-only",
+        action="store_true",
+        help="observe closure health without pausing the scheduler",
+    )
+    run_parser.add_argument(
+        "--closure-product-id",
+        default="jovie",
+        help="gem-repo-registry id for per-product stop-line scoping",
+    )
+    run_parser.add_argument(
         "--closure-gate-max-age-seconds",
         type=int,
         default=FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
@@ -1543,6 +1818,11 @@ def main(argv: list[str] | None = None) -> int:
                 + f"headroom={budget['headroomRequestsPerHour']}"
             )
         return 0 if budget["withinBudget"] else 1
+
+    if args.command == "dispatch-preflight":
+        result = read_dispatch_admission(args.gate_file, mode=args.mode, product_id=args.product_id)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["allowed"] else 75
 
     if args.command == "validate-source":
         result = validate_source(
@@ -1598,7 +1878,9 @@ def main(argv: list[str] | None = None) -> int:
                 hold_receipt_path=args.closure_hold_receipt,
                 dead_letter_dir=args.dead_letter_dir,
                 max_receipt_age_seconds=args.closure_gate_max_age_seconds,
+                product_id=args.closure_product_id,
             ),
+            closure_observe_only=args.closure_observe_only,
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,
         )
 

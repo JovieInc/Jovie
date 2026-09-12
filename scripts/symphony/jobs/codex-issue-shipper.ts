@@ -6,7 +6,7 @@
  * Symphony is the sole backlog selector. The implementation remains for
  * historical recovery context, behind an unconditional source guard.
  *
- * Issues labeled `no-auto`, `invalid` (confirmed misroutes), `type:epic`
+ * Issues labeled `invalid` (confirmed misroutes), `type:epic`
  * (pointer trackers with no code), or already claimed/blocked are excluded.
  * All other open issues are dispatchable.
  *
@@ -53,13 +53,11 @@ import {
   GhEagainBackoff,
   type GithubIssue,
   gbrainContextBlocker,
-  HUMAN_REVIEW_LABEL,
   INCIDENT_RELEASE_COMMENT_HEADER,
   type IssueComment,
   isAlreadyClaimedOrBlocked,
   labelNames,
   loadShipperConfig,
-  NO_AUTO_LABEL,
   parseAgentChain,
   parseDirtyPaths,
   planCheckoutGate,
@@ -700,12 +698,6 @@ function ensureControlLabels(config: ShipperConfig): void {
     CODEX_TRUSTED_LABEL,
     '0e8a16',
     'Maintainer approval for the local codex issue shipper to run an agent'
-  );
-  ensureLabel(
-    config,
-    NO_AUTO_LABEL,
-    'e99695',
-    'Opt out of automated issue shipping — agent will skip this issue'
   );
 }
 
@@ -1736,12 +1728,6 @@ async function runShipper(): Promise<void> {
           }
           const issues = listed.issues;
           const plans = buildDispatchPlans(issues, config);
-          const skippedHuman = issues.filter(issue =>
-            labelNames(issue).includes(HUMAN_REVIEW_LABEL)
-          ).length;
-          const skippedNoAuto = issues.filter(issue =>
-            labelNames(issue).includes(NO_AUTO_LABEL)
-          ).length;
           const skippedEpic = issues.filter(issue =>
             labelNames(issue).includes(EPIC_LABEL)
           ).length;
@@ -1758,8 +1744,6 @@ async function runShipper(): Promise<void> {
             event: 'scanned',
             issueCount: issues.length,
             dispatchableCount: plans.length,
-            skippedHuman,
-            skippedNoAuto,
             skippedEpic,
             batchCount: batch.length,
             openCodexPrCount,

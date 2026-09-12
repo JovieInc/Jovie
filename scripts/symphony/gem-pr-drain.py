@@ -54,7 +54,9 @@ ARTIFACT = STATE / "latest.json"
 TARGET = int(os.environ.get("GEM_PR_DRAIN_TARGET", "5"))
 MAX_CAP = int(os.environ.get("GEM_PR_DRAIN_MAX_PARALLEL", "4"))
 GATE = ROOT / "scripts" / "gem-priority-gate.py"
-EXCLUDED = {"needs-human-taste", "needs-human-review", "hold", "no-auto", "gated", "taste"}
+# Only active machine holds exclude PR remediation. Taste and legacy human/no-auto
+# labels remain visible metadata but never stop the autonomous drain (JOV-INV-028).
+EXCLUDED = {"hold", "gated"}
 MAIN_GREEN_LABELS = {
     "main-green-fix",
     "main-green",
@@ -296,7 +298,7 @@ def ready_autonomous_draft(pr):
 
 def priority_class(pr):
     if labels(pr) & EXCLUDED:
-        return "taste_or_human"
+        return "machine_hold"
     if (
         pr.get("draft")
         or pr.get("head", {}).get("ref", "").startswith("gtmq_")

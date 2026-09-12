@@ -4,7 +4,6 @@ const hoisted = vi.hoisted(() => ({
   afterMock: vi.fn(),
   activateTrialMock: vi.fn(),
   captureErrorMock: vi.fn(),
-  syncAllClerkMetadataMock: vi.fn(),
   syncCanonicalUsernameFromAppMock: vi.fn(),
   withTimeoutMock: vi.fn(),
   sentryAddBreadcrumbMock: vi.fn(),
@@ -13,10 +12,6 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('next/server', () => ({
   after: hoisted.afterMock,
-}));
-
-vi.mock('@/lib/auth/clerk-sync', () => ({
-  syncAllClerkMetadata: hoisted.syncAllClerkMetadataMock,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -55,7 +50,6 @@ describe('post-onboarding side effects', () => {
       (promise: Promise<unknown>) => promise
     );
     hoisted.syncCanonicalUsernameFromAppMock.mockResolvedValue(undefined);
-    hoisted.syncAllClerkMetadataMock.mockResolvedValue(undefined);
     hoisted.activateTrialMock.mockResolvedValue(true);
   });
 
@@ -92,20 +86,19 @@ describe('post-onboarding side effects', () => {
   });
 
   it('runs bounded sync and trial activation once via finalizePostOnboarding', async () => {
-    await finalizePostOnboarding('clerk_123', 'artist');
+    await finalizePostOnboarding('user_123', 'artist');
 
     expect(hoisted.afterMock).toHaveBeenCalledTimes(1);
     expect(hoisted.syncCanonicalUsernameFromAppMock).toHaveBeenCalledWith(
-      'clerk_123',
+      'user_123',
       'artist'
     );
-    expect(hoisted.syncAllClerkMetadataMock).toHaveBeenCalledWith('clerk_123');
-    expect(hoisted.activateTrialMock).toHaveBeenCalledWith('clerk_123');
+    expect(hoisted.activateTrialMock).toHaveBeenCalledWith('user_123');
     expect(hoisted.sentryAddBreadcrumbMock).toHaveBeenCalledWith(
       expect.objectContaining({
         category: 'onboarding',
         message: 'Trial activated',
-        data: { userId: 'clerk_123', activated: true },
+        data: { userId: 'user_123', activated: true },
       })
     );
   });
@@ -122,7 +115,7 @@ describe('post-onboarding side effects', () => {
     );
 
     await expect(
-      finalizePostOnboarding('clerk_123', 'artist')
+      finalizePostOnboarding('user_123', 'artist')
     ).resolves.toBeUndefined();
 
     expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
@@ -132,7 +125,7 @@ describe('post-onboarding side effects', () => {
       }),
       expect.objectContaining({
         route: 'onboarding',
-        contextData: { userId: 'clerk_123', username: 'artist' },
+        contextData: { userId: 'user_123', username: 'artist' },
       })
     );
   });

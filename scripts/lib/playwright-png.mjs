@@ -5,6 +5,19 @@
  */
 import { crc32, inflateSync } from 'node:zlib';
 
+/**
+ * Decoded pixel-buffer ceiling. 2x desktop (2880-wide) full-page marketing
+ * captures exceed 100MB around 5_786 CSS px. This bound covers 2x×1440
+ * full-page pages up to ~23k CSS px:
+ * `(1 + 2880 * 3) * 46_290 ≈ 400_000_000`.
+ *
+ * Ship now: 400MB so Generate Screenshots can upload exact marketing-route
+ * captures. Re-evaluate when a 2x desktop full-page route exceeds ~23k CSS px.
+ * Then: raise this bound or paginate/clip the capture — do not skip CRC or
+ * pixel verification.
+ */
+export const MAX_PLAYWRIGHT_PNG_PIXEL_BYTES = 400_000_000;
+
 /** @param {Buffer} bytes */
 export function validPlaywrightPng(bytes) {
   try {
@@ -57,7 +70,7 @@ export function validPlaywrightPng(bytes) {
     if (
       state !== 3 ||
       !Number.isSafeInteger(expected) ||
-      expected > 100_000_000
+      expected > MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     )
       return false;
     const compressedBytes = Buffer.concat(compressed);

@@ -132,6 +132,10 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_created',
     });
 
+    // Invalidate the same canonical identity used by billing-status reads
+    // before the required outcome receipt so a retry still sees fresh Pro.
+    await invalidateBillingCache(result.appUserId ?? userId);
+
     if (result.success && result.isActive) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
@@ -139,22 +143,29 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
 
       // Secondary revenue attribution always uses the canonical app UUID.
       await tryActivateReferral(result.appUserId);
+
+      // JOV-6166: paid_converted is required. Swallowing here returned 200 to
+      // Stripe after JOV-6129, so retries never ran and funnel metrics stayed
+      // green without an outcome receipt.
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
           subscription.id
         );
       } catch (error) {
-        logger.warn('Failed to attribute lead paid conversion on checkout', {
-          userId,
-          subscriptionId: subscription.id,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+        await captureCriticalError(
+          'Lead paid conversion outcome receipt failed',
+          error,
+          {
+            route: '/api/stripe/webhooks',
+            event: 'checkout.session.completed',
+            subscriptionId: subscription.id,
+            userId,
+          }
+        );
+        throw error;
       }
     }
-
-    // Invalidate the same canonical identity used by billing-status reads.
-    await invalidateBillingCache(result.appUserId ?? userId);
 
     return result;
   }

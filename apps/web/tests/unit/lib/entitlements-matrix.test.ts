@@ -278,7 +278,7 @@ describe('getCurrentUserEntitlements server resolver (targeted contract + catch 
 
     const e = await getCurrentUserEntitlements();
     expect(e.userId).toBe('u_catch');
-    expect(e.email).toBeNull(); // exercised the catch (clerkEmail null || db null)
+    expect(e.email).toBeNull(); // exercised the catch (userEmail null || db null)
     expect(e.plan).toBe('max');
     expect(e.hasAdvancedFeatures).toBe(true);
     expect(e.canAccessWebhooks).toBe(true); // max-only capability

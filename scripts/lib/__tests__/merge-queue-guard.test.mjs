@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { remediateBlockedPrs } from '../../drain-pr-remediate.mjs';
 import {
@@ -2243,7 +2245,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       deterministicMemberFailure: 'isolate-and-remove',
       transientFailure: 'bounded-retry',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(1);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(2);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
     expect(
@@ -2456,7 +2458,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     ).toBe('allow');
   });
 
-  it('skips every pre-land CHANGELOG.md candidate', () => {
+  it('skips implementation changelogs and serializes colliding stamps', () => {
     expect(CHANGELOG_COLLISION_PATH).toBe('CHANGELOG.md');
     expect(
       changelogGroupCollisionDecision({
@@ -2478,7 +2480,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       })
     ).toMatchObject({
       action: 'skip',
-      reason: 'preland-changelog-prohibited',
+      reason: 'changelog-collision',
       collidingPrs: [16352],
     });
     expect(
@@ -2501,6 +2503,258 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         candidateFiles: ['CHANGELOG.md'],
       })
     ).toMatchObject({ action: 'skip', reason: 'pre-land-changelog' });
+  });
+
+  const stampBranch = 'cursor/stable-desktop-publish-12b203f938c1';
+  const stampCases = [
+    {
+      name: 'empty queue',
+      members: [],
+      expected: { action: 'allow', reason: 'no-changelog-collision' },
+    },
+    {
+      name: 'queued member without changelog',
+      members: [{ prNumber: 17464, files: ['package.json'] }],
+      expected: { action: 'allow', reason: 'no-changelog-collision' },
+    },
+    {
+      name: 'queued changelog member',
+      members: [{ prNumber: 17464, files: ['CHANGELOG.md'] }],
+      expected: {
+        action: 'skip',
+        reason: 'changelog-collision',
+        collidingPrs: [17464],
+      },
+    },
+    {
+      name: 'unavailable queued member files',
+      members: [{ prNumber: 17464, files: null }],
+      expected: { action: 'unknown', reason: 'changelog-evidence-unavailable' },
+    },
+  ];
+
+  it.each(stampCases)('evaluates a recognized stamp with $name', ({
+    members,
+    expected,
+  }) => {
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md', 'package.json'],
+        queuedMemberFiles: members,
+        branch: stampBranch,
+      })
+    ).toEqual(expected);
+  });
+
+  it('does not claim a clear queue from missing or malformed stamp evidence', () => {
+    for (const members of [
+      undefined,
+      null,
+      {},
+      [null],
+      [{ prNumber: 0, files: [] }],
+      [{ prNumber: 17464, files: [null] }],
+    ]) {
+      expect(
+        changelogGroupCollisionDecision({
+          candidateFiles: ['CHANGELOG.md'],
+          branch: stampBranch,
+          queuedMemberFiles: members,
+        })
+      ).toEqual({
+        action: 'unknown',
+        reason: 'changelog-evidence-unavailable',
+      });
+    }
+  });
+
+  // Execute production shell inventory/collision functions and both real CLIs.
+  // Only the gh transport is a fixture. SNAP is deliberately target-only.
+  function runDrainChangelogDecision({
+    branch = stampBranch,
+    members = [],
+    candidateFiles = ['CHANGELOG.md'],
+    inventoryFailure = false,
+    malformedInventory = false,
+  } = {}) {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    const functions =
+      drain.slice(
+        drain.indexOf('native_state_to_snap() {'),
+        drain.indexOf('REPO="${REPO:-JovieInc/Jovie}"')
+      ) +
+      drain.slice(
+        drain.indexOf('pr_changed_paths_json() {'),
+        drain.indexOf('deferred_state_is_releasable() {')
+      );
+    const snapshot = [{ n: 17463, head: branch, q: false }];
+    const files = Object.fromEntries([
+      ['17463', candidateFiles],
+      ...members.map(member => [String(member.prNumber), member.files]),
+    ]);
+    const nativePr = (number, queued) => ({
+      id: `PR_${number}`,
+      number,
+      state: 'OPEN',
+      isDraft: false,
+      headRefOid: 'a'.repeat(40),
+      labels: { nodes: [] },
+      isInMergeQueue: queued,
+      autoMergeRequest: null,
+      mergeQueueEntry: queued
+        ? {
+            id: `MQE_${number}`,
+            state: 'QUEUED',
+            position: 1,
+            enqueuedAt: '2026-09-09T00:00:00Z',
+          }
+        : null,
+    });
+    const page = (nodes, hasNextPage) => ({
+      data: {
+        repository: {
+          pullRequests: {
+            nodes,
+            pageInfo: { hasNextPage, endCursor: hasNextPage ? 'next' : null },
+          },
+        },
+      },
+    });
+    const pages = malformedInventory
+      ? [{ data: { repository: {} } }]
+      : [
+          page([nativePr(17463, false)], true),
+          page(
+            members.map(member =>
+              nativePr(member.prNumber, member.queued !== false)
+            ),
+            false
+          ),
+        ];
+    const dir = mkdtempSync(resolve(tmpdir(), 'stamp-drain-'));
+    const callsPath = resolve(dir, 'calls.jsonl');
+    writeFileSync(callsPath, '');
+    writeFileSync(
+      resolve(dir, 'gh'),
+      `#!/usr/bin/env node
+      const fs = require('node:fs');
+      const args = process.argv.slice(2);
+      fs.appendFileSync(process.env.STAMP_CALLS, JSON.stringify(args) + String.fromCharCode(10));
+      if (args[0] === 'api' && args[1] === 'graphql' && args.some(arg => arg.includes('MergeQueueOpenPullRequestStates'))) {
+        if (!args.includes('--paginate') || !args.includes('--slurp')) process.exit(9);
+        console.log(process.env.STAMP_PAGES);
+        if (process.env.STAMP_INVENTORY_FAILURE === '1') process.exit(1);
+      } else if (args[0] === 'pr' && args[1] === 'view' && args.includes('files')) {
+        const files = JSON.parse(process.env.STAMP_FILES)[args[2]];
+        if (files == null) process.exit(1);
+        console.log(JSON.stringify(files));
+      } else { console.error('Unexpected gh invocation'); process.exit(9); }
+    `,
+      { mode: 0o755 }
+    );
+    try {
+      const result = JSON.parse(
+        execFileSync(
+          'bash',
+          [
+            '-c',
+            `
+        set -euo pipefail
+        REPO=fixture/repo
+        SNAP="$STAMP_SNAPSHOT"
+        gh_retry() { gh "$@"; }
+        gh_retry_is_transient_error() { return 1; }
+        ${functions}
+        changelog_collision_decision_for_pr 17463
+        [[ "$SNAP" == "$STAMP_SNAPSHOT" ]]
+      `,
+          ],
+          {
+            cwd: REPO_ROOT,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: `${dir}:${dirname(process.execPath)}:${process.env.PATH}`,
+              GH_INVENTORY_RETRY_ATTEMPTS: '1',
+              STAMP_CALLS: callsPath,
+              STAMP_SNAPSHOT: JSON.stringify(snapshot),
+              STAMP_FILES: JSON.stringify(files),
+              STAMP_PAGES: JSON.stringify(pages),
+              STAMP_INVENTORY_FAILURE: inventoryFailure ? '1' : '0',
+            },
+          }
+        )
+      );
+      const calls = readFileSync(callsPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      const inventoryCalls = calls.filter(args => args[0] === 'api');
+      const needsInventory =
+        branch === stampBranch && candidateFiles?.includes('CHANGELOG.md');
+      expect(inventoryCalls).toHaveLength(needsInventory ? 1 : 0);
+      if (needsInventory) {
+        expect(inventoryCalls[0]).toEqual(
+          expect.arrayContaining(['--paginate', '--slurp'])
+        );
+        expect(inventoryCalls[0].some(arg => /^number=/.test(arg))).toBe(false);
+      }
+      return result;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it.each(
+    stampCases
+  )('runs the canonical shell and CLI for a stamp with $name', ({
+    members,
+    expected,
+  }) => {
+    expect(runDrainChangelogDecision({ members })).toEqual(expected);
+  });
+
+  it('keeps implementation rejection and unavailable candidate evidence through the real drain caller', () => {
+    expect(
+      runDrainChangelogDecision({ branch: 'codex/implementation' })
+    ).toEqual({
+      action: 'skip',
+      reason: 'pre-land-changelog',
+    });
+    expect(runDrainChangelogDecision({ branch: '' })).toEqual({
+      action: 'skip',
+      reason: 'pre-land-changelog',
+    });
+    expect(runDrainChangelogDecision({ candidateFiles: null })).toEqual({
+      action: 'unknown',
+      reason: 'changelog-evidence-unavailable',
+    });
+  });
+
+  it('ignores self and nonqueued changelogs in the separate complete inventory', () => {
+    expect(
+      runDrainChangelogDecision({
+        members: [
+          { prNumber: 17463, files: ['CHANGELOG.md'] },
+          { prNumber: 17464, files: ['CHANGELOG.md'], queued: false },
+        ],
+      })
+    ).toEqual({ action: 'allow', reason: 'no-changelog-collision' });
+  });
+
+  it('reports unknown for failed pagination with partial stdout or malformed inventory', () => {
+    for (const options of [
+      { inventoryFailure: true },
+      { malformedInventory: true },
+    ]) {
+      expect(runDrainChangelogDecision(options)).toEqual({
+        action: 'unknown',
+        reason: 'changelog-evidence-unavailable',
+      });
+    }
   });
 
   it('skips a superseded Production Controller generation and promotes only exact main', () => {

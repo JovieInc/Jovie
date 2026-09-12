@@ -120,33 +120,6 @@ describe('signup onboarding readiness', () => {
     ]);
   });
 
-  it.skip('fails closed with redacted missing-key output (retired Clerk keys)', () => {
-    const result = checkSignupOnboardingReadiness({
-      env: {
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_live_123',
-        CLERK_SECRET_KEY: 'sk_live_123',
-        DATABASE_URL: 'postgres://example',
-        SESSION_SECRET: 'x'.repeat(32),
-        AI_GATEWAY_API_KEY: 'gateway-key',
-      },
-      target: 'prd',
-      source: 'env',
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.missing).toEqual([
-      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
-      'TURNSTILE_SECRET_KEY',
-    ]);
-
-    const report = formatSignupOnboardingReadinessReport(result);
-    expect(report).toContain('NEXT_PUBLIC_TURNSTILE_SITE_KEY: MISSING');
-    expect(report).toContain('TURNSTILE_SECRET_KEY: MISSING');
-    expect(report).toContain('CLERK_SECRET_KEY: SET');
-    expect(report).not.toContain('sk_live_123');
-    expect(report).not.toContain('pk_live_123');
-  });
-
   it('does not require production-only signup keys for local checks', () => {
     const result = checkSignupOnboardingReadiness({
       env: {},

@@ -1,8 +1,13 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
+import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import {
+  ArtistProfilePhoneFrame,
+  type ArtistProfilePhoneFrameSize,
+} from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
 
 export type HomepageCertifiedSectionId =
@@ -21,9 +26,18 @@ export interface HomepageCertifiedSectionsProps {
 
 const PHONE_SIZES = '(min-width: 1024px) 15rem, (min-width: 768px) 24vw, 62vw';
 
-function ProfilePhone({ image }: { readonly image: MarketingExportImage }) {
+function ProfilePhone({
+  image,
+  size,
+}: {
+  readonly image: MarketingExportImage;
+  readonly size: ArtistProfilePhoneFrameSize;
+}) {
   return (
-    <ArtistProfilePhoneFrame className='homepage-certified-section__device'>
+    <ArtistProfilePhoneFrame
+      className='homepage-certified-section__device'
+      size={size}
+    >
       <Image
         alt={image.alt}
         className='homepage-certified-section__screen'
@@ -45,7 +59,7 @@ function sectionMedia(
   if (id === 'connected') {
     return (
       <div className='homepage-certified-section__phones' data-count='1'>
-        <ProfilePhone image={previews.connected} />
+        <ProfilePhone image={previews.connected} size='md' />
       </div>
     );
   }
@@ -56,7 +70,7 @@ function sectionMedia(
         data-count={String(previews.relationships.length)}
       >
         {previews.relationships.map(image => (
-          <ProfilePhone image={image} key={image.publicUrl} />
+          <ProfilePhone image={image} key={image.publicUrl} size='sm' />
         ))}
       </div>
     );
@@ -67,23 +81,36 @@ function sectionMedia(
 /**
  * Sections 2-8 of the certified homepage. Copy is locked in
  * HOMEPAGE_LAUNCH_COPY.certified; this component only owns rhythm: one quiet
- * proof statement, then six top-ruled editorial sections on the shared
- * content column, alternating sides, with real product exports where they
- * exist and nothing where they do not.
+ * verified logos on the page background, then six
+ * top-ruled editorial sections on the shared content column, alternating
+ * sides, with real product exports where they exist and nothing where they do
+ * not.
  */
 export function HomepageCertifiedSections({
   previews,
 }: HomepageCertifiedSectionsProps) {
-  const { proof, sections } = HOMEPAGE_LAUNCH_COPY.certified;
+  const { sections } = HOMEPAGE_LAUNCH_COPY.certified;
 
   return (
     <>
       <section
         className='homepage-certified-proof'
-        data-testid='homepage-proof'
+        data-testid='marketing-section-logo-cloud'
+        data-homepage-testid='homepage-proof'
+        data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
+        data-marketing-variant='inline-strip'
+        data-rhythm='proof'
         aria-label='Proof'
       >
-        <p className='homepage-certified-proof__statement'>{proof.statement}</p>
+        <div className='homepage-certified-proof__logos system-b-mounted-home-trust-strip-shell'>
+          <HomeTrustSection
+            ariaLabel='People and teams who have created with Jovie'
+            // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Preserve the approved all-caps homepage proof label.
+            label="BUILT BY PEOPLE WHO'VE CREATED FOR"
+            logoIds={ARTIST_PROFILE_SOCIAL_PROOF.logos.map(logo => logo.id)}
+            presentation='inline-strip'
+          />
+        </div>
       </section>
       {sections.map((section, index) => {
         const headingId = `homepage-section-${section.id}-heading`;
@@ -94,9 +121,14 @@ export function HomepageCertifiedSections({
             key={section.id}
             id={section.id}
             className='homepage-certified-section'
-            data-testid={`homepage-section-${section.id}`}
+            data-testid='marketing-section-feature-split'
+            data-homepage-testid={`homepage-section-${section.id}`}
+            data-marketing-owner='apps/web/components/homepage/HomepageCertifiedSections.tsx'
+            data-marketing-variant='editorial'
+            data-marketing-occurrence={section.id}
             data-align={index % 2 === 0 ? 'start' : 'end'}
             data-media={media ? 'true' : 'false'}
+            data-rhythm={media ? 'product' : 'text'}
             aria-labelledby={headingId}
           >
             <div className='homepage-certified-section__inner'>

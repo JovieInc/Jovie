@@ -4,6 +4,7 @@
  * `https://itstimwhite/`) before they reach the public profile UI.
  */
 
+import { getDspDisplayName } from '@/lib/dsp-registry';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 
 const ALLOWED_SINGLE_LABEL_HOSTS = new Set(['localhost']);
@@ -98,4 +99,19 @@ export function publicLinkAriaLabel(
     return `Support ${artistName} on ${label}`;
   }
   return `Follow ${artistName} on ${label}`;
+}
+
+/**
+ * Public display label for a social/support platform id.
+ *
+ * Registry-backed so brand casing comes from the canonical DSP registry
+ * (e.g. `tiktok` → `TikTok`, `youtube` → `YouTube`); unknown ids fall back
+ * to sentence case (`twitter` → `Twitter`). Mirrors the AEO link labels in
+ * `lib/profile/aeo-content.ts` so the hero social row, the desktop surface,
+ * and the About section agree on one label per platform.
+ */
+export function publicPlatformDisplayName(platform: string): string {
+  const registryName = getDspDisplayName(platform);
+  if (registryName) return registryName;
+  return platform.charAt(0).toUpperCase() + platform.slice(1);
 }

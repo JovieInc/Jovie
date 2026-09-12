@@ -3,7 +3,6 @@
  * PR Stuck Monitor — Hermes-Air
  *
  * Watches open PRs and files Linear issues for ones that look stuck:
- *  - labeled `needs-human`
  *  - no CI activity for >6h with red checks
  *  - red CI for >2h
  *  - >24h since last commit, still draft
@@ -66,12 +65,6 @@ function hoursSince(iso: string): number {
 
 function verdictFor(pr: Pr): Verdict {
   const reasons: string[] = [];
-  const labelNames = pr.labels.map(l => l.name);
-
-  if (labelNames.includes('needs-human')) {
-    reasons.push('labeled needs-human');
-  }
-
   const failed = pr.statusCheckRollup.filter(
     c => c.conclusion === 'FAILURE' || c.state === 'FAILURE'
   );
@@ -107,7 +100,7 @@ function buildIssueBody(pr: Pr, reasons: ReadonlyArray<string>): string {
       'Stuck PRs block downstream work and confuse merge-queue prioritization. Hermes-air surfaces them so a coder agent can pick them up.',
     classification: 'Required',
     acceptanceCriteria:
-      'PR is either merged, marked needs-human with a fresh review comment, or closed. Linear issue links to the resolution.',
+      'PR is merged, carries current automated remediation or native-queue evidence, or is closed with a machine-readable reason. Linear links to the resolution.',
   });
 }
 

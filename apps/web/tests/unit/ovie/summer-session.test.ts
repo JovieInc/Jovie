@@ -34,7 +34,7 @@ describe('current Summer session (JOV-5212)', () => {
     );
   });
 
-  it('rejects identity drift away from the current Mac Summer', () => {
+  it('rejects identity drift away from the current Eve Summer', () => {
     expect(() =>
       assertSummerIdentity({
         ...CURRENT_SUMMER_IDENTITY,

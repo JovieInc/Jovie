@@ -11,6 +11,11 @@ const RECOVERY_FILE = 'production-generation-recovery.json';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
 const MARKER_RECOVERY_PATH = '.github/workflows/production-marker-recovery.yml';
+const CONTROLLER_PROMOTE_JOB = 'Production Release / Promote to Production';
+const CONTROLLER_BOUNDARY_JOB =
+  'Production Release / Check current main before release';
+const CONTROLLER_VERIFIED_JOB = 'Production Verified';
+const CONTROLLER_ROLLBACK_SUFFIX = 'Centralized production rollback';
 const INTERRUPTED_CONCLUSIONS = new Set([
   'cancelled',
   'failure',
@@ -153,7 +158,7 @@ function validatePostWriteRefreshFailure(jobs, context, attempt) {
     'Upload recovered verified-generation marker',
     'Confirm uploaded recovered marker bytes',
   ];
-  const dispatchName = 'Dispatch fresh fleet reconciliation';
+  const dispatchName = 'Dispatch fresh fleet and desktop reconciliation';
   const requiredSteps = [...requiredSuccessfulSteps, dispatchName].map(name =>
     job.steps.filter(step => step?.name === name)
   );
@@ -268,6 +273,9 @@ function classifyRecoveredMarkerEntry(entry, context) {
     deploymentId: payload.deploymentId,
     markerContext,
     recovered: true,
+    sourceRun,
+    sourceAttempt,
+    sourceConclusion: entry.originalRun.conclusion,
   };
 }
 
@@ -283,7 +291,14 @@ function classifyMarkerEntry(entry, context) {
   }
   const artifact = entry.artifact;
   const attempt = positiveInteger(entry.payload?.controllerAttempt);
-  const expectedName = markerNameForAttempt(context.sha, attempt);
+  // ponytail: upload naming follows marker_recovery, not GitHub's run_attempt.
+  // A full retry before the first marker exists still publishes the normal name.
+  const normalRerun =
+    attempt === 2 &&
+    artifact?.name === `production-generation-verified-${context.sha}`;
+  const expectedName = normalRerun
+    ? artifact.name
+    : markerNameForAttempt(context.sha, attempt);
   if (
     !expectedName ||
     !validateArtifact(artifact, expectedName) ||
@@ -324,11 +339,19 @@ function classifyMarkerEntry(entry, context) {
       controllerRun,
       deploymentId: entry.payload.deploymentId,
       markerContext,
+      normalRerun,
     };
   }
   if (ACTIVE_STATUSES.has(status)) {
-    return { kind: 'active', attempt, controllerRun, markerContext };
+    return {
+      kind: 'active',
+      attempt,
+      controllerRun,
+      markerContext,
+      normalRerun,
+    };
   }
+  if (normalRerun) return { error: 'normal_rerun_not_verified' };
   if (status === 'completed' && INTERRUPTED_CONCLUSIONS.has(conclusion)) {
     return {
       kind: 'interrupted',
@@ -381,15 +404,38 @@ export function classifyProductionMarkerEvidence(evidence) {
     );
     const invalid = classified.find(entry => entry.error);
     if (invalid) return manual(invalid.error);
-    const attempts = classified.map(entry => entry.attempt);
+    // Attempts are scoped to their producer run: recovery and controller runs
+    // may independently reach attempt 2 without duplicating either receipt.
+    const attempts = classified.map(
+      entry => `${entry.controllerRun}:${entry.attempt}`
+    );
     if (new Set(attempts).size !== attempts.length) {
       return manual('duplicate_marker_attempt');
     }
-    const primary =
-      classified.find(entry => entry.attempt === 1) ??
-      classified.find(entry => entry.recovered);
+    // Automatic marker recovery can finish while the original controller's
+    // failed-job retry is still running. Preserve both immutable receipts, but
+    // accept their convergence only when each chain independently verifies the
+    // same deployment and recovery names the retry's interrupted first attempt.
+    const recovered = classified.find(entry => entry.recovered);
+    const retry = classified.find(entry => entry.normalRerun);
+    const converged =
+      classified.length === 2 &&
+      recovered?.kind === 'verified' &&
+      retry?.kind === 'verified' &&
+      recovered.sourceRun === retry.controllerRun &&
+      recovered.sourceAttempt === 1 &&
+      INTERRUPTED_CONCLUSIONS.has(recovered.sourceConclusion) &&
+      recovered.deploymentId === retry.deploymentId &&
+      evidence.markers[0].artifact.id !== evidence.markers[1].artifact.id;
+    const primaryCandidates = classified.filter(
+      entry => entry.attempt === 1 || entry.normalRerun || entry.recovered
+    );
+    if (primaryCandidates.length > 1 && !converged) {
+      return manual('duplicate_primary_marker');
+    }
+    const primary = primaryCandidates[0];
     const recovery = classified.find(
-      entry => entry.attempt === 2 && !entry.recovered
+      entry => entry.attempt === 2 && !entry.recovered && !entry.normalRerun
     );
     const recoveryName = `production-generation-recovery-${sha}`;
     const recoveryArtifacts = evidence.recoveryArtifacts;
@@ -407,6 +453,18 @@ export function classifyProductionMarkerEvidence(evidence) {
       return manual('expired_recovery_lease');
     }
     if (recoveryArtifacts.length > 1) return manual('multiple_recovery_leases');
+    if (converged) {
+      if (recoveryArtifacts.length > 0) {
+        return manual('recovery_evidence_after_verified_primary');
+      }
+      return {
+        state: 'verified',
+        reason: 'exact_recovery_and_retry_verified',
+        controllerRun: retry.controllerRun,
+        controllerAttempt: retry.attempt,
+        deploymentId: retry.deploymentId,
+      };
+    }
     if (!primary) return manual('recovery_marker_without_primary');
     if (primary.kind === 'verified') {
       if (recovery || recoveryArtifacts.length > 0) {
@@ -430,7 +488,7 @@ export function classifyProductionMarkerEvidence(evidence) {
         state: 'pending',
         reason: 'primary_marker_attempt_active',
         controllerRun: primary.controllerRun,
-        controllerAttempt: 1,
+        controllerAttempt: primary.attempt,
       };
     }
     if (primary.kind !== 'interrupted') {
@@ -557,6 +615,181 @@ export function classifyProductionMarkerEvidence(evidence) {
       error instanceof Error ? error.message : String(error)
     );
   }
+}
+
+/**
+ * A controller attempt that coalesced into a newer main head intentionally
+ * completes success without any production mutation and without preserving a
+ * marker: the release boundary proved main had advanced, promotion and the
+ * centralized rollback stayed skipped, and Production Verified still proved
+ * the incumbent generation healthy. Such a run has no installable
+ * production-proven revision, so its activation is a no-op — never a marker
+ * gate failure. Any deviation from the exact coalesced job shape fails
+ * closed.
+ */
+export function classifyProducerCoalescence(run, jobs) {
+  if (
+    !run ||
+    typeof run !== 'object' ||
+    positiveInteger(run.id) === null ||
+    run.path !== CONTROLLER_PATH ||
+    run.head_branch !== 'main' ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success' ||
+    !Array.isArray(jobs)
+  ) {
+    return false;
+  }
+  const exactlyOne = (name, conclusion) =>
+    jobs.filter(
+      job =>
+        job?.name === name &&
+        job.status === 'completed' &&
+        job.conclusion === conclusion
+    ).length === 1;
+  const rollback = jobs.filter(
+    job =>
+      typeof job?.name === 'string' &&
+      job.name.endsWith(CONTROLLER_ROLLBACK_SUFFIX)
+  );
+  return (
+    exactlyOne(CONTROLLER_PROMOTE_JOB, 'skipped') &&
+    exactlyOne(CONTROLLER_BOUNDARY_JOB, 'success') &&
+    exactlyOne(CONTROLLER_VERIFIED_JOB, 'success') &&
+    rollback.length === 1 &&
+    rollback[0].status === 'completed' &&
+    rollback[0].conclusion === 'skipped'
+  );
+}
+
+/**
+ * Select the newest Production Controller run on main for a newer head,
+ * created after the producer run, in any state except startup failure. Its
+ * completion owns the newest revision's activation path: a successful
+ * completion fires its own activation for the newest production-proven
+ * marker, and an unsuccessful one leaves no installable revision either way.
+ * The triggering producer's missing marker is therefore a supersession
+ * no-op, not an anomaly. Fail closed: any malformed evidence means no
+ * supersession.
+ */
+export function selectNewerControllerRun(producerRun, candidates, context) {
+  if (
+    !validateControllerRun(producerRun, context, producerRun?.run_attempt) ||
+    producerRun.status !== 'completed' ||
+    typeof producerRun.created_at !== 'string'
+  ) {
+    return null;
+  }
+  const producerCreatedAt = Date.parse(producerRun.created_at);
+  if (!Number.isFinite(producerCreatedAt) || !Array.isArray(candidates)) {
+    return null;
+  }
+  const newer = candidates.filter(
+    run =>
+      run &&
+      typeof run === 'object' &&
+      positiveInteger(run.id) !== null &&
+      !sameInteger(run.id, context.controllerRun) &&
+      run.path === CONTROLLER_PATH &&
+      run.head_branch === 'main' &&
+      run.head_repository?.full_name === context.repo &&
+      // A newer main head, not a same-sha retry of the producer.
+      run.head_sha !== context.sha &&
+      SHA_PATTERN.test(run.head_sha ?? '') &&
+      typeof run.status === 'string' &&
+      // A startup failure never executed and supersedes nothing; every other
+      // state (in flight, queued, completed with any conclusion) proves the
+      // newer head was picked up and owns the activation path.
+      run.conclusion !== 'startup_failure' &&
+      typeof run.created_at === 'string' &&
+      Date.parse(run.created_at) > producerCreatedAt
+  );
+  if (newer.length === 0) return null;
+  newer.sort(
+    (left, right) => Date.parse(right.created_at) - Date.parse(left.created_at)
+  );
+  return {
+    run: positiveInteger(newer[0].id),
+    sha: newer[0].head_sha,
+    createdAt: newer[0].created_at,
+  };
+}
+
+function fetchProducerAttemptEvidence(repo, producerRunId, producerAttempt) {
+  const attemptRun = ghJson(
+    `repos/${repo}/actions/runs/${producerRunId}/attempts/${producerAttempt}`
+  );
+  const attemptJobs = normalizeProductionJobs(
+    ghJson(
+      `repos/${repo}/actions/runs/${producerRunId}/attempts/${producerAttempt}/jobs?per_page=100`
+    )
+  );
+  return { attemptRun, attemptJobs };
+}
+
+/**
+ * Activation-facing producer evidence (opt-in via --producer-run-id and
+ * --producer-attempt). When the exact verified marker binding for the
+ * triggering producer attempt fails, prove whether that attempt coalesced by
+ * design (no marker is ever preserved) or whether a newer controller run for
+ * a newer main head already owns the activation path. Every probe fails
+ * closed: ambiguity adds no fields and the caller still refuses.
+ */
+function withProducerActivationEvidence(args, result) {
+  const producerRunId = positiveInteger(args['producer-run-id']);
+  const producerAttempt = positiveInteger(args['producer-attempt']);
+  if (producerRunId === null || producerAttempt === null) return result;
+  if (
+    result.state === 'verified' &&
+    sameInteger(result.controllerRun, producerRunId) &&
+    sameInteger(result.controllerAttempt, producerAttempt)
+  ) {
+    return result;
+  }
+  const context = {
+    sha: args.sha,
+    repo: args.repo,
+    controllerRun: producerRunId,
+    controllerWorkflowId: positiveInteger(args['controller-workflow-id']),
+  };
+  let producer;
+  try {
+    producer = fetchProducerAttemptEvidence(
+      context.repo,
+      producerRunId,
+      producerAttempt
+    );
+  } catch {
+    return result;
+  }
+  if (!validateControllerRun(producer.attemptRun, context, producerAttempt)) {
+    return result;
+  }
+  const additions = {};
+  if (
+    producer.attemptJobs.every(job =>
+      validateControllerJob(job, context, producerAttempt)
+    ) &&
+    classifyProducerCoalescence(producer.attemptRun, producer.attemptJobs)
+  ) {
+    additions.coalesced = true;
+  }
+  try {
+    const listing = ghJson(
+      `repos/${context.repo}/actions/workflows/${context.controllerWorkflowId}/runs?branch=main&per_page=30`
+    );
+    const supersededBy = selectNewerControllerRun(
+      producer.attemptRun,
+      listing?.workflow_runs,
+      context
+    );
+    if (supersededBy) additions.supersededBy = supersededBy;
+  } catch {
+    // Supersession must be proven from live evidence, never assumed.
+  }
+  return Object.keys(additions).length > 0
+    ? { ...result, ...additions }
+    : result;
 }
 
 function run(command, args, options = {}) {
@@ -689,11 +922,14 @@ function inspectOnline(args) {
       ),
       markerName
     );
-    if (artifacts.length > 1) return manual('duplicate_marker_name');
-    if (artifacts[0]?.expired) return manual('expired_marker');
-    if (artifacts.length === 1) {
-      evidence.markers.push({ artifact: artifacts[0] });
-    }
+    // Two normal-name artifacts may be the bounded recovery/retry race. Do
+    // not pick the newest: download and classify both complete evidence chains.
+    const limit =
+      markerName === `production-generation-verified-${sha}` ? 2 : 1;
+    if (artifacts.length > limit) return manual('duplicate_marker_name');
+    if (artifacts.some(artifact => artifact.expired))
+      return manual('expired_marker');
+    for (const artifact of artifacts) evidence.markers.push({ artifact });
   }
   // Download every marker payload before selecting or querying any attempt.
   for (const marker of evidence.markers) {
@@ -784,7 +1020,35 @@ function inspectOnline(args) {
       );
     }
   }
-  return classifyProductionMarkerEvidence(evidence);
+  const result = classifyProductionMarkerEvidence(evidence);
+  if (result.state === 'verified' || result.state === 'pending') {
+    // Evidence can arrive while archive/run/job reads are in flight. Require
+    // the same immutable artifact identities and expiry states at the return
+    // boundary; never authorize from a stale partial listing.
+    const snapshot = artifacts =>
+      JSON.stringify([...artifacts].sort((left, right) => left.id - right.id));
+    for (const name of [
+      `production-generation-verified-${sha}`,
+      `production-generation-verified-recovery-${sha}`,
+      recoveryName,
+    ]) {
+      const before =
+        name === recoveryName
+          ? evidence.recoveryArtifacts
+          : evidence.markers
+              .map(marker => marker.artifact)
+              .filter(artifact => artifact.name === name);
+      const after = normalizeArtifacts(
+        ghJson(
+          `repos/${repo}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`
+        ),
+        name
+      );
+      if (snapshot(before) !== snapshot(after))
+        return manual('artifact_snapshot_changed');
+    }
+  }
+  return withProducerActivationEvidence(args, result);
 }
 
 function main() {

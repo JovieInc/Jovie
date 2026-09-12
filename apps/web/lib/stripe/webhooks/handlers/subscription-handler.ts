@@ -184,14 +184,17 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
           subscription.id
         );
       } catch (error) {
-        logger.warn(
-          'Failed to attribute lead paid conversion on subscription created',
+        await captureCriticalError(
+          'Lead paid conversion outcome receipt failed',
+          error,
           {
-            userId,
+            route: '/api/stripe/webhooks',
+            event: 'customer.subscription.created',
             subscriptionId: subscription.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            userId,
           }
         );
+        throw error;
       }
     }
 
@@ -265,14 +268,17 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
           subscription.id
         );
       } catch (error) {
-        logger.warn(
-          'Failed to attribute lead paid conversion on subscription updated',
+        await captureCriticalError(
+          'Lead paid conversion outcome receipt failed',
+          error,
           {
-            userId,
+            route: '/api/stripe/webhooks',
+            event: 'customer.subscription.updated',
             subscriptionId: subscription.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            userId,
           }
         );
+        throw error;
       }
     }
 

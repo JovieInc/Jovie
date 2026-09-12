@@ -1,9 +1,10 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/home/AuthRedirectHandler.test.tsx
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { hasActiveClerkSession } from '@/lib/auth/auth-session-cookies';
+import { hasActiveAuthSession } from '@/lib/auth/auth-session-cookies';
 
 /**
  * Non-blocking redirect handler for authenticated users on legacy launch
@@ -11,9 +12,9 @@ import { hasActiveClerkSession } from '@/lib/auth/auth-session-cookies';
  * `/` is an explicit destination after logout, from the logo, and from
  * browser history.
  *
- * Reads Clerk's `__client_uat` cookie (a non-httpOnly cookie set by Clerk JS
- * containing a Unix timestamp of last user activity). When the value is > 0,
- * the user has an active session and we redirect to the dashboard.
+ * Reads Better Auth session cookies (and leftover `__client_uat` during the
+ * one-release cleanup). When a session cookie is present, redirect to the
+ * dashboard.
  *
  * This runs in a useEffect after hydration so the static homepage renders
  * instantly for all visitors. Authenticated users see a subtle fade overlay
@@ -23,11 +24,11 @@ export function AuthRedirectHandler() {
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(
     () =>
-      typeof document !== 'undefined' && hasActiveClerkSession(document.cookie)
+      typeof document !== 'undefined' && hasActiveAuthSession(document.cookie)
   );
 
   useEffect(() => {
-    const isAuthenticated = hasActiveClerkSession(document.cookie);
+    const isAuthenticated = hasActiveAuthSession(document.cookie);
 
     if (!isAuthenticated) {
       setIsRedirecting(false);
@@ -54,4 +55,7 @@ export function AuthRedirectHandler() {
   );
 }
 
-export { hasActiveClerkSession } from '@/lib/auth/auth-session-cookies';
+export {
+  hasActiveAuthSession,
+  hasActiveClerkSession,
+} from '@/lib/auth/auth-session-cookies';

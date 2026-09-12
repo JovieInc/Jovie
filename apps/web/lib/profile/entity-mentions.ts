@@ -78,6 +78,10 @@ function buildCandidates(context: EntityMentionContext): MentionCandidate[] {
     const handle = artist.handle?.trim();
     // Artists without a Jovie profile stay plain text — internal interlinking only.
     if (!name || name.length < MIN_PHRASE_LENGTH || !handle) continue;
+    // Self-mentions stay plain text: an artist's own bio mentioning their own
+    // name must not link back to this profile (or to a duplicate profile row
+    // carrying the same handle) — the page already IS that entity.
+    if (handle === context.ownHandle) continue;
     const lower = name.toLowerCase();
     if (seen.has(lower)) continue;
     seen.add(lower);

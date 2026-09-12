@@ -122,6 +122,15 @@ const FLEET_PROMOTION_GATE_LANE = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
+const HYPERAGENT_LIFECYCLE_LANE = [
+  '.github/workflows/ci.yml',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/run-affected-tests.mjs',
+  'scripts/symphony/hyperagent/lifecycle.py',
+  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+];
 const GEM_PR_REHABILITATION_LANE = [
   '.github/requirements/pytest.in',
   '.github/requirements/pytest.txt',
@@ -684,6 +693,10 @@ describe('automation-verify affected scope', () => {
       selectedTests: [],
       pythonUnittestTests: ['scripts/symphony/tests/gem-priority-gate.test.py'],
       scriptVitestTests: [
+        'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
+        'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
+        'scripts/lib/__tests__/native-queue-eval.test.mjs',
+        'scripts/lib/__tests__/native-queue-collector.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
@@ -691,6 +704,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+        'scripts/lib/__tests__/merge-queue-backend.test.mjs',
         'scripts/lib/__tests__/pre-land-changelog.test.mjs',
         'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
@@ -921,6 +935,8 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/symphony/tests/closure-health.test.py',
         'scripts/symphony/tests/test_gem_disk_reclaim.py',
+        'scripts/symphony/tests/jovie-symphony-workspace.test.py',
+        'scripts/symphony/tests/test_gem_workspace_migrate.py',
         'scripts/symphony/tests/gem-priority-gate.test.py',
         'scripts/symphony/tests/gem-pr-drain.test.py',
         'scripts/symphony/tests/gem-ops-hud.test.py',
@@ -937,6 +953,26 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...GEM_PR_REHABILITATION_LANE,
+        'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded Hyperagent lifecycle contract', () => {
+    expect(buildAffectedTestPlan(HYPERAGENT_LIFECYCLE_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...HYPERAGENT_LIFECYCLE_LANE,
         'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');
@@ -985,6 +1021,96 @@ describe('automation-verify affected scope', () => {
         'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
       ]).mode
     ).toBe('full');
+  });
+
+  it('runs the operational launcher gate for sender-only changes', () => {
+    const sender = 'scripts/symphony/symphony-agent-router';
+    const test = 'scripts/symphony/tests/symphony-agent-router.test.py';
+    const gate = 'scripts/symphony/tests/run-issue-lease-gate.py';
+    const selector = 'scripts/run-affected-tests.mjs';
+    const selectorTest = 'scripts/lib/__tests__/automation-verify.test.mjs';
+    for (const changed of [
+      [sender],
+      [test],
+      [sender, test],
+      [sender, test, selector, selectorTest],
+    ]) {
+      const plan = buildAffectedTestPlan(changed);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonUnittestTests).toEqual([gate]);
+      expect(plan.scriptVitestTests).toEqual([selectorTest]);
+      expect(buildSelectedTestCommands(plan, '1')).toContainEqual([
+        'python3',
+        [gate],
+      ]);
+    }
+    for (const missing of [sender, test, gate, selectorTest]) {
+      expect(
+        buildAffectedTestPlan([sender], {
+          isFileAvailable: file => file !== missing,
+        }).mode
+      ).toBe('full');
+    }
+    for (const unrelated of [
+      'package.json',
+      'apps/web/app/page.tsx',
+      'scripts/symphony/symphony-codex-router',
+    ]) {
+      expect(buildAffectedTestPlan([sender, unrelated]).mode).toBe('full');
+    }
+  });
+
+  it('runs native admission coverage gates for the bounded consumer change', () => {
+    const files = [
+      'scripts/symphony/tests/native-admission-consumers.test.py',
+      'scripts/symphony/WORKFLOW.md',
+      'scripts/symphony/symphony-agent-router',
+      'scripts/symphony/symphony-codex-exhausted.py',
+      'scripts/symphony/symphony-codex-router',
+      'scripts/symphony/symphony-lease-guard',
+      'scripts/symphony/tests/existing-pr-repair.test.py',
+      'scripts/symphony/tests/run-issue-lease-gate.py',
+      'scripts/symphony/tests/symphony-agent-router.test.py',
+      'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
+      'scripts/symphony/tests/provider-runtime-promotion.test.py',
+      'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+    const gates = [
+      'scripts/symphony/tests/run-issue-lease-gate.py',
+      'scripts/symphony/tests/run-lease-gate.py',
+      'scripts/symphony/tests/run-provider-promotion-gate.py',
+      'scripts/symphony/tests/run-runtime-proof-gate.py',
+    ];
+    const plan = buildAffectedTestPlan(files);
+    expect(plan.mode).toBe('selected');
+    expect(plan.pythonUnittestTests).toEqual(gates);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '1')).toEqual(
+      expect.arrayContaining(gates.map(gate => ['python3', [gate]]))
+    );
+    for (const peer of [
+      'package.json',
+      'apps/web/lib/auth.ts',
+      'scripts/unknown.py',
+    ]) {
+      expect(buildAffectedTestPlan([...files, peer]).mode).toBe('full');
+    }
+    for (const missing of [
+      files[0],
+      ...gates,
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]) {
+      expect(
+        buildAffectedTestPlan(files, {
+          isFileAvailable: file => file !== missing,
+        }).mode
+      ).toBe('full');
+    }
+    expect(buildAffectedTestPlan(files.slice(1)).mode).toBe('full');
   });
 
   it('routes a closure-health source-only repair to its Python regression suite', () => {

@@ -419,7 +419,7 @@ jobs:
           # successfully, so it can only classify the marker after this job exits.
           echo "Uploaded exact recovered marker for $EXPECTED_SHA ($EXPECTED_DEPLOYMENT_ID); authoritative classification follows successful workflow completion."
 
-      - name: Dispatch fresh fleet reconciliation
+      - name: Dispatch fresh fleet and desktop reconciliation
         if: steps.admission.outputs.fleet_refresh_required == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -430,3 +430,6 @@ jobs:
           # GitHub's three-level workflow_run chain ceiling while preserving
           # Fleet Gate Refresh as the canonical receipt writer.
           gh workflow run fleet-gate-refresh.yml --ref main
+          gh workflow run desktop-release.yml --ref main \
+            -f environment=production \
+            -f force_rebuild=false

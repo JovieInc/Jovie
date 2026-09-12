@@ -3119,7 +3119,7 @@ function Sidebar({
             <UserMenu hideInternalTools={hideInternalTools}>
               <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-subtle ease-out cursor-pointer min-w-0'>
                 <BrandLogo
-                  size={16}
+                  size='compact'
                   rounded={false}
                   className='shrink-0 text-primary-token'
                   aria-hidden
@@ -4529,7 +4529,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
         }}
       >
         <BrandLogo
-          size={28}
+          size='control'
           rounded={false}
           className='mx-auto mb-2 text-primary-token opacity-30'
           aria-hidden

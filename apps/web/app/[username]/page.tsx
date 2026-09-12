@@ -8,6 +8,7 @@ import { Suspense } from 'react';
 
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
+import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
@@ -516,6 +517,10 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
 
+  if (username.toLowerCase() === 'unfazed') {
+    return <UnfazedProfileClient />;
+  }
+
   // Resolve a missing/private profile before the page-level Suspense boundary
   // can stream its loading shell. This preserves the segment's profile-specific
   // not-found UI and a real HTTP 404 instead of streaming that UI with HTTP 200.
@@ -545,6 +550,13 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   assertValidProfileUsername(username);
+
+  if (username.toLowerCase() === 'unfazed') {
+    return {
+      title: 'Unfazed | Jovie',
+      robots: { index: false, follow: false },
+    };
+  }
 
   const profileResult = await getProfileAndLinks(username);
   const { profile, genres, status, creatorClerkId } = profileResult;

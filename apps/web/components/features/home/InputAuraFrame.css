@@ -1,0 +1,62 @@
+/* Shared homepage search illumination. Editorial treatment is border-only:
+   a still rim, a calm interior, and focus that brightens the rim without
+   tinting the field or moving layout. */
+.input-aura-frame {
+  position: relative;
+}
+
+.input-aura-frame--editorial {
+  --input-aura-rim: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 16%,
+    transparent
+  );
+  --input-aura-rim-bright: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 30%,
+    transparent
+  );
+
+  border-radius: var(--radius-pill);
+}
+
+.input-aura-frame--editorial > .input-aura-frame__illumination {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  padding: var(--space-px);
+  background: linear-gradient(
+    180deg,
+    var(--input-aura-rim-bright),
+    var(--input-aura-rim) 46%,
+    var(--input-aura-rim-bright)
+  );
+  opacity: 0.72;
+  transition: opacity var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing);
+  -webkit-mask:
+    linear-gradient(var(--system-b-text-primary) 0 0) content-box,
+    linear-gradient(var(--system-b-text-primary) 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(var(--system-b-text-primary) 0 0) content-box,
+    linear-gradient(var(--system-b-text-primary) 0 0);
+  mask-composite: exclude;
+}
+
+.input-aura-frame--editorial:focus-within > .input-aura-frame__illumination {
+  opacity: 1;
+}
+
+.input-aura-frame--editorial > :not(.input-aura-frame__illumination) {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input-aura-frame--editorial > .input-aura-frame__illumination {
+    transition: none;
+  }
+}

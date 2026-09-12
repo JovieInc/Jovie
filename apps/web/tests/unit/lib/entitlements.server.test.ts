@@ -713,11 +713,11 @@ describe('getCurrentUserEntitlements', () => {
 
     const entitlements = await getCurrentUserEntitlements();
 
-    // effectiveEmail = emailFromDb || clerkEmail → '' || 'clerk@example.com'
+    // effectiveEmail = emailFromDb || userEmail → '' || 'clerk@example.com'
     expect(entitlements.email).toBe('clerk@example.com');
   });
 
-  it('prefers billing email over Clerk email when both exist', async () => {
+  it('prefers billing email over auth identity email when both exist', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_bothEmails' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'clerk@example.com' },

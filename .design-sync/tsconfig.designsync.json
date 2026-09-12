@@ -27,8 +27,6 @@
       "next/image": ["../../.design-sync/stubs/next-image.tsx"],
       "next/link": ["../../.design-sync/stubs/next-link.tsx"],
       "next/font/local": ["../../.design-sync/stubs/next-font-local.js"],
-      "@clerk/nextjs": [".storybook/clerk-mock.jsx"],
-      "@clerk/nextjs/server": [".storybook/clerk-server-mock.js"],
       "@sentry/react": ["../../.design-sync/stubs/sentry-passthrough.tsx"],
       "@sentry/browser": ["../../.design-sync/stubs/sentry-passthrough.tsx"],
       "@sentry/nextjs": ["../../.design-sync/stubs/sentry-passthrough.tsx"]

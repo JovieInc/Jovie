@@ -158,7 +158,7 @@ export const getCachedCurrentUser = cache(
       const bypassUser = buildDevTestAuthCurrentUser(bypassSession);
       // The bypass persona preserves the Clerk-shaped currentUser contract
       // (emailAddresses / imageUrl / fullName / firstName / lastName /
-      // username) so legacy consumers (e.g. resolveClerkIdentity) keep
+      // username) so identity consumers (e.g. resolveUserIdentity) keep
       // working in dev/E2E without churn. JovieUser.id is the BA user id
       // for the real-auth path; for the bypass it falls back to the
       // persona's stable string so consumers that key on `user.id` still

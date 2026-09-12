@@ -108,16 +108,22 @@ const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProps>(
           </label>
         ) : null}
         {select}
-        {error ? (
-          <p
-            id={errorId}
-            data-slot='native-select-error'
-            className='text-sm text-destructive'
-            role='alert'
-          >
-            {error}
-          </p>
-        ) : null}
+        <div
+          data-slot='native-select-error-slot'
+          className='min-h-5'
+          aria-live='polite'
+        >
+          {error ? (
+            <p
+              id={errorId}
+              data-slot='native-select-error'
+              className='text-sm text-destructive'
+              role='alert'
+            >
+              {error}
+            </p>
+          ) : null}
+        </div>
       </div>
     );
   }

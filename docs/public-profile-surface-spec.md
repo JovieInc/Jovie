@@ -16,9 +16,7 @@ Every route under `/{username}` belongs to exactly one category. Category member
 
 ### 1.1 Top-Level Profile Section
 
-Routes rendered inside the canonical public profile surface. Compact
-presentations show the bottom tab bar; desktop presentations use the desktop
-navigation contract in §2.7.
+Routes rendered inside the compact profile surface, showing the bottom tab bar.
 
 | Route | Active Tab | Notes |
 |---|---|---|
@@ -103,8 +101,7 @@ A fifth "More" menu item appears after the four tabs when `hideMoreMenu` is `fal
 
 | Context | Tab Bar Visible? |
 |---|---|
-| Any Category 1 route in a compact presentation | Yes |
-| Any Category 1 route in a desktop presentation | No — desktop navigation owns these destinations |
+| Any route in Category 1 (Top-Level Profile Section) | Yes — always |
 | Any route in Category 2 (Secondary Task Flow) | No |
 | Any route in Category 3 (External Action) | No |
 | Any route in Category 4 (Redirect Sink) | No — user is redirected before a UI renders |
@@ -157,11 +154,10 @@ Content that does not apply this padding will be obscured by the tab bar on devi
 |---|---|
 | < 768px (mobile) | Tab bar renders at the bottom of the viewport-locked surface |
 | 768–1179px (tablet / compact mode) | Tab bar renders; profile card is inset inside the page; safe area padding still applies |
-| ≥ 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses its own navigation and panel composition. The compact surface and bottom tab bar do not render. |
+| ≥ 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses its own navigation and panel composition instead of a bottom drawer. The compact surface and bottom tab bar do not render. |
 | ≥ 1180px (explicit embedded preview) | The compact surface may render only inside a labeled preview frame with a keyboard-operable exit to the full profile. |
 
-The 1180px boundary is exclusive: a public profile owns exactly one visible
-surface before and after hydration, including during a live viewport resize.
+Desktop tab behavior is owned by JOV-2024. This spec records the current behavior; JOV-2024 may modify it.
 
 ### 2.8 Maximum Tabs Before Overflow
 
@@ -496,21 +492,20 @@ After the JOV-2023 fix:
 
 ---
 
-## Source parity status (2026-09-04 audit)
+## Source parity status (2026-08-13 audit)
 
 `StaticArtistPage` is the active public-profile adapter and renders
 `ProfileCompactTemplate` (`apps/web/components/features/profile/StaticArtistPage.tsx:124-161`).
-The template reads the 768px and 1180px breakpoints, dynamically imports
-`ProfileDesktopSurface`, and passes both compact and desktop compositions to
-`PublicProfileLayoutShell`. At widths below 1180px, the compact surface owns
-the route. At widths of 1180px and above, the desktop surface owns the route.
-The browser admission selector covers 1179px, 1180px, and 1512px, live
-resize ownership, the labeled embedded-preview exception, SSR readiness, and
-visible-banner geometry. Its fixture exercises claimed, unclaimed, and owner
-component policies. Actual public-route and authenticated dashboard-preview
-certification requires separate current-head runtime evidence; fixture results
-do not establish that acceptance. Public ISR does not resolve authenticated
-owner identity.
+The template reads the 768px and 1180px breakpoints and renders
+`ProfileCompactSurface` in its active production composition
+(`apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx:314-352,795-885`).
+`ProfileDesktopSurface` remains source-visible and barrel/test-covered, but no
+production import from the active template was found in this checkout
+(`apps/web/components/features/profile/shell/index.ts:36-42`; tests at
+`apps/web/tests/unit/profile/profile-compact-template.test.tsx:1364-1455`).
+Desktop source parity is therefore **not_proven**. Treat the desktop behavior
+described in §2.7 as a specification claim pending source reconciliation, not
+as verified production parity.
 
 ---
 

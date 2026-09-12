@@ -21,6 +21,7 @@ import {
   qualifyNode22,
   runLiveStorybookCertification,
   seededPassingObservations,
+  selectLiveStoriesForChanges,
   storyIdFromTitleAndExport,
   validateCanonicalStoryInventory,
 } from '../../component-live-storybook-certification.mjs';
@@ -490,10 +491,58 @@ describe('live Storybook component certification', () => {
     });
     expect(live.ok).toBe(true);
     expect(live.sections.liveStorybookCertification.ok).toBe(true);
+    expect(live.sections.liveStorybookCertification.skipped).toBe(true);
     expect(
       live.sections.liveStorybookCertification.receipt.liveVisualCertification
         .status
-    ).toBe('certified');
+    ).toBe('skipped');
+  });
+
+  it('requires live evidence only for changed enrolled families', () => {
+    expect(
+      selectLiveStoriesForChanges(['docs/README.md']).map(item => item.id)
+    ).toEqual([]);
+    expect(
+      selectLiveStoriesForChanges(['packages/ui/atoms/badge.tsx']).map(
+        item => item.id
+      )
+    ).toEqual(['ui-atoms-badge--default', 'ui-atoms-badge--tones']);
+
+    const docsOnly = runLiveStorybookCertification({
+      headSha: HEAD,
+      nodeVersion: '22.23.2',
+      changedComponents: ['docs/README.md'],
+      observations: [],
+    });
+    expect(docsOnly.ok).toBe(true);
+    expect(docsOnly.skipped).toBe(true);
+
+    const badgeOnly = seededPassingObservations().filter(item =>
+      item.id.startsWith('ui-atoms-badge--')
+    );
+    const badgePass = runLiveStorybookCertification({
+      headSha: HEAD,
+      nodeVersion: '22.23.2',
+      changedComponents: ['packages/ui/atoms/badge.tsx'],
+      observations: badgeOnly,
+    });
+    expect(badgePass.ok).toBe(true);
+    expect(badgePass.receipt.liveVisualCertification.certified).toBe(2);
+    expect(badgePass.receipt.liveVisualCertification.stories).toEqual([
+      'ui-atoms-badge--default',
+      'ui-atoms-badge--tones',
+    ]);
+
+    const badgeMissing = runLiveStorybookCertification({
+      headSha: HEAD,
+      nodeVersion: '22.23.2',
+      changedComponents: ['packages/ui/atoms/button.stories.tsx'],
+      observations: badgeOnly,
+    });
+    expect(badgeMissing.ok).toBe(false);
+    expect(badgeMissing.receipt.issues.join('\n')).toMatch(
+      /shadcn-button--primary@compact: seeded primitive observation is missing/
+    );
   });
 
   it('maps compiled react-dom/client before the generic react-dom Storybook alias', () => {

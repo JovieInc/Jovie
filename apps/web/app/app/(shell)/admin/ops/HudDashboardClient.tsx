@@ -28,13 +28,11 @@ import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
 import { HudEnvExceptionsPanel } from '@/components/features/admin/hud/HudEnvExceptionsPanel';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
-import {
-  HudGithubBudgetPanel,
-  HudShipperNeedPanel,
-} from '@/components/features/admin/hud/HudShipperPanels';
+import { HudGithubBudgetPanel } from '@/components/features/admin/hud/HudShipperPanels';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
+import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import { VisualQaReviewPanel } from '@/components/features/admin/hud/VisualQaReviewPanel';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
@@ -819,11 +817,7 @@ export function HudDashboardClient({
       case 'factory-health':
         return <HudSystemHealthStrip metrics={metrics} />;
       case 'shipper':
-        return (
-          <HudShipperNeedPanel
-            source={presentation === 'token' ? 'kiosk-token' : 'admin-session'}
-          />
-        );
+        return <OvieShippingStateCard kioskToken={kioskToken} />;
       case 'morning-walk':
         return (
           <FounderMorningWalkCard

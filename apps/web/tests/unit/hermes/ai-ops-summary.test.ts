@@ -55,7 +55,7 @@ describe('getHudAiOpsSummary', () => {
               html_url: 'https://github.com/JovieInc/Jovie/pull/42',
               updated_at: '2026-05-07T11:00:00.000Z',
               draft: false,
-              labels: [{ name: 'needs-human' }],
+              labels: [{ name: 'hold' }],
               user: { login: 'jovie-bot' },
               head: { ref: 'codex/fix-agent-regression' },
             },

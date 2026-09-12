@@ -14,6 +14,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -34,9 +35,28 @@ GROK_SHIP = SOURCE_DIR / "grok-ship-one"
 CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
-RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP, CURSOR_STD, MODEL_ROUTER, MODEL_REGISTRY)
+PROVIDER_CAPACITY = SOURCE_DIR / "provider_capacity.py"
+PROMOTION_SCRIPT = ROOT / "scripts/writer-owned-pr-promote.sh"
+PROMOTION_LIB = ROOT / "scripts/lib/writer-owned-pr-promotion.mjs"
+QUEUE_DEFERRAL_LIB = ROOT / "scripts/lib/queue-deferral-receipt.mjs"
+UPSERT_PR_COMMENT = ROOT / "scripts/lib/upsert-pr-comment.sh"
+RUNTIME_ARTIFACTS = (
+    WRAPPER,
+    CONTROLLER,
+    SIDECAR,
+    GROK_SHIP,
+    CURSOR_STD,
+    MODEL_ROUTER,
+    MODEL_REGISTRY,
+    PROVIDER_CAPACITY,
+    PROMOTION_SCRIPT,
+    PROMOTION_LIB,
+    QUEUE_DEFERRAL_LIB,
+    UPSERT_PR_COMMENT,
+)
 RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
+NODE_BIN_DIR = str(pathlib.Path(shutil.which("node") or "/usr/bin/node").parent)
 
 
 def _load_python_module(name: str, path: pathlib.Path):
@@ -318,11 +338,7 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
             labels = self.__class__.labels.get(identifier) or []
             comments = (
                 []
-                if (
-                    "needs-human" in labels
-                    or "blocked" in labels
-                    or identifier in self.__class__.omit_receipt
-                )
+                if "blocked" in labels or identifier in self.__class__.omit_receipt
                 else [{"body": admission_comment(identifier, title, description)}]
             )
             response = {
@@ -369,12 +385,22 @@ class FallbackTests(unittest.TestCase):
         self.root = pathlib.Path(self.tmp.name)
         self.home = self.root / "home"
         self.home.mkdir()
+        for path in (
+            self.home / ".cursor/cli-config.json",
+            self.home / ".grok/auth.json",
+            self.home / ".kimi-code/credentials/kimi-code.json",
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"opaque":"test-auth-pool"}\n')
+            path.chmod(0o600)
         self.bin = self.root / "bin"
         self.bin.mkdir()
         python = self.bin / "python3"
         python.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
         python.chmod(0o755)
-        self.command("grok", "printf 'GROK_MODEL_READY\\n'")
+        # The registry probe requires the selected model name; the canary also
+        # needs its readiness marker.
+        self.command("grok", "printf 'grok-4.6 GROK_MODEL_READY\\n'")
         self.command(
             "gh",
             'case "$*" in\n'
@@ -397,11 +423,14 @@ class FallbackTests(unittest.TestCase):
         self.environment = mock.patch.dict(os.environ, {
             "SYMPHONY_OPEN_PR_INDEX": "empty",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
+            "SYMPHONY_PROVIDER_CAPACITY_STATE": str(self.root / "provider-capacity.json"),
+            "SYMPHONY_GROK_OBSERVED_CAPACITY": "4",
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
             "GEM_KIMI_EXECUTABLE": "/missing",
-            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": str(self.bin / "grok"),
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
         })
@@ -425,17 +454,20 @@ class FallbackTests(unittest.TestCase):
                 env.pop(key)
         env.update({
             "HOME": str(self.home),
-            "PATH": f"{self.bin}:/usr/bin:/bin",
+            "PATH": f"{self.bin}:{NODE_BIN_DIR}:/usr/bin:/bin",
             "GEM_CODEX_ACCOUNTS_STATE": str(self.state),
             "GEM_CODEX_CANARY_TIMEOUT_SECONDS": "1.0",
             "GEM_GROK_CANARY_TIMEOUT_SECONDS": "1.0",
             "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_MODEL_ROUTER_STATE": str(self.root / "model-router-state.json"),
+            "SYMPHONY_PROVIDER_CAPACITY_STATE": str(self.root / "provider-capacity.json"),
+            "SYMPHONY_GROK_OBSERVED_CAPACITY": "4",
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
             "GEM_CURSOR_EXECUTABLE": "/missing",
             "GEM_KIMI_EXECUTABLE": "/missing",
-            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": str(self.bin / "grok"),
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
             "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(json.dumps({
@@ -458,9 +490,97 @@ class FallbackTests(unittest.TestCase):
             "SYMPHONY_FALLBACK_RECEIPT_DIR": str(self.root / "fallback-receipts"),
         })
         env.update({key: str(value) for key, value in overrides.items()})
+        if (
+            "SYMPHONY_GROK_MAX" in overrides
+            and "SYMPHONY_GROK_OBSERVED_CAPACITY" not in overrides
+        ):
+            env.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
         return env
 
     def command(self, name, body):
+        if name == "gh":
+            discovery_body = body
+            # Grok shipper now performs an exact-head GraphQL promotion readback
+            # after these tests' mocked agent creates or updates a PR. Keep that
+            # boundary realistic instead of letting each narrow Git/Grok test's
+            # scalar fallback masquerade as GraphQL JSON.
+            body = r'''
+                if [ "${1:-}" = api ] && [ "${2:-}" = graphql ]; then
+                  number=16211
+                  for arg in "$@"; do
+                    case "$arg" in number=*) number="${arg#number=}";; esac
+                  done
+                  /usr/bin/python3 - "$number" <<'PY'
+import json
+import os
+import sys
+
+number = int(sys.argv[1])
+head = os.environ.get("GEM_TEST_PROMOTION_HEAD", "b" * 40)
+gate_ids = (
+    "exact-head",
+    "writer",
+    "required-tests",
+    "review-sweep",
+    "ticket-evidence",
+    "pr-evidence",
+    "writer-promotion-path",
+)
+receipt = {
+    "schema": "jovie-writer-pr-proof/v1",
+    "issuedAt": "2026-08-14T19:00:00Z",
+    "issueId": "JOV-7",
+    "prNumber": number,
+    "headSha": head,
+    "writerLogin": "test-writer",
+    "ownership": "author-owned",
+    "evidence": {
+        "requiredTests": "passed: mocked focused tests",
+        "reviewSweep": "complete: mocked review sweep",
+        "ticketEvidence": "attached: mocked Linear evidence",
+        "prEvidence": "attached: mocked PR evidence",
+    },
+    "promotion": {
+        "path": "writer-owned-pr-promote",
+        "readyAndNativeIntent": "same-bounded-action",
+        "reconciliationRequired": False,
+    },
+    "gates": [
+        {"id": gate_id, "passed": True, "evidence": "mocked proof"}
+        for gate_id in gate_ids
+    ],
+    "proofComplete": True,
+    "blockedBy": [],
+}
+body = f"<!-- jovie-writer-pr-proof/v1\n{json.dumps(receipt, indent=2)}\n-->"
+print(json.dumps({
+    "number": number,
+    "state": "OPEN",
+    "draft": False,
+    "head": head,
+    "body": body,
+    "labels": [],
+    "autoMerge": True,
+    "queued": False,
+    "mergeQueueEntry": None,
+}))
+PY
+                  exit 0
+                fi
+                if [ "${1:-}" = api ] && [ "${2:-}" = user ]; then
+                  printf '%s\n' test-writer
+                  exit 0
+                fi
+            ''' + body
+            # Preserve each test's PR inventory while expressing the new
+            # complete GraphQL connection, rather than reusing a single-PR read.
+            body = (
+                'case "$*" in *"pullRequests(first:100"*)\n'
+                '(\n' + discovery_body + '\n)'
+                ''' | /usr/bin/python3 -c 'import json,sys; nodes=json.load(sys.stdin); print(json.dumps({"data":{"repository":{"pullRequests":{"nodes":nodes,"pageInfo":{"hasNextPage":False,"endCursor":None}}}}}))'
+'''
+                '  exit 0;;\nesac\n'
+            ) + body
         path = self.bin / name
         path.write_text("#!/bin/sh\nset -eu\n" + textwrap.dedent(body))
         path.chmod(0o755)
@@ -506,7 +626,17 @@ class FallbackTests(unittest.TestCase):
         destination = destination or self.home / ".local/bin"
         result = self.run_install(destination, controller=controller)
         self.assertEqual(result.returncode, 0, result.stderr)
-        return pathlib.Path(destination)
+        installed = pathlib.Path(destination)
+        # grok-ship-one prepends $HOME/.local/bin and /usr/local/bin before
+        # PATH. Host gh on this runner would otherwise shadow the hermetic
+        # mocks and exit 75 (open_pr_inventory_unknown) before the stop-line.
+        for name in ("gh", "git", "flock", "grok"):
+            source = self.bin / name
+            if source.is_file() and name not in LAUNCHER_NAMES:
+                target = installed / name
+                shutil.copy2(source, target)
+                target.chmod(0o755)
+        return installed
 
     def assert_complete_install(self, destination, source_dir=SOURCE_DIR):
         current = destination / ".symphony-codex-auth-fallback/current"
@@ -516,6 +646,8 @@ class FallbackTests(unittest.TestCase):
             source = source_dir / name
             if name == MODEL_REGISTRY.name and not source.is_file():
                 source = source_dir / "config" / name
+            if not source.is_file():
+                source = next(path for path in RUNTIME_ARTIFACTS if path.name == name)
             self.assertEqual((release / name).read_bytes(), source.read_bytes())
             if name in LAUNCHER_NAMES:
                 self.assertTrue((destination / name).is_file())
@@ -839,7 +971,7 @@ class FallbackTests(unittest.TestCase):
     def test_targeted_drain_launches_only_the_exact_eligible_issue(self):
         module = self.load_controller_module()
         captured: dict[str, object] = {}
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
             captured.update(
                 identifiers=identifiers,
@@ -891,7 +1023,7 @@ class FallbackTests(unittest.TestCase):
         selection.assert_not_called()
     def test_targeted_drain_refuses_when_another_worker_owns_capacity(self):
         module = self.load_controller_module()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
@@ -1014,7 +1146,7 @@ class FallbackTests(unittest.TestCase):
     def test_untargeted_drain_preserves_existing_capacity_and_issue_set(self):
         module = self.load_controller_module()
         captured: dict[str, object] = {}
-        selection = {"selected": {"id": "grok-4.6", "pool": "grok-build"}}
+        selection = {"selected": {"id": "grok-4.6", "provider": "grok", "pool": "grok-build"}}
         def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
             captured.update(identifiers=identifiers, limit=limit)
             providers = kwargs.get("unit_providers")
@@ -1069,7 +1201,7 @@ class FallbackTests(unittest.TestCase):
         module = self.load_controller_module()
         final_active = mock.Mock()
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1106,7 +1238,7 @@ class FallbackTests(unittest.TestCase):
         module = self.load_controller_module()
         target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1132,7 +1264,7 @@ class FallbackTests(unittest.TestCase):
         unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
         controls: list[list[str]] = []
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1172,7 +1304,7 @@ class FallbackTests(unittest.TestCase):
         target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
         unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
         stderr = io.StringIO()
-        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        selection = {"selected": {"id": "kimi-k3", "provider": "kimi", "pool": "kimi"}}
         with (
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(
@@ -1380,10 +1512,7 @@ class FallbackTests(unittest.TestCase):
     def _issue_node(self, identifier, *labels, receipt=None, title=None, description=None, state="Todo"):
         title = title if title is not None else f"Ship {identifier}"
         description = description if description is not None else "Bounded admitted work."
-        blocked = any(
-            label.lower() in {"needs:human", "needs-human", "hold", "blocked", "human-review-required"}
-            for label in labels
-        )
+        blocked = any(label.lower() in {"hold", "held", "blocked", "manual-incident"} for label in labels)
         include_receipt = receipt if receipt is not None else not blocked
         comments = []
         if include_receipt:
@@ -1420,7 +1549,7 @@ class FallbackTests(unittest.TestCase):
         ]
         with mock.patch.dict(os.environ, {"LINEAR_API_KEY": "linear-secret", "LINEAR_API_URL": url}):
             identifiers = module._linear_identifiers()
-        self.assertEqual(identifiers, ["JOV-21", "LYB-23", "JOV-25"])
+        self.assertEqual(identifiers, ["JOV-21", "JOV-22", "LYB-23", "JOV-25"])
         self.assertEqual(len(LinearHandler.requests), 2)
         first = json.loads(LinearHandler.requests[0][1])
         second = json.loads(LinearHandler.requests[1][1])
@@ -1517,7 +1646,7 @@ class FallbackTests(unittest.TestCase):
             self.assertIsNone(module._linear_identifiers())
         self.assertEqual(len(LinearHandler.requests), 2)
 
-    def test_grok_limit_autoscales_from_live_oauth_seats_not_codex(self):
+    def test_grok_capacity_is_provider_local_and_has_no_fixed_ceiling(self):
         module = self.load_controller_module()
         with tempfile.TemporaryDirectory() as tmp:
             home = pathlib.Path(tmp)
@@ -1544,8 +1673,8 @@ class FallbackTests(unittest.TestCase):
             with mock.patch.object(module.pathlib.Path, "home", return_value=home):
                 with mock.patch.dict(os.environ):
                     os.environ.pop("SYMPHONY_GROK_MAX", None)
-                    self.assertEqual(module._live_oauth_seats(), 2)
-                    self.assertEqual(module._grok_limit(), 4)
+                    os.environ.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
+                    self.assertEqual(module._grok_limit(), 1)
                 extra = {
                     f"https://auth.x.ai::{index}": {
                         "auth_mode": "oidc",
@@ -1557,23 +1686,38 @@ class FallbackTests(unittest.TestCase):
                 (grok / "auth.json").write_text(json.dumps(extra), encoding="utf-8")
                 with mock.patch.dict(os.environ):
                     os.environ.pop("SYMPHONY_GROK_MAX", None)
-                    self.assertEqual(module._live_oauth_seats(), 7)
-                    self.assertEqual(module._grok_limit(), 7)
-                with mock.patch.dict(os.environ, {"SYMPHONY_GROK_MAX": "0"}):
-                    self.assertEqual(module._grok_limit(), 0)
+                    os.environ.pop("SYMPHONY_GROK_OBSERVED_CAPACITY", None)
+                    self.assertEqual(module._grok_limit(), 6)
+                with mock.patch.dict(
+                    os.environ, {"SYMPHONY_GROK_OBSERVED_CAPACITY": "25"}
+                ):
+                    self.assertEqual(module._grok_limit(), 25)
 
-    def test_default_grok_limit_is_four_and_blocked_labels_are_gates(self):
+    def test_no_fixed_provider_ceiling_and_only_machine_labels_gate_admission(self):
         module = self.load_controller_module()
-        self.assertEqual(module.DEFAULT_GROK_MAX, 4)
-        self.assertEqual(module.MAX_GROK_MAX, 10)
-        self.assertEqual(module.DEFAULT_KIMI_MAX, 4)
-        self.assertEqual(module.MAX_KIMI_MAX, 10)
+        for name in (
+            "DEFAULT_GROK_MAX", "MAX_GROK_MAX", "DEFAULT_KIMI_MAX", "MAX_KIMI_MAX"
+        ):
+            self.assertFalse(hasattr(module, name))
+        with mock.patch.dict(
+            os.environ, {"SYMPHONY_CURSOR_OBSERVED_CAPACITY": "40"}
+        ):
+            self.assertEqual(module._provider_measured_capacity("cursor"), 40)
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
-        self.assertIn("needs-human", module.BLOCKED_ADMISSION_LABELS)
-        self.assertIn("needs:human", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("no-symphony", module.BLOCKED_ADMISSION_LABELS)
-        for label in ("held", "decision-required", "manual-incident"):
+        for label in ("held", "manual-incident"):
             self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
+        for label in (
+            "needs-human",
+            "needs:human",
+            "human-review-required",
+            "needs:taste",
+            "needs-human-taste",
+            "needs-decision",
+            "decision-required",
+            "no-auto",
+        ):
+            self.assertNotIn(label, module.BLOCKED_ADMISSION_LABELS)
         # admission_decision is one predicate shared front-to-back.
         comment = admission_comment("JOV-1", "Ship JOV-1", "Bounded admitted work.")
         ok, _reason = module.admission_decision(
@@ -1595,7 +1739,7 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "blocked")
-        for label in ("held", "decision-required", "manual-incident"):
+        for label in ("held", "manual-incident"):
             ok, reason = module.admission_decision(
                 "JOV",
                 "JOV-1",
@@ -1606,6 +1750,26 @@ class FallbackTests(unittest.TestCase):
             )
             self.assertFalse(ok)
             self.assertEqual(reason, "blocked")
+        for label in (
+            "needs-human",
+            "needs:human",
+            "human-review-required",
+            "needs:taste",
+            "needs-human-taste",
+            "needs-decision",
+            "decision-required",
+            "no-auto",
+        ):
+            ok, reason = module.admission_decision(
+                "JOV",
+                "JOV-1",
+                {label},
+                title="Ship JOV-1",
+                description="Bounded admitted work.",
+                comments=[{"body": comment}],
+            )
+            self.assertTrue(ok, (label, reason))
+            self.assertEqual(reason, "admitted")
         labels_only, reason = module.admission_decision(
             "JOV",
             "JOV-2",
@@ -1641,8 +1805,8 @@ class FallbackTests(unittest.TestCase):
             description=description,
             comments=[{"body": current}],
         )
-        self.assertFalse(ok)
-        self.assertEqual(reason, "blocked")
+        self.assertTrue(ok, reason)
+        self.assertEqual(reason, "admitted")
         recovered, reason = module.admission_decision(
             "JOV",
             "JOV-9",
@@ -1664,12 +1828,11 @@ class FallbackTests(unittest.TestCase):
         meta = json.loads(admitted.stdout)
         self.assertEqual(meta["in_progress_state_id"], "JOV-progress")
         self.assertEqual(meta["in_review_state_id"], "JOV-review")
-        # JOV-1 was flagged needs-human AFTER listing -> rejected by the SAME gate.
-        blocked = self.run_controller("check-admission", "JOV-1",
+        # A legacy human-review label added after listing remains non-blocking.
+        labeled = self.run_controller("check-admission", "JOV-1",
                                       LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url)
-        self.assertEqual(blocked.returncode, 1)
-        self.assertIn("not admitted:blocked", blocked.stderr)
-        # JOV-4 carries needs:human and is missing required admission labels.
+        self.assertEqual(labeled.returncode, 0, labeled.stderr)
+        # JOV-4 carries needs:human but is missing a required admission receipt.
         missing = self.run_controller("check-admission", "JOV-4",
                                       LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url)
         self.assertEqual(missing.returncode, 1)
@@ -1677,7 +1840,7 @@ class FallbackTests(unittest.TestCase):
 
     def test_reconcile_skips_issue_flag_as_not_admitted_between_list_and_launch(self):
         # The list query sees candidates as admitted, but the launch-time re-check
-        # (via single_issue_labels) finds blocked/needs-human added by a guard.
+        # (via single_issue_labels) finds an active machine block added by a guard.
         self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
         self.command(
@@ -1735,7 +1898,7 @@ class FallbackTests(unittest.TestCase):
         events = self.events.read_text()
         self.assertNotIn("systemd-run", events)
         self.assertNotIn("systemctl --user stop", events)
-        self.assertIn("grok_capacity_zero symphony_unchanged", result.stderr)
+        self.assertIn("provider_capacity_zero symphony_unchanged", result.stderr)
 
     def test_grok_max_does_not_steal_kimi_chairs(self):
         module = self.load_controller_module()
@@ -1830,6 +1993,7 @@ class FallbackTests(unittest.TestCase):
                 "SYMPHONY_KIMI_MAX": "8",
                 "GEM_KIMI_EXECUTABLE": str(kimi),
                 "GEM_GROK_EXECUTABLE": "/missing",
+                "SYMPHONY_GROK_OBSERVED_CAPACITY": "8",
             },
             clear=False,
         ):
@@ -1979,6 +2143,21 @@ class FallbackTests(unittest.TestCase):
         module = self.load_controller_module()
         controls: list[list[str]] = []
         unit = module._fallback_unit("JOV-1", "2026-08-14T19:00:00Z") + ".service"
+        # The production selector now fails closed for registry-incompatible
+        # providers. Keep this cleanup test deterministic with a valid
+        # registry-backed Grok selection instead of relying on the old Qwen
+        # compatibility fixture.
+        grok_selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "grok-4.6",
+                "provider": "grok",
+                "pool": "grok-build",
+                "model": "grok-4.6",
+                "executor": {"executable": "/bin/true", "argv": ["-p", "{prompt}"]},
+            },
+        }
 
         def control(command):
             controls.append(command)
@@ -1991,6 +2170,11 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
             mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
+            mock.patch.object(
+                module,
+                "_oauth_fallback_selections",
+                return_value=( {"grok": grok_selection}, "oauth_ready"),
+            ),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit]]),
             mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
@@ -2161,6 +2345,7 @@ class FallbackTests(unittest.TestCase):
         )
         self.command(
             "gh",
+            'case "$*" in *headRefName*) echo "[]"; exit 0;; esac\n'
             '[ ! -f "$GROK_CREATED" ] && echo 0 || echo 1\n',
         )
         self.command(
@@ -2206,7 +2391,7 @@ class FallbackTests(unittest.TestCase):
 
     def test_red_fleet_gate_blocks_fallback_before_workspace_or_provider(self):
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         red = self.root / "red-gate.json"
         red.write_text(json.dumps({
@@ -2232,7 +2417,7 @@ class FallbackTests(unittest.TestCase):
 
     def test_closure_stop_line_blocks_new_fallback_before_workspace_or_provider(self):
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         self.gate.write_text(json.dumps({
             "schema": "jovie-fleet-gate/v1",
@@ -2257,6 +2442,38 @@ class FallbackTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Summer closure stop-line blocks new fallback work", result.stderr)
         self.assertFalse(self.events.exists())
+
+    def test_lyb_new_work_is_not_frozen_by_jovie_mq_closure_stop_line(self):
+        self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
+        self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "GREEN",
+            "closureAdmission": {
+                "newIssueIntakeAllowed": False,
+                "status": "red",
+                "reasons": ["native-queue-unmergeable"],
+            },
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "LYB-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 75, result.stderr)
+        self.assertNotIn("Summer closure stop-line blocks new fallback work", result.stderr)
+        self.assertNotIn("fleet gate blocks isolated work", result.stderr)
 
     def test_revision_scoped_unit_names_prevent_same_revision_duplicates(self):
         module = self.load_controller_module()
@@ -2422,7 +2639,7 @@ class FallbackTests(unittest.TestCase):
         ]
         with (
             mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "live"}),
-            mock.patch.object(module, "_gh_json", return_value=listed),
+            mock.patch.object(module, "_complete_open_prs", side_effect=lambda repo: listed if repo == module.JOV_REPO else []),
             mock.patch.object(module, "_linear_identifiers", return_value=[]),
         ):
             remounts = module._github_remount_identifiers()
@@ -2575,6 +2792,48 @@ class FallbackTests(unittest.TestCase):
             any("JOV-5003" in arg for command in launches for arg in command), launches
         )
 
+    def test_lyb_new_work_launches_while_jovie_closure_stop_line_is_red(self):
+        module = self.load_controller_module()
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "closureAdmission": {
+                "newIssueIntakeAllowed": False,
+                "status": "red",
+                "reasons": ["native-queue-empty-with-eligible-over-15m"],
+            },
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+        launches: list[list[str]] = []
+        lyb_issue = self._admitted_issue("LYB-5003", "In Progress")
+        jov_issue = self._admitted_issue("JOV-5003", "In Progress")
+        issues = {"LYB-5003": lyb_issue, "JOV-5003": jov_issue}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(
+                module, "_fetch_single_issue", side_effect=lambda ident: issues.get(ident)
+            ),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5003", "LYB-5003"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertGreaterEqual(used, 1)
+        self.assertTrue(
+            any("LYB-5003" in arg for command in launches for arg in command), launches
+        )
+        self.assertFalse(
+            any("JOV-5003" in arg for command in launches for arg in command), launches
+        )
+
     def test_exhausted_remounts_github_dirty_head_when_linear_has_no_receipts(self):
         module = self.load_controller_module()
         launches: list[list[str]] = []
@@ -2598,7 +2857,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(
                 module,
                 "_model_router_selection",
-                return_value=({"selected": {"id": "grok", "pool": "grok"}}, "ok"),
+                return_value=({"selected": {"id": "grok", "provider": "grok", "pool": "grok"}}, "ok"),
             ),
             mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
             mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
@@ -3300,11 +3559,40 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(created.exists())
 
     def test_grok_ship_one_retries_cursor_model_flag_when_grok_46_rejected(self):
-        """Live JOV-5220: cursor argv uses --model grok-4.6, not -m."""
+        """Cursor executes through the generic worker while its shared issue lease is held."""
         created = self.root / "pr-created"
+        self.command(
+            "flock",
+            """
+            /usr/bin/python3 - <<'PY'
+import fcntl
+
+fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
+PY
+            """,
+        )
+        self.command(
+            "assert-lease-held",
+            """
+            /usr/bin/python3 - "$SYMPHONY_FALLBACK_LEASE_DIR/JOV-7.lock" "$GEM_EVENTS" <<'PY'
+import fcntl
+import pathlib
+import sys
+
+with pathlib.Path(sys.argv[1]).open("a+") as candidate:
+    try:
+        fcntl.flock(candidate, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        pathlib.Path(sys.argv[2]).open("a").write("cursor shared lease held\\n")
+    else:
+        raise SystemExit("cursor ran without the shared issue lease")
+PY
+            """,
+        )
         self.command(
             "cursor-agent",
             'printf "cursor %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'assert-lease-held\n'
             'case " $* " in\n'
             '  *" --model grok-4.6 "*)\n'
             '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
@@ -3328,7 +3616,7 @@ class FallbackTests(unittest.TestCase):
             'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
             '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
             'case "$*" in\n'
-            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse HEAD") [ ! -f "$GROK_CREATED" ] && printf "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n" || printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
             '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
             '  *"merge-base HEAD origin/main") exit 0;;\n'
             '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
@@ -3349,23 +3637,38 @@ class FallbackTests(unittest.TestCase):
                 },
             },
         }
-        result = subprocess.run(
-            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+        runtime = self.install_runtime()
+        run_env = {
+            "GEM_EVENTS": self.events,
+            "GROK_CREATED": created,
+            "GROK_SHIP_WS_ROOT": self.root / "workspaces",
+            "GROK_SHIP_LOG_DIR": self.root / "logs",
+            "LINEAR_API_KEY": "linear-secret",
+            "LINEAR_API_URL": self.grok_linear_url(),
+            "SYMPHONY_OPEN_PR_INDEX": "live",
+            "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(
+                json.dumps(selection).encode()
+            ).decode(),
+        }
+        external_push = subprocess.run(
+            [runtime / GROK_SHIP.name, "JOV-7"],
             capture_output=True,
             text=True,
-            env=self.env(
-                GEM_EVENTS=self.events,
-                GROK_CREATED=created,
-                GROK_SHIP_WS_ROOT=self.root / "workspaces",
-                GROK_SHIP_LOG_DIR=self.root / "logs",
-                LINEAR_API_KEY="linear-secret",
-                LINEAR_API_URL=self.grok_linear_url(),
-                SYMPHONY_OPEN_PR_INDEX="live",
-                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
-                    json.dumps(selection).encode()
-                ).decode(),
-            ),
+            env=self.env(**run_env, GEM_TEST_PROMOTION_HEAD="c" * 40),
             check=False,
+        )
+        self.assertEqual(external_push.returncode, 0, external_push.stderr + external_push.stdout)
+        completion_dir = self.root / "fallback-receipts/completions"
+        self.assertEqual(list(completion_dir.glob("*.json")), [])
+
+        for stale in ("workspaces", "logs", "fallback-leases", "fallback-receipts"):
+            shutil.rmtree(self.root / stale, ignore_errors=True)
+        for stale in (created, self.events):
+            stale.unlink(missing_ok=True)
+
+        result = subprocess.run(
+            [runtime / GROK_SHIP.name, "JOV-7"], capture_output=True, text=True,
+            env=self.env(**run_env), check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         log = (self.root / "logs/JOV-7.log").read_text()
@@ -3373,7 +3676,33 @@ class FallbackTests(unittest.TestCase):
         events = self.events.read_text()
         self.assertIn("--model grok-4.6", events)
         self.assertIn("--model cursor-grok-4.6-high-fast", events)
+        self.assertEqual(events.count("cursor shared lease held"), 2)
         self.assertTrue(created.exists())
+        receipt_path = self.root / "fallback-receipts/JOV-7.json"
+        receipt = json.loads(receipt_path.read_text())
+        self.assertEqual(receipt_path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(receipt["repository"], "JovieInc/Jovie")
+        self.assertEqual(receipt["executorPath"], str((self.bin / "cursor-agent").resolve()))
+        self.assertRegex(receipt["executorSha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(receipt["profile"], r"^[0-9a-f]{64}$")
+        self.assertEqual(receipt["authStatePath"], str((self.home / ".cursor/cli-config.json").resolve()))
+        self.assertRegex(receipt["authStateSha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(receipt["authPoolIdentity"], receipt["profile"])
+        self.assertRegex(receipt["leaseIdentity"], r"^[0-9a-f]{64}$")
+        result_path = self.root / "fallback-receipts/completions" / f"JOV-7-{'b' * 40}.json"
+        completion = json.loads(result_path.read_text())
+        self.assertEqual(result_path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(completion["schema"], "symphony-fallback-result/v1")
+        self.assertEqual(completion["executionBaseHead"], "a" * 40)
+        self.assertEqual(completion["executionFinalHead"], "b" * 40)
+        self.assertEqual(completion["headSha"], "b" * 40)
+        self.assertEqual(completion["prNumber"], 1)
+        self.assertEqual(completion["provider"], "cursor")
+        self.assertEqual(completion["model"], "cursor-grok-4.6-high-fast")
+        self.assertEqual(completion["selectedModel"], "grok-4.6")
+        self.assertEqual(completion["authPoolIdentity"], completion["profile"])
+        self.assertEqual(completion["leaseReceiptSha256"], hashlib.sha256(receipt_path.read_bytes()).hexdigest())
+        self.assertFalse((self.root / "provider-capacity.json").exists())
 
     def test_grok_ship_one_changelog_strip_failure_still_invokes_grok(self):
         """A missing main-stage CHANGELOG degrades to bounded Grok remediation."""
@@ -3520,11 +3849,12 @@ class FallbackTests(unittest.TestCase):
 
     def test_grok_ship_one_delegates_admission_and_respects_blocked(self):
         # grok-ship-one must not keep its own copy of the admission predicate:
-        # it delegates to the controller's check-admission. A blocked/needs-human
-        # issue is refused before any workspace/grok activity.
+        # it delegates to the controller's check-admission. A machine-blocked
+        # issue is refused before any workspace/grok activity; the legacy human
+        # label is incidental.
         created = self.root / "pr-created"
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
-        self.command("gh", "echo 0")
+        self.command("gh", 'case "$*" in *headRefName*) echo "[]";; *) echo 0;; esac')
         self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
         destination = self.install_runtime()
         url = self.grok_linear_url()
@@ -3664,6 +3994,9 @@ class FallbackLockGcTests(unittest.TestCase):
         assert spec is not None and spec.loader is not None
         self.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.module)
+        prerequisite = mock.patch.object(self.module, "_native_dispatch_prerequisite", return_value=None)
+        prerequisite.start()
+        self.addCleanup(prerequisite.stop)
         self.env = mock.patch.dict(
             os.environ,
             {
@@ -3716,6 +4049,106 @@ class FallbackLockGcTests(unittest.TestCase):
             ("unknown", "lock_held_unverified"),
         )
 
+    def test_gc_never_splits_a_live_lock_inode_for_any_issue_state(self):
+        for state in ["In Progress", "In Review", "Done", "Canceled"]:
+            with self.subTest(state=state):
+                path = self.touch_lock("JOV-59999")
+                with path.open("a+") as holder:
+                    fcntl.flock(holder, fcntl.LOCK_EX)
+                    inode = os.fstat(holder.fileno()).st_ino
+                    self.module.gc_fallback_locks(
+                        open_prs={"JOV-59999": {"number": 1, "mergeStateStatus": "CLEAN"}},
+                        fetch_issue=lambda _: {"state": {"name": state}},
+                    )
+                    with path.open("a+") as challenger:
+                        self.assertEqual(os.fstat(challenger.fileno()).st_ino, inode)
+                        with self.assertRaises(BlockingIOError):
+                            fcntl.flock(challenger, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_unheld_slot_with_preopened_waiter_keeps_one_inode(self):
+        path = self.touch_lock("JOV-59998", self.module.FALLBACK_LEASE_TTL_SECONDS + 5)
+        with path.open("a+") as waiter:
+            inode = os.fstat(waiter.fileno()).st_ino
+            self.module.gc_fallback_locks(open_prs={}, fetch_issue=lambda _: None)
+            self.assertTrue(path.exists())
+            fcntl.flock(waiter, fcntl.LOCK_EX)
+            with path.open("a+") as newcomer:
+                self.assertEqual(os.fstat(newcomer.fileno()).st_ino, inode)
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(newcomer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_retained_unheld_slots_do_not_count_as_occupied_or_query_tracker(self):
+        for number in range(10):
+            self.touch_lock(f"JOV-{59000 + number}")
+        with mock.patch.object(self.module, "_autonomous_open_pr_index", side_effect=AssertionError("no GitHub scan")):
+            self.module.gc_fallback_locks(fetch_issue=lambda _: self.fail("no tracker read"))
+        self.assertEqual(self.module._fallback_lock_count(), 0)
+
+    @contextlib.contextmanager
+    def inherited_claim(self, path):
+        try:
+            saved = os.dup(9)
+        except OSError:
+            saved = None
+        descriptor = os.open(path, os.O_RDWR)
+        if descriptor != 9:
+            os.dup2(descriptor, 9)
+            os.close(descriptor)
+        try:
+            fcntl.flock(9, fcntl.LOCK_EX)
+            with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}):
+                yield
+        finally:
+            os.close(9)
+            if saved is not None:
+                os.dup2(saved, 9)
+                os.close(saved)
+
+    def test_inherited_claim_matches_kernel_inode_and_allows_own_pickup(self):
+        path = self.touch_lock("JOV-59997")
+        other = self.touch_lock("JOV-59996")
+        self.assertFalse(self.module._inherited_issue_lease_held(path))
+        with self.inherited_claim(path):
+            self.assertTrue(self.module._inherited_issue_lease_held(path))
+            self.assertFalse(self.module._inherited_issue_lease_held(other))
+            self.assertFalse(self.module._inherited_issue_lease_held(self.leases / "missing.lock"))
+            issue = {"identifier": "JOV-59997", "state": {"name": "In Progress"}}
+            with mock.patch.object(self.module, "_fetch_single_issue", return_value=issue), mock.patch.object(self.module, "_autonomous_open_pr_index", return_value={}):
+                self.assertEqual(self.module.pickup_check_command("JOV-59997"), 0)
+        self.assertEqual(self.module._fallback_lock_count(), 0)
+
+    def test_grok_release_closes_descriptor_without_unlinking_slot(self):
+        path = self.touch_lock("JOV-59995")
+        inode = path.stat().st_ino
+        function = re.search(r"release_fallback_lease\(\) \{.*?\n\}", GROK_SHIP.read_text(), re.S).group()
+        result = subprocess.run(["bash", "-c", function + '\nexec 9>>"$LEASE_FILE"\nrelease_fallback_lease\n'],
+            env={**os.environ, "LEASE_FILE": str(path)}, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(path.stat().st_ino, inode)
+
+    def test_gc_unreadable_directory_is_unknown_not_zero_capacity(self):
+        with mock.patch.object(self.module, "_iter_fallback_locks", side_effect=PermissionError("denied")):
+            self.assertIsNone(self.module._fallback_lock_count())
+            receipt = self.module.gc_fallback_locks()
+        self.assertTrue(receipt["red"])
+        self.assertIsNone(receipt["lockCountAfter"])
+
+    def test_gc_unknown_holder_or_age_preserves_inode_and_reports_red(self):
+        path = self.touch_lock("JOV-59994")
+        for held in [None, False]:
+            with mock.patch.object(self.module, "_lock_held", return_value=held), mock.patch.object(self.module, "_lock_age_seconds", return_value=None):
+                receipt = self.module.gc_fallback_locks()
+            self.assertTrue(receipt["red"])
+            self.assertTrue(path.exists())
+
+    def test_gc_malformed_observation_and_unwritable_receipt_keep_slots(self):
+        path = self.leases / "malformed.lock"
+        path.touch()
+        with mock.patch.object(self.module, "_iter_fallback_locks", return_value=[path]), mock.patch.object(self.module, "_write_json_atomic", side_effect=PermissionError("denied")):
+            receipt = self.module.gc_fallback_locks()
+        self.assertTrue(receipt["red"])
+        self.assertTrue(path.exists())
+
     def test_gc_expires_in_review_and_ttl_leftovers_keeps_live_holder(self):
         stale = self.touch_lock("JOV-5257", age_seconds=30)
         leftover = self.touch_lock("JOV-5001", age_seconds=self.module.FALLBACK_LEASE_TTL_SECONDS + 5)
@@ -3733,13 +4166,13 @@ class FallbackLockGcTests(unittest.TestCase):
             now=time.time(),
             fetch_issue=lambda ident: issues.get(ident),
         )
-        self.assertFalse(stale.exists())
-        self.assertFalse(leftover.exists())
+        self.assertTrue(stale.exists())
+        self.assertTrue(leftover.exists())
         self.assertTrue(live.exists())
-        self.assertEqual(receipt["lockCountBefore"], 3)
+        self.assertEqual(receipt["lockCountBefore"], 1)
         self.assertEqual(receipt["lockCountAfter"], 1)
-        self.assertEqual({row["identifier"] for row in receipt["expired"]}, {"JOV-5257", "JOV-5001"})
-        self.assertEqual(receipt["kept"][0]["identifier"], "JOV-5002")
+        self.assertEqual({row["identifier"] for row in receipt["expired"]}, {"JOV-5001"})
+        self.assertEqual({row["identifier"] for row in receipt["kept"]}, {"JOV-5257", "JOV-5002"})
         self.assertFalse(receipt["red"])
 
     def test_gc_expires_open_pr_inflight_without_linear(self):
@@ -3749,9 +4182,9 @@ class FallbackLockGcTests(unittest.TestCase):
             open_prs={"JOV-5257": {"number": 16365, "head": "fallback/JOV-5257-fix", "mergeStateStatus": "CLEAN"}},
             fetch_issue=lambda ident: fetches.append(ident) or {"state": {"name": "In Progress"}},
         )
-        self.assertFalse(path.exists())
+        self.assertTrue(path.exists())
         self.assertEqual(fetches, [])
-        self.assertEqual(receipt["expired"][0]["reason"], "open_pr_inflight")
+        self.assertEqual(receipt["lockCountAfter"], 0)
 
     def test_pickup_refuses_in_review_and_unknown_is_red(self):
         self.assertEqual(
@@ -3836,7 +4269,7 @@ class FallbackLockGcTests(unittest.TestCase):
         )
         self.assertEqual(
             expire(held=True, state_name="Canceled", pr_verdict="remount", age_seconds=10),
-            ("expire", "issue_canceled"),
+            ("keep", "live_remount"),
         )
 
     def test_issue_meta_admits_done_state_for_remount_only(self):
@@ -3907,7 +4340,7 @@ class FallbackLockGcTests(unittest.TestCase):
         ]
         with (
             mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": ""}),
-            mock.patch.object(self.module, "_gh_json", return_value=payload),
+            mock.patch.object(self.module, "_complete_open_prs", side_effect=lambda repo: payload if repo == self.module.JOV_REPO else []),
         ):
             index = self.module._autonomous_open_pr_index(None)
         self.assertEqual(index["JOV-5853"]["number"], 17017)
@@ -4030,6 +4463,13 @@ class FallbackLockGcTests(unittest.TestCase):
                 self.module,
                 "_issue_meta",
                 return_value=(True, "admitted", {"issue_revision": "2026-08-22T00:00:00Z"}),
+            ),
+            mock.patch.object(
+                self.module, "_provider_capacity_state",
+                return_value=({"schema": "symphony-provider-capacity/v1", "observedAt": "2026-09-08T00:00:00Z",
+                               "providers": {"grok": {"limit": 1, "status": "available"},
+                                             "kimi": {"limit": 0, "status": "available"}},
+                               "events": {}, "incidents": {}}, pathlib.Path("unused")),
             ),
             mock.patch.object(
                 self.module, "_control", side_effect=lambda command: launches.append(command) or True

@@ -26,7 +26,7 @@ export function FrostedContainer({
   };
 
   return (
-    <div className='relative min-h-screen bg-white dark:bg-gray-900 transition-colors duration-subtle overflow-hidden'>
+    <div className='relative min-h-svh bg-white dark:bg-gray-900 transition-colors duration-subtle overflow-hidden'>
       {/* Background Pattern */}
       {backgroundPattern !== 'none' && (
         <BackgroundPattern variant={backgroundPattern} />
@@ -41,7 +41,7 @@ export function FrostedContainer({
       )}
 
       {/* Content */}
-      <div className='relative z-10 flex min-h-screen flex-col'>
+      <div className='relative z-10 flex min-h-svh flex-col'>
         <div className={cn(variants[variant], className)}>{children}</div>
       </div>
     </div>

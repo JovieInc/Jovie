@@ -76,7 +76,10 @@ export function FeatureFlagAuditSection({
     useState<PendingRollback | null>(null);
 
   const flagKeys = useMemo(
-    () => [...new Set(events.map(event => event.flagKey))].sort(),
+    () =>
+      [...new Set(events.map(event => event.flagKey))].sort((a, b) =>
+        a.localeCompare(b)
+      ),
     [events]
   );
 

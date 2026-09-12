@@ -8,8 +8,8 @@ import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistApprovedStatus } from '@/lib/waitlist/state-machine';
-import { getWaitlistAccess } from './gate';
 import { determineUserStatus } from './user-status';
+import { getWaitlistAccess } from './waitlist-access';
 
 /**
  * App-user provisioning for Better Auth sign-ins.

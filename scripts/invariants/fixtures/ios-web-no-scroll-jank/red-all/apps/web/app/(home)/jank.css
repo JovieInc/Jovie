@@ -1,0 +1,9 @@
+html {
+  overscroll-behavior: none;
+  touch-action: none;
+  will-change: transform, opacity, scroll-position, contents;
+}
+
+.hero {
+  min-height: 100vh;
+}

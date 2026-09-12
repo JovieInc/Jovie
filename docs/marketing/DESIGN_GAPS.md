@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.2.0
+spec-version: 1.3.0
 doc-freshness: docs/marketing/DESIGN_GAPS.md
 -->
 # Missing-section governance
@@ -45,7 +45,7 @@ the existing `humanOptIn` artifact; it does not create a new section type.
 
 | Routes | Audited actual binding / parity | Open design gap |
 |---|---|---|
-| `/` | verified `hero` only; homepage recipe mismatch | none |
+| `/` | unverified nine-beat scripted composition with explicit hero, logo-cloud, six ordered editorial feature-split occurrences, and terminal CTA owners; CTA source/Pen ownership remains unresolved | none |
 | `/new` | verified homepage recipe parity | none |
 | `/pricing` | verified `hero → pricing → social-proof → comparison → cta`; FAQ missing | none |
 | `/launch/pricing` | verified `hero → pricing`; later pricing beats missing | none |
@@ -53,6 +53,7 @@ the existing `humanOptIn` artifact; it does not create a new section type.
 | `/artist-notifications` | verified feature recipe parity | `PROPOSED-SECTION-0001` mode switcher |
 | `/pay` | unverified `PayLanding` body; parity intentionally unknown | `PROPOSED-SECTION-0003` pay-flow video split |
 | `/download` | verified `hero → feature-grid → how-it-works → feature-grid → faq → cta`; feature recipe mismatch | `PROPOSED-SECTION-0004` platform selector |
+| `/youtube-thumbnails` | unverified `hero → how-it-works → feature-grid → cta`; active hero/grid variants are explicit, terminal CTA source/Pen ownership remains unresolved | none |
 | `/voice` | verified `hero → feature-grid → feature-split → cta`; feature recipe mismatch | none |
 | `/launch` | verified launch recipe parity | none |
 | `/about` | verified `hero → content-prose ×2 → faq`; SEO recipe mismatch | none |

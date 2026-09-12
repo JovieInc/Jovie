@@ -20,6 +20,10 @@ describe('self-hosted runner setup action', () => {
     resolve(repoRoot, '.github/actions/setup-node-pnpm/action.yml'),
     'utf8'
   );
+  const ciWorkflow = readFileSync(
+    resolve(repoRoot, '.github/workflows/ci.yml'),
+    'utf8'
+  );
 
   it('never saves pnpm stores from fixed or ephemeral self-hosted runners', () => {
     expect(action).not.toContain('uses: actions/cache@');
@@ -79,11 +83,47 @@ describe('self-hosted runner setup action', () => {
     expect(setupNodeStep).toContain('uses: actions/setup-node@');
     expect(setupNodeStep).toContain("node-version-file: '.nvmrc'");
     expect(setupNodeStep).toContain(
-      "cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}"
+      "runner.environment == 'github-hosted' && inputs.package_cache == 'true'"
     );
     expect(setupNodeStep).toContain(
       "cache-dependency-path: '**/pnpm-lock.yaml'"
     );
+  });
+
+  it('disables cache teardown only for the exact Mac product lane', () => {
+    expect(action).toMatch(
+      /package_cache:\n\s+description:[^\n]+\n\s+required: false\n\s+default: 'true'/
+    );
+
+    const macStart = ciWorkflow.indexOf('  ci-macos:');
+    const crossProductStart = ciWorkflow.indexOf(
+      '  ci-cross-product-integration:',
+      macStart
+    );
+    const laneReceiptStart = ciWorkflow.indexOf(
+      '  ci-product-lane-receipt:',
+      crossProductStart
+    );
+    const laneReceiptEnd = ciWorkflow.indexOf(
+      '\n  ci-build-public:',
+      laneReceiptStart
+    );
+    const macJob = ciWorkflow.slice(macStart, crossProductStart);
+    const crossProductJob = ciWorkflow.slice(
+      crossProductStart,
+      laneReceiptStart
+    );
+    const laneReceiptJob = ciWorkflow.slice(laneReceiptStart, laneReceiptEnd);
+
+    expect(macJob).toMatch(
+      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+[^\n]*\n\s+[^\n]*\n\s+[^\n]*\n\s+with:\n\s+package_cache: 'false'/
+    );
+    expect(macJob).toContain('Test and package exact Mac head');
+    expect(macJob).toContain('Upload exact Mac staging package');
+    expect(crossProductJob).toContain('ci-macos');
+    expect(crossProductJob).toContain('[ "$MAC_RESULT" = \'success\' ]');
+    expect(laneReceiptJob).toContain('ci-cross-product-integration');
+    expect(laneReceiptJob).toContain('needs.ci-macos.result');
   });
 
   it('skips non-bundled onnxruntime downloads in both CI install phases', () => {
@@ -97,6 +137,61 @@ describe('self-hosted runner setup action', () => {
       expect(step).toContain('ONNXRUNTIME_NODE_INSTALL: skip');
     }
     expect(action.match(/ONNXRUNTIME_NODE_INSTALL: skip/g)).toHaveLength(2);
+  });
+});
+
+describe('full browser matrix setup routing', () => {
+  const workflow = readFileSync(
+    resolve(repoRoot, '.github/workflows/e2e-full-matrix.yml'),
+    'utf8'
+  );
+  const setupSteps = workflow
+    .split(/\n      - /)
+    .filter(step => /(?:Cache|Install|Setup) Playwright/.test(step));
+
+  it('routes Chromium exclusively through the shared apt-free setup action', () => {
+    const chromiumSteps = setupSteps.filter(step =>
+      step.includes("if: matrix.browser == 'chromium'")
+    );
+    expect(chromiumSteps).toHaveLength(1);
+    expect(chromiumSteps[0]).toContain(
+      'uses: ./.github/actions/setup-playwright'
+    );
+    expect(chromiumSteps[0]).not.toContain('run:');
+  });
+
+  it('keeps the existing browser cache and dependency installer Firefox-only', () => {
+    const firefoxSteps = setupSteps.filter(step =>
+      step.includes("if: matrix.browser == 'firefox'")
+    );
+    expect(firefoxSteps).toHaveLength(2);
+    expect(firefoxSteps[0]).toContain('path: ~/.cache/ms-playwright');
+    expect(firefoxSteps[0]).toContain(
+      '${{ runner.os }}-playwright-${{ matrix.browser }}-'
+    );
+    expect(firefoxSteps[1]).toContain(
+      'run: pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps'
+    );
+    // No unconditional installer may put Chromium back on the apt path.
+    expect(setupSteps).toHaveLength(3);
+  });
+
+  it('preserves browser host validation and serialized execution', () => {
+    expect(workflow).toContain('browser: [chromium, firefox]');
+    expect(workflow).toContain('max-parallel: 1');
+    const action = readFileSync(
+      resolve(repoRoot, '.github/actions/setup-playwright/action.yml'),
+      'utf8'
+    );
+    expect(action).toContain(
+      'node .github/runner-image/verify-prerequisites.mjs --component playwright'
+    );
+    expect(action).toContain(
+      'run: pnpm --filter=@jovie/web exec playwright install chromium\n'
+    );
+    for (const source of [workflow, action]) {
+      expect(source).not.toMatch(/PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS/);
+    }
   });
 });
 

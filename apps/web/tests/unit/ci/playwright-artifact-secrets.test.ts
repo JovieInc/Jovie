@@ -28,7 +28,10 @@ import {
   redactSecretValues,
   resolveArtifactFiles,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
-import { validPlaywrightPng } from '../../../../../scripts/lib/playwright-png.mjs';
+import {
+  MAX_PLAYWRIGHT_PNG_PIXEL_BYTES,
+  validPlaywrightPng,
+} from '../../../../../scripts/lib/playwright-png.mjs';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -51,11 +54,11 @@ const localTrace = Object.fromEntries(
     .map(value => value.split('='))
 );
 const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const imageUploads =
-  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|ci.yml:homepage-visual-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}|screenshots.yml:marketing-route-screenshots-${{ github.sha }}|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const markdownUploads = [
@@ -67,7 +70,7 @@ const markdownUploads = [
 const protectedJobs: Record<string, string[]> = {
   'agent-tick.yml': ['synthetic-monitoring'],
   'ci.yml':
-    'ci-build-layout ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
+    'ci-visual-snapshot-compare ci-build-layout ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'.split(
       ' '
     ),
   'e2e-full-matrix.yml': ['e2e-full-matrix'],
@@ -82,7 +85,7 @@ const protectedJobs: Record<string, string[]> = {
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
   'canary-health-gate.yml': 1,
-  'ci.yml': 14,
+  'ci.yml': 15,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
@@ -500,18 +503,25 @@ function chunk(type: string, data = Buffer.alloc(0)) {
 
 const pngSignature = Buffer.from('89504e470d0a1a0a', 'hex');
 const pngRows = Buffer.from([0, 0, 0, 0]);
-function png(extra: Buffer[] = [], idat?: Buffer, colorType = 2) {
+function png(
+  extra: Buffer[] = [],
+  idat?: Buffer,
+  colorType = 2,
+  width = 1,
+  height = 1
+) {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(1);
-  header.writeUInt32BE(1, 4);
+  header.writeUInt32BE(width);
+  header.writeUInt32BE(height, 4);
   Buffer.from([8, colorType, 0, 0, 0]).copy(header, 8);
+  const channels = colorType === 6 ? 4 : 3;
   return Buffer.concat([
     pngSignature,
     chunk('IHDR', header),
     ...extra,
     chunk(
       'IDAT',
-      idat ?? deflateSync(Buffer.alloc(1 + (colorType === 6 ? 4 : 3)))
+      idat ?? deflateSync(Buffer.alloc(height * (1 + width * channels)))
     ),
     chunk('IEND'),
   ]);
@@ -793,13 +803,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(uploads.sort()).toEqual(uploadInventory.sort());
     expect(images.sort()).toEqual(imageUploads.sort());
     expect(markdown.sort()).toEqual(markdownUploads.sort());
-    expect(safeUploadJobs).toHaveLength(25);
+    expect(safeUploadJobs).toHaveLength(26);
     expect(
       safeUploadJobs.reduce(
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(29);
+    ).toBe(30);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
@@ -1833,6 +1843,51 @@ ${fixtureCheckout}
     const valid = png();
     expect(validPlaywrightPng(valid)).toBe(true);
     expect(validPlaywrightPng(png([], undefined, 6))).toBe(true);
+    // Exact marketing-route failure mode: 2x desktop (1440 CSS @ 2) full-page
+    // at 7_000 CSS px → 2880×14000 RGB = 120_974_000 decoded bytes. The old
+    // 100MB ceiling rejected these as image-policy even with allow-images.
+    const marketingRouteDesktop = png([], undefined, 2, 2880, 14_000);
+    expect((1 + 2880 * 3) * 14_000).toBeGreaterThan(100_000_000);
+    expect((1 + 2880 * 3) * 14_000).toBeLessThan(
+      MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
+    );
+    expect(validPlaywrightPng(marketingRouteDesktop)).toBe(true);
+    const marketingWorkspace = fixture();
+    write(
+      join(marketingWorkspace, 'marketing-route.png'),
+      marketingRouteDesktop
+    );
+    write(join(marketingWorkspace, 'receipt.json'), '{"ok":true}\n');
+    expect(
+      guardPlaywrightArtifacts(
+        ['marketing-route.png', 'receipt.json'],
+        {},
+        { workspace: marketingWorkspace, allowImages: true }
+      )
+    ).toEqual([]);
+    const marketingUpload = spawnSync(
+      process.execPath,
+      [guardScript, 'marketing-route.png', 'receipt.json'],
+      {
+        cwd: marketingWorkspace,
+        encoding: 'utf8',
+        env: baseEnv(marketingWorkspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+        }),
+      }
+    );
+    expect(
+      marketingUpload.status,
+      `${marketingUpload.stdout}\n${marketingUpload.stderr}`
+    ).toBe(0);
+    expect(`${marketingUpload.stdout}\n${marketingUpload.stderr}`).toContain(
+      'secret guard passed'
+    );
+    const overCap = png([], deflateSync(pngRows), 2, 20_000, 20_000);
+    expect((1 + 20_000 * 3) * 20_000).toBeGreaterThan(
+      MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
+    );
+    expect(validPlaywrightPng(overCap)).toBe(false);
     const badCrc = Buffer.from(valid);
     badCrc[badCrc.length - 1] ^= 1;
     const invalid = [
@@ -1916,7 +1971,75 @@ ${fixtureCheckout}
         { workspace: comparison, allowImages: true }
       )
     ).toEqual([]);
-  }, 90_000);
+    const chromiumDir = fixture('.artifact-chromium-route-', webRoot);
+    const chromiumConfig = join(chromiumDir, 'playwright.config.ts');
+    write(
+      chromiumConfig,
+      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
+    );
+    write(
+      join(chromiumDir, 'route.spec.ts'),
+      "import{test}from'@playwright/test';test('route',async({page},info)=>{await page.setContent('<style>html,body{margin:0}</style><div style=\"height:7000px;background:#111\"></div>');await page.screenshot({animations:'disabled',fullPage:true,path:info.outputPath('marketing-route.png'),type:'png'})})"
+    );
+    const chromiumRun = spawnSync(
+      'pnpm',
+      ['exec', 'playwright', 'test', '--config', chromiumConfig],
+      { cwd: webRoot, encoding: 'utf8', timeout: 90_000 }
+    );
+    expect(
+      chromiumRun.status,
+      `${chromiumRun.stdout}\n${chromiumRun.stderr}`
+    ).toBe(0);
+    const captured = globSync('test-results/**/marketing-route.png', {
+      cwd: chromiumDir,
+    });
+    expect(captured).toHaveLength(1);
+    const capturedBytes = readFileSync(join(chromiumDir, captured[0]));
+    expect(capturedBytes.readUInt32BE(16)).toBe(2880);
+    expect(capturedBytes.readUInt32BE(20)).toBe(14_000);
+    expect(validPlaywrightPng(capturedBytes)).toBe(true);
+    expect(
+      guardPlaywrightArtifacts(
+        [captured[0]],
+        {},
+        { workspace: chromiumDir, allowImages: true }
+      )
+    ).toEqual([]);
+  }, 120_000);
+
+  it('retains filtered profile diagnostics and only explicitly public profile images', () => {
+    const workflow = readFileSync(
+      join(workflowsRoot, 'e2e-full-matrix.yml'),
+      'utf8'
+    );
+    const pattern = workflow.match(
+      /PLAYWRIGHT_ARTIFACT_PATHS:.*&& '([^']+)'/
+    )?.[1];
+    expect(pattern).toBeDefined();
+    const workspace = fixture();
+    const prefix = 'apps/web/test-results/';
+    const diagnostics = [
+      `${prefix}profile-cta-fixture-preflight.json`,
+      `${prefix}.last-run.json`,
+      `${prefix}case/diagnostic.jsonl`,
+    ];
+    for (const file of diagnostics) write(join(workspace, file), '{}');
+    // Failed preflight must still retain diagnostics before any PNG exists.
+    expect(resolveArtifactFiles([pattern!], workspace)).toEqual(
+      diagnostics.map(file => join(workspace, file)).sort()
+    );
+    const publicImage = `${prefix}profile-case/profile-cta-public/events.png`;
+    for (const file of [
+      publicImage,
+      `${prefix}auth-setup/failure.png`,
+      `${prefix}profile-case/test-failed-1.png`,
+    ])
+      write(join(workspace, file), 'fixture');
+    write(join(workspace, 'neon-connection/connection.json'), '{}');
+    expect(resolveArtifactFiles([pattern!], workspace)).toEqual(
+      [...diagnostics, publicImage].map(file => join(workspace, file)).sort()
+    );
+  });
 
   it('rejects outside, symlinked, and non-regular artifact paths', () => {
     const workspace = fixture();
