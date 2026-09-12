@@ -120,7 +120,7 @@ const SECTION_ORDER = [
 const LEVEL3_TOKEN_RE =
   /\bJOV-\d+\b|\bRedis\b|\badmission\b|\bsynthetic identit(?:y|ies)\b|#\d{4,}/gi;
 
-const LEVEL3_PAREN_RE = /\s*\((?:JOV-\d+| #\d{4,})[^)]*\)/g;
+const LEVEL3_PAREN_RE = /\s*\((?:JOV-\d+|\s*#\d{4,})[^)]*\)/g;
 
 const SURFACE_HINTS = [
   { match: /\biphone\b|\bios\b/i, surface: 'ios' },
