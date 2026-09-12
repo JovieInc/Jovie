@@ -65,6 +65,62 @@ describe('customer changelog projection', () => {
     }
   });
 
+  it('strips parenthetical GitHub and Linear ids from title and explanation', () => {
+    const noSpace = extractCustomerChangelogTechnical(
+      'Library Approval Status (#10384) is now visible'
+    );
+    expect(noSpace.clean).toBe('Library Approval Status is now visible');
+    expect(noSpace.clean).not.toContain('(#10384)');
+    expect(noSpace.technical).toEqual(expect.arrayContaining(['#10384']));
+
+    const spaced = extractCustomerChangelogTechnical(
+      'Library Approval Status ( #10384) is now visible'
+    );
+    expect(spaced.clean).toBe('Library Approval Status is now visible');
+    expect(spaced.technical).toEqual(expect.arrayContaining(['#10384']));
+
+    const linear = extractCustomerChangelogTechnical(
+      'Jovie Local no longer says you are offline while compiling (JOV-5339)'
+    );
+    expect(linear.clean).toBe(
+      'Jovie Local no longer says you are offline while compiling'
+    );
+    expect(linear.technical).toEqual(expect.arrayContaining(['JOV-5339']));
+
+    const bare = extractCustomerChangelogTechnical(
+      'See #10384 for the implementation notes'
+    );
+    expect(bare.clean).toContain('#10384');
+    expect(bare.technical).toEqual(expect.arrayContaining(['#10384']));
+
+    const entries = projectCustomerChangelog([
+      release('26.8.1', '2026-08-16', {
+        added: [
+          'Library Approval Status (#10384): reviewers see the current state.',
+          'Mac profile links ( #15488): open the right artist.',
+        ],
+        fixed: [
+          'Jovie Local no longer says you are offline while compiling (JOV-5339): first compile waits.',
+        ],
+      }),
+    ]);
+
+    expect(entries[0]).toMatchObject({
+      title: 'Library Approval Status',
+      explanation: 'reviewers see the current state.',
+    });
+    expect(entries[0]?.title).not.toContain('#10384');
+    expect(entries[0]?.explanation).not.toContain('#10384');
+    expect(entries[0]?.technical).toEqual(expect.arrayContaining(['#10384']));
+
+    expect(entries[1]?.title).toBe('Mac profile links');
+    expect(entries[1]?.title).not.toContain('#15488');
+    expect(entries[1]?.technical).toEqual(expect.arrayContaining(['#15488']));
+
+    expect(entries[2]?.title).not.toContain('JOV-5339');
+    expect(entries[2]?.technical).toEqual(expect.arrayContaining(['JOV-5339']));
+  });
+
   it('keeps Redis, admission, and synthetic identities on Level 3', () => {
     const extracted = extractCustomerChangelogTechnical(
       'Sign-out stays available when Redis is missing and admission rejects synthetic identities JOV-5260'
