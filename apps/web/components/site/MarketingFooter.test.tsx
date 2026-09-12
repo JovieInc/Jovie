@@ -98,21 +98,21 @@ describe('MarketingFooter', () => {
     ).toHaveAttribute('data-brand-mark-size', '20');
   });
 
-  it.each([
-    '/artist-profiles',
-    '/artist-profile',
-  ])('keeps %s on the minimal homepage footer treatment', pathname => {
-    mockUsePathname.mockReturnValue(pathname);
+  it.each(['/artist-profiles', '/artist-profile'])(
+    'keeps %s on the minimal homepage footer treatment',
+    pathname => {
+      mockUsePathname.mockReturnValue(pathname);
 
-    render(<MarketingFooter />);
+      render(<MarketingFooter />);
 
-    expect(screen.getByTestId('marketing-footer')).toHaveClass(
-      'system-b-mounted-home-footer'
-    );
-    expect(
-      screen.queryByTestId('marketing-footer-cta')
-    ).not.toBeInTheDocument();
-  });
+      expect(screen.getByTestId('marketing-footer')).toHaveClass(
+        'system-b-mounted-home-footer'
+      );
+      expect(
+        screen.queryByTestId('marketing-footer-cta')
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('omits the terminal CTA on the support route', () => {
     mockUsePathname.mockReturnValue('/support');
