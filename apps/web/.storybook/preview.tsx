@@ -141,7 +141,7 @@ if (typeof window !== 'undefined') {
         urlObj.pathname === '/api/auth/get-session' &&
         new URLSearchParams(window.location.search)
           .get('id')
-          ?.startsWith('organisms-sidebaridentitygroup--')
+          ?.match(/^organisms-(sidebaridentitygroup|unifiedsidebar)--/)
       ) {
         return Response.json({
           user: {

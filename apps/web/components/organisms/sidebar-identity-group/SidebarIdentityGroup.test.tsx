@@ -321,8 +321,8 @@ describe('UnifiedSidebar identity composition contract', () => {
       'utf8'
     );
 
-    expect(source).toContain(
-      '<SidebarIdentityGroup profileHref={profileHref} />'
+    expect(source).toMatch(
+      /<SidebarIdentityGroup\s+calm=\{!isRouteSidebar\}\s+profileHref=\{profileHref\}\s*\/>/
     );
     expect(source).not.toContain("tooltip='Public Profile'");
     expect(source).not.toContain('CustomerUserPanel');

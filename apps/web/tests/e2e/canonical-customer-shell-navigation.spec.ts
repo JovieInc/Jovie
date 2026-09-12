@@ -73,7 +73,7 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
-test('canonical six are stable at 375, 768, and 1440', async ({
+test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440', async ({
   page,
 }, testInfo) => {
   test.setTimeout(180_000);
@@ -155,26 +155,20 @@ test('canonical six are stable at 375, 768, and 1440', async ({
   ).toBeHidden();
 
   const primarySection = desktopNav.locator('[data-nav-section]').first();
-  expect(await linkContract(primarySection.getByRole('link'))).toEqual(
-    CANONICAL_LABELS.map((label, index) => ({
-      label,
-      href: CANONICAL_HREFS[index],
-    }))
-  );
+  expect(await linkContract(primarySection.getByRole('link'))).toEqual([
+    { label: 'Library', href: APP_ROUTES.LIBRARY },
+    { label: 'Contacts', href: APP_ROUTES.CONTACTS },
+    { label: 'Presence', href: APP_ROUTES.PROFILES },
+  ]);
   for (const label of FORBIDDEN_LABELS) {
     await expect(primarySection.getByRole('link', { name: label })).toHaveCount(
       0
     );
   }
 
-  const navBeforeRail = await desktopNav.boundingBox();
-  const artistRow = desktopNav.getByRole('button', {
-    name: /^Open .+ profile$/,
-  });
-  await artistRow.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByTestId('app-shell-right-rail')).toBeVisible();
-  expect(await desktopNav.boundingBox()).toEqual(navBeforeRail);
+  const navBeforeFilter = await desktopNav.boundingBox();
+  await desktopNav.getByRole('link', { name: 'New Chat' }).focus();
+  expect(await desktopNav.boundingBox()).toEqual(navBeforeFilter);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
     path: testInfo.outputPath('canonical-customer-shell-1440x900.png'),

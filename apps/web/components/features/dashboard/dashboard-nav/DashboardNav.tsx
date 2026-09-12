@@ -1,6 +1,8 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { Bell, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -12,7 +14,6 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
-import { SIDEBAR_SECTION_RHYTHM } from '@/components/shell/SidebarSection';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -27,16 +28,15 @@ import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
   type NavigationTelemetryContext,
+  navigationInputMethodFromClick,
   startNavigationTelemetry,
   trackNavigationImpressions,
 } from '@/lib/tracking/navigation-telemetry';
-import { CustomerNavMoreMenu } from './CustomerNavMoreMenu';
 import {
-  artistNavigation,
   artistSettingsNavigation,
-  CUSTOMER_NAV_CAPACITY,
-  partitionCustomerNavigation,
-  primaryNavigation,
+  canonicalSidebarNavigation,
+  chatNavItem,
+  inboxNavItem,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
@@ -96,7 +96,7 @@ function normalizeTrailingSlash(pathname: string): string {
 }
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
-  const { creatorProfiles, selectedProfile } = useDashboardData();
+  const { selectedProfile, inboxNavigation } = useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -121,28 +121,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     [isElectron, isMobile]
   );
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
-  // Inbox is the shell's single attention center. Keep the destination stable
-  // even when it is caught up; attention state belongs inside the route, not in
-  // whether the route exists.
-  const eligiblePrimaryNavigation = primaryNavigation;
-  const activePrimaryItemId = useMemo(() => {
-    const active = eligiblePrimaryNavigation.find(item => {
-      if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {
-        return normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
-      }
-      return isItemActive(pathname, item);
-    });
-    return active?.id ?? null;
-  }, [eligiblePrimaryNavigation, pathname]);
-  const { visible: visiblePrimaryNavigation, more: morePrimaryNavigation } =
-    useMemo(
-      () =>
-        partitionCustomerNavigation(eligiblePrimaryNavigation, {
-          visibleCap: CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible,
-          activeItemId: activePrimaryItemId,
-        }),
-      [activePrimaryItemId, eligiblePrimaryNavigation]
-    );
   const threadsVisible =
     !isDemo &&
     !isInSettings &&
@@ -190,37 +168,17 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     trackNavigationImpressions(
       isInSettings
         ? ['settings']
-        : visiblePrimaryNavigation.map(item => item.id),
+        : ['inbox', 'chat', ...canonicalSidebarNavigation.map(item => item.id)],
       pathname,
       telemetryContext
     );
-  }, [
-    isDemo,
-    isInSettings,
-    isMobile,
-    pathname,
-    telemetryContext,
-    visiblePrimaryNavigation,
-  ]);
+  }, [isDemo, isInSettings, isMobile, pathname, telemetryContext]);
 
   const artistSettingsLabel = 'Artist';
-  const artistLabel =
-    selectedProfile?.displayName?.trim() ||
-    selectedProfile?.username?.trim() ||
-    'Artist';
-  const hasMultipleProfiles = creatorProfiles.length > 1;
 
-  // Memoize nav sections for dashboard (non-settings) mode
-  const navSections = useMemo<readonly DashboardNavSection[]>(
-    () => [
-      {
-        key: 'primary',
-        items: [...visiblePrimaryNavigation],
-      },
-    ],
-    [visiblePrimaryNavigation]
-  );
-  const moreNavItems = morePrimaryNavigation;
+  const navSections: readonly DashboardNavSection[] = [
+    { key: 'primary', items: [...canonicalSidebarNavigation] },
+  ];
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -349,6 +307,26 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     Promise.resolve(refetchConversations()).catch(() => {});
   }, [refetchConversations]);
 
+  const handleCommandClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    item: NavItem
+  ) => {
+    if (isDemo) {
+      event.preventDefault();
+      handleDemoNavClick(item);
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return;
+    startNavigationTelemetry({
+      itemId: item.id,
+      sourcePathname: pathname,
+      destinationHref: item.href,
+      inputMethod: navigationInputMethodFromClick(event.detail),
+      context: telemetryContext,
+    });
+  };
+
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
@@ -365,18 +343,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       return (
         <NavMenuItem
           key={item.id}
+          calm={!isInSettings}
           item={item}
           isActive={isActive}
           shortcut={shortcut}
-          // These six links are the bounded, high-frequency customer rail.
+          // Warm the approved customer destinations without a route flash.
           // Next's automatic mode skips full payloads for dynamic routes;
           // forcing `true` warms the complete route while preserving the
           // current-page warm-navigation contract (no loading.tsx flash).
-          prefetch={
-            !isDemo && primaryNavigation.some(entry => entry.id === item.id)
-              ? true
-              : undefined
-          }
+          prefetch={!isDemo && !isInSettings ? true : undefined}
           onClick={demoUnavailable ? () => handleDemoNavClick(item) : undefined}
           onActivate={
             demoUnavailable
@@ -408,33 +383,12 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
 
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
-    (items: readonly NavItem[], options?: { includeMore?: boolean }) => (
-      <SidebarMenu className='gap-px'>
+    (items: readonly NavItem[]) => (
+      <SidebarMenu className='gap-1'>
         {items.map((item, index) => renderNavItem(item, index))}
-        {options?.includeMore && moreNavItems.length > 0 ? (
-          <CustomerNavMoreMenu
-            items={moreNavItems}
-            isItemActive={item => {
-              if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {
-                return normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
-              }
-              return isItemActive(pathname, item);
-            }}
-            onActivate={(item, inputMethod) =>
-              startNavigationTelemetry({
-                itemId: item.id,
-                sourcePathname: pathname,
-                destinationHref: item.href,
-                inputMethod,
-                context: telemetryContext,
-              })
-            }
-            onPrefetch={handlePrefetch}
-          />
-        ) : null}
       </SidebarMenu>
     ),
-    [handlePrefetch, moreNavItems, pathname, renderNavItem, telemetryContext]
+    [renderNavItem]
   );
 
   return (
@@ -458,59 +412,64 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
             </SidebarCollapsibleGroup>
           </>
         ) : (
-          <SidebarGroup className='mb-0.5'>
-            <SidebarGroupContent className={SIDEBAR_SECTION_RHYTHM.navGroup}>
-              {navSections.map((section, index) => (
-                <div key={section.key} data-nav-section>
-                  {/* Section divider for visual separation (except for first section) */}
-                  {index > 0 && <div className='my-1.5' />}
-                  {section.label ? (
-                    <SidebarCollapsibleGroup
-                      label={section.label}
-                      defaultOpen
-                      storageKey={`dashboard.${section.key}`}
-                    >
-                      {renderSection(section.items, {
-                        includeMore: index === 0,
-                      })}
-                    </SidebarCollapsibleGroup>
-                  ) : (
-                    <>
-                      {renderSection(section.items.slice(0, 1))}
-                      {index === 0 && searchSurface ? (
-                        <div
-                          data-sidebar-search-slot='true'
-                          className={`${SIDEBAR_SECTION_RHYTHM.searchSlot} group-data-[collapsible=icon]:hidden`}
-                        >
-                          {searchSurface}
-                        </div>
-                      ) : null}
-                      {renderSection(section.items.slice(1), {
-                        includeMore: index === 0,
-                      })}
-                    </>
-                  )}
+          <SidebarGroup className='p-0'>
+            <div
+              data-sidebar-search-slot='true'
+              className='mx-1 flex h-9 shrink-0 items-center gap-2.5 rounded-full border border-subtle bg-surface-1 pr-1.5 group-data-[collapsible=icon]:hidden'
+            >
+              {searchSurface}
+              <span aria-hidden='true' className='h-4 w-px bg-subtle' />
+              <Link
+                href={APP_ROUTES.DASHBOARD}
+                onClick={event => handleCommandClick(event, inboxNavItem)}
+                prefetch={!isDemo}
+                aria-label='Inbox'
+                aria-current={
+                  normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD
+                    ? 'page'
+                    : undefined
+                }
+                className='relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden'
+              >
+                <Bell className='size-[15px]' aria-hidden='true' />
+                {inboxNavigation?.state === 'available' &&
+                (inboxNavigation.pendingCount ?? 0) > 0 ? (
+                  <span
+                    role='status'
+                    aria-label={`${inboxNavigation.pendingCount} pending items`}
+                    className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-[8px] font-bold text-background'
+                  >
+                    {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
+                  </span>
+                ) : null}
+              </Link>
+              <Link
+                href={APP_ROUTES.CHAT}
+                onClick={event => handleCommandClick(event, chatNavItem)}
+                aria-current={
+                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT
+                    ? 'page'
+                    : undefined
+                }
+                prefetch={!isDemo}
+                aria-label='New Chat'
+                className='relative flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-(--color-bg-base) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden'
+              >
+                <Plus className='size-3.5' aria-hidden='true' />
+              </Link>
+            </div>
+            <SidebarGroupContent className='pb-2 pt-4'>
+              {navSections.map(section => (
+                <div key={section.key} data-nav-section={section.key}>
+                  {renderSection(section.items)}
                 </div>
               ))}
-              <div data-nav-section='artist'>
-                {hasMultipleProfiles ? (
-                  <SidebarCollapsibleGroup
-                    label={artistLabel}
-                    defaultOpen
-                    storageKey={`dashboard.artist.${profileId || 'selected'}`}
-                  >
-                    {renderSection(artistNavigation)}
-                  </SidebarCollapsibleGroup>
-                ) : (
-                  renderSection(artistNavigation)
-                )}
-              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
 
         {threadsVisible ? (
-          <div className={SIDEBAR_SECTION_RHYTHM.threads}>
+          <div className='pt-4'>
             <SidebarThreadsSection
               threads={sidebarThreads}
               activeThreadId={activeThreadId}
@@ -526,7 +485,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                     : 'idle'
               }
               onRetry={handleRetryThreads}
-              tight
+              calm
               collapsed={false}
             />
           </div>

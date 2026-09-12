@@ -1,6 +1,7 @@
 import type { Artist } from '@/types/db';
 
 export interface UserButtonProps {
+  readonly calm?: boolean;
   readonly artist?: Artist | null;
   readonly profileHref?: string;
   readonly settingsHref?: string;

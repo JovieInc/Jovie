@@ -4,14 +4,38 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
+import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
+import { queryKeys } from '@/lib/queries/keys';
 import { UnifiedSidebar } from './UnifiedSidebar';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
+
+queryClient.setQueryData(queryKeys.chat.conversations(), [
+  {
+    id: 'merch',
+    title: 'Merch drop checklist',
+    updatedAt: new Date(Date.now() - 120_000).toISOString(),
+    latestTurnStatus: 'completed',
+  },
+  {
+    id: 'tour',
+    title: 'Tour announce — caption drafts',
+    updatedAt: new Date(Date.now() - 3_600_000).toISOString(),
+    latestTurnStatus: 'completed',
+  },
+  {
+    id: 'fans',
+    title: 'Fan segment Q3 planning',
+    updatedAt: new Date(Date.now() - 86_400_000).toISOString(),
+    latestTurnStatus: 'completed',
+  },
+]);
 
 const dashboardData: DashboardData = {
   user: { id: 'story-user' },
@@ -67,11 +91,15 @@ const meta: Meta<typeof UnifiedSidebar> = {
           <DashboardDataProvider value={dashboardData}>
             <TooltipProvider>
               <SidebarProvider>
-                <ShellSidebarOverrideProvider>
-                  <div className='h-screen w-(--app-shell-sidebar-width)'>
-                    <Story />
-                  </div>
-                </ShellSidebarOverrideProvider>
+                <JovieAuthValuesProvider>
+                  <HeaderActionsProvider>
+                    <ShellSidebarOverrideProvider>
+                      <div className='h-screen w-(--app-shell-sidebar-width)'>
+                        <Story />
+                      </div>
+                    </ShellSidebarOverrideProvider>
+                  </HeaderActionsProvider>
+                </JovieAuthValuesProvider>
               </SidebarProvider>
             </TooltipProvider>
           </DashboardDataProvider>

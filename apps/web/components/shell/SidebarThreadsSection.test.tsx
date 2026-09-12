@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  formatSidebarThreadTime,
   getSidebarThreadStatus,
   isTimestampAfter,
   readThreadReadState,
@@ -390,5 +391,104 @@ describe('SidebarThreadsSection', () => {
       isTimestampAfter('2026-05-12T00:00:00.000Z', '2026-05-13T00:00:00.000Z')
     ).toBe(false);
     expect(isTimestampAfter('zeta', 'alpha')).toBe(true);
+  });
+});
+
+describe('founder-locked calm sidebar history', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('groups real conversations into Today and Earlier and filters unread chats', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-12T12:00:00'));
+    const current: SidebarThread[] = [
+      {
+        ...threads[0],
+        updatedAt: new Date('2026-09-12T11:58:00').toISOString(),
+        unread: true,
+      },
+      {
+        ...threads[1],
+        updatedAt: new Date('2026-09-11T10:00:00').toISOString(),
+      },
+    ];
+    render(
+      <SidebarThreadsSection
+        calm
+        threads={current}
+        activeThreadId={null}
+        collapsed={false}
+      />
+    );
+    expect(
+      screen
+        .getByRole('button', { name: 'Filter Unread Chats' })
+        .querySelector('svg')
+    ).not.toBeNull();
+    expect(screen.getByText('TODAY')).toBeInTheDocument();
+    expect(screen.getByText('EARLIER')).toBeInTheDocument();
+    expect(screen.getByText('2m')).toHaveAttribute(
+      'datetime',
+      current[0].updatedAt
+    );
+    expect(screen.getByRole('link', { name: 'All chats' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHATS
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Filter Unread Chats' })
+    );
+    expect(screen.getByText('Release rollout')).toBeInTheDocument();
+    expect(screen.queryByText('Pitch tasks')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Filter Unread Chats' })
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('retains retry and context actions and hides history when collapsed', () => {
+    const retry = vi.fn();
+    const context = vi.fn();
+    const { rerender } = render(
+      <SidebarThreadsSection
+        calm
+        threads={[]}
+        activeThreadId={null}
+        collapsed={false}
+        state='error'
+        onRetry={retry}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Chats' }));
+    expect(retry).toHaveBeenCalledOnce();
+    rerender(
+      <SidebarThreadsSection
+        calm
+        threads={threads}
+        activeThreadId={threads[0].id}
+        collapsed={false}
+        onThreadContextMenu={context}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Chat Actions for Release rollout' })
+    );
+    expect(context).toHaveBeenCalledOnce();
+    rerender(
+      <SidebarThreadsSection
+        calm
+        threads={threads}
+        activeThreadId={null}
+        collapsed
+      />
+    );
+    expect(screen.queryByText('Release rollout')).not.toBeInTheDocument();
+  });
+
+  it('formats old, future, and invalid timestamps without invalid labels', () => {
+    const now = new Date('2026-09-12T12:00:00');
+    expect(formatSidebarThreadTime('invalid', now)).toBe('');
+    expect(formatSidebarThreadTime('2026-09-12T13:00:00', now)).toBe('1m');
+    expect(formatSidebarThreadTime('2026-09-12T10:00:00', now)).toBe('2h');
+    expect(formatSidebarThreadTime('2026-09-11T10:00:00', now)).toBe('Fri');
+    expect(formatSidebarThreadTime('2026-03-04T10:00:00', now)).toBe('Mar 4');
   });
 });

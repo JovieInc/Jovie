@@ -235,6 +235,18 @@ describe('UserButton billing actions', () => {
     });
   });
 
+  it('keeps the calm workspace identity and account menu together', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    render(<UserButton calm showUserInfo profileHref='/adele' />);
+    expect(screen.getByText('Jovie workspace')).toBeVisible();
+    await userEvent.click(screen.getByText('Adele Adkins'));
+    expect(await screen.findByText('Settings')).toBeVisible();
+  });
+
   it('renders the compact trigger avatar on the canonical app frame size', () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },

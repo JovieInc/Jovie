@@ -17,12 +17,8 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Inbox', APP_ROUTES.DASHBOARD],
-  ['New Chat', APP_ROUTES.CHAT],
   ['Library', APP_ROUTES.LIBRARY],
   ['Contacts', APP_ROUTES.CONTACTS],
-  ['Calendar', APP_ROUTES.CALENDAR],
-  ['Tasks', APP_ROUTES.TASKS],
   ['Presence', APP_ROUTES.PROFILES],
 ] as const;
 
@@ -92,7 +88,7 @@ describe('DashboardNav', () => {
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
-  it('places the shell search slot after Inbox and before remaining navigation', () => {
+  it('places search, Inbox, and New Chat together before navigation', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       navChildren: <button type='button'>Search</button>,
@@ -103,12 +99,12 @@ describe('DashboardNav', () => {
     const newChat = getByRole('link', { name: 'New Chat' });
 
     expect(
-      inbox.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING
+      search.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(
       search.compareDocumentPosition(newChat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(search.parentElement).toHaveClass('h-7', 'shrink-0');
+    expect(search.parentElement).toHaveClass('h-9', 'shrink-0');
   });
 
   it('keeps the canonical navigation visible without rollout state', () => {
@@ -199,7 +195,7 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      container.querySelector('[data-nav-section="artist"]')
+      container.querySelector('[data-nav-section="primary"]')
     ).not.toBeNull();
     expect(queryByRole('button', { name: 'Tim White' })).toBeNull();
     expect(
@@ -207,7 +203,7 @@ describe('DashboardNav', () => {
     ).toBeNull();
   });
 
-  it('groups artist destinations under the active artist when multiple profiles exist', () => {
+  it('keeps the approved flat navigation when multiple profiles exist', () => {
     const selectedProfile = {
       id: 'profile_123',
       displayName: 'Tim White',
@@ -231,19 +227,18 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('button', { name: 'Tim White' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
-    );
+    expect(container.querySelector('[aria-expanded]')).toBeNull();
     expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
       'href',
       APP_ROUTES.PROFILES
     );
     const artistSection = container.querySelector(
-      '[data-nav-section="artist"]'
+      '[data-nav-section="primary"]'
     );
     expect(artistSection).not.toBeNull();
-    expect(artistSection?.querySelector('a[href="/app/contacts"]')).toBeNull();
+    expect(
+      artistSection?.querySelector('a[href="/app/contacts"]')
+    ).not.toBeNull();
     expect(getByRole('link', { name: 'Contacts' })).toHaveAttribute(
       'href',
       APP_ROUTES.CONTACTS
@@ -313,16 +308,13 @@ describe('DashboardNav', () => {
     });
 
     const chatLink = getByRole('link', { name: 'New Chat' });
-    expect(chatLink).toHaveClass('w-fit');
-    expect(chatLink).toHaveClass('rounded-full');
-    expect(chatLink).toHaveClass('bg-sidebar-accent/40');
-    expect(chatLink).toHaveClass('text-sidebar-item-foreground');
-    expect(chatLink).toHaveClass('font-medium');
-    expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
-    expect(chatLink).not.toHaveClass(
-      'shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+    expect(chatLink).toHaveClass(
+      'size-6',
+      'rounded-full',
+      'bg-foreground',
+      'text-(--color-bg-base)'
     );
-    expect(chatLink.querySelector('svg')).toHaveClass('text-accent-teal!');
+    expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
     expect(chatLink).not.toHaveAttribute('aria-current');
   });
 
@@ -378,9 +370,9 @@ describe('DashboardNav', () => {
       sidebarProps: { defaultOpen: false },
     });
 
-    expect(primaryLinks(container)).toHaveLength(7);
-    expect(getByRole('link', { name: 'New Chat' }).className).toContain(
-      'group-data-[collapsible=icon]:justify-center'
+    expect(primaryLinks(container)).toHaveLength(3);
+    expect(getByRole('link', { name: 'New Chat' }).parentElement).toHaveClass(
+      'group-data-[collapsible=icon]:hidden'
     );
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
       limit: 10,

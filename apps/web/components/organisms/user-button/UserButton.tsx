@@ -384,6 +384,7 @@ export function UserButton({
   profileHref,
   settingsHref,
   showUserInfo = false,
+  calm = false,
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
@@ -511,7 +512,10 @@ export function UserButton({
     return showUserInfo ? (
       <div
         data-testid='user-button-loading'
-        className='flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        className={cn(
+          'flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
+          calm && 'h-11'
+        )}
       >
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         <div
@@ -556,13 +560,16 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
-        className='group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        className={cn(
+          'group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
+          calm && 'h-11 px-0.5 gap-2.5'
+        )}
       >
         <Avatar
           src={userImageUrl}
           alt={displayName || 'User avatar'}
           name={displayName || userInitials}
-          size='xs'
+          size={calm ? 'sidebar' : 'xs'}
           className='shrink-0'
         />
         <div
@@ -571,10 +578,18 @@ export function UserButton({
         >
           <p
             title={displayName}
-            className='truncate text-app font-normal text-sidebar-item-foreground'
+            className={cn(
+              'truncate text-sidebar-item-foreground',
+              calm ? 'text-[11px] font-semibold' : 'text-app font-normal'
+            )}
           >
             {displayName}
           </p>
+          {calm ? (
+            <p className='truncate text-[10px] text-sidebar-muted/50'>
+              Jovie workspace
+            </p>
+          ) : null}
         </div>
         <Icon
           name='ChevronRight'
