@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface SmartLinkProviderButtonProps {
@@ -9,7 +9,9 @@ interface SmartLinkProviderButtonProps {
   /** Custom icon element — used instead of iconPath when provided */
   readonly icon?: ReactNode;
   readonly href?: string;
-  readonly onClick?: () => void;
+  readonly onClick?: (
+    event: MouseEvent<HTMLAnchorElement | HTMLButtonElement>
+  ) => void;
   readonly className?: string;
   readonly disabled?: boolean;
   readonly ariaLabel?: string;
