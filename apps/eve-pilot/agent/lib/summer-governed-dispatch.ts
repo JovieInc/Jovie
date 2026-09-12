@@ -103,14 +103,15 @@ export function dispatchSummerGovernedRequest(input: {
   };
 
   const route = routeIsolatedRecoveryJob(recoveryJob, admission);
+  // After provider narrows to cursor-cloud, a separate `=== 'gem'` check is
+  // unreachable for TypeScript (and wrong). Pin the recovery route id instead.
   if (route.selectedRoute.tuple.provider !== 'cursor-cloud') {
     throw new Error('gem-dark governed dispatch must select cursor-cloud');
   }
-  if (
-    route.selectedRoute.id !== CURSOR_CLOUD_RECOVERY_ROUTE.id &&
-    route.selectedRoute.tuple.provider === 'gem'
-  ) {
-    throw new Error('gem-dark governed dispatch must not select gem');
+  if (route.selectedRoute.id !== CURSOR_CLOUD_RECOVERY_ROUTE.id) {
+    throw new Error(
+      'gem-dark governed dispatch must select the Cursor Cloud recovery route'
+    );
   }
 
   return {
