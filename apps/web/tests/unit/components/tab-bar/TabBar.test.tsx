@@ -72,32 +72,31 @@ const OPTIONS = [
 ] as const;
 
 describe('TabBar distribution', () => {
-  it.each([
-    'collapse',
-    'scroll',
-    'wrap',
-  ] as const)('adds equal-width tab classes in %s mode when distribution is fill', overflowMode => {
-    render(
-      <TabBar
-        value='overview'
-        onValueChange={() => undefined}
-        options={OPTIONS}
-        ariaLabel='Workspace tabs'
-        overflowMode={overflowMode}
-        distribution='fill'
-        actions={<button type='button'>Pinned action</button>}
-      />
-    );
+  it.each(['collapse', 'scroll', 'wrap'] as const)(
+    'adds equal-width tab classes in %s mode when distribution is fill',
+    overflowMode => {
+      render(
+        <TabBar
+          value='overview'
+          onValueChange={() => undefined}
+          options={OPTIONS}
+          ariaLabel='Workspace tabs'
+          overflowMode={overflowMode}
+          distribution='fill'
+          actions={<button type='button'>Pinned action</button>}
+        />
+      );
 
-    expect(
-      screen.getByRole('button', { name: 'Pinned action' })
-    ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Pinned action' })
+      ).toBeInTheDocument();
 
-    for (const tab of screen.getAllByRole('tab')) {
-      expect(tab.className).toContain('flex-1');
-      expect(tab.className).toContain('min-w-18');
+      for (const tab of screen.getAllByRole('tab')) {
+        expect(tab.className).toContain('flex-1');
+        expect(tab.className).toContain('min-w-18');
+      }
     }
-  });
+  );
 
   it('keeps intrinsic tabs content-sized by default', () => {
     render(
@@ -180,5 +179,47 @@ describe('TabBar distribution', () => {
       'focus-visible:ring-2',
       'focus-visible:ring-focus/35'
     );
+  });
+
+  it('uses a quiet underline selected state for the inspector variant', () => {
+    render(
+      <TabBar
+        value='overview'
+        onValueChange={() => undefined}
+        options={OPTIONS}
+        ariaLabel='Inspector tabs'
+        variant='underline'
+      />
+    );
+
+    const activeTab = screen.getByRole('tab', { name: 'Overview' });
+    const inactiveTab = screen.getByRole('tab', { name: 'Activity' });
+
+    expect(activeTab).toHaveAttribute('aria-selected', 'true');
+    expect(activeTab.className).toContain('border-accent');
+    expect(activeTab.className).toContain('bg-surface-0/80');
+    expect(activeTab.className).not.toContain('rounded-full');
+    expect(inactiveTab).toHaveAttribute('tabIndex', '-1');
+    expect(activeTab).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('moves the selected tab with arrow keys', () => {
+    const onValueChange = vi.fn();
+
+    render(
+      <TabBar
+        value='overview'
+        onValueChange={onValueChange}
+        options={OPTIONS}
+        ariaLabel='Keyboard tabs'
+        variant='underline'
+      />
+    );
+
+    const tablist = screen.getByRole('tablist', { name: 'Keyboard tabs' });
+    fireEvent.keyDown(tablist, { key: 'ArrowRight' });
+    expect(onValueChange).toHaveBeenCalledWith('activity');
+    fireEvent.keyDown(tablist, { key: 'Home' });
+    expect(onValueChange).toHaveBeenCalledWith('overview');
   });
 });
