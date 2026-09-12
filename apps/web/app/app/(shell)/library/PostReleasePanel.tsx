@@ -6,6 +6,10 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { buildReleaseDownloadsRoute } from '@/constants/routes';
+import {
+  findingsForAsset,
+  subjectIdsForAsset,
+} from '@/lib/library/post-release-scope';
 import type {
   LibraryPostReleaseBundle,
   LibraryPresenceFindingView,
@@ -21,26 +25,6 @@ const EVIDENCE_LABELS: Record<
   observed: 'Observed',
   claimed: 'Claimed',
 };
-
-function subjectIdsForAsset(asset: LibraryReleaseAsset): ReadonlySet<string> {
-  return new Set(
-    [asset.id, asset.source?.canonicalId, asset.linkedReleaseId].filter(
-      (value): value is string => Boolean(value)
-    )
-  );
-}
-
-function findingsForAsset(
-  asset: LibraryReleaseAsset,
-  findings: readonly LibraryPresenceFindingView[]
-): LibraryPresenceFindingView[] {
-  const subjectIds = subjectIdsForAsset(asset);
-  return findings.filter(
-    finding =>
-      (finding.status === 'open' || finding.status === 'drafted') &&
-      (finding.subjectType === 'artist' || subjectIds.has(finding.subjectId))
-  );
-}
 
 function rightsholdersForAsset(
   asset: LibraryReleaseAsset,
