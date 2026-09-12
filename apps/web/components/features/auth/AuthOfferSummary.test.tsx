@@ -1,17 +1,38 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const searchParamsState = { value: 'plan=pro&interval=year' };
+const searchParamsState = {
+  value: 'plan=pro&interval=year',
+  instance: null as URLSearchParams | null,
+};
+
+// Stable identity across re-renders: the component persists offer intent in a
+// useEffect keyed on the searchParams object, so returning a fresh
+// URLSearchParams from every mock call would loop effects forever.
+const mockSearchParams = () => {
+  searchParamsState.instance ??= new URLSearchParams(searchParamsState.value);
+  return searchParamsState.instance;
+};
 
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(searchParamsState.value),
+  useSearchParams: () => mockSearchParams(),
 }));
 
 import { AuthOfferSummary } from './AuthOfferSummary';
 
 describe('AuthOfferSummary', () => {
+  let setSearchParams: (value: string) => void;
+
+  beforeEach(() => {
+    // Rebuild the stable instance when a test changes the query.
+    setSearchParams = value => {
+      searchParamsState.value = value;
+      searchParamsState.instance = new URLSearchParams(value);
+    };
+  });
+
   it('shows a Pro trial summary on sign-up with the selected interval', () => {
-    searchParamsState.value = 'plan=pro&interval=year';
+    setSearchParams('plan=pro&interval=year');
     render(<AuthOfferSummary mode='sign-up' />);
 
     const summary = screen.getByTestId('auth-offer-summary');
@@ -24,7 +45,7 @@ describe('AuthOfferSummary', () => {
   });
 
   it('does not pitch a new trial on sign-in', () => {
-    searchParamsState.value = 'plan=pro&interval=month';
+    setSearchParams('plan=pro&interval=month');
     render(<AuthOfferSummary mode='sign-in' />);
 
     const summary = screen.getByTestId('auth-offer-summary');
@@ -34,7 +55,7 @@ describe('AuthOfferSummary', () => {
   });
 
   it('keeps Max explicit and trial-free', () => {
-    searchParamsState.value = 'plan=max&interval=month';
+    setSearchParams('plan=max&interval=month');
     render(<AuthOfferSummary mode='sign-up' />);
 
     const summary = screen.getByTestId('auth-offer-summary');

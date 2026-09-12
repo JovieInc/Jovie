@@ -122,8 +122,8 @@ export function PlanComparisonSection({
       <fieldset data-testid='billing-plan-interval'>
         <legend className='sr-only'>Billing interval</legend>
         <div className='flex items-center justify-center gap-2'>
-          <button
-            type='button'
+          <Button
+            variant='tertiary'
             className={cn(
               'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-subtle bg-transparent px-4 text-sm text-secondary-token',
               billingInterval === 'month' &&
@@ -133,9 +133,9 @@ export function PlanComparisonSection({
             onClick={() => setBillingInterval('month')}
           >
             Monthly
-          </button>
-          <button
-            type='button'
+          </Button>
+          <Button
+            variant='tertiary'
             className={cn(
               'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-subtle bg-transparent px-4 text-sm text-secondary-token',
               billingInterval === 'year' &&
@@ -145,7 +145,7 @@ export function PlanComparisonSection({
             onClick={() => setBillingInterval('year')}
           >
             Annual
-          </button>
+          </Button>
         </div>
       </fieldset>
 

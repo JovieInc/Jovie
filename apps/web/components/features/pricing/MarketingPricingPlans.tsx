@@ -46,24 +46,24 @@ function BillingIntervalSelector({
     >
       <legend className='sr-only'>Billing interval</legend>
       <div className='marketing-pricing-interval__control' role='presentation'>
-        <button
-          type='button'
+        <Button
+          variant='tertiary'
+          aria-pressed={interval === 'month'}
           data-selected={interval === 'month' ? 'true' : 'false'}
           className='marketing-pricing-interval__option'
-          aria-pressed={interval === 'month'}
           onClick={() => onChange('month')}
         >
           Monthly
-        </button>
-        <button
-          type='button'
+        </Button>
+        <Button
+          variant='tertiary'
+          aria-pressed={interval === 'year'}
           data-selected={interval === 'year' ? 'true' : 'false'}
           className='marketing-pricing-interval__option'
-          aria-pressed={interval === 'year'}
           onClick={() => onChange('year')}
         >
           Annual
-        </button>
+        </Button>
       </div>
     </fieldset>
   );
