@@ -31,10 +31,7 @@ vi.mock('../agent/lib/summer-gem-dark-recovery', async () => {
 });
 
 type Store = {
-  create: (
-    pathname: string,
-    record: unknown
-  ) => Promise<'created' | 'exists'>;
+  create: (pathname: string, record: unknown) => Promise<'created' | 'exists'>;
   read: (pathname: string) => Promise<unknown>;
   list: () => Promise<{
     entries: unknown[];
@@ -100,9 +97,7 @@ describe('Summer bottleneck heartbeat — JOV-6163 attestation bridge', () => {
     const { runSummerBottleneckHeartbeat } = await import(
       '../agent/schedules/summer-bottleneck-heartbeat'
     );
-    const result = await runSummerBottleneckHeartbeat(
-      dependencies() as never
-    );
+    const result = await runSummerBottleneckHeartbeat(dependencies() as never);
 
     expect(result.gemDarkTrigger).toMatchObject({
       dark: false,
@@ -120,9 +115,7 @@ describe('Summer bottleneck heartbeat — JOV-6163 attestation bridge', () => {
     const { runSummerBottleneckHeartbeat } = await import(
       '../agent/schedules/summer-bottleneck-heartbeat'
     );
-    const result = await runSummerBottleneckHeartbeat(
-      dependencies() as never
-    );
+    const result = await runSummerBottleneckHeartbeat(dependencies() as never);
 
     expect(result.gemDarkTrigger).toMatchObject({
       dark: true,
@@ -146,9 +139,7 @@ describe('Summer bottleneck heartbeat — JOV-6163 attestation bridge', () => {
     const { runSummerBottleneckHeartbeat } = await import(
       '../agent/schedules/summer-bottleneck-heartbeat'
     );
-    const result = await runSummerBottleneckHeartbeat(
-      dependencies() as never
-    );
+    const result = await runSummerBottleneckHeartbeat(dependencies() as never);
 
     expect(result.gemDarkTrigger).toMatchObject({
       dark: false,

@@ -17,8 +17,8 @@ import type {
 } from '../agent/lib/summer-bottleneck-loop';
 import {
   evaluateRunnerSourceAttestation,
-  resolveGemDarkTrigger,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
+  resolveGemDarkTrigger,
   runGemDarkRecoveryCycle,
 } from '../agent/lib/summer-gem-dark-recovery';
 
@@ -181,13 +181,11 @@ describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
         usefulRecovery: {
           status: recovery.status,
           outboxPath: recovery.outboxPath,
-          isolatedRecoveryAdmitted:
-            recovery.report.isolatedRecoveryAdmitted,
+          isolatedRecoveryAdmitted: recovery.report.isolatedRecoveryAdmitted,
         },
         ownershipPreserved: {
           takeoverDenied: takeoverDenied.status,
-          uncertainLiveJobDuplicated:
-            takeoverReport.uncertainLiveJobDuplicated,
+          uncertainLiveJobDuplicated: takeoverReport.uncertainLiveJobDuplicated,
           permissionSelfExpansionDenied:
             expansionDenied.status === 'denied'
               ? expansionDenied.report.permissionSelfExpansionDenied
