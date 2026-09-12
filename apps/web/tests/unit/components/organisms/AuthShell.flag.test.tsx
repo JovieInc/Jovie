@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as renderUI, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthShell } from '@/components/organisms/AuthShell';
@@ -88,6 +89,18 @@ vi.mock('@/components/organisms/OperatorMobileNavigation', () => ({
 vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
   MobileProfileDrawer: () => <button type='button'>Mobile Profile</button>,
 }));
+
+function render(ui: ReactNode) {
+  return renderUI(
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
+      {ui}
+    </QueryClientProvider>
+  );
+}
 
 function renderAuthShell(showMobileTabs = false) {
   return render(
