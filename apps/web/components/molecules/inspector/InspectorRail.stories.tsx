@@ -15,6 +15,7 @@ const meta = {
     tabsAriaLabel: 'Inspector tabs',
     objectHeader: <strong>Take Me Over</strong>,
     children: <p>Details body</p>,
+    isLoading: false,
   },
 } satisfies Meta<typeof InspectorShell>;
 
@@ -22,3 +23,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Loading: Story = {
+  args: { isLoading: true },
+};
