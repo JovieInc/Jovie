@@ -386,7 +386,9 @@ describe('codex issue shipper prompt', () => {
     );
     expect(prompt).toContain('jovie-writer-pr-proof/v1');
     expect(prompt).toContain('jovie-writer-pr-promotion-blocker/v1');
-    expect(prompt).toContain('gh pr merge --auto --match-head-commit');
+    expect(prompt).toContain(
+      'node scripts/native-merge-intent.mjs --repo JovieInc/Jovie --pr <PR_NUMBER> --head'
+    );
     expect(prompt).toContain('do not rely on `auto-ready-agent-drafts`');
     expect(prompt).toContain(
       'coderabbit review --agent -c AGENTS.md -t uncommitted'
