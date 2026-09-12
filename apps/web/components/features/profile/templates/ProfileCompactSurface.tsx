@@ -187,6 +187,7 @@ interface ProfileCompactSurfaceProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
@@ -286,6 +287,7 @@ export function ProfileCompactSurface({
   viewerLocation,
   resolveNearbyTour = true,
   releases = [],
+  catalogLoadFailed = false,
   merchCards = [],
   drawerOpen,
   drawerView,
@@ -411,10 +413,12 @@ export function ProfileCompactSurface({
         activeSubtitle: getProfileModeDefinition(activeVisiblePrimaryTab)
           .subtitle,
         viewerCountryCode,
+        catalogLoadFailed,
       }),
     [
       activeVisiblePrimaryTab,
       artist,
+      catalogLoadFailed,
       featuredPlaylistFallback,
       isSubscribed,
       latestRelease,
@@ -918,6 +922,7 @@ export function ProfileCompactSurface({
                 allowPhotoDownloads={allowPhotoDownloads}
                 tourDates={tourDates}
                 releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
                 alertSourceContext={defaultNotificationSourceContext}
                 previewNotificationsState={previewNotificationsState}
                 onFlowClosed={returnToProfileAfterNotifications}

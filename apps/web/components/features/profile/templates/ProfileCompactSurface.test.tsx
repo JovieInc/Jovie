@@ -65,8 +65,17 @@ vi.mock('@/features/profile/ProfileHomeRail', () => ({
 }));
 
 vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
-  ProfilePrimaryTabPanel: ({ mode }: { readonly mode: string }) => (
-    <div data-testid={`mock-primary-tab-panel-${mode}`} />
+  ProfilePrimaryTabPanel: ({
+    mode,
+    catalogLoadFailed,
+  }: {
+    readonly mode: string;
+    readonly catalogLoadFailed?: boolean;
+  }) => (
+    <div
+      data-testid={`mock-primary-tab-panel-${mode}`}
+      data-catalog-load-failed={catalogLoadFailed ? 'true' : 'false'}
+    />
   ),
 }));
 
@@ -190,6 +199,19 @@ describe('ProfileCompactSurface', () => {
   });
   // Regression: hero social labels must use registry brand casing
   // (tiktok -> 'TikTok'), not naive title case ('Tiktok').
+  it('forwards catalog load failure into the Music panel instead of an empty catalog', () => {
+    renderSurface({
+      activeMode: 'listen',
+      catalogLoadFailed: true,
+      releases: [],
+    });
+
+    expect(screen.getByTestId('mock-primary-tab-panel-listen')).toHaveAttribute(
+      'data-catalog-load-failed',
+      'true'
+    );
+  });
+
   it('renders registry-cased hero social aria labels for TikTok', () => {
     renderSurface({ socialLinks: [tiktokLink] });
 

@@ -274,6 +274,16 @@ describe('Public Profile Page Logic', () => {
       );
     });
 
+    it('marks a failed catalog load instead of treating it as an empty catalog', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'Error fetching public profile releases'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('failed: true');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'catalogLoadFailed={catalogLoadFailed}'
+      );
+    });
+
     it('reads a confirmed playlist fallback from profile settings without live search', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'getConfirmedFeaturedPlaylistFallback(profileSettings)'
