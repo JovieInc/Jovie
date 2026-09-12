@@ -33,6 +33,12 @@ const summer = [
     'summer-shadow-ingress',
     'vercel-blob-bottleneck-runtime',
     'vercel-blob-shadow-store',
+    // JOV-6163 bounded-operator bridge (heartbeat → governed dispatch → Cursor)
+    'governor-route',
+    'runner-source-attestation',
+    'cursor-recovery',
+    'summer-gem-dark-recovery',
+    'summer-governed-dispatch',
   ].map(name => `agent/lib/${name}.ts`),
   ...[
     'summer-bottleneck-auth',
@@ -47,6 +53,9 @@ const summer = [
     'telegram-fallback',
     'vercel-blob-bottleneck-runtime',
     'vercel-blob-shadow-store',
+    // Eval-only suites land in stacked recovery-evals PR:
+    // cursor-recovery, summer-gem-dark-recovery, summer-governed-dispatch,
+    // summer-bounded-operator-acceptance, jov-6163-attestation-interop
   ].map(name => `tests/${name}.test.ts`),
   'tests/commercial-fixture.ts',
 ];
