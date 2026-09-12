@@ -997,6 +997,7 @@ describe('configuration boundaries', () => {
       host.privateKey,
       'host-outcome'
     );
+    /** @type {any} */
     let request;
     const acknowledgement = {
       schema: 'summer.symphony-outcome-ack/v1',
@@ -1216,6 +1217,7 @@ describe('existing owned repair transport', () => {
   it('uses the existing controller command and retains unsupported live execution explicitly', async () => {
     let calls = 0;
     const executor = createOwnedRepairExecutor({
+      /** @type {any} */
       run: (binary, args, options) => {
         calls++;
         assert.equal(binary, 'python3');
