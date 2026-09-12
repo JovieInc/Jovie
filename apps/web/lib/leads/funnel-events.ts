@@ -3,6 +3,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, desc, sql as drizzleSql, eq, gt, isNull, or } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -10,6 +11,7 @@ import {
   leadFunnelEvents,
   leads,
 } from '@/lib/db/schema/leads';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
@@ -271,8 +273,8 @@ export async function setLeadAttributionCookieFromToken(
   });
 }
 
-export async function attributeLeadSignupFromClerkUserId(
-  clerkUserId: string
+export async function attributeLeadSignupFromAppUserId(
+  appUserId: string
 ): Promise<{ leadId: string | null; userId: string | null }> {
   const attribution = await getLeadAttributionCookie();
   if (!attribution) {
@@ -280,13 +282,13 @@ export async function attributeLeadSignupFromClerkUserId(
   }
 
   const [user] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, activeProfileId: users.activeProfileId })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(appUserIdFilter(appUserId))
     .limit(1);
 
   if (!user) {
-    return { leadId: attribution.leadId, userId: null };
+    throw new Error('Authenticated app user not found for signup attribution');
   }
 
   const [lead] = await db
@@ -319,6 +321,7 @@ export async function attributeLeadSignupFromClerkUserId(
     {
       leadId: lead.id,
       eventType: 'signup_completed',
+      occurredAt: lead.signupAt ?? now,
       channel: attribution.channel,
       provider: attribution.provider,
       campaignKey: attribution.campaignKey,
@@ -328,13 +331,33 @@ export async function attributeLeadSignupFromClerkUserId(
         signupUserId: user.id,
       },
     },
-    { idempotent: true }
+    { idempotent: true, required: true }
   );
+
+  // A reserved direct-claim profile is not an activated account. Keep the
+  // attribution cookie until the owned active profile is durably onboarded.
+  if (!user.activeProfileId) {
+    return { leadId: lead.id, userId: user.id };
+  }
+  const [profile] = await db
+    .select({ onboardingCompletedAt: creatorProfiles.onboardingCompletedAt })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.id, user.activeProfileId),
+        eq(creatorProfiles.userId, user.id)
+      )
+    )
+    .limit(1);
+  if (!profile?.onboardingCompletedAt) {
+    return { leadId: lead.id, userId: user.id };
+  }
 
   await recordLeadFunnelEvent(
     {
       leadId: lead.id,
       eventType: 'onboarding_completed',
+      occurredAt: profile.onboardingCompletedAt,
       channel: attribution.channel,
       provider: attribution.provider,
       campaignKey: attribution.campaignKey,
@@ -344,7 +367,7 @@ export async function attributeLeadSignupFromClerkUserId(
         signupUserId: user.id,
       },
     },
-    { idempotent: true }
+    { idempotent: true, required: true }
   );
 
   await clearLeadAttributionCookie();

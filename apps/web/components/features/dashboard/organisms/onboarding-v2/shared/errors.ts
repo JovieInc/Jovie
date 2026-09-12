@@ -1,3 +1,5 @@
+import { ONBOARDING_RECEIPT_PENDING_MESSAGE } from '@/lib/errors/onboarding';
+
 /**
  * Error mapping utilities for onboarding submission.
  *
@@ -61,6 +63,10 @@ export function mapErrorToUserMessage(
   const errorMessage = getErrorMessage(error);
   const message = errorMessage.toUpperCase();
   const errorCode = extractErrorCode(error);
+
+  if (errorCode === 'ONBOARDING_RECEIPT_PENDING') {
+    return { userMessage: ONBOARDING_RECEIPT_PENDING_MESSAGE };
+  }
 
   // Invalid session - needs refresh
   if (message.includes('INVALID_SESSION')) {

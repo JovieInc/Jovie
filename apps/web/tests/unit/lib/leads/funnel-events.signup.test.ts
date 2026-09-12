@@ -1,5 +1,8 @@
 import crypto from 'node:crypto';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as leadFunnelEventsApi from '@/lib/leads/funnel-events';
 
 const {
   mockCaptureError,
@@ -62,7 +65,7 @@ function createCookieStore() {
 function createSelectChain<T>(rows: T[]) {
   const chain = {
     from: vi.fn(() => chain),
-    where: vi.fn(() => chain),
+    where: vi.fn((_condition?: SQL) => chain),
     limit: vi.fn().mockResolvedValue(rows),
   };
 
@@ -78,7 +81,7 @@ function signLeadAttributionBody(body: string): string {
   return crypto.createHmac('sha256', secret).update(body).digest('hex');
 }
 
-describe('attributeLeadSignupFromClerkUserId', () => {
+describe('attributeLeadSignupFromAppUserId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -98,10 +101,8 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     const cookieStore = createCookieStore();
     mockCookies.mockResolvedValue(cookieStore);
 
-    const { attributeLeadSignupFromClerkUserId } = await import(
-      '@/lib/leads/funnel-events'
-    );
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+    const { attributeLeadSignupFromAppUserId } = leadFunnelEventsApi;
+    const result = await attributeLeadSignupFromAppUserId('clerk_123');
 
     expect(result).toEqual({ leadId: null, userId: null });
     expect(mockDbSelect).not.toHaveBeenCalled();
@@ -112,10 +113,8 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     cookieStore.values.set('jovie_lead_attribution', 'not.valid');
     mockCookies.mockResolvedValue(cookieStore);
 
-    const { attributeLeadSignupFromClerkUserId } = await import(
-      '@/lib/leads/funnel-events'
-    );
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+    const { attributeLeadSignupFromAppUserId } = leadFunnelEventsApi;
+    const result = await attributeLeadSignupFromAppUserId('clerk_123');
 
     expect(result).toEqual({ leadId: null, userId: null });
     expect(mockDbSelect).not.toHaveBeenCalled();
@@ -130,10 +129,8 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     );
     mockCookies.mockResolvedValue(cookieStore);
 
-    const { attributeLeadSignupFromClerkUserId } = await import(
-      '@/lib/leads/funnel-events'
-    );
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+    const { attributeLeadSignupFromAppUserId } = leadFunnelEventsApi;
+    const result = await attributeLeadSignupFromAppUserId('clerk_123');
 
     expect(result).toEqual({ leadId: null, userId: null });
     expect(mockDbSelect).not.toHaveBeenCalled();
@@ -154,8 +151,8 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     try {
       dateNowSpy.mockReturnValue(1_700_000_000_000);
 
-      const { attributeLeadSignupFromClerkUserId, setLeadAttributionCookie } =
-        await import('@/lib/leads/funnel-events');
+      const { attributeLeadSignupFromAppUserId, setLeadAttributionCookie } =
+        leadFunnelEventsApi;
 
       await setLeadAttributionCookie({
         leadId: 'lead_123',
@@ -168,7 +165,7 @@ describe('attributeLeadSignupFromClerkUserId', () => {
 
       dateNowSpy.mockReturnValue(1_700_000_000_000 + 31 * 24 * 60 * 60 * 1000);
 
-      const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+      const result = await attributeLeadSignupFromAppUserId('clerk_123');
 
       expect(result).toEqual({ leadId: null, userId: null });
       expect(mockDbSelect).not.toHaveBeenCalled();
@@ -177,12 +174,12 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     }
   });
 
-  it('returns the lead id when the user has not been persisted yet', async () => {
+  it('retains attribution and rejects completion when the authenticated user is missing', async () => {
     const cookieStore = createCookieStore();
     mockCookies.mockResolvedValue(cookieStore);
 
-    const { attributeLeadSignupFromClerkUserId, setLeadAttributionCookie } =
-      await import('@/lib/leads/funnel-events');
+    const { attributeLeadSignupFromAppUserId, setLeadAttributionCookie } =
+      leadFunnelEventsApi;
 
     await setLeadAttributionCookie({
       leadId: 'lead_123',
@@ -195,17 +192,49 @@ describe('attributeLeadSignupFromClerkUserId', () => {
 
     mockDbSelect.mockImplementationOnce(() => createSelectChain([]));
 
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+    await expect(attributeLeadSignupFromAppUserId('clerk_123')).rejects.toThrow(
+      'Authenticated app user not found'
+    );
+    expect(cookieStore.values.has('jovie_lead_attribution')).toBe(true);
+  });
 
-    expect(result).toEqual({ leadId: 'lead_123', userId: null });
+  it('queries the real Better Auth app UUID rather than a legacy Clerk identifier', async () => {
+    const appUserId = '7b4b948f-9720-4c5f-98da-8a7335015da9';
+    const cookieStore = createCookieStore();
+    mockCookies.mockResolvedValue(cookieStore);
+    await leadFunnelEventsApi.setLeadAttributionCookie({
+      leadId: 'lead_123',
+      channel: 'email',
+      provider: null,
+      campaignKey: null,
+      variantKey: null,
+      contactAttemptId: null,
+    });
+    const select = createSelectChain([
+      { id: appUserId, activeProfileId: null },
+    ]);
+    mockDbSelect
+      .mockImplementationOnce(() => select)
+      .mockImplementationOnce(() =>
+        createSelectChain([
+          { id: 'lead_123', signupUserId: null, signupAt: null, paidAt: null },
+        ])
+      );
+    await leadFunnelEventsApi.attributeLeadSignupFromAppUserId(appUserId);
+    const condition = select.where.mock.calls[0]?.[0] as unknown as SQL;
+    const query = new PgDialect().sqlToQuery(condition);
+    expect(query.sql).toContain('"users"."id" =');
+    expect(query.sql).not.toContain('"clerk_id"');
+    expect(query.params).toEqual([appUserId]);
+    expect(mockDbInsert).toHaveBeenCalledTimes(1);
   });
 
   it('returns the user id without mutating when the lead record does not exist', async () => {
     const cookieStore = createCookieStore();
     mockCookies.mockResolvedValue(cookieStore);
 
-    const { attributeLeadSignupFromClerkUserId, setLeadAttributionCookie } =
-      await import('@/lib/leads/funnel-events');
+    const { attributeLeadSignupFromAppUserId, setLeadAttributionCookie } =
+      leadFunnelEventsApi;
 
     await setLeadAttributionCookie({
       leadId: 'lead_123',
@@ -220,7 +249,7 @@ describe('attributeLeadSignupFromClerkUserId', () => {
       .mockImplementationOnce(() => createSelectChain([{ id: 'user_123' }]))
       .mockImplementationOnce(() => createSelectChain([]));
 
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+    const result = await attributeLeadSignupFromAppUserId('clerk_123');
 
     expect(result).toEqual({ leadId: 'lead_123', userId: 'user_123' });
     expect(mockDbUpdate).not.toHaveBeenCalled();
@@ -230,8 +259,8 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     const cookieStore = createCookieStore();
     mockCookies.mockResolvedValue(cookieStore);
 
-    const { attributeLeadSignupFromClerkUserId, setLeadAttributionCookie } =
-      await import('@/lib/leads/funnel-events');
+    const { attributeLeadSignupFromAppUserId, setLeadAttributionCookie } =
+      leadFunnelEventsApi;
 
     await setLeadAttributionCookie({
       leadId: 'lead_123',
@@ -255,7 +284,7 @@ describe('attributeLeadSignupFromClerkUserId', () => {
         ])
       );
 
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+    const result = await attributeLeadSignupFromAppUserId('clerk_123');
 
     expect(result).toEqual({ leadId: 'lead_123', userId: 'user_123' });
     expect(mockDbUpdate).not.toHaveBeenCalled();
@@ -265,8 +294,8 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     const cookieStore = createCookieStore();
     mockCookies.mockResolvedValue(cookieStore);
 
-    const { attributeLeadSignupFromClerkUserId, setLeadAttributionCookie } =
-      await import('@/lib/leads/funnel-events');
+    const { attributeLeadSignupFromAppUserId, setLeadAttributionCookie } =
+      leadFunnelEventsApi;
 
     await setLeadAttributionCookie({
       leadId: 'lead_123',
@@ -286,7 +315,9 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     }));
 
     mockDbSelect
-      .mockImplementationOnce(() => createSelectChain([{ id: 'user_123' }]))
+      .mockImplementationOnce(() =>
+        createSelectChain([{ id: 'user_123', activeProfileId: 'profile_123' }])
+      )
       .mockImplementationOnce(() =>
         createSelectChain([
           {
@@ -298,7 +329,13 @@ describe('attributeLeadSignupFromClerkUserId', () => {
         ])
       );
 
-    const result = await attributeLeadSignupFromClerkUserId('clerk_123');
+    mockDbSelect.mockImplementationOnce(() =>
+      createSelectChain([
+        { onboardingCompletedAt: new Date('2026-09-12T12:00:00Z') },
+      ])
+    );
+
+    const result = await attributeLeadSignupFromAppUserId('clerk_123');
 
     expect(result).toEqual({ leadId: 'lead_123', userId: 'user_123' });
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
@@ -323,6 +360,129 @@ describe('attributeLeadSignupFromClerkUserId', () => {
       })
     );
     expect(cookieStore.delete).toHaveBeenCalledWith('jovie_lead_attribution');
+  });
+});
+
+describe('signup and activation receipt durability', () => {
+  async function setupReceiptStore(
+    options: {
+      completedAt?: Date | null;
+      activeProfileId?: string | null;
+      missingProfile?: boolean;
+      failEvent?: string;
+    } = {}
+  ) {
+    vi.clearAllMocks();
+    const cookieStore = createCookieStore();
+    mockCookies.mockResolvedValue(cookieStore);
+    const api = leadFunnelEventsApi;
+    await api.setLeadAttributionCookie({
+      leadId: 'lead_123',
+      channel: 'email',
+      provider: 'instantly',
+      campaignKey: 'claim_invite',
+      variantKey: 'v1',
+      contactAttemptId: 'attempt_123',
+    });
+    const completedAt =
+      options.completedAt === undefined
+        ? new Date('2026-09-12T12:00:00Z')
+        : options.completedAt;
+    const lead = {
+      id: 'lead_123',
+      signupUserId: null as string | null,
+      signupAt: null as Date | null,
+      paidAt: null,
+    };
+    const events = new Map<string, { eventType: string; occurredAt: Date }>();
+    let failed = false;
+    mockDbSelect.mockImplementation((fields: Record<string, unknown>) => {
+      if ('activeProfileId' in fields)
+        return createSelectChain([
+          {
+            id: 'user_123',
+            activeProfileId:
+              options.activeProfileId === undefined
+                ? 'profile_123'
+                : options.activeProfileId,
+          },
+        ]);
+      if ('signupUserId' in fields) return createSelectChain([{ ...lead }]);
+      return createSelectChain(
+        options.missingProfile ? [] : [{ onboardingCompletedAt: completedAt }]
+      );
+    });
+    mockDbUpdate.mockImplementation(() => ({
+      set: vi.fn((values: Record<string, unknown>) => ({
+        where: vi.fn(async () => {
+          Object.assign(lead, values);
+        }),
+      })),
+    }));
+    mockDbInsert.mockImplementation(() => ({
+      values: vi.fn((row: { eventType: string; occurredAt: Date }) => ({
+        onConflictDoNothing: vi.fn(async () => {
+          if (row.eventType === options.failEvent && !failed) {
+            failed = true;
+            throw new Error('receipt write failed');
+          }
+          if (!events.has(row.eventType)) events.set(row.eventType, row);
+        }),
+      })),
+    }));
+    return { api, cookieStore, lead, events, completedAt };
+  }
+
+  it.each(['signup_completed', 'onboarding_completed'])(
+    'retains attribution when %s fails and reconciles exactly once on retry',
+    async failEvent => {
+      const { api, cookieStore, lead, events, completedAt } =
+        await setupReceiptStore({ failEvent });
+      await expect(
+        api.attributeLeadSignupFromAppUserId('clerk_123')
+      ).rejects.toThrow('receipt write failed');
+      expect(cookieStore.values.has('jovie_lead_attribution')).toBe(true);
+      expect(cookieStore.delete).not.toHaveBeenCalled();
+      expect(events.has(failEvent)).toBe(false);
+      const signupAt = lead.signupAt;
+      await api.attributeLeadSignupFromAppUserId('clerk_123');
+      await api.attributeLeadSignupFromAppUserId('clerk_123');
+      expect([...events.keys()]).toEqual([
+        'signup_completed',
+        'onboarding_completed',
+      ]);
+      expect(events.get('signup_completed')?.occurredAt).toBe(signupAt);
+      expect(events.get('onboarding_completed')?.occurredAt).toBe(completedAt);
+      expect(cookieStore.values.has('jovie_lead_attribution')).toBe(false);
+      expect(cookieStore.delete).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([
+    { name: 'reserved profile', completedAt: null },
+    { name: 'no active profile', activeProfileId: null },
+    { name: 'no owned active profile', missingProfile: true },
+  ])(
+    'does not call $name activated or clear its attribution',
+    async options => {
+      const { api, cookieStore, events } = await setupReceiptStore(options);
+      await api.attributeLeadSignupFromAppUserId('clerk_123');
+      expect([...events.keys()]).toEqual(['signup_completed']);
+      expect(cookieStore.values.has('jovie_lead_attribution')).toBe(true);
+      expect(cookieStore.delete).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects unavailable persistence without losing attribution', async () => {
+    const { api, cookieStore } = await setupReceiptStore();
+    mockDbInsert.mockImplementationOnce(() => {
+      throw new Error('storage unavailable');
+    });
+    await expect(
+      api.attributeLeadSignupFromAppUserId('clerk_123')
+    ).rejects.toThrow('storage unavailable');
+    expect(cookieStore.values.has('jovie_lead_attribution')).toBe(true);
+    expect(cookieStore.delete).not.toHaveBeenCalled();
   });
 });
 
@@ -392,9 +552,7 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
 
   it('records exactly one paid_converted event on the happy path, including retry', async () => {
     const { leadState, recordedEvents } = createPaidConversionStore();
-    const { attributeLeadPaidConversionByAppUserId } = await import(
-      '@/lib/leads/funnel-events'
-    );
+    const { attributeLeadPaidConversionByAppUserId } = leadFunnelEventsApi;
 
     await attributeLeadPaidConversionByAppUserId('user_123', 'sub_happy');
     await attributeLeadPaidConversionByAppUserId('user_123', 'sub_happy');
@@ -411,9 +569,7 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     const { leadState, recordedEvents } = createPaidConversionStore({
       failFirstEventWrite: true,
     });
-    const { attributeLeadPaidConversionByAppUserId } = await import(
-      '@/lib/leads/funnel-events'
-    );
+    const { attributeLeadPaidConversionByAppUserId } = leadFunnelEventsApi;
 
     await expect(
       attributeLeadPaidConversionByAppUserId('user_123', 'sub_retry')
@@ -461,9 +617,7 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     }));
     mockDbInsert.mockImplementation(() => ({ values: insertValues }));
 
-    const { attributeLeadPaidConversionByAppUserId } = await import(
-      '@/lib/leads/funnel-events'
-    );
+    const { attributeLeadPaidConversionByAppUserId } = leadFunnelEventsApi;
     await attributeLeadPaidConversionByAppUserId(
       betterAuthRow.id,
       'sub_better_auth'
@@ -512,9 +666,7 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
     }));
     mockDbInsert.mockImplementation(() => ({ values: insertValues }));
 
-    const { attributeLeadPaidConversionByClerkUserId } = await import(
-      '@/lib/leads/funnel-events'
-    );
+    const { attributeLeadPaidConversionByClerkUserId } = leadFunnelEventsApi;
     await attributeLeadPaidConversionByClerkUserId(
       'user_legacy_123',
       'sub_legacy'
