@@ -5,10 +5,17 @@ export interface LibraryDownloadView {
   readonly fileName: string;
 }
 
+export type LibraryPresenceFindingScopeType = 'artist' | 'asset';
+
 export interface LibraryPresenceFindingView {
   readonly id: string;
   readonly subjectType: 'artist' | 'release' | 'recording' | 'track';
   readonly subjectId: string;
+  /** Optional explicit scope: asset-scoped findings render in that asset's inspector; artist-scoped ones stay on Presence (JOV-6170). */
+  readonly scopeType: LibraryPresenceFindingScopeType | null;
+  readonly scopeId: string | null;
+  /** Optional grouping label (e.g. 'canonical_profile'); presentation-only. */
+  readonly category: string | null;
   readonly kind: 'repair' | 'collision' | 'placement_opportunity';
   readonly issueType:
     | 'dead_link'
