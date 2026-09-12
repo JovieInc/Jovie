@@ -8,13 +8,10 @@ describe('HudFullscreenControl', () => {
 
   beforeEach(() => {
     assign.mockReset();
-    vi.stubGlobal(
-      'location',
-      {
-        origin: 'https://jov.ie',
-        assign,
-      } satisfies Pick<Location, 'origin' | 'assign'>
-    );
+    vi.stubGlobal('location', {
+      origin: 'https://jov.ie',
+      assign,
+    } satisfies Pick<Location, 'origin' | 'assign'>);
   });
 
   afterEach(() => {
