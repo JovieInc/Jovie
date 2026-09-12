@@ -3,6 +3,7 @@
 import contextlib
 import copy
 import fcntl
+import hashlib
 import importlib.machinery
 import importlib.util
 import io
@@ -94,17 +95,137 @@ class RepairTests(unittest.TestCase):
         target.update(mode="isolated-cli", assignmentDigest=repair.assignment_digest(payload),
                       expiresAt=repair.datetime.fromtimestamp(payload["expiresAt"], repair.timezone.utc).isoformat())
         task = {"schema": "jovie-symphony-repair-task/v3", "taskKey": "a" * 64, "decisionFingerprint": "a" * 64,
-                "action": "execute-existing-owned-repair", "authority": "host-assigned-isolated-repair-only", "existingRepair": target}
+                "action": "execute-existing-owned-repair", "authority": "host-assigned-isolated-repair-only",
+                "selected": {"id": "affected-only-unit-selection"},
+                "source": {"sourceVersion": "b" * 40}, "existingRepair": target}
         eligibility = {"qualified": True, "provider": "fixture-local", "model": "fixture-task-model", "funding": "included-local",
                        "taskAppropriate": True, "costAppropriate": True, "delegationPolicyBound": True,
                        "expiresAt": payload["expiresAt"], "authPoolIdentity": "b" * 64}
         executor = mock.Mock()
         executor.qualify.return_value = eligibility
-        executor.execute.return_value = {"status": "succeeded", "detail": "fixture execution"}
+        executor.execute.return_value = {
+            "status": "succeeded",
+            "detail": "fixture execution",
+            "_executionObservation": {
+                "baseHead": payload["head"],
+                "finalHead": "b" * 40,
+                "outputDigest": "c" * 64,
+            },
+        }
         return task, executor
 
     def run_isolated(self, task, executor=None):
         return repair.execute_isolated(task, controller.__file__, lambda _: self.issue, lambda _: [self.pr], executor=executor)
+
+    def provider_granted_fixture(self):
+        task, _executor = self.isolated_fixture()
+        payload = repair.read_private(self.root / f"{IDENT}.json")
+        router = self.tmp / "grok-router"
+        auth = self.tmp / "grok-auth-state"
+        executable = self.tmp / "grok-cli"
+        router.write_text("#!/bin/sh\n", encoding="utf-8")
+        auth.write_text("oidc-authenticated\n", encoding="utf-8")
+        executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        router.chmod(0o700)
+        auth.chmod(0o600)
+        executable.chmod(0o700)
+        account = "95834901-90c9-4bf0-a85a-6f73192cd9ee"
+        pool = "d" * 64
+        now = time.time()
+        qualification = {
+            "schema": repair.QUALIFICATION_SCHEMA,
+            "marker": "GEM_GROK_QUALIFIED",
+            "provider": "grok",
+            "model": "grok-4.6",
+            "cliVersion": "1.0.13",
+            "observedAt": repair._iso_now(),
+            "outputDigest": "e" * 64,
+            "accountUserId": account,
+            "authPoolIdentity": pool,
+            "includedRemainingPercent": 77,
+        }
+        grant = {
+            "schema": repair.PROVIDER_GRANT_SCHEMA,
+            "grantId": "grant-jov-6224",
+            "provider": "grok",
+            "model": "grok-4.6",
+            "routerId": "gem-grok-router-v1",
+            "routerPath": str(router),
+            "routerDigest": hashlib.sha256(router.read_bytes()).hexdigest(),
+            "accountUserId": account,
+            "authPoolIdentity": pool,
+            "authStatePath": str(auth),
+            "authStateSha256": hashlib.sha256(auth.read_bytes()).hexdigest(),
+            "executablePath": str(executable),
+            "executableSha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+            "qualification": qualification,
+            "identifier": payload["identifier"],
+            "issueId": payload["issueId"],
+            "repository": payload["repository"],
+            "pr": payload["pr"],
+            "head": payload["head"],
+            "workspace": payload["workspace"],
+            "issuedAt": payload["issuedAt"] + 1,
+            "expiresAt": payload["expiresAt"] - 1,
+            "funding": "included-local",
+            "taskAppropriate": True,
+            "costAppropriate": True,
+            "delegationPolicyBound": True,
+        }
+        payload["providerGrant"] = grant
+        self.stack.enter_context(mock.patch.object(repair.time, "time", return_value=now))
+        digest = repair.assignment_digest(payload)
+        task["existingRepair"]["assignmentDigest"] = digest
+        repair._replace_private(self.root / f"{IDENT}.json", payload)
+        return task, payload, executable
+
+    def test_provider_grant_validation_and_grok_runner_are_source_and_assignment_bound(self):
+        task, payload, executable = self.provider_granted_fixture()
+        self.assertEqual(repair.load_validated_candidate(IDENT, controller.__file__), payload)
+        for key, value in (("issuedAt", payload["issuedAt"] - 1),
+                           ("expiresAt", payload["expiresAt"] + 1)):
+            crossed = copy.deepcopy(payload)
+            crossed["providerGrant"][key] = value
+            with self.assertRaisesRegex(ValueError, "provider-grant-assignment-window-invalid"):
+                repair.validate_provider_grant(crossed)
+        naive = copy.deepcopy(payload)
+        observed = repair.datetime.fromisoformat(
+            naive["providerGrant"]["qualification"]["observedAt"].replace("Z", "+00:00")
+        )
+        naive["providerGrant"]["qualification"]["observedAt"] = observed.replace(
+            tzinfo=None
+        ).isoformat()
+        with self.assertRaisesRegex(ValueError, "provider-grant-qualification-time-invalid"):
+            repair.validate_provider_grant(naive)
+        now = time.time()
+        fresh_edge = copy.deepcopy(payload)
+        fresh_edge["providerGrant"]["qualification"]["observedAt"] = repair.datetime.fromtimestamp(
+            now - repair.MAX_QUALIFICATION_AGE_SECONDS + 1,
+            repair.timezone.utc,
+        ).isoformat().replace("+00:00", "Z")
+        repair.validate_provider_grant(fresh_edge, now=now)
+        stale = copy.deepcopy(fresh_edge)
+        stale["providerGrant"]["qualification"]["observedAt"] = repair.datetime.fromtimestamp(
+            now - repair.MAX_QUALIFICATION_AGE_SECONDS - 1,
+            repair.timezone.utc,
+        ).isoformat().replace("+00:00", "Z")
+        with self.assertRaisesRegex(ValueError, "provider-grant-qualification-stale"):
+            repair.validate_provider_grant(stale, now=now)
+        runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout="changed", stderr=""))
+        adapter = repair.GrokOwnedRepairExecutor(run=runner)
+        eligibility = adapter.qualify(task, payload)
+        self.writer()
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9", "OPENAI_API_KEY": "secret"}), \
+             mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
+            result = adapter.execute(task, payload, {**eligibility, "runId": "JOV-5552-run"})
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(result["_executionObservation"]["baseHead"], payload["head"])
+        command = runner.call_args.args[0]
+        self.assertEqual(command[0], str(executable))
+        self.assertIn("grok-4.6", command)
+        self.assertIn("--disable-web-search", command)
+        self.assertIn("--no-subagents", command)
+        self.assertNotIn("OPENAI_API_KEY", runner.call_args.kwargs["env"])
 
     def test_existing_controller_consumes_v3_without_generic_dispatch_or_tracker_write(self):
         task, executor = self.isolated_fixture()
@@ -140,14 +261,22 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
         self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
         self.assertEqual(executor.execute.call_count, 1)
+        execution = json.loads((self.root / f"{IDENT}.execution.json").read_text())["result"]
+        self.assertEqual(execution["execution"]["verification"]["claimRecorded"], True)
+        self.assertTrue((self.root / f"{IDENT}.acceptance.json").is_file())
+        self.assertEqual(json.loads((self.root / f"{IDENT}.run.json").read_text())["status"], "succeeded")
 
     def test_isolated_repair_keeps_unknown_outcome_claim_after_executor_crash(self):
         task, executor = self.isolated_fixture()
         executor.execute.side_effect = OSError("uncertain executor result")
         with self.assertRaises(OSError):
             self.run_isolated(task, executor)
+        self.assertTrue((self.root / f"{IDENT}.acceptance.json").is_file())
+        self.assertEqual(json.loads((self.root / f"{IDENT}.run.json").read_text())["status"], "started")
         self.assertEqual(self.run_isolated(task, executor)["reason"], "isolated-repair-claimed-outcome-unknown")
         self.assertEqual(executor.execute.call_count, 1)
+        recovery = json.loads((self.root / f"{IDENT}.recovery.json").read_text())
+        self.assertEqual(recovery["state"], "unknown")
 
     def test_isolated_repair_rejects_competing_lease_and_does_not_claim(self):
         task, executor = self.isolated_fixture()

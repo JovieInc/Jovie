@@ -42,11 +42,30 @@
     "completedAt": "2026-09-07T01:01:00Z",
     "execution": {
       "runId": "fixture-run",
-      "provider": "fixture-local",
-      "model": "fixture-task-model",
+      "provider": "grok",
+      "model": "grok-4.6",
       "authPoolIdentity": "1111111111111111111111111111111111111111111111111111111111111111",
       "leaseIdentity": "2222222222222222222222222222222222222222222222222222222222222222",
-      "evidenceDigest": "3333333333333333333333333333333333333333333333333333333333333333"
+      "evidenceDigest": "b821e188ca8626daf4d81388b08d1b4b23961c2b0c242c302eb7d66db2a019d2",
+      "assignmentDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "providerGrantDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "acceptanceDigest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "runDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+      "baseHead": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "finalHead": "ffffffffffffffffffffffffffffffffffffffff",
+      "outputDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+      "verification": {
+        "schema": "symphony-existing-repair-evidence/v1",
+        "claimRecorded": true,
+        "acceptanceRecorded": true,
+        "runStarted": true,
+        "runTerminal": true,
+        "resultPersisted": true,
+        "leaseHeld": true,
+        "workspaceBound": true,
+        "headObserved": true,
+        "headChanged": true
+      }
     }
   }
 }

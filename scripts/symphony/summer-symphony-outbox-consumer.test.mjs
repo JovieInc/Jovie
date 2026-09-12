@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync, sign, verify } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import {
   chmodSync,
   mkdirSync,
@@ -1219,25 +1220,94 @@ describe('existing owned repair transport', () => {
     }
   });
   it('uses the existing controller command and retains unsupported live execution explicitly', async () => {
+    const root = mkdtempSync(
+      join(tmpdir(), 'symphony-owned-repair-controller-')
+    );
+    roots.push(root);
+    const home = join(root, 'home');
+    const gem = join(root, 'gem-workspace');
+    const current = join(
+      home,
+      '.local/bin/.symphony-codex-auth-fallback/current'
+    );
+    mkdirSync(join(gem, 'config'), { recursive: true });
+    mkdirSync(current, { recursive: true });
+    writeFileSync(
+      join(gem, 'config/existing-repair-controller-manifest.json'),
+      readFileSync(
+        new URL(
+          './config/existing-repair-controller-manifest.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    for (const path of [
+      join(home, '.local/bin/symphony-codex-exhausted.py'),
+      join(current, 'symphony-codex-exhausted.py'),
+      join(current, 'existing_pr_repair.py'),
+    ]) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, '#!/usr/bin/env python3\n');
+      chmodSync(path, 0o755);
+    }
+    const previousHome = process.env.HOME;
+    const previousGemWorkspace = process.env.GEM_WORKSPACE;
+    process.env.HOME = home;
+    process.env.GEM_WORKSPACE = gem;
     let calls = 0;
-    const executor = createOwnedRepairExecutor({
-      /** @type {any} */
-      run: (binary, args, options) => {
-        calls++;
-        assert.equal(binary, 'python3');
-        assert.equal(args[1], 'owned-repair');
-        assert.match(args[0], /symphony-codex-exhausted.py$/);
-        assert.deepEqual(JSON.parse(options.input), taskV3());
-        return {
-          status: 0,
-          stdout: JSON.stringify({
-            status: 'held',
-            reason: 'qualified-isolated-repair-executor-unavailable',
-          }),
-        };
-      },
-    });
-    assert.equal((await executor.execute(taskV3())).status, 'held');
-    assert.equal(calls, 1);
+    try {
+      const executor = createOwnedRepairExecutor({
+        run: (binary, args, options) => {
+          calls++;
+          assert.match(binary, /\.local\/bin\/symphony-codex-exhausted\.py$/);
+          assert.deepEqual(args, ['owned-repair']);
+          assert.deepEqual(JSON.parse(options.input), taskV3());
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              status: 'held',
+              reason: 'qualified-isolated-repair-executor-unavailable',
+            }),
+          };
+        },
+      });
+      assert.equal((await executor.execute(taskV3())).status, 'held');
+      assert.equal(calls, 1);
+
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.stdin = {
+        end(input) {
+          assert.deepEqual(JSON.parse(input), taskV3());
+          queueMicrotask(() => {
+            child.stdout.emit(
+              'data',
+              JSON.stringify({
+                status: 'held',
+                reason: 'qualified-isolated-repair-executor-unavailable',
+              })
+            );
+            child.emit('close', 0, null);
+          });
+        },
+      };
+      child.kill = signal => assert.equal(signal, 'SIGTERM');
+      const asyncExecutor = createOwnedRepairExecutor({
+        spawnProcess: (binary, args, options) => {
+          assert.match(binary, /\.local\/bin\/symphony-codex-exhausted\.py$/);
+          assert.deepEqual(args, ['owned-repair']);
+          assert.deepEqual(options.stdio, ['pipe', 'pipe', 'pipe']);
+          return child;
+        },
+      });
+      assert.equal((await asyncExecutor.execute(taskV3())).status, 'held');
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousGemWorkspace === undefined) delete process.env.GEM_WORKSPACE;
+      else process.env.GEM_WORKSPACE = previousGemWorkspace;
+    }
   });
 });
