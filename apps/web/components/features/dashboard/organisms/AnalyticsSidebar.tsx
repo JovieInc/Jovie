@@ -307,7 +307,7 @@ export function AnalyticsSidebarView({
       sectionKind='details'
       contentClassName='pt-2'
       entityHeader={
-        <div className='space-y-2.5 p-2.5'>
+        <div className='space-y-2 p-2.5'>
           <div className='relative px-1 py-1'>
             <div className='absolute right-2.5 top-2.5'>
               <DrawerHeaderActions
