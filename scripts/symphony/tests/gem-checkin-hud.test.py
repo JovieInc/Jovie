@@ -22,7 +22,6 @@ NOW = dt.datetime(2026, 8, 31, 12, 0, tzinfo=dt.timezone.utc)
 SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 BANNED = ("GEM OPERATIONS", "FLEET POLICY", "$0", "FAIL 0")
 GREEN = re.compile(r"\033\[(?:1;)?(?:32|92)m|\033\[38;5;(?:2|10|22|28|34|40|46|76|82|112|118)m")
-TEAM_JOV = re.compile(r"team\s*:\s*JOV|team\s*\(\s*key\s*:\s*\"JOV\"", re.I)
 STARTED = "2026-08-31T11:57:00Z"
 
 
@@ -374,7 +373,7 @@ class ReadableWorkTests(unittest.TestCase):
 
     def test_linear_live_schema_has_no_total_count_and_retains_titles(self):
         self.assertNotIn("totalCount", HUD.LINEAR_STAGES_QUERY)
-        payload = {"data": {"project": {"issues": {"nodes": [{"identifier": "JOV-1", "title": "Actual title", "state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": False}}}}}
+        payload = {"data": {"issues": {"nodes": [{"identifier": "JOV-1", "title": "Actual title", "state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": False}}}}
         with mock.patch.object(HUD, "_linear_request", return_value=payload): result = HUD.fetch_linear_project()
         self.assertTrue(result["ok"])
         self.assertEqual(result["total_count"], 1)
@@ -596,17 +595,19 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("$", plain)
         self.assertNotIn("80,000", plain)
 
-    def test_review_query_is_project_filtered_never_team_jov(self):
+    def test_review_query_is_team_filtered_never_project_gated(self):
         source = SOURCE.read_text(encoding="utf-8")
-        self.assertIn("440ea404-041f-461e-ae45-dd6a2e98e4a1", source)
-        self.assertIn("symphony-ui-pilot-96d6b9c5b2d5", source)
-        self.assertIn("project(id: $id)", HUD.LINEAR_QUERY)
-        self.assertIn("project(id: $id)", HUD.LINEAR_STAGES_QUERY)
+        self.assertIn('LIVE_TEAM_KEY = "JOV"', source)
+        self.assertNotIn("440ea404-041f-461e-ae45-dd6a2e98e4a1", source)
+        self.assertNotIn("symphony-ui-pilot-96d6b9c5b2d5", source)
+        self.assertIn("team: { key: { eq: $teamKey } }", HUD.LINEAR_QUERY)
+        self.assertIn("team: { key: { eq: $teamKey } }", HUD.LINEAR_STAGES_QUERY)
+        self.assertNotIn("project(id:", HUD.LINEAR_QUERY)
+        self.assertNotIn("project(id:", HUD.LINEAR_STAGES_QUERY)
         self.assertIn("In Review", HUD.LINEAR_QUERY)
-        self.assertIsNone(TEAM_JOV.search(source))
-        self.assertNotIn("team:JOV", source)
-        self.assertNotIn("team: JOV", source)
-        self.assertEqual(HUD.LIVE_PROJECT_ID, "440ea404-041f-461e-ae45-dd6a2e98e4a1")
+        self.assertIn("Rework", HUD.LINEAR_STAGES_QUERY)
+        self.assertIn("Merging", HUD.LINEAR_STAGES_QUERY)
+        self.assertEqual(HUD.LIVE_TEAM_KEY, "JOV")
 
     def test_layout_uses_terminal_width_not_fixed_skinny_list(self):
         output = paint(width=200)
@@ -1014,52 +1015,52 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("OPEN NOW 0", unknown)
 
     def test_linear_inventory_paginates_and_rejects_incomplete_totals(self):
-        page_one = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}, "createdAt": STARTED, "startedAt": NOW.isoformat()}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}}}}
-        page_two = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "In Review"}}], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}
+        page_one = {"data": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}, "createdAt": STARTED, "startedAt": NOW.isoformat()}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}}}
+        page_two = {"data": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "In Review"}}], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}
         with mock.patch.object(HUD, "_linear_request", side_effect=[page_one, page_two]) as request:
             result = HUD.fetch_linear_project()
         self.assertTrue(result["ok"])
         self.assertEqual((result["total_count"], result["pages"], result["todo"], result["review"]), (2, 2, 1, 1))
         self.assertEqual(request.call_args_list[1].kwargs["variables"], {"after": "cursor-1"})
 
-        incomplete = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}
+        incomplete = {"data": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}
         with mock.patch.object(HUD, "_linear_request", return_value=incomplete):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("1/2", rejected["source_error"])
 
-        without_metadata = {"data": {"project": {"issues": {"nodes": []}}}}
+        without_metadata = {"data": {"issues": {"nodes": []}}}
         with mock.patch.object(HUD, "_linear_request", return_value=without_metadata):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("metadata incomplete", rejected["source_error"])
 
-        partial_metadata = {"data": {"project": {"issues": {"totalCount": 0, "nodes": [], "pageInfo": {}}}}}
+        partial_metadata = {"data": {"issues": {"totalCount": 0, "nodes": [], "pageInfo": {}}}}
         with mock.patch.object(HUD, "_linear_request", return_value=partial_metadata):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("metadata incomplete", rejected["source_error"])
 
-        invalid_metadata = {"data": {"project": {"issues": {"totalCount": True, "nodes": {}, "pageInfo": {"hasNextPage": False}}}}}
+        invalid_metadata = {"data": {"issues": {"totalCount": True, "nodes": {}, "pageInfo": {"hasNextPage": False}}}}
         with mock.patch.object(HUD, "_linear_request", return_value=invalid_metadata):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("metadata incomplete", rejected["source_error"])
 
-        repeated = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "same"}}}}}
+        repeated = {"data": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "same"}}}}
         with mock.patch.object(HUD, "_linear_request", side_effect=[repeated, repeated]):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("cursor repeated", rejected["source_error"])
 
-        over_budget = {"data": {"project": {"issues": {"totalCount": HUD.MAX_LINEAR_ISSUES + 1, "nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}}
+        over_budget = {"data": {"issues": {"totalCount": HUD.MAX_LINEAR_ISSUES + 1, "nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}}}
         with mock.patch.object(HUD, "_linear_request", return_value=over_budget):
             rejected = HUD.fetch_linear_project()
         self.assertFalse(rejected["ok"])
         self.assertIn("bounded total", rejected["source_error"])
 
     def test_linear_pagination_has_one_overall_fetch_budget(self):
-        page_one = {"data": {"project": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}}}}
+        page_one = {"data": {"issues": {"totalCount": 2, "nodes": [{"state": {"name": "Todo"}}], "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}}}
         with (
             mock.patch.object(HUD.time, "monotonic", side_effect=[10.0, 10.1, 18.1]),
             mock.patch.object(HUD, "_linear_request", return_value=page_one) as request,

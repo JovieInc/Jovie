@@ -34,8 +34,7 @@ UNMEASURED = "unmeasured"
 PROD_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.I)
 CAP_RE = re.compile(r"^\s*max_concurrent_agents:\s*([0-9]+)\s*$", re.M)
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-LIVE_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
-LIVE_PROJECT_ID = "440ea404-041f-461e-ae45-dd6a2e98e4a1"
+LIVE_TEAM_KEY = "JOV"
 DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
 DEFAULT_TPS_STATE = Path.home() / ".local/state/gem-checkin-hud/symphony-tps.json"
 DEFAULT_PRESSURE_STATE = Path.home() / ".local/state/gem-checkin-hud/system-pressure.json"
@@ -59,13 +58,14 @@ MQ_QUERY = (
     "pullRequest { number title } } } } } }"
 )
 LINEAR_QUERY = (
-    "query($id: String!) { project(id: $id) { issues(filter: { state: { name: { eq: \"In Review\" } } }) "
-    "{ totalCount } } }"
+    "query($teamKey: String!) { issues(filter: { team: { key: { eq: $teamKey } }, "
+    "state: { name: { eq: \"In Review\" } } }) { totalCount } }"
 )
 LINEAR_STAGES_QUERY = (
-    "query($id: String!, $after: String) { project(id: $id) { issues(first: 100, after: $after, filter: { "
-    "state: { name: { in: [\"Todo\", \"In Progress\", \"In Review\"] } } }) "
-    "{ pageInfo { hasNextPage endCursor } nodes { identifier title url assignee { name } createdAt startedAt completedAt state { name } } } } }"
+    "query($teamKey: String!, $after: String) { issues(first: 100, after: $after, filter: { "
+    "team: { key: { eq: $teamKey } }, "
+    "state: { name: { in: [\"Todo\", \"In Progress\", \"Rework\", \"Merging\", \"In Review\"] } } }) "
+    "{ pageInfo { hasNextPage endCursor } nodes { identifier title url assignee { name } createdAt startedAt completedAt state { name } } } }"
 )
 SHIP_STAGES = (
     ("todo", "Todo/pickup"),
@@ -1470,7 +1470,7 @@ def _linear_request(query: str, *, timeout: float, variables: dict[str, Any] | N
         return None
     request = urllib.request.Request(
         LINEAR_API,
-        data=json.dumps({"query": query, "variables": {"id": LIVE_PROJECT_ID, **(variables or {})}}).encode(),
+        data=json.dumps({"query": query, "variables": {"teamKey": LIVE_TEAM_KEY, **(variables or {})}}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json", "User-Agent": "gem-checkin-hud/3"},
         method="POST",
     )
@@ -1504,7 +1504,7 @@ def fetch_review(*, timeout: float = 8.0) -> int | None:
     payload = _linear_request(LINEAR_QUERY, timeout=timeout)
     if payload is None:
         return None
-    count = (((payload.get("data") or {}).get("project") or {}).get("issues") or {}).get("totalCount")
+    count = ((payload.get("data") or {}).get("issues") or {}).get("totalCount")
     return count if isinstance(count, int) else None
 
 
@@ -1536,8 +1536,7 @@ def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
                 "source_error": f"Linear pagination exceeded {MAX_LINEAR_PAGES} pages",
             }
         payload = _linear_request(LINEAR_STAGES_QUERY, timeout=remaining, variables={"after": cursor})
-        project = (payload.get("data") or {}).get("project") if payload else None
-        issues = project.get("issues") if isinstance(project, dict) else None
+        issues = (payload.get("data") or {}).get("issues") if payload else None
         page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
         if (
             not isinstance(issues, dict)

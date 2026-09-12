@@ -154,6 +154,14 @@
       "agent_argv": ["-m", "{model}", "-p", "{prompt}"],
       "probe_argv": ["{executable}", "provider", "list", "--json"],
       "probe_mode": "json-model-key",
+      "useful_probe_argv": [
+        "{executable}",
+        "-m",
+        "{model}",
+        "-p",
+        "Reply exactly: KIMI_USEFUL_READY"
+      ],
+      "useful_probe_marker": "KIMI_USEFUL_READY",
       "cooldown_seconds": 1800,
       "pool_cooldown_seconds": 3600,
       "strengths": ["included-kimi-sub", "1m-context"],
@@ -179,6 +187,14 @@
       "agent_argv": ["-m", "{model}", "-p", "{prompt}"],
       "probe_argv": ["{executable}", "provider", "list", "--json"],
       "probe_mode": "json-model-key",
+      "useful_probe_argv": [
+        "{executable}",
+        "-m",
+        "{model}",
+        "-p",
+        "Reply exactly: KIMI_USEFUL_READY"
+      ],
+      "useful_probe_marker": "KIMI_USEFUL_READY",
       "cooldown_seconds": 1800,
       "pool_cooldown_seconds": 3600,
       "strengths": ["mechanical-coding", "included-kimi-sub"],

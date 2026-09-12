@@ -281,7 +281,7 @@ Normalize the unstable token before sending the event.
   });
 
   it('ignores legacy human and taste labels while preserving machine holds', () => {
-    for (const label of ['held', 'manual-incident']) {
+    for (const label of ['held', 'manual-incident', 'no-symphony']) {
       const candidate = issue({ labels: { nodes: [{ name: label }] } });
       assert.equal(
         deterministicGates.validateDeterministicPlanCandidate(candidate),
@@ -394,17 +394,32 @@ Normalize the unstable token before sending the event.
   it('counts an admitted intent from the receipt without the triple labels', () => {
     const base = plannedIssue();
     const gateReceipt = admissionGate.buildAdmissionGateReceipt(base);
-    const admitted = plannedIssue({
-      state: { name: 'Todo' },
-      labels: { nodes: [] },
-      comments: {
-        nodes: [...base.comments.nodes, { body: gateReceipt }],
-      },
-    });
+    const admittedInState = state =>
+      plannedIssue({
+        state: { name: state },
+        labels: { nodes: [] },
+        comments: {
+          nodes: [...base.comments.nodes, { body: gateReceipt }],
+        },
+      });
+    const admitted = admittedInState('Todo');
     assert.deepEqual(deterministicGates.admissionIntentLoad([admitted]), {
       count: 1,
       identifiers: ['JOV-4305'],
     });
+    assert.deepEqual(deterministicGates.ADMISSION_INTENT_STATES, [
+      'Todo',
+      'In Progress',
+      'Rework',
+      'Merging',
+    ]);
+    assert.deepEqual(
+      deterministicGates.admissionIntentLoad([admittedInState('In Review')]),
+      {
+        count: 0,
+        identifiers: [],
+      }
+    );
     assert.equal(
       deterministicGates.validateDeterministicPlanCandidate(admitted),
       'already-admitted'
