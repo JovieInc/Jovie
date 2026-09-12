@@ -248,7 +248,6 @@ export function AuthLayout({
         'transition-[padding] duration-subtle ease-subtle'
       )}
     >
-
       {showSkipLink ? (
         <Link
           href='#auth-form'
