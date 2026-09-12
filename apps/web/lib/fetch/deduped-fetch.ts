@@ -83,8 +83,11 @@ const responseCache = new Map<string, CacheEntry>();
 
 interface InflightRecord {
   readonly generation: number;
+  readonly requestId: number;
   readonly promise: Promise<unknown>;
 }
+
+let nextInflightRequestId = 0;
 
 // In-flight requests: tracks ongoing fetches to deduplicate concurrent calls
 const inflightRequests = new Map<string, InflightRecord>();
@@ -273,6 +276,7 @@ export async function dedupedFetchWithMeta<T = unknown>(
     };
   }
 
+  const requestId = ++nextInflightRequestId;
   const fetchPromise = (async (): Promise<T> => {
     try {
       const data = await fetchJsonOnce<T>(url, {
@@ -296,7 +300,7 @@ export async function dedupedFetchWithMeta<T = unknown>(
       return data;
     } finally {
       const current = inflightRequests.get(key);
-      if (current?.promise === fetchPromise) {
+      if (current?.requestId === requestId) {
         inflightRequests.delete(key);
       }
     }
@@ -304,6 +308,7 @@ export async function dedupedFetchWithMeta<T = unknown>(
 
   inflightRequests.set(key, {
     generation: startedGeneration,
+    requestId,
     promise: fetchPromise,
   });
 
