@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
-const runtimeDir = resolve(testDir, '../../hermes/gbrain-runtime');
+const runtimeDir = resolve(testDir, '../../symphony/gbrain-runtime');
 const proxyPath = join(runtimeDir, 'gbrain-mcp-http-proxy.py');
 const wrapperPath = join(runtimeDir, 'gbrain-serve-wrapper.sh');
 const plistPath = join(

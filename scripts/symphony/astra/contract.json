@@ -1,0 +1,78 @@
+{
+  "schema": "jovie-astra-readiness/v1",
+  "model": "gpt-6-astra",
+  "prompt_version": "astra-job-guidance-2026-09-04.1",
+  "verified_at": "2026-09-04",
+  "activation": {
+    "enabled": false,
+    "access": "UNKNOWN",
+    "required_probe_schema": "jovie-astra-capability/v1",
+    "max_probe_age_seconds": 900,
+    "terminal_unavailable_reasons": [
+      "usage_limit",
+      "quota_exhausted",
+      "access_denied"
+    ]
+  },
+  "official_sources": {
+    "model_guide": "https://developers.openai.com/api/docs/guides/latest-model",
+    "model": "https://developers.openai.com/api/docs/models/gpt-6-astra",
+    "async_tools": "https://developers.openai.com/api/docs/guides/async-tool-calling",
+    "steering": "https://developers.openai.com/api/docs/guides/steering",
+    "reasoning": "https://developers.openai.com/api/docs/guides/reasoning",
+    "responses": "https://developers.openai.com/api/docs/guides/migrate-to-responses",
+    "caching": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "compaction": "https://developers.openai.com/api/docs/guides/compaction",
+    "programmatic_tools": "https://developers.openai.com/api/docs/guides/tools-programmatic-tool-calling",
+    "multi_agent": "https://developers.openai.com/api/docs/guides/responses-multi-agent"
+  },
+  "request": {
+    "endpoint": "/v1/responses",
+    "reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+    "unsupported_parameters": [
+      "temperature",
+      "top_p",
+      "top_logprobs",
+      "logprobs",
+      "prompt_cache_retention"
+    ],
+    "prompt_cache_options": { "ttl": "30m" }
+  },
+  "symphony_capabilities": {
+    "responses_transport": false,
+    "dynamic_tool_async": false,
+    "turn_steer": false,
+    "thread_resume": false,
+    "durable_pending_call_registry": false,
+    "reason": "Current official Symphony uses app-server thread/start plus turn/start; its dynamic tool schema has no async field. Retries create fresh threads."
+  },
+  "async_tool_eligibility": {
+    "eligible": [],
+    "ineligible": {
+      "linear_graphql": "Mixed read/write tool without a durable async call/result/cancel contract",
+      "hosted_tools": "OpenAI async calling supports client function/custom tools only",
+      "programmatic_tools": "Async must not be combined with programmatic tool calling"
+    }
+  },
+  "prompt_sections": {
+    "execution": [
+      "Act with initiative inside the stated authority and continue until the acceptance evidence is complete or a concrete gate blocks progress.",
+      "Resolve instruction conflicts by priority and recency; preserve explicit safety and authority boundaries, and state any unresolved conflict.",
+      "Use concise, direct prose. Lead progress and final reports with outcomes and evidence.",
+      "Use Astra only when all task capabilities are proven and a cheaper eligible model is inadequate; honor the supplied attempt, token, cost, and wall-time budget."
+    ],
+    "delegation": [
+      "Delegate only bounded, independent work when policy and capacity permit; keep one owner per mutable surface and integrate only verified results.",
+      "Do not create a competing controller, queue, wait/message layer, or steering protocol."
+    ],
+    "testing": [
+      "Calibrate tests to changed risk: exercise failure modes, state transitions, integrations, and the repository's exact CI selector.",
+      "Keep source, local tests, hosted CI, deployment, runtime, and dogfood evidence as separate proof tiers."
+    ],
+    "state": [
+      "Use Responses API for Astra tool calling and preserve prior response/reasoning state when the transport supports it.",
+      "Keep stable prompt prefixes cacheable; use configuration updates only where supported and never adjacent or with incompatible compaction modes.",
+      "Treat accepted steering as connection-local queued input: it does not undo output or cancel an already-started tool. Reconcile by native IDs and receipts after disconnect."
+    ]
+  }
+}

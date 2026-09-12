@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/features/admin/WhatShipped.test.tsx
+
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink } from 'lucide-react';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
@@ -7,9 +9,9 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import type { HudObservationState } from '@/lib/hud/observation';
 import type { WhatShippedResponse } from '@/lib/hud/what-shipped';
+import { WHAT_SHIPPED_POLL_MS } from '@/lib/hud/what-shipped-policy';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 
-const WHAT_SHIPPED_POLL_MS = 60_000;
 const WHAT_SHIPPED_QUERY_GC_MS = WHAT_SHIPPED_POLL_MS * 2;
 const SKELETON_ROW_KEYS = [
   'what-shipped-skel-1',

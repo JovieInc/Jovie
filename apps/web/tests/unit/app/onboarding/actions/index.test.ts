@@ -61,8 +61,8 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedCurrentUser: hoisted.currentUserMock,
 }));
 
-vi.mock('@/lib/auth/clerk-identity', () => ({
-  resolveClerkIdentity: vi.fn().mockReturnValue({
+vi.mock('@/lib/auth/user-identity', () => ({
+  resolveUserIdentity: vi.fn().mockReturnValue({
     avatarUrl: null,
     displayName: 'Gold Path User',
     email: 'fresh@test.jovie.com',

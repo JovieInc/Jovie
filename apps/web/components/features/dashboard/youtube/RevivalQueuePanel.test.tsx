@@ -132,4 +132,28 @@ describe('RevivalQueuePanel', () => {
     );
     expect(screen.getByRole('progressbar')).toHaveStyle({ width: '85%' });
   });
+
+  it('renders flat on the shell canvas with page-level scrolling (frame=none contract)', () => {
+    render(
+      <RevivalQueuePanel
+        candidates={[]}
+        experiments={[]}
+        quota={null}
+        isConnected={false}
+      />
+    );
+
+    const panel = screen.getByTestId('youtube-revival-queue');
+    // scroll='page': the panel scrolls with the app shell, never inside itself.
+    expect(panel).toHaveClass(
+      'overflow-y-auto',
+      'overflow-x-hidden',
+      'overscroll-contain'
+    );
+    // frame='none' (JOV-5158): the panel hangs directly on the shell canvas —
+    // no nested content-container surface may reappear inside the panel.
+    expect(
+      panel.querySelector('[class*="bg-(--app-shell-content-surface)"]')
+    ).toBeNull();
+  });
 });

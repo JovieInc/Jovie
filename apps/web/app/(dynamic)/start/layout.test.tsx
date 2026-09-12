@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getAppFlagsSnapshot: vi.fn(async () => ({ CHAT_JANK_MONITOR: false })),
   providerProps: [] as Array<{
-    forceBypassClerk?: boolean;
+    forceSignedOutDefaults?: boolean;
     skipCoreProviders?: boolean;
   }>,
   resolveStartRouteFlagNames: vi.fn(() => ['CHAT_JANK_MONITOR']),
@@ -14,14 +14,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/components/providers/ResolvedClientProviders', () => ({
   ResolvedClientProviders: ({
     children,
-    forceBypassClerk,
+    forceSignedOutDefaults,
     skipCoreProviders,
   }: {
     readonly children: ReactNode;
-    readonly forceBypassClerk?: boolean;
+    readonly forceSignedOutDefaults?: boolean;
     readonly skipCoreProviders?: boolean;
   }) => {
-    mocks.providerProps.push({ forceBypassClerk, skipCoreProviders });
+    mocks.providerProps.push({ forceSignedOutDefaults, skipCoreProviders });
 
     return <div data-testid='resolved-client-providers'>{children}</div>;
   },
@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 describe('start route layout', () => {
-  it('bypasses Clerk only for local public no-auth smoke runs', async () => {
+  it('uses signed-out defaults only for local public no-auth smoke runs', async () => {
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
     vi.stubEnv('VERCEL_ENV', '');
     const { default: StartLayout } = await import('./layout');
@@ -60,14 +60,14 @@ describe('start route layout', () => {
     expect(screen.getByTestId('app-flag-provider')).toBeInTheDocument();
     expect(screen.getByTestId('child')).toBeInTheDocument();
     expect(mocks.providerProps).toEqual([
-      { forceBypassClerk: true, skipCoreProviders: true },
+      { forceSignedOutDefaults: true, skipCoreProviders: true },
     ]);
     expect(mocks.getAppFlagsSnapshot).toHaveBeenCalledWith({
       flagNames: ['CHAT_JANK_MONITOR'],
     });
   });
 
-  it('keeps Clerk enabled for secure Vercel smoke runs', async () => {
+  it('keeps live auth enabled for secure Vercel smoke runs', async () => {
     vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
     vi.stubEnv('VERCEL_ENV', 'preview');
     const { default: StartLayout } = await import('./layout');
@@ -75,7 +75,7 @@ describe('start route layout', () => {
     render(await StartLayout({ children: <div data-testid='child' /> }));
 
     expect(mocks.providerProps).toEqual([
-      { forceBypassClerk: false, skipCoreProviders: true },
+      { forceSignedOutDefaults: false, skipCoreProviders: true },
     ]);
   });
 
@@ -88,11 +88,11 @@ describe('start route layout', () => {
     render(await StartLayout({ children: <div data-testid='child' /> }));
 
     expect(mocks.providerProps).toEqual([
-      { forceBypassClerk: false, skipCoreProviders: true },
+      { forceSignedOutDefaults: false, skipCoreProviders: true },
     ]);
   });
 
-  it('bypasses Clerk for local Playwright E2E runs', async () => {
+  it('uses signed-out defaults for local Playwright E2E runs', async () => {
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     vi.stubEnv('VERCEL_ENV', '');
     const { default: StartLayout } = await import('./layout');
@@ -100,7 +100,7 @@ describe('start route layout', () => {
     render(await StartLayout({ children: <div data-testid='child' /> }));
 
     expect(mocks.providerProps).toEqual([
-      { forceBypassClerk: true, skipCoreProviders: true },
+      { forceSignedOutDefaults: true, skipCoreProviders: true },
     ]);
   });
 });

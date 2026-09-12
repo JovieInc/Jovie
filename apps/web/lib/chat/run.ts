@@ -284,7 +284,7 @@ export async function executeChatTurn(
     identity,
   } = input;
 
-  if (identity?.id === 'ovie') {
+  if (identity?.id === 'summer') {
     throw new OvieProgramError(
       'ovie-door-artist-jovie-fallthrough',
       'OV-mode cannot execute the artist Jovie turn. Summer owns the Ovie door response.'

@@ -240,8 +240,8 @@ export const JOVIE_IMAGE_COLOR_POLICY = {
     {
       role: 'ultra',
       uiAnchor: {
-        oklch: 'oklch(69.82% 0.1792 295.80)',
-        hex: '#A982FF',
+        oklch: 'oklch(59.95% 0.2254 294.86)',
+        hex: '#8E56F5',
       },
       sceneReference: {
         lightness: 70,
@@ -265,8 +265,8 @@ export const JOVIE_IMAGE_COLOR_POLICY = {
     {
       role: 'pulse',
       uiAnchor: {
-        oklch: 'oklch(70.73% 0.2552 339.69)',
-        hex: '#FF48D2',
+        oklch: 'oklch(66.00% 0.2586 345.13)',
+        hex: '#F52BB5',
       },
       sceneReference: {
         lightness: 71,

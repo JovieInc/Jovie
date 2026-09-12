@@ -1,3 +1,7 @@
+---
+paths: ["apps/web/**/*.tsx", "apps/web/**/*.css", "packages/ui/**", "DESIGN.md", "docs/design-system/**"]
+---
+
 # Motion
 
 Animation doctrine for Jovie UI. Sibling of `ui.md` — read that first for the component hierarchy and the No Decorative Hover Motion rule. Always reference `design-system.css` tokens; never hardcode durations, easings, or scale values (enforced by `@jovie/no-raw-motion-values`).

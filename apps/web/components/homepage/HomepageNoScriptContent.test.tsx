@@ -40,8 +40,16 @@ describe('HomepageNoScriptContent', () => {
   it('mirrors the nine certified sections in order', () => {
     const { rawMarkup, section } = renderFallback();
     const text = section?.textContent ?? '';
+    expect(text).not.toContain("Proof is earned. We don't borrow it.");
 
     expect(section).not.toBeNull();
+    expect(section?.getAttribute('data-marketing-runtime-state')).toBe(
+      'no-script-fallback'
+    );
+    expect(section?.getAttribute('data-marketing-owner')).toBe(
+      'apps/web/components/homepage/HomepageNoScriptContent.tsx'
+    );
+    expect(section?.hasAttribute('data-testid')).toBe(false);
     expect(rawMarkup).not.toContain('<noscript');
     expect(section?.querySelector('h2')?.textContent).toBe(
       HOMEPAGE_LAUNCH_COPY.hero.headline
@@ -51,7 +59,6 @@ describe('HomepageNoScriptContent', () => {
 
     const ordered = [
       HOMEPAGE_LAUNCH_COPY.hero.subhead,
-      HOMEPAGE_LAUNCH_COPY.certified.proof.statement,
       ...HOMEPAGE_LAUNCH_COPY.certified.sections.flatMap(item => [
         item.headline,
         item.body,

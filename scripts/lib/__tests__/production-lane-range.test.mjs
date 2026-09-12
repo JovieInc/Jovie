@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { classifyProductionMarkerEvidence } from '../../../.github/scripts/production-marker-state.mjs';
 import {
+  classifyProductionBaseEvidence,
   collectProductionGitRange,
+  PRODUCTION_BASE_EVIDENCE,
   planProductionLaneRange,
   planProductionMarkerRecovery,
   resolveHistoricalLaneEvidence,
@@ -48,6 +50,39 @@ function receipt({
 }
 
 describe('production lane range', () => {
+  it('bootstraps only an older canonical live base with no marker', () => {
+    expect(
+      classifyProductionBaseEvidence({
+        markerState: 'none',
+        deployedSha: sha('a'),
+        currentSha: sha('b'),
+      })
+    ).toBe(PRODUCTION_BASE_EVIDENCE.canonicalBootstrap);
+
+    expect(() =>
+      classifyProductionBaseEvidence({
+        markerState: 'none',
+        deployedSha: sha('a'),
+        currentSha: sha('a'),
+      })
+    ).toThrow('production base evidence is not admissible');
+  });
+
+  it.each([
+    'pending',
+    'manual',
+    'recovery_available',
+    '',
+  ])('rejects %s production marker state as a release base', markerState => {
+    expect(() =>
+      classifyProductionBaseEvidence({
+        markerState,
+        deployedSha: sha('a'),
+        currentSha: sha('b'),
+      })
+    ).toThrow('production base evidence is not admissible');
+  });
+
   it('keeps a preceding web lane live when a rapid operations merge becomes current', () => {
     const deployedSha = sha('a');
     const webSha = sha('b');
@@ -384,6 +419,8 @@ describe('production lane range', () => {
         currentSha,
         '--current-receipt',
         receiptPath,
+        '--deployed-marker-state',
+        'verified',
         '--json-out',
         jsonPath,
         '--github-output',
@@ -440,6 +477,12 @@ describe('production lane range', () => {
     );
     expect(productionController).toContain('forcing Web/Promote');
     expect(productionController).toContain('--mode "$lane_range_mode"');
+    expect(productionController).toContain(
+      '--deployed-marker-state "${deployed_marker_state:-verified}"'
+    );
+    expect(productionController).toContain(
+      'Bootstrapping the release range from exact canonical live SHA'
+    );
     expect(productionController).toContain(
       'if $lanes == "none" then [] else ($lanes | split(",")) end'
     );

@@ -2,7 +2,7 @@ import type { OvieLane, OvieReceipt } from '@/lib/ovie/ingest';
 
 export const OVIE_MCP_PROTOCOL_VERSION = '2025-03-26';
 export const OVIE_MCP_SERVER_NAME = 'ovie';
-export const OVIE_MCP_IDENTITY = 'ovie' as const;
+export const OVIE_MCP_IDENTITY = 'summer' as const;
 
 export const OVIE_MCP_TOOLS = [
   'get_org_state',

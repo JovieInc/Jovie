@@ -89,6 +89,10 @@ describe('Input', () => {
       const input = screen.getByTestId('input');
       expect(input.className).toContain('focus-visible:border-focus');
       expect(input.className).toContain('focus-visible:ring-focus/25');
+      expect(input.className).toContain('focus-visible:ring-offset-2');
+      expect(input.className).toContain(
+        'focus-visible:ring-offset-surface-page'
+      );
     });
 
     it('applies error variant classes', () => {

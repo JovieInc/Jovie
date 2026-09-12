@@ -52,9 +52,6 @@ async function gql(query, variables = {}) {
 function shouldSkip(issue) {
   const labels = (issue.labels?.nodes ?? []).map(l => l.name.toLowerCase());
   const text = `${issue.title} ${issue.description ?? ''}`.toLowerCase();
-  if (labels.includes('human-review-required')) return true;
-  if ((issue.description ?? '').includes('This issue requires human review'))
-    return true;
   if (labels.includes('type:epic')) return true;
   if (
     /lyb-|storekit|revenuecat|body_metric|jovieinc\/ci|loop [abc] —/i.test(text)

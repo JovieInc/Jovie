@@ -7,8 +7,10 @@ import type {
 } from '../agent/lib/summer-bottleneck-loop';
 import {
   createVercelBlobBottleneckDependencies,
+  SUMMER_BOTTLENECK_SECURITY_ENV,
   type SummerBottleneckRuntimeSecurity,
   signSymphonyRepairOutcome,
+  summerBottleneckSecurityFromEnvironment,
 } from '../agent/lib/vercel-blob-bottleneck-runtime';
 
 const KEY = 'a'.repeat(64);
@@ -61,18 +63,45 @@ const security: SummerBottleneckRuntimeSecurity = {
     ['symphony-outcome-2026-09', SYMPHONY_PUBLIC_KEY],
   ]),
 };
+const securityEnvironment = {
+  [SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxSigningPrivateKey]:
+    EVE_OUTBOX_PRIVATE_KEY,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxSigningKeyId]:
+    security.eveOutboxSigningKeyId,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxVerificationKeys]: JSON.stringify({
+    [security.eveOutboxSigningKeyId]: EVE_OUTBOX_PUBLIC_KEY,
+  }),
+  [SUMMER_BOTTLENECK_SECURITY_ENV.producerVerificationKeys]: JSON.stringify({
+    'jovie-production-2026-09': PRODUCER_PUBLIC_KEY,
+  }),
+  [SUMMER_BOTTLENECK_SECURITY_ENV.receiptSigningKey]: EVE_RECEIPT_KEY,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.receiptSigningKeyId]:
+    security.receiptSigningKeyId,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.symphonyOutcomeVerificationKeys]:
+    JSON.stringify({ 'symphony-outcome-2026-09': SYMPHONY_PUBLIC_KEY }),
+};
+const SOURCE_VERSION = 'b'.repeat(40);
+const SNAPSHOT_DIGEST = 'c'.repeat(64);
 const task: SymphonyRepairTask = {
   schema: 'jovie-symphony-repair-task/v1',
   taskKey: KEY,
   createdAt: '2026-09-02T08:00:00.000Z',
   owner: 'symphony',
   route: 'symphony',
-  action: 'reconcile-release-certification-starvation',
+  authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
+  action: 'remediate-selected-ci-audit-class',
   issue: 'JOV-5853',
   safety: 'exact-source-ci-native-queue-production-gates-remain-required',
+  selected: {
+    id: 'merge-group-flake-baseline-ratchet',
+    sourceRevision: SOURCE_VERSION,
+    sourceDigest: SNAPSHOT_DIGEST,
+    owner: 'ci-reliability',
+    handle: 'audit:merge-group-flakes',
+  },
   source: {
-    sourceVersion: 'b'.repeat(40),
-    snapshotDigest: 'c'.repeat(64),
+    sourceVersion: SOURCE_VERSION,
+    snapshotDigest: SNAPSHOT_DIGEST,
   },
 };
 
@@ -125,6 +154,31 @@ function signedOutcome(overrides: SummerBottleneckRecord = {}) {
 }
 
 describe('Vercel Blob Summer bottleneck runtime', () => {
+  it('loads only a complete, typed security bundle from the environment', () => {
+    expect(summerBottleneckSecurityFromEnvironment({})).toBeUndefined();
+    expect(
+      summerBottleneckSecurityFromEnvironment(securityEnvironment)
+    ).toMatchObject({
+      eveOutboxSigningKeyId: 'eve-outbox-2026-09',
+      receiptSigningKeyId: 'eve-receipt-2026-09',
+    });
+  });
+
+  it('rejects malformed or incomplete verification-key bindings', () => {
+    expect(
+      summerBottleneckSecurityFromEnvironment({
+        ...securityEnvironment,
+        [SUMMER_BOTTLENECK_SECURITY_ENV.producerVerificationKeys]: '{',
+      })
+    ).toBeUndefined();
+    expect(
+      summerBottleneckSecurityFromEnvironment({
+        ...securityEnvironment,
+        [SUMMER_BOTTLENECK_SECURITY_ENV.producerVerificationKeys]: '{}',
+      })
+    ).toBeUndefined();
+  });
+
   it('fails closed without distinct dedicated signing authorities', () => {
     expect(() => createVercelBlobBottleneckDependencies()).toThrow(
       'dedicated Summer and Symphony signing authority is unavailable'
@@ -186,6 +240,21 @@ describe('Vercel Blob Summer bottleneck runtime', () => {
     ).rejects.toThrow('Symphony outbox conflict');
   });
 
+  it('rejects a task whose bounded action is cross-bound to its selected class', async () => {
+    const runtime = createVercelBlobBottleneckDependencies(
+      storeHarness().store,
+      security
+    );
+    const crossBound = {
+      ...task,
+      action: 'reconcile-release-certification-starvation',
+    } as unknown as SymphonyRepairTask;
+
+    await expect(
+      runtime.dispatchToSymphony(crossBound, { idempotencyKey: KEY })
+    ).rejects.toThrow('Symphony repair task is outside the bounded contract');
+  });
+
   it('accepts only a separately signed, exact-task-bound Symphony outcome', async () => {
     const proof = storeHarness();
     const runtime = createVercelBlobBottleneckDependencies(
@@ -222,6 +291,7 @@ describe('Vercel Blob Summer bottleneck runtime', () => {
         source: { ...task.source, action: 'different-action' },
       }),
     ],
+    ['cross-task', signedOutcome({ taskKey: 'e'.repeat(64) })],
   ])('rejects an %s Symphony outcome', async (_name, outcome) => {
     const proof = storeHarness();
     const runtime = createVercelBlobBottleneckDependencies(

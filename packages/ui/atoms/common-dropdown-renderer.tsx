@@ -187,7 +187,10 @@ export function SearchableContent({
               onClear();
               localInputRef.current?.focus();
             }}
-            className={MENU_SEARCH_CLEAR_BUTTON_BASE}
+            className={cn(
+              MENU_SEARCH_CLEAR_BUTTON_BASE,
+              'relative overflow-visible before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]'
+            )}
             data-slot='common-dropdown-search-clear'
             aria-label='Clear search'
           >

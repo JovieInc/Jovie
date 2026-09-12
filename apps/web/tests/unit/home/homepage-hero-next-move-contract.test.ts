@@ -13,6 +13,35 @@ function readHeroCss(): string {
 }
 
 describe('homepage hero contract (JOV-5864)', () => {
+  it('rejects raster media regardless of how it is mounted', () => {
+    const pageSource = readFileSync(
+      path.join(webRoot, 'app/(home)/page.tsx'),
+      'utf8'
+    );
+    const componentSource = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageEditorialHero.tsx'),
+      'utf8'
+    );
+    const heroSource = pageSource.slice(
+      pageSource.indexOf('function HomepageHero()'),
+      pageSource.indexOf('function HomepageUnlockedSections()')
+    );
+    const heroCss = readHeroCss();
+    const rejectedPhotoFixture = `
+      <picture><img src='/stock-nightlife.webp' /></picture>
+      .homepage-editorial-hero { background: image-set(url('/stock.jpg') 1x); }
+    `;
+    const rasterSourcePattern =
+      /<(?:picture|img|video|canvas)\b|\.(?:avif|gif|jpe?g|png|webp)\b/i;
+    const cssImagePattern = /\b(?:url|image-set)\s*\(/i;
+
+    expect(rejectedPhotoFixture).toMatch(rasterSourcePattern);
+    expect(rejectedPhotoFixture).toMatch(cssImagePattern);
+    const heroImplementation = `${heroSource}\n${componentSource}\n${heroCss}`;
+    expect(heroImplementation).not.toMatch(rasterSourcePattern);
+    expect(heroImplementation).not.toMatch(cssImagePattern);
+  });
+
   it('uses the exact locked headline and one-line support', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
       'Control how the world sees you.'
@@ -38,12 +67,10 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
 
     expect(heroSource).toContain('search={HERO_COPY.search}');
-    expect(heroSource).toContain('backdrop={HERO_BACKDROP}');
     expect(heroSource).not.toContain('primaryCta');
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
-    expect(pageSource).toContain('/images/hero/night-desk.webp');
-    expect(pageSource).toContain('/images/hero/night-desk-mobile.webp');
+    expect(pageSource).not.toContain('/images/hero/');
   });
 
   it('keeps the one-line H1 contract and the two-line phone fallback', () => {
@@ -58,6 +85,25 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(css).toMatch(
       /\.homepage-editorial-hero__support\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
     );
+  });
+
+  it('keeps the editorial search wide and clips its aura to the pill', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__copy\s*\{[\s\S]*?width: min\([\s\S]*?100%[\s\S]*?\);[\s\S]*?\}/
+    );
+    expect(css).toContain('width: min(40rem, 100%);');
+    expect(css).toMatch(
+      /@media \(max-width: 1023px\)[\s\S]*?\.homepage-editorial-hero__search\s*\{[\s\S]*?width: 100%;[\s\S]*?\}/
+    );
+    expect(css).not.toMatch(/\.group\\\//);
+    const auraCss = readFileSync(
+      path.join(webRoot, 'components/features/home/InputAuraFrame.css'),
+      'utf8'
+    );
+    expect(auraCss).toContain('input-aura-frame--editorial');
+    expect(auraCss).toContain('mask-composite: exclude');
   });
 
   it('keeps the Find me pill on the 32/510 marketing button contract', () => {
@@ -88,7 +134,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
   });
 
-  it('keeps homepage nav as wordmark plus Log in text only, with no Get started', () => {
+  it('uses the canonical icon header with full marketing navigation', () => {
     const headerSource = readFileSync(
       path.join(webRoot, 'components/site/MarketingHeader.tsx'),
       'utf8'
@@ -98,10 +144,12 @@ describe('homepage hero contract (JOV-5864)', () => {
       'utf8'
     );
 
-    expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
-    expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
-    expect(layoutSource).toContain("logoVariant='word'");
-    expect(layoutSource).toContain('showHomepageCenterNav={false}');
+    expect(headerSource).toContain('MARKETING_GLASS_DESKTOP_LINKS');
+    expect(headerSource).toContain("presentation === 'marketing-glass'");
+    expect(layoutSource).toContain("headerVariant='landing'");
+    expect(layoutSource).toContain("footerVariant='expanded'");
+    expect(layoutSource).not.toContain("logoVariant='word'");
+    expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
 
     const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
     expect(css).not.toMatch(

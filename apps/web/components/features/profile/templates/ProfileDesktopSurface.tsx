@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Bell,
   CalendarDays,
+  ChevronLeft,
   ChevronRight,
   Disc3,
   House,
@@ -16,7 +17,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -29,9 +31,16 @@ import type {
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
-import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
+import {
+  getPublicProfileHistoryServerSnapshot,
+  getPublicProfileHistorySnapshot,
+  resolveProfileSurfaceState,
+  shouldShowPublicProfileBackChevron,
+  subscribeToPublicProfileHistory,
+} from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
@@ -42,6 +51,7 @@ import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import {
   publicLinkAriaLabel,
+  publicPlatformDisplayName,
   sanitizePublicHref,
 } from '@/lib/utils/public-url';
 import type { PublicContact } from '@/types/contacts';
@@ -80,6 +90,7 @@ interface ProfileDesktopSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
+  readonly allowFanCapture?: boolean;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -96,6 +107,7 @@ interface ProfileDesktopSurfaceProps {
   readonly onDrawerViewChange: (view: DrawerView) => void;
   readonly onOpenMenu: () => void;
   readonly onPlayClick: () => void;
+  readonly onBack?: () => void;
   readonly profileHref: string;
   readonly isSubscribed?: boolean;
   readonly contentPrefs?: Record<NotificationContentType, boolean>;
@@ -202,7 +214,7 @@ function DesktopSurfaceCard({
           <button
             type='button'
             onClick={onAction}
-            className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
+            className='inline-flex min-h-11 items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
           >
             <span>{actionLabel}</span>
             <ChevronRight className='h-4 w-4' />
@@ -233,6 +245,7 @@ export function ProfileDesktopSurface({
   latestRelease,
   profileSettings,
   alertOptInVariant = 'button',
+  allowFanCapture = true,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -249,6 +262,7 @@ export function ProfileDesktopSurface({
   onDrawerViewChange,
   onOpenMenu,
   onPlayClick,
+  onBack,
   profileHref,
   isSubscribed = false,
   contentPrefs = {
@@ -261,6 +275,19 @@ export function ProfileDesktopSurface({
   onUnsubscribe = () => {},
   isUnsubscribing = false,
 }: ProfileDesktopSurfaceProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => setIsHydrated(true), []);
+  const isSignedIn = useIsAuthenticated();
+  const hasHistoryDestination = useSyncExternalStore(
+    subscribeToPublicProfileHistory,
+    getPublicProfileHistorySnapshot,
+    getPublicProfileHistoryServerSnapshot
+  );
+  const showBackChevron = shouldShowPublicProfileBackChevron({
+    isProfileRoot: activeMode === 'profile',
+    hasHistoryDestination,
+    isSignedIn,
+  });
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
@@ -274,12 +301,18 @@ export function ProfileDesktopSurface({
   const baseActivePrimaryTab = getDesktopBaseMode(activeMode);
   const hasTourDates = tourDates.length > 0;
   const activePrimaryTab =
-    baseActivePrimaryTab === 'tour' && !hasTourDates
+    (baseActivePrimaryTab === 'tour' && !hasTourDates) ||
+    (baseActivePrimaryTab === 'subscribe' && !allowFanCapture)
       ? 'profile'
       : baseActivePrimaryTab;
   const visiblePrimaryTabs = useMemo(
-    () => PRIMARY_TABS.filter(tab => tab.mode !== 'tour' || hasTourDates),
-    [hasTourDates]
+    () =>
+      PRIMARY_TABS.filter(
+        tab =>
+          (tab.mode !== 'tour' || hasTourDates) &&
+          (tab.mode !== 'subscribe' || allowFanCapture)
+      ),
+    [allowFanCapture, hasTourDates]
   );
   const surfaceState = useMemo(
     () =>
@@ -345,7 +378,7 @@ export function ProfileDesktopSurface({
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
-    primaryActionElement = (
+    primaryActionElement = allowFanCapture ? (
       <ProfileInlineNotificationsCTA
         artist={artist}
         portalContainer={notificationsPortalContainer}
@@ -354,7 +387,7 @@ export function ProfileDesktopSurface({
         experimentVariant={alertOptInVariant}
         onManageNotifications={() => onModeSelect('subscribe')}
       />
-    );
+    ) : null;
   } else {
     const primaryActionContent = (
       <>
@@ -389,14 +422,23 @@ export function ProfileDesktopSurface({
   }
 
   const homeOverview = (
-    <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
-      <div className='grid min-h-0 min-w-0 gap-3.5'>
+    <div
+      className={cn(
+        'grid min-h-0 min-w-0 flex-1 gap-4 [@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]'
+      )}
+      data-testid='profile-desktop-home-overview'
+      data-side-rail-enabled={allowFanCapture ? 'true' : 'false'}
+    >
+      <div
+        className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
+        data-testid='profile-desktop-main-content'
+      >
         {/* Composition rule (#11899): the desktop cover is a fixed standard
             4:5 shape — height is the single driver (viewport-bounded with a
             min floor), width follows the aspect ratio, and the fill image
             crops (object-cover), never squashes. */}
         <section
-          className='relative aspect-card-standard h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)]'
+          className='relative aspect-card-standard h-[min(620px,calc(100dvh-180px))] min-h-105 min-w-0 max-w-130 overflow-hidden rounded-3xl bg-[color:var(--profile-stage-bg)] [@media(min-width:1180px)]:col-start-1 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-cover'
         >
           <div className='absolute inset-0'>
@@ -428,9 +470,9 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex max-w-205 items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
-                  <span className='line-clamp-2'>{artist.name}</span>
+                  <span className='min-w-0 line-clamp-2'>{artist.name}</span>
                   {artist.is_verified ? (
                     <BadgeCheck
                       className='h-7 w-7 shrink-0'
@@ -459,9 +501,9 @@ export function ProfileDesktopSurface({
                     if (!link.platform) return null;
                     const href = sanitizePublicHref(link.url);
                     if (!href) return null;
-                    const platformLabel =
-                      link.platform.charAt(0).toUpperCase() +
-                      link.platform.slice(1);
+                    const platformLabel = publicPlatformDisplayName(
+                      link.platform
+                    );
                     return (
                       <a
                         key={link.id}
@@ -494,7 +536,7 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'
+          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)] [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1 [@media(min-width:1180px)]:self-start'
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
@@ -530,7 +572,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
-                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
+                        className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
                       </a>
@@ -599,8 +641,20 @@ export function ProfileDesktopSurface({
         </div>
       </div>
 
-      <div className='grid min-h-0 min-w-0 gap-3.5'>
-        <DesktopSurfaceCard title='Alerts' testId='profile-desktop-alerts-card'>
+      <div
+        className={cn(
+          'min-h-0 min-w-0 gap-3.5',
+          allowFanCapture
+            ? 'grid [@media(min-width:1180px)]:col-span-2 [@media(min-width:1180px)]:row-start-2'
+            : 'hidden'
+        )}
+        data-testid='profile-desktop-side-rail'
+      >
+        <DesktopSurfaceCard
+          title='Alerts'
+          testId='profile-desktop-alerts-card'
+          className={allowFanCapture ? undefined : 'hidden'}
+        >
           <div className='space-y-4'>
             {!isSubscribed ? (
               <button
@@ -651,12 +705,30 @@ export function ProfileDesktopSurface({
                         {item.label}
                       </span>
                     </div>
-                    <Switch
-                      checked={checked}
-                      onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label={item.label}
-                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
-                    />
+                    {isSubscribed ? (
+                      // Subscribed visitors manage preferences in place: the
+                      // template's onTogglePref runs the real optimistic
+                      // mutation and rolls back on error.
+                      <Switch
+                        checked={checked}
+                        onCheckedChange={() =>
+                          onTogglePref(item.key as NotificationContentType)
+                        }
+                        aria-label={item.label}
+                        className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
+                      />
+                    ) : (
+                      // Unsubscribed visitors have no notification identity yet
+                      // (the prefs API requires an email/phone), so the row
+                      // routes into the subscribe flow instead — it must not
+                      // render a switch that flips and springs back.
+                      <Switch
+                        checked={false}
+                        onCheckedChange={() => onModeSelect('subscribe')}
+                        aria-label={item.label}
+                        className='data-[state=unchecked]:bg-white/14'
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -838,50 +910,67 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div className='relative flex h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
+    <div className='profile-desktop-surface relative flex w-full overflow-hidden rounded-3xl bg-(--color-bg-surface-0)'>
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
+        data-interactive-ready={isHydrated ? 'true' : undefined}
         data-testid='profile-desktop-surface'
       >
-        <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>
-          <nav
-            className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
-            aria-label='Profile Navigation'
-          >
-            {visiblePrimaryTabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activePrimaryTab === tab.mode;
-              return (
-                <button
-                  key={tab.mode}
-                  type='button'
-                  onClick={() => onModeSelect(tab.mode)}
-                  data-testid={`profile-primary-tab-${tab.mode}`}
-                  className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
-                    isActive
-                      ? 'text-white dark:text-white'
-                      : 'text-white/50 hover:text-white/78'
-                  )}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon
+        <div
+          className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'
+          data-testid='profile-desktop-top-chrome'
+        >
+          <div className='flex min-w-0 items-center gap-2'>
+            {showBackChevron && onBack ? (
+              <CircleIconButton
+                onClick={onBack}
+                size='lg'
+                variant='pearlQuiet'
+                className='profile-top-chrome-icon text-white dark:text-white'
+                ariaLabel='Back'
+              >
+                <ChevronLeft className='h-5 w-5' />
+              </CircleIconButton>
+            ) : null}
+            <nav
+              className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
+              aria-label='Profile Navigation'
+            >
+              {visiblePrimaryTabs.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activePrimaryTab === tab.mode;
+                return (
+                  <button
+                    key={tab.mode}
+                    type='button'
+                    onClick={() => onModeSelect(tab.mode)}
+                    data-testid={`profile-primary-tab-${tab.mode}`}
                     className={cn(
-                      'h-4 w-4 shrink-0 transition-colors duration-subtle',
-                      isActive && 'text-white dark:text-white'
+                      'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
+                      isActive
+                        ? 'text-white dark:text-white'
+                        : 'text-white/50 hover:text-white/78'
                     )}
-                  />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 shrink-0 transition-colors duration-subtle',
+                        isActive && 'text-white dark:text-white'
+                      )}
+                    />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
           <button
             type='button'
             onClick={onOpenMenu}
-            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
+            className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
             aria-label='Menu'
           >
             <MoreHorizontal className='h-5 w-5' />
@@ -895,7 +984,7 @@ export function ProfileDesktopSurface({
           </div>
         </div>
 
-        {activePrimaryTab === 'subscribe' ? (
+        {allowFanCapture && activePrimaryTab === 'subscribe' ? (
           <ProfileInlineNotificationsCTA
             artist={artist}
             presentation='modal'

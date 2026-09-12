@@ -74,9 +74,11 @@ const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
+const CAPACITY_MAX_TARGET = 40;
 export const FLEET_PROMOTION_MODE = Object.freeze({
   NORMAL: 'normal',
   ISOLATED_ONLY: 'isolated-only',
+  CONTROLLER_REPAIR_ONLY: 'controller-repair-only',
   DRAFT_ONLY: 'draft-only',
   HOLD_INTAKE: 'hold-intake',
   BLOCKED: 'blocked',
@@ -102,6 +104,13 @@ function alreadyAdmittedCohortSemantics(promotionMode) {
       preserve: false,
       newIntakeAllowed: true,
       semantics: 'isolated-only',
+    };
+  }
+  if (promotionMode === FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY) {
+    return {
+      preserve: true,
+      newIntakeAllowed: false,
+      semantics: 'preserve-cohort-and-admit-one-controller-repair',
     };
   }
   if (promotionMode === FLEET_PROMOTION_MODE.DRAFT_ONLY) {
@@ -237,7 +246,7 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
   const observedMs = Date.parse(value || '');
   return (
     Number.isFinite(observedMs) &&
-    observedMs <= nowMs + 60_000 &&
+    observedMs <= nowMs &&
     nowMs - observedMs <= maxAgeMs
   );
 }
@@ -409,12 +418,43 @@ function deploymentBound(mainSha, deployedSha) {
   );
 }
 
-/**
- * symphony-concurrency-autoscale-v1: concurrency autoscales from the live-seat
- * receipt with no upper clamp and no clean-run ratchet. Missing, malformed,
- * or stale evidence degrades to the runtime floor (one seat) instead of
- * zeroing the factory; only a RED fleet state blocks mutation.
- */
+function usefulTurnProofs(evidence, nowMs, maxAgeMs) {
+  if (
+    evidence?.schema !== GEM_CONCURRENCY_EVIDENCE_SCHEMA ||
+    evidence?.source !== 'execution-proven-useful-turns' ||
+    !Array.isArray(evidence?.acceptedEvidence) ||
+    !isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs)
+  ) {
+    return null;
+  }
+  const seats = new Set();
+  for (const proof of evidence.acceptedEvidence) {
+    const strings = [proof?.provider, proof?.profile, proof?.model];
+    const completionProven =
+      (Number.isInteger(proof?.outputBytes) && proof.outputBytes > 0) ||
+      (Number.isInteger(proof?.outputTokens) && proof.outputTokens > 0);
+    if (
+      proof?.schema !== 'symphony-useful-turn-proof/v1' ||
+      strings.some(value => typeof value !== 'string' || !value.trim()) ||
+      proof?.rc !== 0 ||
+      proof?.useful !== true ||
+      !/^[0-9a-f]{64}$/.test(proof?.outputDigest || '') ||
+      !completionProven ||
+      !isFreshTimestamp(proof?.completedAt, nowMs, maxAgeMs)
+    ) {
+      return null;
+    }
+    const seat = strings
+      .slice(0, 2)
+      .map(value => value.trim())
+      .join('\u0000');
+    if (seats.has(seat)) return null;
+    seats.add(seat);
+  }
+  return evidence.target === seats.size ? [...seats] : null;
+}
+
+/** Use only fresh, digest-bound useful turns as dispatch capacity. */
 export function resolveGemConcurrency(
   evidence,
   {
@@ -424,24 +464,27 @@ export function resolveGemConcurrency(
 ) {
   const nowMs = Date.parse(now);
   const measuredTarget = evidence?.target;
+  const acceptedEvidence = usefulTurnProofs(evidence, nowMs, maxAgeMs);
   const evidenceAccepted =
-    evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
+    acceptedEvidence !== null &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
+    measuredTarget <= CAPACITY_MAX_TARGET &&
     evidence?.approved === true &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
 
   return {
-    maxConcurrent: evidenceAccepted ? measuredTarget : CAPACITY_POLICY.minimum,
+    maxConcurrent: evidenceAccepted ? measuredTarget : 0,
     runtimeFloor: CAPACITY_POLICY.minimum,
     baseline: DEFAULT_GEM_CONCURRENCY,
     evidenceAccepted,
-    newMutationAllowed: true,
+    newMutationAllowed: evidenceAccepted,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
+    acceptedEvidence: evidenceAccepted ? evidence.acceptedEvidence : [],
     reason: evidenceAccepted
-      ? 'live-seat-capacity'
-      : 'capacity-evidence-missing-runtime-floor',
+      ? 'execution-proven-useful-turns'
+      : 'capacity-evidence-unproven-dispatch-closed',
   };
 }
 
@@ -658,7 +701,10 @@ export function evaluateFleetGate(
         ? ['tests', 'review']
         : [
             ...(newMutationAllowed ? ['approved-issue-lease'] : []),
-            ...FLEET_AUTHORITY.AMBER,
+            ...FLEET_AUTHORITY.AMBER.filter(
+              activity =>
+                newMutationAllowed || activity !== 'isolated-implementation'
+            ),
           ];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&
@@ -670,6 +716,35 @@ export function evaluateFleetGate(
     ['clear', 'resolved'].includes(integrityStatus) &&
     reasons.length === 1 &&
     reasons[0]?.code === FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND;
+  const controllerRepairReasonCodes = new Set(
+    reasons.map(reason => reason.code)
+  );
+  const closureRepairReasons = new Set(closureAdmission.reasons);
+  const closureAllowsControllerRepair =
+    closureAdmission.status === 'healthy' ||
+    (['grace', 'red'].includes(closureAdmission.status) &&
+      [...closureRepairReasons].every(
+        reason => reason === 'queue-controller-red-over-10m'
+      ) &&
+      closureAdmission.newIssueIntakeAllowed === false);
+  const controllerRepairAllowed =
+    state === FLEET_GATE_STATE.AMBER &&
+    reviewAdmission.allowed &&
+    closureAllowsControllerRepair &&
+    controllerFresh &&
+    controllerStatus === 'failed' &&
+    mainStatus === 'green' &&
+    validCommitSha(evidence?.main?.sha, { exact: true }) &&
+    productionStatus === 'green' &&
+    validCommitSha(evidence?.production?.deployedSha) &&
+    ['clear', 'resolved'].includes(integrityStatus) &&
+    controllerRepairReasonCodes.has(FLEET_GATE_REASON.CONTROLLER_FAILURE) &&
+    [...controllerRepairReasonCodes].every(reason =>
+      [
+        FLEET_GATE_REASON.CONTROLLER_FAILURE,
+        FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
+      ].includes(reason)
+    );
   const promotionMode = isolatedPromotionAllowed
     ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
     : state === FLEET_GATE_STATE.GREEN
@@ -680,7 +755,9 @@ export function evaluateFleetGate(
         ? FLEET_PROMOTION_MODE.DRAFT_ONLY
         : holdIntakeAllowed
           ? FLEET_PROMOTION_MODE.HOLD_INTAKE
-          : FLEET_PROMOTION_MODE.BLOCKED;
+          : controllerRepairAllowed
+            ? FLEET_PROMOTION_MODE.CONTROLLER_REPAIR_ONLY
+            : FLEET_PROMOTION_MODE.BLOCKED;
   const cohort = alreadyAdmittedCohortSemantics(promotionMode);
   const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
     ? cohort
@@ -720,6 +797,19 @@ export function evaluateFleetGate(
       maxConcurrent: 1,
       authority: 'canonical-merge-queue-controller',
     },
+    controllerRepairAdmission: {
+      allowed: controllerRepairAllowed,
+      condition: controllerRepairAllowed ? 'controller-failure' : null,
+      mainSha: controllerRepairAllowed ? evidence?.main?.sha : null,
+      deployedSha: controllerRepairAllowed
+        ? evidence?.production?.deployedSha
+        : null,
+      scope: 'trusted-comment-exact-repository-pr-head-main-path-set',
+      maxConcurrent: controllerRepairAllowed ? 1 : 0,
+      deploymentsAllowed: false,
+      runtimeActivationAllowed: false,
+      authority: 'canonical-merge-queue-controller',
+    },
     ownership: {
       controller: 'Gem',
       implementation: 'Symphony',
@@ -752,14 +842,6 @@ function commentsOf(issue) {
 
 export function isConcreteJovieIssue(issue) {
   return Boolean(issue?.id && /^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''));
-}
-
-function isTimOwned(issue) {
-  const assignee = issue?.assignee;
-  if (!assignee) return false;
-  const text =
-    `${assignee.id || ''} ${assignee.name || ''} ${assignee.email || ''} ${assignee.displayName || ''}`.toLowerCase();
-  return /tim(?:\s|-|_)*white|itstimwhite|^tim$/.test(text);
 }
 
 export function hasAdmissionEvidence(issue, classification = issue) {
@@ -854,7 +936,6 @@ function candidateAdmissionDecision(classification, bundledIds) {
       !bundledIds.has(classification.identifier) &&
       classification.category === 'triageable' &&
       ['Triage', 'Backlog', 'Todo'].includes(state) &&
-      !isTimOwned(issue) &&
       !issue.pullRequestUrl &&
       evidence.eligible,
     preAdmission,

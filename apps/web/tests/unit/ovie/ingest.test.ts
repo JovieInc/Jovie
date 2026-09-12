@@ -82,7 +82,7 @@ describe('Ovie dump ingest (JOV-5215)', () => {
         },
       }
     );
-    expect(eveTurn.pack.id).toBe('ovie');
+    expect(eveTurn.pack.id).toBe('summer');
     expect(generation.kind).toBe('summer-transport');
     expect(spawned).toEqual([]);
     expect(receipts).toHaveLength(1);

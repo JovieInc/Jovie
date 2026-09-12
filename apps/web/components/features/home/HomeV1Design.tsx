@@ -26,7 +26,7 @@ const TRUST_LOGOS = [
 
 export function HomeV1Design() {
   return (
-    <div className='min-h-screen bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
+    <div className='min-h-svh bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
       <section
         className='relative isolate flex min-h-[100svh] overflow-hidden'
         aria-labelledby='home-hero-heading'
@@ -47,7 +47,7 @@ export function HomeV1Design() {
               className='inline-flex items-center gap-2 text-white dark:text-white focus-ring-themed rounded-md'
               aria-label='Jovie Home'
             >
-              <BrandLogo size={20} tone='white' aria-hidden />
+              <BrandLogo size='chrome' tone='white' aria-hidden />
               <span className='text-mid font-semibold'>Jovie</span>
             </Link>
             <div className='flex items-center gap-2'>

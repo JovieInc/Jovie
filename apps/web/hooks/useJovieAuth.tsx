@@ -184,10 +184,9 @@ export function JovieAuthValuesProvider({
 
 /**
  * Safe-defaults provider for mock/DB-less mode: build-time rendering, tests,
- * and bypassed-auth origins per the `shouldBypassClerk()` contract in
- * components/providers/clerkAvailability.ts (keyed off NEXT_PUBLIC_CLERK_MOCK
- * today; the NEXT_PUBLIC_AUTH_MOCK rename lands with the migration's env
- * commit). Everything renders signed-out and auth UI stays hidden.
+ * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK, with a
+ * one-release NEXT_PUBLIC_CLERK_MOCK fallback). Everything renders
+ * signed-out and auth UI stays hidden.
  */
 export function JovieAuthDefaultsProvider({
   children,

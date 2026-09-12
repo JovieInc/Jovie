@@ -326,6 +326,60 @@ describe('attributeLeadSignupFromClerkUserId', () => {
   });
 });
 
+function createPaidConversionStore(options?: {
+  failFirstEventWrite?: boolean;
+}) {
+  const leadState = {
+    id: 'lead_123',
+    paidAt: null as Date | null,
+    paidSubscriptionId: null as string | null,
+  };
+  const recordedEvents: Array<{ eventType: string; leadId: string }> = [];
+  let eventWriteAttempts = 0;
+
+  mockDbSelect.mockImplementation(() =>
+    createSelectChain([
+      {
+        id: leadState.id,
+        paidAt: leadState.paidAt,
+        paidSubscriptionId: leadState.paidSubscriptionId,
+      },
+    ])
+  );
+  mockDbUpdate.mockImplementation(() => ({
+    set: vi.fn((values: { paidAt?: Date; paidSubscriptionId?: string }) => ({
+      where: vi.fn().mockImplementation(async () => {
+        leadState.paidAt = values.paidAt ?? leadState.paidAt;
+        leadState.paidSubscriptionId =
+          values.paidSubscriptionId ?? leadState.paidSubscriptionId;
+      }),
+    })),
+  }));
+  mockDbInsert.mockImplementation(() => ({
+    values: vi.fn((row: { eventType: string; leadId: string }) => ({
+      onConflictDoNothing: vi.fn().mockImplementation(async () => {
+        eventWriteAttempts += 1;
+        if (options?.failFirstEventWrite && eventWriteAttempts === 1) {
+          throw new Error('injected event-write failure');
+        }
+        if (
+          !recordedEvents.some(
+            event =>
+              event.leadId === row.leadId && event.eventType === row.eventType
+          )
+        ) {
+          recordedEvents.push({
+            leadId: row.leadId,
+            eventType: row.eventType,
+          });
+        }
+      }),
+    })),
+  }));
+
+  return { leadState, recordedEvents };
+}
+
 describe('attributeLeadPaidConversionByAppUserId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -334,6 +388,58 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
         where: vi.fn().mockResolvedValue(undefined),
       })),
     }));
+  });
+
+  it('records exactly one paid_converted event on the happy path, including retry', async () => {
+    const { leadState, recordedEvents } = createPaidConversionStore();
+    const { attributeLeadPaidConversionByAppUserId } = await import(
+      '@/lib/leads/funnel-events'
+    );
+
+    await attributeLeadPaidConversionByAppUserId('user_123', 'sub_happy');
+    await attributeLeadPaidConversionByAppUserId('user_123', 'sub_happy');
+
+    expect(leadState.paidAt).toBeInstanceOf(Date);
+    expect(leadState.paidSubscriptionId).toBe('sub_happy');
+    expect(recordedEvents).toEqual([
+      { leadId: 'lead_123', eventType: 'paid_converted' },
+    ]);
+    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconciles a missing paid_converted event after an injected write failure', async () => {
+    const { leadState, recordedEvents } = createPaidConversionStore({
+      failFirstEventWrite: true,
+    });
+    const { attributeLeadPaidConversionByAppUserId } = await import(
+      '@/lib/leads/funnel-events'
+    );
+
+    await expect(
+      attributeLeadPaidConversionByAppUserId('user_123', 'sub_retry')
+    ).rejects.toThrow('injected event-write failure');
+    expect(leadState.paidAt).toBeInstanceOf(Date);
+    expect(recordedEvents).toEqual([]);
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Failed to record lead funnel event',
+      expect.any(Error),
+      expect.objectContaining({
+        route: 'lib/leads/funnel-events',
+        contextData: expect.objectContaining({
+          leadId: 'lead_123',
+          eventType: 'paid_converted',
+        }),
+      })
+    );
+
+    await attributeLeadPaidConversionByAppUserId('user_123', 'sub_retry');
+
+    expect(leadState.paidAt).toBeInstanceOf(Date);
+    expect(leadState.paidSubscriptionId).toBe('sub_retry');
+    expect(recordedEvents).toEqual([
+      { leadId: 'lead_123', eventType: 'paid_converted' },
+    ]);
+    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('attributes a Better Auth purchase by app UUID, not its ba: legacy sentinel', async () => {

@@ -24,20 +24,3 @@ export async function guardUsernameUpdate(
     throw error;
   }
 }
-
-export interface SyncClerkProfileParams {
-  clerkUserId: string;
-  clerkUpdates: Record<string, unknown>;
-  avatarUrl: string | undefined;
-}
-
-export interface SyncClerkProfileResult {
-  clerkSyncFailed: boolean;
-  rollback?: () => Promise<void>;
-}
-
-export async function syncClerkProfile(
-  _params: SyncClerkProfileParams
-): Promise<SyncClerkProfileResult> {
-  return { clerkSyncFailed: false };
-}

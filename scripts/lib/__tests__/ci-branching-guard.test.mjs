@@ -13,7 +13,7 @@ describe('ci-branching-guard', () => {
     expect(isAgentBranch('feature/foo')).toBe(false);
   });
 
-  it('allows hotfix and needs-human exemptions', () => {
+  it('allows hotfix but rejects legacy human-label exemptions', () => {
     expect(
       isExemptFromIntegrationTarget({
         headRef: 'hotfix/jov-9999',
@@ -25,7 +25,7 @@ describe('ci-branching-guard', () => {
         headRef: 'tim/jov-2934',
         labels: ['needs-human'],
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('warns when agent branch targets main', () => {

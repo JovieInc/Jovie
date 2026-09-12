@@ -45,7 +45,7 @@ describe('WaitlistSuccessView', () => {
 
     const resume = screen.getByRole('link', { name: 'Resume At Start' });
     expect(resume).toHaveAttribute('data-size', 'marketing');
-    expect(resume).toHaveClass('h-8');
+    expect(resume).toHaveClass('h-7', 'before:h-11', 'before:min-w-11');
   });
 
   it('keeps server state and redirects route-owned while the story uses the exact body', () => {

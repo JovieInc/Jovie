@@ -50,9 +50,6 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   // Certified nine-section homepage: sections 2-9. Section 1 is `hero`.
   certified: {
-    proof: {
-      statement: "Proof is earned. We don't borrow it.",
-    },
     sections: [
       {
         id: 'connected',

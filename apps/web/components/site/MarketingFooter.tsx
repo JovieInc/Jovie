@@ -146,7 +146,7 @@ export function MarketingFooter({
             aria-label='Jovie Home'
             className={markLinkClassName}
           >
-            <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
+            <BrandLogo size='chrome' tone='white' rounded={false} aria-hidden />
           </Link>
         ) : (
           <div className='grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] md:gap-x-16 md:gap-y-14 lg:gap-x-24'>
@@ -157,7 +157,12 @@ export function MarketingFooter({
                 aria-label='Jovie Home'
                 className={markLinkClassName}
               >
-                <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
+                <BrandLogo
+                  size='chrome'
+                  tone='white'
+                  rounded={false}
+                  aria-hidden
+                />
               </Link>
               <p className='mf-mark-tagline'>Built for artists. By artists.</p>
             </div>

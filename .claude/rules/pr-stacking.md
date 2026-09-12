@@ -1,3 +1,7 @@
+---
+paths: [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"]
+---
+
 # PR Stacking & Size
 
 > Part of the canonical [`docs/PR_FLOW.md`](../../docs/PR_FLOW.md). Default: small

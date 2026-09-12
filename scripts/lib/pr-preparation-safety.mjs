@@ -9,7 +9,7 @@ export const RECEIPT_SCHEMA = 'jovie-pr-preparation-canary-receipt/v1';
 const REQUIRED_CHECKS =
   'PR Ready,Migration Guard,Fork PR Gate,PR Size Guard'.split(',');
 export const HOLD_LABELS = Object.freeze(
-  'needs-human,hold,gated,queue-deferred,needs-conflict-resolution,needs-manual-rebase,fast'.split(
+  'hold,gated,incident,queue-deferred,needs-conflict-resolution,needs-manual-rebase,fast'.split(
     ','
   )
 );

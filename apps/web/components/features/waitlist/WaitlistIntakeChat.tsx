@@ -318,7 +318,7 @@ export function WaitlistIntakeChat({
       <main className='mx-auto flex w-full max-w-260 flex-col px-4 py-5 sm:px-6 lg:px-8'>
         <header className='flex h-11 items-center justify-between'>
           <div className='inline-flex items-center gap-2'>
-            <BrandLogo size={20} tone='white' aria-hidden />
+            <BrandLogo size='chrome' tone='white' aria-hidden />
             <span className='text-mid font-semibold text-white dark:text-white'>
               Jovie
             </span>

@@ -368,7 +368,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           item={item}
           isActive={isActive}
           shortcut={shortcut}
-          prefetch={undefined}
+          // These six links are the bounded, high-frequency customer rail.
+          // Next's automatic mode skips full payloads for dynamic routes;
+          // forcing `true` warms the complete route while preserving the
+          // current-page warm-navigation contract (no loading.tsx flash).
+          prefetch={
+            !isDemo && primaryNavigation.some(entry => entry.id === item.id)
+              ? true
+              : undefined
+          }
           onClick={demoUnavailable ? () => handleDemoNavClick(item) : undefined}
           onActivate={
             demoUnavailable

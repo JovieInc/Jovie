@@ -1,4 +1,5 @@
 name: Neon Scheduled Branch Cleanup
+# clock-class: temporal-resource
 
 on:
   schedule:

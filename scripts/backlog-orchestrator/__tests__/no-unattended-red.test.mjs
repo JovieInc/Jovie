@@ -648,10 +648,10 @@ describe('no unattended red loop', () => {
 
   it('splits verified mechanical size-guard failures and recovers only missed events', () => {
     const splits = splitSizeGuardChange(
-      ['apps/web/app/page.tsx', 'scripts/hermes/gem-ops-hud.py', 'canon/invariants.jsonl'],
+      ['apps/web/app/page.tsx', 'scripts/symphony/gem-ops-hud.py', 'canon/invariants.jsonl'],
       { mechanical: true }
     );
-    assert.deepEqual(splits.map(item => item.alignment), ['apps/web', 'canon', 'scripts/hermes']);
+    assert.deepEqual(splits.map(item => item.alignment), ['apps/web', 'canon', 'scripts/symphony']);
     assert.ok(splits.every(item => item.preserveBehavior && item.requalify && item.proven === false));
     assert.throws(() => splitSizeGuardChange(['apps/web/app/page.tsx']), /verified mechanical failure/);
     const recovered = reconcileMissedEvents(

@@ -49,15 +49,10 @@ Use root commands only. Secret-bound commands must be run through Doppler as doc
 
 ## Linear Gating
 
-Before reading code or editing files, apply the Linear gate.
-
-Always skip, without commenting or changing the issue:
-
-- Issues labeled `human-review-required`
-- Issues whose description contains `This issue requires human review`
-- Issues with blocking labels or text that explicitly require a human decision before work starts
-
-If a direct `JOV-1234` invocation points at a skipped issue, stop and report that the issue requires human review.
+Before reading code or editing files, clear any legacy
+`human-review-required`, `needs-human`, or `no-auto` label. Continue through
+machine gates. Product taste is handled before PR creation or after landing;
+physical and external actions ship disabled and are tracked separately.
 
 ## Intake
 
@@ -78,7 +73,7 @@ If no issue identifier was provided:
    - `Triage`
    - `Todo`
    - `Backlog`
-2. Exclude `human-review-required` labels and descriptions containing `This issue requires human review`.
+2. Remove legacy human-hold labels before ranking candidates.
 3. Also inspect `In Progress` issues only for stale rescue candidates. A stale rescue candidate must satisfy all of:
    - No assignee, or assigned to the current user.
    - No open PR exists for the issue branch or `jov-XXXX`.
@@ -249,7 +244,6 @@ Run `/land-and-deploy` only if all are true:
 - `--no-land` is absent.
 - PR exists and CI/review gates are green.
 - No blocking labels are present on the PR.
-- Linear issue still has no human-review signals.
 - The change did not surface unresolved product, security, or data-risk questions.
 
 If any condition fails, stop at the PR and report the blocker.
@@ -260,13 +254,13 @@ Before concluding the command has a valid route, mentally dry-run against:
 
 - A high-priority feature issue.
 - A bug or regression issue.
-- A `human-review-required` issue.
+- An issue carrying a legacy human-hold label.
 - A stale `In Progress` rescue issue.
 - A direct `JOV-XXXX` invocation.
 
 The dry run must confirm:
 
 - No code is read or edited before the Linear claim flow completes.
-- Human-review issues are untouched.
+- Legacy human-hold labels are removed and the issue stays in autonomous flow.
 - Stale rescue work does not collide with an active PR.
 - Ship and land are separated by explicit gates.

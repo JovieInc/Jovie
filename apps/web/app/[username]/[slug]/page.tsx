@@ -33,6 +33,7 @@ import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
+import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
@@ -394,14 +395,24 @@ function ContentPageBody({
   soundsUrl: string | null;
   downloadUrl: string | null;
 }>) {
-  const artistName = creator.displayName ?? creator.username;
-  const artist = makeArtistShape(creator, artistName);
+  const ownerName = creator.displayName ?? creator.username;
+  const artistByline = resolveSmartLinkArtistByline({
+    primaryArtists: content.primaryArtists,
+    ownerName,
+    ownerHandle: creator.usernameNormalized,
+  });
+  const artistName = artistByline.text;
+  const artist = makeArtistShape(creator, ownerName);
+  const primaryArtistIds = new Set(
+    (content.primaryArtists ?? []).map(entry => entry.artistId)
+  );
 
-  // Extract featured artists from credits for inline display
+  // Featured credits stay featured — they are never promoted into the byline.
   const featuredArtists: FeaturedArtist[] =
     content.credits
       ?.find(g => g.role === 'featured_artist')
-      ?.entries.map(e => ({ name: e.name, handle: e.handle })) ?? [];
+      ?.entries.filter(entry => !primaryArtistIds.has(entry.artistId))
+      .map(e => ({ name: e.name, handle: e.handle })) ?? [];
 
   // Mystery phase: revealDate is in the future, hide all details
   if (releasePhase === 'mystery' && content.revealDate) {
@@ -466,10 +477,11 @@ function ContentPageBody({
         previewSource: previewState.previewSource,
       }}
       artist={{
-        name: artistName,
+        name: ownerName,
         handle: creator.usernameNormalized,
         avatarUrl: creator.avatarUrl,
       }}
+      primaryArtists={artistByline.entries}
       featuredArtists={featuredArtists}
       providers={allProviders}
       credits={content.credits}
@@ -635,7 +647,11 @@ export async function generateMetadata({
     return { title: 'Not Found' };
   }
 
-  const artistName = creator.displayName ?? creator.username;
+  const artistName = resolveSmartLinkArtistByline({
+    primaryArtists: content.primaryArtists,
+    ownerName: creator.displayName ?? creator.username,
+    ownerHandle: creator.usernameNormalized,
+  }).text;
   const contentType = content.type === 'release' ? 'album' : 'song';
   const canonicalUrl =
     content.type === 'track' && content.releaseSlug

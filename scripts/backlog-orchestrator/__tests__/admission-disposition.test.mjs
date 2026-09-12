@@ -174,14 +174,14 @@ describe('exhaustive Symphony admission dispositions', () => {
   it('gives protected, sensitive, active, parent, incomplete, and stale work typed outcomes', () => {
     const cases = [
       [
-        issue('JOV-30', { assignee: { id: 'tim', name: 'Tim White' } }),
+        issue('JOV-30', { assignee: { id: 'other', name: 'Other Owner' } }),
         'deferred',
-        'tim-owned',
+        'already-assigned',
       ],
       [
         issue('JOV-31', { labels: { nodes: [{ name: 'needs-human' }] } }),
-        'deferred',
-        'protected-policy',
+        'eligible',
+        'deterministic-safe',
       ],
       [
         issue('JOV-32', { title: 'Rotate production credential' }),
@@ -215,13 +215,22 @@ describe('exhaustive Symphony admission dispositions', () => {
       expect(candidate, outcome, reason);
   });
 
-  it('hard-stops every human hold label but preserves exact-label boundaries', () => {
-    for (const label of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ]) {
+  it('treats founder assignment as steering rather than a human hold', () => {
+    const result = classify(
+      issue('JOV-29', {
+        title: 'Founder steering on visual identity',
+        assignee: { id: 'tim', name: 'Tim White' },
+        labels: { nodes: [{ name: 'needs:taste' }] },
+      })
+    );
+
+    assert.equal(result.outcome, 'eligible');
+    assert.equal(result.reason.code, 'deterministic-safe');
+    assert.equal(result.reason.layer, 'admission');
+  });
+
+  it('ignores legacy human holds while preserving machine incident holds', () => {
+    for (const label of ['held', 'manual-incident']) {
       const result = expect(
         issue(`JOV-${label.length}`, { labels: { nodes: [{ name: label }] } }),
         'deferred',
@@ -229,6 +238,16 @@ describe('exhaustive Symphony admission dispositions', () => {
       );
       assert.equal(result.reason.retryable, false);
       assert.deepEqual(result.preAdmission.matchedLabels, [label]);
+    }
+
+    for (const label of ['needs-human', 'decision-required', 'no-auto']) {
+      const result = classify(
+        issue(`JOV-${label.length + 100}`, {
+          labels: { nodes: [{ name: label }] },
+        })
+      );
+      assert.equal(result.outcome, 'eligible');
+      assert.equal(result.preAdmission.allowed, true);
     }
 
     const nearMiss = classify(

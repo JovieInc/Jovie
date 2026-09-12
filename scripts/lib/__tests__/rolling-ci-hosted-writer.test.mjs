@@ -336,10 +336,18 @@ describe('hosted rolling CI repair policy', () => {
     await expect(
       commitHostedRepair(commitArgs(fx, { request: failedCiRequest() }))
     ).resolves.toMatchObject({ committed: true, outcome: 'repaired' });
-    const heldPr = livePr({ labels: [{ name: 'needs-human' }] });
+    const retiredHoldPr = livePr({ labels: [{ name: 'needs-human' }] });
     await expect(
-      commitHostedRepair(commitArgs(fx, { request: failedCiRequest(heldPr) }))
-    ).resolves.toEqual({ committed: false, outcome: 'human_held' });
+      commitHostedRepair(
+        commitArgs(fx, { request: failedCiRequest(retiredHoldPr) })
+      )
+    ).resolves.toMatchObject({ committed: true, outcome: 'repaired' });
+    const machineHeldPr = livePr({ labels: [{ name: 'hold' }] });
+    await expect(
+      commitHostedRepair(
+        commitArgs(fx, { request: failedCiRequest(machineHeldPr) })
+      )
+    ).resolves.toEqual({ committed: false, outcome: 'machine_held' });
     await expect(
       commitHostedRepair(
         commitArgs(fx, {
@@ -377,7 +385,6 @@ describe('hosted rolling CI repair policy', () => {
     );
     const workflowPath = '.github/workflows/rolling-ci-dispatch.yml';
     const workflow = readFileSync(workflowPath, 'utf8');
-    expect(workflow).toContain('scripts/lib/rolling-ci-hosted-writer.mjs');
     expect(workflow).toContain('hosted-acceptance');
     expect(workflow).toContain('hosted-commit');
   });

@@ -2,14 +2,17 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export type EvePilotIdentityId = 'jovie' | 'ovie' | 'summer';
+export type EvePilotIdentityId = 'jovie' | 'summer';
 
 export type EvePilotCapability =
   | 'privileged-gbrain-write'
   | 'symphony-heal'
   | 'symphony-bounded-dispatch'
   | 'gbrain-read'
-  | 'ingest-ack';
+  | 'ingest-ack'
+  | 'governor-admit'
+  | 'governor-route'
+  | 'governor-enforce';
 
 export type EvePilotPack = {
   readonly id: EvePilotIdentityId;
@@ -19,6 +22,9 @@ export type EvePilotPack = {
   readonly canDispatchBoundedSymphonyRepair: boolean;
   readonly canIngestAck: boolean;
   readonly canReadGbrain: boolean;
+  readonly canGovernorAdmit: boolean;
+  readonly canGovernorRoute: boolean;
+  readonly canGovernorEnforce: boolean;
 };
 
 export class EvePilotCapabilityDeniedError extends Error {
@@ -41,24 +47,11 @@ const JOVIE_PACK: EvePilotPack = {
   canDispatchBoundedSymphonyRepair: false,
   canIngestAck: false,
   canReadGbrain: false,
+  canGovernorAdmit: false,
+  canGovernorRoute: false,
+  canGovernorEnforce: false,
 };
 
-const OVIE_PACK: EvePilotPack = {
-  id: 'ovie',
-  role: 'founder',
-  canPrivilegedWriteGbrain: false,
-  canHealSymphony: false,
-  canDispatchBoundedSymphonyRepair: false,
-  canIngestAck: true,
-  canReadGbrain: true,
-};
-
-/**
- * First Vercel cutover phase: Summer can observe and reason about company
- * operations. Its only mutation capability is the separately tested,
- * source-bound Symphony repair outbox. General Linear, GitHub, GBrain, and
- * Symphony mutation remains denied.
- */
 const SUMMER_SHADOW_PACK: EvePilotPack = {
   id: 'summer',
   role: 'company-operator',
@@ -67,7 +60,25 @@ const SUMMER_SHADOW_PACK: EvePilotPack = {
   canDispatchBoundedSymphonyRepair: true,
   canIngestAck: false,
   canReadGbrain: false,
+  canGovernorAdmit: true,
+  canGovernorRoute: true,
+  canGovernorEnforce: false,
 };
+
+export function summerGovernorEnforceEnabled(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  return environment.SUMMER_GOVERNOR_ENFORCE_ENABLED?.trim() === 'true';
+}
+
+function buildSummerShadowPack(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): EvePilotPack {
+  return {
+    ...SUMMER_SHADOW_PACK,
+    canGovernorEnforce: summerGovernorEnforceEnabled(environment),
+  };
+}
 
 function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
   switch (capability) {
@@ -81,20 +92,21 @@ function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
       return pack.canReadGbrain;
     case 'ingest-ack':
       return pack.canIngestAck;
+    case 'governor-admit':
+      return pack.canGovernorAdmit;
+    case 'governor-route':
+      return pack.canGovernorRoute;
+    case 'governor-enforce':
+      return pack.canGovernorEnforce;
   }
 }
 
-/**
- * Eve agent entry. Loads the on-disk identity pack and exposes `require`
- * so a runtime that still writes gbrain or heals Symphony fails closed.
- */
-export function bindEvePilotIdentity(id: EvePilotIdentityId) {
+export function bindEvePilotIdentity(
+  id: EvePilotIdentityId,
+  environment: Readonly<Record<string, string | undefined>> = process.env
+) {
   const pack =
-    id === 'ovie'
-      ? OVIE_PACK
-      : id === 'summer'
-        ? SUMMER_SHADOW_PACK
-        : JOVIE_PACK;
+    id === 'summer' ? buildSummerShadowPack(environment) : JOVIE_PACK;
   const instructionPath = resolve(root, 'identities', id, 'instructions.md');
   const instructions = existsSync(instructionPath)
     ? readFileSync(instructionPath, 'utf8')
@@ -133,26 +145,38 @@ export type EvePilotChannelSource =
   | 'jovie-core-chat'
   | string;
 
-/**
- * Telegram remains the Ovie founder pack. Photon/iMessage is Summer's live
- * talk channel. The ovie-summer-shadow and ovie-summer-bottleneck sources stay
- * Summer for the OIDC observation and deterministic bottleneck paths. Other
- * sources keep the Jovie runtime default.
- */
 export function eveIdentityIdForChannel(
-  source?: EvePilotChannelSource
+  source?: EvePilotChannelSource,
+  environment: Readonly<Record<string, string | undefined>> = process.env
 ): EvePilotIdentityId {
-  if (source === 'telegram') {
-    return 'ovie';
+  if (
+    source === 'telegram' ||
+    source === 'ovie-summer-shadow' ||
+    source === 'ovie-summer-bottleneck'
+  ) {
+    return 'summer';
   }
   if (source === 'imessage' || source === 'photon') {
-    return 'summer';
+    const lane = photonIdentityFromEnvironment(environment);
+    if (!lane) throw new EvePilotPhotonLaneUnconfiguredError();
+    return lane;
   }
-  if (source === 'ovie-summer-shadow' || source === 'ovie-summer-bottleneck') {
-    return 'summer';
-  }
-  if (process.env.EVE_IDENTITY === 'ovie') return 'ovie';
+  if (environment.EVE_IDENTITY === 'summer') return 'summer';
   return 'jovie';
+}
+
+export class EvePilotPhotonLaneUnconfiguredError extends Error {
+  constructor() {
+    super('Photon lane requires EVE_IDENTITY=jovie or EVE_IDENTITY=summer');
+    this.name = 'EvePilotPhotonLaneUnconfiguredError';
+  }
+}
+
+export function photonIdentityFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): EvePilotIdentityId | null {
+  const identity = environment.EVE_IDENTITY?.trim().toLowerCase();
+  return identity === 'jovie' || identity === 'summer' ? identity : null;
 }
 
 export function eveIdentityForChannel(source?: EvePilotChannelSource) {

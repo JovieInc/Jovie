@@ -1,12 +1,29 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import {
+  appendFile,
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
+  assertCommitDescendantCompare,
+  assertMainlineAncestorCompare,
   assertStagingVersionTransition,
   expectedDesktopAssetNames,
+  fetchRecoverableStagingDraft,
+  prepare,
+  releaseMetadataUpdate,
+  selectRecoverableStagingDraft,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
 import {
@@ -19,8 +36,26 @@ import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
 );
+const { notarizeReleaseDmg } = desktopRequire(
+  './scripts/notarize-release-dmg.cjs'
+);
+const desktopProductionBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.yml', import.meta.url),
+  'utf8'
+);
+const desktopStagingBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.staging.yml', import.meta.url),
+  'utf8'
+);
 const desktopWorkflow = readFileSync(
   new URL('../.github/workflows/desktop-release.yml', import.meta.url),
+  'utf8'
+);
+const productionMarkerRecoveryWorkflow = readFileSync(
+  new URL(
+    '../.github/workflows/production-marker-recovery.yml',
+    import.meta.url
+  ),
   'utf8'
 );
 const desktopReleaseAssets = readFileSync(
@@ -51,8 +86,33 @@ function step(workflow, stepName) {
   );
 }
 
+function shellStepBody(workflow, stepName) {
+  const block = step(workflow, stepName);
+  const marker = '        run: |\n';
+  const start = block.indexOf(marker);
+  assert.notEqual(start, -1, `Missing shell body: ${stepName}`);
+  return block
+    .slice(start + marker.length)
+    .split('\n')
+    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
+    .join('\n');
+}
+
 function assertPatterns(source, patterns) {
   patterns.forEach(pattern => assert.match(source, pattern));
+}
+
+function dedentShell(source) {
+  const indentation = Math.min(
+    ...source
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => line.match(/^\s*/)[0].length)
+  );
+  return source
+    .split('\n')
+    .map(line => line.slice(indentation))
+    .join('\n');
 }
 
 function hash(buffer, algorithm, encoding) {
@@ -191,6 +251,388 @@ test('desktop builder can parse Electron macOS property lists', () => {
   );
 
   assert.deepEqual(parsed, { CFBundleName: 'Jovie' });
+});
+
+test('release DMG finalization signs, notarizes, staples, and refreshes updater metadata', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'jovie-release-dmg-'));
+  t.after(() => rm(dir, { force: true, recursive: true }));
+  const dmg = join(dir, 'Jovie-26.9.0-universal.dmg');
+  const blockmap = `${dmg}.blockmap`;
+  await writeFile(dmg, Buffer.from('pre-staple-dmg'));
+  await writeFile(blockmap, Buffer.from('stale-blockmap'));
+  const event = {
+    file: dmg,
+    updateInfo: {
+      sha512: hash(Buffer.from('pre-staple-dmg'), 'sha512', 'base64'),
+      size: Buffer.byteLength('pre-staple-dmg'),
+    },
+  };
+  const calls = [];
+
+  await notarizeReleaseDmg(event, {
+    environment: {
+      APPLE_API_ISSUER: 'issuer',
+      APPLE_API_KEY: '/tmp/private-key.p8',
+      APPLE_API_KEY_ID: 'key-id',
+      JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
+      JOVIE_RELEASE_DMG: 'true',
+    },
+    executeCodesign: async args => {
+      calls.push(['codesign', ...args]);
+      return { stdout: '' };
+    },
+    executeXcrun: async args => {
+      calls.push(['xcrun', ...args]);
+      if (args[0] === 'notarytool') {
+        return {
+          stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
+        };
+      }
+      if (args[1] === 'staple') await appendFile(dmg, '-ticket');
+      return { stdout: '' };
+    },
+  });
+
+  const finalBytes = await readFile(dmg);
+  assert.deepEqual(calls, [
+    ['codesign', '--force', '--timestamp', '--sign', 'developer-id-hash', dmg],
+    ['codesign', '--verify', '--verbose=2', dmg],
+    [
+      'xcrun',
+      'notarytool',
+      'submit',
+      dmg,
+      '--key',
+      '/tmp/private-key.p8',
+      '--key-id',
+      'key-id',
+      '--issuer',
+      'issuer',
+      '--wait',
+      '--timeout',
+      '20m',
+      '--output-format',
+      'json',
+    ],
+    ['xcrun', 'stapler', 'staple', dmg],
+    ['xcrun', 'stapler', 'validate', dmg],
+  ]);
+  assert.equal(event.updateInfo.size, finalBytes.length);
+  assert.equal(event.updateInfo.sha512, hash(finalBytes, 'sha512', 'base64'));
+  assert.notEqual(await readFile(blockmap, 'utf8'), 'stale-blockmap');
+});
+
+test('release DMG finalization fails closed before publishing incoherent artifacts', async t => {
+  const dmg = '/tmp/Jovie-Staging-26.8.3-staging.1.1-universal.dmg';
+  const accepted = async () => ({
+    stdout: JSON.stringify({ id: 'submission', status: 'Accepted' }),
+  });
+  const codesignAccepted = async () => ({ stdout: '' });
+  const environment = {
+    APPLE_API_ISSUER: 'issuer',
+    APPLE_API_KEY: '/tmp/private-key.p8',
+    APPLE_API_KEY_ID: 'key-id',
+    JOVIE_MAC_SIGNING_IDENTITY: 'developer-id-hash',
+    JOVIE_RELEASE_DMG: 'true',
+  };
+
+  await t.test('ignores non-DMG artifacts', async () => {
+    await notarizeReleaseDmg(
+      { file: `${dmg}.blockmap`, updateInfo: {} },
+      {
+        buildBlockMap: () => assert.fail('must not build'),
+        environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
+        executeXcrun: () => assert.fail('must not execute'),
+      }
+    );
+  });
+  await t.test('keeps ordinary CI packaging credential-free', async () => {
+    const updateInfo = { sha512: 'unchanged', size: 1 };
+    await notarizeReleaseDmg(
+      { file: dmg, updateInfo },
+      {
+        buildBlockMap: () => assert.fail('must not build'),
+        environment: {},
+        executeCodesign: () => assert.fail('must not execute'),
+        executeXcrun: () => assert.fail('must not execute'),
+      }
+    );
+    assert.deepEqual(updateInfo, { sha512: 'unchanged', size: 1 });
+  });
+  await t.test('requires builder update metadata', async () => {
+    await assert.rejects(
+      notarizeReleaseDmg(
+        { file: dmg },
+        { buildBlockMap: assert.fail, environment, executeXcrun: accepted }
+      ),
+      /update metadata is missing/
+    );
+  });
+  await t.test('requires every notarization credential', async () => {
+    for (const [name, missingEnvironment] of [
+      ['issuer', { ...environment, APPLE_API_ISSUER: '' }],
+      ['signingIdentity', { ...environment, JOVIE_MAC_SIGNING_IDENTITY: '' }],
+    ]) {
+      await assert.rejects(
+        notarizeReleaseDmg(
+          { file: dmg, updateInfo: {} },
+          {
+            buildBlockMap: assert.fail,
+            environment: missingEnvironment,
+            executeCodesign: assert.fail,
+            executeXcrun: accepted,
+          }
+        ),
+        new RegExp(`credential is missing: ${name}`)
+      );
+    }
+  });
+  await t.test('requires an accepted structured Apple response', async () => {
+    for (const stdout of [
+      'not-json',
+      JSON.stringify({ id: 'submission', status: 'Invalid' }),
+      JSON.stringify({ id: '', status: 'Accepted' }),
+    ]) {
+      await assert.rejects(
+        notarizeReleaseDmg(
+          { file: dmg, updateInfo: {} },
+          {
+            buildBlockMap: assert.fail,
+            environment,
+            executeCodesign: codesignAccepted,
+            executeXcrun: async () => ({ stdout }),
+          }
+        ),
+        /not valid JSON|did not accept/
+      );
+    }
+  });
+  await t.test('stops before notarization when DMG signing fails', async () => {
+    await assert.rejects(
+      notarizeReleaseDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: assert.fail,
+          environment,
+          executeCodesign: async () => {
+            throw new Error('signing failed');
+          },
+          executeXcrun: assert.fail,
+        }
+      ),
+      /signing failed/
+    );
+  });
+  await t.test('requires final metadata for the stapled bytes', async () => {
+    await assert.rejects(
+      notarizeReleaseDmg(
+        { file: dmg, updateInfo: {} },
+        {
+          buildBlockMap: async () => ({ sha512: '', size: 0 }),
+          environment,
+          executeCodesign: codesignAccepted,
+          executeXcrun: accepted,
+        }
+      ),
+      /update metadata is malformed/
+    );
+  });
+});
+
+test('release validation rejects a DMG mutated after updater metadata creation', () => {
+  const fixture = desktopReleaseFixture('staging');
+  const dmgName = fixture.release.assets.find(asset =>
+    asset.name.endsWith('.dmg')
+  ).name;
+  const finalDmg = Buffer.concat([
+    fixture.buffers.get(dmgName),
+    Buffer.from('-stapled-ticket'),
+  ]);
+  fixture.buffers.set(dmgName, finalDmg);
+  const asset = fixture.release.assets.find(item => item.name === dmgName);
+  asset.size = finalDmg.length;
+  asset.digest = `sha256:${hash(finalDmg, 'sha256', 'hex')}`;
+
+  assert.throws(
+    () => validateReleaseAssets({ ...fixture, draft: true }),
+    /Updater size does not match/
+  );
+});
+
+test('staging release metadata update restores the canonical rolling tag', () => {
+  const version = '26.8.3-staging.34302621597.1';
+  const releaseSha = 'a'.repeat(40);
+
+  assert.deepEqual(
+    releaseMetadataUpdate({
+      environment: 'staging',
+      releaseSha,
+      version,
+    }),
+    {
+      name: version,
+      prerelease: true,
+      tag_name: 'desktop-staging',
+      target_commitish: releaseSha,
+    }
+  );
+});
+
+function recoverableStagingDraft(overrides = {}) {
+  return {
+    assets: [],
+    draft: true,
+    id: 385137639,
+    name: '26.8.3-staging.34302621597.1',
+    prerelease: true,
+    published_at: null,
+    tag_name: 'untagged-84c451c95b383b6899b7',
+    target_commitish: 'a'.repeat(40),
+    ...overrides,
+  };
+}
+
+test('selects only a unique private empty staging-shaped orphan draft', () => {
+  const candidate = recoverableStagingDraft();
+  assert.equal(
+    selectRecoverableStagingDraft([
+      { ...candidate, id: 1, name: 'unrelated', tag_name: 'v1.0.0' },
+      candidate,
+    ]),
+    candidate
+  );
+  assert.equal(selectRecoverableStagingDraft([]), null);
+});
+
+test('rejects ambiguous or unsafe staging orphan drafts', () => {
+  const candidate = recoverableStagingDraft();
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        candidate,
+        recoverableStagingDraft({ id: 385137640 }),
+      ]),
+    /Multiple recoverable staging drafts/
+  );
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        recoverableStagingDraft({ assets: [{ id: 1 }] }),
+      ]),
+    /must be empty/
+  );
+  for (const unsafe of [
+    { draft: false, published_at: '2026-09-09T00:00:00Z' },
+    { prerelease: false },
+    { published_at: '2026-09-09T00:00:00Z' },
+  ]) {
+    assert.throws(
+      () => selectRecoverableStagingDraft([recoverableStagingDraft(unsafe)]),
+      /private prerelease draft/
+    );
+  }
+  assert.throws(
+    () =>
+      selectRecoverableStagingDraft([
+        recoverableStagingDraft({
+          name: '26.8.3-staging.not-a-run.1',
+        }),
+      ]),
+    /version is malformed/
+  );
+});
+
+test('rejects staging orphan ambiguity beyond the first release page', async () => {
+  const first = recoverableStagingDraft();
+  const second = recoverableStagingDraft({ id: 385137640 });
+  const unrelated = index => ({
+    id: index,
+    name: `release-${index}`,
+    tag_name: `v1.0.${index}`,
+  });
+  const pages = [
+    [first, ...Array.from({ length: 99 }, (_, index) => unrelated(index + 1))],
+    [second],
+  ];
+  const requested = [];
+
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async path => {
+        requested.push(path);
+        const page = Number(new URLSearchParams(path.slice(1)).get('page'));
+        return pages[page - 1] || [];
+      },
+      { maxPages: 3 }
+    ),
+    /Multiple recoverable staging drafts/
+  );
+  assert.deepEqual(requested, ['?per_page=100&page=1', '?per_page=100&page=2']);
+});
+
+test('fails closed when the bounded release inventory never completes', async () => {
+  await assert.rejects(
+    fetchRecoverableStagingDraft(
+      async () =>
+        Array.from({ length: 100 }, (_, index) => ({
+          id: index + 1,
+          name: `release-${index}`,
+          tag_name: `v1.0.${index}`,
+        })),
+      { maxPages: 2 }
+    ),
+    /inventory exceeds the 2-page safety bound/
+  );
+});
+
+test('prepare repairs an orphan staging draft before validating it', async () => {
+  const version = '26.8.3-staging.34302621597.1';
+  const releaseSha = 'b'.repeat(40);
+  const orphan = recoverableStagingDraft();
+  const repaired = {
+    ...orphan,
+    name: version,
+    tag_name: 'desktop-staging',
+    target_commitish: releaseSha,
+  };
+  const calls = [];
+  const client = {
+    recoverableStagingDraft: async () => {
+      calls.push('recover');
+      return orphan;
+    },
+    releaseById: async id => {
+      calls.push(`read:${id}`);
+      return repaired;
+    },
+    releaseOrDraftByTag: async () => null,
+    updateReleaseMetadata: async metadata => {
+      calls.push({ update: metadata });
+      return repaired;
+    },
+  };
+
+  await prepare({
+    client,
+    environment: 'staging',
+    installedVersion: '26.8.2',
+    releaseSha,
+    version,
+  });
+
+  assert.deepEqual(calls, [
+    'recover',
+    {
+      update: {
+        environment: 'staging',
+        releaseId: orphan.id,
+        releaseSha,
+        version,
+      },
+    },
+    `read:${orphan.id}`,
+  ]);
 });
 
 test('passes when no desktop files changed', () => {
@@ -400,6 +842,19 @@ test('desktop publishing follows verified production instead of raw main pushes'
   assert.doesNotMatch(desktopWorkflow, /^  push:\n/m);
 });
 
+test('marker recovery wakes a selector-bound desktop reconciliation', () => {
+  assertPatterns(desktopWorkflow, [
+    /force_rebuild:/,
+    /MANUAL_FORCE_REBUILD: \$\{\{ inputs\.force_rebuild \}\}/,
+    /"\$MANUAL_FORCE_REBUILD" = "true"/,
+  ]);
+  assertPatterns(productionMarkerRecoveryWorkflow, [
+    /gh workflow run desktop-release\.yml --ref main/,
+    /-f environment=production/,
+    /-f force_rebuild=false/,
+  ]);
+});
+
 test('desktop authorizer cross-proves exact Production Verified evidence', () => {
   const authorize = job(desktopWorkflow, 'authorize-release');
   const header = authorize.slice(0, authorize.indexOf('    steps:'));
@@ -430,6 +885,22 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
     proof.lastIndexOf('if [ "$EVENT_NAME" = "workflow_dispatch" ]') >
       proof.indexOf('if [ "$production_proven" != "true" ]')
   );
+});
+
+test('desktop authorizer accepts an exact successful recovered production marker', () => {
+  const proof = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
+
+  assertPatterns(proof, [
+    /\.path == "\.github\/workflows\/production-marker-recovery\.yml"/,
+    /\.name == "Production Marker Recovery"/,
+    /\.name == "Recover exact verified-generation marker"/,
+    /\.name == "Confirm uploaded recovered marker bytes"/,
+    /\.recoveredFromControllerRun/,
+    /\.recoveredFromControllerAttempt/,
+  ]);
 });
 
 test('desktop dedup cross-proves an actual-publish-only marker', () => {
@@ -465,9 +936,26 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
     /git diff --name-status --find-renames/,
   ]);
   assert.doesNotMatch(proof, /desktop-staging-/);
-  assert.doesNotMatch(select, /apps\/desktop/);
-  assert.doesNotMatch(select, /desktop-release\.yml/);
   assert.doesNotMatch(proof, /gh api[\s\S]{0,160}\|\| continue/);
+  assert.doesNotMatch(
+    proof,
+    /if \[ "\$EVENT_NAME" = "workflow_dispatch" \]; then\s+exit 0/
+  );
+  assert.match(
+    proof,
+    /Production desktop reconciliation requires a proven desktop publish baseline/
+  );
+  const reconciliationExit = proof.indexOf(
+    'if [ "$EVENT_NAME" = "workflow_dispatch" ] &&'
+  );
+  assert.ok(
+    reconciliationExit > proof.indexOf('echo "authorized=true"'),
+    'manual force/staging bypass must remain behind production authorization'
+  );
+  assert.ok(
+    reconciliationExit < proof.indexOf('publish_markers="$(gh api'),
+    'production reconciliation must continue into durable baseline discovery'
+  );
   const failClosedIndex = proof.indexOf(
     'if [ "$publish_marker_presence_count" -gt 0 ]'
   );
@@ -478,6 +966,321 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
   assert.ok(
     failClosedIndex < proof.indexOf('legacy_runs_json='),
     'unproved marker history must fail before legacy or bootstrap fallback'
+  );
+  const missingReconciliationBaseline = proof.indexOf(
+    'Production desktop reconciliation requires a proven desktop publish baseline'
+  );
+  assert.ok(
+    missingReconciliationBaseline > failClosedIndex,
+    'expired or inconsistent marker history must retain its existing fail-closed error'
+  );
+  assert.ok(
+    missingReconciliationBaseline < proof.indexOf('legacy_runs_json='),
+    'markerless reconciliation must fail before legacy or bootstrap fallback'
+  );
+});
+
+test('desktop selection finds an intervening JOV-5996 change from the durable baseline', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-select-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+
+  git('init', '-q');
+  git('config', 'user.email', 'desktop-release-test@jov.ie');
+  git('config', 'user.name', 'Desktop Release Test');
+  await writeFile(join(root, 'README.md'), 'baseline\n');
+  git('add', 'README.md');
+  git('commit', '-qm', 'baseline');
+  const baseline = git('rev-parse', 'HEAD');
+
+  await mkdir(join(root, 'apps/desktop/src'), { recursive: true });
+  await writeFile(
+    join(root, 'apps/desktop/src/preload.ts'),
+    'export const sandboxPreloadIsSelfContained = true;\n'
+  );
+  git('add', 'apps/desktop/src/preload.ts');
+  git('commit', '-qm', 'fix desktop preload');
+  await writeFile(join(root, 'README.md'), 'baseline\nunrelated follow-up\n');
+  git('add', 'README.md');
+  git('commit', '-qm', 'unrelated follow-up');
+  const releaseSha = git('rev-parse', 'HEAD');
+  const repository = 'JovieInc/Jovie';
+  const artifactId = 101;
+  const runId = 202;
+  const workflowId = 303;
+  const publisherJobId = 404;
+  const markerName = 'desktop-production-published.json';
+  await writeFile(
+    join(root, markerName),
+    JSON.stringify({
+      schema: 1,
+      environment: 'production',
+      sha: baseline,
+      runId: String(runId),
+      publisherAttempt: '1',
+      publisherJobId: String(publisherJobId),
+    })
+  );
+  const markerArchive = join(root, 'desktop-production-published.zip');
+  execFileSync('zip', ['-q', markerArchive, markerName], { cwd: root });
+  const mockBin = join(root, 'bin');
+  await mkdir(mockBin);
+  const mockGh = join(mockBin, 'gh');
+  await writeFile(
+    mockGh,
+    `#!/usr/bin/env bash
+set -euo pipefail
+endpoint="\${!#}"
+case "$endpoint" in
+  *"actions/artifacts?name=desktop-production-published"*) printf '%s' "$MOCK_MARKERS_JSON" ;;
+  *"actions/runs/$MOCK_RUN_ID/attempts/1/jobs"*) printf '%s' "$MOCK_JOBS_JSON" ;;
+  *"actions/runs/$MOCK_RUN_ID") printf '%s' "$MOCK_RUN_JSON" ;;
+  *"actions/workflows/$MOCK_WORKFLOW_ID") printf '%s' "$MOCK_WORKFLOW_JSON" ;;
+  *"actions/artifacts/$MOCK_ARTIFACT_ID/zip") command cat "$MOCK_MARKER_ARCHIVE" ;;
+  *) printf 'unexpected gh endpoint: %s\n' "$endpoint" >&2; exit 64 ;;
+esac
+`
+  );
+  await chmod(mockGh, 0o755);
+
+  const proofBody = shellStepBody(
+    desktopWorkflow,
+    'Cross-prove exact production evidence'
+  );
+  const baselineStart = proofBody.indexOf('baseline_sha=""');
+  const baselineOutputLine =
+    'echo "baseline_sha=$baseline_sha" >> "$GITHUB_OUTPUT"';
+  const baselineEnd = proofBody.indexOf(baselineOutputLine, baselineStart);
+  assert.ok(
+    baselineStart >= 0 && baselineEnd > baselineStart,
+    'missing durable baseline proof block'
+  );
+  const authorizationOutput = join(root, 'authorization-output.txt');
+  await writeFile(authorizationOutput, '');
+  execFileSync(
+    'bash',
+    [
+      '-c',
+      `release_sha="$RELEASE_SHA"\n${proofBody.slice(
+        baselineStart,
+        baselineEnd + baselineOutputLine.length
+      )}`,
+    ],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        DESKTOP_RUN_ATTEMPT: '1',
+        DESKTOP_RUN_ID: '505',
+        EVENT_NAME: 'workflow_dispatch',
+        GITHUB_OUTPUT: authorizationOutput,
+        MANUAL_FORCE_REBUILD: 'false',
+        MOCK_ARTIFACT_ID: String(artifactId),
+        MOCK_JOBS_JSON: JSON.stringify([
+          {
+            jobs: [
+              {
+                id: publisherJobId,
+                name: 'Publish production desktop release',
+                head_sha: baseline,
+                status: 'completed',
+                conclusion: 'success',
+                steps: [
+                  {
+                    name: 'Publish production desktop release',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                ],
+              },
+            ],
+          },
+        ]),
+        MOCK_MARKERS_JSON: JSON.stringify({
+          artifacts: [
+            {
+              id: artifactId,
+              name: 'desktop-production-published',
+              expired: false,
+              created_at: '2026-09-09T00:00:00Z',
+              workflow_run: { id: runId },
+            },
+          ],
+        }),
+        MOCK_MARKER_ARCHIVE: markerArchive,
+        MOCK_RUN_ID: String(runId),
+        MOCK_RUN_JSON: JSON.stringify({
+          workflow_id: workflowId,
+          run_attempt: 1,
+          head_branch: 'main',
+          head_repository: { full_name: repository },
+          path: '.github/workflows/desktop-release.yml',
+          event: 'workflow_run',
+          head_sha: baseline,
+          display_title: `Desktop release ${baseline}`,
+        }),
+        MOCK_WORKFLOW_ID: String(workflowId),
+        MOCK_WORKFLOW_JSON: JSON.stringify({
+          id: workflowId,
+          name: 'desktop-release',
+          path: '.github/workflows/desktop-release.yml',
+        }),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        RELEASE_SHA: releaseSha,
+        REPOSITORY: repository,
+        RUNNER_TEMP: root,
+        environment: 'production',
+      },
+    }
+  );
+  const provenBaseline = (await readFile(authorizationOutput, 'utf8')).match(
+    /^baseline_sha=([0-9a-f]{40})$/m
+  )?.[1];
+  assert.equal(provenBaseline, baseline);
+  const output = join(root, 'github-output.txt');
+  await writeFile(output, '');
+
+  const stdout = execFileSync(
+    'bash',
+    [
+      '-c',
+      shellStepBody(
+        desktopWorkflow,
+        'Select desktop-relevant production generation'
+      ),
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ALREADY_RELEASED: 'false',
+        AUTHORIZED: 'true',
+        BASELINE_SHA: provenBaseline,
+        GITHUB_OUTPUT: output,
+        MANUAL: 'false',
+        RELEASE_SHA: releaseSha,
+      },
+    }
+  );
+  const outputs = await readFile(output, 'utf8');
+
+  assert.match(stdout, /apps\/desktop\/src\/preload\.ts/);
+  assert.match(
+    stdout,
+    /Verified production generation requires a post-land desktop release stamp/
+  );
+  assert.match(outputs, /^should_stamp=true$/m);
+  assert.doesNotMatch(outputs, /^should_release=true$/m);
+});
+
+test('desktop reconciliation continues to baseline proof and fails closed without one', () => {
+  const proof = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
+  const afterAuthorization = proof.slice(
+    proof.indexOf('echo "authorized=true"')
+  );
+  const dispatchGate = afterAuthorization.match(
+    /\s+if \[ "\$EVENT_NAME" = "workflow_dispatch" \] &&[\s\S]*?\n\s+fi/
+  )?.[0];
+  assert.ok(dispatchGate, 'missing workflow_dispatch reconciliation gate');
+  const gateScript = `${dedentShell(dispatchGate)}\nprintf continued`;
+
+  const reconcile = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_dispatch',
+      MANUAL_FORCE_REBUILD: 'false',
+      environment: 'production',
+    },
+  });
+  assert.equal(reconcile, 'continued');
+  const forced = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_dispatch',
+      MANUAL_FORCE_REBUILD: 'true',
+      environment: 'production',
+    },
+  });
+  assert.equal(forced, '');
+  const staging = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_dispatch',
+      MANUAL_FORCE_REBUILD: 'false',
+      environment: 'staging',
+    },
+  });
+  assert.equal(staging, '');
+  const workflowRun = execFileSync('bash', ['-c', gateScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT_NAME: 'workflow_run',
+      MANUAL_FORCE_REBUILD: 'false',
+      environment: 'production',
+    },
+  });
+  assert.equal(workflowRun, 'continued');
+
+  const expiredStart = proof.indexOf(
+    'if [ "$publish_marker_presence_count" -gt 0 ]'
+  );
+  const expiredGuard = proof
+    .slice(expiredStart)
+    .match(/^if [\s\S]*?\n\s+fi/m)?.[0];
+  assert.ok(expiredGuard, 'missing expired baseline fail-closed guard');
+  const expired = spawnSync(
+    'bash',
+    ['-c', `${dedentShell(expiredGuard)}\nprintf continued`],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        baseline_sha: '',
+        publish_marker_presence_count: '1',
+      },
+    }
+  );
+  assert.equal(expired.status, 1);
+  assert.match(
+    expired.stdout,
+    /1 desktop publish marker\(s\) existed, but none fully proved a release/
+  );
+
+  const missingStart = proof.indexOf(
+    'if [ "$EVENT_NAME" = "workflow_dispatch" ] &&',
+    proof.indexOf('publish_marker_presence_count')
+  );
+  const missingGuard = proof
+    .slice(missingStart)
+    .match(/^if [\s\S]*?\n\s+fi/m)?.[0];
+  assert.ok(missingGuard, 'missing baseline fail-closed guard');
+  const missing = spawnSync(
+    'bash',
+    ['-c', `${dedentShell(missingGuard)}\nprintf continued`],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        EVENT_NAME: 'workflow_dispatch',
+        MANUAL_FORCE_REBUILD: 'false',
+        baseline_sha: '',
+        environment: 'production',
+      },
+    }
+  );
+  assert.equal(missing.status, 1);
+  assert.match(
+    missing.stdout,
+    /Production desktop reconciliation requires a proven desktop publish baseline/
   );
 });
 
@@ -524,6 +1327,26 @@ test('desktop stable marker listing distinguishes empty from unprovable history'
     }).trim(),
     '1'
   );
+
+  const candidateProgram = proof.match(
+    /marker_candidates="\$\(jq -r '\n([\s\S]*?)\n\s+' <<<"\$publish_markers"\)"/
+  )?.[1];
+  assert.ok(candidateProgram, 'missing durable baseline marker selector');
+  const selected = execFileSync('jq', ['-r', candidateProgram], {
+    encoding: 'utf8',
+    input: JSON.stringify({
+      artifacts: [
+        marker,
+        {
+          ...marker,
+          id: 3,
+          expired: false,
+          workflow_run: { id: 4 },
+        },
+      ],
+    }),
+  });
+  assert.equal(selected.trim(), '3\t4');
 });
 
 test('desktop recovery ignores legacy push titles and selects new run-name evidence', () => {
@@ -562,18 +1385,48 @@ test('desktop recovery ignores legacy push titles and selects new run-name evide
   assert.equal(output.trim(), `2\t1\t${newSha}`);
 });
 
-test('automatic desktop publishing selects VERSION changes only', () => {
+test('automatic desktop publishing stamps production-impacting source before release', () => {
+  const authorize = job(desktopWorkflow, 'authorize-release');
   const select = step(
-    job(desktopWorkflow, 'authorize-release'),
+    authorize,
     'Select desktop-relevant production generation'
   );
-  const paths = select
-    .match(/release_paths=\(\n([\s\S]*?)\n\s+\)/)?.[1]
+  const productionPaths = select
+    .match(/production_paths=\(\n([\s\S]*?)\n\s+\)/)?.[1]
     ?.trim()
     .split(/\s+/);
-  assert.deepEqual(paths, ['VERSION']);
-  assert.equal(paths?.includes('.github/workflows/desktop-release.yml'), false);
-  assert.equal(paths?.includes('VERSION'), true);
+  assert.equal(productionPaths?.includes('apps/desktop/src'), true);
+  assert.equal(productionPaths?.includes('apps/desktop/package.json'), true);
+  assert.equal(
+    productionPaths?.includes('.github/workflows/desktop-release.yml'),
+    true
+  );
+  assertPatterns(select, [
+    /version_changes=/,
+    /production_changes=/,
+    /should_stamp=false/,
+    /should_stamp=true/,
+    /should_release=true/,
+  ]);
+  assert.match(
+    authorize,
+    /should_stamp: \$\{\{ steps\.select\.outputs\.should_stamp \}\}/
+  );
+
+  const stamp = job(desktopWorkflow, 'stamp-production-release');
+  assertPatterns(stamp, [
+    /needs\.authorize-release\.outputs\.should_stamp == 'true'/,
+    /actions\/create-github-app-token@/,
+    /JOVIE_BOT_APP_ID/,
+    /JOVIE_BOT_PRIVATE_KEY/,
+    /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
+    /repos\/\$REPOSITORY\/commits\/main/,
+    /node scripts\/version-stamp\.mjs/,
+    /node scripts\/version-check\.mjs/,
+    /cursor\/stable-desktop-publish-/,
+    /gh pr create/,
+    /--add-label "merge-queue"/,
+  ]);
 });
 
 test('desktop staging publishes an exact signed prerelease and production stays separately proven', () => {
@@ -582,7 +1435,13 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     'Cross-prove exact production evidence'
   );
   const build = job(desktopWorkflow, 'build');
+  const productionPackage = step(build, 'Package production desktop app');
+  const productionVerify = step(
+    build,
+    'Verify production desktop artifact set'
+  );
   const publish = step(build, 'Publish production desktop release');
+  const stagingPackage = step(build, 'Package staging desktop app');
   const stagingPublish = step(build, 'Publish staging desktop prerelease');
   const stagingVerify = step(build, 'Verify staging desktop artifact set');
   const stagingUpload = step(build, 'Upload staging desktop package');
@@ -599,10 +1458,12 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
+    /JOVIE_RELEASE_DMG: 'true'/,
     /package:production/,
     /sync-version\.mjs[\s\S]*--staging-version/,
     /Validate rolling staging prerelease/,
     /Require staging signing and notarization credentials/,
+    /JOVIE_MAC_SIGNING_IDENTITY=/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
     /dist\/staging-mac\.yml/,
@@ -612,14 +1473,47 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /desktop-release-assets\.mjs upload-and-publish/,
     /--dist "apps\/desktop\/dist"/,
   ]);
+  assertPatterns(stagingPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+  ]);
+  assertPatterns(productionPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+    /package:production/,
+  ]);
+  assertPatterns(productionVerify, [
+    /if: env\.ENVIRONMENT == 'production'/,
+    /codesign --verify --deep --strict "\$production_app"/,
+    /spctl --assess --type execute --verbose=2 "\$production_app"/,
+    /xcrun stapler validate "\$production_app"/,
+    /codesign --verify --verbose=2 "\$production_dmg"/,
+    /xcrun stapler validate "\$production_dmg"/,
+    /spctl --assess --type open --context context:primary-signature/,
+  ]);
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
     /staging-mac\.yml/,
     /retention-days: 7/,
   ]);
+  assert.match(
+    desktopStagingBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
+  );
+  assert.match(
+    desktopProductionBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
+  );
+  assert.doesNotMatch(
+    build,
+    /- name: Notarize and staple staging desktop image/
+  );
   assertPatterns(stagingPublish, [
-    /commits\/main/,
+    /compare\/\$RELEASE_SHA\.\.\.\$current_main_sha/,
+    /\.merge_base_commit\.sha == \$release/,
+    /\.commits[\s\S]*\.\[-1\]\.sha == \$current/,
+    /\.behind_by == 0/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /--environment staging/,
     /--version "\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
@@ -644,6 +1538,14 @@ test('desktop staging publishes an exact signed prerelease and production stays 
   assert.ok(
     build.indexOf('Prepare private production draft') <
       build.indexOf('Package production desktop app')
+  );
+  assert.ok(
+    build.indexOf('- name: Package production desktop app') <
+      build.indexOf('- name: Verify production desktop artifact set')
+  );
+  assert.ok(
+    build.indexOf('- name: Verify production desktop artifact set') <
+      build.indexOf('- name: Publish production desktop release')
   );
   assert.ok(
     build.indexOf('Validate rolling staging prerelease') <
@@ -725,6 +1627,7 @@ test('staging release versions advance beyond installed and current-feed version
     installedVersion: '26.8.1',
     version: '26.8.2-staging.17823456790.1',
   };
+  assert.doesNotThrow(() => assertStagingVersionTransition(valid));
   assert.doesNotThrow(() =>
     assertStagingVersionTransition({
       ...valid,
@@ -751,4 +1654,98 @@ test('staging release versions advance beyond installed and current-feed version
   ]) {
     assert.throws(() => assertStagingVersionTransition(input), message);
   }
+});
+
+test('staging mainline proof permits main advancement but rejects stale or diverged source', () => {
+  const releaseSha = 'a'.repeat(40);
+  const currentSha = 'b'.repeat(40);
+  const mainline = {
+    status: 'ahead',
+    ahead_by: 4,
+    behind_by: 0,
+    base_commit: { sha: releaseSha },
+    commits: [{ sha: 'c'.repeat(40) }, { sha: currentSha }],
+    merge_base_commit: { sha: releaseSha },
+  };
+
+  assert.doesNotThrow(() =>
+    assertMainlineAncestorCompare({
+      comparison: mainline,
+      currentMainSha: currentSha,
+      releaseSha,
+    })
+  );
+  assert.doesNotThrow(() =>
+    assertMainlineAncestorCompare({
+      comparison: {
+        ...mainline,
+        status: 'identical',
+        ahead_by: 0,
+        commits: [],
+      },
+      currentMainSha: releaseSha,
+      releaseSha,
+    })
+  );
+
+  assert.throws(
+    () =>
+      assertMainlineAncestorCompare({
+        comparison: mainline,
+        currentMainSha: currentSha,
+        releaseSha: 'short',
+      }),
+    /Release SHA is malformed/
+  );
+  assert.throws(
+    () =>
+      assertMainlineAncestorCompare({
+        comparison: mainline,
+        currentMainSha: 'short',
+        releaseSha,
+      }),
+    /Current main SHA is malformed/
+  );
+
+  for (const comparison of [
+    { ...mainline, status: 'behind', behind_by: 1 },
+    {
+      ...mainline,
+      status: 'diverged',
+      merge_base_commit: { sha: 'c'.repeat(40) },
+    },
+    { ...mainline, base_commit: { sha: 'c'.repeat(40) } },
+    { ...mainline, commits: [{ sha: 'c'.repeat(40) }] },
+  ]) {
+    assert.throws(
+      () =>
+        assertMainlineAncestorCompare({
+          comparison,
+          currentMainSha: currentSha,
+          releaseSha,
+        }),
+      /not a trusted ancestor/
+    );
+  }
+});
+
+test('staging publication proof rejects a candidate behind the published source', () => {
+  const publishedSha = 'b'.repeat(40);
+  const candidateSha = 'a'.repeat(40);
+  assert.throws(
+    () =>
+      assertCommitDescendantCompare({
+        ancestorSha: publishedSha,
+        comparison: {
+          status: 'behind',
+          ahead_by: 0,
+          behind_by: 1,
+          base_commit: { sha: candidateSha },
+          commits: [],
+          merge_base_commit: { sha: candidateSha },
+        },
+        descendantSha: candidateSha,
+      }),
+    /move backward or leave its published lineage/
+  );
 });

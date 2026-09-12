@@ -30,6 +30,9 @@ vi.mock('lucide-react', () => ({
   Sparkles: (p: Record<string, unknown>) => (
     <span data-testid='icon-sparkles' {...p} />
   ),
+  Download: (p: Record<string, unknown>) => (
+    <span data-testid='icon-download' {...p} />
+  ),
   Users: (p: Record<string, unknown>) => (
     <span data-testid='icon-users' {...p} />
   ),
@@ -92,12 +95,19 @@ vi.mock('@/features/release/SmartLinkProviderButton', () => ({
   SmartLinkProviderButton: ({
     href,
     label,
+    primary,
   }: {
     href: string;
     label: string;
     onClick?: () => void;
+    primary?: boolean;
   }) => (
-    <div data-testid='provider-button' data-href={href} data-label={label}>
+    <div
+      data-testid='provider-button'
+      data-href={href}
+      data-label={label}
+      data-primary={primary ? 'true' : 'false'}
+    >
       {label}
     </div>
   ),
@@ -217,6 +227,34 @@ describe('@critical ReleaseLandingPage', () => {
     );
   });
 
+  it('makes the first available DSP the Stream Now primary action', () => {
+    render(<ReleaseLandingPage {...defaultProps} />);
+    const buttons = screen.getAllByTestId('provider-button');
+
+    expect(buttons[0]).toHaveAttribute('data-label', 'Stream Now');
+    expect(buttons[0]).toHaveAttribute('data-primary', 'true');
+    expect(buttons[1]).toHaveAttribute('data-label', 'Apple Music');
+    expect(buttons[1]).toHaveAttribute('data-primary', 'false');
+  });
+
+  it('keeps downloads in the secondary menu when streaming links exist', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        downloadUrl='/timwhite/midnight-drive/download'
+        soundsUrl='/timwhite/midnight-drive/sounds'
+        initialMenuOpen
+      />
+    );
+
+    const download = screen.getByRole('link', { name: 'Download' });
+    expect(download).toHaveAttribute(
+      'href',
+      '/timwhite/midnight-drive/download?utm_source=jovie'
+    );
+    expect(screen.getByText('Use this sound')).toBeDefined();
+  });
+
   it('appends utm_source=jovie to provider links when no utmParams prop is given', () => {
     render(<ReleaseLandingPage {...defaultProps} />);
     const buttons = screen.getAllByTestId('provider-button');
@@ -303,6 +341,27 @@ describe('@critical ReleaseLandingPage', () => {
     );
     expect(screen.getByText('Is this your music?')).toBeDefined();
     expect(screen.getByText('Claim profile')).toBeDefined();
+  });
+
+  it('renders every canonical primary artist in the byline', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        primaryArtists={[
+          { name: 'Tim White', handle: 'timwhite' },
+          { name: 'LYNX', handle: null },
+        ]}
+      />
+    );
+
+    const byline = screen.getByTestId('smart-link-artist-byline');
+    expect(byline.textContent).toBe('Tim White and LYNX');
+    expect(screen.getByText('Tim White').closest('a')).toHaveAttribute(
+      'href',
+      '/timwhite'
+    );
+    expect(screen.getByText('LYNX').tagName).toBe('SPAN');
+    expect(screen.getByText('LYNX').closest('a')).toBeNull();
   });
 
   it('featured artists line renders "feat." with linked names', () => {

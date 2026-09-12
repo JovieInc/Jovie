@@ -1,11 +1,12 @@
+// @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
+import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   type ReactNode,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,12 +23,18 @@ import type {
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
-import { resolvePublicProfileBackAction } from '@/features/profile/profile-surface-state';
+import {
+  getPublicProfileHistoryExitDelta,
+  readPublicProfileHistoryDepth,
+  resolvePublicProfileBackAction,
+  withPublicProfileHistoryDepth,
+} from '@/features/profile/profile-surface-state';
 import {
   getProfileMode,
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import {
@@ -56,6 +63,26 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+
+const ProfileDesktopSurface = dynamic(
+  () =>
+    import('./ProfileDesktopSurface').then(
+      module => module.ProfileDesktopSurface
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className='public-profile-layout-desktop-placeholder'
+        data-testid='profile-desktop-loading'
+        role='status'
+        aria-busy='true'
+      >
+        <span className='text-secondary-token'>Loading profile…</span>
+      </div>
+    ),
+  }
+);
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -278,18 +305,20 @@ export function ProfileCompactTemplate({
   const [isDesktopLayout, setIsDesktopLayout] = useState(
     getInitialIsDesktopLayout
   );
+  const [isHydrated, setIsHydrated] = useState(false);
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const compactShellRef = useRef<HTMLDivElement | null>(null);
   const drawerOpenRef = useRef(initialDrawerView !== null);
   const drawerViewRef = useRef<DrawerView>(initialDrawerView ?? 'menu');
   const lastSyncedModeRef = useRef<ProfileMode | null>(null);
   const lastPrimaryModeRef = useRef<ProfileMode>('profile');
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
+  const arrivalHistoryLengthRef = useRef<number | null>(null);
+  const profileHistoryDepthRef = useRef(0);
 
   const clearCloseResetTimer = useCallback(() => {
     if (closeResetTimerRef.current !== null) {
@@ -301,6 +330,13 @@ export function ProfileCompactTemplate({
   useEffect(() => {
     drawerOpenRef.current = drawerOpen;
   }, [drawerOpen]);
+
+  useEffect(() => {
+    arrivalHistoryLengthRef.current = globalThis.history.length;
+    profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
+      globalThis.history.state
+    );
+  }, []);
 
   useEffect(() => clearCloseResetTimer, [clearCloseResetTimer]);
 
@@ -326,9 +362,10 @@ export function ProfileCompactTemplate({
     const embeddedQuery = globalThis.matchMedia('(min-width: 768px)');
     const desktopQuery = globalThis.matchMedia('(min-width: 1180px)');
     const syncPresentation = () => {
-      setIsDesktopLayout(desktopQuery.matches);
+      const ownsDesktopLayout = desktopQuery.matches && !embeddedPreview;
+      setIsDesktopLayout(ownsDesktopLayout);
       setDrawerPresentation(
-        desktopQuery.matches
+        ownsDesktopLayout
           ? 'modal'
           : embeddedQuery.matches
             ? 'embedded'
@@ -337,6 +374,7 @@ export function ProfileCompactTemplate({
     };
 
     syncPresentation();
+    setIsHydrated(true);
 
     if (
       typeof embeddedQuery.addEventListener === 'function' &&
@@ -356,7 +394,7 @@ export function ProfileCompactTemplate({
       embeddedQuery.removeListener(syncPresentation);
       desktopQuery.removeListener(syncPresentation);
     };
-  }, []);
+  }, [embeddedPreview]);
 
   const mergedDSPs = useMemo(
     () =>
@@ -618,6 +656,9 @@ export function ProfileCompactTemplate({
 
   useEffect(() => {
     const handlePopState = () => {
+      profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
+        globalThis.history.state
+      );
       syncRequestedModeFromLocation();
     };
 
@@ -658,21 +699,14 @@ export function ProfileCompactTemplate({
       return;
     }
 
-    globalThis.history.pushState(globalThis.history.state, '', href);
+    const nextDepth = profileHistoryDepthRef.current + 1;
+    profileHistoryDepthRef.current = nextDepth;
+    globalThis.history.pushState(
+      withPublicProfileHistoryDepth(globalThis.history.state, nextDepth),
+      '',
+      href
+    );
   }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
-
-  // This is an interaction-readiness contract, not a visual side effect.
-  // Publish it after React commits the hydrated controls, before unrelated
-  // passive work can delay browser readiness probes.
-  useLayoutEffect(() => {
-    const shell = compactShellRef.current;
-    if (!shell) return;
-
-    shell.dataset.interactiveReady = 'true';
-    return () => {
-      delete shell.dataset.interactiveReady;
-    };
-  }, []);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
@@ -751,11 +785,19 @@ export function ProfileCompactTemplate({
     setRequestedMode('listen');
   }, [clearCloseResetTimer, mergedDSPs.length]);
 
+  const isSignedIn = useIsAuthenticated();
   const handleBack = useCallback(() => {
+    const historyLength = globalThis.history.length;
+    const arrivalHistoryLength =
+      arrivalHistoryLengthRef.current ?? historyLength;
+    const internalHistoryDepth = profileHistoryDepthRef.current;
     const action = resolvePublicProfileBackAction({
       isProfileRoot: requestedMode === 'profile',
-      historyLength: globalThis.history.length,
+      historyLength,
       referrer: document.referrer,
+      isSignedIn,
+      arrivalHistoryLength,
+      internalHistoryDepth,
     });
 
     if (action === 'profile-root') {
@@ -765,8 +807,20 @@ export function ProfileCompactTemplate({
 
     if (action === 'history-back') {
       globalThis.history.back();
+      return;
     }
-  }, [requestedMode]);
+
+    if (action === 'history-exit') {
+      globalThis.history.go(
+        getPublicProfileHistoryExitDelta(internalHistoryDepth)
+      );
+      return;
+    }
+
+    if (action === 'app-fallback') {
+      globalThis.location.assign(APP_ROUTES.DASHBOARD);
+    }
+  }, [isSignedIn, requestedMode]);
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -814,14 +868,15 @@ export function ProfileCompactTemplate({
         showClaimFooter={showClaimFooter}
         claimFooterHref={claimFooterHref}
         embedded={embeddedPreview}
+        previewExitHref={profileHref}
         compactSurface={
           <div
-            ref={compactShellRef}
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
+            data-interactive-ready={isHydrated ? 'true' : undefined}
             data-public-profile-nav={publicProfileNavIds}
           >
-            {profileBanner ? (
+            {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
                 data-testid='profile-shell-banner'
@@ -857,6 +912,7 @@ export function ProfileCompactTemplate({
                 hideJovieBranding={hideJovieBranding}
                 hideMoreMenu={hideMoreMenu}
                 allowFanCapture={allowFanCapture}
+                allowSignedInEscape={!embeddedPreview}
                 renderInteractiveOverlays
                 renderSemanticHeading={!isDesktopLayout}
                 drawerOpen={drawerOpen}
@@ -893,6 +949,46 @@ export function ProfileCompactTemplate({
               />
             </div>
           </div>
+        }
+        desktopBanner={isDesktopLayout ? profileBanner : null}
+        desktopSurface={
+          <ProfileDesktopSurface
+            presentation='modal'
+            artist={artist}
+            socialLinks={socialLinks}
+            contacts={contacts}
+            showPayButton={showPayButton}
+            latestRelease={latestRelease}
+            profileSettings={profileSettings}
+            alertOptInVariant={resolvedAlertOptInVariant}
+            allowFanCapture={allowFanCapture}
+            genres={genres}
+            pressPhotos={pressPhotos}
+            allowPhotoDownloads={allowPhotoDownloads}
+            photoDownloadSizes={photoDownloadSizes}
+            tourDates={tourDates}
+            viewerCountryCode={viewerCountryCode}
+            releases={releases}
+            drawerOpen={drawerOpen}
+            drawerView={drawerView}
+            activeMode={requestedMode}
+            onModeSelect={nextMode => {
+              clearCloseResetTimer();
+              setRequestedMode(nextMode);
+            }}
+            onAlertsModalClose={() => setRequestedMode('profile')}
+            onDrawerOpenChange={handleDrawerOpenChange}
+            onDrawerViewChange={handleDrawerViewChange}
+            onOpenMenu={() => openDrawerMode('menu')}
+            onPlayClick={handlePlayClick}
+            onBack={handleBack}
+            profileHref={profileHref}
+            isSubscribed={isSubscribed}
+            contentPrefs={contentPrefs}
+            onTogglePref={handleTogglePref}
+            onUnsubscribe={handleUnsubscribe}
+            isUnsubscribing={unsubMutation.isPending}
+          />
         }
       />
     </ProfileNotificationsContext.Provider>

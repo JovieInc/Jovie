@@ -154,13 +154,13 @@ describe('TourModePanel', () => {
       'events_empty_state'
     );
     const notificationsCta = screen.getByTestId('mock-notifications-cta');
-    expect(notificationsCta).toHaveClass('h-8');
+    expect(notificationsCta).toHaveClass('h-7');
     expect(notificationsCta.className).toContain('before:h-11');
     expect(notificationsCta.className).toContain('before:min-w-11');
     expect(notificationsCta).not.toHaveClass('h-11!', 'h-12');
   });
 
-  it('keeps the preview empty-state action at 32px inside a 44px target', () => {
+  it('keeps the preview empty-state action at 28px inside a 44px target', () => {
     render(
       <TourDrawerContent artist={artist} tourDates={[]} renderMode='preview' />
     );
@@ -168,7 +168,7 @@ describe('TourModePanel', () => {
     const previewCta = screen.getByRole('button', {
       name: 'Turn On Event Alerts',
     });
-    expect(previewCta).toHaveClass('h-8');
+    expect(previewCta).toHaveClass('h-7');
     expect(previewCta.className).toContain('before:h-11');
     expect(previewCta.className).toContain('before:min-w-11');
   });

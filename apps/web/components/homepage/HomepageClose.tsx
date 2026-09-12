@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import { Logo } from '@/components/atoms/Logo';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
+import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import {
   HOMEPAGE_CERTIFIED_CONTEXT,
   HOMEPAGE_CERTIFIED_EVENTS,
@@ -17,9 +18,13 @@ export function HomepageClose() {
   const { search } = HOMEPAGE_LAUNCH_COPY.hero;
 
   return (
-    <section
+    <MarketingCtaSection
       className='homepage-close'
-      data-testid='homepage-close'
+      data-testid='marketing-section-cta'
+      data-marketing-variant='editorial-search'
+      data-homepage-testid='homepage-close'
+      data-marketing-owner='apps/web/components/homepage/HomepageClose.tsx'
+      data-rhythm='close'
       aria-labelledby='homepage-close-heading'
     >
       <div className='homepage-close__inner'>
@@ -54,6 +59,6 @@ export function HomepageClose() {
           <Logo variant='word' size='xs' aria-hidden />
         </div>
       </div>
-    </section>
+    </MarketingCtaSection>
   );
 }

@@ -124,6 +124,21 @@ Change the public page CTA.
     );
   });
 
+  it('treats founder assignment as steering through plan and admission', () => {
+    const assignee = { id: 'tim', name: 'Tim White' };
+    const candidate = issue({ assignee });
+    const plan = deterministicGates.buildDeterministicPlanEvidence(candidate);
+    assert.equal(plan.reason, null);
+    assert.equal(
+      planGate.validatePlanCandidate(candidate, plan.evidence),
+      null
+    );
+    assert.equal(
+      admissionGate.validateAdmissionCandidate(plannedIssue({ assignee })),
+      null
+    );
+  });
+
   it('routes LYB evidence to LogYourBody without requiring a Linear project', () => {
     const candidate = issue({
       identifier: 'LYB-12',
@@ -185,7 +200,7 @@ Change the public page CTA.
   it('fails closed on team routing, ownership, epic, sensitive, stale, and incomplete work', () => {
     const cases = [
       issue({ identifier: 'OPS-1' }),
-      issue({ assignee: { id: 'tim', name: 'Tim White' } }),
+      issue({ assignee: { id: 'other', name: 'Other Owner' } }),
       issue({ labels: { nodes: [{ name: 'type:epic' }] } }),
       issue({ title: 'Rotate a production credential' }),
       issue({ createdAt: '2025-01-01T00:00:00.000Z' }),
@@ -201,23 +216,38 @@ Change the public page CTA.
     }
   });
 
-  it('rejects every explicit human hold before plan or admission approval', () => {
-    for (const label of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ]) {
+  it('ignores legacy human and taste labels while preserving machine holds', () => {
+    for (const label of ['held', 'manual-incident']) {
       const candidate = issue({ labels: { nodes: [{ name: label }] } });
       assert.equal(
         deterministicGates.validateDeterministicPlanCandidate(candidate),
-        'protected-or-human-review'
+        'protected-policy'
       );
       assert.equal(
         admissionGate.validateAdmissionCandidate(
           plannedIssue({ labels: { nodes: [{ name: label }] } })
         ),
-        'protected-or-human-review'
+        'protected-policy'
+      );
+    }
+    for (const label of [
+      'needs-human',
+      'human-review-required',
+      'needs:taste',
+      'needs-human-taste',
+      'decision-required',
+      'no-auto',
+    ]) {
+      const candidate = issue({ labels: { nodes: [{ name: label }] } });
+      assert.equal(
+        deterministicGates.validateDeterministicPlanCandidate(candidate),
+        null
+      );
+      assert.equal(
+        admissionGate.validateAdmissionCandidate(
+          plannedIssue({ labels: { nodes: [{ name: label }] } })
+        ),
+        null
       );
     }
   });

@@ -3,6 +3,7 @@ import { denyEveAction, EveAuthorityError } from '@/lib/ovie/eve-authority';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import { OvieProgramError } from '@/lib/ovie/program';
 import {
+  appendSummerTurn,
   CURRENT_SUMMER_SESSION_ID,
   loadCurrentSummerSession,
 } from '@/lib/ovie/summer-session';
@@ -118,7 +119,7 @@ describe('Summer transport (JOV-5212)', () => {
         runtime: 'mac',
         async *speak() {},
       })
-    ).toThrow(/current Mac Summer/);
+    ).toThrow(/current Summer runtime/);
     expect(() => denyEveAction('summer-answer')).toThrow(EveAuthorityError);
   });
 
@@ -274,6 +275,56 @@ describe('Summer transport (JOV-5212)', () => {
     ).toBe(true);
   });
 
+  it('persists a budget checkpoint so the next client turn advances the predecessor', async () => {
+    const store = new MemoryOperatingStore();
+    const seenPrevious: Array<string | undefined> = [];
+    const speaker: SummerSpeaker = {
+      id: 'summer',
+      runtime: 'eve',
+      async *speak(input) {
+        seenPrevious.push(input.previousEveEventId);
+        if (seenPrevious.length === 1) {
+          yield {
+            type: 'checkpoint',
+            checkpoint: {
+              eventId: 'sum_budget_checkpoint',
+              sessionId: null,
+              nextStartIndex: 0,
+            },
+          };
+          yield { type: 'error', state: 'unavailable' };
+          return;
+        }
+        yield { type: 'text-delta', text: 'Allowance restored.' };
+      },
+    };
+
+    await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'first',
+        speaker,
+        store,
+        clientTurnId: 'budgeted',
+      })
+    );
+    await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'next day',
+        speaker,
+        store,
+        clientTurnId: 'after-reset',
+      })
+    );
+
+    expect(seenPrevious).toEqual([undefined, 'sum_budget_checkpoint']);
+    expect((await loadCurrentSummerSession(store))?.turns[0]).toMatchObject({
+      state: 'unavailable',
+      eveCheckpoint: { eventId: 'sum_budget_checkpoint', sessionId: null },
+    });
+  });
+
   it('surfaces cancel, disable, and reconnect without forking the session', async () => {
     const store = new MemoryOperatingStore();
     const speaker = scriptedSummer({ hangUntilAbort: true });
@@ -309,6 +360,37 @@ describe('Summer transport (JOV-5212)', () => {
     enableSummerTransport();
     const resumed = await relaunchCurrentSummerSession(store);
     expect(resumed.identity.sessionId).toBe(CURRENT_SUMMER_SESSION_ID);
+  });
+
+  it('replaces a legacy canceled session row when reconnect recovers the Mac turn', async () => {
+    const store = new MemoryOperatingStore();
+    await appendSummerTurn(store, {
+      clientTurnId: 'legacy-cancel',
+      userText: 'Resume me',
+      assistantText: '',
+      eveWorkId: 'ini_work_1',
+      eveAcks: [RECEIPT.ack],
+      correlationId: 'ini_work_1:legacy-cancel',
+      state: 'canceled',
+      toolReceipt: null,
+      createdAt: new Date().toISOString(),
+    });
+    const recovered = await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'Resume me',
+        speaker: scriptedSummer({ replies: ['Recovered Summer.'] }),
+        store,
+        clientTurnId: 'legacy-cancel',
+      })
+    );
+    expect(recovered.text).toBe('Recovered Summer.');
+    const session = await loadCurrentSummerSession(store);
+    expect(session?.turns).toHaveLength(1);
+    expect(session?.turns[0]).toMatchObject({
+      assistantText: 'Recovered Summer.',
+      state: 'completed',
+    });
   });
 
   it('keeps unavailable transport turns retryable with the same client id', async () => {

@@ -3,7 +3,7 @@ import 'server-only';
 import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
-import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
+import { resolveUserIdentity } from '@/lib/auth/user-identity';
 import {
   ENTITLEMENT_REGISTRY,
   getEntitlements,
@@ -163,10 +163,10 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     return UNAUTHENTICATED_ENTITLEMENTS;
   }
 
-  let clerkEmail: string | null = null;
+  let userEmail: string | null = null;
   try {
-    const clerkIdentity = resolveClerkIdentity(await getCachedCurrentUser());
-    clerkEmail = clerkIdentity.email;
+    const userIdentity = resolveUserIdentity(await getCachedCurrentUser());
+    userEmail = userIdentity.email;
   } catch (error) {
     logger.error('Failed to load user identity for entitlements', {
       error,
@@ -187,7 +187,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     if (isMissingBillingRecord(billing.error)) {
       return buildFreeEntitlements({
         userId,
-        email: clerkEmail,
+        email: userEmail,
         isAuthenticated: true,
         isAdmin: adminStatus,
         billingVerification: 'missing_user',
@@ -206,7 +206,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     });
     return buildFreeEntitlements({
       userId,
-      email: clerkEmail,
+      email: userEmail,
       isAuthenticated: true,
       isAdmin: adminStatus,
       billingVerification: 'unavailable',
@@ -217,7 +217,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     // User exists in auth but not in billing DB — genuinely a new/free user.
     return buildFreeEntitlements({
       userId,
-      email: clerkEmail,
+      email: userEmail,
       isAuthenticated: true,
       isAdmin: adminStatus,
       billingVerification: 'missing_user',
@@ -225,7 +225,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   }
 
   const { email: emailFromDb, isPro, plan: dbPlan } = billing.data;
-  const effectiveEmail = emailFromDb || clerkEmail;
+  const effectiveEmail = emailFromDb || userEmail;
 
   const rawTrialEndsAt = (billing.data as Record<string, unknown>)
     .trialEndsAt as Date | null;

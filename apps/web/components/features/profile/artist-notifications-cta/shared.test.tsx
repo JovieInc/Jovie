@@ -7,7 +7,7 @@ import {
 } from './shared';
 
 function expectCanonicalCtaGeometry(className: string) {
-  expect(className).toMatch(/(?:^|\s)h-8(?:\s|$)/);
+  expect(className).toMatch(/(?:^|\s)h-7(?:\s|$)/);
   expect(className).toContain('before:h-11');
   expect(className).toContain('before:min-w-11');
   expect(className).toContain('before:w-full');
@@ -15,11 +15,11 @@ function expectCanonicalCtaGeometry(className: string) {
 }
 
 describe('shared public-profile CTA primitives', () => {
-  it('keeps primary semantic CTAs at 32px inside a 44px target', () => {
+  it('keeps primary semantic CTAs at 28px inside a 44px target', () => {
     expectCanonicalCtaGeometry(profilePrimaryPillClassName);
   });
 
-  it('keeps secondary semantic CTAs at 32px inside a 44px target', () => {
+  it('keeps secondary semantic CTAs at 28px inside a 44px target', () => {
     expectCanonicalCtaGeometry(profileSecondaryPillClassName);
   });
 

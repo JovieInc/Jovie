@@ -6,6 +6,9 @@ const meta: Meta<typeof ProfileNavButton> = {
   component: ProfileNavButton,
   parameters: {
     layout: 'centered',
+    jovie: {
+      uncoveredProps: ['loading'],
+    },
     docs: {
       description: {
         component:

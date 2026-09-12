@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { hasClientAuthSession } from '@/lib/auth/auth-session-cookies';
 
 /**
- * Lightweight client-side auth detection using Clerk's `__client_uat` cookie.
+ * Lightweight client-side auth detection from Better Auth session cookies.
  *
  * Returns `false` during SSR/SSG and on initial render, then `true` after
- * hydration if the user has an active Clerk session. This ensures:
+ * hydration if the browser has a Better Auth (or leftover Clerk) session
+ * cookie. This ensures:
  * - No impact on static generation (always renders unauthenticated state first)
  * - No layout shift (buttons are the same size)
  * - No server-side data fetching required
@@ -16,10 +18,7 @@ export function useIsAuthenticated(): boolean {
 
   useEffect(() => {
     const syncAuthState = () => {
-      const cookies = document.cookie.split(';');
-      const clientUat = cookies.find(c => c.trim().startsWith('__client_uat='));
-      const value = clientUat?.slice(clientUat.indexOf('=') + 1)?.trim();
-      setIsAuthed(Boolean(value && value !== '0'));
+      setIsAuthed(hasClientAuthSession(document.cookie));
     };
 
     const onVisibilityChange = () => {

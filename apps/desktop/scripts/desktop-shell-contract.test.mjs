@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import ts from 'typescript';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -79,6 +80,10 @@ test('desktop polls build-info and reloads only hud windows on deploy drift', as
 
 test('desktop window fails into a branded Jovie recovery surface', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
   const tokenSource = await readFile(
     join(desktopRoot, 'src/system-b-tokens.ts'),
     'utf8'
@@ -159,9 +164,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /did-start-navigation/);
   assert.match(mainSource, /function attachRendererRecovery\(/);
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
+  assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
-  assert.match(mainSource, /Loading Jovie/);
-  assert.match(mainSource, /Starting the app/);
+  assert.match(mainSource, /Jovie is loading/);
   assert.match(
     mainSource,
     /renderDesktopBuildIdentitySection\(desktopBuildIdentity\)/
@@ -224,7 +229,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     /localResult\.action === 'retry'[\s\S]*?win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/
   );
   const localDidFailLoadBlock = mainSource.match(
-    /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n      \}\n\n      console\.error/
+    /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n {6}\}\n\n {6}console\.error/
   );
   assert.ok(localDidFailLoadBlock);
   assert.equal(
@@ -239,7 +244,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
+  assert.match(mainSource, /COPY_DESKTOP_AUTH_URL_CHANNEL/);
   assert.match(mainSource, /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL/);
+  assert.match(preloadSource, /copyDesktopAuthUrl/);
   assert.match(mainSource, /function hideMainWindowForAuthHandoff\(\): void/);
   assert.match(
     mainSource,
@@ -275,7 +282,8 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /min-height: 100vh/);
   assert.match(mainSource, /background: var\(--system-b-bg-base\)/);
   assert.match(mainSource, /border-radius: var\(--system-b-radius-pill\)/);
-  assert.match(mainSource, /opacity: 0\.035/);
+  assert.match(tokenSource, /markCream: '#F5F4F0'/);
+  assert.match(tokenSource, /splashMarkSizePx: 32/);
   assert.doesNotMatch(
     mainSource,
     /background: linear-gradient\(145deg, rgba\(15,16,17,0\.94\), rgba\(8,9,10,0\.98\)\)/
@@ -285,6 +293,33 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
   assert.match(tokenSource, /backgroundColor: '#06070a'/);
   assert.match(tokenSource, /radiusPill: '999px'/);
+});
+
+test('Mac boot splash is splash-B: 32px cream mark on an empty field', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const tokenSource = await readFile(
+    join(desktopRoot, 'src/system-b-tokens.ts'),
+    'utf8'
+  );
+  const splashFn = mainSource.match(
+    /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+
+  assert.ok(splashFn, 'buildDesktopBootSplashHtml must exist');
+  assert.match(tokenSource, /splashMarkSizePx: 32/);
+  assert.match(tokenSource, /markCream: '#F5F4F0'/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.splashMarkSizePx/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
+  assert.match(splashFn, /data-desktop-splash="splash-b"/);
+  assert.match(splashFn, /aria-label="Jovie is loading"/);
+  assert.doesNotMatch(splashFn, /180px/);
+  assert.doesNotMatch(splashFn, /opacity:\s*0\.035/);
+  assert.doesNotMatch(splashFn, /<h1>/);
+  assert.doesNotMatch(splashFn, /Loading Jovie/);
+  assert.doesNotMatch(splashFn, /Starting the app/);
+  assert.doesNotMatch(splashFn, /renderDesktopBuildIdentitySection/);
+  assert.doesNotMatch(mainSource, /width:\s*180px/);
+  assert.doesNotMatch(mainSource, /height:\s*180px/);
 });
 
 const FORBIDDEN_MAC_ENTITLEMENTS = [
@@ -371,7 +406,7 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   );
   assert.match(
     mainSource,
-    /isAuthReturnDeepLinkCandidate\(arg\) && !parseDesktopAuthReturnDeepLink\(arg\)/
+    /isAuthReturnDeepLinkCandidate\(arg\)\s*&&\s*!parseDesktopAuthReturnDeepLink\(arg\)/
   );
   assert.doesNotMatch(
     mainSource,
@@ -508,26 +543,6 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
-  assert.match(
-    preloadSource,
-    /import \{ BAKED_DESKTOP_BUILD_IDENTITY \} from '\.\/build-identity\.generated';/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY\.channel/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY\.version/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopSourceRevision =\s*BAKED_DESKTOP_BUILD_IDENTITY\.sourceRevision/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopBuiltAt = BAKED_DESKTOP_BUILD_IDENTITY\.builtAt/
-  );
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
@@ -541,6 +556,29 @@ test('preload marks the hosted app as Electron after the document root is ready'
     mainSource,
     /ipcMain\.handle\(\s*LAUNCH_OPERATOR_CONTROL_CHANNEL/
   );
+});
+
+test('compiled sandbox preload has no unsupported local module dependency', async () => {
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
+  const compiledPreload = ts.transpileModule(preloadSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const requiredModules = [
+    ...compiledPreload.matchAll(/require\(["']([^"']+)["']\)/g),
+  ].map(match => match[1]);
+
+  assert.deepEqual(requiredModules, ['electron']);
+  assert.match(compiledPreload, /contextBridge\.exposeInMainWorld/);
+
+  const unsafeFixture = 'require("./build-identity.generated")';
+  assert.match(unsafeFixture, /require\(["']\.[/\\\\]/);
+  assert.doesNotMatch(compiledPreload, /require\(["']\.[/\\\\]/);
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {
@@ -830,6 +868,10 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
 
 test('desktop main-window hub regression contracts (desktop QA)', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const authRouteSource = await readFile(
+    join(desktopRoot, 'src/desktop-auth-browser-route.ts'),
+    'utf8'
+  );
   const updateSource = await readFile(
     join(desktopRoot, 'src/desktop-auto-update.ts'),
     'utf8'
@@ -893,10 +935,47 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   assert.match(mainSource, /buildAuthCompletionUrl\(pendingAuthCompletion\)/);
 
   // Fix: a forged flow-mismatch deep link keeps the in-flight login; only
-  // success and pkce-expired clear the pending flow.
+  // success and pkce-expired clear the pending flow. Expiry immediately
+  // replaces the dead attempt with the existing canonical handoff.
   assert.match(
     mainSource,
-    /if \(binding\.reason === 'pkce-expired'\) \{\s*\/\/[^\n]*\n\s*pendingDesktopAuthPkce = null;/
+    /if \(binding\.reason === 'pkce-expired'\) \{[\s\S]{0,300}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,200}?surfaceNoPendingAuthFlow\(\);/
+  );
+  assert.match(
+    mainSource,
+    /COPY_DESKTOP_AUTH_URL_CHANNEL,[\s\S]{0,900}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,600}?resolveDesktopBrowserAuthUrl\(authUrl\)[\s\S]{0,500}?clipboard\.writeText\(externalAuthUrl\)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /ipcMain\.handle\(\s*COPY_DESKTOP_AUTH_URL_CHANNEL[\s\S]{0,1400}?console\.(?:log|info|warn|error)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /ipcMain\.handle\(\s*COPY_DESKTOP_AUTH_URL_CHANNEL[\s\S]{0,1400}?return \{ ok: true, authUrl:/
+  );
+  assert.match(
+    mainSource,
+    /showDesktopAuthHandoff\(buildCentralDesktopAuthUrl\('sign_in', '\/app'\), \{[\s\S]{0,100}?recoveryNavigation: true/
+  );
+  assert.match(
+    mainSource,
+    /setDesktopAuthRecoveryNavigationPending\([\s\S]{0,180}?true[\s\S]{0,300}?const finishRecoveryNavigation[\s\S]{0,300}?false[\s\S]{0,180}?\.then\(finishRecoveryNavigation, finishRecoveryNavigation\)/
+  );
+  assert.match(
+    authRouteSource,
+    /state\.cache\.flowNonce === state\.pendingPkce\.flowNonce[\s\S]{0,120}?state\.cache\.codeChallenge === state\.pendingPkce\.codeChallenge/
+  );
+  assert.match(
+    authRouteSource,
+    /if \(state\.recoveryNavigationPending\) \{[\s\S]{0,180}?reason: 'auth-recovery-pending'/
+  );
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.on\('closed',[\s\S]{0,180}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,180}?restoreMainWindowAfterAuthHandoff\(\);/
+  );
+  assert.match(
+    mainSource,
+    /CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,[\s\S]{0,400}?isTrustedDesktopAuthSender\(event\)[\s\S]{0,300}?clearPendingDesktopAuthFlow\(\);[\s\S]{0,200}?win\.close\(\);/
   );
 
   // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.

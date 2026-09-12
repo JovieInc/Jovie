@@ -93,22 +93,28 @@ web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-fou
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
-web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx|desktop,mobile
+web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
+web.smartlink-release|web|release-landing|apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
+web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
 web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
-web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|desktop,mobile
+web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
+web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
+web.root-layout|web|screen.root|apps/web/app/layout.tsx|desktop,mobile
 macos-electron.hud|macos-electron|desktop-hud|apps/desktop/src/main.ts,apps/desktop/src/navigation.ts|desktop
 ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift,apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift|compact
+ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swift|compact
 ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
@@ -274,10 +280,9 @@ export function hashArtifactBytes(artifactPath) {
 }
 
 /**
- * Trusted artifact verification for a screen-browser-proof/v1: the proof must
- * name the exact bundle the external render runner produced, and the gate
- * recomputes the sha256 over those real bytes. Caller-authored JSON without
- * verifiable bytes can never certify (JOV-INV-018).
+ * Legacy local-byte consistency helper. It proves only that a caller-selected
+ * path matches a caller-selected digest; it is deliberately not used by the
+ * certification gate and cannot establish browser-execution provenance.
  *
  * @param {any} proof
  * @param {{ artifactRoot?: string }} [options]
@@ -308,17 +313,25 @@ export function verifyProofArtifact(proof, { artifactRoot = REPO_ROOT } = {}) {
   return null;
 }
 
-/** @param {any} proof @param {{ screen: object, headSha: string, verifyArtifact?: (proof: any) => string | null }} context */
-export function evaluateScreenProof(
-  proof,
-  { screen, headSha, verifyArtifact }
-) {
+/**
+ * @param {any} proof
+ * @param {{ screen: object, headSha: string }} context
+ */
+export function evaluateScreenProof(proof, { screen, headSha }) {
   const findings = [];
   if (!isObject(proof) || proof.schema !== SCREEN_BROWSER_PROOF_SCHEMA) {
     return ['proof schema must be screen-browser-proof/v1'];
   }
   if (proof.producer !== 'external-render-runner') {
     findings.push('proof producer must be external-render-runner');
+  }
+  if (proof.status !== 'unverified-candidate') {
+    findings.push(
+      'proof status must be unverified-candidate before resolver verification'
+    );
+  }
+  if (proof.certificationStatus !== 'not-certified') {
+    findings.push('proof certificationStatus must be not-certified');
   }
   if (proof.screenId !== screen.id) {
     findings.push(
@@ -413,12 +426,12 @@ export function evaluateScreenProof(
   ) {
     findings.push('visible actions are required');
   }
-  // The verifier is the fail-closed default: only real rendered artifact
-  // bytes whose recomputed digest matches the proof can certify.
-  const artifactFinding = verifyArtifact
-    ? verifyArtifact(proof)
-    : 'trusted external artifact verification is not installed; supplied proof cannot certify';
-  if (artifactFinding) findings.push(artifactFinding);
+  // A local path and digest are caller-controlled. The existing Playwright
+  // transport does not yet expose a success-run resolver/decoded bundle, so
+  // external certification must fail closed until that adapter exists.
+  findings.push(
+    'trusted external browser producer integration is unavailable; supplied proof cannot certify'
+  );
   return findings;
 }
 
@@ -749,7 +762,6 @@ export function evaluateChangedScreens({
   headSha,
   proofs = [],
   requireExternalEvidence = false,
-  verifyArtifact = undefined,
 }) {
   const issues = [];
   const changedScreens = [];
@@ -800,7 +812,6 @@ export function evaluateChangedScreens({
     const findings = evaluateScreenProof(proof, {
       screen,
       headSha,
-      verifyArtifact,
     });
     if (findings.length > 0)
       issues.push(`${screen.id}: ${findings.join('; ')}`);
@@ -864,24 +875,21 @@ export function runScreenCertification(options = {}) {
     headSha,
     proofs: options.proofs,
     requireExternalEvidence: options.registrationOnly !== true,
-    verifyArtifact:
-      options.verifyArtifact ??
-      (proof =>
-        verifyProofArtifact(proof, {
-          artifactRoot: options.artifactRoot ?? repoRoot,
-        })),
   });
   issues.push(...changed.issues);
   const ok = issues.length === 0;
-  // Certification is real now: in the full gate, ok means every changed
-  // screen carried an exact-head proof whose rendered artifact bytes
-  // reverified. Registration-only audits and no-change runs never certify.
+  // The future trusted producer adapter may make external certification real.
+  // Registration-only audits and no-change runs never certify.
   const certified =
     ok &&
     options.registrationOnly !== true &&
     changed.changedScreens.length > 0;
   const status = !ok
-    ? 'blocked'
+    ? issues.some(issue =>
+        issue.includes('external browser producer integration is unavailable')
+      )
+      ? 'external-certification-unavailable'
+      : 'blocked'
     : certified
       ? 'certified'
       : changed.changedScreens.length > 0
@@ -910,6 +918,53 @@ export function runScreenCertification(options = {}) {
       excludedChanges: changed.excludedChanges,
       fixtures: red.receipts,
       sweeps: (options.workflows ?? RETAINED_SWEEP_WORKFLOWS).map(item => ({
+        path: item.path,
+        retained: true,
+      })),
+    },
+  };
+}
+
+/**
+ * Reserved external-certification entrypoint. It accepts no verifier callback
+ * and remains unavailable until the dependent authoritative source-continuity
+ * adapter binds a GitHub push event to the immutable artifact.
+ * @param {{ artifactId?: number; screenId?: string; repoRoot?: string }} options
+ */
+export function runScreenCertificationFromArtifact({
+  artifactId,
+  screenId,
+  repoRoot = REPO_ROOT,
+} = {}) {
+  const headSha = resolveHeadSha(undefined, repoRoot);
+  const screen = SCREEN_REGISTRY.find(
+    entry => !entry.excluded && entry.id === screenId
+  );
+  // An immutable artifact alone cannot establish which push event introduced
+  // the registered source change. The post-run GitHub compare binding belongs
+  // to the dependent continuity slice; do not substitute local git history.
+  void artifactId;
+  const issue =
+    'artifact certification is unavailable until authoritative GitHub event source continuity is verified';
+  return {
+    ok: false,
+    schema: SCREEN_CERT_SCHEMA,
+    receipt: {
+      gate: SCREEN_CERT_GATE,
+      invariant: SCREEN_CERT_INVARIANT_ID,
+      headSha,
+      baseSha: null,
+      ok: false,
+      certified: false,
+      registrationOnly: false,
+      status: 'external-certification-unavailable',
+      issues: [issue],
+      changedScreens: screen
+        ? [{ id: screenId, verdict: 'block', findings: [issue] }]
+        : [],
+      excludedChanges: [],
+      fixtures: [],
+      sweeps: RETAINED_SWEEP_WORKFLOWS.map(item => ({
         path: item.path,
         retained: true,
       })),

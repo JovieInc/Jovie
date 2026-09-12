@@ -10,4 +10,7 @@ export const SYSTEM_B_DESKTOP_TOKENS = {
   surfaceColor: '#101216',
   textPrimary: '#f7f8f8',
   textSecondary: '#d7dce8',
+  /** splash-b-everywhere-v1: tiny cream mark. Keep in lockstep with web BRAND_MARK_*. */
+  markCream: '#F5F4F0',
+  splashMarkSizePx: 32,
 } as const;

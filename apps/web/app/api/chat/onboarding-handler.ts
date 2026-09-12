@@ -218,7 +218,7 @@ function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
   return (
     env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
-    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    publicEnv.NEXT_PUBLIC_AUTH_MOCK === '1' ||
     (env.PUBLIC_NOAUTH_SMOKE === '1' &&
       isLocalDevelopmentAutomationHostname(extractRequestHostname(req)))
   );

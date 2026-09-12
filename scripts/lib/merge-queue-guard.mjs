@@ -62,19 +62,33 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // Tim tightened the live ruleset 2026-09-04 (60/3/10 → 20/1/5): solo group
-  // builds with a 20-minute check budget and 5-entry merge batches. Repo is
-  // source of truth — this constant follows the founder's live decision so
-  // the drain's drift guard stops fail-closing on it.
+  // JOV-6107: measured peak 19 hosted jobs/group plus >=7 background jobs on
+  // Team's 60-job budget permits two groups (45), not three (64). Keep the
+  // 20-minute check budget and ALLGREEN; see docs/PR_FLOW.md for the receipt.
   check_response_timeout_minutes: 20,
   grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 1,
+  max_entries_to_build: 2,
   max_entries_to_merge: 5,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
   min_entries_to_merge_wait_minutes:
     NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes,
 });
+
+/**
+ * A lower native build count is safe for source-first rollout and rollback.
+ * @param {string} field
+ * @param {unknown} observed
+ */
+export function isSupportedNativeBuildConcurrency(field, observed) {
+  return (
+    field === 'max_entries_to_build' &&
+    typeof observed === 'number' &&
+    Number.isInteger(observed) &&
+    observed >= 1 &&
+    observed <= NATIVE_QUEUE_POLICY.max_entries_to_build
+  );
+}
 
 export const NATIVE_QUEUE_POLICY_READBACK_SCHEMA =
   'jovie-native-queue-policy-readback/v1';
@@ -337,11 +351,6 @@ export function unmergeableReenqueueDecision({
 }
 
 /**
- * CHANGELOG.md is post-land release state, never a PR artifact. Historical
- * PRs may predate the source-CI guard, so native admission independently
- * rejects every candidate that still touches it. Queued members are retained
- * only as diagnostic evidence while the legacy backlog drains.
- *
  * Implementation PRs that touch CHANGELOG.md are skipped at admission
  * (JOV-5378). Stamp/release heads still serialize against a queued
  * CHANGELOG member. Unknown evidence never skips.
@@ -380,11 +389,27 @@ export function changelogGroupCollisionDecision({
       Array.isArray(member.files) &&
       member.files.includes(CHANGELOG_COLLISION_PATH)
   );
-  return {
-    action: 'skip',
-    reason: 'preland-changelog-prohibited',
-    collidingPrs: colliding.map(member => member.prNumber),
-  };
+  if (colliding.length > 0) {
+    return {
+      action: 'skip',
+      reason: 'changelog-collision',
+      collidingPrs: colliding.map(member => member.prNumber),
+    };
+  }
+  // A failed member-file read is not evidence of an empty collision set.
+  // Retain the caller's existing unknown policy rather than report an allow.
+  if (
+    queuedMemberFiles.some(
+      member =>
+        !Number.isInteger(member?.prNumber) ||
+        member.prNumber <= 0 ||
+        !Array.isArray(member.files) ||
+        member.files.some(file => typeof file !== 'string')
+    )
+  ) {
+    return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
+  }
+  return { action: 'allow', reason: 'no-changelog-collision' };
 }
 
 /**
@@ -503,6 +528,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Layout Guard',
   'CI / Build + Layout (combined)',
   'Build + Layout (combined)',
+  'CI / iOS Fast Unit + Coverage (combined)',
+  'iOS Fast Unit + Coverage (combined)',
   'CI / iOS Build + Test (combined)',
   'iOS Build + Test (combined)',
   'CI / Mac Build + Test (combined)',
@@ -974,10 +1001,10 @@ export function serializationKeysForFile(file) {
       reason: 'web library subsystem',
       file: normalized,
     });
-  } else if (normalized.startsWith('scripts/hermes/')) {
+  } else if (normalized.startsWith('scripts/symphony/')) {
     keys.push({
       key: `subsystem:${firstDirectory(normalized, 3)}`,
-      reason: 'Hermes automation subsystem',
+      reason: 'Symphony automation subsystem',
       file: normalized,
     });
   } else if (normalized.startsWith('scripts/')) {
@@ -1433,7 +1460,8 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
     for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY))
       if (
         observed[field] !== expected &&
-        !isPendingNativeCohortCutoverField(field)
+        !isPendingNativeCohortCutoverField(field) &&
+        !isSupportedNativeBuildConcurrency(field, observed[field])
       )
         errors.push(`live native merge_queue ${field} must be ${expected}`);
   }

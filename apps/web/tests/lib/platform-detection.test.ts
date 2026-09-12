@@ -201,5 +201,19 @@ describe('Platform Detection', () => {
         detectPlatformByHost('https://www.wikidata.org/wiki/Q42')?.id
       ).toBe('wikidata');
     });
+
+    it('detects LINE MUSIC before the LINE messenger domain rule', () => {
+      // music.line.me is the LINE MUSIC streaming DSP; the bare line.me
+      // pattern must not swallow it into the messenger platform.
+      expect(
+        detectPlatformByHost(
+          'https://music.line.me/webapp/artist/mi000000000ccf81e3'
+        )?.id
+      ).toBe('line_music');
+      // Plain line.me links still resolve to the messenger.
+      expect(detectPlatformByHost('https://line.me/R/ti/p/@test')?.id).toBe(
+        'line'
+      );
+    });
   });
 });

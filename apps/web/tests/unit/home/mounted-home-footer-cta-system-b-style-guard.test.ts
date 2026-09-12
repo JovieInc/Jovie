@@ -17,8 +17,8 @@ const footerCtaCssBlock = (source: string) => {
   return source.slice(start, end);
 };
 
-describe('mounted homepage footer CTA System B source contract', () => {
-  it('keeps mounted footer CTA markup on named System B primitives', () => {
+describe('homepage terminal CTA and canonical footer source contract', () => {
+  it('keeps the full canonical footer and terminal CTA primitives', () => {
     const layoutSource = readSource('app/(home)/layout.tsx');
     // The mounted footer CTA classes are owned by the canonical
     // `MarketingTerminalCta` 'homepage-v2' variant; the route CTA composes
@@ -31,8 +31,8 @@ describe('mounted homepage footer CTA System B source contract', () => {
     );
 
     expect(layoutSource).toContain('<PublicPageShell');
-    expect(layoutSource).toContain("footerVariant='minimal'");
-    expect(layoutSource).toContain(
+    expect(layoutSource).toContain("footerVariant='expanded'");
+    expect(layoutSource).not.toContain(
       "footerClassName='system-b-mounted-home-footer'"
     );
     expect(terminalCtaSource).toMatch(

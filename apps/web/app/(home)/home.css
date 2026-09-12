@@ -1973,28 +1973,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* HOMEPAGE POSTER HERO SYSTEM B END */
 
 /* HOMEPAGE EDITORIAL HERO START */
-/* Full-viewport photo hero: one still behind, type on the quiet patch, the
-   existing name search as the only control. Tokens only — no raw color. */
+/* Centered, image-free hero. Soft illumination across a dark plane —
+   no horizon line, no wireframe ellipse, no wallpaper. */
 .homepage-editorial-hero {
   --homepage-hero-reveal-delay: 100ms;
-  --homepage-editorial-scrim: color-mix(
+  --homepage-editorial-light: color-mix(
     in oklab,
-    var(--system-b-bg-page) 72%,
+    var(--system-b-text-primary) 5%,
     transparent
   );
-  --homepage-editorial-scrim-soft: color-mix(
+  --homepage-editorial-light-soft: color-mix(
     in oklab,
-    var(--system-b-bg-page) 42%,
+    var(--system-b-text-primary) 2%,
     transparent
   );
   --homepage-editorial-hairline: color-mix(
     in oklab,
     var(--system-b-text-primary) 12%,
-    transparent
-  );
-  --homepage-editorial-field: color-mix(
-    in oklab,
-    var(--system-b-bg-page) 58%,
     transparent
   );
 
@@ -2017,54 +2012,53 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: absolute;
   inset: 0;
   z-index: 0;
+  overflow: hidden;
   pointer-events: none;
+  background: var(--system-b-bg-page);
 }
 
-.homepage-editorial-hero__backdrop picture,
-.homepage-editorial-hero__backdrop img {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.homepage-editorial-hero__backdrop img {
-  object-fit: cover;
-  object-position: 50% 64%;
-}
-
-/* Quiet patch: darken the sky behind the type and the top edge under the
-   header without touching the desk light at the bottom of the frame. */
-.homepage-editorial-hero__scrim {
+.homepage-editorial-hero__light-well {
   position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(
-      64% 46% at 50% 44%,
-      var(--homepage-editorial-scrim) 0%,
-      transparent 100%
-    ),
-    linear-gradient(
-      180deg,
-      var(--homepage-editorial-scrim-soft) 0%,
-      transparent 32%
-    );
+  top: 48%;
+  left: 50%;
+  width: min(80rem, 120vw);
+  height: min(42rem, 62vw);
+  border: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    var(--homepage-editorial-light) 0%,
+    var(--homepage-editorial-light-soft) 42%,
+    transparent 74%
+  );
+  opacity: 0.5;
+  filter: blur(var(--space-8));
+}
+
+.homepage-editorial-hero__light-well::after {
+  position: absolute;
+  inset: 42% 14% auto;
+  height: 48%;
+  content: "";
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--system-b-text-primary) 1.5%, transparent),
+    transparent 88%
+  );
+  filter: blur(var(--space-12));
+  transform: none;
 }
 
 .homepage-editorial-hero__copy {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   display: flex;
-  width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
-  );
+  width: min(var(--homepage-grid-max), 100%);
   flex-direction: column;
   align-items: center;
   text-align: center;
-  /* Sit slightly above true center so the copy reads on the sky, not the desk. */
-  margin-bottom: clamp(var(--space-10), 9vh, var(--space-24));
+  transform: translateY(calc(var(--homepage-header-height) * -0.12));
 }
 
 .homepage-editorial-hero__headline {
@@ -2094,31 +2088,33 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-editorial-hero__search {
-  width: min(38rem, 100%);
+  width: min(40rem, 100%);
   margin-top: var(--space-8);
 }
 
+/* Field geometry only. Illumination lives on InputAuraFrame.
+   The opaque interior token lives here so hero and close match. */
 .homepage-name-search__field {
-  min-height: calc(var(--space-12) + var(--space-2));
+  --homepage-editorial-field: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 4%,
+    var(--system-b-bg-page)
+  );
+  --homepage-name-search-inset: var(--space-2);
+  /* 28px visible action + matching top/bottom/right inset = 44px pill. */
+  min-height: calc(
+    var(--space-6) +
+    var(--space-1) +
+    var(--homepage-name-search-inset) *
+    2
+  );
+  overflow: hidden;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5);
-  border: 1px solid var(--homepage-editorial-hairline);
+  padding: var(--homepage-name-search-inset) var(--homepage-name-search-inset)
+    var(--homepage-name-search-inset) var(--space-5);
+  border: var(--space-px) solid transparent;
   border-radius: var(--radius-pill);
   background: var(--homepage-editorial-field);
-  backdrop-filter: blur(var(--space-3));
-  -webkit-backdrop-filter: blur(var(--space-3));
-  transition: border-color var(--ds-motion-subtle-duration)
-    var(--ds-motion-subtle-easing);
-}
-
-.homepage-name-search__field:hover,
-.homepage-name-search__field:focus-within,
-.homepage-name-search__field--open {
-  border-color: color-mix(
-    in oklab,
-    var(--system-b-text-primary) 26%,
-    transparent
-  );
 }
 
 .homepage-name-search__input {
@@ -2148,24 +2144,20 @@ body:has(.home-viewport)::-webkit-scrollbar {
     padding-bottom: var(--space-12);
   }
 
-  .homepage-editorial-hero__backdrop img {
-    object-position: 50% 58%;
-  }
-
   .homepage-editorial-hero__copy {
-    margin-bottom: clamp(var(--space-8), 8vh, var(--space-16));
+    transform: none;
   }
 
-  /* Two lines on phones, never three. */
+  /* Keep the tablet composition generous while retaining a two-line measure. */
   .homepage-editorial-hero__headline {
-    max-width: 11ch;
+    max-width: min(16ch, 100%);
     font-size: clamp(2.35rem, 10.6vw, 2.75rem);
     line-height: 1.06;
     white-space: normal;
   }
 
   .homepage-editorial-hero__support {
-    max-width: 22rem;
+    max-width: 30rem;
     margin-top: var(--space-4);
     font-size: var(--text-lg);
     white-space: normal;
@@ -2175,12 +2167,33 @@ body:has(.home-viewport)::-webkit-scrollbar {
     margin-top: var(--space-6);
   }
 
+  .homepage-editorial-hero__light-well {
+    width: 150vw;
+    height: 60vw;
+  }
+
   .homepage-name-search__field {
     padding-left: var(--space-4);
   }
 
   .homepage-name-search__input {
     font-size: var(--text-base);
+  }
+}
+
+@media (max-width: 1023px) {
+  .homepage-editorial-hero__search {
+    width: 100%;
+  }
+}
+
+@media (max-width: 479px) {
+  .homepage-editorial-hero__headline {
+    max-width: 11ch;
+  }
+
+  .homepage-editorial-hero__support {
+    max-width: 22rem;
   }
 }
 
@@ -2204,16 +2217,30 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* HOMEPAGE EDITORIAL HERO END */
 
 /* HOMEPAGE CERTIFIED SECTIONS START */
-/* Sections 2-9. One content column, one gutter, top rules, no cards. */
+/* Sections 2-9. Named rhythm: proof strip, text chapter, product chapter,
+   close. Product chapters take the strongest beat; supporting chapters
+   stay economical. One content column, one gutter, top rules, no cards. */
 .homepage-certified-proof,
 .homepage-certified-section,
 .homepage-close {
+  --homepage-rhythm-proof: clamp(var(--space-8), 4vw, var(--space-12));
+  --homepage-rhythm-text: clamp(var(--space-10), 5.5vw, var(--space-16));
+  --homepage-rhythm-product: clamp(var(--space-16), 8vw, var(--space-24));
+  --homepage-rhythm-close-start: clamp(var(--space-24), 10vw, var(--space-32));
+  --homepage-rhythm-close-end: clamp(var(--space-16), 8vw, var(--space-24));
+
   background: var(--system-b-bg-page);
   color: var(--color-text-primary-token);
 }
 
 .homepage-certified-proof {
-  padding-block: clamp(var(--space-12), 7vw, var(--space-20));
+  padding-block: var(--homepage-rhythm-proof);
+}
+
+.homepage-certified-proof
+  .system-b-mounted-home-trust-strip-shell
+  > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+  padding-block: 0;
 }
 
 .homepage-certified-proof__statement {
@@ -2230,6 +2257,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: balance;
 }
 
+.homepage-certified-proof__logos {
+  margin-top: 0;
+}
+
 .homepage-certified-section__inner,
 .homepage-close__inner {
   width: min(
@@ -2244,11 +2275,18 @@ body:has(.home-viewport)::-webkit-scrollbar {
   grid-template-columns: minmax(0, 1fr);
   gap: clamp(var(--space-8), 5vw, var(--space-16));
   align-items: center;
-  padding-block: clamp(var(--space-12), 8vw, var(--space-24));
+  padding-block: var(--homepage-rhythm-text);
   border-top: 1px solid var(--homepage-chapter-rule);
 }
 
+.homepage-certified-section[data-rhythm="product"]
+  .homepage-certified-section__inner {
+  padding-block: var(--homepage-rhythm-product);
+}
+
 .homepage-certified-section__copy {
+  /* Reading-width LIMIT inside the assigned column. Does not position the
+     column — desktop spans in the 900px grid do that. */
   max-width: 34rem;
 }
 
@@ -2290,7 +2328,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-certified-section__device {
   width: min(100%, 15rem);
   max-width: none;
-  padding: var(--space-2);
 }
 
 .homepage-certified-section__phones[data-count="3"]
@@ -2329,8 +2366,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   isolation: isolate;
   overflow: clip;
   border-top: 1px solid var(--homepage-chapter-rule);
-  padding-block: clamp(var(--space-24), 10vw, var(--space-32))
-    clamp(var(--space-16), 8vw, var(--space-24));
+  padding-block: var(--homepage-rhythm-close-start)
+    var(--homepage-rhythm-close-end);
 }
 
 .homepage-close::before {
@@ -2389,24 +2426,40 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (min-width: 900px) {
-  .homepage-certified-section[data-media="true"]
-    .homepage-certified-section__inner {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  /* Shared 12-column contract for all six editorial sections. Left-copy,
+     right-copy, and media occupy the same spans whether or not media exists.
+     34rem stays a reading-width limit inside the assigned column. */
+  .homepage-certified-section__inner {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: clamp(var(--space-4), 2vw, var(--space-6));
+    row-gap: clamp(var(--space-8), 5vw, var(--space-16));
   }
 
-  .homepage-certified-section[data-media="true"][data-align="end"]
+  .homepage-certified-section[data-align="start"]
     .homepage-certified-section__copy {
-    order: 2;
+    grid-column: 1 / span 6;
   }
 
-  .homepage-certified-section[data-media="true"][data-align="end"]
+  .homepage-certified-section[data-align="end"]
+    .homepage-certified-section__copy {
+    grid-column: 7 / span 6;
+  }
+
+  .homepage-certified-section[data-align="start"]
     .homepage-certified-section__media {
-    order: 1;
+    grid-column: 7 / span 6;
   }
 
-  .homepage-certified-section[data-media="false"][data-align="end"]
-    .homepage-certified-section__copy {
-    margin-left: auto;
+  .homepage-certified-section[data-align="end"]
+    .homepage-certified-section__media {
+    grid-column: 1 / span 6;
+  }
+
+  /* Trio phones share a ~half-rail column here, so bezel tokens follow
+     the squeezed width. Notch already uses cqi. */
+  .homepage-certified-section__phones[data-count="3"]
+  .homepage-certified-section__device {
+    --ap-phone-scale: 0.367;
   }
 }
 
@@ -2414,7 +2467,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-certified-section__phones[data-count="3"]
     .homepage-certified-section__device {
     width: min(100%, 7.5rem);
-    padding: var(--space-1);
+    --ap-phone-scale: 0.3529;
+    --ap-phone-max-width: 7.5rem;
   }
 
   .homepage-certified-section__phones[data-count="3"]
@@ -5178,7 +5232,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-story-stack--proof-transition {
-  margin-top: calc(var(--space-8) * -1);
   overflow: visible;
   background: transparent;
 }
@@ -5299,7 +5352,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Center the composer in its column: the dock's utility padding comes off so
    the surface and its caption share the same edges. */
-.homepage-opportunity-section__demo [aria-label="Jovie AI Composer Demo"]
+.homepage-opportunity-section__demo
+  [aria-label="Jovie AI Composer Demo"]
   > div:last-child {
   padding: 0;
 }
@@ -5697,10 +5751,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     min-height: calc(var(--space-24) * 3.25);
     margin-top: var(--space-8);
   }
-
-  .homepage-story-stack--proof-transition {
-    margin-top: calc(var(--space-6) * -1);
-  }
 }
 
 /* HOMEPAGE CINEMATIC MONOLITH END */
@@ -5817,7 +5867,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Deliberate hierarchy, no glow: the recommended tier gets a flat surface
    shift and a filled badge; everything else stays on surface-0. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card[data-recommended="true"] {
   background: var(--system-b-bg-surface-1);
 }
@@ -5868,7 +5919,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* Price scale: large quiet figure, hushed cadence suffix. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card__price {
   margin: var(--space-5) 0 0;
   color: var(--color-text-primary-token);
@@ -5890,7 +5942,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Feature rhythm: a flat seam separates the list from the CTA, checks sit
    one tone quieter than the line copy. */
-.home-viewport .system-b-mounted-home-pricing
+.home-viewport
+  .system-b-mounted-home-pricing
   .marketing-pricing-plan-card__features {
   gap: var(--space-3);
   margin: var(--space-6) 0 0;

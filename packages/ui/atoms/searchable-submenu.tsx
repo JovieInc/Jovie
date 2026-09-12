@@ -140,6 +140,11 @@ function nextEnabledIndex(
   return candidate;
 }
 
+// Keep compact menu visuals while giving every button the canonical 44px hit
+// container required by the design system touch-target invariant.
+const MENU_TOUCH_TARGET_BASE =
+  'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -317,7 +322,7 @@ export function SearchableSubmenu({
       <DropdownMenuPrimitive.SubTrigger
         disabled={disabled}
         data-slot='searchable-submenu-trigger'
-        className={cn(MENU_ITEM_BASE)}
+        className={cn(MENU_ITEM_BASE, MENU_TOUCH_TARGET_BASE)}
       >
         {triggerIcon}
         <span className='flex-1'>{triggerLabel}</span>
@@ -386,7 +391,11 @@ export function SearchableSubmenu({
                 <button
                   type='button'
                   onClick={handleClearSearch}
-                  className={MENU_SEARCH_CLEAR_BUTTON_BASE}
+                  className={cn(
+                    MENU_SEARCH_CLEAR_BUTTON_BASE,
+                    'relative',
+                    MENU_TOUCH_TARGET_BASE
+                  )}
                   data-slot='search-clear'
                   aria-label='Clear search'
                 >
@@ -477,6 +486,7 @@ export function SearchableSubmenu({
                         disabled={item.disabled}
                         className={cn(
                           MENU_ITEM_BASE,
+                          MENU_TOUCH_TARGET_BASE,
                           'cursor-pointer',
                           item.disabled && 'pointer-events-none opacity-50'
                         )}
@@ -674,7 +684,11 @@ export function SearchableList({
           {searchQuery ? (
             <button
               type='button'
-              className={MENU_SEARCH_CLEAR_BUTTON_BASE}
+              className={cn(
+                MENU_SEARCH_CLEAR_BUTTON_BASE,
+                'relative',
+                MENU_TOUCH_TARGET_BASE
+              )}
               data-slot='search-clear'
               aria-label='Clear search'
               onClick={() => {
@@ -736,6 +750,7 @@ export function SearchableList({
               disabled={item.disabled}
               className={cn(
                 MENU_ITEM_BASE,
+                MENU_TOUCH_TARGET_BASE,
                 'cursor-pointer',
                 item.disabled && 'pointer-events-none opacity-50'
               )}
