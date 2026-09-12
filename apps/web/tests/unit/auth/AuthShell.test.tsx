@@ -76,6 +76,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { AuthShell } from '@/components/features/auth/AuthShell';
+import { APP_ROUTES } from '@/constants/routes';
 
 describe('AuthShell — Better Auth SSO + email-code contract', () => {
   beforeEach(() => {
@@ -301,7 +302,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(screen.getByText('or use email')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Trouble signing in?' })
-    ).toBeInTheDocument();
+    ).toHaveAttribute('href', APP_ROUTES.SUPPORT);
 
     rerender(<AuthShell mode='sign-up' />);
     expect(
@@ -321,6 +322,20 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
       'href',
       '/signin?handle=motion&redirect_url=%2Fstart%3Fhandle%3Dmotion'
     );
+  });
+
+
+  it('keeps Trouble signing in on support when oppositeModeUrl is a signup return', () => {
+    render(
+      <AuthShell
+        mode='sign-in'
+        oppositeModeUrl='/signup?desktop_return=%2Fapp%2Fsettings'
+      />
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Trouble signing in?' })
+    ).toHaveAttribute('href', APP_ROUTES.SUPPORT);
   });
 
   it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
