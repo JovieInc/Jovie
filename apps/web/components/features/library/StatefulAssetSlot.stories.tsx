@@ -4,7 +4,6 @@ import { StatefulAssetSlot } from './StatefulAssetSlot';
 const meta = {
   title: 'Library/StatefulAssetSlot',
   component: StatefulAssetSlot,
-  parameters: { layout: 'centered' },
   args: {
     kind: 'artwork',
     occupancy: 'empty',

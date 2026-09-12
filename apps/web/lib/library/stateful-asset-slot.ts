@@ -47,16 +47,6 @@ export function resolveStatefulAssetSlot(
   };
 }
 
-export function assertPopulatedSlotHidesDropZone(
-  presentation: StatefulAssetSlotPresentation
-): void {
-  if (presentation.mode === 'object' && presentation.showAcquisitionDropZone) {
-    throw new Error(
-      'Populated asset slots must not render an empty acquisition drop zone'
-    );
-  }
-}
-
 export interface LibraryInspectorAssetProjection {
   readonly kind: LibraryInspectorAssetKind;
   readonly occupancy: AssetSlotOccupancy;
@@ -158,13 +148,4 @@ export function projectLibraryInspectorAssetSlot(
         'Downloads, stems, and DJ promos.'
       );
   }
-}
-
-export function projectLibraryInspectorAssetSlots(
-  asset: LibraryInspectorAssetSource,
-  stemCount = 0
-): readonly LibraryInspectorAssetProjection[] {
-  return LIBRARY_INSPECTOR_ASSET_KINDS.map(kind =>
-    projectLibraryInspectorAssetSlot(kind, asset, stemCount)
-  );
 }

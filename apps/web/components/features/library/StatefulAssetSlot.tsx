@@ -5,7 +5,6 @@ import { FileAudio2, FileText, ImageIcon, Upload, Video } from 'lucide-react';
 import Link from 'next/link';
 import { type DragEvent, type ReactNode, useRef, useState } from 'react';
 import {
-  assertPopulatedSlotHidesDropZone,
   type LibraryInspectorAssetKind,
   type ResolveStatefulAssetSlotInput,
   resolveStatefulAssetSlot,
@@ -62,7 +61,6 @@ export function StatefulAssetSlot({
     cardinality,
     acquireMode,
   });
-  assertPopulatedSlotHidesDropZone(presentation);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const Icon = ICONS[kind];

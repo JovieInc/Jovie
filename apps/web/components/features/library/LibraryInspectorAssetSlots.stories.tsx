@@ -12,7 +12,6 @@ const asset = {
 const meta = {
   title: 'Library/LibraryInspectorAssetSlots',
   component: LibraryInspectorAssetSlots,
-  parameters: { layout: 'centered' },
   args: {
     asset,
     downloads: [],

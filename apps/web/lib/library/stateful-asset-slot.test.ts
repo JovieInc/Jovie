@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  assertPopulatedSlotHidesDropZone,
   LIBRARY_INSPECTOR_ASSET_KINDS,
   projectLibraryInspectorAssetSlot,
-  projectLibraryInspectorAssetSlots,
   resolveStatefulAssetSlot,
 } from './stateful-asset-slot';
 
@@ -31,21 +29,22 @@ describe('stateful asset slots', () => {
       });
       expect(populated.mode).toBe('object');
       expect(populated.showAcquisitionDropZone).toBe(false);
-      expect(() => assertPopulatedSlotHidesDropZone(populated)).not.toThrow();
     }
   });
 
   it('projects Library inspector kinds from object state', () => {
-    const slots = projectLibraryInspectorAssetSlots(
-      {
-        itemKind: 'release',
-        title: 'Take Me Over',
-        previewUrl: 'https://cdn.example.com/a.mp3',
-        artworkUrl: 'https://cdn.example.com/a.jpg',
-      },
-      2
-    );
-    expect(slots.map(slot => [slot.kind, slot.occupancy])).toEqual([
+    const source = {
+      itemKind: 'release',
+      title: 'Take Me Over',
+      previewUrl: 'https://cdn.example.com/a.mp3',
+      artworkUrl: 'https://cdn.example.com/a.jpg',
+    };
+    expect(
+      LIBRARY_INSPECTOR_ASSET_KINDS.map(kind => [
+        kind,
+        projectLibraryInspectorAssetSlot(kind, source, 2).occupancy,
+      ])
+    ).toEqual([
       ['audio', 'populated'],
       ['artwork', 'populated'],
       ['video', 'empty'],
