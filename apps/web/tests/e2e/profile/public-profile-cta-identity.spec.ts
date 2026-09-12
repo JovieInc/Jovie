@@ -229,6 +229,9 @@ test.describe('Public profile CTA and identity evidence', () => {
           events.getByText('No upcoming shows.', { exact: true })
         ).toBeVisible();
         await expect(
+          events.getByRole('button', { name: 'View Events' })
+        ).toHaveCount(0);
+        await expect(
           events.getByRole('button', { name: 'Turn On Event Alerts' })
         ).toHaveCount(0);
         await capture(`${viewport.id}-events.png`);
@@ -245,7 +248,7 @@ test.describe('Public profile CTA and identity evidence', () => {
       const emptyEvents = page.getByTestId('profile-primary-tab-events-empty');
       await expect(emptyEvents).toBeVisible();
       await expect(
-        emptyEvents.getByRole('heading', { name: 'No Events' })
+        emptyEvents.getByRole('heading', { name: 'No upcoming shows' })
       ).toBeVisible();
       const canonicalCta = emptyEvents.getByRole('button', {
         name: 'Turn On Event Alerts',
