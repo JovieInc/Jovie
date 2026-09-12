@@ -5,9 +5,7 @@ import { type ComponentType, useState } from 'react';
 import {
   DrawerStatGrid,
   DrawerSurfaceCard,
-  DrawerTabbedCard,
-  DrawerTabs,
-  EntitySidebarShell,
+  EntityTabbedRail,
   StatTile,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -153,7 +151,8 @@ function FunnelCard({
 
   return (
     <DrawerSurfaceCard
-      variant='card'
+      variant='flat'
+      data-right-rail-section='status'
       className='divide-y divide-subtle overflow-hidden py-1'
     >
       {stages.map((stage, index) => {
@@ -293,16 +292,23 @@ export function AnalyticsSidebarView({
   ];
 
   return (
-    <EntitySidebarShell
+    <EntityTabbedRail
       isOpen={isOpen}
       ariaLabel='Analytics'
-      data-testid={testId}
-      headerMode='minimal'
+      title='Analytics'
       hideMinimalHeaderBar
-      entityHeaderSurface='flat'
+      testId={testId}
+      activeTab={activeTab}
+      onTabChange={onActiveTabChange}
+      tabOptions={ANALYTICS_TAB_OPTIONS}
+      tabsAriaLabel='Analytics data tabs'
+      tabDistribution='fill'
+      tabbedCardTestId={tabbedCardTestId}
+      sectionKind='details'
+      contentClassName='pt-2'
       entityHeader={
-        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-          <div className='relative p-3.5'>
+        <div className='space-y-2.5 p-2.5'>
+          <div className='relative px-1 py-1'>
             <div className='absolute right-2.5 top-2.5'>
               <DrawerHeaderActions
                 primaryActions={[]}
@@ -333,114 +339,99 @@ export function AnalyticsSidebarView({
               )}
             </div>
           </div>
-        </DrawerSurfaceCard>
-      }
-    >
-      <div
-        className={cn(
-          'flex min-h-0 flex-1 flex-col space-y-2 transition-opacity duration-subtle',
-          isFetching && !loading && 'opacity-70'
-        )}
-      >
-        <div className='shrink-0 space-y-2'>
-          {/* Funnel waterfall — vertical bars show dropoff at a glance */}
-          <FunnelCard stages={stages} loading={loading} />
 
-          {/* Engagement — compact 2-col, secondary to the funnel */}
-          <DrawerStatGrid
-            variant='card'
+          <div
             className={cn(
-              'gap-1 divide-x-0 p-2',
-              showTipLinkVisits ? 'grid-cols-3' : 'grid-cols-2'
+              'space-y-2 transition-opacity duration-subtle',
+              isFetching && !loading && 'opacity-70'
             )}
+            data-right-rail-section='status'
           >
-            <div className='rounded-lg px-2 py-2'>
-              <StatTile
-                label='Link Clicks'
-                value={formatMetricValue(loading, data?.total_clicks)}
-              />
-            </div>
-            <div className='rounded-lg px-2 py-2'>
-              <StatTile
-                label='Listen Clicks'
-                value={formatMetricValue(loading, data?.listen_clicks)}
-              />
-            </div>
-            {showTipLinkVisits ? (
+            {/* Funnel waterfall — vertical bars show dropoff at a glance */}
+            <FunnelCard stages={stages} loading={loading} />
+
+            {/* Engagement — compact 2-col, secondary to the funnel */}
+            <DrawerStatGrid
+              variant='flush'
+              className={cn(
+                'gap-1 divide-x-0 border-t border-subtle pt-2',
+                showTipLinkVisits ? 'grid-cols-3' : 'grid-cols-2'
+              )}
+            >
               <div className='rounded-lg px-2 py-2'>
                 <StatTile
-                  label='Tip Link Visits'
-                  value={formatMetricValue(loading, data?.tip_link_visits)}
+                  label='Link Clicks'
+                  value={formatMetricValue(loading, data?.total_clicks)}
                 />
               </div>
-            ) : null}
-          </DrawerStatGrid>
+              <div className='rounded-lg px-2 py-2'>
+                <StatTile
+                  label='Listen Clicks'
+                  value={formatMetricValue(loading, data?.listen_clicks)}
+                />
+              </div>
+              {showTipLinkVisits ? (
+                <div className='rounded-lg px-2 py-2'>
+                  <StatTile
+                    label='Tip Link Visits'
+                    value={formatMetricValue(loading, data?.tip_link_visits)}
+                  />
+                </div>
+              ) : null}
+            </DrawerStatGrid>
+          </div>
         </div>
-        <DrawerTabbedCard
-          testId={tabbedCardTestId}
-          tabs={
-            <DrawerTabs
-              value={activeTab}
-              onValueChange={onActiveTabChange}
-              options={ANALYTICS_TAB_OPTIONS}
-              className='w-full'
-              ariaLabel='Analytics data tabs'
-              distribution='fill'
-            />
-          }
-          contentClassName='pt-2'
-        >
-          {activeTab === 'cities' && (
-            <RankedList
-              icon={MapPin}
-              loading={loading}
-              items={(data?.top_cities ?? []).slice(0, 5).map(city => ({
-                key: city.city,
-                label: city.city,
-                value: numberFormatter.format(city.count),
-              }))}
-              emptyMessage='No city data yet'
-            />
-          )}
-          {activeTab === 'countries' && (
-            <RankedList
-              icon={Globe}
-              loading={loading}
-              items={(data?.top_countries ?? []).slice(0, 5).map(country => ({
-                key: country.country,
-                label: country.country,
-                value: numberFormatter.format(country.count),
-              }))}
-              emptyMessage='No country data yet'
-            />
-          )}
-          {activeTab === 'sources' && (
-            <RankedList
-              icon={Globe}
-              loading={loading}
-              items={(data?.top_referrers ?? []).slice(0, 5).map(referrer => ({
-                key: referrer.referrer || 'direct',
-                label: referrer.referrer || 'Direct',
-                value: numberFormatter.format(referrer.count),
-              }))}
-              emptyMessage='No source data yet'
-            />
-          )}
-          {activeTab === 'links' && (
-            <RankedList
-              icon={Link2}
-              loading={loading}
-              items={(data?.top_links ?? []).slice(0, 5).map(link => ({
-                key: link.id,
-                label: link.url,
-                value: numberFormatter.format(link.clicks),
-              }))}
-              emptyMessage='No link data yet'
-            />
-          )}
-        </DrawerTabbedCard>
-      </div>
-    </EntitySidebarShell>
+      }
+    >
+      {activeTab === 'cities' && (
+        <RankedList
+          icon={MapPin}
+          loading={loading}
+          items={(data?.top_cities ?? []).slice(0, 5).map(city => ({
+            key: city.city,
+            label: city.city,
+            value: numberFormatter.format(city.count),
+          }))}
+          emptyMessage='No city data yet'
+        />
+      )}
+      {activeTab === 'countries' && (
+        <RankedList
+          icon={Globe}
+          loading={loading}
+          items={(data?.top_countries ?? []).slice(0, 5).map(country => ({
+            key: country.country,
+            label: country.country,
+            value: numberFormatter.format(country.count),
+          }))}
+          emptyMessage='No country data yet'
+        />
+      )}
+      {activeTab === 'sources' && (
+        <RankedList
+          icon={Globe}
+          loading={loading}
+          items={(data?.top_referrers ?? []).slice(0, 5).map(referrer => ({
+            key: referrer.referrer || 'direct',
+            label: referrer.referrer || 'Direct',
+            value: numberFormatter.format(referrer.count),
+          }))}
+          emptyMessage='No source data yet'
+        />
+      )}
+      {activeTab === 'links' && (
+        <RankedList
+          icon={Link2}
+          loading={loading}
+          items={(data?.top_links ?? []).slice(0, 5).map(link => ({
+            key: link.id,
+            label: link.url,
+            value: numberFormatter.format(link.clicks),
+          }))}
+          emptyMessage='No link data yet'
+        />
+      )}
+    </EntityTabbedRail>
   );
 }
 
