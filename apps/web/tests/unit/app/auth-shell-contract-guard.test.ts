@@ -62,9 +62,9 @@ describe('auth shell contract guard', () => {
       'utf8'
     );
 
-    expect(signin).toContain("layoutVariant='split'");
+    expect(signin).toContain("layoutVariant='stack'");
     expect(signin).not.toContain("chrome='splash-b'");
-    expect(loading).toContain("layoutVariant='split'");
+    expect(loading).toContain("layoutVariant='stack'");
     expect(modal).toContain('<AuthModalShell');
     expect(modal).not.toContain('<AuthLayout');
   });

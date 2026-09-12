@@ -6,9 +6,9 @@ import { AuthPageSkeleton } from '@/features/auth';
 export default function SignInLoading() {
   return (
     <AuthPageSkeleton
-      formTitle='Sign in'
+      formTitle='Log in to Jovie'
       showFormTitle={false}
-      layoutVariant='split'
+      layoutVariant='stack'
     />
   );
 }

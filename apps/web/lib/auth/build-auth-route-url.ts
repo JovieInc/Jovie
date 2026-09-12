@@ -1,5 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 
+import { normalizeAuthClaimHandle } from './auth-shell-intent';
 import { sanitizeRedirectUrl } from './constants';
 
 /**
@@ -14,15 +15,21 @@ interface SearchParamReader {
 }
 
 /**
- * Builds a cross-link between auth routes while forwarding only the sanitized
- * `redirect_url` value. Other search params are intentionally dropped.
+ * Builds a cross-link between auth routes while forwarding the sanitized
+ * `redirect_url` and claim `handle`. Other search params are dropped so
+ * oauth errors and emails do not leak across modes.
  */
 export function buildAuthRouteUrl(
   pathname: string,
   searchParams: SearchParamReader
 ): string {
   const routeUrl = new URL(pathname, 'https://n');
+  const handle = normalizeAuthClaimHandle(searchParams.get('handle'));
   const redirectUrl = sanitizeRedirectUrl(searchParams.get('redirect_url'));
+
+  if (handle) {
+    routeUrl.searchParams.set('handle', handle);
+  }
 
   if (redirectUrl) {
     routeUrl.searchParams.set('redirect_url', redirectUrl);

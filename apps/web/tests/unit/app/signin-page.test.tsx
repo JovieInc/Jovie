@@ -77,10 +77,10 @@ describe('signin page', () => {
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        formTitle: 'Sign in',
+        formTitle: 'Log in to Jovie',
         showFormTitle: false,
         showFooterPrompt: false,
-        layoutVariant: 'split',
+        layoutVariant: 'stack',
       })
     );
     expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');

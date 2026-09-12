@@ -100,13 +100,13 @@ describe('signup page', () => {
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        formTitle: 'Create your account',
+        formTitle: 'Continue to Jovie',
         showFormTitle: false,
         showFooterPrompt: false,
         layoutVariant: 'stack',
-        chrome: 'splash-b',
       })
     );
+    expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
     expect(
       screen.queryByText('Start your private launch request.')
     ).not.toBeInTheDocument();

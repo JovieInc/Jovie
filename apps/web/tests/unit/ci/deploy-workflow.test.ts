@@ -3458,9 +3458,9 @@ describe('CI E2E smoke workflow', () => {
     expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );
-    expect(authHelper).toContain("options.entryPath === '/signup'");
-    expect(authHelper).toContain("'Continue with Email'");
-    expect(authHelper).toContain("'Email me a Code'");
+    expect(authHelper).toContain("readonly entryPath: '/signup' | '/signin'");
+    expect(authHelper).toContain("page.getByLabel('Email')");
+    expect(authHelper).toContain("'Send sign-in code'");
     const routeFetchIndex = authHelper.indexOf(
       'response = await route.fetch()'
     );

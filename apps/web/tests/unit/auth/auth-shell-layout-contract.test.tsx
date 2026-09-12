@@ -178,10 +178,10 @@ describe('auth shell layout contract', () => {
     );
     const handoff = readWebSource('app/(auth)/DesktopAuthRouteHandoff.tsx');
 
-    expect(signinPage).toContain("layoutVariant='split'");
+    expect(signinPage).toContain("layoutVariant='stack'");
     expect(signinPage).not.toContain("chrome='splash-b'");
     expect(signinPage).toContain('<DesktopAuthRouteHandoff');
-    expect(signinLoading).toContain("layoutVariant='split'");
+    expect(signinLoading).toContain("layoutVariant='stack'");
     expect(signinLoading).not.toContain("chrome='splash-b'");
 
     expect(signinModal).toContain('<AuthModalShell');
@@ -198,10 +198,10 @@ describe('auth shell layout contract', () => {
     AUTH_LAYOUT_VIEWPORTS
   )('$name ($width) editorial visibility matches the contract', ({ width }) => {
     expect(editorialCardExpectedVisible('signin-full-route', width)).toBe(
-      width >= AUTH_SPLIT_MIN_WIDTH_PX
+      false
     );
     expect(editorialCardVisibleFromCss(productionCssInspection, width)).toBe(
-      editorialCardExpectedVisible('signin-full-route', width)
+      width >= AUTH_SPLIT_MIN_WIDTH_PX
     );
 
     expect(
@@ -409,7 +409,7 @@ describe('auth shell layout contract', () => {
     }
 
     expect(AUTH_SHELL_LAYOUT_CONTRACT['signin-full-route'].editorialCard).toBe(
-      'desktop-only'
+      'never'
     );
     expect(
       AUTH_SHELL_LAYOUT_CONTRACT['signin-intercepted-modal'].editorialCard

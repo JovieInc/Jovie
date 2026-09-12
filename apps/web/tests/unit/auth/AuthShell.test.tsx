@@ -292,12 +292,43 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('renders login, continue, and claim headings on the shared shell', () => {
+    const { rerender } = render(<AuthShell mode='sign-in' />);
+    expect(
+      screen.getByRole('heading', { name: 'Log in to Jovie' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Go to homepage')).toBeInTheDocument();
+    expect(screen.getByText('or use email')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Trouble signing in?' })
+    ).toBeInTheDocument();
+
+    rerender(<AuthShell mode='sign-up' />);
+    expect(
+      screen.getByRole('heading', { name: 'Continue to Jovie' })
+    ).toBeInTheDocument();
+
+    searchParamsState.value =
+      'handle=Motion&redirect_url=%2Fstart%3Fhandle%3Dmotion';
+    rerender(<AuthShell mode='sign-up' />);
+    expect(
+      screen.getByRole('heading', { name: 'Claim @motion' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Back to @motion' })
+    ).toHaveAttribute('href', '/motion?claim=1');
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin?handle=motion&redirect_url=%2Fstart%3Fhandle%3Dmotion'
+    );
+  });
+
   it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
     authState.isSignedIn = true;
 
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
     expect(serverMarkup).toContain('data-auth-shell-ready="true"');
-    expect(serverMarkup).toContain('Email me a Code');
+    expect(serverMarkup).toContain('Send sign-in code');
 
     const { container } = render(<AuthShell mode='sign-in' />);
     await waitFor(() => expect(container).toBeEmptyDOMElement());

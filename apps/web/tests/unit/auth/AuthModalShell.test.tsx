@@ -97,7 +97,7 @@ describe('AuthModalShell', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults the back button aria-label to a context-neutral "Go back"', () => {
+  it('defaults the back control to an explicit Back to homepage destination', () => {
     // jsdom's <dialog> without `open` hides descendants from the
     // accessibility tree, so query by label rather than by role.
     render(
@@ -110,7 +110,8 @@ describe('AuthModalShell', () => {
     // chat") when no context was passed — it would mislead screen readers
     // when the modal is opened from profile claim, direct /signup, or the
     // dev unavailable card.
-    expect(screen.getByLabelText('Go back')).toBeInTheDocument();
+    expect(screen.getByLabelText('Back to homepage')).toBeInTheDocument();
+    expect(screen.getByText('Back to homepage')).toBeInTheDocument();
     expect(screen.queryByLabelText('Back to chat')).toBeNull();
   });
 
@@ -156,7 +157,7 @@ describe('AuthModalShell', () => {
     expect(document.body.style.overflow).toBe('hidden');
     expect(document.documentElement.style.overscrollBehavior).toBe('contain');
 
-    const backButton = screen.getByLabelText('Go back');
+    const backButton = screen.getByLabelText('Back to homepage');
     await waitFor(() => expect(backButton).toHaveFocus());
     expect(trigger).toHaveAttribute('inert');
     expect(trigger).toHaveAttribute('aria-hidden', 'true');
@@ -182,7 +183,7 @@ describe('AuthModalShell', () => {
     '',
     '   ',
     '\t\n',
-  ])('falls back to "Go back" when backButtonLabel is whitespace-only (%j)', emptyish => {
+  ])('falls back to "Back to homepage" when backButtonLabel is whitespace-only (%j)', emptyish => {
     // Guards the render-time fallback added in c9ae3ce. An empty or
     // whitespace-only aria-label would otherwise leave the button
     // unlabeled for assistive tech.
@@ -192,6 +193,6 @@ describe('AuthModalShell', () => {
       </AuthModalShell>
     );
 
-    expect(screen.getByLabelText('Go back')).toBeInTheDocument();
+    expect(screen.getByLabelText('Back to homepage')).toBeInTheDocument();
   });
 });
