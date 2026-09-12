@@ -157,6 +157,8 @@ Content that does not apply this padding will be obscured by the tab bar on devi
 | ≥ 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop layout uses its own navigation and panel composition instead of a bottom drawer. The compact surface and bottom tab bar do not render. |
 | ≥ 1180px (explicit embedded preview) | The compact surface may render only inside a labeled preview frame with a keyboard-operable exit to the full profile. |
 
+Optimization contract: `apps/web/data/publicProfileDesktopOptimization.ts` (JOV-INV-012). Exposure and outcome reuse existing `profile_claim_banner_impression` / `profile_claim_banner_click` analytics; do not add a parallel stack.
+
 Desktop tab behavior is owned by JOV-2024. This spec records the current behavior; JOV-2024 may modify it.
 
 ### 2.8 Maximum Tabs Before Overflow
