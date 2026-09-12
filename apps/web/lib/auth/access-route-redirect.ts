@@ -6,6 +6,7 @@ import {
   getRedirectForState,
 } from './canonical-user-state';
 import { sanitizeRedirectUrl } from './constants';
+import { isPaidIntent, validatePlan } from './plan-intent';
 
 function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
   return (
@@ -48,10 +49,12 @@ export function getAuthenticatedAuthRouteRedirect(
   options?: {
     readonly redirectUrl?: string | null;
     readonly authState?: string | null;
+    readonly plan?: string | null;
   }
 ): string {
   const sanitizedRedirect = sanitizeRedirectUrl(options?.redirectUrl ?? null);
   const stateRedirect = getRedirectForState(state);
+  const paidOfferIntent = isPaidIntent(validatePlan(options?.plan));
   const nativeCallback = getCentralAuthCallbackPath({
     get: key =>
       key === AUTH_STATE_PARAM ? (options?.authState ?? null) : null,
@@ -72,6 +75,14 @@ export function getAuthenticatedAuthRouteRedirect(
 
   if (sanitizedRedirect && isWaitlistInviteRedirect(sanitizedRedirect)) {
     return sanitizedRedirect;
+  }
+
+  if (
+    state === CanonicalUserState.ACTIVE &&
+    paidOfferIntent &&
+    !(sanitizedRedirect && !isAuthEntryRedirect(sanitizedRedirect))
+  ) {
+    return APP_ROUTES.SETTINGS_BILLING;
   }
 
   if (stateRedirect) {

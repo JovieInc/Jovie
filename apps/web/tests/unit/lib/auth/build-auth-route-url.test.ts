@@ -13,7 +13,17 @@ describe('getDefaultSignUpFallbackRedirectUrl', () => {
 });
 
 describe('buildAuthRouteUrl', () => {
-  it('forwards only a valid redirect_url', () => {
+  it('forwards redirect_url plus validated plan and interval', () => {
+    const searchParams = new URLSearchParams(
+      'redirect_url=%2Fonboarding&plan=pro&interval=year'
+    );
+
+    expect(buildAuthRouteUrl('/signin', searchParams)).toBe(
+      '/signin?redirect_url=%2Fonboarding&plan=pro&interval=year'
+    );
+  });
+
+  it('drops invalid plan values while keeping redirect_url', () => {
     const searchParams = new URLSearchParams(
       'redirect_url=%2Fonboarding&plan=founding'
     );

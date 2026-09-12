@@ -17,6 +17,7 @@ export default async function SignInPage({
     typeof params.redirect_url === 'string' ? params.redirect_url : null;
   const authState =
     typeof params.auth_state === 'string' ? params.auth_state : null;
+  const plan = typeof params.plan === 'string' ? params.plan : null;
   const authResult = await resolveUserState({ createDbUserIfMissing: false });
 
   if (authResult.state !== CanonicalUserState.UNAUTHENTICATED) {
@@ -24,6 +25,7 @@ export default async function SignInPage({
       getAuthenticatedAuthRouteRedirect(authResult.state, {
         redirectUrl,
         authState,
+        plan,
       })
     );
   }

@@ -5,10 +5,16 @@ import { useEffect, useMemo } from 'react';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { toast } from '@/components/feedback';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
+import {
+  AuthLayout,
+  AuthOfferSummary,
+  AuthRoutePrefetch,
+  AuthShell,
+} from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
+import { persistOfferIntentFromSearchParams } from '@/lib/auth/plan-intent';
 import {
   buildAuthRouteUrlWithDesktopReturn,
   buildDesktopAuthReturnPath,
@@ -187,6 +193,10 @@ export function SignInPageClient() {
   );
 
   useEffect(() => {
+    persistOfferIntentFromSearchParams(searchParams);
+  }, [searchParams]);
+
+  useEffect(() => {
     if (resetConfirmed) {
       toast.success('Session cleared. Please sign in again.', {
         id: 'auth-reset',
@@ -208,6 +218,7 @@ export function SignInPageClient() {
       >
         <AuthRoutePrefetch href={signUpUrl} />
         <SignInOauthErrorBanner />
+        <AuthOfferSummary mode='sign-in' />
         <AuthShell
           mode='sign-in'
           forceOppositeModeHardNavigation

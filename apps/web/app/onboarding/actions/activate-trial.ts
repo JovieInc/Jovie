@@ -13,11 +13,10 @@ import 'server-only';
 
 import { and, eq, isNull, or } from 'drizzle-orm';
 
+import { PRO_TRIAL_DURATION_DAYS } from '@/lib/billing/offer-truth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { logger } from '@/lib/utils/logger';
-
-const TRIAL_DURATION_DAYS = 14;
 
 /**
  * Activate a 14-day Pro trial for a user.
@@ -30,7 +29,7 @@ export async function activateTrial(appUserId: string): Promise<boolean> {
   try {
     const now = new Date();
     const trialEndsAt = new Date(
-      now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
+      now.getTime() + PRO_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
     );
 
     // Null plans are legacy free rows unless the legacy paid flag is true.
