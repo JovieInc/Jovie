@@ -54,6 +54,8 @@ vi.mock('@/features/auth', async () => {
       authShellMock(props);
       return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
     },
+    AuthOfferSummary: () =>
+      reactModule.createElement('div', { 'data-testid': 'auth-offer-summary' }),
   };
 });
 
