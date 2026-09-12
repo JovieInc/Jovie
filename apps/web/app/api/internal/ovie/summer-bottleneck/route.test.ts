@@ -18,6 +18,7 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn() },
 }));
 
+import admissionsFixture from '@/lib/ovie/fixtures/summer-admissions-v1.json';
 import fixtures from '@/lib/ovie/fixtures/summer-product-paths-v1.json';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { POST } from './route';
@@ -208,24 +209,25 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 
-  it.each([
-    302, 307, 308,
-  ])('rejects an upstream %i redirect without retry or second destination', async status => {
-    const fetch = vi.fn(
-      async () =>
-        new Response(null, {
-          status,
-          headers: { location: 'https://evil.test/collect' },
-        })
-    );
-    vi.stubGlobal('fetch', fetch);
-    expect((await POST(request(validSnapshot()))).status).toBe(502);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(
-      expect.any(URL),
-      expect.objectContaining({ redirect: 'error' })
-    );
-  });
+  it.each([302, 307, 308])(
+    'rejects an upstream %i redirect without retry or second destination',
+    async status => {
+      const fetch = vi.fn(
+        async () =>
+          new Response(null, {
+            status,
+            headers: { location: 'https://evil.test/collect' },
+          })
+      );
+      vi.stubGlobal('fetch', fetch);
+      expect((await POST(request(validSnapshot()))).status).toBe(502);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.any(URL),
+        expect.objectContaining({ redirect: 'error' })
+      );
+    }
+  );
 
   it('does not retry a rejected redirect or uncertain submission', async () => {
     const fetch = vi.fn(async () => {
@@ -260,48 +262,52 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 
-  it.each(
-    fixtures.cases
-  )('preserves the private receiver compatibility fixture: $name', async fixture => {
-    const productPaths = fixtureProjection(fixture.changes);
-    expect(summerProductPathsSchema.safeParse(productPaths).success).toBe(
-      fixture.valid
-    );
-    const input = {
-      ...validSnapshot(),
-      signals: { ...validSnapshot().signals, productPaths },
-    };
-    const fetch = vi.fn(async () =>
-      Response.json(
-        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
-        { status: 202 }
-      )
-    );
-    vi.stubGlobal('fetch', fetch);
-    const response = await POST(request(input));
-    expect(response.status).toBe(fixture.valid ? 202 : 422);
-    if (!fixture.valid) {
-      expect(fetch).not.toHaveBeenCalled();
-      expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-      return;
+  it.each(fixtures.cases)(
+    'preserves the private receiver compatibility fixture: $name',
+    async fixture => {
+      const productPaths = fixtureProjection(fixture.changes);
+      expect(summerProductPathsSchema.safeParse(productPaths).success).toBe(
+        fixture.valid
+      );
+      const input = {
+        ...validSnapshot(),
+        signals: { ...validSnapshot().signals, productPaths },
+      };
+      const fetch = vi.fn(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: { eventId: input.eventId, decision: 'accepted' },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      const response = await POST(request(input));
+      expect(response.status).toBe(fixture.valid ? 202 : 422);
+      if (!fixture.valid) {
+        expect(fetch).not.toHaveBeenCalled();
+        expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+        return;
+      }
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const call = fetch.mock.calls[0] as unknown as Parameters<
+        typeof globalThis.fetch
+      >;
+      const delivered = JSON.parse(String(call[1]?.body));
+      expect(delivered.signals.productPaths).toEqual(productPaths);
+      expect(
+        nodeVerify(
+          null,
+          Buffer.from(
+            `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(input)}`
+          ),
+          PRODUCER_PUBLIC_KEY,
+          Buffer.from(delivered.producerAttestation.signature, 'base64url')
+        )
+      ).toBe(true);
     }
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const call = fetch.mock.calls[0] as unknown as Parameters<
-      typeof globalThis.fetch
-    >;
-    const delivered = JSON.parse(String(call[1]?.body));
-    expect(delivered.signals.productPaths).toEqual(productPaths);
-    expect(
-      nodeVerify(
-        null,
-        Buffer.from(
-          `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(input)}`
-        ),
-        PRODUCER_PUBLIC_KEY,
-        Buffer.from(delivered.producerAttestation.signature, 'base64url')
-      )
-    ).toBe(true);
-  });
+  );
 
   it('rejects a product source revision outside the signed snapshot source', async () => {
     const productPaths = fixtureProjection([
@@ -336,6 +342,117 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
 
     expect(response.status).toBe(401);
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves and signs separate admission evidence without granting from capacity', async () => {
+    const input = {
+      ...validSnapshot(),
+      signals: { ...validSnapshot().signals, admissions: admissionsFixture },
+    };
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect((await POST(request(input))).status).toBe(202);
+    const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(delivered.signals.admissions).toEqual(admissionsFixture);
+    expect(
+      nodeVerify(
+        null,
+        Buffer.from(
+          `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(input)}`
+        ),
+        PRODUCER_PUBLIC_KEY,
+        Buffer.from(delivered.producerAttestation.signature, 'base64url')
+      )
+    ).toBe(true);
+    const invalid = {
+      ...input,
+      signals: {
+        ...input.signals,
+        admissions: {
+          ...admissionsFixture,
+          push: { ...admissionsFixture.push, sourceDigest: null },
+        },
+      },
+    };
+    expect((await POST(request(invalid))).status).toBe(422);
+    const wrongAuthority = {
+      ...input,
+      signals: {
+        ...input.signals,
+        admissions: {
+          ...admissionsFixture,
+          push: {
+            ...admissionsFixture.push,
+            sourceSchema: 'symphony-concurrency/v1',
+          },
+        },
+      },
+    };
+    expect((await POST(request(wrongAuthority))).status).toBe(422);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const unknown = {
+      ...input,
+      signals: {
+        ...input.signals,
+        admissions: {
+          ...admissionsFixture,
+          push: {
+            ...admissionsFixture.push,
+            state: 'UNKNOWN',
+            observedAt: null,
+            sourceRevision: null,
+            sourceDigest: null,
+          },
+        },
+      },
+    };
+    expect((await POST(request(unknown))).status).toBe(202);
+    expect(
+      JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).signals.admissions.push
+        .state
+    ).toBe('UNKNOWN');
+  });
+
+  it.each(['revision', 'capacity-authority', 'work-authority'])(
+    'rejects mismatched runner %s before signing',
+    async mismatch => {
+      const baseline = validSnapshot();
+      const runner = structuredClone(baseline.signals.runner);
+      if (mismatch === 'revision')
+        runner.workSource.sourceRevision = 'b'.repeat(40);
+      if (mismatch === 'capacity-authority')
+        runner.capacitySource.schema = 'symphony-runtime-state/v1';
+      if (mismatch === 'work-authority')
+        runner.workSource.schema = 'symphony-lease-guard-report/v1';
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
+      expect(
+        (
+          await POST(
+            request({ ...baseline, signals: { ...baseline.signals, runner } })
+          )
+        ).status
+      ).toBe(422);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a malformed OIDC payload before delivery', async () => {
+    mocks.getVercelOidcToken.mockResolvedValue('malformed');
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const response = await POST(request(validSnapshot()));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      code: 'wrong_oidc_audience',
+    });
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -446,35 +563,35 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     });
   });
 
-  it.each([
-    null,
-    'd'.repeat(40),
-  ])('rejects production revision %s that does not identify this deployment', async productionSha => {
-    const baseline = validSnapshot();
-    const input = {
-      ...baseline,
-      signals: {
-        ...baseline.signals,
-        release: {
-          ...baseline.signals.release,
-          productionSha,
-          unverifiedMerges: Number(productionSha !== SOURCE),
+  it.each([null, 'd'.repeat(40)])(
+    'rejects production revision %s that does not identify this deployment',
+    async productionSha => {
+      const baseline = validSnapshot();
+      const input = {
+        ...baseline,
+        signals: {
+          ...baseline.signals,
+          release: {
+            ...baseline.signals.release,
+            productionSha,
+            unverifiedMerges: Number(productionSha !== SOURCE),
+          },
         },
-      },
-    };
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
+      };
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
 
-    const response = await POST(request(input));
+      const response = await POST(request(input));
 
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual({
-      ok: false,
-      code: 'invalid_deployment_revision',
-    });
-    expect(fetch).not.toHaveBeenCalled();
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        code: 'invalid_deployment_revision',
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     ['missing key', undefined, PRODUCER_KEY_ID],
@@ -487,21 +604,24 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       PRODUCER_KEY_ID,
     ],
     ['invalid key ID', PRODUCER_PRIVATE_KEY, 'x'],
-  ])('fails closed for %s before minting a token', async (_name, key, keyId) => {
-    vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY', key);
-    vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', keyId);
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
+  ])(
+    'fails closed for %s before minting a token',
+    async (_name, key, keyId) => {
+      vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY', key);
+      vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', keyId);
+      const fetch = vi.fn();
+      vi.stubGlobal('fetch', fetch);
 
-    const response = await POST(request(validSnapshot()));
+      const response = await POST(request(validSnapshot()));
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'producer_signing_unavailable',
-    });
-    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
-    expect(fetch).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'producer_signing_unavailable',
+      });
+      expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    }
+  );
 
   it('fails closed when the Eve destination is missing or outside the allowlist', async () => {
     vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'https://evil.example.com');

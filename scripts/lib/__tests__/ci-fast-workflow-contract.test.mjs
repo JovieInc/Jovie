@@ -1503,3 +1503,12 @@ it('runs the attestation observation coverage gate for publisher-only edits', ()
     'emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90'
   );
 });
+
+it('runs authenticated Summer bridge coverage for admission-only edits', () => {
+  const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
+  const selected = new RegExp(pattern);
+  expect(selected.test('apps/web/lib/ovie/summer-admissions.ts')).toBe(true);
+  expect(selected.test('apps/web/app/api/internal/ovie/summer-bottleneck/route.ts')).toBe(true);
+  expect(CI_FAST_SOURCE).toContain('app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage');
+  expect(CI_FAST_SOURCE).toContain('--coverage.include=lib/ovie/summer-admissions.ts');
+});
