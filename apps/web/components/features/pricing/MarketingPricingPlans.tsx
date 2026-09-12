@@ -33,6 +33,7 @@ function MarketingPricingPlanCard({
   variant: MarketingPricingVariant;
 }>) {
   const active = isMarketingPlanActive(plan.id);
+  const ctaHref = getMarketingPlanHref(plan.id);
   const recommended =
     variant === 'tier-cards-recommended' && plan.id === RECOMMENDED_PLAN_ID;
   const buttonVariant = recommended
@@ -67,16 +68,24 @@ function MarketingPricingPlanCard({
         {plan.cadence ? <span>{plan.cadence}</span> : null}
       </p>
 
-      <Button
-        variant={buttonVariant}
-        size='lg'
-        className='marketing-pricing-plan-card__cta'
-        asChild
-      >
-        <Link href={getMarketingPlanHref(plan.id)} prefetch={false}>
-          {getMarketingPlanCtaLabel(plan)}
-        </Link>
-      </Button>
+      <p className='marketing-pricing-plan-card__body'>{plan.offerNote}</p>
+
+      {ctaHref ? (
+        <Button
+          variant={buttonVariant}
+          size='lg'
+          className='marketing-pricing-plan-card__cta'
+          asChild
+        >
+          <Link href={ctaHref} prefetch={false}>
+            {getMarketingPlanCtaLabel(plan)}
+          </Link>
+        </Button>
+      ) : (
+        <p className='marketing-pricing-plan-card__body'>
+          Sales contact details coming soon.
+        </p>
+      )}
 
       <ul className='marketing-pricing-plan-card__features'>
         {plan.features.map(feature => (

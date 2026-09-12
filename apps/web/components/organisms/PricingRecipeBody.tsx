@@ -7,17 +7,19 @@ import {
 } from '@/components/marketing';
 import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { PUBLIC_PRICING_DESCRIPTION } from '@/data/marketingPricingPlans';
 
 const STORY_CARDS = [
   {
     label: 'Profile',
-    headline: 'Artist profiles built to convert',
+    headline: 'Your public artist profile',
     body: 'One public fan path for streaming, tickets, support, and capture.',
   },
   {
     label: 'Fan',
-    headline: 'Capture fans once. Bring them back automatically.',
-    body: 'Turn profile visits and QR scans into an audience for every drop.',
+    headline: 'Build your audience',
+    body: 'Capture an audience from your profile. Fan sends are separately metered.',
   },
 ] as const;
 
@@ -60,10 +62,10 @@ export function PricingRecipeBody({
         className='system-b-pricing-hero'
         headingId='pricing-hero-heading'
         headline='Pricing'
-        subtitle='Artist profiles are free forever. Pro adds the release tools when you need them.'
+        subtitle={PUBLIC_PRICING_DESCRIPTION}
         primaryCta={{
-          label: 'Claim Your Profile',
-          href: `${APP_ROUTES.SIGNUP}?plan=free`,
+          label: 'Request Access',
+          href: PUBLIC_WAITLIST_URL,
         }}
         secondaryCta={{
           label: 'Explore Artist Profiles',
@@ -103,8 +105,8 @@ export function PricingRecipeBody({
                 Compare All Features
               </h2>
               <p className='system-b-pricing-section-body'>
-                See the plan matrix for notifications, analytics, contacts,
-                smart links, and release workspace capabilities.
+                Compare profile access, planned visibility capabilities, and fan
+                sends.
               </p>
             </div>
             <div className='system-b-pricing-chart-wrap'>{comparisonChart}</div>
@@ -127,18 +129,18 @@ export function PricingRecipeBody({
             <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
             <div className='system-b-pricing-actions system-b-pricing-actions--center'>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=free`}
+                href={PUBLIC_WAITLIST_URL}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
-                Claim your profile
+                Request access
               </Link>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=pro`}
+                href={APP_ROUTES.ARTIST_PROFILES}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
-                Start Pro trial
+                Explore artist profiles
               </Link>
               <a
                 href={`mailto:${SUPPORT_EMAIL}`}

@@ -3,21 +3,19 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import PricingPage, { metadata } from '@/app/(marketing)/pricing/page';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
-import { getVisibleMarketingPricingPlans } from '@/data/marketingPricingPlans';
+import {
+  getVisibleMarketingPricingPlans,
+  PRICING_REQUEST_ACCESS_COPY,
+} from '@/data/marketingPricingPlans';
 import { PricingRecipeBody } from './PricingRecipeBody';
 import { PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY } from './PricingRecipeBody.stories';
 
-const paidPlans = getVisibleMarketingPricingPlans().filter(
-  plan => plan.id !== 'free'
-);
 const proPlan = getVisibleMarketingPricingPlans().find(
   plan => plan.id === 'pro'
 );
-const paidPlanName = paidPlans.length === 1 ? paidPlans[0]?.name : null;
-const expectedRequestAccessCopy = paidPlanName
-  ? `Claim the profile first. Choose ${paidPlanName} when you want the release system turned on.`
-  : 'Claim the profile first. Choose a paid plan when you want the release system turned on.';
+const expectedRequestAccessCopy = PRICING_REQUEST_ACCESS_COPY;
 
 describe('PricingRecipeBody', () => {
   it('renders the shipped pricing sections and exact injected production slots', () => {
@@ -37,27 +35,21 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Artist profiles built to convert',
+        name: 'Your public artist profile',
       })
     ).toBeVisible();
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Capture fans once. Bring them back automatically.',
+        name: 'Build your audience',
       })
     ).toBeVisible();
     expect(screen.getByTestId('plans-slot')).toBeVisible();
     expect(screen.getByTestId('comparison-slot')).toBeVisible();
     expect(screen.getByText(expectedRequestAccessCopy)).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Claim Your Profile' })
-    ).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Start Pro trial' })
-    ).toHaveAttribute('href', '/signup?plan=pro');
+    for (const link of screen.getAllByRole('link', { name: /Request access/i }))
+      expect(link).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    expect(screen.queryByRole('link', { name: /trial/i })).toBeNull();
     expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
       'href',
       'mailto:support@jov.ie'
@@ -70,7 +62,7 @@ describe('PricingRecipeBody', () => {
     );
   });
 
-  it('serializes the Pro plan, price, and signup intent before hydration', () => {
+  it('serializes the Pro plan, price, and limited access before hydration', () => {
     const markup = renderToStaticMarkup(
       <PricingRecipeBody
         requestAccessCopy={expectedRequestAccessCopy}
@@ -94,10 +86,29 @@ describe('PricingRecipeBody', () => {
     expect(proPlan?.price).toBeDefined();
     expect(proCard?.textContent).toContain(proPlan?.price ?? '');
     expect(proCard?.textContent).toContain('/mo');
-    expect(proCard?.textContent).toContain('Start Free Trial');
+    expect(proCard?.textContent).toContain('Request access');
     expect(proCard?.querySelector('a')?.getAttribute('href')).toBe(
-      '/signup?plan=pro'
+      'https://jov.ie/waitlist'
     );
+  });
+
+  it('keeps machine-readable offers aligned with unavailable public checkout', () => {
+    const markup = renderToStaticMarkup(<PricingPage />);
+    const document = new DOMParser().parseFromString(markup, 'text/html');
+    const schema = JSON.parse(
+      document.querySelector('script[type="application/ld+json"]')
+        ?.textContent ?? '{}'
+    );
+    expect(
+      schema.mainEntity.itemListElement.map(
+        (entry: { item: { name: string } }) => entry.item.name
+      )
+    ).toEqual(['Jovie Free', 'Jovie Pro', 'Jovie Enterprise']);
+    expect(JSON.stringify(schema)).not.toMatch(
+      /InStock|priceValidUntil|offers/
+    );
+    expect(metadata.description).toContain('$199 monthly');
+    expect(markup).not.toMatch(/signup\?plan=(pro|max)|Start Pro trial/);
   });
 
   it('shares one route/story body and records shipped zero-proof omissions', () => {

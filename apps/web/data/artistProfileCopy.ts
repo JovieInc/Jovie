@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { ARTIST_VISIBILITY_AVAILABILITY } from '@/data/marketingPricingPlans';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 export interface ArtistProfileMode {
@@ -1085,8 +1086,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     relatedFeatures: [
       {
         id: 'search-answer-visibility',
-        title: 'Search and Answer Visibility',
-        body: 'Structured artist facts, linked music entities, FAQs, and machine-readable profile data help search and answer engines understand who you are.',
+        title: `Artist Visibility — ${ARTIST_VISIBILITY_AVAILABILITY.label.toLowerCase()}`,
+        body: ARTIST_VISIBILITY_AVAILABILITY.note,
       },
       {
         id: 'audience-quality',
