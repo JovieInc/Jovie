@@ -71,11 +71,17 @@ vi.mock('@/lib/analytics', () => ({
   track: trackMock,
 }));
 
-vi.mock('@/lib/auth/plan-intent', () => ({
-  setPlanIntent: setPlanIntentMock,
-  persistOfferIntentFromSearchParams: vi.fn(),
-  validatePlan: validatePlanMock,
-}));
+vi.mock('@/lib/auth/plan-intent', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/auth/plan-intent')>(
+    '@/lib/auth/plan-intent'
+  );
+  return {
+    ...actual,
+    setPlanIntent: setPlanIntentMock,
+    persistOfferIntentFromSearchParams: vi.fn(),
+    validatePlan: validatePlanMock,
+  };
+});
 
 vi.mock('@/lib/auth/signup-claim-storage', () => ({
   clearSignupClaimValue: clearSignupClaimValueMock,
