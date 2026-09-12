@@ -59,11 +59,20 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
-import {
-  PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
-  PROFILE_LISTEN_DSP_COLUMN_CLASSNAME,
-  PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME,
-} from './profile-listen-desktop-grid';
+
+/**
+ * JOV-6201 listen-mode desktop split. Apply on every desktop listen branch
+ * (JOV-6197 `listenTabContent` copies). Reuses the grandfathered 360px track;
+ * only the 1180px hand-off and min-w-0 are new. Do not invent a new grid-cols
+ * identity or revert the listen split to `xl:` only.
+ */
+export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
+  'grid min-h-0 min-w-0 flex-1 items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1.3fr)_360px]';
+
+export const PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME =
+  'min-h-0 min-w-0 overflow-hidden isolate';
+
+export const PROFILE_LISTEN_DSP_COLUMN_CLASSNAME = 'grid min-w-0 gap-3.5';
 
 const PRIMARY_TABS: ReadonlyArray<{
   mode: ProfilePrimaryTab;

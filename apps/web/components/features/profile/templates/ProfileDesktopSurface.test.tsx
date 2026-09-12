@@ -5,12 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
-import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import {
   PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
   PROFILE_LISTEN_DSP_COLUMN_CLASSNAME,
   PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME,
-} from './profile-listen-desktop-grid';
+  ProfileDesktopSurface,
+} from './ProfileDesktopSurface';
 
 vi.mock('next/link', () => ({
   default: ({
