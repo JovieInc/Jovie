@@ -25,7 +25,7 @@ function SettingsToggle({
     >
       <span
         className={cn(
-          'block h-6 w-6 rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle',
+          'block h-6 w-6 rounded-full shadow-sm transition-transform duration-subtle',
           checked
             ? 'translate-x-4 bg-black dark:bg-black'
             : 'translate-x-0 bg-white dark:bg-surface-1'
@@ -59,7 +59,7 @@ function AlertsSettingsRow({
       className='flex min-h-15 w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
     >
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-medium tracking-[-0.005em] text-white dark:text-white'>
+        <p className='truncate text-sm font-medium tracking-tight text-white dark:text-white'>
           {label}
         </p>
         <p className='truncate text-2xs leading-4 text-white/50'>
@@ -95,7 +95,7 @@ export function AlertsSettingsView({
     >
       {presentation === 'panel' ? (
         <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
+          <h2 className='text-xl font-semibold leading-none tracking-tight text-white dark:text-white'>
             Alerts
           </h2>
           <span className='text-app font-medium text-white/52'>

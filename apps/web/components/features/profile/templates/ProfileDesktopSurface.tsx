@@ -625,7 +625,7 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='grid grid-cols-[56px_minmax(0,1fr)] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
                       <ImageWithFallback
