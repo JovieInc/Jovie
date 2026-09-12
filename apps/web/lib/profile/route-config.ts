@@ -84,19 +84,23 @@ export type ProfileRouteKey =
 // ---------------------------------------------------------------------------
 
 /**
- * The four primary tabs.
- * Order is fixed per spec §2.1.
+ * Equal-weight public destinations. Order is fixed (JOV-6198).
+ * Get updates is an action, not a destination — see PUBLIC_PROFILE_ACTIONS.
  */
 export const BOTTOM_TAB_KEYS = [
   'profile',
   'listen',
   'tour',
-  'subscribe',
+  'about',
 ] as const satisfies readonly ProfilePrimaryTab[];
 
 export type BottomTabKey = (typeof BOTTOM_TAB_KEYS)[number];
 
 export type PublicProfileNavigationAvailability = 'always' | 'fan-capture';
+
+export type PublicProfileDestinationPlacement = 'bottom-bar' | 'top-nav';
+export type PublicProfileActionPlacement = 'inline-action';
+export type PublicProfileActionId = 'subscribe';
 
 export interface PublicProfileNavigationDestination {
   /** Stable semantic identity shared by compact and wide presentations. */
@@ -106,24 +110,39 @@ export interface PublicProfileNavigationDestination {
     | 'profile-root'
     | 'mode-listen'
     | 'mode-tour'
-    | 'mode-subscribe';
-  readonly label: 'Home' | 'Music' | 'Events' | 'Alerts';
+    | 'mode-about';
+  readonly label: 'Home' | 'Music' | 'Shows' | 'About';
   readonly availability: PublicProfileNavigationAvailability;
   readonly audience: 'public';
   readonly badge: null;
-  readonly compactPlacement: 'bottom-bar';
-  readonly widePlacement: 'bottom-bar';
+  /** Compact may dock destinations; wide may put them in top chrome. */
+  readonly compactPlacement: PublicProfileDestinationPlacement;
+  readonly widePlacement: PublicProfileDestinationPlacement;
   readonly collapse: 'none';
   /** Every route mode that selects this destination. */
   readonly activeModes: readonly ProfileMode[];
+}
+
+export interface PublicProfileNavigationAction {
+  readonly id: PublicProfileActionId;
+  readonly routeKey: 'mode-subscribe';
+  readonly label: 'Get updates';
+  readonly availability: 'fan-capture';
+  readonly audience: 'public';
+  readonly kind: 'action';
+  readonly compactPlacement: PublicProfileActionPlacement;
+  readonly widePlacement: PublicProfileActionPlacement;
+  readonly activeModes: readonly ProfileMode[];
+  /** Destination that stays active while this action is open. */
+  readonly fallbackDestination: BottomTabKey;
 }
 
 /**
  * Canonical semantic navigation contract for public profiles.
  *
  * Platform/presentation components own icons and native primitives only. They
- * must derive destination identity, order, labels, authorization/visibility,
- * active state, badges, deep-link ownership, and collapse behavior here.
+ * may arrange destinations. They must not independently decide existence,
+ * labels, availability, active state, fallbacks, or collapse behavior.
  */
 export const PUBLIC_PROFILE_NAVIGATION = [
   {
@@ -134,9 +153,9 @@ export const PUBLIC_PROFILE_NAVIGATION = [
     audience: 'public',
     badge: null,
     compactPlacement: 'bottom-bar',
-    widePlacement: 'bottom-bar',
+    widePlacement: 'top-nav',
     collapse: 'none',
-    activeModes: ['profile', 'about', 'contact', 'pay'],
+    activeModes: ['profile', 'contact', 'pay'],
   },
   {
     id: 'listen',
@@ -146,43 +165,61 @@ export const PUBLIC_PROFILE_NAVIGATION = [
     audience: 'public',
     badge: null,
     compactPlacement: 'bottom-bar',
-    widePlacement: 'bottom-bar',
+    widePlacement: 'top-nav',
     collapse: 'none',
     activeModes: ['listen', 'releases'],
   },
   {
     id: 'tour',
     routeKey: 'mode-tour',
-    label: 'Events',
+    label: 'Shows',
     availability: 'always',
     audience: 'public',
     badge: null,
     compactPlacement: 'bottom-bar',
-    widePlacement: 'bottom-bar',
+    widePlacement: 'top-nav',
     collapse: 'none',
     activeModes: ['tour'],
   },
   {
-    id: 'subscribe',
-    routeKey: 'mode-subscribe',
-    label: 'Alerts',
-    availability: 'fan-capture',
+    id: 'about',
+    routeKey: 'mode-about',
+    label: 'About',
+    availability: 'always',
     audience: 'public',
     badge: null,
     compactPlacement: 'bottom-bar',
-    widePlacement: 'bottom-bar',
+    widePlacement: 'top-nav',
     collapse: 'none',
-    activeModes: ['subscribe'],
+    activeModes: ['about'],
   },
 ] as const satisfies readonly PublicProfileNavigationDestination[];
 
+/**
+ * Public actions that are not equal-weight destinations.
+ * Devices may arrange these; they must not promote them into nav slots.
+ */
+export const PUBLIC_PROFILE_ACTIONS = [
+  {
+    id: 'subscribe',
+    routeKey: 'mode-subscribe',
+    label: 'Get updates',
+    availability: 'fan-capture',
+    audience: 'public',
+    kind: 'action',
+    compactPlacement: 'inline-action',
+    widePlacement: 'inline-action',
+    activeModes: ['subscribe'],
+    fallbackDestination: 'profile',
+  },
+] as const satisfies readonly PublicProfileNavigationAction[];
+
 const REQUIRED_PUBLIC_PROFILE_DESTINATION_ORDER: readonly BottomTabKey[] =
   BOTTOM_TAB_KEYS;
-const REQUIRED_PUBLIC_PROFILE_MODES: readonly ProfileMode[] = [
+const REQUIRED_PUBLIC_PROFILE_DESTINATION_MODES: readonly ProfileMode[] = [
   'profile',
   'listen',
   'pay',
-  'subscribe',
   'about',
   'contact',
   'tour',
@@ -194,7 +231,7 @@ const REQUIRED_PUBLIC_PROFILE_ROUTE_KEYS: Readonly<
   profile: 'profile-root',
   listen: 'mode-listen',
   tour: 'mode-tour',
-  subscribe: 'mode-subscribe',
+  about: 'mode-about',
 };
 
 export function validatePublicProfileNavigation(
@@ -233,11 +270,23 @@ export function validatePublicProfileNavigation(
   if (
     destinations.some(
       destination =>
-        destination.compactPlacement !== destination.widePlacement ||
-        destination.collapse !== 'none'
+        destination.availability !== 'always' || destination.collapse !== 'none'
     )
   ) {
-    issues.push('responsive-drift');
+    issues.push('responsive-existence-drift');
+  }
+
+  if (
+    destinations.some(
+      destination =>
+        destination.label === 'Events' || destination.label === 'Alerts'
+    )
+  ) {
+    issues.push('legacy-nav-label');
+  }
+
+  if (destinations.some(destination => destination.id === 'subscribe')) {
+    issues.push('action-promoted-to-destination');
   }
 
   const activeModes = destinations.flatMap(destination =>
@@ -247,8 +296,55 @@ export function validatePublicProfileNavigation(
   if (new Set(ownedModes).size !== ownedModes.length) {
     issues.push('ambiguous-active-state');
   }
-  if (REQUIRED_PUBLIC_PROFILE_MODES.some(mode => !ownedModes.includes(mode))) {
+  if (
+    REQUIRED_PUBLIC_PROFILE_DESTINATION_MODES.some(
+      mode => !ownedModes.includes(mode)
+    )
+  ) {
     issues.push('missing-active-state');
+  }
+  if (ownedModes.includes('subscribe')) {
+    issues.push('action-promoted-to-destination');
+  }
+
+  return issues;
+}
+
+export function validatePublicProfileActions(
+  actions: readonly PublicProfileNavigationAction[],
+  destinations: readonly PublicProfileNavigationDestination[] = PUBLIC_PROFILE_NAVIGATION
+): readonly string[] {
+  const issues: string[] = [];
+  const destinationIds = new Set(
+    destinations.map(destination => destination.id)
+  );
+
+  if (actions.length !== 1 || actions[0]?.id !== 'subscribe') {
+    issues.push('action-set-drift');
+  }
+
+  for (const action of actions) {
+    if (action.kind !== 'action' || action.label !== 'Get updates') {
+      issues.push('action-contract-drift');
+    }
+    if (action.availability !== 'fan-capture') {
+      issues.push('action-availability-drift');
+    }
+    if (action.audience !== 'public') {
+      issues.push('audience-leak');
+    }
+    if (destinationIds.has(action.id as BottomTabKey)) {
+      issues.push('action-promoted-to-destination');
+    }
+    if (
+      action.compactPlacement !== 'inline-action' ||
+      action.widePlacement !== 'inline-action'
+    ) {
+      issues.push('action-equal-weight-nav');
+    }
+    if (!destinationIds.has(action.fallbackDestination)) {
+      issues.push('action-fallback-drift');
+    }
   }
 
   return issues;
@@ -263,12 +359,27 @@ if (PUBLIC_PROFILE_NAVIGATION_ISSUES.length > 0) {
   );
 }
 
-export function getPermittedPublicProfileNavigation(options: {
-  readonly fanCaptureEnabled: boolean;
+const PUBLIC_PROFILE_ACTION_ISSUES = validatePublicProfileActions(
+  PUBLIC_PROFILE_ACTIONS
+);
+if (PUBLIC_PROFILE_ACTION_ISSUES.length > 0) {
+  throw new Error(
+    `[profile/route-config] Invalid public actions: ${PUBLIC_PROFILE_ACTION_ISSUES.join(', ')}`
+  );
+}
+
+export function getPermittedPublicProfileNavigation(_options?: {
+  readonly fanCaptureEnabled?: boolean;
 }): readonly PublicProfileNavigationDestination[] {
-  return PUBLIC_PROFILE_NAVIGATION.filter(
-    destination =>
-      destination.availability === 'always' || options.fanCaptureEnabled
+  // Destinations are always-on. Fan-capture only gates the Get updates action.
+  return PUBLIC_PROFILE_NAVIGATION;
+}
+
+export function getPermittedPublicProfileActions(options: {
+  readonly fanCaptureEnabled: boolean;
+}): readonly PublicProfileNavigationAction[] {
+  return PUBLIC_PROFILE_ACTIONS.filter(
+    action => action.availability === 'always' || options.fanCaptureEnabled
   );
 }
 
@@ -281,10 +392,10 @@ function resolveEffectivePublicProfileMode(options: {
     case 'releases':
     case 'tour':
     case 'subscribe':
+    case 'about':
       return options.overlayView;
     case 'notifications':
       return 'subscribe';
-    case 'about':
     case 'contact':
     case 'pay':
     case 'menu':
@@ -299,6 +410,13 @@ export function resolvePublicProfileActiveDestination(options: {
   readonly overlayView?: string | null;
 }): BottomTabKey {
   const effectiveMode = resolveEffectivePublicProfileMode(options);
+  const action = PUBLIC_PROFILE_ACTIONS.find(candidate => {
+    const activeModes: readonly ProfileMode[] = candidate.activeModes;
+    return activeModes.includes(effectiveMode);
+  });
+  if (action) {
+    return action.fallbackDestination;
+  }
 
   return (
     PUBLIC_PROFILE_NAVIGATION.find(destination => {
@@ -306,6 +424,23 @@ export function resolvePublicProfileActiveDestination(options: {
       return activeModes.includes(effectiveMode);
     })?.id ?? 'profile'
   );
+}
+
+export function resolvePublicProfileActiveAction(options: {
+  readonly mode: ProfileMode;
+  readonly overlayView?: string | null;
+  readonly fanCaptureEnabled?: boolean;
+}): PublicProfileActionId | null {
+  const effectiveMode = resolveEffectivePublicProfileMode(options);
+  const action = PUBLIC_PROFILE_ACTIONS.find(candidate => {
+    const activeModes: readonly ProfileMode[] = candidate.activeModes;
+    return activeModes.includes(effectiveMode);
+  });
+  if (!action) return null;
+  if (action.availability === 'fan-capture' && !options.fanCaptureEnabled) {
+    return null;
+  }
+  return action.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -420,10 +555,10 @@ export const PROFILE_ROUTE_CONFIG: Record<ProfileRouteKey, ProfileRouteConfig> =
     'mode-subscribe': {
       key: 'mode-subscribe',
       category: 'top-level',
-      label: 'Alerts',
+      label: 'Get updates',
       buildPath: username => `/${username}?mode=subscribe`,
       showBottomTabBar: true,
-      activeTab: 'subscribe',
+      activeTab: 'profile',
       profileMode: 'subscribe',
       analyticsSurface: 'profile_alerts',
       hasOwnMetadata: false,
@@ -433,7 +568,7 @@ export const PROFILE_ROUTE_CONFIG: Record<ProfileRouteKey, ProfileRouteConfig> =
     'mode-tour': {
       key: 'mode-tour',
       category: 'top-level',
-      label: 'Events',
+      label: 'Shows',
       buildPath: username => `/${username}?mode=tour`,
       showBottomTabBar: true,
       activeTab: 'tour',
@@ -457,14 +592,13 @@ export const PROFILE_ROUTE_CONFIG: Record<ProfileRouteKey, ProfileRouteConfig> =
       caching: 'server-dynamic',
     },
 
-    // Drawer overlay modes — tab bar visible, active tab is Home
     'mode-about': {
       key: 'mode-about',
       category: 'top-level',
       label: 'About',
       buildPath: username => `/${username}?mode=about`,
       showBottomTabBar: true,
-      activeTab: 'profile',
+      activeTab: 'about',
       profileMode: 'about',
       analyticsSurface: 'profile_about',
       hasOwnMetadata: false,
@@ -853,9 +987,8 @@ export const REDIRECT_SINK_ROUTE_KEYS: readonly ProfileRouteKey[] = [
 ] as const;
 
 /**
- * Resolve the active primary tab for a given mode, accounting for the
- * spec §2.4 rule: if mode is `tour` and hasTourDates is false, fall back
- * to `profile`.
+ * Resolve the active destination for a given mode.
+ * Shows stays active without dates. Get updates falls back to Home.
  */
 export function resolveActiveTab(
   mode: string | null | undefined,

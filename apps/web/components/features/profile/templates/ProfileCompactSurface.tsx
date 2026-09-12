@@ -52,7 +52,10 @@ import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-p
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import { resolvePublicHeroObjectPosition } from '@/lib/profile/public-hero-media';
-import { resolvePublicProfileActiveDestination } from '@/lib/profile/route-config';
+import {
+  getPermittedPublicProfileActions,
+  resolvePublicProfileActiveDestination,
+} from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -381,12 +384,14 @@ export function ProfileCompactSurface({
   const activeNotificationSourceContext =
     notificationSourceContext ?? defaultNotificationSourceContext;
   const isHomeMode = activeVisiblePrimaryTab === 'profile';
-  const activeNavTab = resolvePublicProfileActiveDestination({
+  const visibleNavTab = resolvePublicProfileActiveDestination({
     mode: activeMode,
     overlayView: isDrawerOverlayActive ? drawerView : null,
   });
-  const visibleNavTab =
-    !allowFanCapture && activeNavTab === 'subscribe' ? 'profile' : activeNavTab;
+  const canGetUpdates =
+    getPermittedPublicProfileActions({
+      fanCaptureEnabled: allowFanCapture,
+    }).length > 0;
   const showBottomNav = shouldShowColdVisitorTabBar({
     tabBarArm: profilePacAssignment.tabBar,
     isSubscribed,
@@ -515,7 +520,7 @@ export function ProfileCompactSurface({
   }, [onModeSelect]);
   const openNotifications = useCallback(
     (sourceContext?: NotificationSourceContext) => {
-      if (!allowFanCapture) return;
+      if (!canGetUpdates) return;
       setNotificationSourceContext(
         sourceContext ?? defaultNotificationSourceContext
       );
@@ -537,7 +542,7 @@ export function ProfileCompactSurface({
       onRevealNotifications?.();
     },
     [
-      allowFanCapture,
+      canGetUpdates,
       defaultNotificationSourceContext,
       onModeSelect,
       onRevealNotifications,
@@ -582,9 +587,7 @@ export function ProfileCompactSurface({
   );
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
-    renderMode === 'interactive' &&
-    renderInteractiveOverlays &&
-    allowFanCapture;
+    renderMode === 'interactive' && renderInteractiveOverlays && canGetUpdates;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
   const homeProfileSettings = homeLatestRelease
@@ -826,7 +829,7 @@ export function ProfileCompactSurface({
             isHomeMode ? 'profile-home-content-column pt-0' : 'pt-2'
           )}
         >
-          {allowFanCapture &&
+          {canGetUpdates &&
           shouldRenderInteractiveOverlays &&
           activeVisiblePrimaryTab !== 'subscribe' ? (
             <ProfileInlineNotificationsCTA
@@ -890,7 +893,7 @@ export function ProfileCompactSurface({
                 renderMode={renderMode}
                 onPlayClick={onPlayClick}
                 onAlertsClick={openNotifications}
-                showAlertsCard={allowFanCapture}
+                showAlertsCard={canGetUpdates}
                 isSubscribed={homeAlertsSubscribed}
                 profilePacAssignment={profilePacAssignment}
                 viewerLocation={viewerLocation}

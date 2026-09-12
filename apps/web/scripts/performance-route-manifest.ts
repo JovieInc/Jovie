@@ -915,7 +915,8 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
       shell: ['[data-testid="profile-header"]'],
       content: ['[data-testid="profile-primary-tab-subscribe"]'],
       navTrigger: [
-        '[data-testid="profile-bottom-nav"] button[aria-label="Alerts"]',
+        '[data-testid="profile-home-alerts-row"] button',
+        'button:has-text("Get updates")',
       ],
     },
     viewport: { width: 390, height: 844 },
@@ -991,7 +992,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
       shell: ['[data-testid="profile-header"]'],
       content: ['[data-testid="profile-primary-tab-tour"]'],
       navTrigger: [
-        '[data-testid="profile-bottom-nav"] button[aria-label="Events"]',
+        '[data-testid="profile-bottom-nav"] button[aria-label="Shows"]',
       ],
     },
     viewport: { width: 390, height: 844 },

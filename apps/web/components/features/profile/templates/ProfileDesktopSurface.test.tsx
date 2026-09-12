@@ -268,12 +268,34 @@ describe('ProfileDesktopSurface', () => {
     );
 
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
+    const navigation = screen.getByRole('navigation', {
+      name: 'Profile Navigation',
+    });
+    expect(navigation).toHaveAttribute(
+      'data-public-profile-nav',
+      'profile,listen,tour,about'
+    );
     expect(
-      screen.queryByRole('button', { name: 'Events' })
+      within(navigation).getByRole('button', { name: 'Home' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('button', { name: 'Music' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('button', { name: 'Shows' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('button', { name: 'About' })
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).queryByRole('button', { name: 'Events' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
+    expect(
+      within(navigation).queryByRole('button', { name: 'Alerts' })
+    ).not.toBeInTheDocument();
+    expect(
+      within(navigation).queryByRole('button', { name: 'Get updates' })
+    ).not.toBeInTheDocument();
     const listenCta = screen.getByRole('button', { name: 'Listen' });
     expect(listenCta).toHaveClass('h-7');
     expect(listenCta.className).toContain('before:h-11');
@@ -474,7 +496,7 @@ describe('ProfileDesktopSurface', () => {
         screen.queryByRole('switch', { name: 'Merch' })
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'View Events' })
+        screen.queryByRole('button', { name: 'View Shows' })
       ).not.toBeInTheDocument();
       expect(screen.getByText('No live shows listed.')).toBeVisible();
       expect(screen.queryByText('No upcoming shows.')).not.toBeInTheDocument();
@@ -564,7 +586,7 @@ describe('ProfileDesktopSurface', () => {
     ).toBeNull();
   });
 
-  it('offers View Events only when upcoming dates exist', () => {
+  it('offers View Shows only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
     const upcomingShow = {
       id: 'show-1',
@@ -610,7 +632,7 @@ describe('ProfileDesktopSurface', () => {
       />
     );
 
-    screen.getByRole('button', { name: 'View Events' }).click();
+    screen.getByRole('button', { name: 'View Shows' }).click();
     expect(onModeSelect).toHaveBeenCalledWith('tour');
   });
 

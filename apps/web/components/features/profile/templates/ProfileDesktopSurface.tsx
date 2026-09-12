@@ -3,11 +3,11 @@
 import { Button, Switch } from '@jovie/ui';
 import {
   BadgeCheck,
-  Bell,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   House,
+  type LucideIcon,
   Mail,
   MapPin,
   MoreHorizontal,
@@ -47,6 +47,12 @@ import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
+import {
+  type BottomTabKey,
+  getPermittedPublicProfileActions,
+  getPermittedPublicProfileNavigation,
+  resolvePublicProfileActiveDestination,
+} from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -77,17 +83,12 @@ export const PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME =
 
 export const PROFILE_LISTEN_DSP_COLUMN_CLASSNAME = 'grid min-w-0 gap-3.5';
 
-const PRIMARY_TABS: ReadonlyArray<{
-  mode: ProfilePrimaryTab;
-  label: string;
-  icon: typeof House;
-}> = [
-  { mode: 'profile', label: 'Profile', icon: House },
-  { mode: 'listen', label: 'Music', icon: Music2 },
-  { mode: 'tour', label: 'Events', icon: CalendarDays },
-  { mode: 'subscribe', label: 'Alerts', icon: Bell },
-  { mode: 'about', label: 'About', icon: UserRound },
-];
+const DESTINATION_ICONS: Readonly<Record<BottomTabKey, LucideIcon>> = {
+  profile: House,
+  listen: Music2,
+  tour: CalendarDays,
+  about: UserRound,
+};
 
 interface ProfileDesktopSurfaceProps {
   readonly presentation?: ProfileSurfacePresentation;
@@ -183,22 +184,6 @@ function formatReleaseMeta(
           .replace(/^./, value => value.toUpperCase());
 
   return [normalizedType, year].filter(Boolean).join(' • ');
-}
-
-function getDesktopBaseMode(mode: ProfileMode): ProfilePrimaryTab {
-  switch (mode) {
-    case 'listen':
-    case 'releases':
-      return 'listen';
-    case 'tour':
-      return 'tour';
-    case 'subscribe':
-      return 'subscribe';
-    case 'about':
-      return 'about';
-    default:
-      return 'profile';
-  }
 }
 
 function DesktopSurfaceCard({
@@ -317,25 +302,18 @@ export function ProfileDesktopSurface({
       ),
     [artist, socialLinks, viewerCountryCode]
   );
-  const baseActivePrimaryTab = getDesktopBaseMode(activeMode);
   const hasTourDates = tourDates.length > 0;
   const hasEventsDestination = shouldOfferPublicEventsDestination(
     tourDates.length
   );
-  const activePrimaryTab =
-    (baseActivePrimaryTab === 'tour' && !hasEventsDestination) ||
-    (baseActivePrimaryTab === 'subscribe' && !allowFanCapture)
-      ? 'profile'
-      : baseActivePrimaryTab;
-  const visiblePrimaryTabs = useMemo(
-    () =>
-      PRIMARY_TABS.filter(
-        tab =>
-          (tab.mode !== 'tour' || hasTourDates) &&
-          (tab.mode !== 'subscribe' || allowFanCapture)
-      ),
-    [allowFanCapture, hasTourDates]
-  );
+  const activePrimaryTab = resolvePublicProfileActiveDestination({
+    mode: activeMode,
+  });
+  const visiblePrimaryTabs = getPermittedPublicProfileNavigation();
+  const canGetUpdates =
+    getPermittedPublicProfileActions({
+      fanCaptureEnabled: allowFanCapture,
+    }).length > 0;
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -407,7 +385,7 @@ export function ProfileDesktopSurface({
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
-    primaryActionElement = allowFanCapture ? (
+    primaryActionElement = canGetUpdates ? (
       <ProfileInlineNotificationsCTA
         artist={artist}
         portalContainer={notificationsPortalContainer}
@@ -456,7 +434,7 @@ export function ProfileDesktopSurface({
         'grid min-h-0 min-w-0 flex-1 gap-4 [@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]'
       )}
       data-testid='profile-desktop-home-overview'
-      data-side-rail-enabled={allowFanCapture ? 'true' : 'false'}
+      data-side-rail-enabled={canGetUpdates ? 'true' : 'false'}
     >
       <div
         className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
@@ -569,8 +547,8 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
-            title='Events'
-            actionLabel={hasEventsDestination ? 'View Events' : undefined}
+            title='Shows'
+            actionLabel={hasEventsDestination ? 'View Shows' : undefined}
             onAction={
               hasEventsDestination ? () => onModeSelect('tour') : undefined
             }
@@ -675,16 +653,16 @@ export function ProfileDesktopSurface({
       <div
         className={cn(
           'min-h-0 min-w-0 gap-3.5',
-          allowFanCapture
+          canGetUpdates
             ? 'grid [@media(min-width:1180px)]:col-span-2 [@media(min-width:1180px)]:row-start-2'
             : 'hidden'
         )}
         data-testid='profile-desktop-side-rail'
       >
         <DesktopSurfaceCard
-          title='Alerts'
+          title='Get updates'
           testId='profile-desktop-alerts-card'
-          className={allowFanCapture ? undefined : 'hidden'}
+          className={canGetUpdates ? undefined : 'hidden'}
         >
           <div className='space-y-4'>
             <button
@@ -866,7 +844,7 @@ export function ProfileDesktopSurface({
   const nonHomeContent =
     activePrimaryTab === 'listen' ? (
       listenTabContent
-    ) : activePrimaryTab === 'subscribe' && isSubscribed && allowFanCapture ? (
+    ) : activeMode === 'subscribe' && isSubscribed && canGetUpdates ? (
       <DesktopSurfaceCard
         title='Manage updates'
         className='flex-1'
@@ -883,7 +861,7 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'tour' ? (
       <DesktopSurfaceCard
-        title='Events'
+        title='Shows'
         className='flex-1'
         testId='profile-primary-tab-tour'
       >
@@ -932,7 +910,7 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'about' ? (
       <DesktopSurfaceCard
-        title='Profile'
+        title='About'
         className='flex-1'
         testId='profile-primary-tab-about'
       >
@@ -974,16 +952,19 @@ export function ProfileDesktopSurface({
             <nav
               className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
               aria-label='Profile Navigation'
+              data-public-profile-nav={visiblePrimaryTabs
+                .map(destination => destination.id)
+                .join(',')}
             >
               {visiblePrimaryTabs.map(tab => {
-                const Icon = tab.icon;
-                const isActive = activePrimaryTab === tab.mode;
+                const Icon = DESTINATION_ICONS[tab.id];
+                const isActive = activePrimaryTab === tab.id;
                 return (
                   <button
-                    key={tab.mode}
+                    key={tab.id}
                     type='button'
-                    onClick={() => onModeSelect(tab.mode)}
-                    data-testid={`profile-primary-tab-${tab.mode}`}
+                    onClick={() => onModeSelect(tab.id)}
+                    data-testid={`profile-primary-tab-${tab.id}`}
                     className={cn(
                       'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
                       isActive
@@ -1022,9 +1003,7 @@ export function ProfileDesktopSurface({
           </div>
         </div>
 
-        {allowFanCapture &&
-        activePrimaryTab === 'subscribe' &&
-        !isSubscribed ? (
+        {canGetUpdates && activeMode === 'subscribe' && !isSubscribed ? (
           <ProfileInlineNotificationsCTA
             artist={artist}
             presentation='modal'

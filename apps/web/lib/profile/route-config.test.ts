@@ -8,17 +8,22 @@ import { describe, expect, it } from 'vitest';
 import {
   BOTTOM_TAB_KEYS,
   categoryShowsTabBar,
+  getPermittedPublicProfileActions,
   getPermittedPublicProfileNavigation,
   getProfileRouteConfig,
   getRouteConfigForMode,
   PROFILE_ROUTE_CONFIG,
   type ProfileRouteKey,
+  PUBLIC_PROFILE_ACTIONS,
   PUBLIC_PROFILE_NAVIGATION,
+  type PublicProfileNavigationAction,
   type PublicProfileNavigationDestination,
   REDIRECT_SINK_ROUTE_KEYS,
   resolveActiveTab,
+  resolvePublicProfileActiveAction,
   resolvePublicProfileActiveDestination,
   TOP_LEVEL_ROUTE_KEYS,
+  validatePublicProfileActions,
   validatePublicProfileNavigation,
 } from './route-config';
 
@@ -181,16 +186,18 @@ describe('getRouteConfigForMode', () => {
     expect(config.showBottomTabBar).toBe(true);
   });
 
-  it('"subscribe" → mode-subscribe with Alerts tab active', () => {
+  it('"subscribe" → mode-subscribe with Home fallback (Get updates is an action)', () => {
     const config = getRouteConfigForMode('subscribe');
     expect(config.key).toBe('mode-subscribe');
-    expect(config.activeTab).toBe('subscribe');
+    expect(config.activeTab).toBe('profile');
+    expect(config.label).toBe('Get updates');
   });
 
-  it('"tour" → mode-tour with Events tab active', () => {
+  it('"tour" → mode-tour with Shows destination active', () => {
     const config = getRouteConfigForMode('tour');
     expect(config.key).toBe('mode-tour');
     expect(config.activeTab).toBe('tour');
+    expect(config.label).toBe('Shows');
   });
 
   it('"releases" → mode-releases with Music tab active (drawer overlay)', () => {
@@ -199,9 +206,9 @@ describe('getRouteConfigForMode', () => {
     expect(config.activeTab).toBe('listen');
   });
 
-  it('"about" → mode-about with Home tab active (drawer overlay)', () => {
+  it('"about" → mode-about with About destination active', () => {
     const config = getRouteConfigForMode('about');
-    expect(config.activeTab).toBe('profile');
+    expect(config.activeTab).toBe('about');
   });
 
   it('"contact" → mode-contact with Home tab active (drawer overlay)', () => {
@@ -248,8 +255,8 @@ describe('resolveActiveTab', () => {
     expect(resolveActiveTab('listen')).toBe('listen');
   });
 
-  it('subscribe mode → "subscribe" tab', () => {
-    expect(resolveActiveTab('subscribe')).toBe('subscribe');
+  it('subscribe mode falls back to Home because Get updates is an action', () => {
+    expect(resolveActiveTab('subscribe')).toBe('profile');
   });
 
   it('tour mode with hasTourDates=true → "tour" tab', () => {
@@ -268,8 +275,8 @@ describe('resolveActiveTab', () => {
     expect(resolveActiveTab('releases')).toBe('listen');
   });
 
-  it('about mode → "profile" tab (drawer overlay keeps Home active)', () => {
-    expect(resolveActiveTab('about')).toBe('profile');
+  it('about mode → About destination', () => {
+    expect(resolveActiveTab('about')).toBe('about');
   });
 
   it('pay mode → "profile" tab (drawer overlay keeps Home active)', () => {
@@ -393,8 +400,8 @@ describe('REDIRECT_SINK_ROUTE_KEYS', () => {
 });
 
 describe('BOTTOM_TAB_KEYS', () => {
-  it('contains exactly four primary tab keys in spec order', () => {
-    expect(BOTTOM_TAB_KEYS).toEqual(['profile', 'listen', 'tour', 'subscribe']);
+  it('contains exactly four destination keys in Home · Music · Shows · About order', () => {
+    expect(BOTTOM_TAB_KEYS).toEqual(['profile', 'listen', 'tour', 'about']);
   });
 });
 
@@ -402,11 +409,14 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
   it('defines the one ordered semantic contract for compact and wide shells', () => {
     expect(
       PUBLIC_PROFILE_NAVIGATION.map(destination => destination.id)
-    ).toEqual(['profile', 'listen', 'tour', 'subscribe']);
+    ).toEqual(['profile', 'listen', 'tour', 'about']);
+    expect(
+      PUBLIC_PROFILE_NAVIGATION.map(destination => destination.label)
+    ).toEqual(['Home', 'Music', 'Shows', 'About']);
     expect(
       PUBLIC_PROFILE_NAVIGATION.every(
         destination =>
-          destination.compactPlacement === destination.widePlacement &&
+          destination.availability === 'always' &&
           destination.collapse === 'none' &&
           destination.badge === null &&
           destination.audience === 'public'
@@ -415,24 +425,36 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
     expect(validatePublicProfileNavigation(PUBLIC_PROFILE_NAVIGATION)).toEqual(
       []
     );
+    expect(validatePublicProfileActions(PUBLIC_PROFILE_ACTIONS)).toEqual([]);
   });
 
-  it('filters only the typed fan-capture destination', () => {
+  it('keeps destinations always-on and gates only the Get updates action', () => {
     expect(
       getPermittedPublicProfileNavigation({ fanCaptureEnabled: false }).map(
         destination => destination.id
       )
-    ).toEqual(['profile', 'listen', 'tour']);
+    ).toEqual(['profile', 'listen', 'tour', 'about']);
     expect(
       getPermittedPublicProfileNavigation({ fanCaptureEnabled: true }).map(
         destination => destination.id
       )
-    ).toEqual(['profile', 'listen', 'tour', 'subscribe']);
+    ).toEqual(['profile', 'listen', 'tour', 'about']);
+    expect(
+      getPermittedPublicProfileActions({ fanCaptureEnabled: false }).map(
+        action => action.id
+      )
+    ).toEqual([]);
+    expect(
+      getPermittedPublicProfileActions({ fanCaptureEnabled: true }).map(
+        action => action.id
+      )
+    ).toEqual(['subscribe']);
+    expect(PUBLIC_PROFILE_ACTIONS[0]?.label).toBe('Get updates');
   });
 
   it('owns active-state mapping for route and overlay modes', () => {
     expect(resolvePublicProfileActiveDestination({ mode: 'about' })).toBe(
-      'profile'
+      'about'
     );
     expect(
       resolvePublicProfileActiveDestination({
@@ -445,6 +467,13 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
         mode: 'profile',
         overlayView: 'notifications',
       })
+    ).toBe('profile');
+    expect(
+      resolvePublicProfileActiveAction({
+        mode: 'profile',
+        overlayView: 'notifications',
+        fanCaptureEnabled: true,
+      })
     ).toBe('subscribe');
     expect(
       resolvePublicProfileActiveDestination({
@@ -452,6 +481,12 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
         overlayView: 'contact',
       })
     ).toBe('profile');
+    expect(
+      resolvePublicProfileActiveDestination({
+        mode: 'profile',
+        overlayView: 'about',
+      })
+    ).toBe('about');
   });
 
   it('deliberately rejects missing, reordered, duplicated, operator, and responsive-drift contracts', () => {
@@ -501,13 +536,31 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
       );
     }
 
-    const responsiveDrift = clone();
-    responsiveDrift[0] = {
-      ...responsiveDrift[0],
-      widePlacement: 'sidebar',
+    const existenceDrift = clone();
+    existenceDrift[2] = {
+      ...existenceDrift[2],
+      availability: 'fan-capture',
+    };
+    expect(validatePublicProfileNavigation(existenceDrift)).toContain(
+      'responsive-existence-drift'
+    );
+
+    const legacyLabel = clone();
+    legacyLabel[2] = {
+      ...legacyLabel[2],
+      label: 'Events',
     } as unknown as PublicProfileNavigationDestination;
-    expect(validatePublicProfileNavigation(responsiveDrift)).toContain(
-      'responsive-drift'
+    expect(validatePublicProfileNavigation(legacyLabel)).toContain(
+      'legacy-nav-label'
+    );
+
+    const actionPromoted = clone();
+    actionPromoted[3] = {
+      ...actionPromoted[3],
+      activeModes: ['about', 'subscribe'],
+    };
+    expect(validatePublicProfileNavigation(actionPromoted)).toContain(
+      'action-promoted-to-destination'
     );
 
     const ambiguous = clone();
@@ -526,6 +579,20 @@ describe('PUBLIC_PROFILE_NAVIGATION', () => {
     };
     expect(validatePublicProfileNavigation(missingActive)).toContain(
       'missing-active-state'
+    );
+  });
+
+  it('rejects promoting Get updates into an equal-weight nav slot', () => {
+    const clone = (): PublicProfileNavigationAction[] =>
+      structuredClone([...PUBLIC_PROFILE_ACTIONS]);
+    const equalWeight = clone();
+    equalWeight[0] = {
+      ...equalWeight[0],
+      compactPlacement: 'bottom-bar',
+      widePlacement: 'top-nav',
+    } as unknown as PublicProfileNavigationAction;
+    expect(validatePublicProfileActions(equalWeight)).toContain(
+      'action-equal-weight-nav'
     );
   });
 });

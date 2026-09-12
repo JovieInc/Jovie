@@ -308,7 +308,7 @@ test.describe('Public profile /tim layout hardening @regression', () => {
     expect(metrics.navRail?.height ?? 0).toBeGreaterThanOrEqual(30);
     expect(metrics.navRail?.height ?? 0).toBeLessThanOrEqual(34);
 
-    const tabNames = new Set(['Home', 'Music', 'Events', 'Alerts']);
+    const tabNames = new Set(['Home', 'Music', 'Shows', 'About']);
     const tabTargets = metrics.actionTargets.filter(target =>
       tabNames.has(target.label)
     );

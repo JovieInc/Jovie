@@ -742,11 +742,17 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Events', 'Alerts']) {
+    for (const label of ['Home', 'Music', 'Shows', 'About']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Alerts' })
+    ).toBeNull();
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Get updates' })
+    ).toBeNull();
     expect(
       within(bottomNav).queryByRole('button', { name: 'More options' })
     ).not.toBeInTheDocument();
@@ -796,7 +802,7 @@ describe('ProfileCompactTemplate', () => {
     expect(surfaceSlot).toHaveClass('min-h-0', 'flex-1');
   });
 
-  it('keeps the home tab active for about mode deep links', async () => {
+  it('marks About as the active destination for about mode deep links', async () => {
     render(
       <ProfileCompactTemplate
         mode='about'
@@ -808,8 +814,11 @@ describe('ProfileCompactTemplate', () => {
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
     expect(
-      within(bottomNav).getByRole('button', { name: 'Home' })
+      within(bottomNav).getByRole('button', { name: 'About' })
     ).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(bottomNav).getByRole('button', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
       'data-mode',
       'about'
