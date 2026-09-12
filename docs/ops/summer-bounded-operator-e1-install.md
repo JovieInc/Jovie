@@ -130,9 +130,18 @@ Do **not** install the JOV-6163 publisher until these are true, or E1 fails clos
 
 2. **Activation installs the publisher (after #17736).**  
    Before that lands, activation only installs fleet / PR-rehab controllers. After it
-   lands, activation copies the emitter onto the existing `gem-service-attestation`
-   timer path and verifies `configurationSourceRevision` (Jovie tip). Still fail-closed
-   when `~/.config/symphony/runner-source.env` is missing or `--check` is unhealthy.
+   lands, activation aligns `JOVIE_CONFIGURATION_SOURCE_REVISION` to the production tip,
+   copies the emitter onto the existing `gem-service-attestation` timer path, and verifies
+   `configurationSourceRevision` (Jovie tip). Still fail-closed when
+   `~/.config/symphony/runner-source.env` is missing or `--check` is unhealthy.
+
+   **When tip churn coalesces activation past Install:** dispatch
+   **Gem Publisher Commission (JOV-6163 E1)** (`gem-publisher-commission.yml`) on
+   `jovie-fixed` with `tip_sha=<current main tip>` and confirm
+   `install-jov-6163-publisher`. That path is publisher-only (no fleet/controller
+   replace), fail-closed on dirty config root / `--check`, and emits two ≤600s
+   observations for the live E1 verifier. It does **not** weaken the 600s gate and
+   does **not** claim E1 closed by itself — attach the observation artifacts.
 
 3. **Gem → Summer transport.**  
    Summer (Vercel) reads `SUMMER_RUNNER_SOURCE_ATTESTATION_PATH` / `_JSON`. Host-local
