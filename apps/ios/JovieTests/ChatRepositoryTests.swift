@@ -694,7 +694,12 @@ struct ChatRepositoryTests {
     )
 
     let openTask = Task { await repository.openConversation("conv_cached") }
-    for _ in 0..<50 where repository.timeline.map(\.content) != Array(6...45).map({ "Cached \($0)" }) {
+    // Time-bounded wait for the cache-first paint instead of a fixed yield
+    // budget: under merge-queue runner load a fixed 50-iteration loop can
+    // expire before the parallel executor paints the cached tail.
+    let cachePaintDeadline = Date().addingTimeInterval(10)
+    while repository.timeline.map(\.content) != Array(6...45).map({ "Cached \($0)" }),
+          Date() < cachePaintDeadline {
       await Task.yield()
     }
     #expect(repository.timeline.map(\.content) == Array(6...45).map { "Cached \($0)" })
@@ -781,7 +786,11 @@ struct ChatRepositoryTests {
     )
 
     let firstSend = Task { await repository.send(text: "First") }
-    for _ in 0..<50 where client.sendCount < 1 {
+    // Time-bounded wait for the first send to start instead of a fixed yield
+    // budget: under merge-queue runner load a fixed 50-iteration loop can
+    // expire before the detached task reaches the client.
+    let sendStartDeadline = Date().addingTimeInterval(10)
+    while client.sendCount < 1, Date() < sendStartDeadline {
       await Task.yield()
     }
     #expect(repository.isSending)
