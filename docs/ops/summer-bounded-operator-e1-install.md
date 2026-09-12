@@ -10,9 +10,9 @@ from fresh runner-source attestations (≤600s) without holding on
 
 | Check | Result |
 |---|---|
-| PR [#17725](https://github.com/JovieInc/Jovie/pull/17725) open on `codex/jov-6163-runtime-attestation` | OPEN |
-| CI `Validate exact PR head proof v2` | SUCCESS |
-| Publisher unit tests `scripts/symphony/tests/gem-service-attestation.test.py` | **9 passed** (2026-09-12) |
+| PR [#17725](https://github.com/JovieInc/Jovie/pull/17725) on `codex/jov-6163-runtime-attestation` | OPEN / **MERGEABLE** (head `afe8e3229640`, re-verified 2026-09-12) |
+| Publisher unit tests `scripts/symphony/tests/gem-service-attestation.test.py` | **9 passed** on that head |
+| Summer governed dispatch + Gem-down acceptance (local) | PASS — Cursor alternate selected without Gem; hold when no probe |
 | 600s freshness gate weakened? | **No** |
 
 Local publisher proof command (from PR head):
@@ -63,15 +63,20 @@ python3 /tmp/jov-6163-attestation/scripts/symphony/tests/gem-service-attestation
 
 ## Repair-to-runtime bridge (this branch)
 
-Summer bottleneck heartbeat now evaluates runner-source attestation before the
-Gem-dark recovery cycle:
+Summer bottleneck heartbeat evaluates runner-source attestation, then runs
+**governed dispatch** (`dispatchSummerGovernedRequest`) so the request outcome
+selects the router launch:
 
 1. Load `SUMMER_RUNNER_SOURCE_ATTESTATION_JSON` or the file at
    `SUMMER_RUNNER_SOURCE_ATTESTATION_PATH`.
-2. `resolveGemDarkTrigger` admits the Cursor outbox lane when the receipt is
-   missing/invalid/stale/unhealthy/unbound (**including age >600s**), or when
-   `SUMMER_GEM_DARK` is explicitly dark.
-3. Fresh ≤600s attestations keep the normal symphony path authoritative.
+2. Governed dispatch outcomes:
+   - `symphony-route` — fresh ≤600s attestation (Symphony remains authoritative)
+   - `cursor-recovery-request` — missing/invalid/stale/unhealthy/unbound receipt
+     (**including age >600s**) or explicit `SUMMER_GEM_DARK` → Cursor outbox only
+     (never Gem)
+   - `hold` — no probe configured → no Cursor spend
+3. Only `cursor-recovery-request` advances the Gem-dark Cursor recovery cycle /
+   durable outbox.
 4. `SUMMER_GEM_DARK=live` wins over a missing receipt (operator override).
 5. PATH alone (without loading the file) does **not** imply dark — avoids
    accidental Cursor spend; the heartbeat always loads first.
