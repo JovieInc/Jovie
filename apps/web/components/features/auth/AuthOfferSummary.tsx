@@ -13,7 +13,9 @@ import {
   formatAnnualMonthlyEquivalent,
   formatUsdAmount,
   getPaidPlanPriceUsd,
+  getPlanCtaLabel,
   getPlanOfferNote,
+  isSelfServiceOffer,
   type PublicOfferPlan,
   validateBillingInterval,
 } from '@/lib/billing/offer-truth';
@@ -45,6 +47,7 @@ function getOfferHeading(
 
 function getOfferPriceLine(plan: PublicOfferPlan, interval: BillingInterval) {
   if (plan === 'free') return '$0';
+  if (!isSelfServiceOffer(plan, interval)) return getPlanCtaLabel(plan);
   const paidPlan = plan === 'max' ? 'max' : 'pro';
   const amount = getPaidPlanPriceUsd(paidPlan, interval);
   if (interval === 'year') {

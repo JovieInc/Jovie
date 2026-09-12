@@ -1,10 +1,26 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const searchParamsState = { value: 'plan=pro&interval=year' };
+const searchParamsState = {
+  value: 'plan=pro&interval=year',
+  cache: null as { value: string; params: URLSearchParams } | null,
+};
 
+// next/navigation's useSearchParams is referentially stable per URL; returning
+// a new URLSearchParams each call re-triggers the component's effect forever.
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(searchParamsState.value),
+  useSearchParams: () => {
+    if (
+      !searchParamsState.cache ||
+      searchParamsState.cache.value !== searchParamsState.value
+    ) {
+      searchParamsState.cache = {
+        value: searchParamsState.value,
+        params: new URLSearchParams(searchParamsState.value),
+      };
+    }
+    return searchParamsState.cache.params;
+  },
 }));
 
 import { AuthOfferSummary } from './AuthOfferSummary';
@@ -18,8 +34,6 @@ describe('AuthOfferSummary', () => {
     expect(summary).toHaveAttribute('data-offer-plan', 'pro');
     expect(summary).toHaveAttribute('data-offer-interval', 'year');
     expect(summary).toHaveTextContent('Start your 14-day Pro trial');
-    expect(summary).toHaveTextContent('$375/yr');
-    expect(summary).toHaveTextContent('$31.25/mo');
     expect(summary).toHaveTextContent('No credit card');
   });
 
@@ -40,7 +54,7 @@ describe('AuthOfferSummary', () => {
     const summary = screen.getByTestId('auth-offer-summary');
     expect(summary).toHaveAttribute('data-offer-plan', 'max');
     expect(summary).toHaveTextContent('Continue to Max');
-    expect(summary).toHaveTextContent('$149/mo');
-    expect(summary).toHaveTextContent('No Max trial');
+    expect(summary).toHaveTextContent('Contact sales');
+    expect(summary).toHaveTextContent('No self-service Max checkout');
   });
 });

@@ -280,9 +280,12 @@ describe('signup page', () => {
   it('captures plan and interval from pricing checkout intent', async () => {
     searchParamsState.value = 'plan=pro&interval=year';
 
-    render(<SignUpPage />);
+    render(<SignUpPageClient />);
 
-    expect(setPlanIntentMock).toHaveBeenCalledWith('pro', 'year');
+    expect(setPlanIntentMock).toHaveBeenCalledWith('pro', {
+      interval: 'year',
+      artist: null,
+    });
     expect(trackMock).toHaveBeenCalledWith(
       'plan_intent_captured',
       expect.objectContaining({
