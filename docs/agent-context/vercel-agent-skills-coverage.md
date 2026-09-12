@@ -172,3 +172,7 @@ empty/error/loading states.
 
 Protect JovieInc/Jovie#17453. HOLD #17156. Leave #17511 and #17521. No Tim
 merge-queue enroll. No Observability Plus spend.
+
+Deferred candidates (do not implement in this PR):
+- JOV-6193 writing-guidelines docs-only pin promotion
+- JOV-6194 scoped react-view-transitions for a named interaction

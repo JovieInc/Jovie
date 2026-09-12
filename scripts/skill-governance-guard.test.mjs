@@ -54,7 +54,11 @@ function createFixture() {
     root,
     'skills-lock.json',
     JSON.stringify({
-      codexSkills: ['find-skills', ...Object.keys(APPROVED_VERCEL_SKILLS)],
+      codexSkills: [
+        'find-skills',
+        'gstack',
+        ...Object.keys(APPROVED_VERCEL_SKILLS),
+      ],
       ownedSkills: ['find-skills'],
       skills,
       version: 1,
