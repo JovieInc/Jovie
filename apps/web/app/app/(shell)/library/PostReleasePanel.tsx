@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
+import { DisclosureRow, InfoPopover } from '@/components/molecules/inspector';
 import { buildReleaseDownloadsRoute } from '@/constants/routes';
 import type {
   LibraryPostReleaseBundle,
@@ -57,18 +58,6 @@ function releaseIdForAsset(asset: LibraryReleaseAsset): string | null {
     : null;
 }
 
-function EvidenceBadge({
-  evidenceClass,
-}: {
-  readonly evidenceClass: LibraryRightsholderEvidenceView['evidenceClass'];
-}) {
-  return (
-    <span className='inline-flex h-5 shrink-0 items-center border border-subtle bg-surface-1 px-1.5 text-2xs font-medium text-secondary-token'>
-      {EVIDENCE_LABELS[evidenceClass]}
-    </span>
-  );
-}
-
 function PresenceFindingRow({
   creatorProfileId,
   finding,
@@ -106,7 +95,7 @@ function PresenceFindingRow({
         error?: string;
       };
       if (!response.ok || !result.finding) {
-        throw new Error(result.error ?? 'Update could not be prepared');
+        throw new Error(result.error ?? 'Repair could not be prepared');
       }
       onChange(result.finding);
       if (action === 'prepare_update') {
@@ -122,7 +111,7 @@ function PresenceFindingRow({
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : 'Update could not be prepared'
+        error instanceof Error ? error.message : 'Repair could not be prepared'
       );
     } finally {
       setIsSaving(false);
@@ -155,7 +144,7 @@ function PresenceFindingRow({
             onClick={() => void applyAction('prepare_update')}
             className='shrink-0'
           >
-            {finding.actionMode === 'draft_request' ? 'Draft' : 'Update'}
+            {finding.actionMode === 'draft_request' ? 'Draft' : 'Open'}
             {finding.actionMode === 'direct_update' ? (
               <ExternalLink className='ml-1 h-3 w-3' aria-hidden='true' />
             ) : null}
@@ -249,12 +238,18 @@ export function PostReleasePanel({
       <section aria-labelledby='library-downloads-heading'>
         <div className='flex min-h-8 items-center justify-between gap-3'>
           <div className='min-w-0'>
-            <h3
-              id='library-downloads-heading'
-              className='text-xs font-semibold text-primary-token'
-            >
-              Downloads
-            </h3>
+            <div className='flex items-center gap-1'>
+              <h3
+                id='library-downloads-heading'
+                className='text-xs font-semibold text-primary-token'
+              >
+                Downloads
+              </h3>
+              <InfoPopover label='About downloads'>
+                Email gate to file to this content card. Only recordings with
+                explicit full-control attestation can go live.
+              </InfoPopover>
+            </div>
             <p className='mt-0.5 text-2xs text-tertiary-token'>
               {downloadsSummary}
             </p>
@@ -270,10 +265,6 @@ export function PostReleasePanel({
             </Button>
           ) : null}
         </div>
-        <p className='mt-2 text-2xs leading-4 text-secondary-token'>
-          Email gate → file → this content card. Only recordings with explicit
-          full-control attestation can go live.
-        </p>
       </section>
 
       <section className='border-t border-subtle pt-3' aria-label='Stats'>
@@ -294,29 +285,30 @@ export function PostReleasePanel({
         className='border-t border-subtle pt-3'
         aria-labelledby='library-rightsholders-heading'
       >
-        <h3
-          id='library-rightsholders-heading'
-          className='text-xs font-semibold text-primary-token'
-        >
-          Rightsholders
-        </h3>
+        <div className='flex items-center gap-1'>
+          <h3
+            id='library-rightsholders-heading'
+            className='text-xs font-semibold text-primary-token'
+          >
+            Rightsholders
+          </h3>
+          <InfoPopover label='About rightsholders'>
+            Songview and MLC are public composition observations, not proof of
+            master ownership. A file or email does not grant rights.
+          </InfoPopover>
+        </div>
         {relevantRightsholders.length > 0 ? (
-          <div className='mt-2 space-y-2'>
+          <div className='mt-2 space-y-1'>
             {relevantRightsholders.map(evidence => (
-              <div
+              <DisclosureRow
                 key={evidence.id}
-                className='flex min-h-8 items-center justify-between gap-3'
+                label={evidence.partyName}
+                summary={EVIDENCE_LABELS[evidence.evidenceClass]}
               >
-                <div className='min-w-0'>
-                  <p className='truncate text-xs text-primary-token'>
-                    {evidence.partyName}
-                  </p>
-                  <p className='truncate text-2xs text-tertiary-token'>
-                    {evidence.role} · {evidence.domain} · {evidence.source}
-                  </p>
-                </div>
-                <EvidenceBadge evidenceClass={evidence.evidenceClass} />
-              </div>
+                <p className='truncate text-2xs text-tertiary-token'>
+                  {evidence.role} · {evidence.domain} · {evidence.source}
+                </p>
+              </DisclosureRow>
             ))}
           </div>
         ) : (
@@ -324,10 +316,6 @@ export function PostReleasePanel({
             No rightsholder evidence recorded.
           </p>
         )}
-        <p className='mt-2 text-2xs leading-4 text-secondary-token'>
-          Songview and MLC are public composition observations, not proof of
-          master ownership. A file or email does not grant rights.
-        </p>
       </section>
 
       <section
