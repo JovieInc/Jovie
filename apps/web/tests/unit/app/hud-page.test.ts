@@ -232,9 +232,9 @@ describe('/hud page auth', () => {
     expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
     expect(findElementByName(result, 'AdminPage')).toBeNull();
     expect(findElementByName(result, 'StandaloneProductPage')).toBeNull();
-    expect(findElementByName(result, 'HudFullscreenControl')?.props?.action).toBe(
-      'exit'
-    );
+    expect(
+      findElementByName(result, 'HudFullscreenControl')?.props?.action
+    ).toBe('exit');
   });
 
   it('renders the three-metric Mac HUD instead of the seven-band dashboard', async () => {
