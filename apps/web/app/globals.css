@@ -2017,7 +2017,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   * {
-    animation-duration: 0.01ms !important;
+    /* Exact 0s — Chromium serializes 0.01ms as 1e-05s and fails JOV-4911. */
+    animation-duration: 0s !important;
   }
 }
 
@@ -2375,8 +2376,8 @@ body {
   .transition-all,
   .transform,
   [data-state] {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
   }
 }
 
