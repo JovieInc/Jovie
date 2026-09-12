@@ -77,70 +77,73 @@ export interface LibraryInspectorAssetSource {
   readonly documentStage?: string | null;
 }
 
+function slot(
+  kind: LibraryInspectorAssetKind,
+  occupancy: AssetSlotOccupancy,
+  cardinality: AssetSlotCardinality,
+  acquireMode: AssetSlotAcquireMode,
+  objectTitle: string,
+  objectSubtitle: string
+): LibraryInspectorAssetProjection {
+  return { kind, occupancy, cardinality, acquireMode, objectTitle, objectSubtitle };
+}
+
 export function projectLibraryInspectorAssetSlot(
   kind: LibraryInspectorAssetKind,
   asset: LibraryInspectorAssetSource,
   stemCount = 0
 ): LibraryInspectorAssetProjection {
   const isRelease = (asset.itemKind ?? 'release') === 'release';
+  const occupied = (value: unknown) => (value ? 'populated' : 'empty');
 
   switch (kind) {
     case 'audio':
-      return {
+      return slot(
         kind,
-        occupancy: asset.previewUrl ? 'populated' : 'empty',
-        cardinality: 'single',
-        acquireMode: 'file',
-        objectTitle: 'Audio attached',
-        objectSubtitle: 'Preview, scrub, and trim a promo snippet for drops.',
-      };
+        occupied(asset.previewUrl),
+        'single',
+        'file',
+        'Audio attached',
+        'Preview, scrub, and trim a promo snippet for drops.'
+      );
     case 'artwork':
-      return {
+      return slot(
         kind,
-        occupancy: asset.artworkUrl ? 'populated' : 'empty',
-        cardinality: 'single',
-        acquireMode: isRelease ? 'file' : 'action',
-        objectTitle: asset.artworkUrl ? 'Artwork attached' : 'Artwork',
-        objectSubtitle: 'Cover art for this object.',
-      };
+        occupied(asset.artworkUrl),
+        'single',
+        isRelease ? 'file' : 'action',
+        asset.artworkUrl ? 'Artwork attached' : 'Artwork',
+        'Cover art for this object.'
+      );
     case 'video':
-      return {
+      return slot(
         kind,
-        occupancy:
-          asset.videoUrl ||
-          asset.hasVideoLinks ||
-          asset.source?.provider === 'youtube'
-            ? 'populated'
-            : 'empty',
-        cardinality: 'single',
-        acquireMode: 'action',
-        objectTitle: asset.title,
-        objectSubtitle:
-          asset.source?.provider === 'youtube'
-            ? 'YouTube video'
-            : 'Video attached',
-      };
+        occupied(asset.videoUrl || asset.hasVideoLinks || asset.source?.provider === 'youtube'),
+        'single',
+        'action',
+        asset.title,
+        asset.source?.provider === 'youtube' ? 'YouTube video' : 'Video attached'
+      );
     case 'docs':
-      return {
+      return slot(
         kind,
-        occupancy: asset.itemKind === 'document' ? 'populated' : 'empty',
-        cardinality: 'single',
-        acquireMode: 'action',
-        objectTitle: asset.title,
-        objectSubtitle: asset.documentStage
+        occupied(asset.itemKind === 'document'),
+        'single',
+        'action',
+        asset.title,
+        asset.documentStage
           ? asset.documentStage.replaceAll('_', ' ')
-          : 'Document',
-      };
+          : 'Document'
+      );
     case 'stems':
-      return {
+      return slot(
         kind,
-        occupancy: stemCount > 0 ? 'populated' : 'empty',
-        cardinality: 'multi',
-        acquireMode: 'action',
-        objectTitle:
-          stemCount === 1 ? '1 stem file' : `${stemCount} stem files`,
-        objectSubtitle: 'Downloads, stems, and DJ promos.',
-      };
+        occupied(stemCount > 0),
+        'multi',
+        'action',
+        stemCount === 1 ? '1 stem file' : `${stemCount} stem files`,
+        'Downloads, stems, and DJ promos.'
+      );
   }
 }
 

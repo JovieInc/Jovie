@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/components/features/library/StatefulAssetSlot.test.tsx
 import { useCallback, useMemo, useState } from 'react';
 import {
   getLibraryItemKind,
@@ -13,44 +14,16 @@ import {
 } from '@/constants/routes';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import type { LibraryDownloadView } from '@/lib/library/post-release-types';
-import {
-  type LibraryInspectorAssetKind,
-  projectLibraryInspectorAssetSlot,
-} from '@/lib/library/stateful-asset-slot';
+import { projectLibraryInspectorAssetSlot } from '@/lib/library/stateful-asset-slot';
 import { StatefulAssetSlot } from './StatefulAssetSlot';
 
 const IMAGE_ACCEPT = SUPPORTED_IMAGE_MIME_TYPES.join(',');
-const SLOT_SECTIONS: readonly {
-  readonly kind: Exclude<LibraryInspectorAssetKind, 'audio'>;
-  readonly title: string;
-  readonly acquireLabel: string;
-  readonly acquireHint: string;
-}[] = [
-  {
-    kind: 'artwork',
-    title: 'Artwork',
-    acquireLabel: 'Drop artwork',
-    acquireHint: 'JPEG, PNG, WebP, or AVIF.',
-  },
-  {
-    kind: 'video',
-    title: 'Video',
-    acquireLabel: 'Add video',
-    acquireHint: 'Connect a video to this object.',
-  },
-  {
-    kind: 'docs',
-    title: 'Documents',
-    acquireLabel: 'Add document',
-    acquireHint: 'Ideas, scripts, and one-sheets.',
-  },
-  {
-    kind: 'stems',
-    title: 'Stems',
-    acquireLabel: 'Add stems',
-    acquireHint: 'Promo downloads and stem packs.',
-  },
-];
+const SLOT_SECTIONS = [
+  ['artwork', 'Artwork', 'Drop artwork', 'JPEG, PNG, WebP, or AVIF.'],
+  ['video', 'Video', 'Add video', 'Connect a video to this object.'],
+  ['docs', 'Documents', 'Add document', 'Ideas, scripts, and one-sheets.'],
+  ['stems', 'Stems', 'Add stems', 'Promo downloads and stem packs.'],
+] as const;
 
 function releaseIdForAsset(asset: LibraryReleaseAsset): string | null {
   if (getLibraryItemKind(asset) === 'release') return asset.id;
@@ -82,13 +55,11 @@ export function LibraryInspectorAssetSlots({
   asset,
   downloads,
   disabled = false,
-  defaultSectionOpen = false,
   onArtworkUploaded,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly downloads: readonly LibraryDownloadView[];
   readonly disabled?: boolean;
-  readonly defaultSectionOpen?: boolean;
   readonly onArtworkUploaded?: (assetId: string, artworkUrl: string) => void;
 }) {
   const releaseId = releaseIdForAsset(asset);
@@ -122,54 +93,49 @@ export function LibraryInspectorAssetSlots({
 
   return (
     <div data-testid='library-inspector-asset-slots'>
-      {SLOT_SECTIONS.map(section => {
+      {SLOT_SECTIONS.map(([kind, title, acquireLabel, acquireHint]) => {
         const slot = projectLibraryInspectorAssetSlot(
-          section.kind,
+          kind,
           { ...asset, artworkUrl },
           stems.length
         );
         const acquireHref =
-          section.kind === 'video'
+          kind === 'video'
             ? buildLibraryViewRoute('videos')
-            : section.kind === 'docs'
+            : kind === 'docs'
               ? buildLibraryViewRoute('documents')
               : stemsHref;
 
         return (
           <DrawerSection
-            key={section.kind}
-            sectionId={section.kind}
+            key={kind}
+            sectionId={kind}
             surface='card'
-            title={section.title}
-            defaultOpen={defaultSectionOpen}
+            title={title}
+            defaultOpen={false}
           >
             <StatefulAssetSlot
-              kind={section.kind}
+              kind={kind}
               occupancy={slot.occupancy}
               cardinality={slot.cardinality}
               acquireMode={slot.acquireMode}
-              testIdPrefix={`library-${section.kind}`}
+              testIdPrefix={`library-${kind}`}
               objectTitle={slot.objectTitle}
               objectSubtitle={slot.objectSubtitle}
-              previewSrc={section.kind === 'artwork' ? artworkUrl : undefined}
-              accept={section.kind === 'artwork' ? IMAGE_ACCEPT : undefined}
-              disabled={disabled || (section.kind === 'artwork' && !releaseId)}
-              acquireLabel={section.acquireLabel}
-              acquireHint={section.acquireHint}
-              acquireHref={section.kind === 'artwork' ? undefined : acquireHref}
+              previewSrc={kind === 'artwork' ? artworkUrl : undefined}
+              accept={kind === 'artwork' ? IMAGE_ACCEPT : undefined}
+              disabled={disabled || (kind === 'artwork' && !releaseId)}
+              acquireLabel={acquireLabel}
+              acquireHint={acquireHint}
+              acquireHref={kind === 'artwork' ? undefined : acquireHref}
               onFile={
-                section.kind === 'artwork' && releaseId
-                  ? handleArtworkFile
-                  : undefined
+                kind === 'artwork' && releaseId ? handleArtworkFile : undefined
               }
-              addHref={section.kind === 'stems' ? stemsHref : undefined}
+              addHref={kind === 'stems' ? stemsHref : undefined}
             >
-              {section.kind === 'stems'
+              {kind === 'stems'
                 ? stems.map(stem => (
-                    <p
-                      key={stem.id}
-                      className='truncate text-2xs text-secondary-token'
-                    >
+                    <p key={stem.id} className='truncate text-2xs text-secondary-token'>
                       {stem.fileName}
                     </p>
                   ))

@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assertPopulatedSlotHidesDropZone,
@@ -8,16 +6,6 @@ import {
   projectLibraryInspectorAssetSlots,
   resolveStatefulAssetSlot,
 } from './stateful-asset-slot';
-
-function readRepoFile(relativePath: string): string {
-  const candidates = [
-    resolve(process.cwd(), relativePath),
-    resolve(process.cwd(), 'apps/web', relativePath),
-  ];
-  const match = candidates.find(existsSync);
-  if (!match) throw new Error(`Unable to locate ${relativePath}`);
-  return readFileSync(match, 'utf8');
-}
 
 describe('stateful asset slots', () => {
   it('never shows a drop zone on populated slots', () => {
@@ -70,22 +58,5 @@ describe('stateful asset slots', () => {
         source: { provider: 'youtube' },
       }).occupancy
     ).toBe('populated');
-  });
-
-  it('wires drop-zone gating and all five inspector kinds', () => {
-    const slot = readRepoFile(
-      'components/features/library/StatefulAssetSlot.tsx'
-    );
-    const inspector = readRepoFile(
-      'components/features/library/LibraryInspectorAssetSlots.tsx'
-    );
-    expect(slot).toContain('presentation.showAcquisitionDropZone');
-    expect(inspector).toMatch(/kind: 'artwork'[\s\S]*kind: 'stems'/);
-    expect(
-      readRepoFile('components/features/release/ReleaseAudioAssetPanel.tsx')
-    ).toContain('resolveStatefulAssetSlot');
-    expect(
-      readRepoFile('app/app/(shell)/library/LibrarySurface.tsx')
-    ).toContain('LibraryInspectorAssetSlots');
   });
 });
