@@ -135,7 +135,10 @@ export function LibraryInspectorAssetSlots({
             >
               {kind === 'stems'
                 ? stems.map(stem => (
-                    <p key={stem.id} className='truncate text-2xs text-secondary-token'>
+                    <p
+                      key={stem.id}
+                      className='truncate text-2xs text-secondary-token'
+                    >
                       {stem.fileName}
                     </p>
                   ))

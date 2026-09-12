@@ -85,7 +85,14 @@ function slot(
   objectTitle: string,
   objectSubtitle: string
 ): LibraryInspectorAssetProjection {
-  return { kind, occupancy, cardinality, acquireMode, objectTitle, objectSubtitle };
+  return {
+    kind,
+    occupancy,
+    cardinality,
+    acquireMode,
+    objectTitle,
+    objectSubtitle,
+  };
 }
 
 export function projectLibraryInspectorAssetSlot(
@@ -118,11 +125,17 @@ export function projectLibraryInspectorAssetSlot(
     case 'video':
       return slot(
         kind,
-        occupied(asset.videoUrl || asset.hasVideoLinks || asset.source?.provider === 'youtube'),
+        occupied(
+          asset.videoUrl ||
+            asset.hasVideoLinks ||
+            asset.source?.provider === 'youtube'
+        ),
         'single',
         'action',
         asset.title,
-        asset.source?.provider === 'youtube' ? 'YouTube video' : 'Video attached'
+        asset.source?.provider === 'youtube'
+          ? 'YouTube video'
+          : 'Video attached'
       );
     case 'docs':
       return slot(

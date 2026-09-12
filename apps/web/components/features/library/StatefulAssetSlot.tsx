@@ -110,7 +110,9 @@ export function StatefulAssetSlot({
             PANEL,
             'flex min-h-30 w-full flex-col items-center justify-center border-dashed py-4 text-center',
             dragging && 'border-default bg-surface-1',
-            !disabled && onFile && 'hover:border-default hover:bg-surface-1 focus-ring-themed'
+            !disabled &&
+              onFile &&
+              'hover:border-default hover:bg-surface-1 focus-ring-themed'
           )}
         >
           <Upload className='h-5 w-5 text-tertiary-token' aria-hidden />
@@ -118,7 +120,9 @@ export function StatefulAssetSlot({
             {acquireLabel}
           </span>
           {acquireHint ? (
-            <span className='mt-1 text-2xs text-tertiary-token'>{acquireHint}</span>
+            <span className='mt-1 text-2xs text-tertiary-token'>
+              {acquireHint}
+            </span>
           ) : null}
         </button>
         {fileInput}
@@ -163,7 +167,9 @@ export function StatefulAssetSlot({
             {objectTitle}
           </p>
           {objectSubtitle ? (
-            <p className='mt-0.5 text-2xs text-tertiary-token'>{objectSubtitle}</p>
+            <p className='mt-0.5 text-2xs text-tertiary-token'>
+              {objectSubtitle}
+            </p>
           ) : null}
         </div>
         {presentation.replaceAction === 'secondary' && onFile ? (
@@ -180,7 +186,11 @@ export function StatefulAssetSlot({
         ) : null}
         {presentation.addAction === 'secondary' && addHref ? (
           <Button asChild size='sm' variant='ghost'>
-            <Link href={addHref} tabIndex={disabled ? -1 : undefined} data-testid={`${testIdPrefix}-add`}>
+            <Link
+              href={addHref}
+              tabIndex={disabled ? -1 : undefined}
+              data-testid={`${testIdPrefix}-add`}
+            >
               Add
             </Link>
           </Button>
