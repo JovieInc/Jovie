@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { PublicProfileFixture } from '@/features/profile/PublicProfileFixture';
@@ -45,11 +44,6 @@ function DeliberateRedDesktopHybrid() {
 export function ProfileAdmissionFixtureClient({
   params,
 }: Readonly<{ params: Record<string, string | string[] | undefined> }>) {
-  // QueryProvider's development-only chrome reads browser state. Keep this
-  // deterministic fixture client-only without changing the shared provider.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const searchParams = {
     get: (key: string) => {
       const value = params[key];
@@ -81,8 +75,6 @@ export function ProfileAdmissionFixtureClient({
   if (searchParams.get('violation') === 'desktop-compact-shell') {
     return <DeliberateRedDesktopHybrid />;
   }
-
-  if (!mounted) return null;
 
   return (
     <QueryProvider>

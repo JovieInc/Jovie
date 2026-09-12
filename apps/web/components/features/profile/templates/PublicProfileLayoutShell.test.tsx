@@ -57,4 +57,34 @@ describe('PublicProfileLayoutShell', () => {
       '/unfazed'
     );
   });
+
+  it('does not infer a banner height from a child that renders null', () => {
+    function NoBanner() {
+      return null;
+    }
+
+    render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout
+        desktopBanner={<NoBanner />}
+      />
+    );
+
+    expect(screen.getByTestId('profile-desktop-banner')).toBeEmptyDOMElement();
+  });
+
+  it('offers a noninteractive desktop loading state before hydration', () => {
+    render(
+      <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
+    );
+
+    expect(screen.getByTestId('profile-desktop-loading')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(screen.getByTestId('profile-desktop-loading')).not.toHaveAttribute(
+      'data-interactive-ready'
+    );
+  });
 });
