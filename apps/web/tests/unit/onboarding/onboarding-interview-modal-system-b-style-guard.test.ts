@@ -41,4 +41,13 @@ describe('onboarding interview modal System B source contract', () => {
     expect(source).not.toContain("'○'");
     expect(source).not.toContain('tracking-widest');
   });
+
+  it('submits through the canonical primary Button, not a deprecated alias (JOV-5602)', () => {
+    const source = readFileSync(sourcePath, 'utf8');
+
+    expect(source).toContain("variant='primary'");
+    expect(source).not.toContain('whitePill');
+    expect(source).not.toContain('frosted');
+    expect(source).not.toContain("variant='outline'");
+  });
 });

@@ -230,7 +230,7 @@ export function OnboardingInterviewModal({
           Skip
         </button>
         <Button
-          variant='whitePill'
+          variant='primary'
           onClick={() => advance(false)}
           disabled={!canSubmit || entry.answer.trim().length === 0}
           className='px-4 py-2 text-sm'
