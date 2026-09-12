@@ -4,7 +4,7 @@ import {
   evaluateE1AttestationObservations,
   verdictForObservation,
 } from '../agent/lib/e1-attestation-observation-gate';
-import { RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS } from '../agent/lib/summer-gem-dark-recovery';
+import { RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS } from '../agent/lib/runner-source-attestation';
 
 describe('E1 attestation observation gate (post-install proof)', () => {
   const nowMs = Date.parse('2026-09-12T18:00:00.000Z');

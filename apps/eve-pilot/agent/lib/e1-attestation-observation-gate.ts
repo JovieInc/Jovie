@@ -6,12 +6,26 @@
  * local self-check that Summer's close-path is ready when observations exist.
  */
 
-import type { DecisionJob } from './governor-route';
 import {
   evaluateRunnerSourceAttestation,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
-} from './summer-gem-dark-recovery';
-import { dispatchSummerGovernedRequest } from './summer-governed-dispatch';
+} from './runner-source-attestation';
+
+/**
+ * Governed-dispatch predicate for E1 (mirrors dispatchSummerGovernedRequest):
+ * fresh attestation → symphony-route. Does not open Cursor spend paths.
+ */
+function governedDispatchOutcomeForAttestation(
+  receipt: unknown,
+  nowMs: number
+): 'symphony-route' | 'cursor-recovery-request' | 'hold' {
+  const probe = evaluateRunnerSourceAttestation(receipt, nowMs);
+  if (probe.status === 'fresh') return 'symphony-route';
+  // No receipt configured → hold (mirrors unknown-fail-closed; no Cursor spend).
+  if (probe.status === 'unavailable' && probe.reason === 'missing') return 'hold';
+  // Present but unusable/stale → Cursor recovery lane (never Gem).
+  return 'cursor-recovery-request';
+}
 
 export const E1_OBSERVATION_GATE_SCHEMA =
   'jovie.summer.e1-attestation-observations/v1' as const;
@@ -54,20 +68,6 @@ export type E1ObservationGateResult =
       readonly reason: string;
     };
 
-function e1DecisionJob(): DecisionJob {
-  return {
-    kind: 'decision',
-    id: 'e1-observation-gate',
-    jobClass: 'ambiguous-product-reasoning',
-    riskTier: 'medium',
-    objective:
-      'E1 close-path: confirm fresh runner-source attestation restores Symphony authority',
-    requiredCapabilities: ['reasoning', 'product'],
-    certificationPredicate: 'source-bound-signed-rate-limited',
-    authority: 'automation',
-    evidenceRefs: ['e1-attestation-observations', 'jov-6163'],
-  };
-}
 
 export function verdictForObservation(
   receipt: unknown,
@@ -140,19 +140,18 @@ export function evaluateE1AttestationObservations(input: {
 
   // Prefer the fresher observation for dispatch authority check
   const fresher = a.ageMs <= b.ageMs ? input.observationA : input.observationB;
-  const dispatch = dispatchSummerGovernedRequest({
-    decisionJob: e1DecisionJob(),
-    attestationReceipt: fresher,
-    nowMs,
-  });
+  const governedDispatchOutcome = governedDispatchOutcomeForAttestation(
+    fresher,
+    nowMs
+  );
 
-  if (dispatch.outcome !== 'symphony-route') {
+  if (governedDispatchOutcome !== 'symphony-route') {
     return {
       status: 'fail',
       schema: E1_OBSERVATION_GATE_SCHEMA,
       maxAgeMs: RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
       observations,
-      governedDispatchOutcome: dispatch.outcome,
+      governedDispatchOutcome,
       weakened600sGate: false,
       reason: 'governed-dispatch-did-not-select-symphony',
       remainingHumanDecision:
