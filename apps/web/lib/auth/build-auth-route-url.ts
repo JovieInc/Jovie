@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { validateBillingInterval } from '@/lib/billing/offer-truth';
 
 import { normalizeAuthClaimHandle } from './auth-shell-intent';
 import { sanitizeAuthStateParam } from './central-auth-routing';
@@ -18,6 +19,26 @@ export function getDefaultSignUpFallbackRedirectUrl(): string {
 
 interface SearchParamReader {
   get(key: string): string | null;
+}
+
+export function applyPreservedAuthOfferParams(
+  routeUrl: URL,
+  searchParams: SearchParamReader
+): void {
+  const plan = validatePlan(searchParams.get('plan'));
+  if (plan) {
+    routeUrl.searchParams.set('plan', plan);
+  }
+
+  const interval = validateBillingInterval(searchParams.get('interval'));
+  if (plan && plan !== 'free' && interval) {
+    routeUrl.searchParams.set('interval', interval);
+  }
+
+  const handle = searchParams.get('handle')?.trim() ?? '';
+  if (/^[a-zA-Z0-9._-]{2,32}$/.test(handle)) {
+    routeUrl.searchParams.set('handle', handle);
+  }
 }
 
 /**
