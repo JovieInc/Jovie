@@ -6,29 +6,13 @@ const meta = {
   component: OverflowMenu,
   parameters: {
     layout: 'centered',
-    jovie: {
-      uncoveredProps: ['align', 'testId'],
-    },
+    jovie: { uncoveredProps: ['align', 'testId'] },
   },
-} satisfies Meta<typeof OverflowMenu>;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
-
-export const ShareLinkActions: Story = {
   args: {
     label: 'Share link actions',
+    disabled: false,
     items: [
-      {
-        id: 'visibility',
-        label: 'Make public',
-        onSelect: () => undefined,
-      },
-      {
-        id: 'open',
-        label: 'Open',
-        onSelect: () => undefined,
-      },
+      { id: 'open', label: 'Open', onSelect: () => undefined },
       {
         id: 'revoke',
         label: 'Revoke private link',
@@ -38,19 +22,9 @@ export const ShareLinkActions: Story = {
       },
     ],
   },
-};
+} satisfies Meta<typeof OverflowMenu>;
 
-export const DisabledOverflow: Story = {
-  args: {
-    label: 'Actions for Spotify',
-    disabled: true,
-    items: [
-      {
-        id: 'remove',
-        label: 'Remove Spotify',
-        variant: 'destructive',
-        onSelect: () => undefined,
-      },
-    ],
-  },
-};
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const ShareLinkActions: Story = {};

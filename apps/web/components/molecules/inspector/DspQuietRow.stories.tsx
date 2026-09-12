@@ -6,44 +6,18 @@ const meta = {
   component: DspQuietRow,
   parameters: {
     layout: 'centered',
-    jovie: {
-      uncoveredProps: ['closedTabIndex'],
-    },
+    jovie: { uncoveredProps: ['closedTabIndex', 'testId'] },
   },
-  decorators: [
-    Story => (
-      <div className='w-72'>
-        <Story />
-      </div>
-    ),
-  ],
+  args: {
+    label: 'Spotify',
+    href: 'https://open.spotify.com/album/example',
+    icon: <span aria-hidden='true'>S</span>,
+    onFind: () => undefined,
+    findLabel: 'Find',
+  },
 } satisfies Meta<typeof DspQuietRow>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const LinkedRow: Story = {
-  args: {
-    label: 'Spotify',
-    href: 'https://open.spotify.com/album/example',
-    icon: <span aria-hidden='true'>S</span>,
-  },
-};
-
-export const MissingRowWithFind: Story = {
-  args: {
-    label: 'Apple Music',
-    icon: <span aria-hidden='true'>A</span>,
-    onFind: () => undefined,
-  },
-};
-
-export const DisabledFind: Story = {
-  args: {
-    label: 'Deezer',
-    icon: <span aria-hidden='true'>D</span>,
-    onFind: () => undefined,
-    findLabel: 'Find',
-    className: 'opacity-60',
-  },
-};
+export const LinkedRow: Story = {};

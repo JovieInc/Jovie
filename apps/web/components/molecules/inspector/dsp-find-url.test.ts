@@ -8,13 +8,10 @@ describe('buildDspFindUrl', () => {
     );
   });
 
-  it('substitutes a default storefront when the template needs one', () => {
+  it('uses a US storefront and rejects empty or unknown providers', () => {
     expect(buildDspFindUrl('apple_music', 'Take Me Over')).toBe(
       'https://music.apple.com/us/search?term=Take%20Me%20Over'
     );
-  });
-
-  it('returns null without a query or search template', () => {
     expect(buildDspFindUrl('spotify', '   ')).toBeNull();
     expect(buildDspFindUrl('unknown_provider', 'Take Me Over')).toBeNull();
   });

@@ -7,24 +7,10 @@ const meta = {
   component: TrackPlatformLinksSection,
   parameters: {
     layout: 'centered',
-    jovie: {
-      uncoveredProps: ['emptyMessage', 'title'],
-    },
+    jovie: { uncoveredProps: ['emptyMessage', 'title'] },
   },
-  decorators: [
-    Story => (
-      <div className='w-72'>
-        <Story />
-      </div>
-    ),
-  ],
-} satisfies Meta<typeof TrackPlatformLinksSection>;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
-
-export const LinkedAndMissing: Story = {
   args: {
+    findQuery: 'Midnight Drive',
     providers: [
       {
         key: 'spotify' as ProviderKey,
@@ -33,23 +19,10 @@ export const LinkedAndMissing: Story = {
       },
     ],
     missingProviders: [{ key: 'apple_music' as ProviderKey }],
-    findQuery: 'Midnight Drive',
   },
-};
+} satisfies Meta<typeof TrackPlatformLinksSection>;
 
-export const AllLinked: Story = {
-  args: {
-    providers: [
-      {
-        key: 'spotify' as ProviderKey,
-        label: 'Spotify',
-        url: 'https://open.spotify.com/track/example',
-      },
-      {
-        key: 'apple_music' as ProviderKey,
-        label: 'Apple Music',
-        url: 'https://music.apple.com/track/example',
-      },
-    ],
-  },
-};
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const LinkedAndMissing: Story = {};

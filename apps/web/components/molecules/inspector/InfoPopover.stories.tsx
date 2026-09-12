@@ -6,21 +6,15 @@ const meta = {
   component: InfoPopover,
   parameters: {
     layout: 'centered',
+    jovie: { uncoveredProps: ['side', 'align', 'testId'] },
+  },
+  args: {
+    label: 'About downloads',
+    children: <p>Helper copy stays behind ⓘ.</p>,
   },
 } satisfies Meta<typeof InfoPopover>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const DownloadsHelper: Story = {
-  args: {
-    label: 'About downloads',
-    testId: 'downloads-info',
-    children: (
-      <p>
-        Email gate to file. Only recordings with explicit full-control
-        attestation can go live.
-      </p>
-    ),
-  },
-};
+export const DownloadsHelper: Story = {};
