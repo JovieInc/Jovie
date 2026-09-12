@@ -18,17 +18,17 @@ importers:
         specifier: 7.0.58
         version: 7.0.58(zod@4.3.6)
       braintrust:
-        specifier: 3.25.0
-        version: 3.25.0(zod@4.3.6)
+        specifier: 3.30.0
+        version: 3.30.0(zod@4.3.6)
       eve:
         specifier: 0.47.7
-        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.25.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.16)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.30.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
       microsandbox:
-        specifier: 0.6.16
-        version: 0.6.16
+        specifier: 0.6.18
+        version: 0.6.18
       zod:
         specifier: 4.3.6
         version: 4.3.6
@@ -526,12 +526,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
-
-  '@kwsites/file-exists@1.1.1':
-    resolution: {integrity: sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw==}
-
-  '@kwsites/promise-deferred@1.1.1':
-    resolution: {integrity: sha512-GaHYm+c0O9MjZRu0ongGBRbinu8gVAMd2UZjji6jVmqKtZluZnptXGWhz1E8j8D2HJ3f/yMxKAUC0b+57wncIw==}
 
   '@mapbox/node-pre-gyp@2.0.3':
     resolution: {integrity: sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg==}
@@ -1051,44 +1045,38 @@ packages:
       rollup:
         optional: true
 
-  '@simple-git/args-pathspec@1.0.3':
-    resolution: {integrity: sha512-ngJMaHlsWDTfjyq9F3VIQ8b7NXbBLq5j9i5bJ6XLYtD6qlDXT7fdKY2KscWWUF8t18xx052Y/PUO1K1TRc9yKA==}
-
-  '@simple-git/argv-parser@1.1.1':
-    resolution: {integrity: sha512-Q9lBcfQ+VQCpQqGJFHe5yooOS5hGdLFFbJ5R+R5aDsnkPCahtn1hSkMcORX65J2Z5lxSkD0lQorMsncuBQxYUw==}
-
   '@sinclair/typebox@0.25.24':
     resolution: {integrity: sha512-XJfwUVUKDHF5ugKwIcxEgc9k8b7HbznCp6eUfWgu710hMPNIO4aw4/zB5RogDQz8nd6gyCDpU9O/m6qYEWY6yQ==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.6.16':
-    resolution: {integrity: sha512-ZfiOPxBEPh+ihOFmK5hYWzCe+SmDdiiYMO760duRRVz/YhGiarGkQKbBZhofGIZdxw7549dTZyZ/IvE43Vzwzg==}
+  '@superradcompany/microsandbox-darwin-arm64@0.6.18':
+    resolution: {integrity: sha512-C+bz9+v8JXQ6BG0FXbiTywM/dSNjIFifF3fOh5IU3JW3OiB0HcgjBiVRFWpZYk/pV6eKhZTYSkUiIWwYc3SRNA==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [darwin]
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.16':
-    resolution: {integrity: sha512-I3vYp+hZ0CsE5l+9JRNlnl94X7M3yLkQAHMKcOkLOvhzqsOL/ON/OlFuqOmq6jC4rIx+wA46fgHI5W1jlcx6mg==}
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.18':
+    resolution: {integrity: sha512-UVtFm32CExLeB0VhiLIW+mvVCkyWi6Yg+1AYWQAvfXj8ngDYEprZz/0Kksp/T8lAnV5hFIYZ2ZrPs0jAGbAR6A==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [linux]
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.6.16':
-    resolution: {integrity: sha512-OkJCYv3kP1rS7mOmvZJtPCVouc3fzbeDlhBI8icum4EJX2dZ+xCHA0Tm+PUApYkMg3bSZSV+BHC9lnFwSA3CGg==}
+  '@superradcompany/microsandbox-linux-x64-gnu@0.6.18':
+    resolution: {integrity: sha512-b9Mu+tu1Vq407c8sr7scNOxBgGpJX/Znd4NGFQ/Dx44SS6bHU3pjUEAdso3IpEB2Cx9nrGIBtBdaRrVw1ro+6w==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [linux]
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.16':
-    resolution: {integrity: sha512-FQNbLJQ5DE8hhw+N8hS8BeFZe9ONySfRHM0wKbN6gnwofbnMEdre+BvR8UZCKACdHNvoPpBstrMXk3LmsUJ+Pg==}
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.18':
+    resolution: {integrity: sha512-QDW9JfnTHd4lbFpms3y+c5oyEdOXK1kZCNPONm6nVrdz1Wr+UVy+zMiMadzL1AJgG4rF3Tg6WT9Xa1j0ekPk6w==}
     engines: {node: '>= 22'}
     cpu: [arm64]
     os: [win32]
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.6.16':
-    resolution: {integrity: sha512-8vJnOkywYbrYURR3bSt21SHqo5YfyA+96jmExxlOfTlH5wRwbiBt8stnGNlbBd1BFoaPV7WxdINOiHTxuf+sHQ==}
+  '@superradcompany/microsandbox-win32-x64-msvc@0.6.18':
+    resolution: {integrity: sha512-PS1vBcboB4QwZjruBouRApAsqyhUk9U1c2w+hQOCzYzFMoWVsSyUanAwuswiloqyoj2SREwBG5wY8jnAJFzr2g==}
     engines: {node: '>= 22'}
     cpu: [x64]
     os: [win32]
@@ -1433,8 +1421,8 @@ packages:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
 
-  braintrust@3.25.0:
-    resolution: {integrity: sha512-0BIk3RDO9nLcvx4C7zaVJV0NfepZlJGi+K4jjUA/D8M9qq6YpCAP2gnBZr4UHAju8+t2Rl7MINim05K0BfaA9Q==}
+  braintrust@3.30.0:
+    resolution: {integrity: sha512-F0TWmhAyvC6b8QgrKRZsVz3xcQN4I2fVHpkeUVEic57bvWg7szfW9RvA5BX5M4qSmp9XCH7QytX0m0vsCzgjIg==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.34 || ^4.0
@@ -1573,9 +1561,6 @@ packages:
         optional: true
       sqlite3:
         optional: true
-
-  dc-browser@1.0.4:
-    resolution: {integrity: sha512-7oEtnzNlcE+hr4OvO3GR6Gndgw8BhW+wKOEwMqSleyY7N29jbAxzyW5BaJl7qBCw+6OIxfMWtY0T+6dxq8RWLw==}
 
   debug@4.3.4:
     resolution: {integrity: sha512-PRWFHuSU3eDtQJPvnNY7Jcket1j0t5OuOsFzPPzsekD52Zl8qUfFIPEiswXqIvHWGVHOgX+7G/vCNNhehwxfkQ==}
@@ -2197,8 +2182,8 @@ packages:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
 
-  microsandbox@0.6.16:
-    resolution: {integrity: sha512-D2BKR1CDXWiHkzRA9IwaJnSHpk25kY5/Il5POf08T8wo3q5jBGMQJ/bGTHB4Qr+W49DxD7HEOGMsXwa1plNAKg==}
+  microsandbox@0.6.18:
+    resolution: {integrity: sha512-M38LkxCk6ppz7qXuQ+bHAgahX4bWNgNdrN5OIFpm7OVV1Bqfpvbwog+zP/QvIiImNHgIleB7M8dU1Kd4jTdwvg==}
     engines: {node: '>= 22'}
     hasBin: true
 
@@ -2697,9 +2682,6 @@ packages:
 
   simple-get@4.0.1:
     resolution: {integrity: sha512-brv7p5WgH0jmQJr1ZDDfKDOSeWWg+OVypG99A/5vYGPqJ6pxiaHLy8nxtFjBA7oMa01ebA9gfh1uMCFqOuXxvA==}
-
-  simple-git@3.36.0:
-    resolution: {integrity: sha512-cGQjLjK8bxJw4QuYT7gxHw3/IouVESbhahSsHrX97MzCL1gu2u7oy38W6L2ZIGECEfIBG4BabsWDPjBxJENv9Q==}
 
   smol-toml@1.5.2:
     resolution: {integrity: sha512-QlaZEqcAH3/RtNyet1IPIYPsEWAaYyXXv1Krsi+1L/QHppjX4Ifm8MQsBISz9vE8cHicIq3clogsheili5vhaQ==}
@@ -3524,14 +3506,6 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@kwsites/file-exists@1.1.1':
-    dependencies:
-      debug: 4.4.3
-    transitivePeerDependencies:
-      - supports-color
-
-  '@kwsites/promise-deferred@1.1.1': {}
-
   '@mapbox/node-pre-gyp@2.0.3':
     dependencies:
       consola: 3.4.2
@@ -3861,29 +3835,23 @@ snapshots:
       estree-walker: 2.0.2
       picomatch: 4.0.5
 
-  '@simple-git/args-pathspec@1.0.3': {}
-
-  '@simple-git/argv-parser@1.1.1':
-    dependencies:
-      '@simple-git/args-pathspec': 1.0.3
-
   '@sinclair/typebox@0.25.24': {}
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@superradcompany/microsandbox-darwin-arm64@0.6.16':
+  '@superradcompany/microsandbox-darwin-arm64@0.6.18':
     optional: true
 
-  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.16':
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.18':
     optional: true
 
-  '@superradcompany/microsandbox-linux-x64-gnu@0.6.16':
+  '@superradcompany/microsandbox-linux-x64-gnu@0.6.18':
     optional: true
 
-  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.16':
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.18':
     optional: true
 
-  '@superradcompany/microsandbox-win32-x64-msvc@0.6.16':
+  '@superradcompany/microsandbox-win32-x64-msvc@0.6.18':
     optional: true
 
   '@tokenizer/inflate@0.4.1':
@@ -4451,7 +4419,7 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  braintrust@3.25.0(zod@4.3.6):
+  braintrust@3.30.0(zod@4.3.6):
     dependencies:
       '@next/env': 14.2.35
       '@vercel/functions': 1.6.0
@@ -4464,7 +4432,6 @@ snapshots:
       cli-progress: 3.12.0
       cli-table3: 0.6.5
       cors: 2.8.6
-      dc-browser: 1.0.4
       dotenv: 16.6.1
       esbuild: 0.28.1
       esquery: 1.7.0
@@ -4477,7 +4444,6 @@ snapshots:
       mustache: 4.2.0
       pluralize: 8.0.0
       semifies: 1.0.0
-      simple-git: 3.36.0
       source-map: 0.7.6
       termi-link: 1.1.0
       unplugin: 2.3.11
@@ -4583,8 +4549,6 @@ snapshots:
       srvx: 0.11.22
 
   db0@0.3.4: {}
-
-  dc-browser@1.0.4: {}
 
   debug@4.3.4:
     dependencies:
@@ -4741,16 +4705,16 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.25.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.16)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.30.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.58(zod@4.3.6)
       nitro: 3.0.260610-beta(@vercel/blob@2.8.0)(chokidar@4.0.0)(dotenv@16.6.1)(lru-cache@11.5.2)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       undici: 8.9.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
-      braintrust: 3.25.0(zod@4.3.6)
+      braintrust: 3.30.0(zod@4.3.6)
       just-bash: 3.4.2
-      microsandbox: 0.6.16
+      microsandbox: 0.6.18
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -5264,13 +5228,13 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.2
 
-  microsandbox@0.6.16:
+  microsandbox@0.6.18:
     optionalDependencies:
-      '@superradcompany/microsandbox-darwin-arm64': 0.6.16
-      '@superradcompany/microsandbox-linux-arm64-gnu': 0.6.16
-      '@superradcompany/microsandbox-linux-x64-gnu': 0.6.16
-      '@superradcompany/microsandbox-win32-arm64-msvc': 0.6.16
-      '@superradcompany/microsandbox-win32-x64-msvc': 0.6.16
+      '@superradcompany/microsandbox-darwin-arm64': 0.6.18
+      '@superradcompany/microsandbox-linux-arm64-gnu': 0.6.18
+      '@superradcompany/microsandbox-linux-x64-gnu': 0.6.18
+      '@superradcompany/microsandbox-win32-arm64-msvc': 0.6.18
+      '@superradcompany/microsandbox-win32-x64-msvc': 0.6.18
 
   mime-db@1.52.0: {}
 
@@ -5829,16 +5793,6 @@ snapshots:
       once: 1.4.0
       simple-concat: 1.0.1
     optional: true
-
-  simple-git@3.36.0:
-    dependencies:
-      '@kwsites/file-exists': 1.1.1
-      '@kwsites/promise-deferred': 1.1.1
-      '@simple-git/args-pathspec': 1.0.3
-      '@simple-git/argv-parser': 1.1.1
-      debug: 4.4.3
-    transitivePeerDependencies:
-      - supports-color
 
   smol-toml@1.5.2: {}
 

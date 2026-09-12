@@ -89,6 +89,29 @@ describe('InvisibleTurnstile', () => {
     );
   });
 
+  it('bypasses verification when NEXT_PUBLIC_AUTH_MOCK is enabled', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const onToken = vi.fn();
+    const renderMock = vi.fn(
+      (_target: HTMLElement, _options: TurnstileOptions) => 'widget-1'
+    );
+    window.turnstile = {
+      render: renderMock,
+      reset: vi.fn(),
+      remove: vi.fn(),
+    };
+
+    render(<InvisibleTurnstile onToken={onToken} />);
+
+    expect(screen.queryByTestId('next-script')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(onToken).toHaveBeenCalledWith('local-dev-turnstile-bypass');
+    });
+    expect(renderMock).not.toHaveBeenCalled();
+  });
+
   it('bypasses verification in runtime E2E mode', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');

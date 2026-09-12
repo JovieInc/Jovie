@@ -170,7 +170,7 @@ apps/web/components/
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by shrink-only ratchets — the count may only go DOWN. Shared UI foundation: `packages/ui` via `pnpm design:shared-ui-visual-arbitrary:check`. Broader web surfaces: `apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`. Converge to tokens; never add new arbitrary values.
 
-**Server-import isolation:** `apps/web/components/{atoms,molecules,organisms}` are shared presentation layers that must bundle for the browser. Files in these layers must not import server-only specifiers (`server-only`, `@clerk/nextjs/server`, `drizzle-orm`, `@/lib/db/*`, `next/headers`, `/actions` modules, etc.) or contain `'use server'`. Violations are tracked by a drift ratchet (`apps/web/tests/unit/design-system/server-imports-ratchet.test.ts`) — the count may only go DOWN. Move server dependencies to a feature wrapper or API route.
+**Server-import isolation:** `apps/web/components/{atoms,molecules,organisms}` are shared presentation layers that must bundle for the browser. Files in these layers must not import server-only specifiers (`server-only`, `@/lib/auth/better-auth`, `drizzle-orm`, `@/lib/db/*`, `next/headers`, `/actions` modules, etc.) or contain `'use server'`. Violations are tracked by a drift ratchet (`apps/web/tests/unit/design-system/server-imports-ratchet.test.ts`) — the count may only go DOWN. Move server dependencies to a feature wrapper or API route.
 
 ## New Component Pattern
 
@@ -255,7 +255,7 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
 
 ### Locked Marketing Geometry and Review
 
-- Marketing pill controls are visibly 32px high inside a 44px minimum target.
+- Marketing pill controls are visibly 28px high inside a 44px minimum target.
 - The marketing O-mark is visibly 32px and shares the control alignment.
 - Decorative icons and emoji have no border, ring, circle, or badge container.
 - Reuse one canonical component family; encode supported states as variants and
@@ -432,7 +432,7 @@ Global UI elements must only render in root `app/layout.tsx`:
 - Modal providers
 - Analytics scripts
 
-**NEVER** render these in individual pages or nested layouts — causes duplicate overlapping UI elements. Nested layouts must not mount `CookieBannerSection`, `ToastProvider`, `ClerkAnalytics`, or other analytics/provider singletons directly.
+**NEVER** render these in individual pages or nested layouts — causes duplicate overlapping UI elements. Nested layouts must not mount `CookieBannerSection`, `ToastProvider`, or other analytics/provider singletons directly.
 
 ## Marketing Pages Must Be Fully Static
 

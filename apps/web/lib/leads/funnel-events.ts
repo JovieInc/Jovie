@@ -12,6 +12,7 @@ import {
 } from '@/lib/db/schema/leads';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
 import { hashClaimToken } from '@/lib/security/claim-token';
 
 const LEAD_ATTRIBUTION_COOKIE = 'jovie_lead_attribution';
@@ -140,12 +141,24 @@ export async function getLeadAttributionCookie(): Promise<LeadAttributionCookieP
   }
 }
 
+export interface RecordLeadFunnelEventOptions {
+  idempotent?: boolean;
+  /**
+   * Persistence-critical events rethrow after capture so callers can retry.
+   * Best-effort funnel breadcrumbs keep the default swallow.
+   */
+  required?: boolean;
+}
+
 export async function recordLeadFunnelEvent(
   input: RecordLeadFunnelEventInput,
-  options?: { idempotent?: boolean }
+  options?: RecordLeadFunnelEventOptions
 ): Promise<void> {
   try {
     if (typeof db.insert !== 'function') {
+      if (options?.required) {
+        throw new Error('Lead funnel event insert is unavailable');
+      }
       return;
     }
     const insertQuery = db.insert(leadFunnelEvents).values({
@@ -175,6 +188,9 @@ export async function recordLeadFunnelEvent(
         eventType: input.eventType,
       },
     });
+    if (options?.required) {
+      throw error;
+    }
   }
 }
 
@@ -370,30 +386,39 @@ export async function attributeLeadPaidConversionByAppUserId(
     .where(eq(leads.signupUserId, appUserId))
     .limit(1);
 
-  if (!lead || lead.paidAt) {
+  if (!lead) {
     return;
   }
 
+  // paidAt can land before paid_converted when the event write fails.
+  // Retry must still write the missing event; the unique (leadId, eventType)
+  // constraint plus onConflictDoNothing keeps the happy path at one row.
   const now = new Date();
-  await db
-    .update(leads)
-    .set({
-      paidAt: now,
-      paidSubscriptionId: subscriptionId,
-      updatedAt: now,
-    })
-    .where(eq(leads.id, lead.id));
+  if (!lead.paidAt) {
+    await db
+      .update(leads)
+      .set({
+        paidAt: now,
+        paidSubscriptionId: subscriptionId,
+        updatedAt: now,
+      })
+      .where(eq(leads.id, lead.id));
+  }
 
+  const outcomeAttribution = claimPayOutcomeAttribution();
   await recordLeadFunnelEvent(
     {
       leadId: lead.id,
       eventType: 'paid_converted',
+      campaignKey: outcomeAttribution.campaignKey,
+      variantKey: outcomeAttribution.variantKey,
       metadata: {
         signupUserId: appUserId,
         stripeSubscriptionId: subscriptionId,
+        experimentId: outcomeAttribution.experimentId,
       },
     },
-    { idempotent: true }
+    { idempotent: true, required: true }
   );
 }
 

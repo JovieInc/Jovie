@@ -9,9 +9,9 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
-import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { resolveUserIdentity } from '@/lib/auth/user-identity';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import {
   clearPendingClaimContext,
@@ -292,9 +292,9 @@ export async function completeOnboarding({
     const clientIP = extractClientIP(headersList);
     const cookieHeader = headersList.get('cookie');
 
-    const clerkUser = await getCachedCurrentUser();
-    const clerkIdentity = resolveClerkIdentity(clerkUser);
-    const oauthAvatarUrl = clerkIdentity.avatarUrl;
+    const currentUser = await getCachedCurrentUser();
+    const userIdentity = resolveUserIdentity(currentUser);
+    const oauthAvatarUrl = userIdentity.avatarUrl;
 
     // IMPORTANT: Always check IP-based rate limiting, even for 'unknown' IPs
     // The 'unknown' bucket acts as a shared rate limit to prevent abuse
@@ -308,7 +308,7 @@ export async function completeOnboarding({
     });
 
     // Step 4-6: Parallel operations for performance optimization
-    const userEmail = email ?? clerkIdentity.email ?? null;
+    const userEmail = email ?? userIdentity.email ?? null;
 
     // CRITICAL: Use SERIALIZABLE isolation level to prevent race conditions
     // where two users could claim the same handle simultaneously.

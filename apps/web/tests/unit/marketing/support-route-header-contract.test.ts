@@ -40,6 +40,10 @@ describe('support route header contract', () => {
     expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('MARKETING_NAV_UTILITIES');
     expect(headerSource).toContain('showContactLink={false}');
+    expect(headerSource).toContain("import './MarketingHeader.css'");
+    expect(headerSource).toContain(
+      "presentation === 'marketing-glass' || isArtistProfiles ? 'sm'"
+    );
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);

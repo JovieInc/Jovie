@@ -154,7 +154,12 @@ export function SidebarNavItem({
         strokeWidth={2}
       />
       {!collapsed && (
-        <span className='min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]'>
+        // These rows never render a trailing action over the label, so the
+        // old terminal fade had nothing to serve — on the compact w-fit
+        // create pills it sheared the trailing glyph ("Chat" -> "Cha") with
+        // rail space still free (JOV-6181). Long labels still truncate
+        // gracefully via overflow-hidden + text-clip.
+        <span className='min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left'>
           {item.label}
         </span>
       )}

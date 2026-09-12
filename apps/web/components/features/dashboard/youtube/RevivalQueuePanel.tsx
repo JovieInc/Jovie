@@ -294,7 +294,7 @@ export function RevivalQueuePanel({
 
   return (
     <AppShellContentPanel
-      frame='content-container'
+      frame='none'
       contentPadding='compact'
       scroll='page'
       toolbar={toolbar}

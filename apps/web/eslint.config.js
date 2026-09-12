@@ -18,7 +18,6 @@ const noDirectElectronBridgeRule = require('./eslint-rules/no-direct-electron-br
 const noBannedMarketingCopyRule = require('./eslint-rules/no-banned-marketing-copy');
 const noRawFocusRingRule = require('./eslint-rules/no-raw-focus-ring');
 const noAdHocCurrencyRule = require('./eslint-rules/no-ad-hoc-currency');
-const clerkOauthOptionsMustIncludePromptRule = require('./eslint-rules/clerk-oauth-options-must-include-prompt');
 const chatToolSchemaStrictRule = require('./eslint-rules/chat-tool-schema-strict');
 const canonicalUiLabelCasingRule = require('./eslint-rules/canonical-ui-label-casing');
 const noHardcodedThemeColorsRule = require('./eslint-rules/no-hardcoded-theme-colors');
@@ -47,8 +46,6 @@ const baseConfig = {
         'no-banned-marketing-copy': noBannedMarketingCopyRule,
         'no-raw-focus-ring': noRawFocusRingRule,
         'no-ad-hoc-currency': noAdHocCurrencyRule,
-        'clerk-oauth-options-must-include-prompt':
-          clerkOauthOptionsMustIncludePromptRule,
         'chat-tool-schema-strict': chatToolSchemaStrictRule,
         'canonical-ui-label-casing': canonicalUiLabelCasingRule,
         'no-hardcoded-theme-colors': noHardcodedThemeColorsRule,
@@ -71,11 +68,6 @@ const baseConfig = {
       'error',
       {
         paths: [
-          {
-            name: '@clerk/clerk-react',
-            message:
-              'Use @clerk/nextjs in the App Router. Import components/hooks from @clerk/nextjs or @clerk/nextjs/server only.',
-          },
           {
             name: '@/components/atoms/Select',
             message: "Use Select from '@jovie/ui' instead of local atoms.",
@@ -148,6 +140,11 @@ const baseConfig = {
         ],
         patterns: [
           {
+            group: ['@clerk', '@clerk/*'],
+            message:
+              'Clerk is retired. Use Better Auth via @/lib/auth/better-auth and @/hooks/useJovieAuth.',
+          },
+          {
             group: [
               '../components/atoms/Button',
               './components/atoms/Button',
@@ -205,10 +202,6 @@ const baseConfig = {
     // canonical focus-ring-themed or focus-visible:* utilities
     '@jovie/no-raw-focus-ring': 'error',
     '@jovie/no-ad-hoc-currency': 'error',
-    // clerk-oauth-options-must-include-prompt is scoped to app/(auth)/** via
-    // its internal file-path check, so setting 'error' globally is safe — it
-    // will only fire on files under app/(auth)/.
-    '@jovie/clerk-oauth-options-must-include-prompt': 'error',
     '@jovie/chat-tool-schema-strict': 'error',
     // DESIGN.md text casing — Title Case labels, sentence case body/toasts/tooltips
     '@jovie/canonical-ui-label-casing': 'error',
@@ -342,6 +335,78 @@ module.exports = [
     rules: {
       '@jovie/use-client-directive': 'off',
       '@next/next/no-img-element': 'off',
+    },
+  },
+
+  // JOV-INV-031 thread-blocking hard-gate (latency-sensitive-execution-v1).
+  // Separate from route-response-latency budgets in performance-invariants-v1.
+  // Author-time selectors; the CI harness also follows aliases/wrappers so a
+  // helper import cannot bypass. existsSync is gray (harness-only). Existing
+  // request-path debt is allowlisted in
+  // scripts/invariants/latency-sensitive-execution-allowlist.json.
+  {
+    files: [
+      'app/**/*.{ts,tsx,js,mjs}',
+      'lib/**/*.{ts,tsx,js,mjs}',
+      'components/**/*.{ts,tsx,js,mjs}',
+      'hooks/**/*.{ts,tsx,js,mjs}',
+      'middleware.ts',
+      'proxy.ts',
+    ],
+    ignores: [
+      '**/*.test.*',
+      '**/*.spec.*',
+      '**/*.stories.*',
+      '**/scripts/**',
+      'components/atoms/**',
+      'app/(marketing)/changelog/feed.xml/route.ts',
+      'app/api/health/build-info/route.ts',
+      'components/features/home/RecentlyShippedSection.tsx',
+      'lib/a11y-gates/contrast-engine.ts',
+      'lib/a11y-gates/touch-target-engine.ts',
+      'lib/changelog-source.ts',
+      'lib/chat/knowledge/topics.ts',
+      'lib/eval/calibration.ts',
+      'lib/hud/ovie-mac-hud.server.ts',
+      'lib/hud/shipper-state.ts',
+      'lib/hud/symphony-codex-accounts.server.ts',
+      'lib/library-share/passphrase.ts',
+      'lib/merch/artwork.ts',
+      'lib/ovie/identity.ts',
+      'lib/ovie/mcp/artist-profile-inventory.ts',
+      'lib/seo/ratchet.ts',
+      'lib/testing/quarantine-ledger.server.ts',
+      'lib/utils/pii-encryption.ts',
+      'lib/utils/url-encryption.server.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ImportSpecifier[imported.name='sql'][local.name='sql'][parent.source.value='drizzle-orm']",
+          message:
+            "Alias drizzle's sql as drizzleSql to avoid conflicts with Neon client.",
+        },
+        {
+          selector:
+            'CallExpression[callee.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]',
+          message:
+            'JOV-INV-031 thread-blocking: known sync I/O/crypto blocks the event loop. Use nonblocking I/O or precompute. This is not a route-response-latency budget and does not change crawler/bot wait.',
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]',
+          message:
+            'JOV-INV-031 thread-blocking: known sync I/O/crypto blocks the event loop. Aliases and members are the same violation. This is not a route-response-latency budget.',
+        },
+        {
+          selector:
+            'ImportSpecifier[imported.name=/^(readFileSync|writeFileSync|readdirSync|execSync|spawnSync|execFileSync|gzipSync|gunzipSync|deflateSync|inflateSync|unzipSync|brotliCompressSync|brotliDecompressSync|deflateRawSync|inflateRawSync|pbkdf2Sync|scryptSync|randomFillSync)$/]',
+          message:
+            'JOV-INV-031 thread-blocking: importing a known sync I/O/crypto API is rejected in runtime app code, including aliases. Moving the call into a helper is zero escape.',
+        },
+      ],
     },
   },
   // lib/db internal files are allowed to use database patterns

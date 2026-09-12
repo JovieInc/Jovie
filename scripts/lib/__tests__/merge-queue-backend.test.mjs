@@ -10,6 +10,7 @@ import {
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import { describe, expect, it, vi } from 'vitest';
 import { classifyProductionMarkerEvidence } from '../../../.github/scripts/production-marker-state.mjs';
 import {
@@ -2261,7 +2262,7 @@ describe('native mutation actor boundary', () => {
   });
 });
 
-function ghTransportFixtureError(error, stderr, environment) {
+function ghTransportFixtureError(error, stderr, environment, phases = {}) {
   let safeStderr = String(stderr ?? '');
   // Never print inherited credentials, the command/argv, or process.env.
   const secrets = Object.entries(environment)
@@ -2279,6 +2280,24 @@ function ghTransportFixtureError(error, stderr, environment) {
       killed: error.killed === true,
       signal: error.signal ?? null,
       stderr: safeStderr.slice(0, 1500),
+      // Whitelist numeric lifecycle evidence only; never include response
+      // bodies, command arguments, process objects, or ambient environment.
+      phases: Object.fromEntries(
+        [
+          'elapsedMs',
+          'spawnMs',
+          'requestMs',
+          'requestEndMs',
+          'responseFinishMs',
+          'exitMs',
+          'stdoutBytes',
+          'eventLoopDelayMaxMs',
+        ].flatMap(key =>
+          Number.isFinite(phases[key]) && phases[key] >= 0
+            ? [[key, Math.round(phases[key])]]
+            : []
+        )
+      ),
     })}`
   );
 }
@@ -2307,16 +2326,65 @@ describe('canonical admission membership binding', () => {
       '"code":1,"killed":false,"signal":null'
     );
   });
+  it('distinguishes pre-request and post-response timeouts without leaking extra phase data', () => {
+    const error = { code: null, killed: true, signal: 'SIGTERM' };
+    const beforeRequest = ghTransportFixtureError(
+      error,
+      '',
+      {},
+      {
+        elapsedMs: 3001,
+        spawnMs: 1,
+        eventLoopDelayMaxMs: 2998,
+        requestMs: NaN,
+        body: 'private-body',
+        token: 'private-token',
+      }
+    );
+    const afterResponse = ghTransportFixtureError(
+      error,
+      '',
+      {},
+      {
+        elapsedMs: 3002,
+        spawnMs: 1,
+        requestMs: 15,
+        requestEndMs: 16,
+        responseFinishMs: 17,
+        stdoutBytes: 500,
+        eventLoopDelayMaxMs: 20,
+        exitMs: -1,
+      }
+    );
+    expect(beforeRequest.message).toContain('"spawnMs":1');
+    expect(beforeRequest.message).toContain('"eventLoopDelayMaxMs":2998');
+    expect(beforeRequest.message).not.toMatch(
+      /requestMs|private-body|private-token/
+    );
+    expect(afterResponse.message).toContain('"responseFinishMs":17');
+    expect(afterResponse.message).toContain('"stdoutBytes":500');
+    expect(afterResponse.message).not.toContain('exitMs');
+  });
   it('encodes the GraphQL Int through the real gh HTTP transport', async () => {
     const config = mkdtempSync(join(tmpdir(), 'membership-gh-'));
+    const started = performance.now();
+    const phases = {};
+    const mark = name => {
+      phases[name] = performance.now() - started;
+    };
+    const eventLoopDelay = monitorEventLoopDelay({ resolution: 20 });
+    eventLoopDelay.enable();
     /** @type {Array<Record<string, unknown>>} */
     const received = [];
     const server = createServer((request, response) => {
+      mark('requestMs');
+      response.once('finish', () => mark('responseFinishMs'));
       let body = '';
       request.on('data', chunk => {
         body += chunk;
       });
       request.on('end', () => {
+        mark('requestEndMs');
         const payload = JSON.parse(body);
         received.push(payload);
         const valid = typeof payload.number === 'number';
@@ -2356,7 +2424,7 @@ describe('canonical admission membership binding', () => {
                 GH_TOKEN: 'fixture',
                 GH_ENTERPRISE_TOKEN: 'fixture',
               };
-              execFile(
+              const child = execFile(
                 'gh',
                 [
                   'api',
@@ -2369,12 +2437,21 @@ describe('canonical admission membership binding', () => {
                 },
                 (error, stdout, stderr) => {
                   if (error) {
-                    reject(ghTransportFixtureError(error, stderr, environment));
+                    mark('elapsedMs');
+                    reject(
+                      ghTransportFixtureError(error, stderr, environment, {
+                        ...phases,
+                        stdoutBytes: Buffer.byteLength(stdout),
+                        eventLoopDelayMaxMs: eventLoopDelay.max / 1e6,
+                      })
+                    );
                     return;
                   }
                   resolve({ code: 0, stdout, stderr });
                 }
               );
+              child.once('spawn', () => mark('spawnMs'));
+              child.once('exit', () => mark('exitMs'));
             })
         ),
         expectedHeadOid: HEAD,
@@ -2388,7 +2465,17 @@ describe('canonical admission membership binding', () => {
         name: 'Jovie',
       });
       expect(received[0].query).toContain('$number:Int!');
+      for (const phase of [
+        'spawnMs',
+        'requestMs',
+        'requestEndMs',
+        'responseFinishMs',
+        'exitMs',
+      ]) {
+        expect(Number.isFinite(phases[phase])).toBe(true);
+      }
     } finally {
+      eventLoopDelay.disable();
       await new Promise(resolve => server.close(resolve));
       rmSync(config, { recursive: true, force: true });
     }

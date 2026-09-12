@@ -86,9 +86,10 @@ describe('public CTA guard', () => {
 
     const primaryCta = contents.slice(start, end);
 
-    // Waitlist-first Get started / Request Access uses the locked 32px pill.
-    // HeaderPrimaryAuthLink owns the single primary-variant CTA and defaults
-    // to the marketing size; the minimal pill sign-in passes md explicitly.
+    // Waitlist-first Get started / Request Access uses the locked marketing
+    // ActionButton (28px visible / 44px mobile hit). HeaderPrimaryAuthLink
+    // owns the single primary-variant CTA and defaults to marketing; the
+    // minimal pill sign-in passes md explicitly.
     expect(primaryCta).toContain("size = 'marketing'");
     expect(primaryCta).toContain("variant='primary'");
     expect(primaryCta).not.toMatch(/\bsize='(?:sm|lg|xl)'/);

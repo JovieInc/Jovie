@@ -280,6 +280,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-eval.test.mjs',
+  'scripts/lib/__tests__/native-queue-collector.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
@@ -658,6 +659,37 @@ const GEM_STORAGE_PYTEST_TESTS = [
 const SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS = new Set([
   'scripts/symphony/symphony-codex-exhausted.py',
   'scripts/symphony/tests/symphony-additive-router.test.py',
+]);
+const SYMPHONY_NATIVE_ADMISSION_ANCHOR =
+  'scripts/symphony/tests/native-admission-consumers.test.py';
+const SYMPHONY_NATIVE_ADMISSION_GATES = [
+  'scripts/symphony/tests/run-issue-lease-gate.py',
+  'scripts/symphony/tests/run-lease-gate.py',
+  'scripts/symphony/tests/run-provider-promotion-gate.py',
+  'scripts/symphony/tests/run-runtime-proof-gate.py',
+];
+const SYMPHONY_NATIVE_ADMISSION_LANE = new Set([
+  SYMPHONY_NATIVE_ADMISSION_ANCHOR,
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/symphony-agent-router',
+  'scripts/symphony/symphony-codex-exhausted.py',
+  'scripts/symphony/symphony-codex-router',
+  'scripts/symphony/symphony-lease-guard',
+  'scripts/symphony/tests/existing-pr-repair.test.py',
+  'scripts/symphony/tests/symphony-agent-router.test.py',
+  'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
+  'scripts/symphony/tests/provider-runtime-promotion.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
+  ...SYMPHONY_NATIVE_ADMISSION_GATES,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SYMPHONY_AGENT_ROUTER_INPUTS = new Set([
+  'scripts/symphony/symphony-agent-router',
+  'scripts/symphony/tests/symphony-agent-router.test.py',
+]);
+const SYMPHONY_AGENT_ROUTER_LANE = new Set([
+  ...SYMPHONY_AGENT_ROUTER_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
   ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
@@ -1187,6 +1219,55 @@ export function buildAffectedTestPlan(
       scriptVitestTests: [
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
+      nodeTests: [],
+    };
+  }
+  if (files.includes(SYMPHONY_NATIVE_ADMISSION_ANCHOR)) {
+    // Run the actual operational coverage gates, not an unrelated full web
+    // suite. This exception cannot absorb unknown peers or missing gate files.
+    if (
+      !files.every(file => SYMPHONY_NATIVE_ADMISSION_LANE.has(file)) ||
+      ![
+        SYMPHONY_NATIVE_ADMISSION_ANCHOR,
+        ...SYMPHONY_NATIVE_ADMISSION_GATES,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SYMPHONY_NATIVE_ADMISSION_GATES,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (files.some(file => SYMPHONY_AGENT_ROUTER_INPUTS.has(file))) {
+    const gates = ['scripts/symphony/tests/run-issue-lease-gate.py'];
+    if (
+      !files.every(file => SYMPHONY_AGENT_ROUTER_LANE.has(file)) ||
+      ![
+        ...SYMPHONY_AGENT_ROUTER_INPUTS,
+        ...gates,
+        ...AFFECTED_TEST_SELECTOR_TESTS,
+      ].every(isFileAvailable)
+    ) {
+      return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: gates,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: [],
     };
   }
@@ -2293,6 +2374,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       '--coverage.include=lib/native-queue-group-evidence.mjs',
       '--coverage.include=lib/native-queue-policy-evidence.mjs',
       '--coverage.include=lib/native-queue-eval.mjs',
+      '--coverage.include=**/scripts/native-queue-eval.mjs',
       '--coverage.thresholds.perFile=true',
       '--coverage.thresholds.lines=85',
       '--coverage.thresholds.branches=75',

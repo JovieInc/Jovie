@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { buildReleaseDownloadsRoute } from '@/constants/routes';
+import { selectFindingsForLibraryAsset } from '@/lib/library/inspector-scope';
 import type {
   LibraryPostReleaseBundle,
   LibraryPresenceFindingView,
@@ -34,12 +35,7 @@ function findingsForAsset(
   asset: LibraryReleaseAsset,
   findings: readonly LibraryPresenceFindingView[]
 ): LibraryPresenceFindingView[] {
-  const subjectIds = subjectIdsForAsset(asset);
-  return findings.filter(
-    finding =>
-      (finding.status === 'open' || finding.status === 'drafted') &&
-      (finding.subjectType === 'artist' || subjectIds.has(finding.subjectId))
-  );
+  return selectFindingsForLibraryAsset(findings, asset);
 }
 
 function rightsholdersForAsset(

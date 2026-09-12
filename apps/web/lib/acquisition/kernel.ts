@@ -404,6 +404,89 @@ export function captureAcquisitionRejection(input: {
   };
 }
 
+export const REJECTION_FUNNEL_EVENT_TYPE = 'rejected' as const;
+
+/**
+ * Decision-scoped funnel dedup key. `leadId + eventType` alone drops a second
+ * rejection after rebuild when the reason changed (JOV-6130).
+ */
+export function rejectionEventDedupKey(
+  rejection: Pick<AcquisitionRejection, 'reason' | 'productGapIssueKey'>
+): string {
+  return `${REJECTION_FUNNEL_EVENT_TYPE}:${rejection.reason}:${rejection.productGapIssueKey ?? 'none'}`;
+}
+
+export type RejectionEventDedupAction =
+  | 'insert'
+  | 'skip'
+  | 'record-new-attempt';
+
+export function resolveRejectionEventDedup(input: {
+  readonly incomingKey: string;
+  readonly existingKey: string | null;
+}): RejectionEventDedupAction {
+  if (input.existingKey == null) return 'insert';
+  if (input.existingKey === input.incomingKey) return 'skip';
+  return 'record-new-attempt';
+}
+
+export function existingRejectionDedupKey(
+  metadata:
+    | {
+        readonly dedupKey?: unknown;
+        readonly rejection?: unknown;
+      }
+    | null
+    | undefined
+): string | null {
+  if (typeof metadata?.dedupKey === 'string' && metadata.dedupKey.length > 0) {
+    return metadata.dedupKey;
+  }
+
+  const rejection = metadata?.rejection;
+  if (!rejection || typeof rejection !== 'object') return null;
+
+  const record = rejection as {
+    reason?: unknown;
+    productGapIssueKey?: unknown;
+  };
+  if (
+    typeof record.reason !== 'string' ||
+    !isAcquisitionRejectionReason(record.reason)
+  ) {
+    return null;
+  }
+
+  return rejectionEventDedupKey({
+    reason: record.reason,
+    productGapIssueKey:
+      typeof record.productGapIssueKey === 'string'
+        ? record.productGapIssueKey
+        : null,
+  });
+}
+
+function isAcquisitionRejectionReason(
+  value: string
+): value is AcquisitionRejectionReason {
+  return (ACQUISITION_REJECTION_REASONS as readonly string[]).includes(value);
+}
+
+/**
+ * Product-gap rejects wait for a verified capability fix. Other rebuild-eligible
+ * reasons can take another attempt immediately.
+ */
+export function isRebuildEligibleForAttempt(input: {
+  readonly rejection: AcquisitionRejection;
+  readonly verifiedProductGapIssueKeys?: readonly string[];
+}): boolean {
+  if (!input.rejection.rebuildEligible) return false;
+  if (!input.rejection.productGap) return true;
+  const key = input.rejection.productGapIssueKey;
+  if (!key) return false;
+  return (input.verifiedProductGapIssueKeys ?? []).includes(key);
+}
+
 export function buildProductGapIssue(rejection: AcquisitionRejection): {
   readonly key: string;
   readonly title: string;

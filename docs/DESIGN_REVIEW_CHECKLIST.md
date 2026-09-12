@@ -3,6 +3,10 @@
 > `DESIGN.md` is authoritative. This checklist is a review aid and must not
 > introduce geometry, palette, or component rules of its own.
 
+Uncovered forms / overflow / media / l10n / browser / a11y checks live in
+[`.agents/skills/gstack/design-review/references/web-interface-gaps.md`](../.agents/skills/gstack/design-review/references/web-interface-gaps.md).
+Do not invoke `web-design-guidelines` as a parallel skill.
+
 ## Icon Usage Standards ✅
 
 When reviewing PRs or design implementations, ensure the following icon standards are met:

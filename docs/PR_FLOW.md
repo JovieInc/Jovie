@@ -244,8 +244,12 @@ writer. The closure observer classifies every open PR as `close`, `repair`,
 `close` requires the repository's explicit `duplicate` lifecycle label;
 matching titles or Linear issue IDs never prove semantic redundancy.
 Summer grants no new issue lease, new implementation, or fallback PR generation
-unless the typed closure receipt is healthy. Missing or malformed closure
-evidence fails new intake closed.
+unless the typed closure receipt is healthy for that gem-repo-registry product.
+Jovie native-queue empty/UNMERGEABLE is issue-blocked and does not freeze
+LogYourBody or Ovie new leases; missing or malformed shared receipts stay
+systems-down and fail every product closed. Promotion and deploy holds remain
+Jovie-scoped. Missing or malformed closure evidence fails new Jovie intake
+closed.
 
 Closure health is red when the sole queue controller stays non-green for more
 than 10 minutes, the native queue stays empty with eligible clean PRs for more

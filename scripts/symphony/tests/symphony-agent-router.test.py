@@ -43,6 +43,9 @@ class SymphonyAgentRouterTests(unittest.TestCase):
         cursor: pathlib.Path | None = None,
         adapter: pathlib.Path | None = None,
     ) -> dict[str, str]:
+        controller = self.home / ".local/bin/symphony-codex-exhausted.py"
+        controller.parent.mkdir(parents=True, exist_ok=True)
+        controller.write_text("import sys\nassert sys.argv[1:3] == ['native-preflight', 'JOV-5954']\n")
         auto_route = self.root / "auto-route.mjs"
         auto_route.write_text("#!/usr/bin/env node\nprocess.exit(0);\n")
         auto_route.chmod(0o755)
@@ -53,6 +56,7 @@ class SymphonyAgentRouterTests(unittest.TestCase):
         return {
             **os.environ,
             "SYMPHONY_HOME": str(self.home),
+            "SYMPHONY_ROUTER_HEARTBEAT_SECONDS": "0",
             "SYMPHONY_WORKSPACE": str(self.workspace),
             "SYMPHONY_ISSUE_IDENTIFIER": "JOV-5954",
             "SYMPHONY_CAPACITY_GUARD": str(guard),
@@ -70,6 +74,37 @@ class SymphonyAgentRouterTests(unittest.TestCase):
             "SYMPHONY_CODEX_ROUTER": str(codex),
             "CODEX_ACCOUNTS_STATE": str(state),
         }
+
+    def test_native_admission_refuses_before_any_provider_probe(self):
+        calls = self.root / "provider-called"
+        guard = self.executable("guard", f'touch "{calls}"\nexit 0\n')
+        env = self.environment(guard)
+        controller = self.home / ".local/bin/symphony-codex-exhausted.py"
+        for installed in (False, True):
+            if installed:
+                controller.parent.mkdir(parents=True, exist_ok=True)
+                controller.write_text("raise SystemExit(75)\n")
+            else:
+                controller.unlink(missing_ok=True)
+            result = subprocess.run(["bash", str(ROUTER), "app-server"], cwd=self.workspace,
+                                    env=env, capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 75, result.stderr)
+            self.assertFalse(calls.exists())
+
+    def test_native_preflight_keeps_initialize_stream_alive_without_provider(self):
+        calls = self.root / "provider-called"
+        guard = self.executable("guard", f'touch "{calls}"\nexit 0\n')
+        env = self.environment(guard)
+        env["SYMPHONY_ROUTER_HEARTBEAT_SECONDS"] = "1"
+        controller = self.home / ".local/bin/symphony-codex-exhausted.py"
+        controller.write_text("import time\ntime.sleep(2.1)\nraise SystemExit(75)\n")
+        result = subprocess.run(["bash", str(ROUTER), "app-server"], cwd=self.workspace,
+                                env=env, capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 75)
+        self.assertFalse(calls.exists())
+        messages = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertGreaterEqual(len(messages), 1)
+        self.assertTrue(all(row["method"] == "symphony-router/preflight" for row in messages))
 
     def write_route(self, model: str = "gpt-5.6-sol") -> None:
         (self.workspace / ".symphony-routing.json").write_text(
@@ -224,6 +259,49 @@ with path.open("a+") as challenger:
             result.stdout,
         )
 
+    def test_actual_codex_handoff_preserves_pickup_refusal_status(self):
+        guard = self.executable("guard", "exit 0\n")
+        env = self.environment(guard)
+        self.write_route()
+        codex_router = ROOT / "scripts/symphony/symphony-codex-router"
+        traced_router = self.executable(
+            "traced-router", f'exec bash -x "{codex_router}" "$@"\n'
+        )
+        exhausted = self.root / "exhausted.py"
+        downstream = self.root / "rotate-called"
+        rotate = self.executable("rotate", f'touch "{downstream}"\n')
+        env.update({
+            "SYMPHONY_CODEX_ROUTER": str(traced_router),
+            "SYMPHONY_CODEX_EXHAUSTED": str(exhausted),
+            "SYMPHONY_CODEX_ROTATE": str(rotate),
+            "SYMPHONY_ROUTER_HEARTBEAT_SECONDS": "0",
+            "PS4": r"+${LINENO}: ",
+        })
+        pickup_line = next(
+            number
+            for number, line in enumerate(codex_router.read_text().splitlines(), 1)
+            if 'python3 "$EXHAUSTED" pickup-check "$issue"' in line
+        )
+        for status, retryable in ((75, "true"), (78, "false")):
+            with self.subTest(status=status):
+                diagnostic = (
+                    "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+                    f"class=pickup-refused retryable={retryable}"
+                )
+                exhausted.write_text(
+                    'import sys\nassert sys.argv[1:] == ["pickup-check", "JOV-5954"]\n'
+                    f"print({diagnostic!r}, file=sys.stderr)\nraise SystemExit({status})\n"
+                )
+                result = subprocess.run(
+                    [str(ROUTER), "app-server"], cwd=self.workspace, env=env,
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, status, result.stderr)
+                self.assertIn(diagnostic, result.stderr)
+                self.assertIn(f"+{pickup_line}: exit {status}", result.stderr)
+                self.assertFalse(downstream.exists(), result.stdout)
+                self.assertEqual(result.stdout, "")
+
     def test_cli_only_cursor_cannot_enter_official_app_server(self) -> None:
         calls = self.root / "cli-only-provider-called"
         guard = self.executable("guard", "exit 75\n")
@@ -238,8 +316,11 @@ with path.open("a+") as challenger:
         )
         self.assertEqual(result.returncode, 75, result.stderr)
         self.assertEqual(result.stdout, "")
-        self.assertIn("codex app-server capacity unavailable", result.stderr)
-        self.assertIn("CLI-only providers remain isolated", result.stderr)
+        self.assertEqual(result.stderr.strip(), (
+            "codex-rotate: CAPACITY_UNAVAILABLE schema=symphony-provider-capacity/v1 "
+            "class=provider-capacity retryable=true reason=app_server_capacity_unavailable "
+            "retryAt=unknown waitSeconds=unknown"
+        ))
         self.assertFalse(calls.exists())
         self.assertFalse(
             (

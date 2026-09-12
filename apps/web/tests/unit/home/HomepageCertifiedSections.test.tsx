@@ -48,6 +48,7 @@ describe('HomepageCertifiedSections', () => {
     const proof = screen.getByTestId('marketing-section-logo-cloud');
     expect(proof).toHaveAttribute('data-homepage-testid', 'homepage-proof');
     expect(proof).toHaveAttribute('data-marketing-variant', 'inline-strip');
+    expect(proof).toHaveAttribute('data-rhythm', 'proof');
     expect(
       screen.getAllByTestId('marketing-section-feature-split')
     ).toHaveLength(HOMEPAGE_LAUNCH_COPY.certified.sections.length);
@@ -83,9 +84,27 @@ describe('HomepageCertifiedSections', () => {
       expect(region).toHaveTextContent(section.body);
       expect(region).toHaveAttribute('data-marketing-occurrence', section.id);
       expect(region).toHaveAttribute(
+        'data-rhythm',
+        section.id === 'connected' || section.id === 'relationships'
+          ? 'product'
+          : 'text'
+      );
+      expect(region).toHaveAttribute(
         'aria-labelledby',
         `homepage-section-${section.id}-heading`
       );
+    }
+
+    const connectedDevice = document.querySelector(
+      '[data-homepage-testid="homepage-section-connected"] .ap-phone-frame'
+    );
+    const relationshipDevices = document.querySelectorAll(
+      '[data-homepage-testid="homepage-section-relationships"] .ap-phone-frame'
+    );
+    expect(connectedDevice).toHaveAttribute('data-size', 'md');
+    expect(relationshipDevices).toHaveLength(3);
+    for (const device of relationshipDevices) {
+      expect(device).toHaveAttribute('data-size', 'sm');
     }
 
     // Real product exports only where the copy talks about the profile.
@@ -134,6 +153,7 @@ describe('HomepageCertifiedSections', () => {
       'apps/web/components/homepage/HomepageClose.tsx'
     );
     expect(section).toHaveAttribute('data-homepage-testid', 'homepage-close');
+    expect(section).toHaveAttribute('data-rhythm', 'close');
     expect(section.querySelector('section')).toBeNull();
     expect(within(section).getByRole('combobox')).toBe(
       screen.getByRole('combobox')

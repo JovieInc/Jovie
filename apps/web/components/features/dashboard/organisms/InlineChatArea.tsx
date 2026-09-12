@@ -145,7 +145,7 @@ export const InlineChatArea = forwardRef<
         aria-expanded={expanded}
       >
         <div className='flex items-center gap-2'>
-          <BrandLogo size={16} tone='auto' />
+          <BrandLogo size='compact' tone='auto' />
           <span className='text-app font-caption text-primary-token'>
             Jovie
           </span>

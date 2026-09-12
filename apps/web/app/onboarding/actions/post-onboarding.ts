@@ -5,7 +5,6 @@
 
 import * as Sentry from '@sentry/nextjs';
 
-import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
 import { withTimeout } from '@/lib/resilience/primitives';
@@ -44,16 +43,9 @@ async function runBoundedBackgroundSyncOperations(
       timeoutMs: POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS,
       context: 'onboarding_username_sync',
     }),
-    withTimeout(syncAllClerkMetadata(userId), {
-      timeoutMs: POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS,
-      context: 'onboarding_metadata_sync',
-    }),
   ]);
 
-  const syncContexts = [
-    'onboarding_username_sync',
-    'onboarding_metadata_sync',
-  ] as const;
+  const syncContexts = ['onboarding_username_sync'] as const;
 
   for (const [index, result] of results.entries()) {
     if (result.status === 'rejected') {

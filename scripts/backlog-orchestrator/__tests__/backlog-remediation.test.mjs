@@ -16,6 +16,7 @@ import {
   inventoryBacklog,
   OFFICIAL_SYMPHONY_REFRESH_URL,
   REMEDIATION_SCHEMA,
+  readHostPressure,
   upsertRemediationWorkpad,
   WORKPAD_HEADING,
   WORKPAD_PREFIX,
@@ -77,6 +78,8 @@ function healthySignals(overrides = {}) {
       cpuSomeAvg10: 1,
       memoryFullAvg10: 0.1,
       ioFullAvg10: 0.2,
+      loadAvg1: 1,
+      cpuCount: 4,
       availableMemoryBytes: 16 * 1024 ** 3,
     },
     provider: { accounts: 3, ready: 2 },
@@ -340,9 +343,33 @@ describe('official Symphony backlog remediation', () => {
     assert.equal(scaled.reason, 'capacity-available');
   });
 
+  it('includes normalized host load in capacity evidence and backoff', () => {
+    const host = readHostPressure('/proc');
+    assert.ok(Number.isFinite(host.loadAvg1));
+    assert.ok(Number.isInteger(host.cpuCount));
+    assert.ok(host.cpuCount > 0);
+
+    const overloaded = evaluateRuntimeCapacity(
+      healthySignals({
+        host: {
+          cpuSomeAvg10: 1,
+          memoryFullAvg10: 0.1,
+          ioFullAvg10: 0.2,
+          loadAvg1: 8,
+          cpuCount: 4,
+          availableMemoryBytes: 16 * 1024 ** 3,
+        },
+      }),
+      { now: NOW, previousCleanStreak: CLEAN_STREAK_REQUIRED }
+    );
+    assert.equal(overloaded.reason, 'host-pressure-severe');
+    assert.equal(overloaded.allowed, false);
+  });
+
   it('writes a single workpad matrix and feeds only the official Elixir Symphony refresh', async () => {
     const built = receiptFor([issue('JOV-50')]);
-    assert.match(built.workpad, new RegExp(`^${WORKPAD_PREFIX}`));
+    assert.match(built.workpad, new RegExp(`^${WORKPAD_HEADING}`));
+    assert.match(built.workpad, new RegExp(WORKPAD_PREFIX));
     assert.match(built.workpad, new RegExp(WORKPAD_HEADING));
     assert.match(built.workpad, /JOV-50/);
     assert.match(built.workpad, /official Elixir Symphony/);
@@ -383,7 +410,8 @@ describe('official Symphony backlog remediation', () => {
         async addComment(id, body) {
           comments.push({ id: 'comment-1', body });
           assert.equal(id, 'workpad-id');
-          assert.ok(body.startsWith(WORKPAD_PREFIX));
+          assert.ok(body.startsWith(WORKPAD_HEADING));
+          assert.match(body, new RegExp(WORKPAD_PREFIX));
           return { commentCreate: { success: true } };
         },
         async updateComment(id, body) {
@@ -418,6 +446,38 @@ describe('official Symphony backlog remediation', () => {
       },
     });
     assert.equal(updated.status, 'updated');
+  });
+
+  it('updates the legacy remediation comment instead of creating a second workpad', async () => {
+    const comments = [
+      {
+        id: 'legacy-comment',
+        body: '## Symphony backlog remediation\nold receipt',
+      },
+    ];
+    const result = await upsertRemediationWorkpad({
+      workpadIssue: 'JOV-5492',
+      receipt: receiptFor([issue('JOV-51')]),
+      client: {
+        async fetchIssue() {
+          return {
+            id: 'workpad-id',
+            identifier: 'JOV-5492',
+            comments: { nodes: comments },
+          };
+        },
+        async addComment() {
+          throw new Error('should-update-existing-workpad');
+        },
+        async updateComment(id, body) {
+          assert.equal(id, 'legacy-comment');
+          comments[0] = { id, body };
+          return { commentUpdate: { success: true } };
+        },
+      },
+    });
+    assert.equal(result.status, 'updated');
+    assert.match(comments[0].body, new RegExp(`^${WORKPAD_HEADING}`));
   });
 
   it('does not revive homemade Symphony admission or JOV-5466 wrappers', () => {

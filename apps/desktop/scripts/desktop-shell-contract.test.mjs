@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import ts from 'typescript';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -163,9 +164,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /did-start-navigation/);
   assert.match(mainSource, /function attachRendererRecovery\(/);
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
+  assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
-  assert.match(mainSource, /Loading Jovie/);
-  assert.match(mainSource, /Starting the app/);
+  assert.match(mainSource, /Jovie is loading/);
   assert.match(
     mainSource,
     /renderDesktopBuildIdentitySection\(desktopBuildIdentity\)/
@@ -281,7 +282,8 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /min-height: 100vh/);
   assert.match(mainSource, /background: var\(--system-b-bg-base\)/);
   assert.match(mainSource, /border-radius: var\(--system-b-radius-pill\)/);
-  assert.match(mainSource, /opacity: 0\.035/);
+  assert.match(tokenSource, /markCream: '#F5F4F0'/);
+  assert.match(tokenSource, /splashMarkSizePx: 32/);
   assert.doesNotMatch(
     mainSource,
     /background: linear-gradient\(145deg, rgba\(15,16,17,0\.94\), rgba\(8,9,10,0\.98\)\)/
@@ -291,6 +293,33 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
   assert.match(tokenSource, /backgroundColor: '#06070a'/);
   assert.match(tokenSource, /radiusPill: '999px'/);
+});
+
+test('Mac boot splash is splash-B: 32px cream mark on an empty field', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const tokenSource = await readFile(
+    join(desktopRoot, 'src/system-b-tokens.ts'),
+    'utf8'
+  );
+  const splashFn = mainSource.match(
+    /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+
+  assert.ok(splashFn, 'buildDesktopBootSplashHtml must exist');
+  assert.match(tokenSource, /splashMarkSizePx: 32/);
+  assert.match(tokenSource, /markCream: '#F5F4F0'/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.splashMarkSizePx/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
+  assert.match(splashFn, /data-desktop-splash="splash-b"/);
+  assert.match(splashFn, /aria-label="Jovie is loading"/);
+  assert.doesNotMatch(splashFn, /180px/);
+  assert.doesNotMatch(splashFn, /opacity:\s*0\.035/);
+  assert.doesNotMatch(splashFn, /<h1>/);
+  assert.doesNotMatch(splashFn, /Loading Jovie/);
+  assert.doesNotMatch(splashFn, /Starting the app/);
+  assert.doesNotMatch(splashFn, /renderDesktopBuildIdentitySection/);
+  assert.doesNotMatch(mainSource, /width:\s*180px/);
+  assert.doesNotMatch(mainSource, /height:\s*180px/);
 });
 
 const FORBIDDEN_MAC_ENTITLEMENTS = [
@@ -514,26 +543,6 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
-  assert.match(
-    preloadSource,
-    /import \{ BAKED_DESKTOP_BUILD_IDENTITY \} from '\.\/build-identity\.generated';/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY\.channel/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY\.version/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopSourceRevision =\s*BAKED_DESKTOP_BUILD_IDENTITY\.sourceRevision/
-  );
-  assert.match(
-    preloadSource,
-    /dataset\.desktopBuiltAt = BAKED_DESKTOP_BUILD_IDENTITY\.builtAt/
-  );
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
@@ -547,6 +556,29 @@ test('preload marks the hosted app as Electron after the document root is ready'
     mainSource,
     /ipcMain\.handle\(\s*LAUNCH_OPERATOR_CONTROL_CHANNEL/
   );
+});
+
+test('compiled sandbox preload has no unsupported local module dependency', async () => {
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
+  const compiledPreload = ts.transpileModule(preloadSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const requiredModules = [
+    ...compiledPreload.matchAll(/require\(["']([^"']+)["']\)/g),
+  ].map(match => match[1]);
+
+  assert.deepEqual(requiredModules, ['electron']);
+  assert.match(compiledPreload, /contextBridge\.exposeInMainWorld/);
+
+  const unsafeFixture = 'require("./build-identity.generated")';
+  assert.match(unsafeFixture, /require\(["']\.[/\\\\]/);
+  assert.doesNotMatch(compiledPreload, /require\(["']\.[/\\\\]/);
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {
@@ -577,8 +609,19 @@ test('desktop bridge exposes bounded dictation support', async () => {
     'utf8'
   );
   assert.match(mainSource, /from '\.\/desktop-auto-update'/);
+  assert.match(mainSource, /from '\.\/nightly-update-launch-agent'/);
+  assert.match(mainSource, /from '\.\/bounded-process'/);
+  assert.match(mainSource, /from '\.\/window-state-store'/);
   assert.match(mainSource, /hasNightlyUpdateFlag/);
   assert.match(mainSource, /installNightlyUpdateLaunchAgent/);
+  assert.match(mainSource, /scheduleNightlyUpdateLaunchAgent/);
+  assert.match(
+    mainSource,
+    /await hydrateWindowState\(\);[\s\S]*createWindow\([\s\S]*scheduleNightlyUpdateLaunchAgent\(\)/
+  );
+  assert.doesNotMatch(mainSource, /spawnSync/);
+  assert.doesNotMatch(mainSource, /writeFileSync/);
+  assert.match(mainSource, /runBoundedProcess/);
   assert.match(mainSource, /shouldScheduleDesktopAutoUpdate\(/);
   assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
@@ -589,7 +632,11 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(autoUpdateSource, /app\.jov\.ie\.nightly-update/);
   assert.match(autoUpdateSource, /appEnv === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowPrerelease = true/);
-  assert.match(mainSource, /sanitizeWindowState/);
+  const windowStateStoreSource = await readFile(
+    join(desktopRoot, 'src/window-state-store.ts'),
+    'utf8'
+  );
+  assert.match(windowStateStoreSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
   assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
   assert.match(mainSource, /!app\.isPackaged/);

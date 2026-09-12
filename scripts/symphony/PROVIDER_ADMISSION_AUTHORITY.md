@@ -25,3 +25,12 @@ Unknown probe results remain non-authoritative. The official launcher returns
 typed retryable capacity when Codex cannot enter app-server; the isolated
 fallback worker may independently select a registry-backed CLI provider under
 the same issue lease.
+
+The registry also carries a `hyperagent` pool (GLM 5.3 Flash, GLM 5.3, Kimi K3,
+DeepSeek V4, Astra) as `gateway-budgeted-paid` entries. They are `channel: api`,
+so policy ranks them strictly after every subscription/local pool
+(`gateway_only_after_included_pools_are_exhausted`), and the fallback lane's
+subscription filter never derives them as CLI executors. Each entry probes
+through the operator-installed `GEM_HYPERAGENT_EXECUTABLE` shim with a
+`json-model-key` identity check; until that shim serves the exact model id, the
+entry stays unavailable and selection fails closed.

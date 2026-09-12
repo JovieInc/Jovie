@@ -27,6 +27,9 @@ hooks:
   after_create: |
     export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
     exec "$HOME/.local/bin/jovie-symphony-workspace-create" "$PWD"
+  before_run: |
+    export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
+    exec python3 "$HOME/.local/bin/symphony-codex-exhausted.py" native-preflight "${PWD##*/}" --before-run
   before_remove: |
     export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
     cache_status=0
@@ -57,7 +60,9 @@ Ticket: `{{ issue.identifier }}` — {{ issue.title }}
 Status: {{ issue.state }}
 URL: {{ issue.url }}
 
-Intake is the Jovie Linear team. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. Only the mechanical `no-symphony` dead-letter label excludes dispatch; legacy human-review labels never do. Admission stop-line: the source-owned runtime wrapper holds new dispatch while Summer's closure-health signal in the Gem fleet gate receipt is not healthy (missing or stale receipts hold too), and an issue that hits the bounded ceiling of permanent Linear 4xx errors is dead-lettered to a durable `symphony-issue-dead-letter/v1` receipt and must receive the `no-symphony` label before any further machine pickup. <!-- JOV-INV-028 -->
+Intake is the Jovie Linear team. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. Only the mechanical `no-symphony` dead-letter label excludes dispatch; legacy human-review labels never do. An issue that hits the bounded ceiling of permanent Linear 4xx errors is dead-lettered to a durable `symphony-issue-dead-letter/v1` receipt and must receive the `no-symphony` label before any further machine pickup. <!-- JOV-INV-028 -->
+
+Closure enforcement depends on the runtime wrapper's configured mode. In enforcement mode, an unhealthy, missing, or stale Summer closure-health receipt holds admission. With `--closure-observe-only`, the wrapper observes that receipt without enforcing the closure hold. Native pickup still checks tracker state, terminal fences, shared issue leases, and existing PRs; routing, provider authentication, and capacity checks remain separate. Observe-only mode grants no additional intake, push, merge, deployment, or runtime-change authority. The isolated fallback worker separately enforces its fleet admission fields before new work.
 
 {% if attempt %}Continuation attempt #{{ attempt }}. Resume; do not redo finished validation.{% endif %}
 

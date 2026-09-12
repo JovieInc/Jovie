@@ -15,7 +15,15 @@ describe('useIsAuthenticated', () => {
     setCookieString('');
   });
 
-  it('returns true when Clerk session cookie is present', () => {
+  it('returns true when a Better Auth session cookie is present', () => {
+    setCookieString('better-auth.session_token=signed-session');
+
+    const { result } = renderHook(() => useIsAuthenticated());
+
+    expect(result.current).toBe(true);
+  });
+
+  it('returns true when leftover Clerk activity cookie is present', () => {
     setCookieString('__client_uat=1712345678');
 
     const { result } = renderHook(() => useIsAuthenticated());

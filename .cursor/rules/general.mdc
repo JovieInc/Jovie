@@ -19,49 +19,34 @@
 
 ## Project Overview
 
-Jovie is a Next.js 14 application with Clerk authentication and Supabase database integration. The project uses the latest native Clerk-Supabase integration method.
+Jovie is a Next.js application with Better Auth and Neon PostgreSQL. Clerk is retired — do not import `@clerk/*`.
 
 ## Technology Stack
 
 - **Frontend**: Next.js 14 (App Router)
 - **Database**: Supabase (PostgreSQL with RLS)
-- **Authentication**: Clerk with native Supabase integration
+- **Authentication**: Better Auth (self-hosted)
 - **Styling**: Tailwind CSS
 - **Testing**: Vitest + Playwright
 - **Deployment**: Vercel
 
 ## Critical Guidelines
 
-### 1. Clerk-Supabase Integration
+### 1. Authentication (Better Auth)
 
-**ALWAYS use the native integration method:**
-
-```typescript
-// ✅ CORRECT: Use native integration
-import { useSession } from '@clerk/nextjs';
-import { createClient } from '@supabase/supabase-js';
-
-function createClerkSupabaseClient() {
-  const { session } = useSession();
-
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_KEY!,
-    {
-      async accessToken() {
-        return session?.getToken() ?? null;
-      },
-    }
-  );
-}
-```
-
-**NEVER use JWT templates (deprecated):**
+**ALWAYS use Better Auth.** Canonical rules: `.claude/rules/auth.md`.
 
 ```typescript
-// ❌ DO NOT use JWT templates
-const token = await getToken({ template: 'supabase' });
+// Server
+import { getCachedAuth } from '@/lib/auth/cached';
+const { userId } = await getCachedAuth();
+
+// Client
+import { useJovieAuth } from '@/hooks/useJovieAuth';
+const { user } = useJovieAuth();
 ```
+
+**NEVER** import `@clerk/*`, add `CLERK_*` env, or create Clerk test users.
 
 ### 2. RLS Policies
 
@@ -80,25 +65,13 @@ for select to authenticated using (
 **Use the established patterns:**
 
 ```typescript
-// ✅ CORRECT: Client component with Clerk integration
+// ✅ CORRECT: Client component with Better Auth
 'use client';
-import { useSession } from '@clerk/nextjs';
-import { createClient } from '@supabase/supabase-js';
+import { useJovieAuth } from '@/hooks/useJovieAuth';
 
 export function MyComponent() {
-  const { session } = useSession();
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_KEY!,
-    {
-      async accessToken() {
-        return session?.getToken() ?? null;
-      },
-    }
-  );
-
-  // Component logic here
+  const { user } = useJovieAuth();
+  void user;
 }
 ```
 
@@ -148,13 +121,12 @@ const { data: users, error } = await supabase
 Required environment variables:
 
 ```bash
-# Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+# Better Auth
+BETTER_AUTH_SECRET=...
+BETTER_AUTH_URL=http://localhost:3100
 
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_KEY=your-anon-key
+# Neon
+DATABASE_URL=postgresql://...
 
 # Spotify
 SPOTIFY_CLIENT_ID=your-spotify-client-id
@@ -165,7 +137,7 @@ SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
 
 Key tables:
 
-- `users` - User accounts (Clerk ID mapping)
+- `users` - User accounts (`better_auth_user_id` links to `ba_users`)
 - `artists` - Artist profiles
 - `social_links` - Social media links
 - `releases` - Music releases
@@ -176,7 +148,7 @@ Key tables:
 1. **Unit Tests**: Use Vitest for component testing
 2. **E2E Tests**: Use Playwright for end-to-end testing
 3. **Database Tests**: Test RLS policies with multiple users
-4. **Authentication Tests**: Verify Clerk integration works correctly
+4. **Authentication Tests**: Use `E2E_USE_TEST_AUTH_BYPASS=1` and `/api/dev/test-auth/enter`
 
 ## Code Style
 
@@ -194,15 +166,14 @@ Key tables:
 4. **Never expose sensitive data** in client-side code
 5. **Use environment variables** for all secrets
 
-## Migration Guidelines
+## Auth Guidelines
 
-When updating Clerk-Supabase integration:
+When changing auth:
 
-1. **Remove JWT templates** from Clerk dashboard
-2. **Update client configuration** to use `accessToken()`
-3. **Update RLS policies** to use `auth.jwt()->>'sub'`
-4. **Test thoroughly** with existing data
-5. **Verify data isolation** between users
+1. **Keep Better Auth as the only runtime** — no Clerk SDK or `CLERK_*` env
+2. **Use `users.better_auth_user_id` / `users.id`** in new code
+3. **Leave `users.clerk_id` nullable** for historical rows only
+4. **Test with the Better Auth bypass** (`E2E_USE_TEST_AUTH_BYPASS=1`)
 
 ## Common Patterns
 
@@ -218,8 +189,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   setError(undefined);
 
   try {
-    const supabase = createClerkSupabaseClient();
-    const { error } = await supabase.from('table').insert(data);
+    const { userId } = await getCachedAuth();
+    if (!userId) throw new Error('Unauthorized');
 
     if (error) throw error;
     // Handle success
@@ -240,8 +211,8 @@ const [loading, setLoading] = useState(true);
 useEffect(() => {
   const fetchData = async () => {
     try {
-      const supabase = createClerkSupabaseClient();
-      const { data, error } = await supabase.from('users').select('*');
+      const { userId } = await getCachedAuth();
+      void userId;
 
       if (error) throw error;
       setData(data || []);
@@ -258,8 +229,8 @@ useEffect(() => {
 
 ## Resources
 
-- [Clerk Supabase Integration](https://clerk.com/docs/raw/integrations/databases/supabase.mdx)
-- [Supabase RLS Documentation](https://supabase.com/docs/guides/auth/row-level-security)
+- [Better Auth](https://www.better-auth.com/docs)
+- `.claude/rules/auth.md`
 - [Next.js App Router](https://nextjs.org/docs/app)
 - [Tailwind CSS](https://tailwindcss.com/docs)
 
@@ -267,7 +238,7 @@ useEffect(() => {
 
 **Before creating any cron job, scheduled task, or polling loop:**
 
-1. **Webhook first** — Can an external service notify you? (Stripe, Clerk, Resend all have webhooks)
+1. **Webhook first** — Can an external service notify you? (Stripe, Resend all have webhooks)
 2. **Inline after-action** — Can it happen right after the triggering action?
 3. **Lazy evaluation** — Can it happen when data is next accessed?
 4. **Add to existing job** — Can you extend an existing cron?
@@ -290,7 +261,7 @@ See `AGENTS.md` at repo root for full infrastructure guardrails.
 
 Before suggesting code changes, verify:
 
-1. ✅ Uses native Clerk-Supabase integration
+1. ✅ Uses Better Auth (`useJovieAuth` / `getCachedAuth`)
 2. ✅ Implements proper RLS policies
 3. ✅ Handles errors gracefully
 4. ✅ Uses TypeScript types

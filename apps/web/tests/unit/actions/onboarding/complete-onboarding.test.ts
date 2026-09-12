@@ -102,8 +102,8 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedCurrentUser: mockGetCachedCurrentUser,
 }));
 
-vi.mock('@/lib/auth/clerk-identity', () => ({
-  resolveClerkIdentity: mockResolveClerkIdentity,
+vi.mock('@/lib/auth/user-identity', () => ({
+  resolveUserIdentity: mockResolveClerkIdentity,
 }));
 
 vi.mock('@/lib/claim/context', () => ({

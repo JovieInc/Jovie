@@ -92,4 +92,59 @@ describe('launch acquisition kernel', () => {
       acq.LAUNCH_ACQUISITION_OPTIMIZATION_CONTRACT.decisionWriteback
     ).toMatch(/JOV-5911/);
   });
+
+  it('dedupes rejection events on the decision, not leadId + eventType', () => {
+    const first = acq.captureAcquisitionRejection({
+      candidateId: 'lead-9',
+      experimentId: acq.PREMADE_ARTIST_PROFILE_EXPERIMENT_ID,
+      reason: 'quality_below_bar',
+    });
+    const replay = acq.captureAcquisitionRejection({
+      candidateId: 'lead-9',
+      experimentId: acq.PREMADE_ARTIST_PROFILE_EXPERIMENT_ID,
+      reason: 'quality_below_bar',
+    });
+    const afterRebuild = acq.captureAcquisitionRejection({
+      candidateId: 'lead-9',
+      experimentId: acq.PREMADE_ARTIST_PROFILE_EXPERIMENT_ID,
+      reason: 'missing_product_capability',
+      capability: 'claim page',
+    });
+
+    const firstKey = acq.rejectionEventDedupKey(first);
+    expect(firstKey).not.toBe('rejected');
+    expect(
+      acq.resolveRejectionEventDedup({
+        incomingKey: acq.rejectionEventDedupKey(replay),
+        existingKey: firstKey,
+      })
+    ).toBe('skip');
+    expect(
+      acq.resolveRejectionEventDedup({
+        incomingKey: acq.rejectionEventDedupKey(afterRebuild),
+        existingKey: firstKey,
+      })
+    ).toBe('record-new-attempt');
+    expect(
+      acq.resolveRejectionEventDedup({
+        incomingKey: firstKey,
+        existingKey: null,
+      })
+    ).toBe('insert');
+    expect(acq.existingRejectionDedupKey({ rejection: first })).toBe(firstKey);
+    expect(acq.buildProductGapIssue(first)).toBeNull();
+    expect(acq.buildProductGapIssue(afterRebuild)?.key).toBe(
+      afterRebuild.productGapIssueKey
+    );
+    expect(acq.isRebuildEligibleForAttempt({ rejection: first })).toBe(true);
+    expect(acq.isRebuildEligibleForAttempt({ rejection: afterRebuild })).toBe(
+      false
+    );
+    expect(
+      acq.isRebuildEligibleForAttempt({
+        rejection: afterRebuild,
+        verifiedProductGapIssueKeys: [afterRebuild.productGapIssueKey ?? ''],
+      })
+    ).toBe(true);
+  });
 });

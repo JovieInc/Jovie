@@ -16,6 +16,15 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
     expect(source).not.toMatch(/--linear-duration-/);
   });
 
+  it('defers DeeplinksGrid scroll layout reads behind a passive listener', () => {
+    const source = readSource('components/features/home/DeeplinksGrid.tsx');
+    expect(source).toContain(
+      "addEventListener('scroll', handleScroll, { passive: true })"
+    );
+    expect(source).toContain('requestAnimationFrame');
+    expect(source).toContain('getBoundingClientRect');
+  });
+
   it('keeps FloatingClaimBar on the canonical elevated card shadow', () => {
     const source = readSource('components/features/home/FloatingClaimBar.tsx');
     expect(source).toContain('var(--shadow-card-elevated)');

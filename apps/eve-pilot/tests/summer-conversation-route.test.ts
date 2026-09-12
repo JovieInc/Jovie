@@ -129,21 +129,82 @@ describe('native Summer conversation route integration', () => {
     );
     expect(f.send).toHaveBeenCalledOnce();
   });
-  it.each([
-    'x-jovie-summer-principal-hash',
-    'x-jovie-summer-deployment-id',
-  ])('rejects wrong %s before accessing a private session', async header => {
+
+  it('reconciles an immutable event through a newer verified deployment', async () => {
+    const f = fixture();
+    expect(
+      (await post.handler(f.request('POST'), f.context as never)).status
+    ).toBe(202);
+    vi.stubEnv('VERCEL_DEPLOYMENT_ID', 'dpl_current');
+
+    const response = await get.handler(f.request('GET'), f.context as never);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      result: {
+        eventId: value.eventId,
+        principalHash: value.principalHash,
+        deploymentId: value.deploymentId,
+        responseText: 'Hello Tim',
+      },
+    });
+    expect(response.headers.get('x-jovie-eve-deployment-id')).toBe(
+      'dpl_current'
+    );
+    expect(f.send).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a wrong founder principal before accessing a private session', async () => {
     const f = fixture();
     expect(
       (
         await get.handler(
-          f.request('GET', { [header]: 'wrong' }),
+          f.request('GET', {
+            'x-jovie-summer-principal-hash': 'b'.repeat(43),
+          }),
           f.context as never
         )
       ).status
     ).toBe(403);
     expect(f.getEventStream).not.toHaveBeenCalled();
     expect(f.context.resolveSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed deployment before accessing a private session', async () => {
+    const f = fixture();
+    expect(
+      (
+        await get.handler(
+          f.request('GET', { 'x-jovie-summer-deployment-id': 'wrong' }),
+          f.context as never
+        )
+      ).status
+    ).toBe(403);
+    expect(f.getEventStream).not.toHaveBeenCalled();
+    expect(f.context.resolveSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a well-formed deployment that does not match the immutable event', async () => {
+    const f = fixture();
+    expect(
+      (await post.handler(f.request('POST'), f.context as never)).status
+    ).toBe(202);
+    const resolveCallsBeforeRead = f.context.resolveSession.mock.calls.length;
+
+    expect(
+      (
+        await get.handler(
+          f.request('GET', {
+            'x-jovie-summer-deployment-id': 'dpl_foreign',
+          }),
+          f.context as never
+        )
+      ).status
+    ).toBe(503);
+    expect(f.getEventStream).not.toHaveBeenCalled();
+    expect(f.context.resolveSession).toHaveBeenCalledTimes(
+      resolveCallsBeforeRead
+    );
   });
   it('rejects wrong OIDC app before admission or result retrieval', async () => {
     const f = fixture();

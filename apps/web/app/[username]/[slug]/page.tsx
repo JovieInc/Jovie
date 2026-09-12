@@ -33,12 +33,19 @@ import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
+import { resolveSmartLinkArtistByline } from '@/lib/discography/release-credits';
 import { determineReleasePhase } from '@/lib/discography/release-phase';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import {
+  canonicalizeReleaseArtistCredits,
+  canonicalizeReleaseCreditGroups,
+  opaqueInternalProfileRedirectPath,
+} from '@/lib/profile/opaque-internal-profile-handle';
+import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -113,6 +120,14 @@ export default async function ContentSmartLinkPage({
   }
 
   const normalizedUsername = username.toLowerCase();
+  const opaqueDecision =
+    await resolveOpaqueInternalProfileUsername(normalizedUsername);
+  if (opaqueDecision.action === 'not_found') {
+    notFound();
+  }
+  if (opaqueDecision.action === 'redirect') {
+    permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
+  }
 
   const creator = await getCreatorByUsername(normalizedUsername);
   if (!creator) {
@@ -394,14 +409,27 @@ function ContentPageBody({
   soundsUrl: string | null;
   downloadUrl: string | null;
 }>) {
-  const artistName = creator.displayName ?? creator.username;
-  const artist = makeArtistShape(creator, artistName);
+  const ownerName = creator.displayName ?? creator.username;
+  const artistByline = resolveSmartLinkArtistByline({
+    primaryArtists: content.primaryArtists,
+    ownerName,
+    ownerHandle: creator.usernameNormalized,
+  });
+  const artistName = artistByline.text;
+  const artist = makeArtistShape(creator, ownerName);
+  const primaryArtistIds = new Set(
+    (content.primaryArtists ?? []).map(entry => entry.artistId)
+  );
 
-  // Extract featured artists from credits for inline display
-  const featuredArtists: FeaturedArtist[] =
+  // Featured credits stay featured — they are never promoted into the byline.
+  const owner = { name: ownerName, handle: creator.usernameNormalized };
+  const featuredArtists: FeaturedArtist[] = canonicalizeReleaseArtistCredits(
     content.credits
       ?.find(g => g.role === 'featured_artist')
-      ?.entries.map(e => ({ name: e.name, handle: e.handle })) ?? [];
+      ?.entries.filter(entry => !primaryArtistIds.has(entry.artistId))
+      .map(e => ({ name: e.name, handle: e.handle })) ?? [],
+    owner
+  );
 
   // Mystery phase: revealDate is in the future, hide all details
   if (releasePhase === 'mystery' && content.revealDate) {
@@ -466,13 +494,17 @@ function ContentPageBody({
         previewSource: previewState.previewSource,
       }}
       artist={{
-        name: artistName,
+        name: ownerName,
         handle: creator.usernameNormalized,
         avatarUrl: creator.avatarUrl,
       }}
+      primaryArtists={artistByline.entries}
       featuredArtists={featuredArtists}
       providers={allProviders}
-      credits={content.credits}
+      credits={canonicalizeReleaseCreditGroups(content.credits, {
+        name: ownerName,
+        handle: creator.usernameNormalized,
+      })}
       artworkSizes={content.artworkSizes}
       allowDownloads={
         (creator.settings as Record<string, unknown> | null)
@@ -616,6 +648,15 @@ export async function generateMetadata({
   }
 
   const normalizedUsername = username.toLowerCase();
+  const opaqueDecision =
+    await resolveOpaqueInternalProfileUsername(normalizedUsername);
+  if (opaqueDecision.action === 'not_found') {
+    return { title: 'Not Found', robots: { index: false, follow: false } };
+  }
+  if (opaqueDecision.action === 'redirect') {
+    permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
+  }
+
   const creator = await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     return { title: 'Not Found' };
@@ -635,7 +676,11 @@ export async function generateMetadata({
     return { title: 'Not Found' };
   }
 
-  const artistName = creator.displayName ?? creator.username;
+  const artistName = resolveSmartLinkArtistByline({
+    primaryArtists: content.primaryArtists,
+    ownerName: creator.displayName ?? creator.username,
+    ownerHandle: creator.usernameNormalized,
+  }).text;
   const contentType = content.type === 'release' ? 'album' : 'song';
   const canonicalUrl =
     content.type === 'track' && content.releaseSlug

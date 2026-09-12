@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 import { sanitizeDesktopAuthUrl } from '@/lib/desktop/auth-return';
 import {
   closeDesktopAuthWindow,
@@ -237,7 +238,7 @@ export function DesktopAuthClient({ authUrlParam }: DesktopAuthClientProps) {
       data-testid='desktop-auth-handoff'
     >
       <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>
-        <BrandLogo aria-hidden size={60} tone='white' />
+        <BrandLogo aria-hidden size={BRAND_MARK_SIZE.splash} tone='white' />
         <h1 className='sr-only'>Sign In To Jovie</h1>
         <DesktopAuthHandoffActions
           authUrl={authUrl}

@@ -14,7 +14,7 @@ import types
 ROOT = Path(__file__).resolve().parents[3]
 SUITE = ROOT / "scripts/symphony/tests/symphony-burrito-workflow.test.py"
 TARGETS = {
-    "symphony_official_runtime.py": {"run_official_binary_once"},
+    "symphony_official_runtime.py": {"run_official_binary_once", "read_dispatch_admission", "_closure_snapshot_verdict"},
 }
 
 

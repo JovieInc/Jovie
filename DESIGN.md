@@ -31,11 +31,17 @@ instructions, use this order:
    skills. These are implementation aids or historical evidence, never
    authority over the sources above.
 
-Pen is a review and proposal surface. A Pen component is not source-backed
-until its identity maps to the current source registry and the required
-save/readback evidence exists. Source identities do not become Pen masters by
-visual resemblance. Keep one canonical master or family per source concept;
-express supported states as variants and consume them as instances.
+Pen is a review and proposal surface, except for colors: Pen node **ZiaWI**
+(`ziawi-color-sot-v1` in `apps/web/design/ziawi-color-sot.json`) is the
+canonical color source of truth. React tokens, OKLCH projections, and CSS
+emitters must match ZiaWI (ion `#11AFFF`, ultra/pulse/mint/orange/red, exactly
+5 elevations). Do not invent a parallel React-only color root.
+
+Other Pen components are not source-backed until their identity maps to the
+current source registry and the required save/readback evidence exists. Source
+identities do not become Pen masters by visual resemblance. Keep one canonical
+master or family per source concept; express supported states as variants and
+consume them as instances.
 
 Founder-facing review surfaces contain only canonical masters and intentional
 variants. Receipts, mappings, duplicate explorations, status copy, and process
@@ -166,9 +172,10 @@ of redefining them.
   - Raw durations and easings in route code are forbidden (enforced in Wave 4).
 - **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
   and `link`. Destructive styling is a `destructive` prop, not a variant.
-- **Canonical text button size (founder-approved 2026-09-05):** `sm`,
-  `marketing`, `md`, and `lg` share one 28px visible control, typography, and
-  padding inside a 44px minimum hit target across apps and marketing.
+- **Canonical text button size (Tim KEEP 2026-09-10):** `sm`,
+  `marketing`, `md`, and `lg` share one 28px visible ActionButton / product
+  CTA, weight 510, radius 999. Mobile wraps that 28px pill in a 44px tap
+  target. Not 32-in-44 and not density-32 on every size.
   `icon` remains a distinct 36px square utility control with a 44px hit target.
 - **Touch targets (founder-locked 2026-08-20):** enlarge the hit **container**,
   never the visible item. Compact controls keep their visual height; the 44px
@@ -271,10 +278,11 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 
 | File | Responsibility |
 |------|----------------|
-| `apps/web/design/oklch-palette.json` | **Authored OKLCH palette** — locked light/dark semantics, elevation, and hex projections (JOV-5388) |
-| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences |
+| `apps/web/design/ziawi-color-sot.json` | **Color SoT (`ziawi-color-sot-v1`)** — Pen node ZiaWI hex lock. React projects this file. |
+| `apps/web/design/oklch-palette.json` | **OKLCH projection of ZiaWI** — not a color root; hex must match `ziawi-color-sot-v1` |
+| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences; accent hexes project ZiaWI |
 | `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
-| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match the OKLCH registry |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match ZiaWI |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |

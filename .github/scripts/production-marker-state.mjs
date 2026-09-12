@@ -11,6 +11,11 @@ const RECOVERY_FILE = 'production-generation-recovery.json';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
 const MARKER_RECOVERY_PATH = '.github/workflows/production-marker-recovery.yml';
+const CONTROLLER_PROMOTE_JOB = 'Production Release / Promote to Production';
+const CONTROLLER_BOUNDARY_JOB =
+  'Production Release / Check current main before release';
+const CONTROLLER_VERIFIED_JOB = 'Production Verified';
+const CONTROLLER_ROLLBACK_SUFFIX = 'Centralized production rollback';
 const INTERRUPTED_CONCLUSIONS = new Set([
   'cancelled',
   'failure',
@@ -612,6 +617,181 @@ export function classifyProductionMarkerEvidence(evidence) {
   }
 }
 
+/**
+ * A controller attempt that coalesced into a newer main head intentionally
+ * completes success without any production mutation and without preserving a
+ * marker: the release boundary proved main had advanced, promotion and the
+ * centralized rollback stayed skipped, and Production Verified still proved
+ * the incumbent generation healthy. Such a run has no installable
+ * production-proven revision, so its activation is a no-op — never a marker
+ * gate failure. Any deviation from the exact coalesced job shape fails
+ * closed.
+ */
+export function classifyProducerCoalescence(run, jobs) {
+  if (
+    !run ||
+    typeof run !== 'object' ||
+    positiveInteger(run.id) === null ||
+    run.path !== CONTROLLER_PATH ||
+    run.head_branch !== 'main' ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success' ||
+    !Array.isArray(jobs)
+  ) {
+    return false;
+  }
+  const exactlyOne = (name, conclusion) =>
+    jobs.filter(
+      job =>
+        job?.name === name &&
+        job.status === 'completed' &&
+        job.conclusion === conclusion
+    ).length === 1;
+  const rollback = jobs.filter(
+    job =>
+      typeof job?.name === 'string' &&
+      job.name.endsWith(CONTROLLER_ROLLBACK_SUFFIX)
+  );
+  return (
+    exactlyOne(CONTROLLER_PROMOTE_JOB, 'skipped') &&
+    exactlyOne(CONTROLLER_BOUNDARY_JOB, 'success') &&
+    exactlyOne(CONTROLLER_VERIFIED_JOB, 'success') &&
+    rollback.length === 1 &&
+    rollback[0].status === 'completed' &&
+    rollback[0].conclusion === 'skipped'
+  );
+}
+
+/**
+ * Select the newest Production Controller run on main for a newer head,
+ * created after the producer run, in any state except startup failure. Its
+ * completion owns the newest revision's activation path: a successful
+ * completion fires its own activation for the newest production-proven
+ * marker, and an unsuccessful one leaves no installable revision either way.
+ * The triggering producer's missing marker is therefore a supersession
+ * no-op, not an anomaly. Fail closed: any malformed evidence means no
+ * supersession.
+ */
+export function selectNewerControllerRun(producerRun, candidates, context) {
+  if (
+    !validateControllerRun(producerRun, context, producerRun?.run_attempt) ||
+    producerRun.status !== 'completed' ||
+    typeof producerRun.created_at !== 'string'
+  ) {
+    return null;
+  }
+  const producerCreatedAt = Date.parse(producerRun.created_at);
+  if (!Number.isFinite(producerCreatedAt) || !Array.isArray(candidates)) {
+    return null;
+  }
+  const newer = candidates.filter(
+    run =>
+      run &&
+      typeof run === 'object' &&
+      positiveInteger(run.id) !== null &&
+      !sameInteger(run.id, context.controllerRun) &&
+      run.path === CONTROLLER_PATH &&
+      run.head_branch === 'main' &&
+      run.head_repository?.full_name === context.repo &&
+      // A newer main head, not a same-sha retry of the producer.
+      run.head_sha !== context.sha &&
+      SHA_PATTERN.test(run.head_sha ?? '') &&
+      typeof run.status === 'string' &&
+      // A startup failure never executed and supersedes nothing; every other
+      // state (in flight, queued, completed with any conclusion) proves the
+      // newer head was picked up and owns the activation path.
+      run.conclusion !== 'startup_failure' &&
+      typeof run.created_at === 'string' &&
+      Date.parse(run.created_at) > producerCreatedAt
+  );
+  if (newer.length === 0) return null;
+  newer.sort(
+    (left, right) => Date.parse(right.created_at) - Date.parse(left.created_at)
+  );
+  return {
+    run: positiveInteger(newer[0].id),
+    sha: newer[0].head_sha,
+    createdAt: newer[0].created_at,
+  };
+}
+
+function fetchProducerAttemptEvidence(repo, producerRunId, producerAttempt) {
+  const attemptRun = ghJson(
+    `repos/${repo}/actions/runs/${producerRunId}/attempts/${producerAttempt}`
+  );
+  const attemptJobs = normalizeProductionJobs(
+    ghJson(
+      `repos/${repo}/actions/runs/${producerRunId}/attempts/${producerAttempt}/jobs?per_page=100`
+    )
+  );
+  return { attemptRun, attemptJobs };
+}
+
+/**
+ * Activation-facing producer evidence (opt-in via --producer-run-id and
+ * --producer-attempt). When the exact verified marker binding for the
+ * triggering producer attempt fails, prove whether that attempt coalesced by
+ * design (no marker is ever preserved) or whether a newer controller run for
+ * a newer main head already owns the activation path. Every probe fails
+ * closed: ambiguity adds no fields and the caller still refuses.
+ */
+function withProducerActivationEvidence(args, result) {
+  const producerRunId = positiveInteger(args['producer-run-id']);
+  const producerAttempt = positiveInteger(args['producer-attempt']);
+  if (producerRunId === null || producerAttempt === null) return result;
+  if (
+    result.state === 'verified' &&
+    sameInteger(result.controllerRun, producerRunId) &&
+    sameInteger(result.controllerAttempt, producerAttempt)
+  ) {
+    return result;
+  }
+  const context = {
+    sha: args.sha,
+    repo: args.repo,
+    controllerRun: producerRunId,
+    controllerWorkflowId: positiveInteger(args['controller-workflow-id']),
+  };
+  let producer;
+  try {
+    producer = fetchProducerAttemptEvidence(
+      context.repo,
+      producerRunId,
+      producerAttempt
+    );
+  } catch {
+    return result;
+  }
+  if (!validateControllerRun(producer.attemptRun, context, producerAttempt)) {
+    return result;
+  }
+  const additions = {};
+  if (
+    producer.attemptJobs.every(job =>
+      validateControllerJob(job, context, producerAttempt)
+    ) &&
+    classifyProducerCoalescence(producer.attemptRun, producer.attemptJobs)
+  ) {
+    additions.coalesced = true;
+  }
+  try {
+    const listing = ghJson(
+      `repos/${context.repo}/actions/workflows/${context.controllerWorkflowId}/runs?branch=main&per_page=30`
+    );
+    const supersededBy = selectNewerControllerRun(
+      producer.attemptRun,
+      listing?.workflow_runs,
+      context
+    );
+    if (supersededBy) additions.supersededBy = supersededBy;
+  } catch {
+    // Supersession must be proven from live evidence, never assumed.
+  }
+  return Object.keys(additions).length > 0
+    ? { ...result, ...additions }
+    : result;
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: options.binary ? undefined : 'utf8',
@@ -868,7 +1048,7 @@ function inspectOnline(args) {
         return manual('artifact_snapshot_changed');
     }
   }
-  return result;
+  return withProducerActivationEvidence(args, result);
 }
 
 function main() {

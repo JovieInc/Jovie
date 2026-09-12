@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.9.1",
+  "version": "26.9.2",
   "private": true,
   "config": {
     "commitizen": {
@@ -166,7 +166,7 @@
     "ci:harness:validate": "node scripts/ci-harness.mjs validate",
     "ci:harness:docs": "node scripts/ci-harness.mjs generate-docs --write",
     "ci:harness:check": "pnpm ci:harness:validate && node scripts/lib/policy-gate-liveness.mjs && node scripts/ci-harness.mjs generate-docs --check",
-    "invariants:check": "node scripts/invariants/validate.mjs && node scripts/invariants/queue-scope-contract.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/reconcile.mjs --test-coverage-include=scripts/backlog-orchestrator/triage-router.mjs --test-coverage-include=scripts/invariants/growth-learning-policy.mjs --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=90 scripts/invariants/registry.test.mjs scripts/invariants/growth-learning-policy.test.mjs scripts/invariants/macos-swift-control.test.mjs scripts/invariants/optimization-contract.test.mjs scripts/invariants/screen-certification.test.mjs scripts/invariants/fleet-autonomy.test.mjs scripts/invariants/harness-contract.test.mjs scripts/invariants/queue-scope-contract.test.mjs scripts/invariants/performance-factory.test.mjs scripts/invariants/quality-ratchet.test.mjs scripts/invariant-stewardship/audit.test.mjs scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs scripts/backlog-orchestrator/__tests__/symphony-routing.test.mjs scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs && python3 scripts/tests/test_openai_symphony_install.py && python3 scripts/symphony/tests/codex-account-probe.test.py && python3 scripts/symphony/tests/symphony-lease-guard.test.py && python3 scripts/symphony/tests/gem-priority-gate.test.py && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract OfficialServiceCoverageContract && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/api/webhooks/linear.test.ts",
+    "invariants:check": "node scripts/invariants/validate.mjs && node scripts/invariants/queue-scope-contract.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/reconcile.mjs --test-coverage-include=scripts/backlog-orchestrator/triage-router.mjs --test-coverage-include=scripts/invariants/growth-learning-policy.mjs --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=90 scripts/invariants/registry.test.mjs scripts/invariants/growth-learning-policy.test.mjs scripts/invariants/macos-swift-control.test.mjs scripts/invariants/optimization-contract.test.mjs scripts/invariants/screen-certification.test.mjs scripts/invariants/fleet-autonomy.test.mjs scripts/invariants/harness-contract.test.mjs scripts/invariants/queue-scope-contract.test.mjs scripts/invariants/performance-factory.test.mjs scripts/invariants/quality-ratchet.test.mjs scripts/invariants/latency-sensitive-execution.test.mjs scripts/invariants/ios-web-no-scroll-jank.test.mjs scripts/invariant-stewardship/audit.test.mjs scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs scripts/backlog-orchestrator/__tests__/symphony-routing.test.mjs scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs && python3 scripts/tests/test_openai_symphony_install.py && python3 scripts/symphony/tests/codex-account-probe.test.py && python3 scripts/symphony/tests/symphony-lease-guard.test.py && python3 scripts/symphony/tests/gem-priority-gate.test.py && python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract OfficialServiceCoverageContract && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/api/webhooks/linear.test.ts",
     "ci:incident-contract:validate": "node scripts/ci-release-incident-contract.mjs",
     "ci:duration-ratchet": "node scripts/ci-duration-ratchet.mjs",
     "ci:duration-ratchet:validate": "node scripts/ci-duration-ratchet.mjs validate",
@@ -240,8 +240,9 @@
     "design:source-count-ratchet": "node scripts/design-system-source-ratchet.mjs",
     "design:authority:check": "node scripts/design-authority-guard.mjs",
     "design:conformance:check": "node scripts/design-conformance-check.mjs",
-    "design:conformance:test": "node --test scripts/design-conformance-check.test.mjs scripts/generate-design-tokens-export.test.mjs scripts/design-governance-audit.test.mjs scripts/invariant-stewardship/audit.test.mjs scripts/oklch-palette-guard.test.mjs scripts/shared-ui-visual-arbitrary-audit.test.mjs && pnpm --filter web exec vitest run --config vitest.config.mts tests/unit/design-system/ui-ownership-registry.test.ts tests/unit/design-system/app-screen-canvas-source-guard.test.ts tests/unit/design-system/app-screen-canvas-manifest.test.ts",
+    "design:conformance:test": "node --test scripts/design-conformance-check.test.mjs scripts/generate-design-tokens-export.test.mjs scripts/design-governance-audit.test.mjs scripts/invariant-stewardship/audit.test.mjs scripts/oklch-palette-guard.test.mjs scripts/shared-ui-visual-arbitrary-audit.test.mjs scripts/component-ownership-check.test.mjs && pnpm --filter web exec vitest run --config vitest.config.mts tests/unit/design-system/ui-ownership-registry.test.ts tests/unit/design-system/app-screen-canvas-source-guard.test.ts tests/unit/design-system/app-screen-canvas-manifest.test.ts",
     "component-ownership:test": "node --test scripts/component-ownership-check.test.mjs",
+    "design-eight-invariants:test": "node --test scripts/component-ownership-check.test.mjs && vitest --root scripts --config vitest.config.mts run lib/__tests__/component-rendered-invariant-policy.test.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/home/homepage-certified-optical-grid.test.ts tests/unit/home/homepage-optical-polish-v1.test.tsx",
     "design:conformance:gate": "pnpm design:conformance:test && pnpm design:conformance:check && pnpm design:oklch-palette:check && pnpm design:shared-ui-visual-arbitrary:check",
     "design:governance:audit": "node scripts/design-governance-audit.mjs",
     "invariants:stewardship": "node scripts/invariant-stewardship/audit.mjs",
@@ -266,16 +267,16 @@
     "backlog:test": "node --test scripts/backlog-orchestrator/__tests__/*.test.mjs"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.100.1",
-    "@biomejs/biome": "^2.5.1",
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@biomejs/biome": "^2.5.12",
     "@commitlint/cli": "^21.2.2",
-    "@commitlint/config-conventional": "^21.2.0",
+    "@commitlint/config-conventional": "^21.2.2",
     "@playwright/test": "1.63.0",
     "commitizen": "^4.3.2",
     "csv-parse": "^7.0.2",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
-    "knip": "^6.0.4",
+    "knip": "^6.34.0",
     "lint-staged": "^17.5.0",
     "playwright": "1.60.0",
     "tsx": "^4.23.13",

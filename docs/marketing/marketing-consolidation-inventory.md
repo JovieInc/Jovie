@@ -23,9 +23,13 @@ historical screenshots are not treated as proof of current behavior.
 - DOM owner attributes are identity-consistency evidence only. Import/callsite
   provenance remains a separate source gate, and route `bindingEvidence` stays
   `unverified` until the actual route passes the exact-head observer.
-- The terminal CTA on both acquisition routes remains deliberately unresolved
-  under JOV-5356. No footer/final-shell Pen ID or metadata alias may be borrowed
-  to manufacture certification.
+- The terminal CTA on both acquisition routes has truthful source ownership
+  under JOV-5356 (#17477): `section.cta` resolves to `MarketingCtaSection` with
+  an explicitly unknown Pen identity (zero Pen roots, recorded reason), and
+  HomepageClose (`editorial-search`) plus the YouTube inline CTA
+  (`included-single`) are source-bound variant occurrences — never aliases of
+  MarketingTerminalCta. No footer/final-shell Pen ID or metadata alias may be
+  borrowed to manufacture certification.
 - This composes the existing registry, route-health Playwright gate, visual
   snapshots, and governed review flow. It does not add a second registry,
   screenshot service, review UI, queue, CI lane, or design system.

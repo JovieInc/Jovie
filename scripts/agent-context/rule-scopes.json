@@ -1,13 +1,8 @@
 [
   {
     "file": ".claude/rules/auth.md",
-    "paths": [
-      "apps/web/**/auth/**",
-      "apps/web/**/clerk*",
-      "apps/web/proxy.ts",
-      "apps/web/tests/**"
-    ],
-    "bodySha256": "f4f47b3acc01d76d980d48344117bb41e3480daf0b4dba1c6d95af701e155ea2"
+    "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
+    "bodySha256": "f51100637f153d064b0c292b508a0b4ea5079fc238d86c6de4244f02e5ea3f5c"
   },
   {
     "file": ".claude/rules/ci-branching.md",
@@ -17,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "f6b327bba7ba7033cb351cf065945e476291b445d09c658573b4f1bbd294419d"
+    "bodySha256": "c08876df6d30729eddd8d7c8ec3e36b2338298c97cc54a463ef6b864e3591e26"
   },
   {
     "file": ".claude/rules/db.md",
@@ -44,7 +39,7 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "81ddf33073d91e23b2666d1330025c4d83bd743a1c2c806def16ef0122293938"
+    "bodySha256": "2524497e7f69a6fc2fe20bee4b1735bc3797d5c375d38ced0bb34c2090ac1142"
   },
   {
     "file": ".claude/rules/hermes-air.md",
@@ -141,7 +136,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "d8fc11d851d52ebf1ebf19308ea563be4041da85769d24bc0242ce7251c1ca90"
+    "bodySha256": "db9e655787d8cb9b4500a66d14e8419185a362b3cf3913e4b32459ad3bcc4bc6"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -152,6 +147,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "4fcf8773be1909d059c1fd20b90ef0cd594fb7d65a58e2d809544b7d60bb481f"
+    "bodySha256": "1b9a4c8bf35485f87bdc4f6d7154be9da5996460e8144dcd74dc2eb21a10e51b"
   }
 ]

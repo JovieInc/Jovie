@@ -34,6 +34,15 @@ with scripts, outbound network access, credentials, fan data, payments, artist
 accounts, production mutation, or destructive operations requires explicit
 human review even when the publisher is allowlisted.
 
+**Allowlist deny** (JOV-6188; see
+`docs/agent-context/vercel-agent-skills-coverage.md`): never install
+`vercel-cli-with-tokens`, `deploy-to-vercel`, `react-native-skills`, unscoped
+`react-view-transitions`, `writing-guidelines` as a product skill,
+`web-design-guidelines` as a parallel skill, or `vercel-optimize` as a skill.
+Reject imports that introduce SWR, `printenv`/grep tokens from `.env`,
+override `DESIGN.md` / design-canonical, expand task scope to app-wide
+animation, bypass deployment URL verification, or enable Observability Plus.
+
 ## Install Safely
 
 Install only an exact reviewed skill. Never install a source without

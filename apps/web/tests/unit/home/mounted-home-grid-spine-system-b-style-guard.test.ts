@@ -123,5 +123,23 @@ describe('mounted homepage grid spine System B source contract', () => {
         '--homepage-grid-gutter: var(--homepage-page-gutter);'
       );
     }
+
+    // homepage-optical-polish-v1: editorial sections reuse the shared
+    // 12-column desktop spans. 34rem is a reading-width limit, not a
+    // column position. Offset-copy / two-track-only rules belong in the
+    // certified optical-grid contract test.
+    const certifiedStart = cssSource.indexOf(
+      'HOMEPAGE CERTIFIED SECTIONS START'
+    );
+    const certified = cssSource.slice(
+      certifiedStart,
+      cssSource.indexOf('HOMEPAGE CERTIFIED SECTIONS END', certifiedStart)
+    );
+    expect(certified).toContain(
+      'grid-template-columns: repeat(12, minmax(0, 1fr))'
+    );
+    expect(certified).toContain('grid-column: 1 / span 6');
+    expect(certified).toContain('grid-column: 7 / span 6');
+    expect(certified).not.toMatch(/margin-left:\s*auto/);
   });
 });

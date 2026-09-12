@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE } from '@/lib/profile/opaque-internal-profile-handle';
 
 // ---------------------------------------------------------------------------
 // Type helpers for mock props
@@ -309,6 +310,31 @@ describe('@critical ReleaseLandingPage', () => {
     expect(artistLink.closest('a')?.getAttribute('href')).toBe('/timwhite');
   });
 
+  it('Never Say a Word artist name links to canonical /tim not the opaque ID', () => {
+    const fixture = NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE;
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        artist={{
+          name: fixture.ownerName,
+          handle: fixture.ownerHandle,
+          avatarUrl: null,
+        }}
+        primaryArtists={[
+          { name: fixture.artistName, handle: fixture.opaqueHandle },
+        ]}
+      />
+    );
+
+    const artistLink = screen.getByText(fixture.artistName);
+    expect(artistLink.closest('a')?.getAttribute('href')).toBe(
+      `/${fixture.ownerHandle}`
+    );
+    expect(artistLink.closest('a')?.getAttribute('href')).not.toBe(
+      fixture.opaqueProfilePath
+    );
+  });
+
   it('artist name is plain text when handle is null', () => {
     render(
       <ReleaseLandingPage
@@ -341,6 +367,27 @@ describe('@critical ReleaseLandingPage', () => {
     );
     expect(screen.getByText('Is this your music?')).toBeDefined();
     expect(screen.getByText('Claim profile')).toBeDefined();
+  });
+
+  it('renders every canonical primary artist in the byline', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        primaryArtists={[
+          { name: 'Tim White', handle: 'timwhite' },
+          { name: 'LYNX', handle: null },
+        ]}
+      />
+    );
+
+    const byline = screen.getByTestId('smart-link-artist-byline');
+    expect(byline.textContent).toBe('Tim White and LYNX');
+    expect(screen.getByText('Tim White').closest('a')).toHaveAttribute(
+      'href',
+      '/timwhite'
+    );
+    expect(screen.getByText('LYNX').tagName).toBe('SPAN');
+    expect(screen.getByText('LYNX').closest('a')).toBeNull();
   });
 
   it('featured artists line renders "feat." with linked names', () => {

@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Bell,
   CalendarDays,
+  ChevronLeft,
   ChevronRight,
   Disc3,
   House,
@@ -16,7 +17,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -29,9 +31,16 @@ import type {
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
-import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
+import {
+  getPublicProfileHistoryServerSnapshot,
+  getPublicProfileHistorySnapshot,
+  resolveProfileSurfaceState,
+  shouldShowPublicProfileBackChevron,
+  subscribeToPublicProfileHistory,
+} from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
@@ -42,6 +51,7 @@ import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import {
   publicLinkAriaLabel,
+  publicPlatformDisplayName,
   sanitizePublicHref,
 } from '@/lib/utils/public-url';
 import type { PublicContact } from '@/types/contacts';
@@ -97,6 +107,7 @@ interface ProfileDesktopSurfaceProps {
   readonly onDrawerViewChange: (view: DrawerView) => void;
   readonly onOpenMenu: () => void;
   readonly onPlayClick: () => void;
+  readonly onBack?: () => void;
   readonly profileHref: string;
   readonly isSubscribed?: boolean;
   readonly contentPrefs?: Record<NotificationContentType, boolean>;
@@ -251,6 +262,7 @@ export function ProfileDesktopSurface({
   onDrawerViewChange,
   onOpenMenu,
   onPlayClick,
+  onBack,
   profileHref,
   isSubscribed = false,
   contentPrefs = {
@@ -265,6 +277,17 @@ export function ProfileDesktopSurface({
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => setIsHydrated(true), []);
+  const isSignedIn = useIsAuthenticated();
+  const hasHistoryDestination = useSyncExternalStore(
+    subscribeToPublicProfileHistory,
+    getPublicProfileHistorySnapshot,
+    getPublicProfileHistoryServerSnapshot
+  );
+  const showBackChevron = shouldShowPublicProfileBackChevron({
+    isProfileRoot: activeMode === 'profile',
+    hasHistoryDestination,
+    isSignedIn,
+  });
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
@@ -447,9 +470,9 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex max-w-205 items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
-                  <span className='line-clamp-2'>{artist.name}</span>
+                  <span className='min-w-0 line-clamp-2'>{artist.name}</span>
                   {artist.is_verified ? (
                     <BadgeCheck
                       className='h-7 w-7 shrink-0'
@@ -478,9 +501,9 @@ export function ProfileDesktopSurface({
                     if (!link.platform) return null;
                     const href = sanitizePublicHref(link.url);
                     if (!href) return null;
-                    const platformLabel =
-                      link.platform.charAt(0).toUpperCase() +
-                      link.platform.slice(1);
+                    const platformLabel = publicPlatformDisplayName(
+                      link.platform
+                    );
                     return (
                       <a
                         key={link.id}
@@ -682,12 +705,30 @@ export function ProfileDesktopSurface({
                         {item.label}
                       </span>
                     </div>
-                    <Switch
-                      checked={checked}
-                      onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label={item.label}
-                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
-                    />
+                    {isSubscribed ? (
+                      // Subscribed visitors manage preferences in place: the
+                      // template's onTogglePref runs the real optimistic
+                      // mutation and rolls back on error.
+                      <Switch
+                        checked={checked}
+                        onCheckedChange={() =>
+                          onTogglePref(item.key as NotificationContentType)
+                        }
+                        aria-label={item.label}
+                        className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
+                      />
+                    ) : (
+                      // Unsubscribed visitors have no notification identity yet
+                      // (the prefs API requires an email/phone), so the row
+                      // routes into the subscribe flow instead — it must not
+                      // render a switch that flips and springs back.
+                      <Switch
+                        checked={false}
+                        onCheckedChange={() => onModeSelect('subscribe')}
+                        aria-label={item.label}
+                        className='data-[state=unchecked]:bg-white/14'
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -876,39 +917,55 @@ export function ProfileDesktopSurface({
         data-interactive-ready={isHydrated ? 'true' : undefined}
         data-testid='profile-desktop-surface'
       >
-        <div className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'>
-          <nav
-            className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
-            aria-label='Profile Navigation'
-          >
-            {visiblePrimaryTabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activePrimaryTab === tab.mode;
-              return (
-                <button
-                  key={tab.mode}
-                  type='button'
-                  onClick={() => onModeSelect(tab.mode)}
-                  data-testid={`profile-primary-tab-${tab.mode}`}
-                  className={cn(
-                    'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
-                    isActive
-                      ? 'text-white dark:text-white'
-                      : 'text-white/50 hover:text-white/78'
-                  )}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon
+        <div
+          className='relative z-20 flex shrink-0 items-center justify-between gap-4 px-5 pt-5'
+          data-testid='profile-desktop-top-chrome'
+        >
+          <div className='flex min-w-0 items-center gap-2'>
+            {showBackChevron && onBack ? (
+              <CircleIconButton
+                onClick={onBack}
+                size='lg'
+                variant='pearlQuiet'
+                className='profile-top-chrome-icon text-white dark:text-white'
+                ariaLabel='Back'
+              >
+                <ChevronLeft className='h-5 w-5' />
+              </CircleIconButton>
+            ) : null}
+            <nav
+              className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
+              aria-label='Profile Navigation'
+            >
+              {visiblePrimaryTabs.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activePrimaryTab === tab.mode;
+                return (
+                  <button
+                    key={tab.mode}
+                    type='button'
+                    onClick={() => onModeSelect(tab.mode)}
+                    data-testid={`profile-primary-tab-${tab.mode}`}
                     className={cn(
-                      'h-4 w-4 shrink-0 transition-colors duration-subtle',
-                      isActive && 'text-white dark:text-white'
+                      'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
+                      isActive
+                        ? 'text-white dark:text-white'
+                        : 'text-white/50 hover:text-white/78'
                     )}
-                  />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon
+                      className={cn(
+                        'h-4 w-4 shrink-0 transition-colors duration-subtle',
+                        isActive && 'text-white dark:text-white'
+                      )}
+                    />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
 
           <button
             type='button'

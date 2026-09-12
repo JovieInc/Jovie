@@ -1,4 +1,3 @@
-import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -17,6 +16,10 @@ import {
   shell,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import {
+  OPERATOR_SPAWN_TIMEOUT_MS,
+  runBoundedProcess,
+} from './bounded-process';
 import {
   DESKTOP_BUILD_IDENTITY_PRINT_FLAG,
   DESKTOP_BUILD_IDENTITY_RESOURCE_NAME,
@@ -46,13 +49,8 @@ import {
 } from './desktop-auth-security';
 import {
   buildDesktopUpdateMenuItem,
-  desktopBundlePathFromExecutable,
   hasNightlyUpdateFlag,
-  NIGHTLY_UPDATE_HOUR,
   NIGHTLY_UPDATE_TIMEOUT_MS,
-  nightlyUpdateLaunchAgentLabel,
-  nightlyUpdateMinute,
-  renderNightlyUpdateLaunchAgentPlist,
   shouldInstallDownloadedUpdateNow,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
@@ -71,6 +69,7 @@ import {
   getHudBuildFingerprint,
   isHudRoutePath,
 } from './hud-build-reload';
+import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -124,7 +123,11 @@ import {
   type TrayAction,
   type TrayStatePayload,
 } from './tray';
-import { sanitizeWindowState, type WindowState } from './window-state';
+import type { WindowState } from './window-state';
+import {
+  createWindowStateStore,
+  WINDOW_STATE_SHUTDOWN_FLUSH_MS,
+} from './window-state-store';
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
@@ -157,6 +160,7 @@ const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
 const APP_ICON_FILENAME =
   APP_ENV === 'production' ? 'icon.png' : 'icon-staging.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
+const APP_ICON_AVAILABLE = fs.existsSync(APP_ICON_PATH);
 const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
 const JOVIE_MARK_SVG_PATH =
   'm176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z';
@@ -165,6 +169,8 @@ const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
 function readPackagedBuildIdentityRecord(): unknown {
   if (!app.isPackaged) return null;
   try {
+    // Exact-site bootstrap read for About/identity before whenReady.
+    // Interactive window-state and launch-agent paths stay async.
     return JSON.parse(
       fs.readFileSync(
         path.join(process.resourcesPath, DESKTOP_BUILD_IDENTITY_RESOURCE_NAME),
@@ -706,27 +712,24 @@ const WINDOW_STATE_FILE = path.join(
 );
 
 function getAppIconPath(): string | undefined {
-  return fs.existsSync(APP_ICON_PATH) ? APP_ICON_PATH : undefined;
+  return APP_ICON_AVAILABLE ? APP_ICON_PATH : undefined;
 }
 
-function loadWindowState(): WindowState {
+const windowStateStore = createWindowStateStore({
+  filePath: WINDOW_STATE_FILE,
+});
+let windowStateQuitFlushed = false;
+
+async function hydrateWindowState(): Promise<WindowState> {
   const displayBounds = screen.getPrimaryDisplay().workArea;
   const connectedDisplays = screen
     .getAllDisplays()
     .map(display => display.workArea);
-
-  try {
-    const raw = fs.readFileSync(WINDOW_STATE_FILE, 'utf8');
-    const parsed: unknown = JSON.parse(raw);
-    return sanitizeWindowState(
-      parsed,
-      displayBounds,
-      reportDesktopSecurityEvent,
-      connectedDisplays
-    );
-  } catch {
-    return sanitizeWindowState(undefined, displayBounds);
-  }
+  return windowStateStore.load({
+    displayBounds,
+    connectedDisplays,
+    report: reportDesktopSecurityEvent,
+  });
 }
 
 function saveWindowState(win: BrowserWindow): void {
@@ -735,17 +738,12 @@ function saveWindowState(win: BrowserWindow): void {
   // pre-fullscreen bounds so those transient states are never persisted.
   if (win.isMinimized()) return;
   const bounds = win.getNormalBounds();
-  const state: WindowState = {
+  windowStateStore.scheduleSave({
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-  };
-  try {
-    fs.writeFileSync(WINDOW_STATE_FILE, JSON.stringify(state), 'utf8');
-  } catch {
-    // Non-fatal — window state loss is acceptable
-  }
+  });
 }
 
 function showWindowNow(win: BrowserWindow): void {
@@ -1159,11 +1157,11 @@ function buildDesktopShellHtml(input: {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${input.title}</title>
     <style>
-      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; }
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; --system-b-mark-cream: ${SYSTEM_B_DESKTOP_TOKENS.markCream}; }
       html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); color: var(--system-b-text-primary); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
       body { display: grid; place-items: center; overflow: hidden; }
-      .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; }
-      .mark { position: absolute; left: 50%; top: 50%; width: 180px; height: 180px; opacity: 0.035; pointer-events: none; transform: translate(-50%, -50%); }
+      .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; justify-items: center; }
+      .mark { width: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; height: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; color: var(--system-b-mark-cream); }
       .copy { position: relative; display: grid; gap: 8px; justify-items: center; }
       h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
       p { margin: 0; max-width: 34ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
@@ -1206,14 +1204,34 @@ function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
+function buildDesktopBootSplashHtml(): string {
+  const markPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
+  const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jovie</title>
+    <style>
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-mark-cream: ${markCream}; }
+      html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); }
+      body { display: grid; place-items: center; overflow: hidden; }
+      .mark { width: ${markPx}px; height: ${markPx}px; color: var(--system-b-mark-cream); }
+    </style>
+  </head>
+  <body>
+    <main role="main" aria-label="Jovie is loading" data-desktop-splash="splash-b">
+      <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
+        <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
+      </svg>
+    </main>
+  </body>
+</html>`;
+}
+
 function buildDesktopBootSplashUrl(): string {
-  const html = buildDesktopShellHtml({
-    title: 'Jovie',
-    heading: 'Loading Jovie',
-    body: 'Starting the app…',
-    identityHtml: renderDesktopBuildIdentitySection(desktopBuildIdentity),
-  });
-  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(buildDesktopBootSplashHtml())}`;
 }
 
 function buildDesktopAboutUrl(): string {
@@ -1232,9 +1250,9 @@ function buildDesktopAboutUrl(): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
-function persistDesktopBuildIdentityEvidence(): void {
+async function persistDesktopBuildIdentityEvidence(): Promise<void> {
   try {
-    fs.writeFileSync(
+    await fs.promises.writeFile(
       path.join(app.getPath('userData'), DESKTOP_BUILD_IDENTITY_RESOURCE_NAME),
       toDesktopBuildIdentityJson(desktopBuildIdentity)
     );
@@ -1908,7 +1926,7 @@ function attachRendererRecovery(
 }
 
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
-  const windowState = loadWindowState();
+  const windowState = windowStateStore.peek();
 
   const win = new BrowserWindow({
     show: false,
@@ -2076,6 +2094,12 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     return { action: 'deny' };
   });
 
+  win.on('resize', () => {
+    saveWindowState(win);
+  });
+  win.on('move', () => {
+    saveWindowState(win);
+  });
   win.on('close', () => {
     saveWindowState(win);
   });
@@ -2223,52 +2247,20 @@ function scheduleDesktopAutoUpdate(): void {
   interval.unref?.();
 }
 
-function installNightlyUpdateLaunchAgent(): void {
-  if (
-    nightlyUpdateLaunch ||
-    !app.isPackaged ||
-    process.platform !== 'darwin' ||
-    !desktopUpdatesSupported()
-  ) {
-    return;
-  }
-
-  const label = nightlyUpdateLaunchAgentLabel(APP_ENV);
-  const minute = nightlyUpdateMinute(APP_ENV);
-  if (!label || minute === null) {
-    return;
-  }
-
-  const bundlePath = desktopBundlePathFromExecutable(process.execPath);
-  const plistPath = path.join(
-    app.getPath('home'),
-    'Library',
-    'LaunchAgents',
-    `${label}.plist`
-  );
-  fs.mkdirSync(path.dirname(plistPath), { recursive: true });
-  fs.writeFileSync(
-    plistPath,
-    renderNightlyUpdateLaunchAgentPlist({
-      label,
-      bundlePath,
-      hour: NIGHTLY_UPDATE_HOUR,
-      minute,
-    }),
-    'utf8'
-  );
-
-  const uid = process.getuid?.();
-  if (typeof uid !== 'number') {
-    return;
-  }
-
-  const domain = `gui/${uid}`;
-  spawnSync('launchctl', ['bootout', `${domain}/${label}`], {
-    stdio: 'ignore',
-  });
-  spawnSync('launchctl', ['bootstrap', domain, plistPath], {
-    stdio: 'ignore',
+function scheduleNightlyUpdateLaunchAgent(): void {
+  void installNightlyUpdateLaunchAgent({
+    nightlyUpdateLaunch,
+    packaged: app.isPackaged,
+    platform: process.platform,
+    appEnv: APP_ENV,
+    execPath: process.execPath,
+    homeDirectory: app.getPath('home'),
+    uid: process.getuid?.(),
+  }).catch(error => {
+    console.warn(
+      '[jovie-desktop-launch-agent]',
+      error instanceof Error ? error.message : String(error)
+    );
   });
 }
 
@@ -2517,9 +2509,17 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', event => {
   summerRuntimeBridge?.stop();
   summerRuntimeBridge = null;
+  if (windowStateQuitFlushed || !windowStateStore.needsFlush()) return;
+  windowStateQuitFlushed = true;
+  event.preventDefault();
+  void windowStateStore
+    .flushOnShutdown(WINDOW_STATE_SHUTDOWN_FLUSH_MS)
+    .finally(() => {
+      app.quit();
+    });
 });
 
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
@@ -2748,10 +2748,10 @@ if (gotSingleInstanceLock) {
   pendingLegacyAuthReturnRoute = findLegacyAuthReturnRouteInArgv(process.argv);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 
-  persistDesktopBuildIdentityEvidence();
+  void persistDesktopBuildIdentityEvidence();
   app.setAboutPanelOptions({
     applicationName: getDesktopAppDisplayName(),
     applicationVersion: desktopBuildIdentity.version,
@@ -2791,7 +2791,7 @@ app.whenReady().then(() => {
     return;
   }
 
-  installNightlyUpdateLaunchAgent();
+  await hydrateWindowState();
 
   // macOS menu bar extra (NSStatusItem via Electron Tray)
   if (process.platform === 'darwin') {
@@ -2810,6 +2810,7 @@ app.whenReady().then(() => {
   );
   if (directProfileUrl) showPublicProfilePreview(directProfileUrl);
   pendingLegacyAuthReturnRoute = null;
+  scheduleNightlyUpdateLaunchAgent();
   scheduleDesktopAutoUpdate();
   scheduleHudBuildAutoReload();
 
@@ -2889,14 +2890,17 @@ ipcMain.handle(
     }
     const spec = terminalLaunchSpec(process.platform, decision.command);
     if (!spec) return { ok: false, reason: 'unsupported-platform' };
-    try {
-      spawn(spec.command, [...spec.args], {
-        detached: true,
-        stdio: 'ignore',
-      }).unref();
-      return { ok: true };
-    } catch {
-      return { ok: false, reason: 'open-terminal-failed' };
+    const launched = await runBoundedProcess({
+      command: spec.command,
+      args: spec.args,
+      timeoutMs: OPERATOR_SPAWN_TIMEOUT_MS,
+      detached: true,
+      stdio: 'ignore',
+      waitForExit: false,
+    });
+    if (!launched.ok) {
+      return { ok: false, reason: launched.reason };
     }
+    return { ok: true };
   }
 );

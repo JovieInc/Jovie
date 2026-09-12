@@ -40,6 +40,7 @@ describe('MarketingFooter', () => {
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.footer
     );
+    expect(MARKETING_PEN_CONTRACT_IDS.shell.footer).toBe('jhV4a');
     expect(footer.firstElementChild).toHaveClass(
       'max-w-public-content',
       'px-5',
@@ -79,7 +80,7 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText('Built for artists. By artists.')
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Connect' })
     ).not.toBeInTheDocument();
@@ -98,23 +99,33 @@ describe('MarketingFooter', () => {
       'href',
       '/cli'
     );
-  });
-
-  it.each([
-    '/artist-profiles',
-    '/artist-profile',
-  ])('keeps %s on the minimal homepage footer treatment', pathname => {
-    mockUsePathname.mockReturnValue(pathname);
-
-    render(<MarketingFooter />);
-
-    expect(screen.getByTestId('marketing-footer')).toHaveClass(
-      'system-b-mounted-home-footer'
+    const homeLink = screen.getByRole('link', { name: 'Jovie Home' });
+    const baseband = document.querySelector('.mf-baseband');
+    expect(homeLink.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
     );
-    expect(
-      screen.queryByTestId('marketing-footer-cta')
-    ).not.toBeInTheDocument();
+    expect(baseband).toContainElement(homeLink);
+    expect(baseband?.querySelector(':scope > .mf-copyright')).toHaveTextContent(
+      /Jovie Technology Inc/
+    );
   });
+
+  it.each(['/artist-profiles', '/artist-profile'])(
+    'keeps %s on the minimal homepage footer treatment',
+    pathname => {
+      mockUsePathname.mockReturnValue(pathname);
+
+      render(<MarketingFooter />);
+
+      expect(screen.getByTestId('marketing-footer')).toHaveClass(
+        'system-b-mounted-home-footer'
+      );
+      expect(
+        screen.queryByTestId('marketing-footer-cta')
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('omits the terminal CTA on the support route', () => {
     mockUsePathname.mockReturnValue('/support');

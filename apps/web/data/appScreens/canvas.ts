@@ -162,9 +162,9 @@ export const APP_SCREEN_CANVAS_EXCEPTIONS: Readonly<
   }),
   'apps/web/app/app/(shell)/youtube/page.tsx': screenOwned({
     source:
-      'apps/web/components/features/dashboard/youtube/RevivalQueuePanel.tsx',
+      'apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx',
     component: 'AppShellContentPanel',
-    enclosingFunction: 'RevivalQueuePanel',
+    enclosingFunction: 'YouTubeChannelPilotPanel',
   }),
 };
 

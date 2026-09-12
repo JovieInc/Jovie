@@ -1,4 +1,9 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import {
+  evaluateAcceptanceEvidence,
+  evaluateRelationalGrid,
+  evaluateSharedSearchGeometry,
+} from '../../../../scripts/component-rendered-invariant-policy.mjs';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -486,6 +491,74 @@ test.describe('Homepage', () => {
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
+  test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoHomepage(page);
+    await page.evaluate(() => document.fonts.ready);
+
+    const proof = page.getByTestId('marketing-section-logo-cloud');
+    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-presentation',
+      'inline-strip'
+    );
+    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
+
+    const logoBoxes = await proof.locator('svg').evaluateAll(svgs =>
+      svgs.map(svg => {
+        const box = svg.getBoundingClientRect();
+        return {
+          label: svg.getAttribute('aria-label') ?? svg.textContent ?? '',
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        };
+      })
+    );
+    expect(logoBoxes).toHaveLength(4);
+    for (let index = 0; index < logoBoxes.length; index += 1) {
+      for (let other = index + 1; other < logoBoxes.length; other += 1) {
+        const a = logoBoxes[index];
+        const b = logoBoxes[other];
+        const overlaps =
+          a.left < b.right &&
+          a.right > b.left &&
+          a.top < b.bottom &&
+          a.bottom > b.top;
+        expect(overlaps, `${a.label} overlaps ${b.label} at 1280px`).toBe(
+          false
+        );
+      }
+    }
+
+    const headerBottom = await page
+      .getByTestId('header-nav')
+      .evaluate(header => {
+        const shell = header.querySelector('.marketing-glass-header__shell');
+        return (shell ?? header).getBoundingClientRect().bottom;
+      });
+
+    const headings = page.locator('[data-homepage-section-heading]');
+    const headingCount = await headings.count();
+    expect(headingCount).toBeGreaterThanOrEqual(7);
+
+    for (let index = 0; index < headingCount; index += 1) {
+      const heading = headings.nth(index);
+      const name = (await heading.innerText()).trim();
+      await heading.evaluate(element => {
+        element.scrollIntoView({ block: 'start', inline: 'nearest' });
+      });
+      const top = await heading.evaluate(
+        element => element.getBoundingClientRect().top
+      );
+      expect(top, `${name} must clear the sticky nav`).toBeGreaterThanOrEqual(
+        headerBottom - 0.5
+      );
+    }
+  });
+
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
     page,
   }) => {
@@ -529,17 +602,19 @@ test.describe('Homepage', () => {
           '.homepage-name-search__field'
         );
         const glow = element.querySelector<HTMLElement>(
-          ":scope > .group\\/aura > [aria-hidden='true']"
+          '.input-aura-frame__illumination'
         );
         if (!(field && glow)) return null;
         const fieldBounds = field.getBoundingClientRect();
         const glowBounds = glow.getBoundingClientRect();
+        const glowStyle = getComputedStyle(glow);
         return {
           fieldLeft: fieldBounds.left,
           fieldRight: fieldBounds.right,
           glowLeft: glowBounds.left,
           glowRight: glowBounds.right,
-          glowClipPath: getComputedStyle(glow).clipPath,
+          glowMaskComposite: glowStyle.maskComposite,
+          glowWebkitMaskComposite: glowStyle.webkitMaskComposite,
         };
       }),
     ]);
@@ -560,7 +635,11 @@ test.describe('Homepage', () => {
       searchMaterial?.fieldRight ?? Number.NaN,
       0
     );
-    expect(searchMaterial?.glowClipPath).not.toBe('none');
+    expect(
+      searchMaterial?.glowMaskComposite === 'exclude' ||
+        searchMaterial?.glowWebkitMaskComposite === 'xor' ||
+        searchMaterial?.glowWebkitMaskComposite === 'XOR'
+    ).toBe(true);
     await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
 
     await page.evaluate(() => {
@@ -675,6 +754,231 @@ test.describe('Homepage', () => {
       expect(headingLines).toBeLessThanOrEqual(3);
       await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
     }
+  });
+
+  test('editorial sections share one desktop column grid and scaled phone chrome', async ({
+    page,
+  }) => {
+    const measure = async (width: number) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+      return page.evaluate(() => {
+        const copies = [
+          ...document.querySelectorAll<HTMLElement>(
+            '.homepage-certified-section .homepage-certified-section__copy'
+          ),
+        ];
+        const starts = copies.map(copy => {
+          const section = copy.closest<HTMLElement>(
+            '.homepage-certified-section'
+          );
+          return {
+            align: section?.dataset.align ?? '',
+            left: copy.getBoundingClientRect().left,
+          };
+        });
+        const startLefts = starts
+          .filter(entry => entry.align === 'start')
+          .map(entry => entry.left);
+        const endLefts = starts
+          .filter(entry => entry.align === 'end')
+          .map(entry => entry.left);
+        const notches = [
+          ...document.querySelectorAll<HTMLElement>(
+            '.homepage-certified-section__phones[data-count="3"] .ap-phone-frame'
+          ),
+        ].map(frame => {
+          const notch = frame.querySelector<HTMLElement>(
+            '.ap-phone-frame__notch'
+          );
+          const frameWidth = frame.getBoundingClientRect().width;
+          const notchWidth = notch?.getBoundingClientRect().width ?? 0;
+          return { frameWidth, notchWidth, ratio: notchWidth / frameWidth };
+        });
+        return { startLefts, endLefts, notches };
+      });
+    };
+
+    const spread = (values: number[]) =>
+      Math.max(...values) - Math.min(...values);
+
+    const desktop = await measure(1440);
+    expect(spread(desktop.startLefts)).toBeLessThanOrEqual(2);
+    expect(spread(desktop.endLefts)).toBeLessThanOrEqual(2);
+    expect(
+      evaluateRelationalGrid({
+        candidateRevision: 'live',
+        route: '/',
+        viewport: { width: 1440, height: 900 },
+        state: 'idle',
+        theme: 'light',
+        sourceTokensPass: true,
+        elements: desktop.endLefts.map((x, index) => ({
+          id: `end-copy-${index}`,
+          column: '7 / span 6',
+          align: 'end',
+          role: 'copy',
+          box: { x, y: 0, width: 0, height: 0 },
+        })),
+      }).ok
+    ).toBe(true);
+    expect(
+      evaluateAcceptanceEvidence({
+        candidateRevision: 'live',
+        route: '/',
+        viewport: { width: 1440, height: 900 },
+        state: 'idle',
+        theme: 'light',
+        sourceTokensPass: true,
+        rendered: { aligned: spread(desktop.endLefts) <= 2 },
+        screenshotBaselineUpdated: false,
+      }).ok
+    ).toBe(true);
+    expect(desktop.endLefts[0] ?? 0).toBeGreaterThan(
+      (desktop.startLefts[0] ?? 0) + 80
+    );
+
+    const aboveSwitch = await measure(900);
+    const belowSwitch = await measure(899);
+    expect(spread(aboveSwitch.startLefts)).toBeLessThanOrEqual(2);
+    expect(spread(aboveSwitch.endLefts)).toBeLessThanOrEqual(2);
+    expect(aboveSwitch.endLefts[0] ?? 0).toBeGreaterThan(
+      (aboveSwitch.startLefts[0] ?? 0) + 40
+    );
+    expect(
+      spread([...belowSwitch.startLefts, ...belowSwitch.endLefts])
+    ).toBeLessThanOrEqual(2);
+
+    const mobile = await measure(390);
+    expect(
+      spread([...mobile.startLefts, ...mobile.endLefts])
+    ).toBeLessThanOrEqual(2);
+    expect(mobile.notches.length).toBeGreaterThan(0);
+    for (const notch of mobile.notches) {
+      expect(notch.ratio).toBeLessThan(0.45);
+      expect(notch.notchWidth).toBeLessThan(notch.frameWidth);
+    }
+  });
+
+  test('optical polish keeps shared search geometry and a quiet hero field', async ({
+    page,
+  }) => {
+    await page.evaluate(() => document.fonts.ready);
+
+    const measureSearch = (root: string) =>
+      page.locator(root).evaluate(element => {
+        const field = element.querySelector<HTMLElement>(
+          '.homepage-name-search__field'
+        );
+        const glow = element.querySelector<HTMLElement>(
+          '.input-aura-frame__illumination'
+        );
+        const action = element.querySelector<HTMLElement>(
+          'button[data-size="marketing"]'
+        );
+        if (!(field && glow && action)) return null;
+        const fieldBox = field.getBoundingClientRect();
+        const actionBox = action.getBoundingClientRect();
+        const fieldStyle = getComputedStyle(field);
+        const glowStyle = getComputedStyle(glow);
+        return {
+          fieldHeight: fieldBox.height,
+          fieldBackground: fieldStyle.backgroundColor,
+          insetTop: actionBox.top - fieldBox.top,
+          insetBottom: fieldBox.bottom - actionBox.bottom,
+          insetRight: fieldBox.right - actionBox.right,
+          actionHeight: actionBox.height,
+          glowTop: glow.getBoundingClientRect().top,
+          fieldTop: fieldBox.top,
+          maskComposite: glowStyle.maskComposite,
+          treatment: element
+            .querySelector('[data-aura-treatment]')
+            ?.getAttribute('data-aura-treatment'),
+        };
+      });
+
+    const heroSearch = await measureSearch(
+      '[data-testid="homepage-editorial-hero-search"]'
+    );
+    const closeSearch = await measureSearch(
+      '[data-testid="homepage-close-search"]'
+    );
+    expect(heroSearch).not.toBeNull();
+    expect(closeSearch).not.toBeNull();
+    expect(heroSearch?.treatment).toBe('editorial');
+    expect(closeSearch?.treatment).toBe('editorial');
+    expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
+    expect(closeSearch?.actionHeight).toBeCloseTo(28, 0);
+    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
+    expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
+    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetBottom ?? 0, 0);
+    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetRight ?? 0, 0);
+    expect(heroSearch?.fieldHeight).toBeCloseTo(
+      closeSearch?.fieldHeight ?? 0,
+      0
+    );
+    expect(heroSearch?.fieldBackground).toBe(closeSearch?.fieldBackground);
+    expect(
+      evaluateSharedSearchGeometry({
+        hero: {
+          treatment: heroSearch?.treatment,
+          fieldHeight: heroSearch?.fieldHeight,
+          fieldBackground: heroSearch?.fieldBackground,
+          consumerAuraPierce: false,
+        },
+        close: {
+          treatment: closeSearch?.treatment,
+          fieldHeight: closeSearch?.fieldHeight,
+          fieldBackground: closeSearch?.fieldBackground,
+          consumerAuraPierce: false,
+        },
+      }).ok
+    ).toBe(true);
+
+    const input = page
+      .getByTestId('homepage-editorial-hero-search')
+      .getByRole('combobox');
+    const idleBackground = heroSearch?.fieldBackground;
+    await input.focus();
+    const focused = await measureSearch(
+      '[data-testid="homepage-editorial-hero-search"]'
+    );
+    expect(focused?.fieldBackground).toBe(idleBackground);
+    expect(focused?.fieldHeight).toBeCloseTo(heroSearch?.fieldHeight ?? 0, 0);
+
+    const lightWell = page.locator('.homepage-editorial-hero__light-well');
+    expect(
+      await lightWell.evaluate(element => {
+        const style = getComputedStyle(element);
+        return {
+          borderWidth: style.borderWidth,
+          backgroundImage: style.backgroundImage,
+        };
+      })
+    ).toMatchObject({
+      borderWidth: '0px',
+      backgroundImage: expect.not.stringMatching(/55\.1%/),
+    });
+
+    await page.setViewportSize({ width: 900, height: 800 });
+    await page.evaluate(() => document.fonts.ready);
+    const heading = page.getByRole('heading', {
+      name: 'Control how the world sees you.',
+    });
+    const headingLines = await heading.evaluate(element => {
+      const style = getComputedStyle(element);
+      return Math.ceil(
+        element.getBoundingClientRect().height /
+          Number.parseFloat(style.lineHeight) -
+          0.05
+      );
+    });
+    expect(headingLines).toBe(1);
   });
 
   test('loads without critical console errors', async ({ page }) => {

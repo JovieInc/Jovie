@@ -2,16 +2,25 @@ name: HA CI remediator poke
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Hyperagent
 # necessary-trust-boundary: GitHub-hosted CI failure events on pull_request/merge_group
-#   wake the Hyperagent remediator via a signed outbound webhook. No self-hosted
+#   wake the Hyperagent remediator via X-Hyperagent-Webhook-Secret (HA docs;
+#   ha-webhook-auth-only-v1). Timestamp/Signature HMAC headers are also sent;
+#   HA ignores them and 401s only when the secret header is missing. Do not
+#   send Authorization Bearer as a substitute. No self-hosted
 #   runner access, no local systemd, no Symphony port pokes.
 # removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
-# idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA.
-#   - Workflow-level concurrency serializes same-key runs (FIFO, no cancel), so
-#     a redelivery storm can never race the webhook POST below.
-#   - The job-level filter fails closed: only CI failures on pull_request/merge_group
-#     for non-excluded PRs are forwarded.
-#   - Successful runs are the durable dedup record (GitHub Actions run history);
-#     no external state, so restarts cannot lose ownership of a key.
+# idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA,
+#   and at most one new remediator thread per open PR inside a 45-minute window.
+#   - Workflow-level concurrency is per-PR (not PR+sha), FIFO, no cancel. Same-PR
+#     storms serialize instead of racing; queued runs still hit the gate.
+#   - Gate (merged/closed + commit-status receipt per sha + 45m per-PR cooldown /
+#     in-flight via run-name `ha-remediate/PR<n>/`) runs before the webhook POST.
+#   - Durable per-sha receipt is the commit status context `ha-ci-remediator-poke`
+#     (success|pending). Do NOT use Actions `runs?head_sha=$HEAD_SHA&status=success`:
+#     poke-run Actions `head_sha` is the default-branch tip that holds this file,
+#     not the failing PR head, so that filter stays ~0.
+#   - `force: true` on workflow_dispatch is the only bounded-retry escape hatch.
+#   - Successful HTTP 202 writes the status receipt; non-202 must stay retryable.
+run-name: ha-remediate/PR${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}/${{ github.event.workflow_run.head_sha || github.sha }}
 on:
   workflow_run:
     workflows: ['CI']
@@ -26,10 +35,12 @@ on:
         description: 'Bounded retry: poke even if a poke already succeeded for this head SHA'
         type: boolean
         default: false
-permissions: {}
+permissions:
+  actions: read
+  pull-requests: read
+  statuses: write
 concurrency:
-  group: >-
-    ha-ci-remediator-${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}-${{ github.event.workflow_run.head_sha || github.sha }}
+  group: ha-ci-remediator-${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}
   cancel-in-progress: false
 jobs:
   poke:
@@ -42,12 +53,75 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    permissions: {}
+    permissions:
+      actions: read
+      pull-requests: read
+      statuses: write
     steps:
+      - name: Gate duplicate, merged, closed, and cooldown keys
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || '' }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          FORCE: ${{ inputs.force || false }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${PR_NUMBER:-}" ]; then
+            pr_json=$(gh api "repos/$REPO/pulls/$PR_NUMBER")
+            merged=$(jq -r '.merged' <<<"$pr_json")
+            state=$(jq -r '.state' <<<"$pr_json")
+            if [ "$merged" = "true" ] || [ "$state" != "open" ]; then
+              echo "::notice::PR #$PR_NUMBER is $state (merged=$merged); remediation key is terminal. Skipping poke."
+              exit 0
+            fi
+          fi
+
+          if [ "${FORCE:-false}" != "true" ]; then
+            if [ -n "${HEAD_SHA:-}" ]; then
+              receipt_hits=$(gh api "repos/$REPO/commits/$HEAD_SHA/statuses?per_page=100" \
+                | jq '[.[] | select(.context == "ha-ci-remediator-poke" and (.state == "success" or .state == "pending"))] | length')
+              if [ "${receipt_hits:-0}" -gt 0 ]; then
+                echo "::notice::already delivered/in-flight for this head SHA ($HEAD_SHA). Skipping poke."
+                exit 0
+              fi
+            fi
+
+            if [ -n "${PR_NUMBER:-}" ]; then
+              now_epoch=$(date -u +%s)
+              cooldown_hits=$(gh api "repos/$REPO/actions/workflows/ha-ci-remediator-poke.yml/runs?per_page=30" \
+                | jq --arg prefix "ha-remediate/PR${PR_NUMBER}/" --argjson run_id "${RUN_ID:-0}" --argjson now "$now_epoch" '
+                  [
+                    .workflow_runs[]
+                    | select((.id | tonumber) != $run_id)
+                    | select((.display_title // "") | startswith($prefix))
+                    | select(
+                        (.status == "in_progress" or .status == "queued")
+                        or (
+                          .conclusion == "success"
+                          and ((.created_at | fromdateiso8601) as $created | ($now - $created) <= 2700)
+                        )
+                      )
+                  ] | length
+                ')
+              if [ "${cooldown_hits:-0}" -gt 0 ]; then
+                echo "::notice::remediator already poked for this PR within cooldown / in flight. Skipping poke."
+                exit 0
+              fi
+            fi
+          fi
+
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
       - name: Poke Hyperagent CI remediator
+        if: steps.gate.outputs.proceed == 'true'
         env:
           WEBHOOK_URL: ${{ secrets.HYPERAGENT_CI_WEBHOOK_URL }}
           WEBHOOK_SECRET: ${{ secrets.HYPERAGENT_CI_WEBHOOK_SECRET }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || '' }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           RUN_URL: ${{ github.event.workflow_run.html_url || inputs.run_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
@@ -56,13 +130,34 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ -z "${WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
+            echo "::error::HYPERAGENT_CI_WEBHOOK_URL and HYPERAGENT_CI_WEBHOOK_SECRET are required. Refusing an unauthenticated Hyperagent poke (ha-webhook-auth-only-v1)."
+            exit 1
+          fi
+
+          write_receipt() {
+            local state="$1"
+            local desc="$2"
+            if [ -z "${HEAD_SHA:-}" ]; then
+              return 0
+            fi
+            gh api "repos/$REPO/statuses/$HEAD_SHA" \
+              -f state="$state" \
+              -f context=ha-ci-remediator-poke \
+              -f description="$desc" \
+              -f target_url="$RUN_URL"
+          }
+
+          write_receipt pending "HA remediator poke in flight"
+
           payload=$(jq -n \
             --arg repo "$REPO" \
             --arg pr_number "$PR_NUMBER" \
             --arg head_sha "$HEAD_SHA" \
             --arg run_url "$RUN_URL" \
             --arg event "$EVENT" \
-            '{repository: $repo, pr_number: ($pr_number | tonumber? // null), head_sha: $head_sha, run_url: $run_url, event: $event, source: "ha-ci-remediator-poke"}')
+            --arg idempotency_key "ha-ci-remediator:${REPO}:PR${PR_NUMBER}:${HEAD_SHA}" \
+            '{repository: $repo, pr_number: ($pr_number | tonumber? // null), head_sha: $head_sha, run_url: $run_url, event: $event, source: "ha-ci-remediator-poke", idempotency_key: $idempotency_key}')
 
           timestamp=$(date -u +%s)
           signature=$(printf '%s.%s' "$timestamp" "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)
@@ -70,6 +165,7 @@ jobs:
           http_code=$(curl -sS -o /tmp/hyperagent-response -w '%{http_code}' \
             -X POST --max-time 5 \
             -H 'Content-Type: application/json' \
+            -H "X-Hyperagent-Webhook-Secret: $WEBHOOK_SECRET" \
             -H "X-Hyperagent-Webhook-Timestamp: $timestamp" \
             -H "X-Hyperagent-Webhook-Signature: sha256=$signature" \
             -d "$payload" \
@@ -78,7 +174,12 @@ jobs:
           if [ "$http_code" != "202" ]; then
             echo "::error::Hyperagent CI webhook returned HTTP $http_code (expected 202). Response:"
             cat /tmp/hyperagent-response
+            write_receipt failure "HA remediator poke failed HTTP $http_code" || true
             exit 1
+          fi
+
+          if ! write_receipt success "HA remediator poke delivered"; then
+            echo "::warning::Failed to write ha-ci-remediator-poke commit status for $HEAD_SHA after HTTP 202."
           fi
 
           echo "::notice::Hyperagent CI remediator poke accepted (HTTP 202)."

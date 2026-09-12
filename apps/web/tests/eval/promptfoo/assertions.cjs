@@ -3621,6 +3621,14 @@ function assertSkillPromptContractCovered(output) {
       `retouch generation prompt missing facts: ${missingGenerationFacts.join(', ')}`
     );
   }
+  const missingRetouchFacts = Array.isArray(retouch.missingFacts)
+    ? retouch.missingFacts
+    : [];
+  if (missingRetouchFacts.length > 0) {
+    return fail(
+      `retouch identity gate missing facts: ${missingRetouchFacts.join(', ')}`
+    );
+  }
 
   const packaging = payload.packaging ?? {};
   if (!packaging || typeof packaging !== 'object') {
@@ -3752,6 +3760,34 @@ function assertSmartLinkSwitchRuleCase(output) {
   if (smartLinkSwitch.ruleCasePassed !== true) {
     return fail(
       `smart link switch rule case failed: ${String(smartLinkSwitch.ruleCase)} ${String(smartLinkSwitch.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertReleasePitchRuleCase(output) {
+  const payload = parseOutput(output);
+  const releasePitch = payload.releasePitch ?? {};
+  if (releasePitch.skillId !== 'generateReleasePitch') {
+    return fail('release pitch rule case is not tied to generateReleasePitch');
+  }
+  if (releasePitch.ruleCasePassed !== true) {
+    return fail(
+      `release pitch rule case failed: ${String(releasePitch.ruleCase)} ${String(releasePitch.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertRetouchRuleCase(output) {
+  const payload = parseOutput(output);
+  const retouch = payload.retouch ?? {};
+  if (retouch.skillId !== 'retouch') {
+    return fail('retouch rule case is not tied to retouch');
+  }
+  if (retouch.ruleCasePassed !== true) {
+    return fail(
+      `retouch rule case failed: ${String(retouch.ruleCase)} ${String(retouch.ruleCaseReason)}`
     );
   }
   return pass();
@@ -5250,6 +5286,8 @@ module.exports = {
   assertChannelPlaylistRuleCase,
   assertFanEmailRuleCase,
   assertSmartLinkSwitchRuleCase,
+  assertReleasePitchRuleCase,
+  assertRetouchRuleCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

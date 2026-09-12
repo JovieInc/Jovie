@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authClerkLocalization } from '@/components/providers/clerkLocalization';
+import { authCopy } from '@/components/providers/auth-copy';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   getHomepageFrontDoorCtaContract,
@@ -39,7 +39,7 @@ describe('auth front-door contract', () => {
     expect(APP_ROUTES.SIGNIN).toBe('/signin');
   });
 
-  it('redirects legacy hyphenated auth paths to the canonical Clerk routes', async () => {
+  it('redirects legacy hyphenated auth paths to the canonical auth routes', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = await nextConfig.redirects();
@@ -64,19 +64,13 @@ describe('auth front-door contract', () => {
     });
   });
 
-  it('keeps Clerk-owned auth copy aligned with the canonical cross-links', () => {
-    expect(authClerkLocalization.signUp.start.title).toBe(
-      'Create your account'
-    );
-    expect(authClerkLocalization.signUp.start.actionText).toBe(
-      'Have an account?'
-    );
-    expect(authClerkLocalization.signUp.start.actionLink).toBe('Sign in');
+  it('keeps first-party auth copy aligned with the canonical cross-links', () => {
+    expect(authCopy.signUp.start.title).toBe('Create your account');
+    expect(authCopy.signUp.start.actionText).toBe('Have an account?');
+    expect(authCopy.signUp.start.actionLink).toBe('Sign in');
 
-    expect(authClerkLocalization.signIn.start.title).toBe('Welcome back');
-    expect(authClerkLocalization.signIn.start.actionText).toBe('No account?');
-    expect(authClerkLocalization.signIn.start.actionLink).toBe(
-      'Create your account'
-    );
+    expect(authCopy.signIn.start.title).toBe('Welcome back');
+    expect(authCopy.signIn.start.actionText).toBe('No account?');
+    expect(authCopy.signIn.start.actionLink).toBe('Create your account');
   });
 });

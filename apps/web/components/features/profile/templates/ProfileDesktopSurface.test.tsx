@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -120,6 +120,12 @@ vi.mock('@/lib/dsp', () => ({
   sortDSPsByGeoPopularity: (value: unknown) => value,
 }));
 
+const mockUseIsAuthenticated = vi.hoisted(() => vi.fn(() => false));
+
+vi.mock('@/hooks/useIsAuthenticated', () => ({
+  useIsAuthenticated: () => mockUseIsAuthenticated(),
+}));
+
 const artist = {
   id: 'artist-1',
   owner_user_id: 'user-1',
@@ -152,6 +158,60 @@ const contentPrefs: Record<NotificationContentType, boolean> = {
 };
 
 describe('ProfileDesktopSurface', () => {
+  beforeEach(() => {
+    mockUseIsAuthenticated.mockReturnValue(false);
+  });
+
+  it('hides the desktop back control on the public profile root for logged-out visitors', () => {
+    mockUseIsAuthenticated.mockReturnValue(false);
+
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onBack={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the desktop back control for a signed-in session', () => {
+    mockUseIsAuthenticated.mockReturnValue(true);
+    const onBack = vi.fn();
+
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onBack={onBack}
+        profileHref='/timwhite'
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('publishes readiness only after the desktop surface hydrates', () => {
     const surface = (
       <ProfileDesktopSurface
@@ -212,9 +272,12 @@ describe('ProfileDesktopSurface', () => {
     expect(listenCta).toHaveClass('h-7');
     expect(listenCta.className).toContain('before:h-11');
     expect(listenCta.className).toContain('before:min-w-11');
-    expect(
-      within(screen.getByTestId('profile-header')).getByText('Tim White')
-    ).toHaveClass('line-clamp-2');
+    const profileHeader = screen.getByTestId('profile-header');
+    expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
+    expect(within(profileHeader).getByText('Tim White')).toHaveClass(
+      'min-w-0',
+      'line-clamp-2'
+    );
     expect(
       screen.getByText('Producer, songwriter, and after-hours romantic.')
     ).toHaveClass('line-clamp-2');
@@ -353,5 +416,137 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.getByRole('link', { name: 'Follow Tim White on Twitter' })
     ).toHaveAttribute('href', 'https://x.com/timwhite');
+  });
+
+  // Dead-control regression (JOV-6124 desktop hydrated-beat cert): the Alerts
+  // card preference switches rendered `checked={contentPrefs[key]}` but routed
+  // activation to the subscribe flow, so a role="switch" never changed state —
+  // for subscribed visitors the template's real mutation handler was dropped.
+  describe('Alerts card preference switches', () => {
+    const renderAlertsCard = (props: {
+      readonly onTogglePref: (key: NotificationContentType) => void;
+    }) =>
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode='profile'
+          onModeSelect={vi.fn()}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+          isSubscribed
+          contentPrefs={contentPrefs}
+          onTogglePref={props.onTogglePref}
+          onUnsubscribe={vi.fn()}
+        />
+      );
+
+    it('routes activation to the template preference mutation when subscribed', () => {
+      const onTogglePref = vi.fn<(key: NotificationContentType) => void>();
+      renderAlertsCard({ onTogglePref });
+
+      const merchSwitch = screen.getByRole('switch', { name: 'Merch' });
+      expect(merchSwitch).toHaveAttribute('data-state', 'unchecked');
+      merchSwitch.click();
+
+      expect(onTogglePref).toHaveBeenCalledTimes(1);
+      expect(onTogglePref).toHaveBeenCalledWith('merch');
+    });
+
+    it('keeps the switch state owned by contentPrefs when subscribed', () => {
+      renderAlertsCard({ onTogglePref: vi.fn() });
+      expect(screen.getByRole('switch', { name: 'New Music' })).toHaveAttribute(
+        'data-state',
+        'checked'
+      );
+      expect(screen.getByRole('switch', { name: 'Shows' })).toHaveAttribute(
+        'data-state',
+        'unchecked'
+      );
+    });
+
+    it('routes activation to the subscribe flow for unsubscribed visitors', () => {
+      const onModeSelect = vi.fn();
+      const onTogglePref = vi.fn();
+      render(
+        <ProfileDesktopSurface
+          artist={artist}
+          socialLinks={[]}
+          contacts={contacts}
+          photoDownloadSizes={[]}
+          drawerOpen={false}
+          drawerView='menu'
+          activeMode='profile'
+          onModeSelect={onModeSelect}
+          onDrawerOpenChange={vi.fn()}
+          onDrawerViewChange={vi.fn()}
+          onOpenMenu={vi.fn()}
+          onPlayClick={vi.fn()}
+          profileHref='/timwhite'
+          allowFanCapture
+          isSubscribed={false}
+          contentPrefs={contentPrefs}
+          onTogglePref={onTogglePref}
+          onUnsubscribe={vi.fn()}
+        />
+      );
+
+      const newMusicSwitch = screen.getByRole('switch', {
+        name: 'New Music',
+      });
+      expect(newMusicSwitch).toHaveAttribute('data-state', 'unchecked');
+      newMusicSwitch.click();
+
+      expect(onModeSelect).toHaveBeenCalledWith('subscribe');
+      expect(onTogglePref).not.toHaveBeenCalled();
+    });
+  });
+  // Regression: hero social labels must use registry brand casing
+  // (tiktok → 'TikTok'), not naive title case ('Tiktok').
+  it('renders registry-cased hero social aria labels for TikTok', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[
+          {
+            id: 'tt-1',
+            artist_id: artist.id,
+            platform: 'tiktok',
+            url: 'https://www.tiktok.com/@timwhite',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Follow Tim White on TikTok' })
+    ).toHaveAttribute('href', 'https://www.tiktok.com/@timwhite');
+    expect(
+      screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
+    ).toBeNull();
   });
 });

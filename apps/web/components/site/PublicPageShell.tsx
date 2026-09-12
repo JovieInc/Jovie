@@ -49,7 +49,8 @@ export function PublicPageShell({
 }: Readonly<PublicPageShellProps>) {
   return (
     <div
-      className={cn('flex min-h-screen flex-col', className)}
+      // JOV-INV-032: svh avoids iOS Safari 100vh chrome jumps on public web.
+      className={cn('flex min-h-svh flex-col', className)}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.publicPage}
     >
       {skipToContent ? <SkipToContent /> : null}

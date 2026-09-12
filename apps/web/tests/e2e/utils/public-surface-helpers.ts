@@ -64,6 +64,22 @@ export async function installPublicRouteMocks(page: Page) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+  await page.route('**/api/profile/audience-anon-cookie', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        alertOptInVariant: 'button',
+        profilePac: {
+          copyArm: 'default',
+          triggerThreshold: '30s',
+          s2Slot: 'merch',
+          tabBar: 'visible',
+          dismissAffordance: 'text',
+        },
+      }),
+    })
+  );
   await page.route('**/api/profile/capture-dismissal**', route =>
     route.fulfill({
       status: 200,

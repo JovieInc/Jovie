@@ -36,7 +36,7 @@ export function HeroProfilePreview() {
         {/* Nav bar */}
         <div className='flex items-center justify-between px-4 pt-10 pb-1'>
           <CircleIconButton size='xs' variant='surface' ariaLabel='Jovie'>
-            <BrandLogo size={14} tone='auto' rounded={false} aria-hidden />
+            <BrandLogo size='compact' tone='auto' rounded={false} aria-hidden />
           </CircleIconButton>
           <CircleIconButton size='xs' variant='ghost' ariaLabel='Notifications'>
             <Bell className='h-4 w-4' />

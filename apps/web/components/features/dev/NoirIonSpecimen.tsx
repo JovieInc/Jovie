@@ -6,8 +6,7 @@
 const SURFACES = [
   { name: 'Canvas', token: 'var(--noir-ion-canvas)', role: 'App page' },
   { name: 'Shell', token: 'var(--noir-ion-shell)', role: 'Sidebar / chrome' },
-  { name: 'Panel', token: 'var(--noir-ion-panel)', role: 'Main content' },
-  { name: 'Card', token: 'var(--noir-ion-card)', role: 'Cards' },
+  { name: 'Card', token: 'var(--noir-ion-card)', role: 'Cards / content' },
   {
     name: 'Elevated',
     token: 'var(--noir-ion-elevated)',
@@ -49,27 +48,21 @@ const ACCENTS = [
     soft: 'var(--noir-ion-pulse-soft)',
   },
   {
-    name: 'Aqua',
-    role: 'System signal',
-    color: 'var(--noir-ion-aqua)',
-    soft: 'var(--noir-ion-aqua-soft)',
-  },
-  {
     name: 'Mint',
-    role: 'Success',
+    role: 'Success (aqua aliases mint)',
     color: 'var(--noir-ion-mint)',
     soft: 'var(--noir-ion-mint-soft)',
   },
   {
-    name: 'Gold',
-    role: 'Warning',
-    color: 'var(--noir-ion-gold)',
+    name: 'Orange',
+    role: 'Warning (gold aliases orange)',
+    color: 'var(--noir-ion-orange)',
     soft: 'var(--noir-ion-gold-soft)',
   },
   {
-    name: 'Flare',
-    role: 'Danger / error',
-    color: 'var(--noir-ion-flare)',
+    name: 'Red',
+    role: 'Danger / error (flare aliases red)',
+    color: 'var(--noir-ion-red)',
     soft: 'var(--noir-ion-flare-soft)',
   },
 ] as const;
@@ -101,7 +94,7 @@ export function NoirIonSpecimen() {
       <div
         className='mx-auto flex max-w-5xl flex-col gap-8 rounded-xl border p-6'
         style={{
-          background: 'var(--noir-ion-panel)',
+          background: 'var(--noir-ion-card)',
           borderColor: 'var(--noir-ion-border-default)',
         }}
       >

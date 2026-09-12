@@ -531,14 +531,18 @@ def _fleet_gate_allows_isolated() -> tuple[bool, str]:
     return True, f"fleet_gate_{state.lower()}"
 
 
-def _closure_intake_allowed() -> bool:
-    """Mirror grok-ship-one's new-work gate: closureAdmission.newIssueIntakeAllowed.
+def _product_id_for_identifier(identifier: str | None) -> str:
+    if isinstance(identifier, str) and identifier.startswith("LYB-"):
+        return "logyourbody"
+    return "jovie"
 
-    The sidecar must not lease NEW fallback work while the Summer closure
-    stop-line is closed — the leased worker would only die on grok-ship-one's
-    own stop-line check, burning a lease, Linear calls, and a unit launch for
-    nothing (live 2026-09-03: JOV-3583 exit 1 churn). Fail-closed when the
-    receipt is unreadable, matching grok-ship-one.
+
+def _closure_intake_allowed(identifier: str | None = None) -> bool:
+    """Mirror grok-ship-one's new-work gate, scoped by gem-repo-registry id.
+
+    Jovie MQ red (issue-blocked) must not freeze LYB/Ovie new leases.
+    Missing or unreadable receipts stay systems-down and fail closed.
+    Remounts skip this helper entirely.
     """
     path = pathlib.Path(
         os.path.expanduser(
@@ -553,7 +557,33 @@ def _closure_intake_allowed() -> bool:
     except (OSError, TypeError, ValueError):
         return False
     closure = receipt.get("closureAdmission")
-    return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+    signals = receipt.get("signals") if isinstance(receipt.get("signals"), dict) else {}
+    shared = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if not isinstance(shared, dict) and isinstance(closure, dict):
+        shared = closure
+    products = None
+    if isinstance(closure, dict) and isinstance(closure.get("products"), dict):
+        products = closure["products"]
+    elif isinstance(signals, dict) and isinstance(signals.get("productClosureHealth"), dict):
+        products = signals["productClosureHealth"]
+    product_id = _product_id_for_identifier(identifier)
+    helper_dir = pathlib.Path(__file__).resolve().parent
+    if str(helper_dir) not in sys.path:
+        sys.path.insert(0, str(helper_dir))
+    try:
+        from closure_health import product_intake_allowed
+    except ImportError:
+        if product_id == "jovie":
+            return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+        reasons = closure.get("reasons") if isinstance(closure, dict) else None
+        systems = {
+            "closure-health-receipt-missing-or-malformed",
+            "gate-evaluation-failed",
+        }
+        return not (
+            isinstance(reasons, list) and any(reason in systems for reason in reasons)
+        )
+    return product_intake_allowed(shared, product_id, products=products)
 
 
 def _grok_units_after_survival_window() -> list[str] | None:
@@ -2136,7 +2166,11 @@ def repair_preflight_command(identifier, issue_revision):
         if not issue or issue.get("updatedAt") != issue_revision:
             raise ValueError("assignment-tracker-revision-mismatch")
         verdict, pr = _open_pr_verdict(identifier, _autonomous_open_pr_index([identifier]))
-        _validated_existing_pr_repair(identifier, issue, verdict, pr, inherited=False)
+        inherited = os.environ.get("SYMPHONY_ISSUE_LEASE_FD") == "9"
+        lease = _fallback_lease_dir() / f"{identifier}.lock"
+        if inherited and (not _lock_held(lease) or not _inherited_issue_lease_held(lease)):
+            raise ValueError("assignment-writer-lease-mismatch")
+        _validated_existing_pr_repair(identifier, issue, verdict, pr, inherited=inherited)
     except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError) as exc:
         print(f"REPAIR_REFUSED reason={exc}", file=sys.stderr)
         return 78
@@ -2158,7 +2192,72 @@ def repair_assign_command(spec_path):
     return 0
 
 
-def pickup_check_command(identifier: str) -> int:
+def _native_dispatch_prerequisite(identifier, issue, repair, *, inherited=True):
+    """Bind fresh tracker/workspace identity to the installed strict gate CLI.
+
+    This does not claim the assignment, reserve capacity, or authorize a push.
+    """
+    repo = _repo_for_identifier(identifier)
+    if (not re.fullmatch(r"(?:JOV|LYB)-[1-9][0-9]*", identifier) or repo is None
+            or not isinstance(issue, dict) or issue.get("identifier") != identifier
+            or not isinstance(issue.get("id"), str)
+            or not re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", issue["id"])
+            or not isinstance(issue.get("team"), dict)
+            or issue["team"].get("key") != identifier.split("-")[0]
+            or not isinstance(issue.get("updatedAt"), str) or not issue["updatedAt"]):
+        return "native_identity_unverifiable"
+    connection = issue.get("labels")
+    if not isinstance(connection, dict) or not isinstance(connection.get("nodes"), list):
+        return "native_labels_unverifiable"
+    labels = connection["nodes"]
+    if any(not isinstance(node, dict) or not isinstance(node.get("name"), str)
+           or not node["name"].strip() for node in labels):
+        return "native_labels_unverifiable"
+    # Native WORKFLOW excludes only the mechanical dead-letter label.
+    if any(node["name"].strip().lower() == "no-symphony" for node in labels):
+        return "native_issue_excluded"
+    if repair is None and (_issue_state_name(issue) or "").lower() not in {
+            "todo", "in progress", "rework", "merging"}:
+        return "native_state_not_admitted"
+    lease = _fallback_lease_dir() / f"{identifier}.lock"
+    if inherited and (not _lock_held(lease) or not _inherited_issue_lease_held(lease)):
+        return "native_issue_lease_missing"
+    workspace = pathlib.Path.cwd().resolve()
+    if pathlib.Path(os.environ.get("SYMPHONY_WORKSPACE", str(workspace))).resolve() != workspace:
+        return "native_workspace_mismatch"
+    if repair is None and workspace.name != identifier:
+        return "native_workspace_issue_mismatch"
+    try:
+        def git(*args):
+            return subprocess.run(["git", "-C", str(workspace), *args], check=True,
+                                  capture_output=True, text=True, timeout=10).stdout.strip()
+        if (git("rev-parse", "--show-toplevel") != str(workspace)
+                or git("remote", "get-url", "origin") not in {
+                    f"https://github.com/{repo}.git", f"https://github.com/{repo}", f"git@github.com:{repo}.git"}):
+            return "native_repository_mismatch"
+        mode = "existing-pr-repair" if repair is not None else "new-work"
+        product = "jovie" if repo == JOV_REPO else "logyourbody"
+        installed = pathlib.Path.home() / ".local/bin"
+        checked = subprocess.run([str(installed / "symphony-official-runtime"), "dispatch-preflight",
+                                  "--mode", mode, "--product-id", product],
+                                 capture_output=True, text=True, timeout=CONTROL_TIMEOUT_SECONDS)
+        gate = json.loads(checked.stdout)
+        if (checked.returncode or not isinstance(gate, dict) or gate.get("allowed") is not True
+                or gate.get("reason") != "dispatch-gate-prerequisite-passed"
+                or gate.get("mode") != mode or gate.get("productId") != product
+                or type(gate.get("maxConcurrent")) is not int or gate["maxConcurrent"] <= 0):
+            return "dispatch_gate_closed"
+        # Preserve monotonic terminal fences, including operator-assigned repairs.
+        checked = subprocess.run([str(installed / "symphony-lease-guard"), "check", identifier],
+                                 capture_output=True, text=True, timeout=45, pass_fds=(9,) if inherited else ())
+        if checked.returncode:
+            return "native_lease_refused"
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return "dispatch_admission_unavailable"
+    return None
+
+
+def pickup_check_command(identifier: str, *, preflight=False, inherited=True) -> int:
     """Router preflight: GC this issue's stale lock, then fail closed with a typed reason."""
     if not IDENTIFIER.fullmatch(identifier):
         print(
@@ -2177,7 +2276,8 @@ def pickup_check_command(identifier: str) -> int:
             file=sys.stderr,
         )
         return 75
-    gc_fallback_locks()
+    if not preflight:
+        gc_fallback_locks()
     issue = _fetch_single_issue(identifier)
     lock_path = _fallback_lease_dir() / f"{identifier}.lock"
     held = _lock_held(lock_path) if lock_path.is_file() else False
@@ -2188,24 +2288,33 @@ def pickup_check_command(identifier: str) -> int:
     reserved = (_pr or {}).get("operatorRepairOnly")
     if reserved or (_issue_state_name(issue) or "").strip().lower() == "in review":
         try:
-            repair = _validated_existing_pr_repair(identifier, issue, verdict, _pr, inherited=True)
+            repair = _validated_existing_pr_repair(identifier, issue, verdict, _pr, inherited=inherited)
         except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError):
             repair_error = "existing_pr_repair_unauthorized"
     reason = pickup_refuse_reason(
         identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True,
         existing_pr_repair=repair is not None,
     ) or repair_error
-    if reason is None and repair is not None:
+    if reason is None:
+        reason = _native_dispatch_prerequisite(identifier, issue, repair, inherited=inherited)
+    if reason is None and repair is not None and not preflight:
         try:
             # Fresh complete inventory closes the discovery-to-claim head race.
             fresh_verdict, fresh_pr = _open_pr_verdict(identifier, _autonomous_open_pr_index([identifier]))
             fresh_issue = _fetch_single_issue(identifier)
             fresh = _validated_existing_pr_repair(identifier, fresh_issue, fresh_verdict, fresh_pr, inherited=True)
             _repair_module().require(fresh == repair, "assignment-replaced")
-            _repair_module().claim(fresh, __file__)
+            gate_reason = _native_dispatch_prerequisite(identifier, fresh_issue, fresh)
+            if gate_reason is not None:
+                reason = gate_reason
+            else:
+                _repair_module().claim(fresh, __file__)
         except (OSError, ValueError, KeyError, TypeError, ImportError, subprocess.SubprocessError):
             reason = "existing_pr_repair_claim_refused"
-    lock_count = _fallback_lock_count()
+    if preflight and reason is None:
+        print(f"PICKUP_PREFLIGHT_ADMITTED identifier={identifier}")
+        return 0
+    lock_count = _fallback_lock_count() if not preflight else None
     if reason is not None:
         _emit_pickup(
             "refuse",
@@ -2217,11 +2326,11 @@ def pickup_check_command(identifier: str) -> int:
         failure_class = "fallback-lease-held" if reason == "fallback_lease_held" else "pickup-refused"
         print(
             "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
-            f"class={failure_class} retryable=false maxAttempts=1 "
+            f"class={failure_class} retryable={str(reason.startswith('dispatch_')).lower()} "
             f'reason="{reason} owns {identifier}"',
             file=sys.stderr,
         )
-        return 78
+        return 75 if reason.startswith("dispatch_") else 78
     _emit_pickup(
         "lease_start",
         reason="lease_start",
@@ -2321,8 +2430,8 @@ def _launch_fallback_workers(
     first_lease: str | None = None
     # Mirror grok-ship-one's new-work stop-line so the sidecar never leases
     # fresh work it would only launch into a refusal. Remounts of existing
-    # open PRs are continuation and stay exempt.
-    closure_intake_open = _closure_intake_allowed()
+    # open PRs are continuation and stay exempt. Intake is per-product: Jovie
+    # MQ red does not freeze LYB/Ovie.
     for identifier in identifiers:
         if len(launched_units) >= max(0, limit) or (
             not any(value > 0 for value in remaining.values())
@@ -2346,7 +2455,7 @@ def _launch_fallback_workers(
             _emit_pickup("skip", reason="existing_pr_repair_reserved", identifier=identifier,
                          lock_count=_fallback_lock_count(), next_issue="")
             continue
-        if verdict != "remount" and not closure_intake_open:
+        if verdict != "remount" and not _closure_intake_allowed(identifier):
             _emit_pickup(
                 "refuse",
                 reason="closure_stop_line",
@@ -3131,6 +3240,7 @@ def main() -> int:
             "open-pr-verdict",
             "gc-fallback-locks",
             "pickup-check",
+            "native-preflight",
             "repair-preflight",
             "repair-assign",
         ),
@@ -3140,6 +3250,7 @@ def main() -> int:
     parser.add_argument("--destination-root")
     parser.add_argument("--issue-revision")
     parser.add_argument("--assignment-spec")
+    parser.add_argument("--before-run", action="store_true")
     parser.add_argument(
         "--remount",
         action="store_true",
@@ -3171,6 +3282,10 @@ def main() -> int:
         receipt = gc_fallback_locks()
         print(json.dumps(receipt, indent=2, sort_keys=True))
         return 2 if receipt.get("red") else 0
+    if args.command == "native-preflight":
+        if not args.identifier:
+            return 2
+        return pickup_check_command(args.identifier, preflight=True, inherited=not args.before_run)
     if args.command == "pickup-check":
         if not args.identifier:
             print("pickup-check requires an issue identifier", file=sys.stderr)
