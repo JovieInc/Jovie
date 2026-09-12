@@ -708,12 +708,19 @@
       "when": 1788415600001,
       "tag": "0100_hesitant_demogoblin",
       "breakpoints": true
-    }
-    ,{
+    },
+    {
       "idx": 101,
       "version": "7",
       "when": 1788415600002,
       "tag": "0101_canonical_release_communications",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1789200000002,
+      "tag": "0102_presence_finding_scope",
       "breakpoints": true
     }
   ]
