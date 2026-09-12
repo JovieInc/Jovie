@@ -212,7 +212,7 @@ final class ChatRepository {
     }
 
     let task = Task { [weak self] in
-      await self?.performSend(text: trimmed, generation: generation)
+      _ = await self?.performSend(text: trimmed, generation: generation)
     }
     sendTask = task
     await task.value
@@ -602,7 +602,12 @@ final class ChatRepository {
     _ conversationID: String,
     snapshot: CachedChatSnapshot? = nil
   ) async -> Bool {
-    let loaded = snapshot ?? (await cache.load(for: userID, workspace: workspace))
+    let loaded: CachedChatSnapshot?
+    if let snapshot {
+      loaded = snapshot
+    } else {
+      loaded = await cache.load(for: userID, workspace: workspace)
+    }
     guard let cachedMessages = loaded?.messagesByConversationID[conversationID] else {
       return false
     }
@@ -767,8 +772,8 @@ final class MobileChatStreamCoalescer {
     let window = self.window
     flushTask = Task { [weak self] in
       try? await Task.sleep(for: window)
-      guard !Task.isCancelled else { return }
-      self?.flush()
+      guard !Task.isCancelled, let self else { return }
+      self.flush()
     }
   }
 
