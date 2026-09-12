@@ -22,6 +22,7 @@ export type {
 } from './hooks/useAsyncValidation';
 export { useAsyncValidation } from './hooks/useAsyncValidation';
 export type {
+  AutoSaveAttemptMeta,
   UseAutoSaveOptions,
   UseAutoSaveReturn,
 } from './hooks/useAutoSave';
