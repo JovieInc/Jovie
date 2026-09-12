@@ -268,6 +268,10 @@ ${AI_SLOP_BLACKLIST.map(item => `- ${item}`).join('\n')}
 - Fonts: \`font-display: swap\`, preconnect to CDN origins
 - No visible font swap flash (FOUT) — critical fonts preloaded
 
+**11. Forms, overflow, media, l10n, browser, a11y gaps**
+
+Load \`.agents/skills/gstack/design-review/references/web-interface-gaps.md\` after the 10 categories above. That file is the uncovered fold from the pinned web-interface handbook. Do not fetch \`main\`. Do not invoke a parallel \`web-design-guidelines\` skill. \`DESIGN.md\` and \`/design-canonical\` remain authoritative.
+
 ---
 
 ## Phase 4: Interaction Flow Review
