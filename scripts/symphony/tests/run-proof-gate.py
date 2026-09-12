@@ -19,7 +19,7 @@ TARGETS = {
     "symphony_proof_context.py": None,
     "symphony_useful_turn_probe.py": None,
     "symphony_capacity_evidence.py": None,
-    "symphony_accepted_completion.py": {"validate_lease", "validate_result", "validate_github_outcome", "github_outcome", "build_proof", "persist_proof", "reconcile"},
+    "symphony_accepted_completion.py": {"validate_lease", "validate_result", "validate_github_outcome", "github_outcome", "refresh_context", "build_proof", "persist_proof", "reconcile"},
     "provider_capacity.py": {"provider_record", "apply_observation", "record_observation"},
     "symphony-concurrency-controller.py": None,
 }
