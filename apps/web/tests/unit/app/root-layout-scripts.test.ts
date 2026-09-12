@@ -30,7 +30,7 @@ describe('root layout scripts', () => {
 
   it('binds generated font variables on html where inherited typography tokens resolve', () => {
     const htmlTag = layoutSource.match(
-      /<html\s[\s\S]*?(?=\sdata-clerk-mock=)/
+      /<html\s[\s\S]*?(?=\sdata-auth-mock=)/
     )?.[0];
     expect(htmlTag).toBeDefined();
     expect(htmlTag).toContain(
