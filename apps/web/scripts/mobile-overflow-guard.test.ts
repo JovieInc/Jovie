@@ -47,9 +47,12 @@ describe('audited overlay width exception', () => {
     ['apps/web/components/example.css', utility],
     [globals, utility.replace('w-overlay-viewport', 'w-other-overlay')],
     [globals, `@media (min-width: 1px) {\n${utility}\n}`],
-  ])('rejects the utility outside its exact file and top-level owner: %s', (file, css) => {
-    expect(scanSourceFile(file, css)).toHaveLength(1);
-  });
+  ])(
+    'rejects the utility outside its exact file and top-level owner: %s',
+    (file, css) => {
+      expect(scanSourceFile(file, css)).toHaveLength(1);
+    }
+  );
 
   it.each([
     '100vw',
@@ -67,15 +70,14 @@ describe('audited overlay width exception', () => {
     ).toHaveLength(1);
   });
 
-  it.each([
-    'min-width: 100vw;',
-    'padding: 1rem;',
-    'width: 100vw;',
-  ])('rejects additional declarations: %s', extra => {
-    expect(
-      scanSourceFile(globals, utility.replace('\n}', `\n${extra}\n}`))
-    ).toHaveLength(1);
-  });
+  it.each(['min-width: 100vw;', 'padding: 1rem;', 'width: 100vw;'])(
+    'rejects additional declarations: %s',
+    extra => {
+      expect(
+        scanSourceFile(globals, utility.replace('\n}', `\n${extra}\n}`))
+      ).toHaveLength(1);
+    }
+  );
 
   it('rejects duplicate utility blocks and important overrides', () => {
     expect(scanSourceFile(globals, `${utility}\n${utility}`)).toHaveLength(1);
@@ -84,19 +86,19 @@ describe('audited overlay width exception', () => {
     ).toHaveLength(1);
   });
 
-  it.each([
-    'before',
-    'after',
-  ])('still reports another risky declaration %s the allowed block at the original line', position => {
-    const risky = '.unrelated {\n  width: 100vw;\n}';
-    const css =
-      position === 'before' ? `${risky}\n${utility}` : `${utility}\n${risky}`;
-    const violations = scanSourceFile(globals, css);
-    expect(violations).toHaveLength(1);
-    expect(violations[0].rule).toBe('width: 100vw');
-    // Existing scanner reports the opening delimiter's line, preserved by masking.
-    expect(violations[0].line).toBe(position === 'before' ? 1 : 4);
-  });
+  it.each(['before', 'after'])(
+    'still reports another risky declaration %s the allowed block at the original line',
+    position => {
+      const risky = '.unrelated {\n  width: 100vw;\n}';
+      const css =
+        position === 'before' ? `${risky}\n${utility}` : `${utility}\n${risky}`;
+      const violations = scanSourceFile(globals, css);
+      expect(violations).toHaveLength(1);
+      expect(violations[0].rule).toBe('width: 100vw');
+      // Existing scanner reports the opening delimiter's line, preserved by masking.
+      expect(violations[0].line).toBe(position === 'before' ? 1 : 4);
+    }
+  );
 
   it('rejects new consumers and removal of the audited owner constraints', () => {
     expect(
@@ -124,21 +126,21 @@ describe('audited overlay width exception', () => {
     }
   });
 
-  it.each([
-    'additional export',
-    'comment-only constraints',
-  ])('rejects an unaudited same-file consumer: %s', mutation => {
-    const original = readFileSync(join(repoRoot, owner), 'utf8');
-    const changed =
-      mutation === 'additional export'
-        ? `${original}\nexport const unconstrained = 'w-overlay-viewport';`
-        : `${original.replace('fixed left-1/2', 'absolute left-0')}\n// position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]'`;
-    expect(
-      scanSourceFile(owner, changed).some(item =>
-        item.rule.includes('unaudited')
-      )
-    ).toBe(true);
-  });
+  it.each(['additional export', 'comment-only constraints'])(
+    'rejects an unaudited same-file consumer: %s',
+    mutation => {
+      const original = readFileSync(join(repoRoot, owner), 'utf8');
+      const changed =
+        mutation === 'additional export'
+          ? `${original}\nexport const unconstrained = 'w-overlay-viewport';`
+          : `${original.replace('fixed left-1/2', 'absolute left-0')}\n// position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]'`;
+      expect(
+        scanSourceFile(owner, changed).some(item =>
+          item.rule.includes('unaudited')
+        )
+      ).toBe(true);
+    }
+  );
 
   it('fails closed on ambiguous or invalid owner declarations', () => {
     const original = readFileSync(join(repoRoot, owner), 'utf8');
