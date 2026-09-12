@@ -70,6 +70,8 @@ import {
   formatProfileRankChange,
   getConnectionPrimaryAction,
   getConnectionStatus,
+  getPresenceSignals,
+  type PresenceSignal,
   sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import { fetchWithTimeout, queryKeys, STANDARD_CACHE } from '@/lib/queries';
@@ -87,20 +89,17 @@ import type {
 } from './data';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
-const DSP_FILTER_LABEL = 'DSPs';
 type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested';
 const FILTERS: ReadonlyArray<{
-  id: ProfilesWorkspaceView;
-  label: string;
+  readonly id: ProfilesWorkspaceView;
+  readonly label: string;
 }> = [
   { id: 'all', label: 'All Pages' },
+  { id: 'identity', label: 'Identity' },
+  { id: 'profiles', label: 'Profiles' },
+  { id: 'catalog', label: 'Catalog' },
   { id: 'suggested', label: 'Suggested' },
-  { id: 'dsp', label: DSP_FILTER_LABEL },
-  { id: 'social', label: 'Social' },
   { id: 'connector', label: 'Connectors' },
-  { id: 'source', label: 'Sources' },
-  { id: 'website', label: 'Websites' },
-  { id: 'jovie', label: 'Jovie' },
 ];
 
 type ConnectionSuggestion = ProfileSuggestion & {
@@ -657,23 +656,16 @@ function ConnectionRail({
             reserveFooterSlot
             testId='profiles-rail-summary'
           />
-          <DrawerSection
-            title='Profile / Page'
-            sectionKind='facts'
-            className='space-y-2'
-          >
-            <RailMetric label='Type' value={kindLabel(row)} />
-            <RailMetric label='Status' value={getConnectionStatus(row).label} />
-            <RailMetric
-              label='Monitoring'
-              value={MONITORING_LABELS[row.monitoringState]}
-            />
+          <DrawerSection title='Profile / Page' sectionKind='facts'>
+            <div className='space-y-2'>
+              <RailMetric label='Type' value={kindLabel(row)} />
+              <RailMetric
+                label='Monitoring'
+                value={MONITORING_LABELS[row.monitoringState]}
+              />
+            </div>
           </DrawerSection>
-          <DrawerSection title='Next Best Action' sectionKind='status'>
-            <p className='text-xs leading-5 text-secondary-token'>
-              {getConnectionStatus(row).nextAction}
-            </p>
-          </DrawerSection>
+          <PresenceSignalSection row={row} />
           <DrawerSection sectionKind='details'>
             <div
               className={cn(
@@ -728,6 +720,99 @@ function RailMetric({
       <span className='text-tertiary-token'>{label}</span>
       <span className='max-w-36 truncate text-primary-token'>{value}</span>
     </div>
+  );
+}
+
+const SIGNAL_LABELS: Readonly<Record<PresenceSignal['kind'], string>> = {
+  blocker: 'Blocker',
+  finding: 'Finding',
+  recommendation: 'Recommendation',
+  state: 'State',
+};
+
+/**
+ * JOV-6170: one opportunity = one identity. Canonical directory sources
+ * (Genius / Last.fm / MusicBrainz) are quiet drill-in links so the artist
+ * can complete the canonical profile from the same review, without Jovie
+ * fabricating matches it has not detected.
+ */
+const CANONICAL_SOURCE_DRILLS: ReadonlyArray<{
+  readonly label: string;
+  readonly searchPath: string;
+}> = [
+  { label: 'Genius', searchPath: 'https://genius.com/search?q=' },
+  { label: 'Last.fm', searchPath: 'https://www.last.fm/search?q=' },
+  {
+    label: 'MusicBrainz',
+    searchPath: 'https://musicbrainz.org/search?type=artist&query=',
+  },
+];
+
+function CanonicalSourceDrills({ identity }: Readonly<{ identity: string }>) {
+  const query = encodeURIComponent(identity);
+  return (
+    <div className='flex items-center gap-3 border-b border-subtle px-3 py-1.5'>
+      <span className='text-2xs text-tertiary-token'>Find on</span>
+      {CANONICAL_SOURCE_DRILLS.map(source => (
+        <a
+          key={source.label}
+          href={`${source.searchPath}${query}`}
+          target='_blank'
+          rel='noreferrer'
+          data-testid='canonical-source-drill'
+          className='inline-flex items-center gap-0.5 text-2xs text-secondary-token underline-offset-2 transition-colors duration-fast hover:text-primary-token hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50'
+        >
+          {source.label}
+          <ExternalLink className='h-2.5 w-2.5' aria-hidden />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * JOV-6170: signals render as four SEPARATE primitives with distinct weight —
+ * blockers loudest, state quiet — never merged into one undifferentiated feed.
+ */
+function PresenceSignalSection({
+  row,
+}: Readonly<{ row: ProfileWorkspaceRow }>) {
+  const signals = getPresenceSignals(row);
+  return (
+    <DrawerSection title='Signals' sectionKind='status'>
+      <ul className='space-y-2' data-testid='presence-signal-list'>
+        {signals.map(signal => (
+          <li
+            key={`${signal.kind}:${signal.label}`}
+            className='text-xs leading-5'
+            data-testid={`presence-signal-${signal.kind}`}
+          >
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 font-medium',
+                signal.tone === 'error' && 'text-error',
+                signal.tone === 'warning' && 'text-warning',
+                signal.tone === 'success' && 'text-success',
+                signal.tone === 'neutral' && 'text-secondary-token'
+              )}
+            >
+              {signal.tone === 'neutral' || signal.tone === 'success' ? (
+                <Circle className='h-3 w-3' aria-hidden />
+              ) : signal.tone === 'error' ? (
+                <CircleX className='h-3 w-3' aria-hidden />
+              ) : (
+                <CircleAlert className='h-3 w-3' aria-hidden />
+              )}
+              <span className='sr-only'>{SIGNAL_LABELS[signal.kind]}:</span>
+              {signal.label}
+            </span>
+            <span className='mt-0.5 block text-secondary-token'>
+              {signal.detail}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </DrawerSection>
   );
 }
 
@@ -1027,6 +1112,18 @@ function SuggestedConnectionsReview({
               data-suggestion-identity={group.id}
               className='min-w-0 border-b border-subtle last:border-b-0'
             >
+              <div className='flex min-h-9 items-center justify-between gap-2 border-b border-subtle bg-surface-2 px-3'>
+                <span className='truncate text-2xs font-medium text-secondary-token'>
+                  Add canonical {group.identity} profile
+                </span>
+                <span
+                  className='shrink-0 text-2xs text-tertiary-token'
+                  data-testid='suggested-connection-group-count'
+                >
+                  Review {group.suggestions.length}
+                </span>
+              </div>
+              <CanonicalSourceDrills identity={group.identity} />
               <ul
                 aria-label={`${group.identity} suggestions`}
                 className='min-w-0 divide-y divide-subtle'
@@ -1437,13 +1534,13 @@ export function ProfilesWorkspace({
             setPendingCandidate(candidate);
             if (!candidate) return;
             setFilter(
-              candidate.category === 'website' ? 'website' : candidate.category
+              candidate.category === 'website' ? 'identity' : 'profiles'
             );
           }}
           onReviewCandidate={candidate => {
             setPendingCandidate(candidate);
             setFilter(
-              candidate.category === 'website' ? 'website' : candidate.category
+              candidate.category === 'website' ? 'identity' : 'profiles'
             );
             setIsAddConnectionOpen(false);
           }}
