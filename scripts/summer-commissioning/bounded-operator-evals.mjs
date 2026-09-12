@@ -2,7 +2,7 @@
 /**
  * Strict eval gate for Summer bounded-operator goal.
  * Exit 0 only when local E2–E5 suites pass. E1 remains externally gated on
- * Gem install of PR #17725 attestation publisher.
+ * Gem deploy of merged PR #17725 attestation publisher (on main).
  *
  * Note: apps/eve-pilot is excluded from the pnpm workspace, so its suite is
  * invoked with cwd=apps/eve-pilot (not --filter).
@@ -137,13 +137,13 @@ run(
 
 console.log(`
 == E1 attestation delivery ==
-EXTERNAL GATE: land/install PR #17725 on Gem, prove two ≤600s fresh observations,
+EXTERNAL GATE: PR #17725 is MERGED to main — deploy/install publisher on Gem, prove two ≤600s fresh observations,
 then confirm Summer no longer holds on runner-source-attestation-unavailable.
 Operator install packet: docs/ops/summer-bounded-operator-e1-install.md
 Post-install proof (same Summer predicates):
-  node scripts/summer-commissioning/verify-e1-attestation-observations.mjs \\
+  node scripts/summer-commissioning/verify-e1-attestation-observations.mjs \
     --observation-a obs-a.json --observation-b obs-b.json
-Local publisher tests live on branch codex/jov-6163-runtime-attestation.
+Local publisher tests: python3 scripts/symphony/tests/gem-service-attestation.test.py (on main).
 Local close-path readiness (--self-test) is covered by the E1 observation gate suite above;
 that does NOT close E1 without real Gem observations.
 `);

@@ -10,23 +10,22 @@ from fresh runner-source attestations (≤600s) without holding on
 
 | Check | Result |
 |---|---|
-| PR [#17725](https://github.com/JovieInc/Jovie/pull/17725) on `codex/jov-6163-runtime-attestation` | OPEN / **MERGEABLE + CLEAN** (head `afe8e3229640`; ci-fast + required checks green, re-verified 2026-09-12) |
-| Publisher unit tests `scripts/symphony/tests/gem-service-attestation.test.py` | **9 passed** on that head |
+| PR [#17725](https://github.com/JovieInc/Jovie/pull/17725) | **MERGED to `main`** (merge commit `6f617b3d61`, 2026-09-12) — publisher is on the default branch |
+| Publisher unit tests `scripts/symphony/tests/gem-service-attestation.test.py` | **9 passed** on merged main |
 | Summer governed dispatch + Gem-down acceptance (local) | PASS — Cursor alternate selected without Gem; hold when no probe |
 | 600s freshness gate weakened? | **No** |
+| Live Gem install + two ≤600s observations | **EXTERNAL** — this cloud agent has no Gem SSH; `gem.jovie.ai:22` times out from agent network |
 
-Local publisher proof command (from PR head):
+Local publisher proof command (from `main` after merge):
 
 ```bash
-git fetch origin codex/jov-6163-runtime-attestation
-git worktree add /tmp/jov-6163-attestation origin/codex/jov-6163-runtime-attestation
-python3 /tmp/jov-6163-attestation/scripts/symphony/tests/gem-service-attestation.test.py
+git fetch origin main
+python3 scripts/symphony/tests/gem-service-attestation.test.py
 ```
 
 ## Prerequisites (operator)
 
-- Merge authority for PR #17725 onto the Gem runtime release channel Summer reads.
-- Gem host install authority (SSH / fleet installer).
+- Gem host install authority (SSH / fleet installer). Publisher code is already on `main` via #17725.
 - Operator-selected nonsecret values in `~/.config/symphony/runner-source.env`:
   - `SYMPHONY_RELEASE_PROVENANCE=/absolute/path/to/verified-release.provenance.json`
   - `JOVIE_CONFIGURATION_SOURCE_ROOT=/absolute/path/to/jovie-git-repository`
@@ -34,7 +33,7 @@ python3 /tmp/jov-6163-attestation/scripts/symphony/tests/gem-service-attestation
 
 ## Install steps (Gem — external authority)
 
-1. Merge or cherry-pick PR #17725 onto the Gem runtime release channel.
+1. Deploy/sync `main` (includes #17725) onto the Gem runtime release channel Summer reads.
 2. Before replacement, run:
    `emit_gem_service_attestation.py --check --provenance … --source-root … --source-revision …`
    - exit 0 = measured inputs match
