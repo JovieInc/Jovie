@@ -1423,12 +1423,19 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 });
 
-
 it('runs the attestation observation coverage gate for publisher-only edits', () => {
   const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)[1];
   const selected = new RegExp(pattern);
-  expect(selected.test('scripts/symphony/emit_gem_service_attestation.py')).toBe(true);
-  expect(selected.test('scripts/symphony/tests/gem-service-attestation.test.py')).toBe(true);
-  expect(CI_FAST_SOURCE).toContain('coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py');
-  expect(CI_FAST_SOURCE).toContain('emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90');
+  expect(
+    selected.test('scripts/symphony/emit_gem_service_attestation.py')
+  ).toBe(true);
+  expect(
+    selected.test('scripts/symphony/tests/gem-service-attestation.test.py')
+  ).toBe(true);
+  expect(CI_FAST_SOURCE).toContain(
+    'coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py'
+  );
+  expect(CI_FAST_SOURCE).toContain(
+    'emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90'
+  );
 });
