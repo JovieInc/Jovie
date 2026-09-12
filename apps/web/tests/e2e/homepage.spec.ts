@@ -162,7 +162,7 @@ test.describe('Homepage', () => {
       const actions = page.locator(
         '.marketing-glass-header__cta:visible, [data-testid="cookie-actions"] button, [data-testid="homepage-primary-cta"]:visible'
       );
-      expect(await actions.count()).toBeGreaterThanOrEqual(1);
+      expect(await actions.count()).toBeGreaterThanOrEqual(4);
       for (const action of await actions.all()) {
         const geometry = await action.evaluate(element => {
           const face = element.getBoundingClientRect();
