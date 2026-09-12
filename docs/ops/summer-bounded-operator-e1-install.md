@@ -79,43 +79,10 @@ Local readiness only (does **not** close E1):
 node scripts/summer-commissioning/verify-e1-attestation-observations.mjs --self-test
 ```
 
-## Repair-to-runtime bridge (this branch)
+## Repair-to-runtime bridge
 
-Summer bottleneck heartbeat evaluates runner-source attestation, then runs
-**governed dispatch** (`dispatchSummerGovernedRequest`) so the request outcome
-selects the router launch:
+Heartbeat loads runner-source attestation then `dispatchSummerGovernedRequest`: `symphony-route` (≤600s fresh), `cursor-recovery-request` (missing/stale/unhealthy/`SUMMER_GEM_DARK`), or `hold` (no probe). Only cursor-recovery advances Gem-dark outbox. Require `SUMMER_RUNNER_SOURCE_ATTESTATION_PATH`/`_JSON`. Schema: `gem-service-attestation/v1` + `sourceRevision` (40 hex) + `observedAt` + active/healthy + listener port 4041 bound.
 
-1. Load `SUMMER_RUNNER_SOURCE_ATTESTATION_JSON` or the file at
-   `SUMMER_RUNNER_SOURCE_ATTESTATION_PATH`.
-2. Governed dispatch outcomes:
-   - `symphony-route` — fresh ≤600s attestation (Symphony remains authoritative)
-   - `cursor-recovery-request` — missing/invalid/stale/unhealthy/unbound receipt
-     (**including age >600s**) or explicit `SUMMER_GEM_DARK` → Cursor outbox only
-     (never Gem)
-   - `hold` — no probe configured → no Cursor spend
-3. Only `cursor-recovery-request` advances the Gem-dark Cursor recovery cycle /
-   durable outbox.
-4. `SUMMER_GEM_DARK=live` wins over a missing receipt (operator override).
-5. PATH alone (without loading the file) does **not** imply dark — avoids
-   accidental Cursor spend; the heartbeat always loads first.
-
-**Required for the bridge to arm:** set
-`SUMMER_RUNNER_SOURCE_ATTESTATION_PATH` (or `_JSON`) on the Summer runtime to
-the live Gem attestation file. If neither probe is configured, Summer
-fail-closes to “not dark” (no Cursor spend). A configured path whose file is
-missing/unreadable counts as unavailable → Cursor outbox.
-
-Schema match (must equal Symphony concurrency controller):
-`gem-service-attestation/v1` + `sourceRevision` (40 hex) + `observedAt` +
-`active`/`healthy` + `listener.port===4041` + `listener.boundToService===true`.
-
-Local Gem-down acceptance narrative (does not close E1):
-
-```bash
-pnpm --dir apps/eve-pilot exec vitest run --config vitest.config.ts \
-  tests/summer-bounded-operator-acceptance.test.ts
-# writes /opt/cursor/artifacts/summer-bounded-operator-acceptance-receipt.json
-```
 
 ## Pre-install gates (read before touching Gem)
 
@@ -128,20 +95,8 @@ Do **not** install the JOV-6163 publisher until these are true, or E1 fails clos
    must match `scripts/symphony/systemd/symphony-elixir.service.d/<basename>` at the
    selected configuration revision. Unknown or drifted drop-ins keep `healthy:false`.
 
-2. **Activation installs the publisher (after #17736).**  
-   Before that lands, activation only installs fleet / PR-rehab controllers. After it
-   lands, activation aligns `JOVIE_CONFIGURATION_SOURCE_REVISION` to the production tip,
-   copies the emitter onto the existing `gem-service-attestation` timer path, and verifies
-   `configurationSourceRevision` (Jovie tip). Still fail-closed when
-   `~/.config/symphony/runner-source.env` is missing or `--check` is unhealthy.
+2. **Activation installs the publisher (after #17736).** Aligns `JOVIE_CONFIGURATION_SOURCE_REVISION`, installs onto the existing `gem-service-attestation` timer, verifies `configurationSourceRevision`. Fail-closed if `runner-source.env` is missing or `--check` is unhealthy. If tip churn coalesces past Install: dispatch `gem-publisher-commission.yml` on `jovie-fixed` with `tip_sha=<main tip>` and `confirm=install-jov-6163-publisher` (publisher-only; 600s gate unchanged; attach observation artifacts — does not close E1).
 
-   **When tip churn coalesces activation past Install:** dispatch
-   **Gem Publisher Commission (JOV-6163 E1)** (`gem-publisher-commission.yml`) on
-   `jovie-fixed` with `tip_sha=<current main tip>` and confirm
-   `install-jov-6163-publisher`. That path is publisher-only (no fleet/controller
-   replace), fail-closed on dirty config root / `--check`, and emits two ≤600s
-   observations for the live E1 verifier. It does **not** weaken the 600s gate and
-   does **not** claim E1 closed by itself — attach the observation artifacts.
 
 3. **Gem → Summer transport.**  
    Summer (Vercel) reads `SUMMER_RUNNER_SOURCE_ATTESTATION_PATH` / `_JSON`. Host-local
@@ -159,44 +114,12 @@ is readiness only.
 
 ## Named external blocker
 
-**Owner:** Gem operator / Symphony fleet owner  
-**Blocker:** This agent cannot SSH Gem or select live release provenance.  
-**Unblock when:** Steps 1–9 above produce two ≤600s observations and Summer
-admission no longer holds on `runner-source-attestation-unavailable`.
+**Owner:** Gem/Symphony fleet operator. **Blocker:** no Gem SSH from this agent. **Unblock:** two ≤600s observations + Summer admission not holding on `runner-source-attestation-unavailable`.
+
 
 ## Out of scope / do not
 
-- Do not bypass or extend the 600s attestation freshness window
-- Do not grant Summer privileged GBrain write or Symphony heal
-- Do not claim E1 green from local unit tests alone — Gem install is required
-- Do not install the publisher solely to “make E1 green” while `--check` is non-zero
-- Do not re-pin provenance to force `healthy:true` against live drift
+- Do not weaken the 600s freshness gate
+- Do not claim E1 from self-test / local unit proof alone
+- Do not install publisher while `--check` is non-zero
 
-## Related local gates (automated)
-
-```bash
-node scripts/summer-commissioning/bounded-operator-evals.mjs
-```
-
-## Completion reconciler runtime inputs
-
-The existing `gem-pr-drain.service` and `symphony-concurrency-controller.service`
-read optional runtime inputs from the same
-`~/.config/symphony/runner-source.env` used by the service observer:
-
-- `SYMPHONY_RUNTIME_SOURCE_ROOT`: checkout of the actual Symphony release commit,
-  not the Jovie application/configuration checkout.
-- `SYMPHONY_RUNTIME_EXECUTABLE`: actual running executable (for Burrito, the
-  verified listener's ERTS executable), not the packaged launcher.
-- `SYMPHONY_RUNTIME_WORKFLOW`: actual service workflow path.
-
-The concurrency controller uses the same workflow input so its resource scope
-and permitted scalar adjustment refer to the running workflow. These inputs
-also configure the existing accepted-completion reconciler defaults; explicit
-CLI flags still take precedence. They are inputs, not grants or observations.
-The reconciler requires a fresh healthy service attestation and verifies the
-source revision, executable hash, workflow hash/path, and live service generation
-before publishing context. Keep the observed service timestamp; do not refresh
-it through an environment update or copy an old context to simulate enrollment.
-A configuration mismatch remains a blocker until its separately reviewed repair
-is installed. Changing these inputs does not restart Symphony or launch work.
