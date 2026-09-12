@@ -33,7 +33,9 @@ interface LogoBox {
 
 function logosOverlap(boxes: readonly LogoBox[]): boolean {
   return boxes.some((box, index) =>
-    boxes.slice(index + 1).some(other => box.left < other.right && box.right > other.left)
+    boxes
+      .slice(index + 1)
+      .some(other => box.left < other.right && box.right > other.left)
   );
 }
 
@@ -93,12 +95,18 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
     const certifiedCss = readCertifiedCss();
 
     expect(css).toContain('--homepage-sticky-nav-clearance:');
-    expect(css).toContain('scroll-padding-top: var(--homepage-sticky-nav-clearance)');
+    expect(css).toContain(
+      'scroll-padding-top: var(--homepage-sticky-nav-clearance)'
+    );
     expect(certifiedCss).toContain(
       'scroll-margin-top: var(--homepage-sticky-nav-clearance)'
     );
-    expect(certifiedCss).toContain('.home-viewport [data-homepage-section-heading]');
-    expect(certifiedCss).toContain('.home-viewport .homepage-certified-section__headline');
+    expect(certifiedCss).toContain(
+      '.home-viewport [data-homepage-section-heading]'
+    );
+    expect(certifiedCss).toContain(
+      '.home-viewport .homepage-certified-section__headline'
+    );
     expect(css).toContain('--homepage-sticky-nav-height: 2.72rem');
     expect(css).toContain('--homepage-sticky-nav-height: 3.15rem');
   });

@@ -523,18 +523,22 @@ test.describe('Homepage', () => {
         const a = logoBoxes[index];
         const b = logoBoxes[other];
         const overlaps =
-          a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-        expect(
-          overlaps,
-          `${a.label} overlaps ${b.label} at 1280px`
-        ).toBe(false);
+          a.left < b.right &&
+          a.right > b.left &&
+          a.top < b.bottom &&
+          a.bottom > b.top;
+        expect(overlaps, `${a.label} overlaps ${b.label} at 1280px`).toBe(
+          false
+        );
       }
     }
 
-    const headerBottom = await page.getByTestId('header-nav').evaluate(header => {
-      const shell = header.querySelector('.marketing-glass-header__shell');
-      return (shell ?? header).getBoundingClientRect().bottom;
-    });
+    const headerBottom = await page
+      .getByTestId('header-nav')
+      .evaluate(header => {
+        const shell = header.querySelector('.marketing-glass-header__shell');
+        return (shell ?? header).getBoundingClientRect().bottom;
+      });
 
     const headings = page.locator('[data-homepage-section-heading]');
     const headingCount = await headings.count();
