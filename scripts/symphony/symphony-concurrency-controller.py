@@ -556,7 +556,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workflow",
         type=pathlib.Path,
-        default=home / ".config/symphony/WORKFLOW.md",
+        default=pathlib.Path(os.environ.get("SYMPHONY_RUNTIME_WORKFLOW", home / ".config/symphony/WORKFLOW.md")),
     )
     parser.add_argument(
         "--state",

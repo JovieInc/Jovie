@@ -171,7 +171,8 @@ node scripts/summer-commissioning/bounded-operator-evals.mjs
 
 ## Completion reconciler runtime inputs
 
-The existing `gem-pr-drain.service` reads optional runtime inputs from the same
+The existing `gem-pr-drain.service` and `symphony-concurrency-controller.service`
+read optional runtime inputs from the same
 `~/.config/symphony/runner-source.env` used by the service observer:
 
 - `SYMPHONY_RUNTIME_SOURCE_ROOT`: checkout of the actual Symphony release commit,
@@ -180,7 +181,9 @@ The existing `gem-pr-drain.service` reads optional runtime inputs from the same
   verified listener's ERTS executable), not the packaged launcher.
 - `SYMPHONY_RUNTIME_WORKFLOW`: actual service workflow path.
 
-These configure the existing accepted-completion reconciler defaults; explicit
+The concurrency controller uses the same workflow input so its resource scope
+and permitted scalar adjustment refer to the running workflow. These inputs
+also configure the existing accepted-completion reconciler defaults; explicit
 CLI flags still take precedence. They are inputs, not grants or observations.
 The reconciler requires a fresh healthy service attestation and verifies the
 source revision, executable hash, workflow hash/path, and live service generation
