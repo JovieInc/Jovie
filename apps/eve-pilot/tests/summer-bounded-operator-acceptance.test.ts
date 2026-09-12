@@ -78,10 +78,9 @@ function freshReceipt(nowMs: number) {
 }
 
 describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
-  it(
-    'proves Gem-down → governed Cursor alternate → recovery → ownership → human decision',
-    { timeout: 20_000 },
-    async () => {
+  it('proves Gem-down → governed Cursor alternate → recovery → ownership → human decision', {
+    timeout: 20_000,
+  }, async () => {
     const nowMs = Date.parse('2026-09-12T17:00:00.000Z');
     const store = memoryStore();
 
