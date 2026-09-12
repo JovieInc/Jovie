@@ -72,6 +72,9 @@ describe('CustomerChangelogArchive', () => {
     const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
 
     expect(screen.getByText('August 2026')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'August 2026' })).toHaveClass(
+      'truncate'
+    );
     expect(screen.queryByText('July 2026')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Load Earlier Updates' })
