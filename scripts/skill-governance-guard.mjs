@@ -48,6 +48,13 @@ const REQUIRED_FIND_SKILL_PHRASES = [
   'Never use `--global` or `-g`',
   'Treat `npx skills check` and `npx skills update` as',
   'Do not use `npx skills add <source> --help`',
+  'vercel-cli-with-tokens',
+  'deploy-to-vercel',
+  'react-native-skills',
+  'react-view-transitions',
+  'writing-guidelines',
+  'Observability Plus',
+  'docs/agent-context/vercel-agent-skills-coverage.md',
 ];
 
 const REQUIRED_OVERLAY_PHRASES = [
@@ -56,7 +63,83 @@ const REQUIRED_OVERLAY_PHRASES = [
   'Route application calls through `apps/web/lib/ai/sdk.ts`',
   'boolean-prop guidance as an API-design heuristic',
   'inline hydration scripts or `suppressHydrationWarning`',
+  'docs/agent-context/vercel-agent-skills-coverage.md',
+  'Observability Plus',
+  'vercel-cli-with-tokens',
 ];
+
+export const DENIED_VERCEL_SKILLS = Object.freeze([
+  'vercel-cli-with-tokens',
+  'deploy-to-vercel',
+  'react-native-skills',
+  'vercel-react-native-skills',
+  'react-view-transitions',
+  'vercel-react-view-transitions',
+  'writing-guidelines',
+  'web-design-guidelines',
+  'vercel-optimize',
+]);
+
+const COVERAGE_MAP_PATH = 'docs/agent-context/vercel-agent-skills-coverage.md';
+const VERCEL_LABS_PINS_PATH = 'docs/vendor/vercel-labs/pins.json';
+const WEB_INTERFACE_GAPS_PATH =
+  '.agents/skills/gstack/design-review/references/web-interface-gaps.md';
+
+const REQUIRED_COVERAGE_MAP_PHRASES = [
+  'JOV-6188',
+  'vercel-cli-with-tokens',
+  'deploy-to-vercel',
+  'react-native-skills',
+  'react-view-transitions',
+  'writing-guidelines',
+  'Observability Plus',
+  'Tim-gated',
+  'vercel-react-best-practices',
+  'vercel-composition-patterns',
+];
+
+const REQUIRED_HANDBOOK_PINS = [
+  'vercel-labs/web-interface-guidelines',
+  'vercel-labs/writing-guidelines',
+];
+
+const IMPORT_HAZARD_PATTERNS = [
+  {
+    id: 'swr-import',
+    re: /\bfrom\s+['"]swr(?:\/[^'"]*)?['"]|\bfrom\s+['"]@vercel\/swr['"]|\buseSWR(?:Mutation|Subscription)?\b/,
+    message: 'imported skill must not introduce SWR; Jovie uses TanStack Query',
+  },
+  {
+    id: 'printenv-token',
+    re: /printenv\s+VERCEL_TOKEN|grep\s+['"]?VERCEL_TOKEN|grep\s+.*\.env.*VERCEL_TOKEN|VERCEL_TOKEN=\$\(printenv/,
+    message: 'imported skill must not printenv/grep VERCEL_TOKEN from .env',
+  },
+  {
+    id: 'skip-url-verify',
+    re: /skip(?:ping)?\s+(?:deployment\s+)?URL\s+verif|do not verify (?:the )?(?:deployment )?URL|bypass(?:es)? (?:deployment )?URL verif/i,
+    message: 'imported skill must not bypass deployment URL verification',
+  },
+  {
+    id: 'enable-observability-plus',
+    re: /Enable Observability Plus|enable Observability Plus|Observability Plus.{0,40}(?:turn on|enable|upgrade|paid)/i,
+    message:
+      'imported skill must not enable Observability Plus or paid Vercel products',
+  },
+  {
+    id: 'override-design-rules',
+    re: /(?:override|supersede|replace)\s+(?:DESIGN\.md|design-canonical|Jovie design)/i,
+    message: 'imported skill must not override Jovie design rules',
+  },
+  {
+    id: 'expand-task-scope',
+    re: /Implement \*\*all\*\* applicable patterns|do not ask which issues to fix/i,
+    message:
+      'imported skill must not expand task scope beyond the assigned candidate',
+  },
+];
+
+const RUNTIME_MAIN_FETCH =
+  /raw\.githubusercontent\.com\/vercel-labs\/(?:web-interface-guidelines|writing-guidelines)\/main\/command\.md/;
 
 const REQUIRED_EXECUTED_SKILL_OVERLAYS = Object.freeze({
   'ai-sdk': [
@@ -170,6 +253,146 @@ function validateSkillDirectory(
       errors.push(
         `${relativePath}: computedHash does not match installed content (expected ${expectedHash}, got ${actualHash})`
       );
+    }
+  }
+}
+
+function sha256File(filePath) {
+  return createHash('sha256').update(readFileSync(filePath)).digest('hex');
+}
+
+function walkRepoFiles(absolute, hits) {
+  if (!existsSync(absolute)) return;
+  let entries;
+  try {
+    entries = readdirSync(absolute, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    const child = resolve(absolute, entry.name);
+    if (entry.isDirectory() || entry.isSymbolicLink()) {
+      walkRepoFiles(child, hits);
+      continue;
+    }
+    hits.push(child);
+  }
+}
+
+function assertDeniedSkillsAbsent(root, lock, errors) {
+  const listed = new Set([
+    ...Object.keys(lock.skills ?? {}),
+    ...(lock.ownedSkills ?? []),
+    ...(lock.codexSkills ?? []),
+  ]);
+  for (const name of DENIED_VERCEL_SKILLS) {
+    if (listed.has(name)) {
+      errors.push(
+        `${name}: denied Vercel skill must not appear in skills-lock.json inventories`
+      );
+    }
+    for (const resolverRoot of ['.claude/skills', '.agents/skills']) {
+      if (existsSync(resolve(root, resolverRoot, name))) {
+        errors.push(
+          `${resolverRoot}/${name}: denied Vercel skill must not be installed`
+        );
+      }
+    }
+  }
+}
+
+function assertCoverageMap(root, errors) {
+  const text = readText(root, COVERAGE_MAP_PATH, errors);
+  if (!text) return;
+  for (const phrase of REQUIRED_COVERAGE_MAP_PHRASES) {
+    if (!text.includes(phrase)) {
+      errors.push(`${COVERAGE_MAP_PATH}: missing required coverage phrase: ${phrase}`);
+    }
+  }
+}
+
+function assertPinnedHandbooks(root, errors) {
+  const pinsText = readText(root, VERCEL_LABS_PINS_PATH, errors);
+  if (!pinsText) return;
+  let pins;
+  try {
+    pins = JSON.parse(pinsText);
+  } catch (error) {
+    errors.push(`${VERCEL_LABS_PINS_PATH}: invalid JSON (${error.message})`);
+    return;
+  }
+  const handbooks = pins.handbooks ?? {};
+  for (const name of REQUIRED_HANDBOOK_PINS) {
+    const pin = handbooks[name];
+    if (!pin?.ref || !pin.sha256 || !pin.path) {
+      errors.push(`${VERCEL_LABS_PINS_PATH}: missing a complete pin for ${name}`);
+      continue;
+    }
+    const absolute = resolve(root, pin.path);
+    if (!existsSync(absolute)) {
+      errors.push(`Pinned handbook ${pin.path} is missing`);
+      continue;
+    }
+    const actual = sha256File(absolute);
+    if (actual !== pin.sha256) {
+      errors.push(
+        `Pinned handbook ${pin.path} hash drifted. Expected ${pin.sha256}, found ${actual}`
+      );
+    }
+  }
+}
+
+function assertDesignGapFold(root, errors) {
+  const text = readText(root, WEB_INTERFACE_GAPS_PATH, errors);
+  if (!text) return;
+  for (const phrase of [
+    'Do not invoke `web-design-guidelines`',
+    '## Forms',
+    '## Overflow',
+    '## Media',
+    '## Localization',
+    '## Browser',
+    '## Accessibility gaps',
+  ]) {
+    if (!text.includes(phrase)) {
+      errors.push(`${WEB_INTERFACE_GAPS_PATH}: missing required fold: ${phrase}`);
+    }
+  }
+}
+
+function assertNoRuntimeMainFetches(root, errors) {
+  const hits = [];
+  walkRepoFiles(resolve(root, '.claude/skills'), hits);
+  walkRepoFiles(resolve(root, '.agents/skills'), hits);
+  for (const filePath of hits) {
+    if (!/(?:SKILL\.md|SKILL\.md\.tmpl)$/.test(filePath)) continue;
+    const text = readFileSync(filePath, 'utf8');
+    if (RUNTIME_MAIN_FETCH.test(text)) {
+      errors.push(
+        `${relative(root, filePath)}: must not fetch mutable vercel-labs handbook docs from main`
+      );
+    }
+  }
+}
+
+function assertImportHazards(root, lock, errors) {
+  for (const name of Object.keys(lock.skills ?? {})) {
+    if (APPROVED_VERCEL_SKILLS[name]) continue;
+    for (const resolverRoot of ['.claude/skills', '.agents/skills']) {
+      const dir = resolve(root, resolverRoot, name);
+      if (!existsSync(dir)) continue;
+      const hits = [];
+      walkRepoFiles(dir, hits);
+      for (const filePath of hits) {
+        if (!/\.(md|tmpl|ts|tsx|js|mjs)$/.test(filePath)) continue;
+        const text = readFileSync(filePath, 'utf8');
+        for (const hazard of IMPORT_HAZARD_PATTERNS) {
+          if (hazard.re.test(text)) {
+            errors.push(`${relative(root, filePath)}: ${hazard.message}`);
+          }
+        }
+      }
     }
   }
 }
@@ -345,6 +568,13 @@ export function evaluateSkillGovernance({ root = process.cwd() } = {}) {
       errors.push(`gstack.md: missing required Vercel overlay: ${phrase}`);
     }
   }
+
+  assertDeniedSkillsAbsent(root, lock, errors);
+  assertCoverageMap(root, errors);
+  assertPinnedHandbooks(root, errors);
+  assertDesignGapFold(root, errors);
+  assertNoRuntimeMainFetches(root, errors);
+  assertImportHazards(root, lock, errors);
 
   return errors;
 }
