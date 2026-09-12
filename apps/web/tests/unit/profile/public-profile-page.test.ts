@@ -185,6 +185,15 @@ describe('Public Profile Page Logic', () => {
       expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
     });
 
+    it('redirects or 404s opaque internal-ID profile URLs before rendering junk', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'resolveOpaqueInternalProfileUsername'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'not_found'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'redirect'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('permanentRedirect');
+    });
+
     it('keeps the transient profile error state out of the client graph', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
         '@/features/feedback/ErrorBanner'
