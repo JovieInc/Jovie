@@ -56,6 +56,9 @@ function finding(
   return {
     subjectType: 'artist',
     subjectId: 'profile-1',
+    scopeType: null,
+    scopeId: null,
+    category: null,
     issueType: 'dead_link',
     platform: 'Genius',
     currentUrl: 'https://genius.com/artists/tim-white',
@@ -82,8 +85,13 @@ const bundle: LibraryPostReleaseBundle = {
       id: 'finding-repair',
       kind: 'repair',
       title: 'Replace dead artist link',
+      subjectType: 'release',
+      subjectId: 'release-1',
+      scopeType: 'asset',
+      scopeId: 'release-1',
     }),
   ],
+
   rightsholders: [
     {
       id: 'evidence-1',
