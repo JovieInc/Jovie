@@ -174,6 +174,20 @@ export function buildBaseline(measured) {
 
 /**
  * Shared event-aware shrink-only verdict on the armed tier; strict is reported.
+ *
+ * JSDoc-authored on purpose: under checkJs, destructured parameters without a
+ * type infer every property as REQUIRED, so callers that legitimately omit
+ * `event` (and the script's own `evaluateNativeSpacingScale({ measured,
+ * baseline })` call) fail scripts-typecheck with TS2345 against the
+ * shrink-only baseline. `event` accepts any string and is forwarded to
+ * evaluateShrinkOnlyCount, which validates it.
+ *
+ * @param {{
+ *   measured?: Record<string, any>,
+ *   baseline?: any,
+ *   event?: any,
+ * }} input
+ * @returns {{ ok: boolean, issues: string[], warnings: string[] }}
  */
 export function evaluateNativeSpacingScale({ measured, baseline, event }) {
   const issues = [];
@@ -200,6 +214,20 @@ export function evaluateNativeSpacingScale({ measured, baseline, event }) {
   return { ok: issues.length === 0, issues, warnings };
 }
 
+/**
+ * Minimal writable-stream sink — NOT NodeJS.Process, whose full shape the
+ * tests' `{ stdout: { write }, stderr: { write } }` capture stub could never
+ * satisfy under checkJs (TS2345 against the shrink-only baseline).
+ *
+ * @typedef {{ stdout: { write: (value: string) => void }, stderr: { write: (value: string) => void } }} OutputSink
+ */
+
+/**
+ * @param {string[]} [args]
+ * @param {string} [repoRoot]
+ * @param {OutputSink} [output]
+ * @returns {number}
+ */
 export function runNativeSpacingScale(
   args = process.argv.slice(2),
   repoRoot = REPO_ROOT,
