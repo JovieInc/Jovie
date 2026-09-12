@@ -487,6 +487,45 @@ describe('completeOnboarding', () => {
     expect(mockClearPendingClaimContext).toHaveBeenCalled();
   });
 
+  it('keeps signed claim context after receipt failure and clears it only on successful retry', async () => {
+    mockClaimPrebuiltProfileForUser.mockResolvedValue({
+      username: 'artist',
+      profileId: 'profile-claim-123',
+      status: 'updated',
+    });
+    mockReadPendingClaimContext.mockResolvedValue({
+      mode: 'token_backed',
+      creatorProfileId: 'profile-claim-123',
+      username: 'artist',
+      claimTokenHash: 'hash',
+      leadId: 'lead-123',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    mockAttributeLeadSignupFromClerkUserId.mockRejectedValueOnce(
+      new Error('receipt down')
+    );
+    await expect(
+      completeOnboarding({
+        username: 'artist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow('Your profile is saved');
+    expect(mockClaimPrebuiltProfileForUser).toHaveBeenCalledTimes(1);
+    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+    expect(cookieSetMock).not.toHaveBeenCalled();
+    await expect(
+      completeOnboarding({
+        username: 'artist',
+        displayName: 'Artist',
+        redirectToDashboard: false,
+      })
+    ).resolves.toMatchObject({ profileId: 'profile-claim-123' });
+    expect(mockAttributeLeadSignupFromClerkUserId).toHaveBeenCalledTimes(2);
+    expect(mockClearPendingClaimContext).toHaveBeenCalledTimes(1);
+  });
+
   it('reserves the prebuilt profile for direct pending claims', async () => {
     mockReadPendingClaimContext.mockResolvedValueOnce({
       mode: 'direct_profile',
@@ -531,8 +570,8 @@ describe('completeOnboarding', () => {
   });
 
   it('creates a new user profile, caches completion, and keeps side effects non-blocking', async () => {
-    mockAttributeLeadSignupFromClerkUserId.mockRejectedValueOnce(
-      new Error('lead attribution down')
+    mockCacheHandleAvailability.mockRejectedValueOnce(
+      new Error('handle cache down')
     );
 
     const result = await completeOnboarding({
@@ -574,13 +613,13 @@ describe('completeOnboarding', () => {
       'artist'
     );
     expect(mockCaptureError).toHaveBeenCalledWith(
-      'attribute_lead_signup failed',
+      'cache_handle_availability failed',
       expect.objectContaining({
-        message: 'lead attribution down',
+        message: 'handle cache down',
       }),
       expect.objectContaining({
         route: 'onboarding',
-        contextData: { userId: 'clerk-user-123' },
+        contextData: { username: 'artist' },
       })
     );
     expect(cookieSetMock).toHaveBeenCalledWith(

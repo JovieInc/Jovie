@@ -179,6 +179,46 @@ describe('completeOnboarding', () => {
     });
   });
 
+  it('rejects completion when required lead receipts fail instead of swallowing them', async () => {
+    hoisted.withRetryMock.mockResolvedValueOnce({
+      username: 'freshhandle',
+      profileId: 'profile_123',
+      status: 'complete',
+    });
+    hoisted.attributeLeadSignupFromClerkUserIdMock.mockRejectedValueOnce(
+      new Error('receipt unavailable')
+    );
+    await expect(
+      completeOnboarding({
+        username: 'freshhandle',
+        displayName: 'Fresh Handle',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow('Your profile is saved');
+    expect(hoisted.captureErrorMock).toHaveBeenCalledWith(
+      'completeOnboarding failed',
+      expect.objectContaining({
+        message: expect.stringContaining('Your profile is saved'),
+      }),
+      expect.anything()
+    );
+    hoisted.withRetryMock.mockResolvedValueOnce({
+      username: 'freshhandle',
+      profileId: 'profile_123',
+      status: 'complete',
+    });
+    await expect(
+      completeOnboarding({
+        username: 'freshhandle',
+        displayName: 'Fresh Handle',
+        redirectToDashboard: false,
+      })
+    ).resolves.toMatchObject({ profileId: 'profile_123', status: 'complete' });
+    expect(
+      hoisted.attributeLeadSignupFromClerkUserIdMock
+    ).toHaveBeenCalledTimes(2);
+  });
+
   it('recovers as success when a concurrent duplicate handle belongs to the same user', async () => {
     hoisted.withRetryMock.mockRejectedValueOnce(
       Object.assign(

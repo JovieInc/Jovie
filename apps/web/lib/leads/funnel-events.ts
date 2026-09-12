@@ -10,6 +10,7 @@ import {
   leadFunnelEvents,
   leads,
 } from '@/lib/db/schema/leads';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
@@ -280,7 +281,7 @@ export async function attributeLeadSignupFromClerkUserId(
   }
 
   const [user] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, activeProfileId: users.activeProfileId })
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
@@ -319,6 +320,7 @@ export async function attributeLeadSignupFromClerkUserId(
     {
       leadId: lead.id,
       eventType: 'signup_completed',
+      occurredAt: lead.signupAt ?? now,
       channel: attribution.channel,
       provider: attribution.provider,
       campaignKey: attribution.campaignKey,
@@ -328,13 +330,33 @@ export async function attributeLeadSignupFromClerkUserId(
         signupUserId: user.id,
       },
     },
-    { idempotent: true }
+    { idempotent: true, required: true }
   );
+
+  // A reserved direct-claim profile is not an activated account. Keep the
+  // attribution cookie until the owned active profile is durably onboarded.
+  if (!user.activeProfileId) {
+    return { leadId: lead.id, userId: user.id };
+  }
+  const [profile] = await db
+    .select({ onboardingCompletedAt: creatorProfiles.onboardingCompletedAt })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.id, user.activeProfileId),
+        eq(creatorProfiles.userId, user.id)
+      )
+    )
+    .limit(1);
+  if (!profile?.onboardingCompletedAt) {
+    return { leadId: lead.id, userId: user.id };
+  }
 
   await recordLeadFunnelEvent(
     {
       leadId: lead.id,
       eventType: 'onboarding_completed',
+      occurredAt: profile.onboardingCompletedAt,
       channel: attribution.channel,
       provider: attribution.provider,
       campaignKey: attribution.campaignKey,
@@ -344,7 +366,7 @@ export async function attributeLeadSignupFromClerkUserId(
         signupUserId: user.id,
       },
     },
-    { idempotent: true }
+    { idempotent: true, required: true }
   );
 
   await clearLeadAttributionCookie();
