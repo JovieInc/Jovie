@@ -113,6 +113,28 @@ class PublisherTests(unittest.TestCase):
         self.fields["NeedDaemonReload"] = "yes"
         self.assertFalse(self.observe()["daemonReloaded"])
 
+    def test_owned_unit_dropins_match_source_and_stay_healthy(self):
+        mounts = self.root / "workspace-mounts.conf"
+        guard = self.root / "90-symphony-safe-restart-guard.conf"
+        mounts.write_bytes(
+            b"[Service]\nExecStartPre=/usr/bin/sudo -n /usr/local/sbin/jovie-symphony-workspace restore-all\n"
+        )
+        guard.write_bytes(b"[Unit]\nRefuseManualStop=yes\n")
+        self.sources[
+            "scripts/symphony/systemd/symphony-elixir.service.d/workspace-mounts.conf"
+        ] = mounts.read_bytes()
+        self.sources[
+            "scripts/symphony/systemd/symphony-elixir.service.d/90-symphony-safe-restart-guard.conf"
+        ] = guard.read_bytes()
+        self.fields["DropInPaths"] = f"{mounts} {guard}"
+        result = self.observe()
+        self.assertTrue(result["healthy"])
+        self.assertEqual(
+            [item["name"] for item in result["unitOverrides"]],
+            ["workspace-mounts.conf", "90-symphony-safe-restart-guard.conf"],
+        )
+        self.assertTrue(all(item["matches"] for item in result["unitOverrides"]))
+
     def test_only_existing_concurrency_overlay_is_accepted(self):
         for value in [1, 41, 128]:
             self.workflow.write_bytes(WORKFLOW.replace(b"agents: 5", f"agents: {value}".encode()))

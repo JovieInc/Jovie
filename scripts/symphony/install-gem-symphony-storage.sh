@@ -41,7 +41,7 @@ for path in "$helper_source" "$wrapper_source" "$cache_source" "$boot_simulation
   "$systemd_source/jovie-symphony-workspace-cleanup.timer" \
   "$systemd_source/gem-disk-reclaim.service" \
   "$systemd_source/gem-disk-reclaim.timer" \
-  "$systemd_source/symphony-elixir-workspace-mounts.conf"; do
+  "$systemd_source/symphony-elixir.service.d/workspace-mounts.conf"; do
   [[ -f "$path" && ! -L "$path" ]] || { echo "missing or unsafe source artifact: $path" >&2; exit 65; }
 done
 
@@ -130,7 +130,7 @@ atomic_install "$systemd_source/jovie-symphony-workspace-cleanup.service" /etc/s
 atomic_install "$systemd_source/jovie-symphony-workspace-cleanup.timer" /etc/systemd/system/jovie-symphony-workspace-cleanup.timer 0644 root root
 atomic_install "$systemd_source/gem-disk-reclaim.service" "/home/$owner/.config/systemd/user/gem-disk-reclaim.service" 0644 "$owner" "$owner"
 atomic_install "$systemd_source/gem-disk-reclaim.timer" "/home/$owner/.config/systemd/user/gem-disk-reclaim.timer" 0644 "$owner" "$owner"
-atomic_install "$systemd_source/symphony-elixir-workspace-mounts.conf" "$user_dropin_dir/workspace-mounts.conf" 0644 "$owner" "$owner"
+atomic_install "$systemd_source/symphony-elixir.service.d/workspace-mounts.conf" "$user_dropin_dir/workspace-mounts.conf" 0644 "$owner" "$owner"
 
 install_symlink() {
   local target="$1" link="$2"

@@ -117,6 +117,37 @@ pnpm --dir apps/eve-pilot exec vitest run --config vitest.config.ts \
 # writes /opt/cursor/artifacts/summer-bounded-operator-acceptance-receipt.json
 ```
 
+## Pre-install gates (read before touching Gem)
+
+Do **not** install the JOV-6163 publisher until these are true, or E1 fails closed
+/ Summer routes into Cursor recovery spend:
+
+1. **Config drift must be healthy first.**  
+   `python3 scripts/symphony/emit_gem_service_attestation.py --check …` must exit **0**.
+   Live unit drop-ins (`workspace-mounts.conf`, `90-symphony-safe-restart-guard.conf`)
+   must match `scripts/symphony/systemd/symphony-elixir.service.d/<basename>` at the
+   selected configuration revision. Unknown or drifted drop-ins keep `healthy:false`.
+
+2. **Activation installs the publisher (after #17736).**  
+   Before that lands, activation only installs fleet / PR-rehab controllers. After it
+   lands, activation copies the emitter onto the existing `gem-service-attestation`
+   timer path and verifies `configurationSourceRevision` (Jovie tip). Still fail-closed
+   when `~/.config/symphony/runner-source.env` is missing or `--check` is unhealthy.
+
+3. **Gem → Summer transport.**  
+   Summer (Vercel) reads `SUMMER_RUNNER_SOURCE_ATTESTATION_PATH` / `_JSON`. Host-local
+   files on Gem are not visible to Summer. Wire signed snapshot/env transport before
+   claiming admission green. Static env goes stale inside the 600s window by design.
+
+4. **Public DNS is not Gem.**  
+   `gem.jovie.ai` from the public internet is a parking lander. Operator access is the
+   self-hosted `jovie-fixed` runner / Gem shell — not Cloud Agent egress.
+
+**E1 close proof (not self-test):** live-mode receipt, two real 40-hex `sourceRevision`s,
+age ≤600s at verify time, `weakened600sGate: false`, and Summer admission no longer
+holding on `runner-source-attestation-unavailable`. Anything with `mode: "self-test"`
+is readiness only.
+
 ## Named external blocker
 
 **Owner:** Gem operator / Symphony fleet owner  
@@ -129,6 +160,8 @@ admission no longer holds on `runner-source-attestation-unavailable`.
 - Do not bypass or extend the 600s attestation freshness window
 - Do not grant Summer privileged GBrain write or Symphony heal
 - Do not claim E1 green from local unit tests alone — Gem install is required
+- Do not install the publisher solely to “make E1 green” while `--check` is non-zero
+- Do not re-pin provenance to force `healthy:true` against live drift
 
 ## Related local gates (automated)
 
