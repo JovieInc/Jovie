@@ -26,7 +26,8 @@
       "!apps/web/typecheck-tests-baseline.json",
       "!scripts/shared-ui-visual-arbitrary.baseline.json",
       "!apps/web/tests/unit/design-system/source-identity.baseline.json",
-      "!packages/action-contracts/generated/**"
+      "!packages/action-contracts/generated/**",
+      "!**/*.a11y-red.tsx"
     ]
   },
   "formatter": {
@@ -168,33 +169,6 @@
         "rules": {
           "style": {
             "noRestrictedGlobals": "off"
-          }
-        }
-      }
-    },
-    {
-      "includes": [
-        "apps/web/components/organisms/table/atoms/AudienceRowSelectionCell.tsx",
-        "apps/web/components/organisms/table/atoms/TableCheckboxCell.tsx"
-      ],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "noNoninteractiveElementInteractions": "off",
-            "noStaticElementInteractions": "off"
-          }
-        }
-      }
-    },
-    {
-      "includes": [
-        "apps/web/components/features/admin/CreatorProfileTableRow.tsx",
-        "apps/web/components/features/admin/table/organisms/KanbanBoard.tsx"
-      ],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "noNoninteractiveElementInteractions": "off"
           }
         }
       }
