@@ -16,4 +16,15 @@ describe('TabBar task density contract', () => {
       "cn('invisible absolute', overflowTriggerClassName)"
     );
   });
+
+  it('keeps the underline trigger classes exported for the Inspector rail', () => {
+    const source = readFileSync(resolve(__dirname, './TabBar.tsx'), 'utf8');
+
+    const underlineBlock = source.match(
+      /const TAB_BAR_UNDERLINE_TRIGGER_CLASSNAME =[\s\S]*?;/u
+    )?.[0];
+    expect(underlineBlock).toBeDefined();
+    expect(underlineBlock).not.toContain('rounded-full');
+    expect(source).toContain("variant === 'underline'");
+  });
 });
