@@ -1,4 +1,3 @@
-import { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
 /**
  * POST /api/connectors/suggested-actions/[id]/reject
  *
@@ -15,7 +14,10 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
-import { YOUTUBE_THUMBNAIL_CANDIDATE_KIND } from '@/lib/connectors/suggested-action-kinds';
+import {
+  WORKFLOW_CAPTURE_REQUEST_KIND,
+  YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
+} from '@/lib/connectors/suggested-action-kinds';
 import { parseYouTubeThumbnailCandidate } from '@/lib/connectors/youtube-thumbnail-candidate';
 import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
@@ -57,7 +59,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       })
       .from(suggestedActions)
       .where(
-        and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+        and(
+          eq(suggestedActions.id, id),
+          eq(suggestedActions.userId, userId),
+          ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
+        )
       )
       .limit(1);
     if (!candidate) {

@@ -40,6 +40,7 @@ vi.mock('@/lib/db/schema/connectors', () => ({
 vi.mock('drizzle-orm', () => ({
   and: (...values: unknown[]) => values,
   eq: (column: unknown, value: unknown) => [column, value],
+  ne: (column: unknown, value: unknown) => [column, value],
 }));
 vi.mock('@/lib/connectors/inbox-decision', () => ({
   recordInboxDecision: hoisted.recordDecision,

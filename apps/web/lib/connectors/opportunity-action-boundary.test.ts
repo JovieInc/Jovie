@@ -23,6 +23,10 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn() },
 }));
 vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
+vi.mock('@/lib/youtube-library', () => ({
+  reconcileThumbnailCandidateDecision: vi.fn(),
+  YouTubeThumbnailDecisionError: class YouTubeThumbnailDecisionError extends Error {},
+}));
 
 import { POST as nextStep } from '@/app/api/connectors/suggested-actions/[id]/next-step/route';
 import { POST as reject } from '@/app/api/connectors/suggested-actions/[id]/reject/route';
@@ -39,7 +43,18 @@ describe('stale consumer action links cannot mutate Ovie captures', () => {
     ['next-step', nextStep, '=', 'experiment.report'],
   ] as const)(
     '%s restricts both mutation and retry lookup by owned kind',
-    async (_name, action, operator, kind) => {
+    async (name, action, operator, kind) => {
+      if (name === 'reject') {
+        mocks.readWhere.mockReturnValueOnce({
+          limit: async () => [
+            {
+              kind: 'brand_deal.opportunity',
+              payload: {},
+              status: 'pending',
+            },
+          ],
+        });
+      }
       const response = await action(
         new Request('https://jov.ie/api', { method: 'POST' }),
         { params: Promise.resolve({ id: 'capture' }) }
