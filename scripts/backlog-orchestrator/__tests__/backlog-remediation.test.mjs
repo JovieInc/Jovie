@@ -56,7 +56,7 @@ function issue(identifier, overrides = {}) {
     createdAt: overrides.createdAt || '2026-08-20T00:00:00.000Z',
     updatedAt: '2026-08-30T00:00:00.000Z',
     priority: 3,
-    state: { name: overrides.state || 'Backlog' },
+    state: { name: overrides.state || 'Todo' },
     assignee: overrides.assignee ?? null,
     labels: {
       nodes: (overrides.labels || []).map(name => ({ name })),
@@ -197,6 +197,30 @@ describe('official Symphony backlog remediation', () => {
       assert.equal(result.reason, reason);
       assert.ok(['blocked', 'split'].includes(result.outcome), reason);
     }
+  });
+
+  it('honors an explicit engineering implementation admission while unresolved founder decisions remain blocked', () => {
+    const description = `Admission class: engineering-implementation\n\n${SAFE_DESCRIPTION}`;
+    const approved = classifyRemediationCandidate(
+      issue('JOV-5995', { description }),
+      { now: NOW }
+    );
+    assert.equal(approved.selected, true);
+    assert.equal(approved.reason, 'bounded-isolated-code-shippable');
+
+    const unresolved = classifyRemediationCandidate(
+      issue('JOV-5996', { description, labels: ['needs-decision'] }),
+      { now: NOW }
+    );
+    assert.equal(unresolved.selected, true);
+    assert.equal(unresolved.reason, 'bounded-isolated-code-shippable');
+
+    const deadLetter = classifyRemediationCandidate(
+      issue('JOV-5997', { description, labels: ['no-symphony'] }),
+      { now: NOW }
+    );
+    assert.equal(deadLetter.selected, false);
+    assert.equal(deadLetter.reason, 'machine-hold');
   });
 
   it('selects only bounded isolated issues and refuses overlapping ownership in a wave', () => {

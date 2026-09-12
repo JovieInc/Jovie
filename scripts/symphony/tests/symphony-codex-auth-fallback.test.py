@@ -34,6 +34,7 @@ SIDECAR = SOURCE_DIR / "symphony-grok-sidecar"
 GROK_SHIP = SOURCE_DIR / "grok-ship-one"
 CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
+FALLBACK_FINALIZER = SOURCE_DIR / "symphony-fallback-finalize.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
 PROVIDER_CAPACITY = SOURCE_DIR / "provider_capacity.py"
 EXISTING_PR_REPAIR = SOURCE_DIR / "existing_pr_repair.py"
@@ -48,6 +49,7 @@ RUNTIME_ARTIFACTS = (
     GROK_SHIP,
     CURSOR_STD,
     MODEL_ROUTER,
+    FALLBACK_FINALIZER,
     MODEL_REGISTRY,
     PROVIDER_CAPACITY,
     EXISTING_PR_REPAIR,
@@ -57,7 +59,14 @@ RUNTIME_ARTIFACTS = (
     UPSERT_PR_COMMENT,
 )
 RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
-LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
+LAUNCHER_NAMES = (
+    WRAPPER.name,
+    CONTROLLER.name,
+    SIDECAR.name,
+    GROK_SHIP.name,
+    CURSOR_STD.name,
+    FALLBACK_FINALIZER.name,
+)
 NODE_BIN_DIR = str(pathlib.Path(shutil.which("node") or "/usr/bin/node").parent)
 
 
@@ -157,6 +166,124 @@ class OfficialServiceCoverageContract(unittest.TestCase):
             ):
                 verify_official_service_coverage(report_path)
 
+
+class FallbackTerminalContract(unittest.TestCase):
+    def setUp(self):
+        self.module = _load_python_module(
+            "symphony_fallback_finalize", FALLBACK_FINALIZER
+        )
+        self.expected = {
+            "issueId": "uuid-JOV-5995",
+            "issueRevision": "rev-1",
+            "ownerId": "owner-1",
+            "claimState": {"id": "progress", "name": "In Progress"},
+        }
+        self.observed = {
+            "id": "uuid-JOV-5995",
+            "updatedAt": "rev-1",
+            "assignee": {"id": "owner-1"},
+            "state": {"id": "progress", "name": "In Progress"},
+        }
+        self.clear = {
+            "prExists": False,
+            "officialProcess": False,
+            "fallbackProcess": False,
+            "validLease": False,
+        }
+
+    def test_compensation_blockers_cover_clear_drift_and_vetoes(self):
+        self.assertEqual(
+            self.module.compensation_blockers(
+                self.expected, self.observed, self.clear
+            ),
+            [],
+        )
+        drifted = dict(self.observed, updatedAt="rev-2", assignee={"id": "owner-2"})
+        self.assertEqual(
+            self.module.compensation_blockers(self.expected, drifted, self.clear),
+            ["issue_revision_changed", "owner_changed"],
+        )
+        vetoes = {
+            "prExists": ("pr_exists", "pr_unverifiable"),
+            "officialProcess": (
+                "official_process_active",
+                "official_process_unverifiable",
+            ),
+            "fallbackProcess": (
+                "fallback_process_active",
+                "fallback_process_unverifiable",
+            ),
+            "validLease": ("valid_lease_active", "valid_lease_unverifiable"),
+        }
+        for key, (active, unknown) in vetoes.items():
+            with self.subTest(key=key, kind="active"):
+                self.assertEqual(
+                    self.module.compensation_blockers(
+                        self.expected, self.observed, dict(self.clear, **{key: True})
+                    ),
+                    [active],
+                )
+            with self.subTest(key=key, kind="unknown"):
+                self.assertEqual(
+                    self.module.compensation_blockers(
+                        self.expected, self.observed, dict(self.clear, **{key: None})
+                    ),
+                    [unknown],
+                )
+
+    def test_terminal_finalize_restores_safe_state_with_readback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            receipt_dir = pathlib.Path(directory)
+            revision = "rev-1"
+            suffix = hashlib.sha256(revision.encode()).hexdigest()[:12]
+            launch = {
+                "schema": "symphony-fallback-lease/v2",
+                "identifier": "JOV-5995",
+                "issueId": "uuid-JOV-5995",
+                "issueRevision": revision,
+                "ownerId": "owner-1",
+                "originalState": {"id": "progress", "name": "In Progress"},
+                "claimState": {"id": "progress", "name": "In Progress"},
+                "safeState": {"id": "todo", "name": "Todo"},
+                "provider": "kimi",
+                "model": "kimi-code/k3",
+                "modelId": "kimi-k3",
+                "unit": f"fallback-ship-JOV-5995-{suffix}",
+            }
+            (receipt_dir / "JOV-5995.json").write_text(json.dumps(launch))
+            (receipt_dir / f"JOV-5995-{suffix}.outcome.json").write_text(
+                json.dumps({"category": "provider_exhausted", "exitCode": 1})
+            )
+            final = {**self.observed, "updatedAt": "rev-2", "state": {"id": "todo", "name": "Todo"}}
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"SYMPHONY_FALLBACK_RECEIPT_DIR": str(receipt_dir)},
+                    clear=False,
+                ),
+                mock.patch.object(self.module, "_pr_exists", return_value=False),
+                mock.patch.object(self.module, "_official_issue_active", return_value=False),
+                mock.patch.object(self.module, "_fallback_process_active", return_value=False),
+                mock.patch.object(self.module, "_valid_lease", return_value=False),
+                mock.patch.object(self.module, "_mark_provider_exhausted", return_value=True),
+                mock.patch.object(
+                    self.module,
+                    "_fetch_issue",
+                    side_effect=[self.observed, self.observed, final],
+                ),
+                mock.patch.object(self.module, "_update_state", return_value=True) as update,
+            ):
+                rc, receipt = self.module.finalize("JOV-5995")
+                repeated_rc, repeated = self.module.finalize("JOV-5995")
+            self.assertEqual(rc, 0)
+            self.assertEqual(repeated_rc, 0)
+            self.assertEqual(repeated, receipt)
+            self.assertEqual(receipt["terminalCategory"], "compensation_restored")
+            self.assertEqual(receipt["finalState"]["name"], "Todo")
+            self.assertEqual(receipt["heartbeat"]["phase"], "terminal")
+            update.assert_called_once_with("uuid-JOV-5995", "todo")
+            terminal = receipt_dir / f"JOV-5995-{suffix}.terminal.json"
+            self.assertTrue(json.loads(terminal.read_text())["terminalComplete"])
 
 def issue_revision(identifier, title="", description=""):
     canonical = f"{identifier}\n{title.strip()}\n{description.strip()}"
@@ -326,11 +453,26 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
     labels: dict[str, list[str]] = {}
     omit_receipt: set[str] = set()
     states: dict[str, str] = {}
+    revisions: dict[str, int] = {}
 
     def do_POST(self):  # noqa: N802 - stdlib handler API
         payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         self.__class__.requests.append(payload)
         if "issueUpdate" in payload["query"]:
+            issue_id = payload["variables"]["id"]
+            identifier = issue_id.removeprefix("uuid-")
+            state_id = payload["variables"]["input"]["stateId"]
+            state_names = {
+                "progress": "In Progress",
+                "review": "In Review",
+                "todo": "Todo",
+            }
+            self.__class__.states[identifier] = state_names.get(
+                state_id.rsplit("-", 1)[-1], state_id
+            )
+            self.__class__.revisions[identifier] = (
+                self.__class__.revisions.get(identifier, 0) + 1
+            )
             response = {"data": {"issueUpdate": {"success": True}}}
         else:
             identifier = payload["variables"]["id"]
@@ -351,7 +493,12 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
                         "title": title,
                         "description": description,
                         "url": f"https://linear.example/{identifier}",
-                        "updatedAt": "2026-08-14T19:00:00Z",
+                        "updatedAt": (
+                            "2026-08-14T19:00:00Z"
+                            if not self.__class__.revisions.get(identifier)
+                            else f"2026-08-14T19:00:{self.__class__.revisions[identifier]:02d}Z"
+                        ),
+                        "assignee": {"id": "owner-1"},
                         "state": {
                             "id": f"{team}-state",
                             "name": self.__class__.states.get(identifier) or "Todo",
@@ -362,6 +509,7 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
                                 "nodes": [
                                     {"id": f"{team}-progress", "name": "In Progress"},
                                     {"id": f"{team}-review", "name": "In Review"},
+                                    {"id": f"{team}-todo", "name": "Todo"},
                                 ]
                             },
                         },
@@ -682,6 +830,7 @@ PY
         GrokLinearHandler.labels = {}
         GrokLinearHandler.omit_receipt = set()
         GrokLinearHandler.states = {}
+        GrokLinearHandler.revisions = {}
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), GrokLinearHandler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
@@ -1567,13 +1716,15 @@ PY
         self.assertIn("state { name }", first["query"])
         self.assertEqual(module.REQUIRED_ADMISSION_LABELS, frozenset())
 
-    def test_linear_identifiers_continues_in_review_without_receipt(self):
-        """Live :4041 retrying In Review issues after #16212 emptied receipts."""
+    def test_linear_identifiers_continues_inflight_states_without_receipt(self):
+        """Live :4041 retrying in-flight issues after #16212 emptied receipts."""
         module = self.load_controller_module()
         url = self.linear_url()
         LinearHandler.pages = [
             [
                 self._issue_node("JOV-5015", "symphony", receipt=False, state="In Review"),
+                self._issue_node("JOV-5016", "symphony", receipt=False, state="Rework"),
+                self._issue_node("JOV-5017", "symphony", receipt=False, state="Merging"),
                 self._issue_node("JOV-5000", "symphony", receipt=False, state="Todo"),
                 self._issue_node(
                     "JOV-4998", "symphony", "blocked", receipt=False, state="In Review"
@@ -1582,7 +1733,7 @@ PY
         ]
         with mock.patch.dict(os.environ, {"LINEAR_API_KEY": "linear-secret", "LINEAR_API_URL": url}):
             identifiers = module._linear_identifiers()
-        self.assertEqual(identifiers, ["JOV-5015"])
+        self.assertEqual(identifiers, ["JOV-5015", "JOV-5016", "JOV-5017"])
 
     def test_launch_continues_in_review_head_without_receipt(self):
         module = self.load_controller_module()
@@ -1707,6 +1858,10 @@ PY
             self.assertEqual(module._provider_measured_capacity("cursor"), 40)
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("no-symphony", module.BLOCKED_ADMISSION_LABELS)
+        self.assertIn("rework", module.CONTINUE_WITHOUT_RECEIPT_STATES)
+        self.assertIn("merging", module.CONTINUE_WITHOUT_RECEIPT_STATES)
+        self.assertIn("rework", module.ADMITTED_STATES)
+        self.assertIn("merging", module.ADMITTED_STATES)
         for label in ("held", "manual-incident"):
             self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
         for label in (
@@ -1741,7 +1896,7 @@ PY
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "blocked")
-        for label in ("held", "manual-incident"):
+        for label in ("held", "manual-incident", "no-symphony"):
             ok, reason = module.admission_decision(
                 "JOV",
                 "JOV-1",
@@ -2380,12 +2535,18 @@ PY
             self.assertIn(f"git clone --depth 1 https://github.com/{repository}.git", self.events.read_text())
             self.assertIn(f"--cwd {workspace / identifier.split('-', 1)[0] / identifier}", self.events.read_text())
             receipt = json.loads((self.root / "fallback-receipts" / f"{identifier}.json").read_text())
-            self.assertEqual(receipt["schema"], "symphony-fallback-lease/v1")
-            self.assertEqual(receipt["issueRevision"], "2026-08-14T19:00:00Z")
+            self.assertEqual(receipt["schema"], "symphony-fallback-lease/v2")
+            self.assertEqual(receipt["admissionRevision"], "2026-08-14T19:00:00Z")
+            self.assertEqual(receipt["issueRevision"], "2026-08-14T19:00:01Z")
+            self.assertEqual(receipt["issueId"], f"uuid-{identifier}")
+            self.assertEqual(receipt["ownerId"], "owner-1")
+            self.assertEqual(receipt["claimState"]["name"], "In Progress")
             self.assertEqual(receipt["baseRevision"], "b" * 40)
             self.assertEqual(receipt["bundleRevision"], "a" * 64)
             self.assertEqual(receipt["ownership"], "isolated-implementation-only")
-            expected_unit = self.load_controller_module()._fallback_unit(identifier, receipt["issueRevision"])
+            expected_unit = self.load_controller_module()._fallback_unit(
+                identifier, receipt["admissionRevision"]
+            )
             self.assertEqual(receipt["unit"], expected_unit)
             self.assertIn("deploy", receipt["forbidden"])
         mutations = [request["variables"]["input"]["stateId"] for request in GrokLinearHandler.requests if "issueUpdate" in request["query"]]
@@ -3231,6 +3392,7 @@ PY
         self.assertTrue(
             any(arg.startswith("Environment=SYMPHONY_FALLBACK_PROVIDER=") for arg in command)
         )
+        self.assertIn("ExecStopPost=/bin/symphony-fallback-finalize.py JOV-7", command)
         ship = GROK_SHIP.read_text()
         self.assertIn('AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"', ship)
 

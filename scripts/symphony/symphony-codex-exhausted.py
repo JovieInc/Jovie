@@ -98,8 +98,14 @@ RUNTIME_NAMES = (
     "writer-owned-pr-promotion.mjs",
     "queue-deferral-receipt.mjs",
     "upsert-pr-comment.sh",
+    "symphony-fallback-finalize.py",
 )
-LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
+LAUNCHER_NAMES = (
+    *LEGACY_RUNTIME_NAMES,
+    "grok-ship-one",
+    "cursor-agent-std",
+    "symphony-fallback-finalize.py",
+)
 # Labels are derived audit evidence, never independent admission blockers.
 # The machine-written admission-gate/v1 receipt is the source of truth.
 REQUIRED_ADMISSION_LABELS = frozenset()
@@ -146,7 +152,7 @@ query($first: Int!, $after: String) {
     first: $first
     after: $after
     filter: {
-      state: { name: { in: ["Todo", "In Progress", "In Review"] } }
+      state: { name: { in: ["Todo", "In Progress", "Rework", "Merging", "In Review"] } }
     }
   ) {
     nodes {
@@ -169,6 +175,7 @@ query($id: String!) {
   issue(id: $id) {
     id identifier title description url updatedAt
     state { id name }
+    assignee { id }
     team { key states { nodes { id name } } }
     labels { nodes { name } }
     comments { nodes { body } }
@@ -178,11 +185,13 @@ query($id: String!) {
 
 # Admission must mirror the list query. In Review stays eligible so a CI-red
 # autonomous PR can be remounted; launch still skips inflight green/pending PRs.
-ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
+ADMITTED_STATES = frozenset(("todo", "in progress", "rework", "merging", "in review"))
 # Already-claimed work (Symphony retrying In Review with no Codex slots) must
 # keep flowing on the grok fallback after #16212 emptied the receipt list.
 # Todo still requires a current admission-gate/v1 receipt.
-CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(("in progress", "in review"))
+CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(
+    ("in progress", "rework", "merging", "in review")
+)
 # symphony/grok/fallback heads are the autonomous lane's own; codex/fable/fugu
 # heads are GPT-worker-authored. Failed or DIRTY GPT work is adopted by the
 # grok/kimi fallback lane (Tim 2026-09-03: "allow the failed gpt ones to move
@@ -1513,6 +1522,10 @@ def _issue_meta(
         "original_state_name": state.get("name") or "",
         "in_progress_state_id": states["in progress"],
         "in_review_state_id": states["in review"],
+        "todo_state_id": states.get("todo", ""),
+        "owner_id": (issue.get("assignee") or {}).get("id")
+        if isinstance(issue.get("assignee"), dict)
+        else None,
         "issue_revision": issue_revision,
     }
     return True, "admitted", meta
@@ -2623,9 +2636,11 @@ def _grok_command(
     kimi_exe = _kimi_executable() or str(pathlib.Path.home() / ".local/bin/kimi")
     cursor_exe = _cursor_executable() or str(pathlib.Path.home() / ".local/bin/cursor-agent-std")
     provider = _selection_provider(selection) or "grok"
+    finalizer = str(pathlib.Path(executable).with_name("symphony-fallback-finalize.py"))
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+        "-p", f"ExecStopPost={finalizer} {identifier}",
         "-p", "Environment=AUTOMATION_VERIFY_MAX_WORKERS=4",
         "-p", "Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
@@ -3037,7 +3052,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
         return packaged if packaged.is_file() else source
 
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py", "symphony-fallback-finalize.py")},
         "model-registry.json": registry,
         "writer-owned-pr-promote.sh": packaged_or_source(
             "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"

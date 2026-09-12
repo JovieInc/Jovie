@@ -1899,7 +1899,12 @@ describe('deterministic Symphony admission boundary', () => {
     // continuation turns, the implementation slot is released, and the issue
     // is never redispatched (verified in production on 2026-08-11: active
     // leases fell 4 -> 1 within one poll while the draft PRs stayed put).
-    assert.deepEqual(activeStates, ['Todo', 'In Progress']);
+    assert.deepEqual(activeStates, [
+      'Todo',
+      'In Progress',
+      'Rework',
+      'Merging',
+    ]);
     assert.ok(!activeStates.includes('In Review'));
 
     // Capacity and lease invariants are preserved: four concurrent agents,

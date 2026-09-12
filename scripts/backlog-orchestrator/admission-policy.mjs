@@ -16,6 +16,7 @@ export const PROTECTED_ADMISSION_LABELS = Object.freeze([
   'launch-blocker',
   'manual-incident',
   'missed-work',
+  'no-symphony',
   'protected',
   'type:epic',
 ]);
