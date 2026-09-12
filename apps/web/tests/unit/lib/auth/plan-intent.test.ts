@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_UPSELL_PLAN,
+  getPlanIntentRecord,
   MAX_FOLLOWER_THRESHOLD,
   recommendPlan,
+  setPlanIntent,
   validatePlan,
 } from '@/lib/auth/plan-intent';
 
@@ -41,6 +43,22 @@ describe('DEFAULT_UPSELL_PLAN', () => {
 describe('MAX_FOLLOWER_THRESHOLD', () => {
   it('is 10,000', () => {
     expect(MAX_FOLLOWER_THRESHOLD).toBe(10_000);
+  });
+});
+
+describe('setPlanIntent extras', () => {
+  it('keeps billing interval and artist in sessionStorage without changing the cookie contract', () => {
+    document.cookie = 'jovie_plan_intent=; path=/; max-age=0';
+    sessionStorage.clear();
+
+    setPlanIntent('pro', { interval: 'annual', artist: 'Motion' });
+
+    expect(document.cookie).toContain('jovie_plan_intent=pro');
+    expect(getPlanIntentRecord()).toEqual({
+      plan: 'pro',
+      interval: 'annual',
+      artist: 'Motion',
+    });
   });
 });
 

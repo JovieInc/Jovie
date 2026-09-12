@@ -56,10 +56,16 @@ vi.mock('@/lib/analytics', () => ({
   track: trackMock,
 }));
 
-vi.mock('@/lib/auth/plan-intent', () => ({
-  setPlanIntent: setPlanIntentMock,
-  validatePlan: validatePlanMock,
-}));
+vi.mock('@/lib/auth/plan-intent', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/auth/plan-intent')>(
+    '@/lib/auth/plan-intent'
+  );
+  return {
+    ...actual,
+    setPlanIntent: setPlanIntentMock,
+    validatePlan: validatePlanMock,
+  };
+});
 
 vi.mock('@/lib/auth/signup-claim-storage', () => ({
   clearSignupClaimValue: clearSignupClaimValueMock,
@@ -90,7 +96,15 @@ describe('signup page', () => {
     sessionStorage.clear();
     trackMock.mockReset();
     validatePlanMock.mockReset();
-    validatePlanMock.mockImplementation(plan => plan);
+    validatePlanMock.mockImplementation(plan =>
+      plan === 'free' ||
+      plan === 'pro' ||
+      plan === 'team' ||
+      plan === 'enterprise' ||
+      plan === 'max'
+        ? plan
+        : null
+    );
     globalThis.history.replaceState(null, '', '/signup');
   });
 

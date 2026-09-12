@@ -71,6 +71,10 @@ export default async function OnboardingCheckoutPage({
     redirect(APP_ROUTES.SIGNIN);
   }
 
+  if (authResult.context.isPro) {
+    redirect(APP_ROUTES.SETTINGS_BILLING);
+  }
+
   // Read plan intent from cookie, falling back to ?plan= query param
   const cookieStore = await cookies();
   const cookieHeader = cookieStore

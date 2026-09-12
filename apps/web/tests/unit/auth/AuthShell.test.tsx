@@ -323,6 +323,35 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     );
   });
 
+  it('shows the Pro trial offer and keeps plan params on Sign in', () => {
+    searchParamsState.value =
+      'plan=pro&interval=annual&artist_name=Motion&handle=Motion';
+    render(<AuthShell mode='sign-up' />);
+
+    expect(screen.getByText('Start your Pro trial')).toBeInTheDocument();
+    expect(screen.getByText('14 days · No card required')).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-auth-offer-kind="pro-trial"]')
+    ).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin?handle=motion&plan=pro&interval=annual&artist_name=Motion'
+    );
+  });
+
+  it('does not invent Max trial copy on the shared shell', () => {
+    searchParamsState.value = 'plan=max&interval=monthly';
+    render(<AuthShell mode='sign-up' />);
+
+    expect(screen.getByText('Continue to Max')).toBeInTheDocument();
+    expect(screen.queryByText(/trial/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/14 days/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No card required/i)).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[data-auth-offer-kind="max-continue"]')
+    ).not.toBeNull();
+  });
+
   it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
     authState.isSignedIn = true;
 
