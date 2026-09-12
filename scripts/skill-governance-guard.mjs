@@ -281,7 +281,7 @@ function walkRepoFiles(absolute, hits) {
   }
 }
 
-function assertDeniedSkillsAbsent(root, lock, errors) {
+function assertDeniedSkillInventory(root, lock, errors) {
   const listed = new Set([
     ...Object.keys(lock.skills ?? {}),
     ...(lock.ownedSkills ?? []),
@@ -576,7 +576,7 @@ export function evaluateSkillGovernance({ root = process.cwd() } = {}) {
     }
   }
 
-  assertDeniedSkillsAbsent(root, lock, errors);
+  assertDeniedSkillInventory(root, lock, errors);
   assertCoverageMap(root, errors);
   assertPinnedHandbooks(root, errors);
   assertDesignGapFold(root, errors);
