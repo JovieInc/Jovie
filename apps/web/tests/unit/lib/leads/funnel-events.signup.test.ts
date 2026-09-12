@@ -475,9 +475,12 @@ describe('attributeLeadPaidConversionByAppUserId', () => {
       expect.objectContaining({
         leadId: 'lead_123',
         eventType: 'paid_converted',
+        campaignKey: 'premade-artist-profile',
+        variantKey: 'launch-acquisition:premade-artist-profile:v1',
         metadata: expect.objectContaining({
           signupUserId: betterAuthRow.id,
           stripeSubscriptionId: 'sub_better_auth',
+          experimentId: 'premade-artist-profile',
         }),
       })
     );
