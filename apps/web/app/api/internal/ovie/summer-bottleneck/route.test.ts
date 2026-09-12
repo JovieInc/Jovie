@@ -345,6 +345,95 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('authenticates the exact existing repair reference without changing admission', async () => {
+    const existingRepair = {
+      mode: 'isolated-cli',
+      identifier: 'JOV-6224',
+      issueId: 'd1d9b064-5264-4907-a3ca-f599eb75b9de',
+      ownerId: 'bb142ab2-e0e9-4f89-b330-b484d6b32139',
+      issueRevision: NOW,
+      repository: 'JovieInc/Jovie',
+      pr: 17753,
+      head: SOURCE,
+      workspace: '/fixture/owned-repair',
+      writerUnit: 'fixture-repair.service',
+      assignmentDigest: 'f'.repeat(64),
+      expiresAt: '2026-09-04T20:30:00.000Z',
+    };
+    const input = {
+      ...validSnapshot(),
+      signals: {
+        ...validSnapshot().signals,
+        admissions: admissionsFixture,
+        existingRepair,
+      },
+    };
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(
+        { ok: true, receipt: { eventId: input.eventId, decision: 'accepted' } },
+        { status: 202 }
+      )
+    );
+    vi.stubGlobal('fetch', fetch);
+    expect((await POST(request(input))).status).toBe(202);
+    const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(delivered.signals).toEqual(input.signals);
+    const signature = Buffer.from(
+      delivered.producerAttestation.signature,
+      'base64url'
+    );
+    const verifies = (payload: unknown) =>
+      nodeVerify(
+        null,
+        Buffer.from(
+          `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(payload)}`
+        ),
+        PRODUCER_PUBLIC_KEY,
+        signature
+      );
+    expect(verifies(input)).toBe(true);
+    expect(
+      verifies({
+        ...input,
+        signals: {
+          ...input.signals,
+          existingRepair: {
+            ...existingRepair,
+            assignmentDigest: 'e'.repeat(64),
+          },
+        },
+      })
+    ).toBe(false);
+    for (const patch of [
+      { mode: 'native' },
+      { repository: 'another/repository' },
+      { assignmentDigest: 'bad' },
+      { ownerId: 'unknown' },
+      { head: 'main' },
+      { pr: 0 },
+      { workspace: '/fixture/../other' },
+      { workspace: 'relative' },
+      { writerUnit: '../worker.service' },
+      { expiresAt: 'never' },
+      { providerGrant: { allowed: true } },
+    ]) {
+      expect(
+        (
+          await POST(
+            request({
+              ...input,
+              signals: {
+                ...input.signals,
+                existingRepair: { ...existingRepair, ...patch },
+              },
+            })
+          )
+        ).status
+      ).toBe(422);
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves and signs separate admission evidence without granting from capacity', async () => {
     const input = {
       ...validSnapshot(),
