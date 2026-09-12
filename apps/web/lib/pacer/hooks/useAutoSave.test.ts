@@ -13,13 +13,6 @@ function deferred<T = void>() {
   return { promise, reject, resolve };
 }
 
-async function settle(): Promise<void> {
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-}
-
 describe('useAutoSave', () => {
   it('does not resubmit a completed revision when flush follows a successful debounce', async () => {
     const saveFn = vi.fn().mockResolvedValue(undefined);
@@ -56,12 +49,16 @@ describe('useAutoSave', () => {
       result.current.save('keep-me');
     });
 
-    await expect(
-      act(async () => {
+    let flushError: unknown;
+    await act(async () => {
+      try {
         await result.current.flush();
-      })
-    ).rejects.toThrow('persist failed');
+      } catch (error) {
+        flushError = error;
+      }
+    });
 
+    expect(flushError).toMatchObject({ message: 'persist failed' });
     expect(result.current.error?.message).toBe('persist failed');
     expect(result.current.isDirty).toBe(true);
 
@@ -157,16 +154,12 @@ describe('useAutoSave', () => {
       result.current.save('newer');
     });
 
-    await act(async () => {
-      first.resolve();
-      await flushA;
-    });
-
     expect(onSuccess).not.toHaveBeenCalled();
     expect(result.current.isDirty).toBe(true);
 
     await act(async () => {
-      await result.current.flush();
+      first.resolve();
+      await flushA;
     });
 
     expect(saveFn.mock.calls.map(call => call[0])).toEqual(['older', 'newer']);
@@ -212,12 +205,16 @@ describe('useAutoSave', () => {
     expect(saveFn).toHaveBeenCalledTimes(1);
     expect(onSuccess).toHaveBeenCalledTimes(1);
 
-    await expect(
-      act(async () => {
-        result.current.save('invalid');
+    let validationError: unknown;
+    await act(async () => {
+      result.current.save('invalid');
+      try {
         await result.current.flush();
-      })
-    ).rejects.toThrow('validation failed');
+      } catch (error) {
+        validationError = error;
+      }
+    });
+    expect(validationError).toMatchObject({ message: 'validation failed' });
     expect(onSuccess).toHaveBeenCalledTimes(1);
     expect(result.current.error?.message).toBe('validation failed');
   });
@@ -326,9 +323,8 @@ describe('useAutoSave legitimate neighbors', () => {
 
     await act(async () => {
       gate.reject(new Error('write failed'));
-      await settle();
+      await expect(flushPromise).rejects.toThrow('write failed');
     });
-    await expect(flushPromise).rejects.toThrow('write failed');
 
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledTimes(1);
