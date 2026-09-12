@@ -805,6 +805,28 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the public pricing page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/pricing/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.pricing');
+
+    assert.deepEqual(screen, {
+      id: 'web.pricing',
+      platform: 'web',
+      owner: 'marketing-pricing',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'A' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.pricing', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
   it('registers the marketing AI landing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/ai/page.tsx';
     const screen = SCREEN_REGISTRY.find(
