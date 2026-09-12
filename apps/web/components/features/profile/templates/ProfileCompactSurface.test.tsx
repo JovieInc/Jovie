@@ -61,7 +61,15 @@ vi.mock(
 );
 
 vi.mock('@/features/profile/ProfileHomeRail', () => ({
-  ProfileHomeRail: () => <div data-testid='mock-profile-home-rail' />,
+  ProfileHomeRail: ({
+    showAlertsCard,
+  }: {
+    readonly showAlertsCard?: boolean;
+  }) => (
+    <div data-testid='mock-profile-home-rail'>
+      {showAlertsCard ? <div data-testid='profile-home-alerts-row' /> : null}
+    </div>
+  ),
 }));
 
 vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
@@ -223,5 +231,22 @@ describe('ProfileCompactSurface', () => {
     expect(
       screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
     ).toBeNull();
+  });
+
+  // JOV-6198: fan-capture gates the Get updates action, not the destination
+  // set. The home alerts row must disappear when fan capture is off while
+  // the primary tab panel keeps rendering.
+  it('hides the home alerts card when fan capture is disabled', () => {
+    renderSurface({ allowFanCapture: false });
+
+    expect(
+      screen.queryByTestId('profile-home-alerts-row')
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the home alerts card when fan capture is enabled', () => {
+    renderSurface({ allowFanCapture: true });
+
+    expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
   });
 });

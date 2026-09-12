@@ -11,18 +11,17 @@
  * Spec: docs/public-profile-surface-spec.md §2
  * Constants: apps/web/lib/profile/nav-constants.ts
  *
- * Tab definitions (spec §2.1, fixed order):
- *   1. Home     (mode: profile)   — UserRound icon
- *   2. Music    (mode: listen)    — Music2 icon
- *   3. Events   (mode: tour)      — CalendarDays icon
- *   4. Alerts   (mode: subscribe) — Bell icon
- * Desktop / tablet behaviour: the public profile shell may center this
- * compact experience on larger screens, so the tab bar remains canonical.
+ * Destinations (JOV-6198 shared contract):
+ *   1. Home   (mode: profile) — House icon
+ *   2. Music  (mode: listen)  — Music2 icon
+ *   3. Shows  (mode: tour)    — CalendarDays icon
+ *   4. About  (mode: about)   — UserRound icon
+ * Get updates is an action, not a destination. Presentation owns icons only.
  */
 
 import {
-  Bell,
   CalendarDays,
+  House,
   type LucideIcon,
   Music2,
   UserRound,
@@ -35,16 +34,11 @@ import {
 import { cn } from '@/lib/utils';
 import type { ProfilePrimaryTab } from '../contracts';
 
-// ---------------------------------------------------------------------------
-// Tab definitions — fixed order per spec §2.1
-// ---------------------------------------------------------------------------
-
 const TAB_ICONS: Readonly<Record<BottomTabKey, LucideIcon>> = {
-  // UserRound = profile home (not a separate "person" destination).
-  profile: UserRound,
+  profile: House,
   listen: Music2,
   tour: CalendarDays,
-  subscribe: Bell,
+  about: UserRound,
 };
 
 // ---------------------------------------------------------------------------
@@ -53,18 +47,18 @@ const TAB_ICONS: Readonly<Record<BottomTabKey, LucideIcon>> = {
 
 export interface BottomTabBarProps {
   /**
-   * Which primary tab is currently active.
+   * Which destination is currently active.
    * Determines `aria-current="page"` and active colour on the tab button.
    */
   readonly activeTab: ProfilePrimaryTab;
 
   /**
-   * Retained for API compatibility; Events now remains visible so the tab can
-   * show a native empty state when no upcoming dates exist.
+   * Retained for API compatibility. Shows stays visible so Wave 1 can own
+   * empty-vs-no-surface copy without compact hiding the destination.
    */
   readonly hasTourDates: boolean;
 
-  /** Whether the artist has an ownership-safe fan-capture surface. */
+  /** Retained for API compatibility. Fan-capture gates the action, not dests. */
   readonly showAlerts?: boolean;
 
   /**
@@ -72,10 +66,10 @@ export interface BottomTabBarProps {
    */
   readonly isMenuOpen?: boolean;
 
-  /** Called when the user taps a primary tab. */
+  /** Called when the user taps a primary destination. */
   readonly onTabSelect: (mode: ProfilePrimaryTab) => void;
 
-  /** Whether the Alerts destination is available for this profile. */
+  /** Retained for API compatibility. Does not invent or hide destinations. */
   readonly showAlertsTab?: boolean;
 
   /** Optional extra className applied to the outermost wrapper. */
@@ -99,15 +93,13 @@ export interface BottomTabBarProps {
 export function BottomTabBar({
   activeTab,
   hasTourDates: _hasTourDates,
-  showAlerts = true,
+  showAlerts: _showAlerts = true,
   isMenuOpen = false,
   onTabSelect,
-  showAlertsTab = true,
+  showAlertsTab: _showAlertsTab = true,
   className,
 }: BottomTabBarProps) {
-  const visibleTabs = getPermittedPublicProfileNavigation({
-    fanCaptureEnabled: showAlerts && showAlertsTab,
-  });
+  const visibleTabs = getPermittedPublicProfileNavigation();
   const columnCount = visibleTabs.length;
 
   return (

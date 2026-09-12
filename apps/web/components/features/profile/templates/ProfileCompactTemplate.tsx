@@ -280,9 +280,7 @@ export function ProfileCompactTemplate({
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
   const hasReleases = (releases?.length ?? 0) >= 2;
-  const publicProfileNavIds = getPermittedPublicProfileNavigation({
-    fanCaptureEnabled: allowFanCapture,
-  })
+  const publicProfileNavIds = getPermittedPublicProfileNavigation()
     .map(destination => destination.id)
     .join(',');
   const initialDrawerView = resolveDrawerView(

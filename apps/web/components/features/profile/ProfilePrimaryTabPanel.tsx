@@ -483,7 +483,7 @@ export function ProfilePrimaryTabPanel({
       >
         <div className='px-4 pb-2 pt-3'>
           <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-            Events
+            Shows
           </h2>
         </div>
         <TourDrawerContent
@@ -520,7 +520,7 @@ export function ProfilePrimaryTabPanel({
 
   return (
     <div className={PANEL_CLASS_NAME} data-testid='profile-primary-tab-about'>
-      <SectionIntro title='Profile' />
+      <SectionIntro title='About' />
       <div
         className={cn(
           'text-white/80',
