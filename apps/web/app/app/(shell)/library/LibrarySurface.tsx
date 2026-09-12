@@ -62,6 +62,7 @@ import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
+import { LibraryInspectorAssetSlots } from '@/components/features/library/LibraryInspectorAssetSlots';
 import {
   formatLibraryItemType,
   formatLibraryStatus,
@@ -2015,6 +2016,7 @@ function AssetDrawer({
   playingPreviewId,
   onTogglePreview,
   onAudioUploaded,
+  onArtworkUploaded,
   getContextMenuItems,
   profileId,
   approvalSavingIds,
@@ -2033,6 +2035,7 @@ function AssetDrawer({
   readonly playingPreviewId: string | null;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
+  readonly onArtworkUploaded: (assetId: string, artworkUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
   readonly profileId: string | null;
   readonly approvalSavingIds: ReadonlySet<string>;
@@ -2271,6 +2274,13 @@ function AssetDrawer({
                       embedded
                     />
                   </DrawerSection>
+
+                  <LibraryInspectorAssetSlots
+                    asset={current}
+                    downloads={postReleaseBundle.downloads}
+                    disabled={!open}
+                    onArtworkUploaded={onArtworkUploaded}
+                  />
 
                   <DrawerSection
                     sectionId='press-kit-drop'
@@ -3016,6 +3026,13 @@ export function LibrarySurface({
     [router]
   );
 
+  const handleArtworkUploaded = useCallback(
+    (_assetId: string, _artworkUrl: string) => {
+      router.refresh();
+    },
+    [router]
+  );
+
   const assetDrawerPanel = useMemo(
     () => (
       <AssetDrawer
@@ -3026,6 +3043,7 @@ export function LibrarySurface({
         playingPreviewId={playingPreviewId}
         onTogglePreview={handleTogglePreview}
         onAudioUploaded={handleAudioUploaded}
+        onArtworkUploaded={handleArtworkUploaded}
         getContextMenuItems={getContextMenuItems}
         profileId={profileId}
         approvalSavingIds={approvalSavingIds}
@@ -3053,6 +3071,7 @@ export function LibrarySurface({
       effectiveAssets,
       getContextMenuItems,
       handleApprovalStatusChange,
+      handleArtworkUploaded,
       handleAudioUploaded,
       handleShareChange,
       handleTogglePreview,

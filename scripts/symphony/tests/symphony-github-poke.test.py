@@ -98,7 +98,10 @@ class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
         text = POKE.read_text(encoding="utf-8")
         self.assertIn("runs-on: ubuntu-latest", text)
         self.assertIn("timeout-minutes: 2", text)
-        self.assertIn("permissions: {}", text)
+        self.assertIn("actions: read", text)
+        self.assertIn("pull-requests: read", text)
+        self.assertIn("statuses: write", text)
+        self.assertNotIn("permissions: {}", text)
 
     def test_poke_needs_no_checkout_or_node(self):
         text = POKE.read_text(encoding="utf-8")
@@ -122,13 +125,38 @@ class HyperagentCiRemediatorPokeContractTests(unittest.TestCase):
         self.assertIn("run_url", text)
         self.assertIn("jq -n", text)
 
-    def test_concurrency_serializes_by_pr_and_head_sha(self):
+    def test_concurrency_serializes_by_pr_only(self):
         text = POKE.read_text(encoding="utf-8")
-        self.assertIn("concurrency:", text)
-        self.assertIn("ha-ci-remediator-", text)
-        self.assertIn("pull_requests[0].number || inputs.pr_number", text)
+        start = text.index("concurrency:")
+        end = text.index("jobs:", start)
+        block = text[start:end]
+        self.assertIn("concurrency:", block)
+        self.assertIn(
+            "ha-ci-remediator-${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number || 'na' }}",
+            block,
+        )
+        self.assertIn("cancel-in-progress: false", block)
+        self.assertNotIn("head_sha", block)
+        self.assertNotIn("github.sha", block)
         self.assertIn("workflow_run.head_sha || github.sha", text)
-        self.assertIn("cancel-in-progress: false", text)
+        self.assertIn("if: steps.gate.outputs.proceed == 'true'", text)
+        self.assertIn("ha-remediate/PR", text)
+
+    def test_gate_uses_commit_status_receipt_not_broken_head_sha_filter(self):
+        text = POKE.read_text(encoding="utf-8")
+        gate = text.index("id: gate")
+        poke = text.index("Poke Hyperagent CI remediator")
+        self.assertLess(gate, poke)
+        self.assertIn('context == "ha-ci-remediator-poke"', text)
+        self.assertIn("repos/$REPO/commits/$HEAD_SHA/statuses", text)
+        self.assertIn("-f context=ha-ci-remediator-poke", text)
+        self.assertIn('if [ "${FORCE:-false}" != "true" ]', text)
+        self.assertIn('prefix "ha-remediate/PR${PR_NUMBER}/"', text)
+        self.assertIn("idempotency_key", text)
+        self.assertNotIn(
+            "actions/workflows/ha-ci-remediator-poke.yml/runs?head_sha=$HEAD_SHA&status=success",
+            text,
+        )
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ import {
 } from '@/lib/db/schema/leads';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { claimPayOutcomeAttribution } from '@/lib/leads/claim-pay-outcome-receipt';
 import { hashClaimToken } from '@/lib/security/claim-token';
 
 const LEAD_ATTRIBUTION_COOKIE = 'jovie_lead_attribution';
@@ -404,13 +405,17 @@ export async function attributeLeadPaidConversionByAppUserId(
       .where(eq(leads.id, lead.id));
   }
 
+  const outcomeAttribution = claimPayOutcomeAttribution();
   await recordLeadFunnelEvent(
     {
       leadId: lead.id,
       eventType: 'paid_converted',
+      campaignKey: outcomeAttribution.campaignKey,
+      variantKey: outcomeAttribution.variantKey,
       metadata: {
         signupUserId: appUserId,
         stripeSubscriptionId: subscriptionId,
+        experimentId: outcomeAttribution.experimentId,
       },
     },
     { idempotent: true, required: true }

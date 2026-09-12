@@ -587,6 +587,63 @@ describe('@critical CheckoutSessionHandler', () => {
     });
   });
 
+  describe('handle - paid outcome receipt (JOV-6166)', () => {
+    it('fails closed when paid_converted write throws so Stripe retries', async () => {
+      const mockSubscription = {
+        id: 'sub_receipt_fail',
+        status: 'active',
+        customer: 'cus_receipt',
+        items: { data: [{ price: { id: 'price_pro' } }] },
+      } as unknown as Stripe.Subscription;
+
+      mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+      mockUpdateUserBillingStatus.mockResolvedValue({
+        success: true,
+        appUserId: 'app_user_receipt',
+      });
+      mockAttributeLeadPaidConversionByAppUserId.mockRejectedValue(
+        new Error('injected event-write failure')
+      );
+
+      const context: WebhookContext = {
+        event: {
+          id: 'evt_receipt_fail',
+          type: 'checkout.session.completed',
+          created: Math.floor(Date.now() / 1000),
+          data: {
+            object: {
+              id: 'cs_receipt_fail',
+              customer: 'cus_receipt',
+              subscription: 'sub_receipt_fail',
+              metadata: { clerk_user_id: 'user_receipt' },
+            } as unknown as Stripe.Checkout.Session,
+          },
+        } as Stripe.Event,
+        stripeEventId: 'evt_receipt_fail',
+        stripeEventTimestamp: new Date(),
+      };
+
+      await expect(handler.handle(context)).rejects.toThrow(
+        'injected event-write failure'
+      );
+
+      expect(mockInvalidateBillingCache).toHaveBeenCalledTimes(1);
+      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+        'Lead paid conversion outcome receipt failed',
+        expect.any(Error),
+        expect.objectContaining({
+          route: '/api/stripe/webhooks',
+          event: 'checkout.session.completed',
+          subscriptionId: 'sub_receipt_fail',
+        })
+      );
+      expect(mockLoggerWarn).not.toHaveBeenCalledWith(
+        'Failed to attribute lead paid conversion on checkout',
+        expect.anything()
+      );
+    });
+  });
+
   describe('handle - billing cache invalidation', () => {
     it('invalidates billing cache after successful processing', async () => {
       const mockSubscription = {
