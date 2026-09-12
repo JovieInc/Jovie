@@ -763,6 +763,8 @@ def test_merge_group_allocates_no_fixed_runner_probe() -> None:
     assert "remediation-clock:" in heartbeat
     assert "if: github.event_name == 'schedule'" in heartbeat
     assert "runs-on: ubuntu-latest" in heartbeat
+    assert "GH_TOKEN: ${{ github.token }}" in heartbeat
+    assert "GH_REPO: ${{ github.repository }}" in heartbeat
     assert "gh workflow run fleet-gate-refresh.yml --ref main" in heartbeat
     assert "gh workflow run ownerless-recovery-sweep.yml --ref main" in heartbeat
     assert "actions: write" in heartbeat
