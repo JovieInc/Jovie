@@ -1,6 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 // Prelaunch front-door label and destination. Server-side waitlist gate
 // still handles post-auth routing.
@@ -40,7 +41,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
     secondaryCta: {
       // Quiet proof path — not a peer conversion objective to Get started.
       label: 'See a live profile',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: TIM_WHITE_PROFILE.publicProfilePath,
     },
   },
   fallbackCta: {
