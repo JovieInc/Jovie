@@ -210,14 +210,10 @@ Read [the component patterns reference](docs/design-system/DETAILS.md#component-
 
 ### Sidebar (App Shell)
 
-Founder lock 2026-09-12: Pen node `OqZTF` is the canonical customer sidebar
-composition. Use a 280px rail, one search/inbox/new-chat command bar, Library /
-Contacts / Presence navigation, 36px navigation and history rows, Today / Earlier
-history, and a bottom-anchored account footer. The source tuple is
-`canonicalSidebarNavigation` in `dashboard-nav/config.ts`; mobile navigation
-keeps its existing independent composition. Pen homepage node `t1x8T` is locked
-and is not part of sidebar implementation changes.
-
+Founder lock 2026-09-12, Pen `OqZTF`: 280px customer rail; combined search/inbox/
+new-chat bar; Library, Contacts, Presence (`canonicalSidebarNavigation`); 36px
+nav/history rows; Today/Earlier history; bottom-anchored account footer. Mobile
+keeps its composition. Homepage `t1x8T` remains locked.
 
 | Token | Light | Dark |
 |-------|-------|------|
