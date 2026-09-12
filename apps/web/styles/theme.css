@@ -10,6 +10,31 @@
   background-size: 28px 28px;
 }
 
+/* Route chrome owns notch/home-indicator padding. Keyboard-open only
+   collapses the top inset so the email field stays on screen. */
+[data-auth-shell] {
+  padding: var(--space-6);
+  padding-left: max(var(--space-6), env(safe-area-inset-left));
+  padding-right: max(var(--space-6), env(safe-area-inset-right));
+  padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
+}
+
+[data-auth-shell][data-auth-keyboard-visible] {
+  padding-top: var(--space-2);
+}
+
+.auth-form-max-width {
+  max-width: 360px;
+}
+
+.auth-form-stack-offset {
+  padding-top: min(18vh, 7.5rem);
+}
+
+[data-auth-shell][data-auth-keyboard-visible] .auth-form-stack-offset {
+  padding-top: var(--space-2);
+}
+
 /* AUTH_SPLIT_MIN_WIDTH_PX (1024) — keep in sync with auth-shell-layout-contract.ts */
 .auth-desktop-only {
   display: none;
@@ -242,7 +267,7 @@
 /* Reserve balanced space only when the badge exists so Apple/Google labels
    remain centered and never run under Clerk's inline "Last used" badge. */
 :is(.cl-signIn-root, .cl-signUp-root)
-  .cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
+.cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
   padding-inline: 4.5rem;
 }
 

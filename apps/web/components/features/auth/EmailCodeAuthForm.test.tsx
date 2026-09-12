@@ -92,7 +92,7 @@ describe('EmailCodeAuthForm', () => {
     renderForm();
 
     const emailButton = screen.getByRole('button', {
-      name: /continue with email/i,
+      name: /send sign-in code/i,
     });
     expectAuthEntryCta(emailButton);
 
@@ -172,6 +172,46 @@ describe('EmailCodeAuthForm', () => {
         document.querySelector('[data-auth-email-code-step="locked"]')
       ).toBeTruthy()
     );
+    expect(locationAssign).not.toHaveBeenCalled();
+  });
+
+  it('validates email on submit without disabling the send button', async () => {
+    renderForm();
+    const form = screen
+      .getByLabelText(/email/i)
+      .closest('form') as HTMLFormElement;
+    expect(
+      screen.getByRole('button', { name: /send sign-in code/i })
+    ).toBeEnabled();
+    fireEvent.submit(form);
+    expect(await screen.findByText(/enter your email address/i)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'x' },
+    });
+    fireEvent.submit(form);
+    expect(await screen.findByText(/doesn.t look right/i)).toBeTruthy();
+    expect(sendVerificationOtp).not.toHaveBeenCalled();
+  });
+
+  it('shows the recipient, Change email, and controlled resend after send', async () => {
+    renderForm();
+    await reachCodeStep();
+    expect(screen.getByText(/artist@example.com/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /change email/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/resend in 30s/i)).toBeInTheDocument();
+  });
+
+  it('recovers from an expired code by sending a new one', async () => {
+    renderForm();
+    await reachCodeStep();
+    signInEmailOtp.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'OTP_EXPIRED', message: 'Expired', status: 400 },
+    });
+    await submitCode('111111');
+    expect(await screen.findByText(/that code has expired/i)).toBeTruthy();
     expect(locationAssign).not.toHaveBeenCalled();
   });
 

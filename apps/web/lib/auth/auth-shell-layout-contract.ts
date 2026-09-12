@@ -31,9 +31,9 @@ export type AuthEditorialCardPolicy = 'desktop-only' | 'never';
 
 export const AUTH_SHELL_LAYOUT_CONTRACT = {
   'signin-full-route': {
-    shellKind: AUTH_SHELL_KIND.desktopSplitRoute,
-    layoutVariant: 'split',
-    editorialCard: 'desktop-only',
+    shellKind: AUTH_SHELL_KIND.stackRoute,
+    layoutVariant: 'stack',
+    editorialCard: 'never',
     owner: 'AuthLayout',
   },
   'signin-intercepted-modal': {

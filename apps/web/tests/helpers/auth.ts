@@ -286,12 +286,9 @@ export async function prepareBetterAuthEmailOtp(
     timeout: 60_000,
   });
 
-  const emailInput = page.getByLabel('Email Address');
+  const emailInput = page.getByLabel('Email');
   const emailSubmitButton = page.getByRole('button', {
-    name:
-      options.entryPath === '/signup'
-        ? 'Continue with Email'
-        : 'Email me a Code',
+    name: 'Send sign-in code',
   });
   await fillControlledInputUntilEnabled(
     emailInput,

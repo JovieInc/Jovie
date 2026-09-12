@@ -59,19 +59,20 @@ import { WAITLIST_FRONT_DOOR_VARIANT_ID } from '@/data/homepageFrontDoorCta';
 import { WaitlistPublicLanding } from './WaitlistPublicLanding';
 
 describe('WaitlistPublicLanding', () => {
-  it('renders splash-B sign-up on the waitlist URL without a second Get started', () => {
+  it('renders the shared sign-up shell on the waitlist URL without a second Get started', () => {
     render(<WaitlistPublicLanding />);
 
     expect(authEntryGuardMock).toHaveBeenCalledOnce();
     expect(screen.getByTestId('auth-entry-guard')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        chrome: 'splash-b',
+        formTitle: 'Continue to Jovie',
         layoutVariant: 'stack',
         showFormTitle: false,
         showFooterPrompt: false,
       })
     );
+    expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'sign-up',

@@ -72,9 +72,9 @@ describe('AuthLayout', () => {
     expect(screen.getByRole('main')).toHaveAttribute('tabIndex', '-1');
   });
 
-  it('keeps the homepage logo link available when the logo is shown', async () => {
+  it('keeps the homepage logo link available when the split rail is shown', async () => {
     render(
-      <AuthLayout formTitle='Sign In'>
+      <AuthLayout formTitle='Sign In' layoutVariant='split'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -83,7 +83,7 @@ describe('AuthLayout', () => {
       'href',
       '/'
     );
-    expect(screen.getByLabelText('Go to homepage')).toHaveClass('size-11');
+    expect(screen.getByLabelText('Go to homepage')).toHaveClass('size-5');
   });
 
   it('keeps the footer prompt opt-in through the auth shell contract', async () => {
@@ -160,7 +160,7 @@ describe('AuthLayout', () => {
     expect(screen.getByText('Legal disclosure')).toBeInTheDocument();
   });
 
-  it('centers the 32px mark on splash-B chrome without film grain', async () => {
+  it('keeps splash-B chrome free of film grain and editorial cards', async () => {
     const { container } = render(
       <AuthLayout formTitle='Sign In' chrome='splash-b'>
         <div>Auth form body</div>
@@ -185,7 +185,11 @@ describe('AuthLayout', () => {
     const defaultColumn = container.querySelector('[data-auth-form-column]');
     expect(defaultColumn).not.toBeNull();
     expect(defaultColumn).toHaveClass('justify-start');
+    expect(defaultColumn).toHaveClass('auth-form-stack-offset');
     expect(defaultColumn).not.toHaveClass('justify-center');
+    expect(container.querySelector('[data-auth-shell]')).not.toHaveAttribute(
+      'data-auth-keyboard-visible'
+    );
 
     rerender(
       <AuthLayout
@@ -212,7 +216,7 @@ describe('AuthLayout', () => {
 
     const slot = container.querySelector('[data-auth-splash-logo-slot]');
     expect(slot).not.toBeNull();
-    expect(slot).toHaveClass('size-11');
+    expect(slot).toHaveClass('h-5');
     const logoLink = container.querySelector('[data-auth-splash-logo-slot] a');
     expect(logoLink).not.toBeNull();
     expect(logoLink).toHaveAttribute('aria-hidden', 'true');
@@ -220,11 +224,28 @@ describe('AuthLayout', () => {
     expect(logoLink).toHaveClass('opacity-0');
   });
 
+  it('marks the shell when the mobile keyboard is visible', async () => {
+    keyboardVisible = true;
+    const { container } = render(
+      <AuthLayout formTitle='Sign In'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    expect(container.querySelector('[data-auth-shell]')).toHaveAttribute(
+      'data-auth-keyboard-visible'
+    );
+    expect(container.querySelector('[data-auth-form-column]')).toHaveClass(
+      'auth-form-stack-offset'
+    );
+  });
+
   it('hides non-form chrome while the mobile keyboard is visible', async () => {
     keyboardVisible = true;
     render(
       <AuthLayout
         formTitle='Sign In'
+        layoutVariant='split'
         footerPrompt='Need an account?'
         footerLinkText='Join now'
         footerLinkHref='/signup'
@@ -235,11 +256,27 @@ describe('AuthLayout', () => {
 
     const logoLink = screen.getByLabelText('Go to homepage');
     expect(logoLink).toHaveAttribute('tabIndex', '-1');
-    expect(screen.getByRole('heading', { hidden: true })).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    const hiddenTitle = document.querySelector('h1');
+    expect(hiddenTitle).toHaveTextContent('Sign In');
+    expect(hiddenTitle).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('Need an account?')).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveTextContent('Auth form body');
+  });
+
+  it('hides shared-shell chrome while the mobile keyboard is visible', async () => {
+    keyboardVisible = true;
+    const { container } = render(
+      <AuthLayout formTitle='Log in to Jovie' showFormTitle={false}>
+        <div data-auth-shell-identity>Identity</div>
+        <button type='submit'>Send sign-in code</button>
+      </AuthLayout>
+    );
+
+    expect(
+      container.querySelector('[data-auth-form-column]')?.className
+    ).toContain('[&_[data-auth-shell-identity]]:hidden');
+    expect(
+      screen.getByRole('button', { name: 'Send sign-in code' })
+    ).toBeVisible();
   });
 });
