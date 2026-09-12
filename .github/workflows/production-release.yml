@@ -1361,14 +1361,52 @@ jobs:
             --retry 2 --retry-all-errors
             --header "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET"
           )
-          build_info="$(curl "${curl_args[@]}" \
-            https://staging.jov.ie/api/health/build-info)"
-          jq -e --arg sha "$EXPECTED_COMMIT_SHA" '
-            .commitSha == $sha and .environment == "preview"
-          ' >/dev/null <<<"$build_info" || {
-            echo "::error::Staging build-info is not the exact preview SHA."
-            exit 1
-          }
+          # Alias metadata may settle before HTTP content. Retry only a valid
+          # but different build identity; transport/auth/schema failures stay
+          # terminal after curl's existing bounded transport retries.
+          build_info_path="$RUNNER_TEMP/staging-build-info.json"
+          for identity_attempt in $(seq 1 5); do
+            curl_status=0
+            response_meta="$(curl "${curl_args[@]}" \
+              --output "$build_info_path" \
+              --write-out '%{http_code}\n%{content_type}' \
+              https://staging.jov.ie/api/health/build-info)" || curl_status=$?
+            http_status="$(head -n 1 <<<"$response_meta")"
+            [[ "$http_status" =~ ^[0-9]{3}$ ]] || http_status=unknown
+            content_type="$(tail -n 1 <<<"$response_meta" | tr '[:upper:]' '[:lower:]')"
+            case "$content_type" in
+              application/json|application/json\;*) content_type=application/json ;;
+              text/html|text/html\;*) content_type=text/html ;;
+              *) content_type=other ;;
+            esac
+            # Never print response bodies, arbitrary headers, or unchecked
+            # field values. Only canonical SHAs and environment enums escape.
+            observed_sha="$(jq -er '
+              .commitSha | select(type == "string") | select(length == 40) | select(test("^[0-9a-f]{40}$"))
+            ' "$build_info_path" 2>/dev/null)" || observed_sha=invalid
+            observed_environment="$(jq -er '
+              .environment | select(. == "preview" or . == "production" or . == "development")
+            ' "$build_info_path" 2>/dev/null)" || observed_environment=invalid
+            rm -f "$build_info_path"
+            echo "Staging identity attempt $identity_attempt/5: status=$http_status content_type=$content_type commitSha=$observed_sha environment=$observed_environment"
+            if [ "$curl_status" -ne 0 ]; then
+              echo "::error::Staging build-info transport or HTTP request failed."
+              exit "$curl_status"
+            fi
+            if [ "$http_status" != "200" ] || [ "$content_type" != "application/json" ] ||
+              [ "$observed_sha" = "invalid" ] || [ "$observed_environment" = "invalid" ]; then
+              echo "::error::Staging build-info response is not a valid build identity."
+              exit 1
+            fi
+            if [ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ] && [ "$observed_environment" = "preview" ]; then
+              break
+            fi
+            if [ "$identity_attempt" -eq 5 ]; then
+              echo "::error::Staging build-info is not the exact preview SHA after 5 attempts."
+              exit 1
+            fi
+            sleep 4
+          done
           homepage_headers="$RUNNER_TEMP/staging-homepage-headers.txt"
           curl "${curl_args[@]}" --dump-header "$homepage_headers" \
             --output /dev/null https://staging.jov.ie/

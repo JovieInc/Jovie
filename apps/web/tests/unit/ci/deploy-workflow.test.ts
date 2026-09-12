@@ -2521,7 +2521,8 @@ describe('canary health gate workflow', () => {
     expect(prove).toContain('[ "$attempt" -eq 15 ]');
     expect(prove).toContain('sleep 4');
     expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
-    expect(prove).toContain('.commitSha == $sha and .environment == "preview"');
+    expect(prove).toContain('[ "$observed_sha" = "$EXPECTED_COMMIT_SHA" ]');
+    expect(prove).toContain('[ "$observed_environment" = "preview" ]');
     expect(prove).toContain('https://staging.jov.ie/robots.txt');
     expect(prove).toContain('staging-homepage-headers.txt');
     expect(prove).toContain("grep -Eiq '^x-robots-tag:.*noindex'");
@@ -2591,36 +2592,55 @@ describe('canary health gate workflow', () => {
     expect(stagingReceiptRobotsPolicyValid(robotsBody)).toBe(expected);
   });
 
-  it('waits through a malformed alias inspect before writing an exact staging receipt', () => {
-    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
-    const prove = getStepBlock(
-      getJobBlock(release, 'staging-deployment-receipt'),
-      'Prove exact staging identity, privacy, and representative routes'
-    );
-    const root = mkdtempSync(resolve(tmpdir(), 'jovie-staging-receipt-'));
+  // Execute the production Bash, including privacy checks after identity passes.
+  it.each([
+    ['exact', 0, 1],
+    ['sha-converges', 0, 2],
+    ['environment-converges', 0, 2],
+    ['sha-stays-wrong', 1, 5],
+    ['environment-stays-wrong', 1, 5],
+    ['invalid-json', 1, 1],
+    ['untrusted-fields', 1, 1],
+    ['embedded-newline-sha', 1, 1],
+    ['trailing-newline-sha', 1, 1],
+    ['html', 1, 1],
+    ['redirect', 1, 1],
+    ['unauthorized', 22, 1],
+    ['transport', 28, 1],
+    ['missing-noindex', 1, 1],
+    ['public-robots', 1, 1],
+  ] as const)(
+    'gates staging content identity: %s',
+    (scenario, expectedStatus, expectedRequests) => {
+      const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+      const prove = getStepBlock(
+        getJobBlock(release, 'staging-deployment-receipt'),
+        'Prove exact staging identity, privacy, and representative routes'
+      );
+      const root = mkdtempSync(resolve(tmpdir(), 'jovie-staging-receipt-'));
 
-    try {
-      const fakeBin = resolve(root, 'bin');
-      const runnerTemp = resolve(root, 'runner-temp');
-      const vercelBin = resolve(root, 'node_modules/.bin');
-      const counter = resolve(root, 'alias-inspect-count');
-      mkdirSync(fakeBin, { recursive: true });
-      mkdirSync(runnerTemp);
-      mkdirSync(vercelBin, { recursive: true });
-      writeFileSync(
-        resolve(fakeBin, 'node'),
-        `#!/usr/bin/env bash
+      try {
+        const fakeBin = resolve(root, 'bin');
+        const runnerTemp = resolve(root, 'runner-temp');
+        const vercelBin = resolve(root, 'node_modules/.bin');
+        const counter = resolve(root, 'alias-inspect-count');
+        mkdirSync(fakeBin, { recursive: true });
+        mkdirSync(runnerTemp);
+        mkdirSync(vercelBin, { recursive: true });
+        writeFileSync(
+          resolve(fakeBin, 'node'),
+          `#!/usr/bin/env bash
 set -euo pipefail
 jq -n \
   --arg id "$EXPECTED_DEPLOYMENT_ID" \
   --arg url "$VERCEL_CANDIDATE_DEPLOYMENT_URL" \
   '{id: $id, url: $url}'
 `,
-        { mode: 0o700 }
-      );
-      writeFileSync(
-        resolve(vercelBin, 'vercel'),
-        `#!/usr/bin/env bash
+          { mode: 0o700 }
+        );
+        writeFileSync(
+          resolve(vercelBin, 'vercel'),
+          `#!/usr/bin/env bash
 set -euo pipefail
 attempt=0
 if [ -f "$RECEIPT_ALIAS_COUNTER" ]; then
@@ -2635,18 +2655,28 @@ else
     '{id: $id, readyState: "READY", target: "preview"}'
 fi
 `,
-        { mode: 0o700 }
-      );
-      writeFileSync(
-        resolve(fakeBin, 'curl'),
-        `#!/usr/bin/env bash
+          { mode: 0o700 }
+        );
+        writeFileSync(
+          resolve(fakeBin, 'curl'),
+          `#!/usr/bin/env bash
 set -euo pipefail
 header_path=""
+output_path=/dev/stdout
+write_meta=false
 url=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dump-header)
       header_path="$2"
+      shift 2
+      ;;
+    --output)
+      output_path="$2"
+      shift 2
+      ;;
+    --write-out)
+      write_meta=true
       shift 2
       ;;
     http*)
@@ -2660,63 +2690,137 @@ while [ "$#" -gt 0 ]; do
 done
 case "$url" in
   */api/health/build-info)
-    jq -n --arg sha "$EXPECTED_COMMIT_SHA" \
-      '{commitSha: $sha, environment: "preview"}'
+    attempt=0
+    if [ -f "$RECEIPT_CONTENT_COUNTER" ]; then attempt="$(cat "$RECEIPT_CONTENT_COUNTER")"; fi
+    attempt=$((attempt + 1))
+    printf '%s' "$attempt" > "$RECEIPT_CONTENT_COUNTER"
+    sha="$EXPECTED_COMMIT_SHA"
+    environment=preview
+    status=200
+    content_type='application/json; charset=utf-8'
+    curl_status=0
+    case "$RECEIPT_SCENARIO" in
+      sha-converges) if [ "$attempt" -eq 1 ]; then sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; fi ;;
+      environment-converges) if [ "$attempt" -eq 1 ]; then environment=production; fi ;;
+      sha-stays-wrong) sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ;;
+      environment-stays-wrong) environment=production ;;
+      untrusted-fields) sha='SECRET_SENTINEL'; environment='SECRET_SENTINEL' ;;
+      embedded-newline-sha) sha=$'SECRET_SENTINEL\\n'"$EXPECTED_COMMIT_SHA"$'\\nSECRET_SENTINEL' ;;
+      trailing-newline-sha) sha="$EXPECTED_COMMIT_SHA"$'\\n' ;;
+      html) content_type='text/html; SECRET_SENTINEL' ;;
+      redirect) status=302 ;;
+      unauthorized) status=401; curl_status=22 ;;
+      transport) status=000; curl_status=28 ;;
+    esac
+    if [ "$RECEIPT_SCENARIO" = invalid-json ]; then
+      printf 'SECRET_SENTINEL' > "$output_path"
+    else
+      jq -n --arg sha "$sha" --arg environment "$environment" \
+        '{commitSha: $sha, environment: $environment, privateField: "SECRET_SENTINEL"}' > "$output_path"
+    fi
+    if "$write_meta"; then printf '%s\\n%s' "$status" "$content_type"; fi
+    exit "$curl_status"
     ;;
   */robots.txt)
-    printf 'User-agent: *\\nDisallow: /\\n'
+    printf '%s\\n' robots >> "$RECEIPT_PRIVACY_LOG"
+    if [ "$RECEIPT_SCENARIO" = public-robots ]; then printf 'User-agent: *\\nAllow: /\\n'; else printf 'User-agent: *\\nDisallow: /\\n'; fi
     ;;
   */)
-    printf 'HTTP/2 200\\nx-robots-tag: noindex\\n\\n' > "$header_path"
+    printf '%s\\n' homepage >> "$RECEIPT_PRIVACY_LOG"
+    if [ "$RECEIPT_SCENARIO" = missing-noindex ]; then printf 'HTTP/2 200\\n\\n' > "$header_path"; else printf 'HTTP/2 200\\nx-robots-tag: noindex\\n\\n' > "$header_path"; fi
     ;;
   *)
     exit 44
     ;;
 esac
 `,
-        { mode: 0o700 }
-      );
-      writeFileSync(
-        resolve(fakeBin, 'sleep'),
-        '#!/usr/bin/env bash\nexit 0\n',
-        { mode: 0o700 }
-      );
+          { mode: 0o700 }
+        );
+        writeFileSync(
+          resolve(fakeBin, 'sleep'),
+          '#!/usr/bin/env bash\nprintf \"%s\\n\" \"$1\" >> \"$RECEIPT_SLEEP_LOG\"\n',
+          { mode: 0o700 }
+        );
 
-      const expectedSha = '0123456789abcdef0123456789abcdef01234567';
-      const expectedDeploymentId = 'dpl_exact_receipt';
-      const result = spawnSync(
-        'bash',
-        ['-c', `set -euo pipefail\n${getStepRunScript(prove)}`],
-        {
-          cwd: root,
-          env: {
-            ...process.env,
-            DEPLOYMENT_URL_B64: Buffer.from(
-              'https://jovie-exact-jovie.vercel.app'
-            ).toString('base64'),
-            EXPECTED_COMMIT_SHA: expectedSha,
-            EXPECTED_DEPLOYMENT_ID: expectedDeploymentId,
-            PATH: `${fakeBin}:${process.env.PATH}`,
-            RECEIPT_ALIAS_COUNTER: counter,
-            RUNNER_TEMP: runnerTemp,
-            VERCEL_AUTOMATION_BYPASS_SECRET: 'test-bypass',
-            VERCEL_ORG_ID: 'team_test',
-            VERCEL_PROJECT_ID: 'project_test',
-            VERCEL_TOKEN: 'test-token',
-          },
-          encoding: 'utf8',
+        const expectedSha = '0123456789abcdef0123456789abcdef01234567';
+        const expectedDeploymentId = 'dpl_exact_receipt';
+        const result = spawnSync(
+          'bash',
+          ['-c', `set -euo pipefail\n${getStepRunScript(prove)}`],
+          {
+            cwd: root,
+            env: {
+              ...process.env,
+              DEPLOYMENT_URL_B64: Buffer.from(
+                'https://jovie-exact-jovie.vercel.app'
+              ).toString('base64'),
+              EXPECTED_COMMIT_SHA: expectedSha,
+              EXPECTED_DEPLOYMENT_ID: expectedDeploymentId,
+              PATH: `${fakeBin}:${process.env.PATH}`,
+              RECEIPT_ALIAS_COUNTER: counter,
+              RECEIPT_CONTENT_COUNTER: resolve(root, 'content-count'),
+              RECEIPT_SCENARIO: scenario,
+              RECEIPT_PRIVACY_LOG: resolve(root, 'privacy-log'),
+              RECEIPT_SLEEP_LOG: resolve(root, 'sleep-log'),
+              RUNNER_TEMP: runnerTemp,
+              VERCEL_AUTOMATION_BYPASS_SECRET: 'test-bypass',
+              VERCEL_ORG_ID: 'team_test',
+              VERCEL_PROJECT_ID: 'project_test',
+              VERCEL_TOKEN: 'test-token',
+            },
+            encoding: 'utf8',
+            timeout: 15_000,
+          }
+        );
+
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(
+          expectedStatus
+        );
+        expect(readFileSync(resolve(root, 'content-count'), 'utf8')).toBe(
+          String(expectedRequests)
+        );
+        const output = `${result.stdout}\n${result.stderr}`;
+        expect(output).not.toContain('SECRET_SENTINEL');
+        expect(output).not.toContain('test-bypass');
+        expect(output).toContain(
+          `Staging identity attempt ${expectedRequests}/5:`
+        );
+        expect(
+          readFileSync(resolve(root, 'sleep-log'), 'utf8').trim().split('\n')
+        ).toEqual(Array(expectedRequests).fill('4'));
+        if (expectedStatus === 0) {
+          expect(readFileSync(resolve(root, 'privacy-log'), 'utf8')).toBe(
+            'homepage\nrobots\n'
+          );
+          expect(output).toContain(
+            `commitSha=${expectedSha} environment=preview`
+          );
+        } else if (
+          scenario === 'missing-noindex' ||
+          scenario === 'public-robots'
+        ) {
+          expect(output).toContain(
+            scenario === 'missing-noindex'
+              ? 'missing the HTTP noindex'
+              : 'robots policy is not private'
+          );
+        } else {
+          expect(() =>
+            readFileSync(resolve(root, 'privacy-log'), 'utf8')
+          ).toThrow();
         }
-      );
-
-      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-      expect(readFileSync(counter, 'utf8')).toBe('2');
-      expect(result.stdout).toContain(
-        `staging.jov.ie owns exact READY preview ${expectedDeploymentId}.`
-      );
-    } finally {
-      rmSync(root, { force: true, recursive: true });
+        expect(() =>
+          readFileSync(resolve(runnerTemp, 'staging-build-info.json'), 'utf8')
+        ).toThrow();
+        expect(readFileSync(counter, 'utf8')).toBe('2');
+        expect(result.stdout).toContain(
+          `staging.jov.ie owns exact READY preview ${expectedDeploymentId}.`
+        );
+      } finally {
+        rmSync(root, { force: true, recursive: true });
+      }
     }
-  });
+  );
 
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
     const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
