@@ -2,15 +2,28 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import {
+  CANONICAL_PUBLIC_SHELL_CONTEXT,
+  CANONICAL_PUBLIC_SHELL_EVENTS,
+} from '@/data/canonicalPublicShellOptimization';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const mockUsePathname = vi.fn<() => string | null>(() => '/about');
+const mockTrack = vi.fn();
 
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
   return {
     ...actual,
     usePathname: () => mockUsePathname(),
+  };
+});
+
+vi.mock('@/lib/analytics', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/analytics')>();
+  return {
+    ...actual,
+    track: (...args: unknown[]) => mockTrack(...args),
   };
 });
 
@@ -31,11 +44,22 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
 
 describe('MarketingHeader', () => {
   beforeEach(() => {
+    mockTrack.mockClear();
     mockUsePathname.mockReturnValue('/about');
     Object.defineProperty(window, 'scrollY', {
       configurable: true,
       value: 0,
     });
+  });
+
+  it('fires one canonical public-shell exposure receipt', () => {
+    render(<MarketingHeader />);
+
+    expect(mockTrack).toHaveBeenCalledTimes(1);
+    expect(mockTrack).toHaveBeenCalledWith(
+      CANONICAL_PUBLIC_SHELL_EVENTS.EXPOSURE,
+      CANONICAL_PUBLIC_SHELL_CONTEXT
+    );
   });
 
   it('renders the canonical public navigation when the center-nav flag is enabled', () => {

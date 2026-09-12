@@ -146,8 +146,10 @@ describe('homepage hero contract (JOV-5864)', () => {
 
     expect(headerSource).toContain('MARKETING_GLASS_DESKTOP_LINKS');
     expect(headerSource).toContain("presentation === 'marketing-glass'");
-    expect(layoutSource).toContain("headerVariant='landing'");
+    expect(layoutSource).toContain("headerVariant='homepage'");
     expect(layoutSource).toContain("footerVariant='expanded'");
+    expect(layoutSource).toContain("logoSize='sm'");
+    expect(layoutSource).toContain("logoVariant='icon'");
     expect(layoutSource).not.toContain("logoVariant='word'");
     expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
 

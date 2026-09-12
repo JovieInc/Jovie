@@ -120,9 +120,12 @@ test.describe('Homepage', () => {
       'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
+    await expect(
+      header.getByRole('link', { name: 'Customers' })
+    ).toHaveAttribute('href', '/artists');
     await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
@@ -130,18 +133,16 @@ test.describe('Homepage', () => {
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Find yourself' })
-    ).toHaveAttribute('href', '/start');
+      header.getByRole('link', { name: 'Get started' })
+    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
   });
 
-  test('canonical header flyouts stay closed until requested', async ({
-    page,
-  }) => {
+  test('canonical header has no flyout menus', async ({ page }) => {
     const header = page.getByTestId('header-nav');
     const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
     await expect(toolsFlyout).toHaveCount(0);
   });
 
@@ -656,17 +657,14 @@ test.describe('Homepage', () => {
     const mobileNav = page.locator('#mobile-nav-panel');
     await expect(mobileNav).toBeVisible();
     await expect(
-      header.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveCount(0);
-    await expect(
       header.getByRole('link', { name: 'Find yourself', exact: true })
     ).toHaveCount(0);
     await expect(
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
-    ).toHaveAttribute('href', '/start');
+      mobileNav.getByRole('link', { name: 'Get started', exact: true })
+    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
   });
 
   test('has no horizontal overflow across common viewports', async ({

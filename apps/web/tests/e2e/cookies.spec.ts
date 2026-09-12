@@ -153,7 +153,7 @@ test.describe('Cookie banner @smoke', () => {
         const mobileNav = page.locator('#mobile-nav-panel');
         await expect(mobileNav).toBeVisible();
         await expect(
-          mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
+          mobileNav.getByRole('link', { name: 'Get started', exact: true })
         ).toBeVisible();
       }
     });

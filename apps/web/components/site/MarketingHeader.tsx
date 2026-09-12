@@ -2,6 +2,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import {
   type HeaderFlyoutMenu,
@@ -10,6 +11,10 @@ import {
 } from '@/components/organisms/HeaderNav';
 import './MarketingHeader.css';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  CANONICAL_PUBLIC_SHELL_CONTEXT,
+  CANONICAL_PUBLIC_SHELL_EVENTS,
+} from '@/data/canonicalPublicShellOptimization';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
@@ -17,6 +22,7 @@ import {
   MARKETING_NAV_LINKS,
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
+import { track } from '@/lib/analytics';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export type MarketingHeaderVariant = 'landing' | 'minimal' | 'homepage';
@@ -105,6 +111,12 @@ export function MarketingHeader({
   variant = 'landing',
 }: MarketingHeaderProps) {
   const pathname = usePathname();
+  useEffect(() => {
+    track(
+      CANONICAL_PUBLIC_SHELL_EVENTS.EXPOSURE,
+      CANONICAL_PUBLIC_SHELL_CONTEXT
+    );
+  }, []);
   const resolvedNavLinks = navLinks ?? MARKETING_NAV_LINKS;
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
