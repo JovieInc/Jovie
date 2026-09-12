@@ -142,7 +142,7 @@ def legacy_controller_repair_receipt():
     receipt["controllerRepairAdmission"] = {
         "allowed": True, "condition": "controller-failure",
         "mainSha": SHA, "deployedSha": SHA,
-        "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+        "scope": "github-approved-exact-repository-pr-head-main-path-set",
         "maxConcurrent": 1, "deploymentsAllowed": False,
         "runtimeActivationAllowed": False,
         "authority": "canonical-merge-queue-controller",

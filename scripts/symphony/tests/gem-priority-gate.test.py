@@ -1926,7 +1926,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 "condition": None,
                 "mainSha": None,
                 "deployedSha": None,
-                "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+                "scope": "github-approved-exact-repository-pr-head-main-path-set",
                 "maxConcurrent": 0,
                 "deploymentsAllowed": False,
                 "runtimeActivationAllowed": False,

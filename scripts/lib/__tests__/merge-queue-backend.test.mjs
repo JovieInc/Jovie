@@ -1,3 +1,4 @@
+// biome-ignore-all format: keep origin/main layout under PR Size Guard
 import { execFile, spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -1181,7 +1182,7 @@ describe('queue workflow mutation safety', () => {
   it('keeps the controller repair escape exact, independently owned, and expiring', () => {
     const now = Date.parse('2026-09-06T18:00:00.000Z');
     const changedPathsSha256 = 'c'.repeat(64);
-    const operationId = 'run-34050357620-attempt-1';
+    const reviewId = 'github-review-17219';
     const body = renderControllerRepairAttestation(
       {
         schema: 'jovie-controller-repair-attestation/v1',
@@ -1191,11 +1192,10 @@ describe('queue workflow mutation safety', () => {
         pr: 16546,
         head: HEAD,
         mainSha: OTHER_HEAD,
-        reviewAuthority: 'independent-llm-review',
-        reviewId: 'review-release-repair-1',
+        reviewAuthority: 'github-approved-collaborator',
+        reviewId,
         reviewedHead: HEAD,
         changedPathsSha256,
-        operationId,
         issuedAt: new Date(now).toISOString(),
         expiresAt: new Date(now + 15 * 60_000).toISOString(),
         deploymentsAllowed: false,
@@ -1209,7 +1209,7 @@ describe('queue workflow mutation safety', () => {
       head: HEAD,
       mainSha: OTHER_HEAD,
       changedPathsSha256,
-      operationId,
+      reviewId,
     };
 
     expect(
@@ -1237,7 +1237,7 @@ describe('queue workflow mutation safety', () => {
     expect(
       attestationMatchesControllerRepair(body, {
         ...exactScope,
-        operationId: 'run-34050357620-attempt-2',
+        reviewId: 'github-review-99999',
         minimumValidForMs: 1,
         now: now + 10 * 60_000,
       })
