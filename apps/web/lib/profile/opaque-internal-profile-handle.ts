@@ -9,7 +9,8 @@
  *
  * Shape matches JOV-6126 QA machine handles. Unclaimed collaborator
  * `a_{uuid36}` profiles are a separate, intentional public identity and are
- * not treated as junk here.
+ * not treated as junk destinations here — except when that encoded handle is
+ * attached to the page owner, in which case the owner's claimed handle wins.
  */
 
 export const QA_MACHINE_HANDLE_PATTERN = /^tmoc[0-9a-z]{10,}$/;
@@ -50,6 +51,21 @@ export function isEncodedUnclaimedArtistHandle(
   );
 }
 
+export function isCanonicalPublicProfileHandle(
+  handle: string | null | undefined
+): boolean {
+  const normalized = normalizePublicProfileHandle(handle);
+  return (
+    normalized.length > 0 &&
+    !isOpaqueInternalProfileHandle(normalized) &&
+    !isEncodedUnclaimedArtistHandle(normalized)
+  );
+}
+
+function namesMatch(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
 /**
  * Public href handle for a release-page artist name.
  *
@@ -63,21 +79,74 @@ export function canonicalizeReleaseArtistHandle(input: {
   readonly ownerHandle: string | null;
   readonly ownerName: string;
 }): string | null {
-  // Intentionally pass-through until JOV-6201 is implemented. Tests first.
-  void input.name;
-  void input.ownerHandle;
-  void input.ownerName;
   const handle = input.handle?.trim() ?? '';
-  return handle.length > 0 ? handle : null;
+  const ownerHandle = input.ownerHandle?.trim() || null;
+  const ownerIsCanonical = isCanonicalPublicProfileHandle(ownerHandle);
+  const isOwnerCredit = namesMatch(input.name, input.ownerName);
+
+  if (isOwnerCredit && ownerHandle && ownerIsCanonical) {
+    return ownerHandle;
+  }
+
+  if (!handle) return null;
+  if (isOpaqueInternalProfileHandle(handle)) return null;
+  return handle;
+}
+
+export function canonicalizeReleaseArtistCredits<
+  T extends { readonly name: string; readonly handle: string | null },
+>(
+  entries: readonly T[],
+  owner: { readonly name: string; readonly handle: string | null }
+): T[] {
+  return entries.map(entry => ({
+    ...entry,
+    handle: canonicalizeReleaseArtistHandle({
+      handle: entry.handle,
+      name: entry.name,
+      ownerHandle: owner.handle,
+      ownerName: owner.name,
+    }),
+  }));
+}
+
+export function canonicalizeReleaseCreditGroups<
+  T extends {
+    readonly entries: ReadonlyArray<{
+      readonly name: string;
+      readonly handle: string | null;
+    }>;
+  },
+>(
+  groups: readonly T[] | null | undefined,
+  owner: { readonly name: string; readonly handle: string | null }
+): T[] | undefined {
+  if (!groups) return undefined;
+  return groups.map(group => ({
+    ...group,
+    entries: canonicalizeReleaseArtistCredits(group.entries, owner),
+  }));
 }
 
 export function decideOpaqueInternalProfileUsername(input: {
   readonly username: string;
   readonly canonicalHandle?: string | null;
 }): OpaqueInternalProfileDecision {
-  // Intentionally serve until JOV-6201 is implemented. Tests first.
-  void input;
-  return { action: 'serve' };
+  if (!isOpaqueInternalProfileHandle(input.username)) {
+    return { action: 'serve' };
+  }
+
+  const requested = normalizePublicProfileHandle(input.username);
+  const canonical = normalizePublicProfileHandle(input.canonicalHandle);
+  if (
+    canonical &&
+    canonical !== requested &&
+    isCanonicalPublicProfileHandle(canonical)
+  ) {
+    return { action: 'redirect', handle: canonical };
+  }
+
+  return { action: 'not_found' };
 }
 
 export function publicProfilePathForHandle(handle: string): string {

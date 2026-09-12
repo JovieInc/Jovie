@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   canonicalizeReleaseArtistHandle,
   decideOpaqueInternalProfileUsername,
+  NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE as FIXTURE,
   isEncodedUnclaimedArtistHandle,
   isOpaqueInternalProfileHandle,
-  NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE as FIXTURE,
   opaqueInternalProfileRedirectPath,
   publicProfilePathForHandle,
 } from './opaque-internal-profile-handle';

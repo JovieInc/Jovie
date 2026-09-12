@@ -166,7 +166,7 @@ describe('Public Profile Page Logic', () => {
 
     it('resolves missing profiles before the streamed page boundary', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        "import { notFound } from 'next/navigation'"
+        "import { notFound, permanentRedirect } from 'next/navigation'"
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'const profileResult = await getProfileAndLinks(username)'
