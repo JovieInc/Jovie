@@ -9,7 +9,13 @@ import { bundleDesktopPreload } from './bundle-preload.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test('sandboxed preload bundle exposes identity and app boot APIs', async t => {
+function requiredModuleIds(source) {
+  return [...source.matchAll(/require\(["']([^"']+)["']\)/g)].map(
+    match => match[1]
+  );
+}
+
+test('sandboxed preload bundle inlines local modules and exposes app boot APIs', async t => {
   const temporaryDirectory = await mkdtemp(
     join(tmpdir(), 'jovie-preload-bundle-')
   );
@@ -18,14 +24,32 @@ test('sandboxed preload bundle exposes identity and app boot APIs', async t => {
   const entryPoint = join(temporaryDirectory, 'preload.ts');
   const outfile = join(temporaryDirectory, 'preload.js');
   await Promise.all([
-    readFile(join(desktopRoot, 'src', 'preload.ts'), 'utf8').then(source =>
-      writeFile(entryPoint, source)
+    writeFile(
+      entryPoint,
+      `import { contextBridge, ipcRenderer } from 'electron';
+import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
+
+const root = globalThis.document?.documentElement;
+if (root) {
+  root.dataset.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY.channel;
+  root.dataset.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY.version;
+}
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  platform: process.platform,
+  electronVersion: process.versions.electron,
+  getBuildIdentity: () => ipcRenderer.invoke('get-build-identity'),
+  notifyAppBooted: () => {
+    ipcRenderer.send('app-booted');
+  },
+});
+`
     ),
     writeFile(
       join(temporaryDirectory, 'build-identity.generated.ts'),
       `export const BAKED_DESKTOP_BUILD_IDENTITY = {
   channel: 'local',
-  version: '26.8.2',
+  version: '26.9.2',
   sourceRevision: null,
   builtAt: null,
 } as const;
@@ -52,6 +76,11 @@ test('sandboxed preload bundle exposes identity and app boot APIs', async t => {
   };
 
   const source = await readFile(outfile, 'utf8');
+  assert.deepEqual([...new Set(requiredModuleIds(source))].sort(), [
+    'electron',
+  ]);
+  assert.doesNotMatch(source, /require\(["']\.[/\\\\]/);
+
   vm.runInNewContext(
     source,
     {
@@ -82,8 +111,8 @@ test('sandboxed preload bundle exposes identity and app boot APIs', async t => {
   assert.equal(electronApi.electronVersion, '44.0.0');
   assert.equal(typeof electronApi.getBuildIdentity, 'function');
   assert.equal(typeof electronApi.notifyAppBooted, 'function');
-  assert.match(dataset.desktopChannel, /^(local|staging|production)$/);
-  assert.match(dataset.desktopVersion, /^\d+\.\d+\.\d+/);
+  assert.equal(dataset.desktopChannel, 'local');
+  assert.equal(dataset.desktopVersion, '26.9.2');
 
   await electronApi.getBuildIdentity();
   electronApi.notifyAppBooted();
@@ -116,10 +145,11 @@ test('the production bundle command writes a sandbox-compatible preload', async 
   await bundleDesktopPreload();
 
   const source = await readFile(productionOutfile, 'utf8');
-  const requiredModules = [
-    ...source.matchAll(/require\(["']([^"']+)["']\)/g),
-  ].map(match => match[1]);
-  assert.deepEqual([...new Set(requiredModules)].sort(), ['electron']);
-  assert.match(source, /desktopChannel/);
+  assert.deepEqual([...new Set(requiredModuleIds(source))].sort(), [
+    'electron',
+  ]);
+  assert.doesNotMatch(source, /require\(["']\.[/\\\\]/);
+  assert.match(source, /desktopRuntime/);
   assert.match(source, /notifyAppBooted/);
+  assert.match(source, /getBuildIdentity/);
 });
