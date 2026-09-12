@@ -218,9 +218,13 @@ export const DEFAULT_UPSELL_PLAN: PlanIntentTier = 'pro';
  */
 export const MAX_FOLLOWER_THRESHOLD = 10_000;
 
-/** Recommend the current public upsell; legacy follower counts never select Max. */
-export function recommendPlan(
-  _spotifyFollowers: number | null
-): PlanIntentTier {
+/**
+ * Recommend a plan tier based on Spotify follower count.
+ * Artists with 10K+ followers get Max; everyone else gets Pro.
+ */
+export function recommendPlan(spotifyFollowers: number | null): PlanIntentTier {
+  if (spotifyFollowers !== null && spotifyFollowers >= MAX_FOLLOWER_THRESHOLD) {
+    return 'max';
+  }
   return DEFAULT_UPSELL_PLAN;
 }

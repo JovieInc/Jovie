@@ -3,6 +3,7 @@ import { connection } from 'next/server';
 import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { getAuthenticatedAuthRouteRedirect } from '@/lib/auth/access-route-redirect';
+import { readAuthOfferHandoff } from '@/lib/auth/auth-shell-offer';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import { SignupModalClient } from './SignupModalClient';
 
@@ -13,17 +14,16 @@ export default async function SignupModalPage({
 }>) {
   await connection();
   const params = await searchParams;
-  const redirectUrl =
-    typeof params.redirect_url === 'string' ? params.redirect_url : null;
-  const authState =
-    typeof params.auth_state === 'string' ? params.auth_state : null;
+  const get = (key: string) =>
+    typeof params[key] === 'string' ? (params[key] as string) : null;
   const authResult = await resolveUserState({ createDbUserIfMissing: false });
-
   if (authResult.state !== CanonicalUserState.UNAUTHENTICATED) {
     redirect(
       getAuthenticatedAuthRouteRedirect(authResult.state, {
-        redirectUrl,
-        authState,
+        redirectUrl: get('redirect_url'),
+        authState: get('auth_state'),
+        offerHandoff: readAuthOfferHandoff({ get }),
+        isPaidSubscriber: authResult.context?.isPro ?? false,
       })
     );
   }

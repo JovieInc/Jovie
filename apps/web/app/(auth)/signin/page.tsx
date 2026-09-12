@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { getAuthenticatedAuthRouteRedirect } from '@/lib/auth/access-route-redirect';
+import { readAuthOfferHandoff } from '@/lib/auth/auth-shell-offer';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import { SignInPageClient } from './SignInPageClient';
 
@@ -24,6 +25,11 @@ export default async function SignInPage({
       getAuthenticatedAuthRouteRedirect(authResult.state, {
         redirectUrl,
         authState,
+        offerHandoff: readAuthOfferHandoff({
+          get: key =>
+            typeof params[key] === 'string' ? (params[key] as string) : null,
+        }),
+        isPaidSubscriber: authResult.context?.isPro ?? false,
       })
     );
   }
