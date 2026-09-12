@@ -34,6 +34,7 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
+  PUBLIC_EVENTS_NO_SURFACE,
   resolveProfileSurfaceState,
   resolvePublicMusicSurface,
   shouldOfferPublicEventsDestination,
@@ -596,7 +597,9 @@ export function ProfileDesktopSurface({
                   </div>
                 ))
               ) : (
-                <EmptySurfaceBlock>{emptyState.tour}</EmptySurfaceBlock>
+                <EmptySurfaceBlock>
+                  {PUBLIC_EVENTS_NO_SURFACE}
+                </EmptySurfaceBlock>
               )}
             </div>
           </DesktopSurfaceCard>

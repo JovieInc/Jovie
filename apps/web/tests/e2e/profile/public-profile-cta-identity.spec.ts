@@ -226,7 +226,7 @@ test.describe('Public profile CTA and identity evidence', () => {
           events.getByRole('heading', { name: 'Events', exact: true })
         ).toBeVisible();
         await expect(
-          events.getByText('No upcoming shows.', { exact: true })
+          events.getByText('No live shows listed.', { exact: true })
         ).toBeVisible();
         await expect(
           events.getByRole('button', { name: 'View Events' })

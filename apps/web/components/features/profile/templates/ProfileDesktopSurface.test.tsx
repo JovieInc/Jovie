@@ -462,6 +462,8 @@ describe('ProfileDesktopSurface', () => {
       expect(
         screen.queryByRole('button', { name: 'View Events' })
       ).not.toBeInTheDocument();
+      expect(screen.getByText('No live shows listed.')).toBeVisible();
+      expect(screen.queryByText('No upcoming shows.')).not.toBeInTheDocument();
 
       screen.getByTestId('profile-desktop-get-updates').click();
       expect(onModeSelect).toHaveBeenCalledWith('subscribe');
