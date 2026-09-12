@@ -2897,7 +2897,7 @@ JSON
                 queued=$(<"$state_file")
                 state_json() {{
                   if [[ "$queued" == 1 ]]; then
-                    entry='{{"id":"MQE_904","state":"QUEUED","position":1}}'
+                    entry='{{"id":"MQE_904","state":"QUEUED","position":1,"enqueuedAt":"2026-09-05T00:00:00Z"}}'
                     auto='{{"enabledAt":"2026-09-05T00:00:00Z"}}'
                   else
                     entry=null; auto=null
@@ -2943,6 +2943,10 @@ JSON
                   if [[ "$args" == *"dequeuePullRequest"* ]]; then echo 0 >"$state_file"; echo '{{"data":{{"dequeuePullRequest":{{"mergeQueueEntry":null}}}}}}'; exit 0; fi
                   if [[ "$args" == *"disablePullRequestAutoMerge"* ]]; then echo '{{"data":{{"disablePullRequestAutoMerge":{{}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueuePullRequestState"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequest:$state}}}}}}'; exit 0; fi
+                  if [[ "$args" == *"MergeQueueCanonicalMembership"* ]]; then
+                    if [[ "$queued" != 1 ]]; then echo '{{"data":{{"repository":{{"pullRequest":{{"id":"PR_kwDO_native_904","number":904,"state":"OPEN","isDraft":false,"headRefOid":"'"$head"'","headRefName":"codex/controller-repair","baseRefName":"main","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","labels":{{"nodes":[]}},"isInMergeQueue":false,"mergeQueueEntry":null,"autoMergeRequest":null,"timelineItems":{{"nodes":[],"pageInfo":{{"hasNextPage":false}}}}}}}}}}}}'; exit 0; fi
+                    jq -nc --arg id "$pr_node" --arg head "$head" '{{data:{{repository:{{pullRequest:{{id:$id,number:904,state:"OPEN",isDraft:false,headRefOid:$head,headRefName:"codex/controller-repair",baseRefName:"main",mergeable:"MERGEABLE",mergeStateStatus:"CLEAN",labels:{{nodes:[]}},isInMergeQueue:true,mergeQueueEntry:{{id:"MQE_904",state:"QUEUED",position:1,enqueuedAt:"2026-09-05T00:00:00Z",enqueuer:{{__typename:"Bot",login:"jovie-bot"}}}},autoMergeRequest:{{enabledAt:"2026-09-05T00:00:00Z"}},timelineItems:{{nodes:[{{__typename:"AddedToMergeQueueEvent",id:"MQE_EVT_904",createdAt:"2026-09-05T00:00:00Z",actor:{{__typename:"Bot",login:"jovie-bot"}},enqueuer:{{login:"jovie-bot[bot]"}}}}],pageInfo:{{hasNextPage:false}}}}}}}}}}}}'; exit 0
+                  fi
                   if [[ "$args" == *"MergeQueueOpenPullRequestStates"* ]]; then state=$(state_json); jq -nc --argjson state "$state" '{{data:{{repository:{{pullRequests:{{nodes:[$state],pageInfo:{{hasNextPage:false}}}}}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueueBranchProtection"* ]]; then echo '{{"data":{{"repository":{{"ref":{{"name":"main","branchProtectionRule":null}}}}}}}}'; exit 0; fi
                   if [[ "$args" == *"MergeQueueLiveConfiguration"* ]]; then echo '{{"data":{{"repository":{{"mergeQueue":{{"configuration":{{"checkResponseTimeout":1200,"maximumEntriesToBuild":1,"maximumEntriesToMerge":5,"mergeMethod":"SQUASH","minimumEntriesToMerge":5,"minimumEntriesToMergeWaitTime":10}}}}}}}}}}'; exit 0; fi
@@ -2972,7 +2976,7 @@ JSON
         assert state_file.read_text(encoding="utf-8").strip() == "1"
         statuses = status_log.read_text(encoding="utf-8")
         assert "context=jovie-controller-repair-queue/v1" in statuses
-        assert "context=jovie-queue-reentry/v1" in statuses
+        assert "context=jovie-queue-admission/v2" in statuses
 
         retained = _run_bash(
             _drain_command(
