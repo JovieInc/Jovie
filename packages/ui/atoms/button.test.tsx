@@ -440,25 +440,22 @@ describe('Button', () => {
     expect(btn.className).toContain('bg-error-subtle');
   });
 
-  it.each([
-    'primary',
-    'secondary',
-    'tertiary',
-    'ghost',
-    'link',
-  ] as const)('applies destructive styling to the %s variant through a prop', variant => {
-    render(
-      <Button variant={variant} destructive>
-        Delete
-      </Button>
-    );
-    const btn = screen.getByRole('button');
-    expect(btn).toHaveAttribute('data-variant', variant);
-    expect(btn).toHaveAttribute('data-destructive', 'true');
-    expect(btn.className).toContain(
-      variant === 'primary' ? 'bg-error' : 'text-error'
-    );
-  });
+  it.each(['primary', 'secondary', 'tertiary', 'ghost', 'link'] as const)(
+    'applies destructive styling to the %s variant through a prop',
+    variant => {
+      render(
+        <Button variant={variant} destructive>
+          Delete
+        </Button>
+      );
+      const btn = screen.getByRole('button');
+      expect(btn).toHaveAttribute('data-variant', variant);
+      expect(btn).toHaveAttribute('data-destructive', 'true');
+      expect(btn.className).toContain(
+        variant === 'primary' ? 'bg-error' : 'text-error'
+      );
+    }
+  );
 
   it('forwards refs', () => {
     const ref = React.createRef<HTMLButtonElement>();
@@ -475,26 +472,26 @@ describe('Button', () => {
     expect(screen.getByRole('link')).toBeInTheDocument();
   });
 
-  it.each([
-    'disabled',
-    'loading',
-  ] as const)('prevents child and wrapper activation while asChild is %s', state => {
-    const onClick = vi.fn();
-    const onChildClick = vi.fn();
-    render(
-      <Button asChild {...{ [state]: true }} onClick={onClick}>
-        <a href='/destination' onClick={onChildClick}>
-          Continue
-        </a>
-      </Button>
-    );
-    const link = screen.getByRole('link', { name: 'Continue' });
-    // Keyboard and assistive technologies synthesize clicks independently
-    // of pointer-events. The default action must be cancelled as well.
-    expect(fireEvent.click(link, { detail: 0 })).toBe(false);
-    expect(onClick).not.toHaveBeenCalled();
-    expect(onChildClick).not.toHaveBeenCalled();
-  });
+  it.each(['disabled', 'loading'] as const)(
+    'prevents child and wrapper activation while asChild is %s',
+    state => {
+      const onClick = vi.fn();
+      const onChildClick = vi.fn();
+      render(
+        <Button asChild {...{ [state]: true }} onClick={onClick}>
+          <a href='/destination' onClick={onChildClick}>
+            Continue
+          </a>
+        </Button>
+      );
+      const link = screen.getByRole('link', { name: 'Continue' });
+      // Keyboard and assistive technologies synthesize clicks independently
+      // of pointer-events. The default action must be cancelled as well.
+      expect(fireEvent.click(link, { detail: 0 })).toBe(false);
+      expect(onClick).not.toHaveBeenCalled();
+      expect(onChildClick).not.toHaveBeenCalled();
+    }
+  );
 
   it('restores composed activation after leaving the disabled state', () => {
     const onClick = vi.fn();

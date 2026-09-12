@@ -299,36 +299,38 @@ describe('CookieModal loads saved preferences', () => {
     expect(close.className).not.toContain('size-12');
   });
 
-  it.each([
-    false,
-    true,
-  ])('cancels unsaved preferences without persisting (mobile=%s)', async mobile => {
-    mockMobile.value = mobile;
-    const onClose = vi.fn();
-    const onSave = vi.fn();
-    const beforeSaveCalls = mockSaveConsent.mock.calls.length;
-    const { CookieModal } = await import('@/components/organisms/CookieModal');
-    const { unmount } = render(
-      <CookieModal open onClose={onClose} onSave={onSave} />
-    );
-    try {
-      for (const name of [/cancel/i, /save preferences/i]) {
-        const action = screen.getByRole('button', { name });
-        expect(action).toHaveAttribute('data-size', 'marketing');
-        expect(action.className.split(' ')).toContain('my-2');
-        expect(action.className.split(' ')).not.toContain('min-h-12');
+  it.each([false, true])(
+    'cancels unsaved preferences without persisting (mobile=%s)',
+    async mobile => {
+      mockMobile.value = mobile;
+      const onClose = vi.fn();
+      const onSave = vi.fn();
+      const beforeSaveCalls = mockSaveConsent.mock.calls.length;
+      const { CookieModal } = await import(
+        '@/components/organisms/CookieModal'
+      );
+      const { unmount } = render(
+        <CookieModal open onClose={onClose} onSave={onSave} />
+      );
+      try {
+        for (const name of [/cancel/i, /save preferences/i]) {
+          const action = screen.getByRole('button', { name });
+          expect(action).toHaveAttribute('data-size', 'marketing');
+          expect(action.className.split(' ')).toContain('my-2');
+          expect(action.className.split(' ')).not.toContain('min-h-12');
+        }
+        fireEvent.click(screen.getByRole('switch', { name: /analytics/i }));
+        fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+        expect(onClose).toHaveBeenCalledOnce();
+        expect(onSave).not.toHaveBeenCalled();
+        expect(mockSaveConsent.mock.calls.length).toBe(beforeSaveCalls);
+        expect(localStorage.getItem('jv_cc')).toBeNull();
+      } finally {
+        unmount();
+        mockMobile.value = false;
       }
-      fireEvent.click(screen.getByRole('switch', { name: /analytics/i }));
-      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-      expect(onClose).toHaveBeenCalledOnce();
-      expect(onSave).not.toHaveBeenCalled();
-      expect(mockSaveConsent.mock.calls.length).toBe(beforeSaveCalls);
-      expect(localStorage.getItem('jv_cc')).toBeNull();
-    } finally {
-      unmount();
-      mockMobile.value = false;
     }
-  });
+  );
 
   it('calls onSave and onClose when Save Preferences succeeds', async () => {
     const onSave = vi.fn();

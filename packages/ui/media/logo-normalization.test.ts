@@ -38,30 +38,32 @@ describe('logo normalization', () => {
 });
 
 describe('contained logo normalization', () => {
-  it.each([
-    64, 32, 12,
-  ])('contains all visible ink at frame width %s without distorting it', frameWidth => {
-    const style = normalizedLogoStyle(asset, 'contain');
-    const frameHeight = frameWidth / 2;
-    const canvasWidth =
-      (Number.parseFloat(style['--logo-render-width']) * frameWidth) / 100;
-    const canvasHeight =
-      (Number.parseFloat(style['--logo-render-height']) * frameHeight) / 100;
-    const x = (Number.parseFloat(style['--logo-offset-x']) * canvasWidth) / 100;
-    const y =
-      (Number.parseFloat(style['--logo-offset-y']) * canvasHeight) / 100;
-    const scale = canvasWidth / 100;
-    expect(canvasWidth / canvasHeight).toBe(1);
-    expect(x + asset.visibleBounds.x * scale).toBeCloseTo(0);
-    expect(y + asset.visibleBounds.y * scale).toBeCloseTo(0);
-    expect(
-      x + (asset.visibleBounds.x + asset.visibleBounds.width) * scale
-    ).toBeCloseTo(frameWidth);
-    expect(
-      y + (asset.visibleBounds.y + asset.visibleBounds.height) * scale
-    ).toBeCloseTo(frameHeight);
-    expect(style['--logo-frame-width']).toBe('64px');
-  });
+  it.each([64, 32, 12])(
+    'contains all visible ink at frame width %s without distorting it',
+    frameWidth => {
+      const style = normalizedLogoStyle(asset, 'contain');
+      const frameHeight = frameWidth / 2;
+      const canvasWidth =
+        (Number.parseFloat(style['--logo-render-width']) * frameWidth) / 100;
+      const canvasHeight =
+        (Number.parseFloat(style['--logo-render-height']) * frameHeight) / 100;
+      const x =
+        (Number.parseFloat(style['--logo-offset-x']) * canvasWidth) / 100;
+      const y =
+        (Number.parseFloat(style['--logo-offset-y']) * canvasHeight) / 100;
+      const scale = canvasWidth / 100;
+      expect(canvasWidth / canvasHeight).toBe(1);
+      expect(x + asset.visibleBounds.x * scale).toBeCloseTo(0);
+      expect(y + asset.visibleBounds.y * scale).toBeCloseTo(0);
+      expect(
+        x + (asset.visibleBounds.x + asset.visibleBounds.width) * scale
+      ).toBeCloseTo(frameWidth);
+      expect(
+        y + (asset.visibleBounds.y + asset.visibleBounds.height) * scale
+      ).toBeCloseTo(frameHeight);
+      expect(style['--logo-frame-width']).toBe('64px');
+    }
+  );
 
   it('retains fixed canvas dimensions for natural provider logos', () => {
     expect(normalizedLogoStyle(asset)).toMatchObject({
