@@ -644,6 +644,7 @@ function runStructural() {
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
     'python3 scripts/symphony/tests/run-hud-proof-gate.py',
     'python3 scripts/symphony/tests/run-runtime-proof-gate.py',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
     'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
     'python3 scripts/symphony/tests/jovie-symphony-workspace.test.py',
     'python3 scripts/symphony/tests/test_gem_workspace_migrate.py',
