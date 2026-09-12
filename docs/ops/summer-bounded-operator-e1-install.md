@@ -10,7 +10,7 @@ from fresh runner-source attestations (≤600s) without holding on
 
 | Check | Result |
 |---|---|
-| PR [#17725](https://github.com/JovieInc/Jovie/pull/17725) on `codex/jov-6163-runtime-attestation` | OPEN / **MERGEABLE** (head `afe8e3229640`, re-verified 2026-09-12) |
+| PR [#17725](https://github.com/JovieInc/Jovie/pull/17725) on `codex/jov-6163-runtime-attestation` | OPEN / **MERGEABLE + CLEAN** (head `afe8e3229640`; ci-fast + required checks green, re-verified 2026-09-12) |
 | Publisher unit tests `scripts/symphony/tests/gem-service-attestation.test.py` | **9 passed** on that head |
 | Summer governed dispatch + Gem-down acceptance (local) | PASS — Cursor alternate selected without Gem; hold when no probe |
 | 600s freshness gate weakened? | **No** |
