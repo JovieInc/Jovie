@@ -93,13 +93,13 @@ export function AuthOfferSummary({
       data-offer-mode={mode}
       className={cn(AUTH_SURFACE.card, 'mb-4 px-4 py-3 text-center')}
     >
-      <p className='text-[17px] font-[510] leading-[1.25] tracking-[-0.017em] text-primary-token'>
+      <p className='text-lg font-medium leading-tight tracking-tight text-primary-token'>
         {getOfferHeading(mode, publicPlan)}
       </p>
-      <p className='mt-1 text-[13px] leading-5 text-secondary-token'>
+      <p className='mt-1 text-app leading-5 text-secondary-token'>
         {getOfferPriceLine(publicPlan, interval)}
       </p>
-      <p className='mt-2 text-[12px] leading-5 text-tertiary-token'>{note}</p>
+      <p className='mt-2 text-xs leading-5 text-tertiary-token'>{note}</p>
     </aside>
   );
 }
