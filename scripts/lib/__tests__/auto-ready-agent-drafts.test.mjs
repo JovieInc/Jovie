@@ -408,7 +408,7 @@ describe('Writer-owned PR promotion proof', () => {
       'jovie-writer-pr-promotion-blocker/v1'
     );
     [
-      'native-merge-intent.mjs',
+      '--match-head-commit "$EXPECTED_HEAD"',
       'dequeuePullRequest',
       'compensate_to_draft',
       'render-blocker',

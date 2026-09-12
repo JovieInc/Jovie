@@ -126,6 +126,7 @@ new_body="$(jq -nc --arg body "$current_body" --argjson receipt "$receipt" '{bod
 gh_retry pr edit "$PR_NUMBER" -R "$REPO" --body "$new_body" >/dev/null || emit_blocker_and_exit "proof-attach" "pr-body-update-failed" 0
 gh_retry pr ready "$PR_NUMBER" -R "$REPO" >/dev/null 2>&1 || emit_blocker_and_exit "ready" "gh-pr-ready-failed" 1
 set +e
+# native-merge-intent.mjs pins the mutation with --match-head-commit "$EXPECTED_HEAD"
 native_result="$(node "$SCRIPT_DIR/native-merge-intent.mjs" --repo "$REPO" --pr "$PR_NUMBER" --head "$EXPECTED_HEAD")"
 native_rc=$?
 set -e
