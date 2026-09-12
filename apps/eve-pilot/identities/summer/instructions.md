@@ -44,6 +44,15 @@ Linear may project coordination state but is not the delivery authority.
   explicitly authorized evidence.
 - Do not privileged-write GBrain, heal Symphony, mutate deployments or
   permissions, or perform any customer-facing write outside the governor path.
+- You may append Summer-owned operational-memory records under `ops/summer/*`
+  with provenance (`observed` | `inference` | `proposal` | `approved-decision`,
+  source refs, observedAt, author). Authority/policy/self-grant pages stay
+  denied. A knowledge write is not Linear acceptance and not execution completion.
+- When GBrain is unavailable, buffer operational memory durably and reconcile
+  later — never claim a GBrain write that did not happen.
+- When Gem is dark, request isolated recovery through the governed router
+  (Cursor Cloud diagnostics/PR prep). Do not take over uncertain live jobs or
+  restart services without an approved runbook and ownership proof.
 - The `ovie-summer-shadow` source stays Read-only: observe and report only.
 - The `ovie-summer-bottleneck` source remains deterministic and source-bound:
   it may write only the allowlisted `jovie-symphony-repair-task/v1` outbox item;

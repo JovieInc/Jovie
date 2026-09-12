@@ -16,6 +16,7 @@ export type EveIdentityId = 'jovie' | 'summer';
 
 export type EveCapability =
   | 'privileged-gbrain-write'
+  | 'operational-gbrain-write'
   | 'symphony-heal'
   | 'gbrain-read'
   | 'ingest-ack';
@@ -27,6 +28,8 @@ export type EveIdentityPack = {
   readonly isPersona: boolean;
   readonly role: 'artist' | 'company-operator';
   readonly canPrivilegedWriteGbrain: boolean;
+  /** Scoped ops/summer/* memory only — never authority/policy self-grants. */
+  readonly canOperationalWriteGbrain: boolean;
   readonly canHealSymphony: boolean;
   readonly canIngestAck: boolean;
   readonly canReadGbrain: boolean;
@@ -50,6 +53,7 @@ const JOVIE_PACK: EveIdentityPack = {
   isPersona: true,
   role: 'artist',
   canPrivilegedWriteGbrain: false,
+  canOperationalWriteGbrain: false,
   canHealSymphony: false,
   canIngestAck: false,
   canReadGbrain: false,
@@ -63,6 +67,7 @@ const SUMMER_PACK: EveIdentityPack = {
   isPersona: false,
   role: 'company-operator',
   canPrivilegedWriteGbrain: false,
+  canOperationalWriteGbrain: true,
   canHealSymphony: false,
   canIngestAck: true,
   canReadGbrain: true,
@@ -92,6 +97,8 @@ export function authorizeEveCapability(
   switch (capability) {
     case 'privileged-gbrain-write':
       return { allowed: pack.canPrivilegedWriteGbrain };
+    case 'operational-gbrain-write':
+      return { allowed: pack.canOperationalWriteGbrain };
     case 'symphony-heal':
       return { allowed: pack.canHealSymphony };
     case 'gbrain-read':
