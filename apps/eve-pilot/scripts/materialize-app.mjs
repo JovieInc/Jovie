@@ -262,13 +262,13 @@ The source export is preparatory; deployment and commissioning require separate 
         resolve(pilot, '../../packages/agent-transport-contracts', path),
         'utf8'
       );
-      if (path === 'index.ts') {
-        // Workspace uses .ts so Next and scripts typecheck resolve the
-        // module; isolated NodeNext copies need the .js target.
-        contents = contents.replace(
-          /from ['"]\.\/symphony-outage(?:\.ts)?['"]/gu,
-          "from './symphony-outage.js'"
-        );
+      if (
+        path === 'index.ts' &&
+        !contents.includes("from './symphony-outage.js'")
+      ) {
+        // Workspace index stays bundler-safe for Next typecheck/Turbopack.
+        // Isolated NodeNext copies re-export the health module with .js.
+        contents = `${contents.trimEnd()}\n\nexport * from './symphony-outage.js';\n`;
       }
       put(`vendor/agent-transport-contracts/${path}`, contents);
     }

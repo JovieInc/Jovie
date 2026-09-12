@@ -5,7 +5,7 @@ import {
   outageIncidentId,
   signSymphonyOutageHealth,
   verifyOutageHealthProjection,
-} from '../../../packages/agent-transport-contracts/index.ts';
+} from '../../../packages/agent-transport-contracts/symphony-outage.ts';
 
 const keys = generateKeyPairSync('ed25519');
 const privateKey = keys.privateKey
@@ -17,7 +17,7 @@ const trusted = new Map([
     keys.publicKey.export({ format: 'pem', type: 'spki' }).toString(),
   ],
 ]);
-/** @type {Omit<import('../../../packages/agent-transport-contracts/index.ts').SymphonyOutageHealth, 'attestation'>} */
+/** @type {Omit<import('../../../packages/agent-transport-contracts/symphony-outage.ts').SymphonyOutageHealth, 'attestation'>} */
 const health = {
   schema: 'jovie-symphony-health-transition/v1',
   eventId: 'health-event-001',
