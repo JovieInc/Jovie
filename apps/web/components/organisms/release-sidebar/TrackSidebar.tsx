@@ -301,134 +301,6 @@ export function TrackSidebar({
     trackLabel = String(track.trackNumber);
   }
 
-  let inspectorPanel = null;
-  if (track && activeTab === 'details') {
-    inspectorPanel = (
-      <InspectorSection>
-        <InspectorRow label='Track' value={trackLabel} />
-        <InspectorRow
-          label='Duration'
-          value={
-            track.durationMs == null ? '—' : formatDuration(track.durationMs)
-          }
-        />
-        <InspectorRow label='ISRC' value={track.isrc ?? 'No ISRC'} />
-        <InspectorRow
-          label='Explicit'
-          value={track.isExplicit ? 'Yes' : 'No'}
-        />
-      </InspectorSection>
-    );
-  } else if (track && activeTab === 'assets') {
-    inspectorPanel = (
-      <DrawerSurfaceCard
-        variant='flat'
-        className='overflow-hidden'
-        testId='track-tabbed-card'
-      >
-        <div className='space-y-3 p-2.5'>
-          <div className='flex min-h-11 items-center gap-2'>
-            {playableUrl ? (
-              <button
-                type='button'
-                onClick={handleTogglePlayback}
-                aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
-                aria-pressed={isPlaying}
-                className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
-              >
-                {isPlaying ? (
-                  <Pause className='h-4 w-4' />
-                ) : (
-                  <Play className='h-4 w-4 translate-x-px' />
-                )}
-              </button>
-            ) : (
-              <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-0 text-quaternary-token'>
-                <VolumeX className='h-4 w-4' />
-              </span>
-            )}
-
-            <div className='min-w-0 flex-1 space-y-1'>
-              <SeekBar
-                currentTime={currentTime}
-                duration={duration}
-                onSeek={seek}
-                disabled={!isThisTrack}
-                className='h-1 w-full'
-              />
-              <div className='flex items-center justify-between text-3xs tabular-nums text-tertiary-token'>
-                <span>{formatDuration(Math.round(currentTime) * 1000)}</span>
-                <span>
-                  {duration > 0
-                    ? formatDuration(Math.round(duration) * 1000)
-                    : '0:00'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className='space-y-1 text-2xs text-tertiary-token'>
-            <p>{getPreviewStatusLabel(track.previewVerification)}</p>
-            {track.previewVerification === 'fallback' ? (
-              <p>
-                {getPreviewSourceLabel(track.previewSource) ??
-                  'Fallback source'}
-              </p>
-            ) : null}
-            {track.previewVerification === 'unknown' ? (
-              <p>Preview unavailable. Verify on streaming platforms.</p>
-            ) : null}
-          </div>
-
-          <div className='text-2xs text-tertiary-token'>
-            Providers: {track.providerConfidenceSummary?.canonical ?? 0}{' '}
-            canonical, {track.providerConfidenceSummary?.searchFallback ?? 0}{' '}
-            fallback
-            {track.providerConfidenceSummary?.unknown
-              ? `, ${track.providerConfidenceSummary.unknown} unknown`
-              : ''}
-          </div>
-
-          {unresolvedProviders.length > 0 ? (
-            <p className='text-2xs text-tertiary-token'>
-              Unresolved:{' '}
-              {unresolvedProviders
-                .map(provider => PROVIDER_LABELS[provider])
-                .join(', ')}
-            </p>
-          ) : null}
-        </div>
-      </DrawerSurfaceCard>
-    );
-  } else if (track && activeTab === 'links') {
-    inspectorPanel = (
-      <div className='space-y-2'>
-        <TrackPlatformLinksSection
-          providers={canonicalProviders}
-          title='Canonical DSPs'
-        />
-        {fallbackProviders.length > 0 ? (
-          <TrackPlatformLinksSection
-            providers={fallbackProviders}
-            title='Search Fallback'
-            emptyMessage='No fallback DSP links available.'
-          />
-        ) : null}
-        {unverifiedProviders.length > 0 ? (
-          <TrackPlatformLinksSection
-            providers={unverifiedProviders}
-            title='Unverified DSPs'
-            emptyMessage='No unverified DSP links available.'
-          />
-        ) : null}
-      </div>
-    );
-  } else if (track && activeTab === 'rights') {
-    inspectorPanel = (
-      <InspectorEmpty message='No rights findings for this track.' />
-    );
-  }
-
   return (
     <InspectorShell
       isOpen={isOpen}
@@ -439,6 +311,10 @@ export function TrackSidebar({
       onClose={onClose}
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
+      tabs={LIBRARY_INSPECTOR_TABS}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      tabsAriaLabel='Inspector tabs'
       objectHeader={
         track ? (
           <div className='space-y-2.5'>
@@ -529,12 +405,125 @@ export function TrackSidebar({
           </div>
         ) : undefined
       }
-      tabs={LIBRARY_INSPECTOR_TABS}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      tabsAriaLabel='Inspector tabs'
     >
-      {inspectorPanel}
+      {activeTab === 'details' && track ? (
+        <InspectorSection>
+          <InspectorRow label='Track' value={trackLabel} />
+          <InspectorRow
+            label='Duration'
+            value={
+              track.durationMs == null ? '—' : formatDuration(track.durationMs)
+            }
+          />
+          <InspectorRow label='ISRC' value={track.isrc ?? 'No ISRC'} />
+          <InspectorRow
+            label='Explicit'
+            value={track.isExplicit ? 'Yes' : 'No'}
+          />
+        </InspectorSection>
+      ) : activeTab === 'assets' && track ? (
+        <DrawerSurfaceCard
+          variant='flat'
+          className='overflow-hidden'
+          testId='track-tabbed-card'
+        >
+          <div className='space-y-3 p-2.5'>
+            <div className='flex min-h-11 items-center gap-2'>
+              {playableUrl ? (
+                <button
+                  type='button'
+                  onClick={handleTogglePlayback}
+                  aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+                  aria-pressed={isPlaying}
+                  className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                >
+                  {isPlaying ? (
+                    <Pause className='h-4 w-4' />
+                  ) : (
+                    <Play className='h-4 w-4 translate-x-px' />
+                  )}
+                </button>
+              ) : (
+                <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-0 text-quaternary-token'>
+                  <VolumeX className='h-4 w-4' />
+                </span>
+              )}
+
+              <div className='min-w-0 flex-1 space-y-1'>
+                <SeekBar
+                  currentTime={currentTime}
+                  duration={duration}
+                  onSeek={seek}
+                  disabled={!isThisTrack}
+                  className='h-1 w-full'
+                />
+                <div className='flex items-center justify-between text-3xs tabular-nums text-tertiary-token'>
+                  <span>{formatDuration(Math.round(currentTime) * 1000)}</span>
+                  <span>
+                    {duration > 0
+                      ? formatDuration(Math.round(duration) * 1000)
+                      : '0:00'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className='space-y-1 text-2xs text-tertiary-token'>
+              <p>{getPreviewStatusLabel(track.previewVerification)}</p>
+              {track.previewVerification === 'fallback' ? (
+                <p>
+                  {getPreviewSourceLabel(track.previewSource) ??
+                    'Fallback source'}
+                </p>
+              ) : null}
+              {track.previewVerification === 'unknown' ? (
+                <p>Preview unavailable. Verify on streaming platforms.</p>
+              ) : null}
+            </div>
+
+            <div className='text-2xs text-tertiary-token'>
+              Providers: {track.providerConfidenceSummary?.canonical ?? 0}{' '}
+              canonical, {track.providerConfidenceSummary?.searchFallback ?? 0}{' '}
+              fallback
+              {track.providerConfidenceSummary?.unknown
+                ? `, ${track.providerConfidenceSummary.unknown} unknown`
+                : ''}
+            </div>
+
+            {unresolvedProviders.length > 0 ? (
+              <p className='text-2xs text-tertiary-token'>
+                Unresolved:{' '}
+                {unresolvedProviders
+                  .map(provider => PROVIDER_LABELS[provider])
+                  .join(', ')}
+              </p>
+            ) : null}
+          </div>
+        </DrawerSurfaceCard>
+      ) : activeTab === 'links' && track ? (
+        <div className='space-y-2'>
+          <TrackPlatformLinksSection
+            providers={canonicalProviders}
+            title='Canonical DSPs'
+          />
+          {fallbackProviders.length > 0 ? (
+            <TrackPlatformLinksSection
+              providers={fallbackProviders}
+              title='Search Fallback'
+              emptyMessage='No fallback DSP links available.'
+            />
+          ) : null}
+          {unverifiedProviders.length > 0 ? (
+            <TrackPlatformLinksSection
+              providers={unverifiedProviders}
+              title='Unverified DSPs'
+              emptyMessage='No unverified DSP links available.'
+            />
+          ) : null}
+        </div>
+      ) : activeTab === 'rights' ? (
+        <InspectorEmpty message='No rights findings for this track.' />
+      ) : null}
     </InspectorShell>
   );
 }

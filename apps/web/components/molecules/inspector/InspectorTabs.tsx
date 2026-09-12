@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/components/molecules/inspector/InspectorRail.test.tsx
 import type { SegmentControlOption } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { TabBar } from '@/components/molecules/tab-bar/TabBar';

@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/components/molecules/inspector/InspectorRail.test.tsx
 import { DrawerInlineNote } from '@/components/molecules/drawer/DrawerInlineNote';
 
 export interface InspectorEmptyProps {
