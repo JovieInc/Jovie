@@ -217,34 +217,32 @@ describe('SidebarIdentityGroup', () => {
     expect(actions[1]).toHaveFocus();
   });
 
-  it.each(
-    IDENTITY_GROUP_STATES
-  )('keeps one identity group in the $id sidebar state', ({
-    width,
-    collapsible,
-  }) => {
-    const { container } = render(
-      <RailFrame width={width} collapsible={collapsible}>
-        <SidebarIdentityGroup profileHref={PROFILE_HREF} />
-      </RailFrame>
-    );
+  it.each(IDENTITY_GROUP_STATES)(
+    'keeps one identity group in the $id sidebar state',
+    ({ width, collapsible }) => {
+      const { container } = render(
+        <RailFrame width={width} collapsible={collapsible}>
+          <SidebarIdentityGroup profileHref={PROFILE_HREF} />
+        </RailFrame>
+      );
 
-    expect(
-      screen.getAllByRole('group', { name: SIDEBAR_IDENTITY_GROUP_LABEL })
-    ).toHaveLength(1);
-    expect(getIdentityGroups(container)).toHaveLength(1);
-    const group = screen.getByRole('group', {
-      name: SIDEBAR_IDENTITY_GROUP_LABEL,
-    });
-    expect(getTabbableActions(group)).toHaveLength(2);
-    expect(getNestedInteractive(group)).toBeNull();
-    expect(
-      within(group).getByRole('link', { name: PROFILE_LINK_NAME })
-    ).toHaveAttribute('href', PROFILE_HREF);
-    expect(
-      screen.queryByTestId(SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID)
-    ).toBeNull();
-  });
+      expect(
+        screen.getAllByRole('group', { name: SIDEBAR_IDENTITY_GROUP_LABEL })
+      ).toHaveLength(1);
+      expect(getIdentityGroups(container)).toHaveLength(1);
+      const group = screen.getByRole('group', {
+        name: SIDEBAR_IDENTITY_GROUP_LABEL,
+      });
+      expect(getTabbableActions(group)).toHaveLength(2);
+      expect(getNestedInteractive(group)).toBeNull();
+      expect(
+        within(group).getByRole('link', { name: PROFILE_LINK_NAME })
+      ).toHaveAttribute('href', PROFILE_HREF);
+      expect(
+        screen.queryByTestId(SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID)
+      ).toBeNull();
+    }
+  );
 
   it('sweeps the sidebar identity group against the equivalent public-profile surface', () => {
     render(
