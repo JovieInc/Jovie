@@ -323,6 +323,9 @@ describe('DashboardNav', () => {
       'shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
     );
     expect(chatLink.querySelector('svg')).toHaveClass('text-accent-teal!');
+    expect(chatLink.querySelector('span')?.className).not.toContain(
+      'mask-image:linear-gradient'
+    );
     expect(chatLink).not.toHaveAttribute('aria-current');
   });
 
