@@ -269,11 +269,12 @@ export function useSettingsProfile({
     },
   });
 
-  // Sync saving state with hook
+  // Derive the visible saving bit from the hook. A stale ack skips the
+  // success path and must not leave the indicator stuck on.
   useEffect(() => {
-    if (isSaving) {
-      setProfileSaveStatus(prev => ({ ...prev, saving: true }));
-    }
+    setProfileSaveStatus(prev =>
+      prev.saving === isSaving ? prev : { ...prev, saving: isSaving }
+    );
   }, [isSaving]);
 
   // Handle save errors from hook

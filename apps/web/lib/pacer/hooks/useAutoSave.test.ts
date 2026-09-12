@@ -171,6 +171,41 @@ describe('useAutoSave', () => {
     expect(result.current.isDirty).toBe(false);
   });
 
+  it('exposes a live isLatest flag so saveFn can skip apply after a newer edit arrives', async () => {
+    const first = deferred();
+    const latestAtApply: boolean[] = [];
+    const saveFn = vi.fn().mockImplementation(async (_data, meta) => {
+      if (saveFn.mock.calls.length === 1) {
+        await first.promise;
+        latestAtApply.push(meta.isLatest);
+      }
+    });
+    const { result } = renderHook(() =>
+      useAutoSave({ saveFn, wait: 20, maxRetries: 1 })
+    );
+
+    act(() => {
+      result.current.save('older');
+    });
+
+    let flushA!: Promise<void>;
+    act(() => {
+      flushA = result.current.flush();
+    });
+    await waitFor(() => expect(saveFn).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      result.current.save('newer');
+    });
+
+    await act(async () => {
+      first.resolve();
+      await flushA;
+    });
+
+    expect(latestAtApply).toEqual([false]);
+  });
+
   it('does not report validation or equal-payload no-ops as new durable writes', async () => {
     const onSuccess = vi.fn();
     const saveFn = vi.fn().mockImplementation(async (value: string) => {
