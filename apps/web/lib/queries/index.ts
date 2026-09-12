@@ -58,6 +58,22 @@ export {
 } from './admin-infinite';
 // Audience infinite query
 export { useAudienceInfiniteQuery } from './audience-infinite';
+// Cache isolation / stale-result fencing (JOV-6186)
+export {
+  advanceCacheGeneration,
+  applyCacheScope,
+  type CacheFenceEvent,
+  type CacheFenceReason,
+  type CacheScope,
+  copyShareableQueryData,
+  getCacheGeneration,
+  getCacheScope,
+  isShareableAcrossProfileSwitch,
+  registerIsolatedCacheSurface,
+  resetCacheIsolationForTests,
+  subscribeCacheFence,
+  withCacheScope,
+} from './cache-isolation';
 // Cache strategy presets
 export {
   FREQUENT_BACKGROUND_CACHE,

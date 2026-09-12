@@ -13,6 +13,11 @@ import {
   useSessionSafe,
   useUserSafe,
 } from '@/hooks/useJovieAuth';
+import {
+  applyCacheScope,
+  getCacheScope,
+  resetCacheIsolationForTests,
+} from '@/lib/queries/cache-isolation';
 
 const { useSessionMock, signOutMock } = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
@@ -90,6 +95,7 @@ function renderWithWrapper(
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetCacheIsolationForTests();
 
   if (originalLocationDescriptor) {
     Object.defineProperty(globalThis, 'location', originalLocationDescriptor);
@@ -217,11 +223,19 @@ describe('useJovieAuth', () => {
     document.cookie = '__client_uat=1700000000; path=/';
     signOutMock.mockResolvedValue({ data: { success: true }, error: null });
     const assignMock = overrideLocation();
+    applyCacheScope({
+      userId: 'ba_user_tim',
+      sessionId: 'ba_sess_1',
+      profileId: 'profile-a',
+      ready: true,
+    });
 
     await signOut({ redirectUrl: '/' });
 
     expect(document.cookie).not.toContain('__client_uat=');
     expect(assignMock).toHaveBeenCalledWith('/');
+    expect(getCacheScope().userId).toBeNull();
+    expect(getCacheScope().profileId).toBeNull();
   });
 
   it('defaults to /signin and still navigates when revocation fails', async () => {
