@@ -953,6 +953,13 @@ body {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
+  .marketing-hero-public-heading {
+    display: block;
+    max-block-size: none;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    line-clamp: none;
+  }
   @media (min-width: 768px) {
     .marketing-h1-linear {
       font-size: var(--linear-h1-size-md);

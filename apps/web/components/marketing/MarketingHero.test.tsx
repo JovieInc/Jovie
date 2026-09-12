@@ -1,4 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingHero } from './MarketingHero';
@@ -7,6 +9,7 @@ import marketingHeroMeta, {
   MARKETING_HERO_SOURCE_SHA,
   SourceBackedDefault,
 } from './MarketingHero.stories';
+import { MarketingHeroDeveloperCommand } from './MarketingHeroDeveloperCommand';
 
 vi.mock('@/components/features/home/HomeTrustSection', () => ({
   HomeTrustSection: () => <div data-testid='home-trust-section' />,
@@ -141,5 +144,119 @@ describe('MarketingHero source-backed default story', () => {
     expect(shell).toHaveClass('relative', 'w-full');
     expect(shell).toHaveClass('pt-20', 'pb-16');
     expect(shell).toHaveClass('items-center', 'text-center');
+  });
+
+  it('renders the developer variant command leaf and reports clipboard success', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(
+      <MarketingHero
+        variant='developer'
+        headingId='developer-heading'
+        testId='developer-hero'
+        headline='Developer hero'
+        subtitle='Read-only public data.'
+        className='custom-developer-hero'
+        install={{
+          command: 'jovie --help',
+          copyLabel: 'Copy command',
+          copiedLabel: 'Copied command',
+          errorLabel: 'Copy failed',
+          availabilityNote: 'Available now.',
+        }}
+      />
+    );
+
+    const copyButton = screen.getByRole('button', { name: 'Copy command' });
+    expect(screen.getByRole('heading', { name: 'Developer hero' })).toHaveClass(
+      'marketing-hero-public-heading'
+    );
+    expect(screen.getByTestId('developer-hero')).toHaveClass(
+      'marketing-hero--center',
+      'custom-developer-hero'
+    );
+    expect(copyButton).toHaveAttribute('type', 'button');
+    fireEvent.click(copyButton);
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('jovie --help');
+      expect(
+        screen.getByRole('button', { name: 'Copy command' })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Copied command');
+    });
+  });
+
+  it('covers the developer command leaf directly with its canonical copy contract', () => {
+    render(
+      <MarketingHeroDeveloperCommand
+        command='jovie --help'
+        copyLabel='Copy command'
+        copiedLabel='Copied command'
+        errorLabel='Copy failed'
+        availabilityNote='Available now.'
+      />
+    );
+
+    expect(screen.getByText('jovie --help')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Copy command' })
+    ).toHaveAttribute('type', 'button');
+  });
+
+  it('keeps the public heading override uncapped in the global stylesheet', () => {
+    const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8');
+    const rule = css.match(
+      /\.marketing-hero-public-heading\s*\{([^}]+)\}/u
+    )?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).toContain('display: block');
+    expect(rule).toContain('max-block-size: none');
+    expect(rule).toContain('overflow: visible');
+    expect(rule).toContain('-webkit-line-clamp: unset');
+    expect(rule).toContain('line-clamp: none');
+  });
+
+  it('reports clipboard rejection through the developer command leaf', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn().mockReturnValue(false),
+    });
+
+    render(
+      <MarketingHero
+        variant='developer'
+        headingId='developer-error-heading'
+        testId='developer-error-hero'
+        headline='Developer hero'
+        subtitle='Read-only public data.'
+        install={{
+          command: 'jovie --version',
+          copyLabel: 'Copy command',
+          copiedLabel: 'Copied command',
+          errorLabel: 'Copy failed',
+          availabilityNote: 'Available now.',
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Copy command' })
+      ).toBeVisible();
+      expect(screen.getByRole('status')).toHaveTextContent('Copy failed');
+    });
   });
 });

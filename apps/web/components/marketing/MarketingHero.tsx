@@ -1,12 +1,18 @@
 import { Button } from '@jovie/ui/atoms/button';
+import Image from 'next/image';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
+import {
+  HeroSpotifySearch,
+  type HeroSpotifySearchProps,
+} from '@/components/features/home/HeroSpotifySearch';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
+import { MarketingHeroDeveloperCommand } from './MarketingHeroDeveloperCommand';
 
 export interface MarketingHeroCta {
   readonly label: ReactNode;
@@ -109,10 +115,65 @@ export interface MarketingHeroLandingProps extends MarketingHeroBaseProps {
   readonly gridClassName?: string;
 }
 
+interface MarketingHeroPublicCommon extends MarketingHeroBaseProps {
+  readonly variant: 'desktop' | 'mobile' | 'claim' | 'developer';
+  readonly headingId: string;
+  readonly headline: string;
+  readonly subtitle: string;
+  readonly primaryCta?: MarketingHeroCta;
+  readonly secondaryCta?: MarketingHeroCta;
+  readonly linkComponent?: ElementType;
+}
+
+interface MarketingHeroPublicImage {
+  readonly src: string;
+  readonly alt: string;
+  readonly width: number;
+  readonly height: number;
+  readonly sizes: string;
+}
+
+export interface MarketingHeroPublicDesktopProps
+  extends MarketingHeroPublicCommon {
+  readonly variant: 'desktop';
+  readonly image: MarketingHeroPublicImage;
+}
+
+export interface MarketingHeroPublicMobileProps
+  extends MarketingHeroPublicCommon {
+  readonly variant: 'mobile';
+  readonly image: MarketingHeroPublicImage;
+}
+
+export interface MarketingHeroPublicClaimProps
+  extends MarketingHeroPublicCommon {
+  readonly variant: 'claim';
+  readonly claim: HeroSpotifySearchProps;
+}
+
+export interface MarketingHeroPublicDeveloperProps
+  extends MarketingHeroPublicCommon {
+  readonly variant: 'developer';
+  readonly install: {
+    readonly command: string;
+    readonly copyLabel: string;
+    readonly copiedLabel: string;
+    readonly errorLabel: string;
+    readonly availabilityNote: string;
+  };
+}
+
+export type MarketingHeroPublicProps =
+  | MarketingHeroPublicDesktopProps
+  | MarketingHeroPublicMobileProps
+  | MarketingHeroPublicClaimProps
+  | MarketingHeroPublicDeveloperProps;
+
 export type MarketingHeroProps =
   | MarketingHeroShellProps
   | MarketingHeroContentProps
-  | MarketingHeroLandingProps;
+  | MarketingHeroLandingProps
+  | MarketingHeroPublicProps;
 
 const shellVariantClasses = {
   centered:
@@ -157,15 +218,21 @@ function MarketingHeroTitle({
   id,
   testId,
   className,
+  clamp = true,
   children,
 }: Readonly<{
   id?: string;
   testId?: string;
   className: string;
+  clamp?: boolean;
   children: ReactNode;
 }>) {
   return (
-    <h1 id={id} data-testid={testId} className={cn('line-clamp-2', className)}>
+    <h1
+      id={id}
+      data-testid={testId}
+      className={cn(clamp && 'line-clamp-2', className)}
+    >
       {children}
     </h1>
   );
@@ -414,6 +481,105 @@ function MarketingHeroLanding({
   );
 }
 
+function MarketingHeroPublic({
+  variant,
+  headline,
+  subtitle,
+  primaryCta,
+  secondaryCta,
+  linkComponent = Link,
+  headingId,
+  testId,
+  className,
+  ...variantProps
+}: MarketingHeroPublicProps) {
+  const layoutVariant =
+    variant === 'desktop' || variant === 'mobile' ? 'split' : 'center';
+  return (
+    <MarketingHeroFrame
+      className={cn(
+        'marketing-hero',
+        `marketing-hero--${layoutVariant}`,
+        'relative',
+        className
+      )}
+      headingId={headingId}
+      testId={testId}
+    >
+      <MarketingContainer width='page'>
+        <div className='marketing-hero-inner'>
+          <div className='marketing-hero-copy'>
+            <MarketingHeroTitle
+              id={headingId}
+              className='marketing-hero-headline marketing-hero-public-heading'
+              clamp={false}
+            >
+              {headline}
+            </MarketingHeroTitle>
+            <MarketingHeroSubtitle>{subtitle}</MarketingHeroSubtitle>
+            {primaryCta || secondaryCta ? (
+              <div className='marketing-hero-actions'>
+                {primaryCta ? (
+                  <MarketingHeroCtaLink
+                    cta={primaryCta}
+                    intent='primary'
+                    linkComponent={linkComponent}
+                  />
+                ) : null}
+                {secondaryCta ? (
+                  <MarketingHeroCtaLink
+                    cta={secondaryCta}
+                    intent='secondary'
+                    linkComponent={linkComponent}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+            {variant === 'developer' ? (
+              <MarketingHeroDeveloperCommand
+                {...(variantProps as MarketingHeroPublicDeveloperProps).install}
+              />
+            ) : null}
+            {variant === 'claim' ? (
+              <HeroSpotifySearch
+                {...(variantProps as MarketingHeroPublicClaimProps).claim}
+              />
+            ) : null}
+          </div>
+          {variant === 'desktop' || variant === 'mobile' ? (
+            <div className='marketing-hero-media'>
+              {/* The public image contract is intentionally inert until its route adapter lands. */}
+              <Image
+                src={
+                  (variantProps as MarketingHeroPublicDesktopProps).image.src
+                }
+                alt={
+                  (variantProps as MarketingHeroPublicDesktopProps).image.alt
+                }
+                width={
+                  (variantProps as MarketingHeroPublicDesktopProps).image.width
+                }
+                height={
+                  (variantProps as MarketingHeroPublicDesktopProps).image.height
+                }
+                sizes={
+                  (variantProps as MarketingHeroPublicDesktopProps).image.sizes
+                }
+              />
+            </div>
+          ) : null}
+        </div>
+      </MarketingContainer>
+    </MarketingHeroFrame>
+  );
+}
+
+function isMarketingHeroPublicVariant(
+  variant: string
+): variant is MarketingHeroPublicProps['variant'] {
+  return ['desktop', 'mobile', 'claim', 'developer'].includes(variant);
+}
+
 /**
  * The single marketing hero section primitive.
  *
@@ -428,8 +594,11 @@ function MarketingHeroLanding({
  *   route-specific, already-approved presentation without changing its pixels.
  */
 export function MarketingHero(props: MarketingHeroProps) {
+  if ('variant' in props && isMarketingHeroPublicVariant(props.variant)) {
+    return <MarketingHeroPublic {...(props as MarketingHeroPublicProps)} />;
+  }
   if ('variant' in props) {
-    return <MarketingHeroShell {...props} />;
+    return <MarketingHeroShell {...(props as MarketingHeroShellProps)} />;
   }
   if ('title' in props) {
     return <MarketingHeroLanding {...props} />;
