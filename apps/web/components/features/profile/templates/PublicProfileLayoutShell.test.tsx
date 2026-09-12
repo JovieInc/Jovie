@@ -189,5 +189,8 @@ describe('PublicProfileLayoutShell', () => {
       'true'
     );
     expect(screen.queryByTestId('desktop-content')).toBeNull();
+    expect(screen.getByTestId('profile-desktop-loading')).not.toHaveAttribute(
+      'data-interactive-ready'
+    );
   });
 });
