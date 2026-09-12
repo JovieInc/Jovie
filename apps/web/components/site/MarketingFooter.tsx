@@ -205,11 +205,11 @@ export function MarketingFooter({
           )}
         >
           {isMinimal ? <FooterBrandMark /> : null}
+          <span className='mf-copyright'>
+            © {new Date().getFullYear()} Jovie Technology Inc.
+          </span>
           {isMinimal ? (
             <div className='mf-baseband__meta'>
-              <span className='mf-copyright'>
-                © {new Date().getFullYear()} Jovie Technology Inc.
-              </span>
               <nav
                 aria-label='Resources'
                 className='flex flex-wrap items-center gap-6'
@@ -220,12 +220,7 @@ export function MarketingFooter({
               <FooterLegalNav />
             </div>
           ) : (
-            <>
-              <span className='mf-copyright'>
-                © {new Date().getFullYear()} Jovie Technology Inc.
-              </span>
-              <FooterLegalNav />
-            </>
+            <FooterLegalNav />
           )}
         </div>
       </div>

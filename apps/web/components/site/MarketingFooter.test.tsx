@@ -92,11 +92,15 @@ describe('MarketingFooter', () => {
       '/cli'
     );
     const homeLink = screen.getByRole('link', { name: 'Jovie Home' });
+    const baseband = document.querySelector('.mf-baseband');
     expect(homeLink.querySelector('[data-brand-mark-size]')).toHaveAttribute(
       'data-brand-mark-size',
       '20'
     );
-    expect(document.querySelector('.mf-baseband')).toContainElement(homeLink);
+    expect(baseband).toContainElement(homeLink);
+    expect(baseband?.querySelector(':scope > .mf-copyright')).toHaveTextContent(
+      /Jovie Technology Inc/
+    );
   });
 
   it.each(['/artist-profiles', '/artist-profile'])(
