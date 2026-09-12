@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { toast } from '@/components/feedback';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
+import type { AutoSaveAttemptMeta } from '@/lib/pacer/hooks/useAutoSave';
 import { useAutoSave } from '@/lib/pacer/hooks/useAutoSave';
 import { useAvatarMutation, useProfileSaveMutation } from '@/lib/queries';
 import type { SaveStatus } from '@/types';
@@ -152,6 +153,7 @@ export function useProfileEditor(
     username: string;
   } | null>(null);
   const wasEditingRef = useRef(false);
+  const previousProfileIdRef = useRef(profileId);
 
   // Track pending save data for comparison
   const pendingDataRef = useRef<{
@@ -162,8 +164,15 @@ export function useProfileEditor(
   // Save profile using TanStack Query mutation
   /* eslint-disable react-hooks/preserve-manual-memoization -- intentional: specific property deps prevent unnecessary re-computation */
   const saveProfile = useCallback(
-    async (data: { displayName: string; username: string }): Promise<void> => {
-      if (!profileId) {
+    async (
+      data: { displayName: string; username: string },
+      meta?: AutoSaveAttemptMeta
+    ): Promise<void> => {
+      const targetProfileId =
+        meta?.resourceKey && meta.resourceKey !== 'missing-profile'
+          ? meta.resourceKey
+          : profileId;
+      if (!targetProfileId) {
         setProfileSaveStatus({
           saving: false,
           success: false,
@@ -198,9 +207,13 @@ export function useProfileEditor(
 
       try {
         const result = await profileMutation.mutateAsync({
-          profileId,
+          profileId: targetProfileId,
           updates: { displayName, username },
         });
+
+        if (meta && !meta.isLatest) {
+          return;
+        }
 
         const nextHandle = result.profile.username ?? artist?.handle;
         const nextName = result.profile.displayName ?? artist?.name;
@@ -258,6 +271,7 @@ export function useProfileEditor(
   // Use Pacer's useAutoSave for debounced saving
   const autoSave = useAutoSave<{ displayName: string; username: string }>({
     saveFn: saveProfile,
+    resourceKey: profileId ?? 'missing-profile',
     wait: debounceMs,
     onSuccess: () => {
       // Success handling is done in saveProfile
@@ -293,11 +307,19 @@ export function useProfileEditor(
       return;
     }
 
+    const profileChanged = previousProfileIdRef.current !== profileId;
+    previousProfileIdRef.current = profileId;
     const wasEditing = wasEditingRef.current;
 
-    if (editingField !== null) {
+    // Keep keystrokes only for the same profile. A profile switch must not
+    // carry the previous resource's draft into the new callback.
+    if (!profileChanged && editingField !== null) {
       wasEditingRef.current = true;
       return;
+    }
+
+    if (profileChanged && editingField !== null) {
+      setEditingField(null);
     }
 
     setArtist(
@@ -335,12 +357,18 @@ export function useProfileEditor(
     }
   }, [editingField]);
 
-  // Cleanup on unmount - flush pending saves
+  const flushRef = useRef(autoSave.flush);
+  flushRef.current = autoSave.flush;
+
+  // Cleanup on unmount only. `autoSave` identity changes every render, so this
+  // must not flush on ordinary rerenders or profile switches.
   useEffect(() => {
     return () => {
-      autoSave.flush();
+      void flushRef.current().catch(() => {
+        // Unmount cannot present cleanup as durable delivery.
+      });
     };
-  }, [autoSave]);
+  }, []);
 
   // Handle avatar upload using TanStack Query mutation
   const handleAvatarUpload = useCallback(
@@ -413,7 +441,9 @@ export function useProfileEditor(
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent, field: 'displayName' | 'username') => {
       if (e.key === 'Enter') {
-        debouncedProfileSave.flush();
+        void debouncedProfileSave.flush().catch(() => {
+          // Save status already reflects the truthful failure.
+        });
         setEditingField(null);
       }
       if (e.key === 'Escape') {
@@ -431,7 +461,9 @@ export function useProfileEditor(
 
   // Handle input blur
   const handleInputBlur = useCallback(() => {
-    debouncedProfileSave.flush();
+    void debouncedProfileSave.flush().catch(() => {
+      // Save status already reflects the truthful failure.
+    });
     setEditingField(null);
   }, [debouncedProfileSave]);
 
