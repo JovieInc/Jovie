@@ -9,13 +9,13 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet';
 import {
   classifySpacingFamily,
   measureSpacingScale,
   SPACING_SCALE_FAMILIES,
   type SpacingScaleFamily,
-} from '@/lib/design/optical-grid-scanners';
-import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet';
+} from '../../../scripts/optical-grid-scanners';
 
 /**
  * Optical-grid spacing-scale ratchet (JOV-5865, parent JOV-3570).

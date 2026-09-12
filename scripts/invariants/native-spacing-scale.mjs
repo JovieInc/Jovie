@@ -119,6 +119,7 @@ function tally(values) {
 }
 
 export function measureNativeSpacingScale(repoRoot = REPO_ROOT) {
+  /** @type {Record<string, NativeSpacingCounts>} */
   const surfaces = {};
   for (const [surface, config] of Object.entries(NATIVE_SURFACES)) {
     const files = [];
@@ -129,6 +130,7 @@ export function measureNativeSpacingScale(repoRoot = REPO_ROOT) {
     const scan = surface === 'ios' ? scanSwiftSource : scanCssSource;
     let strict = 0;
     let conservative = 0;
+    /** @type {Record<string, { conservative: number, strict: number }>} */
     const perFile = {};
     for (const file of files) {
       const counts = tally(scan(readFileSync(file, 'utf8')));
@@ -156,6 +158,7 @@ export function readBaseline(repoRoot = REPO_ROOT) {
 }
 
 export function buildBaseline(measured) {
+  /** @type {Record<string, NativeSpacingCounts>} */
   const surfaces = {};
   for (const [surface, result] of Object.entries(measured)) {
     surfaces[surface] = {
@@ -173,19 +176,17 @@ export function buildBaseline(measured) {
 }
 
 /**
+ * @typedef {{ conservative: number, strict: number, files?: number, perFile?: Record<string, { conservative: number, strict: number }> }} NativeSpacingCounts
+ */
+
+/**
  * Shared event-aware shrink-only verdict on the armed tier; strict is reported.
- *
- * JSDoc-authored on purpose: under checkJs, destructured parameters without a
- * type infer every property as REQUIRED, so callers that legitimately omit
- * `event` (and the script's own `evaluateNativeSpacingScale({ measured,
- * baseline })` call) fail scripts-typecheck with TS2345 against the
- * shrink-only baseline. `event` accepts any string and is forwarded to
- * evaluateShrinkOnlyCount, which validates it.
+ * Omitted event uses the shared evaluator's GitHub-event resolution.
  *
  * @param {{
- *   measured?: Record<string, any>,
- *   baseline?: any,
- *   event?: any,
+ *   measured: Record<string, NativeSpacingCounts>,
+ *   baseline: { surfaces: Record<string, NativeSpacingCounts> } | null,
+ *   event?: import('../../apps/web/lib/design/shrink-only-count-ratchet.ts').ShrinkOnlyCountEvent,
  * }} input
  * @returns {{ ok: boolean, issues: string[], warnings: string[] }}
  */

@@ -1242,6 +1242,25 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(uiRe.test('apps/web/scripts/seo-ratchet-guard.mjs')).toBe(true);
     expect(uiRe.test('apps/web/scripts/tailwind-guard.mjs')).toBe(true);
     expect(selectsStructural.test('scripts/doc-freshness-lint.mjs')).toBe(true);
+    expect(
+      spawnSync('grep', ['-qE', controlPattern], {
+        input: 'apps/web/scripts/optical-grid-scanners.ts\n',
+        encoding: 'utf8',
+      }).status
+    ).toBe(0);
+    const scannerCoverage = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('const webParts = ['),
+      CI_FAST_SOURCE.indexOf('const macParts = [')
+    );
+    expect(scannerCoverage).toContain(
+      '--coverage.include=scripts/optical-grid-scanners.ts'
+    );
+    expect(scannerCoverage).toContain(
+      'tests/unit/design-system/spacing-scale-ratchet.test.ts'
+    );
+    expect(scannerCoverage).toContain(
+      'tests/unit/design-system/concentric-radius-contract.test.ts'
+    );
 
     // JOV-5435 centralized web-test boundary stays selected.
     expect(uiRe.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')).toBe(true);

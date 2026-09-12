@@ -1,17 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  ARBITRARY_RADIUS,
-  isDerivedRadius,
-  measureArbitraryRadius,
-} from '@/lib/design/optical-grid-scanners';
 import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet';
 import {
   SYSTEM_B_CONCENTRIC_SURFACES,
   SYSTEM_B_RADIUS_PX,
   SYSTEM_B_SURFACE_INSET_PX,
 } from '@/lib/design/system-b-radius';
+import {
+  ARBITRARY_RADIUS,
+  isDerivedRadius,
+  measureArbitraryRadius,
+} from '../../../scripts/optical-grid-scanners';
 
 const APP_ROOT = join(__dirname, '../../..');
 const REPO_ROOT = join(APP_ROOT, '../..');
