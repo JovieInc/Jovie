@@ -1,4 +1,9 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import {
+  evaluateAcceptanceEvidence,
+  evaluateRelationalGrid,
+  evaluateSharedSearchGeometry,
+} from '../../../../scripts/component-rendered-invariant-policy.mjs';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -737,6 +742,35 @@ test.describe('Homepage', () => {
     const desktop = await measure(1440);
     expect(spread(desktop.startLefts)).toBeLessThanOrEqual(2);
     expect(spread(desktop.endLefts)).toBeLessThanOrEqual(2);
+    expect(
+      evaluateRelationalGrid({
+        candidateRevision: 'live',
+        route: '/',
+        viewport: { width: 1440, height: 900 },
+        state: 'idle',
+        theme: 'light',
+        sourceTokensPass: true,
+        elements: desktop.endLefts.map((x, index) => ({
+          id: `end-copy-${index}`,
+          column: '7 / span 6',
+          align: 'end',
+          role: 'copy',
+          box: { x, y: 0, width: 0, height: 0 },
+        })),
+      }).ok
+    ).toBe(true);
+    expect(
+      evaluateAcceptanceEvidence({
+        candidateRevision: 'live',
+        route: '/',
+        viewport: { width: 1440, height: 900 },
+        state: 'idle',
+        theme: 'light',
+        sourceTokensPass: true,
+        rendered: { aligned: spread(desktop.endLefts) <= 2 },
+        screenshotBaselineUpdated: false,
+      }).ok
+    ).toBe(true);
     expect(desktop.endLefts[0] ?? 0).toBeGreaterThan(
       (desktop.startLefts[0] ?? 0) + 80
     );
@@ -821,6 +855,22 @@ test.describe('Homepage', () => {
       0
     );
     expect(heroSearch?.fieldBackground).toBe(closeSearch?.fieldBackground);
+    expect(
+      evaluateSharedSearchGeometry({
+        hero: {
+          treatment: heroSearch?.treatment,
+          fieldHeight: heroSearch?.fieldHeight,
+          fieldBackground: heroSearch?.fieldBackground,
+          consumerAuraPierce: false,
+        },
+        close: {
+          treatment: closeSearch?.treatment,
+          fieldHeight: closeSearch?.fieldHeight,
+          fieldBackground: closeSearch?.fieldBackground,
+          consumerAuraPierce: false,
+        },
+      }).ok
+    ).toBe(true);
 
     const input = page
       .getByTestId('homepage-editorial-hero-search')
