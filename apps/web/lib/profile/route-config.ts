@@ -277,15 +277,20 @@ export function validatePublicProfileNavigation(
   }
 
   if (
-    destinations.some(
-      destination =>
-        destination.label === 'Events' || destination.label === 'Alerts'
-    )
+    destinations.some(destination => {
+      const label: string = destination.label;
+      return label === 'Events' || label === 'Alerts';
+    })
   ) {
     issues.push('legacy-nav-label');
   }
 
-  if (destinations.some(destination => destination.id === 'subscribe')) {
+  if (
+    destinations.some(destination => {
+      const id: string = destination.id;
+      return id === 'subscribe';
+    })
+  ) {
     issues.push('action-promoted-to-destination');
   }
 
@@ -378,9 +383,10 @@ export function getPermittedPublicProfileNavigation(_options?: {
 export function getPermittedPublicProfileActions(options: {
   readonly fanCaptureEnabled: boolean;
 }): readonly PublicProfileNavigationAction[] {
-  return PUBLIC_PROFILE_ACTIONS.filter(
-    action => action.availability === 'always' || options.fanCaptureEnabled
-  );
+  if (!options.fanCaptureEnabled) {
+    return [];
+  }
+  return PUBLIC_PROFILE_ACTIONS;
 }
 
 function resolveEffectivePublicProfileMode(options: {
