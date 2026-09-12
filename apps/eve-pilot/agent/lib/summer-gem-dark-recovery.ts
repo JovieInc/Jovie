@@ -191,9 +191,6 @@ export async function runGemDarkRecoveryCycle(
   };
 }
 
-
-
-
 export {
   evaluateRunnerSourceAttestation,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
