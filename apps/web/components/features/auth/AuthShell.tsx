@@ -583,7 +583,7 @@ function AuthModeSwitchLink({
   const isSignUp = mode === 'sign-up';
   const className =
     'focus-ring-themed rounded-sm text-primary-token underline underline-offset-2';
-  const troubleHref = isSignUp ? APP_ROUTES.SUPPORT : oppositeModeUrl;
+  const troubleHref = APP_ROUTES.SUPPORT;
 
   return (
     <div
