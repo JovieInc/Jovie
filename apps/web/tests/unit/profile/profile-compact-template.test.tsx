@@ -302,8 +302,15 @@ describe('ProfileCompactTemplate', () => {
       )
     );
     mockProfilePrimaryTabPanel.mockImplementation(
-      (props: { readonly mode: string }) => (
-        <div data-testid='mock-primary-tab-panel' data-mode={props.mode}>
+      (props: {
+        readonly mode: string;
+        readonly catalogLoadFailed?: boolean;
+      }) => (
+        <div
+          data-testid='mock-primary-tab-panel'
+          data-mode={props.mode}
+          data-catalog-load-failed={props.catalogLoadFailed ? 'true' : 'false'}
+        >
           {props.mode}
         </div>
       )
@@ -1779,6 +1786,54 @@ describe('ProfileCompactTemplate', () => {
           activeMode: 'profile',
           presentation: 'modal',
         })
+      );
+    });
+
+    restoreViewport();
+  });
+
+  it('forwards catalog load failure to the desktop surface', async () => {
+    const restoreViewport = mockViewport('desktop');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        catalogLoadFailed
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          catalogLoadFailed: true,
+          activeMode: 'listen',
+        })
+      );
+    });
+
+    restoreViewport();
+  });
+
+  it('forwards catalog load failure to the compact Music panel', async () => {
+    const restoreViewport = mockViewport('mobile');
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        catalogLoadFailed
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-catalog-load-failed',
+        'true'
       );
     });
 
