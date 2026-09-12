@@ -20,6 +20,7 @@ import { toast } from '@/components/feedback';
 import { SidebarMenuItem } from '@/components/organisms/Sidebar';
 import {
   getSidebarNavIconClassName,
+  getSidebarNavLabelClassName,
   getSidebarNavRowClassName,
 } from '@/components/shell/SidebarNavItem';
 import { Tooltip } from '@/components/shell/Tooltip';
@@ -302,12 +303,13 @@ export function NavMenuItem({
         />
       )}
       <span
-        className={cn(
-          'min-w-0 w-full justify-self-stretch truncate overflow-hidden whitespace-nowrap text-left',
-          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
-          '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
-          'group-data-[collapsible=icon]:hidden'
-        )}
+        className={getSidebarNavLabelClassName({
+          tone: item.tone,
+          className: cn(
+            'w-full truncate',
+            'group-data-[collapsible=icon]:hidden'
+          ),
+        })}
       >
         {item.name}
       </span>
