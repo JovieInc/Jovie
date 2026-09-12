@@ -11,6 +11,10 @@ export const PROMOTION_EVIDENCE = Object.freeze([
   'security',
   'policy',
 ]);
+export const MERGE_GROUP_PROMOTION_EVIDENCE = Object.freeze([
+  ...PROMOTION_EVIDENCE,
+  'combined',
+]);
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
 
@@ -83,24 +87,65 @@ export function staleWorkReceipt({
   };
 }
 
+function evaluateChecks(checks, required) {
+  for (const name of required) {
+    if (checks[name] !== 'success') {
+      return { ok: false, reason: `missing-${name}` };
+    }
+  }
+  return null;
+}
+
 /** @param {*} [input] */
-export function evaluateReadyLanding({
+export function evaluateSourceQueueAdmission({
   publishedHead,
   liveHead,
-  rebased = false,
+  observedBase,
+  liveMain,
   checks = {},
 } = {}) {
   const published = normalizeSha(publishedHead);
   const live = normalizeSha(liveHead);
   if (!published || !live) return { ok: false, reason: 'invalid-head' };
   if (published !== live) return { ok: false, reason: 'stale-head' };
-  if (rebased !== true) return { ok: false, reason: 'not-rebased' };
-  for (const name of PROMOTION_EVIDENCE) {
-    if (checks[name] !== 'success') {
-      return { ok: false, reason: `missing-${name}` };
-    }
+  const missing = evaluateChecks(checks, PROMOTION_EVIDENCE);
+  if (missing) return missing;
+
+  const observed = normalizeSha(observedBase);
+  const currentMain = normalizeSha(liveMain);
+  return {
+    ok: true,
+    reason: 'source-head-qualified-for-queue',
+    baseAdvanced: Boolean(observed && currentMain && observed !== currentMain),
+  };
+}
+
+/** @param {*} [input] */
+export function evaluateMergeGroupLanding({
+  combinedHead,
+  checkedCombinedHead,
+  latestMainIncluded = false,
+  checks = {},
+} = {}) {
+  const combined = normalizeSha(combinedHead);
+  const checked = normalizeSha(checkedCombinedHead);
+  if (!combined || !checked) return { ok: false, reason: 'invalid-head' };
+  if (combined !== checked) {
+    return { ok: false, reason: 'stale-combined-head' };
   }
-  return { ok: true, reason: 'exact-head-qualified' };
+  if (latestMainIncluded !== true) {
+    return { ok: false, reason: 'latest-main-not-proven' };
+  }
+  const missing = evaluateChecks(checks, MERGE_GROUP_PROMOTION_EVIDENCE);
+  if (missing) return missing;
+  return { ok: true, reason: 'merge-group-qualified-for-landing' };
+}
+
+/** @param {*} [input] */
+export function evaluateReadyLanding(input = {}) {
+  return input.stage === 'merge-group'
+    ? evaluateMergeGroupLanding(input)
+    : evaluateSourceQueueAdmission(input);
 }
 
 /** @param {*} [input] */
