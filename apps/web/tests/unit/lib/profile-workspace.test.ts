@@ -15,18 +15,20 @@ const rows = [
 ] as unknown as ProfileWorkspaceRow[];
 
 describe('profile workspace presentation', () => {
-  it('filters Sources and Websites separately', () => {
+  it('filters by artist outcome groups', () => {
     expect(
-      filterProfileWorkspaceRows(rows, 'source').map(row => row.id)
+      filterProfileWorkspaceRows(rows, 'catalog').map(row => row.id)
     ).toEqual(['wiki']);
     expect(
-      filterProfileWorkspaceRows(rows, 'website').map(row => row.id)
-    ).toEqual(['website']);
+      filterProfileWorkspaceRows(rows, 'identity').map(row => row.id)
+    ).toEqual(['jovie', 'website']);
   });
 
   it('filters every remaining category exactly', () => {
-    expect(filterProfileWorkspaceRows(rows, 'dsp')).toHaveLength(1);
-    expect(filterProfileWorkspaceRows(rows, 'social')).toHaveLength(1);
+    expect(filterProfileWorkspaceRows(rows, 'profiles')).toHaveLength(2);
+    expect(
+      filterProfileWorkspaceRows(rows, 'profiles').map(row => row.id)
+    ).toEqual(['spotify', 'instagram']);
     expect(filterProfileWorkspaceRows(rows, 'connector')).toHaveLength(1);
     expect(filterProfileWorkspaceRows(rows, 'all')).toHaveLength(rows.length);
   });

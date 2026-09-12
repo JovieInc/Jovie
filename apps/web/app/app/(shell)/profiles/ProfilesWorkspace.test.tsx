@@ -436,9 +436,57 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
     expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
 
+    // Catalog outcome: authority/directory sources. Base fixture has none,
+    // so the outcome tab renders the category empty state.
+    fireEvent.click(screen.getByRole('button', { name: 'Catalog' }));
+    expect(
+      screen.getByText('No Presence in This Category')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
+
     expect(
       screen.getByRole('button', { name: 'Connectors' })
     ).toBeInTheDocument();
+  });
+
+  it('renders one recommendation primitive per suggested-qualification surface', async () => {
+    renderWorkspace({
+      ...data,
+      rows: [
+        ...data.rows,
+        {
+          id: 'fan-wiki',
+          rowType: 'surface',
+          kind: 'authority',
+          platform: 'wikipedia',
+          label: 'Fan Wiki',
+          handle: null,
+          url: 'https://example.com/wiki/tim',
+          trackedUrl: null,
+          qualificationStatus: 'suggested',
+          isOfficial: false,
+          monitoringState: 'unavailable',
+          rank: null,
+          previousRank: null,
+          lastObservedAt: null,
+        },
+      ],
+    });
+
+    await userEvent.setup().click(screen.getByText('Fan Wiki'));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(panel).not.toBeNull();
+
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    const signalList = screen.getByTestId('presence-signal-list');
+    // Suggested qualification: recommendation primitive at its own weight.
+    expect(
+      within(signalList).getByTestId('presence-signal-recommendation')
+    ).toHaveTextContent('Qualify This Page');
+    expect(
+      within(signalList).getByTestId('presence-signal-finding')
+    ).toHaveTextContent('Needs Qualification');
   });
 
   it('groups presence signals into separated blocker, finding, and state primitives', async () => {
