@@ -168,3 +168,23 @@ admission no longer holds on `runner-source-attestation-unavailable`.
 ```bash
 node scripts/summer-commissioning/bounded-operator-evals.mjs
 ```
+
+## Completion reconciler runtime inputs
+
+The existing `gem-pr-drain.service` reads optional runtime inputs from the same
+`~/.config/symphony/runner-source.env` used by the service observer:
+
+- `SYMPHONY_RUNTIME_SOURCE_ROOT`: checkout of the actual Symphony release commit,
+  not the Jovie application/configuration checkout.
+- `SYMPHONY_RUNTIME_EXECUTABLE`: actual running executable (for Burrito, the
+  verified listener's ERTS executable), not the packaged launcher.
+- `SYMPHONY_RUNTIME_WORKFLOW`: actual service workflow path.
+
+These configure the existing accepted-completion reconciler defaults; explicit
+CLI flags still take precedence. They are inputs, not grants or observations.
+The reconciler requires a fresh healthy service attestation and verifies the
+source revision, executable hash, workflow hash/path, and live service generation
+before publishing context. Keep the observed service timestamp; do not refresh
+it through an environment update or copy an old context to simulate enrollment.
+A configuration mismatch remains a blocker until its separately reviewed repair
+is installed. Changing these inputs does not restart Symphony or launch work.

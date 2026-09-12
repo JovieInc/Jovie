@@ -166,6 +166,29 @@ class AcceptedCompletionTests(unittest.TestCase):
                 self.assertEqual(self.context.read_bytes(), b"existing context must survive")
                 self.assertFalse(self.ledger.exists())
 
+    def test_operator_runtime_inputs_are_verified_before_accepting_completion(self):
+        arguments = ["--receipt-dir", str(self.receipt_dir), "--result-dir", str(self.result_dir),
+                     "--service-attestation", str(self.service), "--context", str(self.context),
+                     "--attestation-dir", str(self.attestations), "--ledger", str(self.ledger),
+                     "--capacity", str(self.capacity), "--provider-capacity", str(self.provider_capacity)]
+        environment = {
+            "SYMPHONY_RUNTIME_SOURCE_ROOT": str(F.SOURCE),
+            "SYMPHONY_RUNTIME_EXECUTABLE": str(F.RUNTIME_BINARY),
+            "SYMPHONY_RUNTIME_WORKFLOW": str(F.SOURCE / "scripts/symphony/WORKFLOW.md"),
+        }
+        with mock.patch.dict(os.environ, environment):
+            result = A.reconcile(A.parser().parse_args(arguments), github=self.github, now=self.now)
+            self.assertTrue(result["approved"])
+            before = self.context.read_bytes()
+            wrong_binary = self.root / "wrong-binary"
+            wrong_binary.write_bytes(b"different executable")
+            os.environ["SYMPHONY_RUNTIME_EXECUTABLE"] = str(wrong_binary)
+            with self.assertRaisesRegex(ValueError, "runtime binding mismatch"):
+                A.reconcile(A.parser().parse_args(arguments), github=self.github, now=self.now)
+            self.assertEqual(self.context.read_bytes(), before)
+            explicit = A.parser().parse_args([*arguments, "--binary", str(F.RUNTIME_BINARY)])
+            self.assertEqual(explicit.binary, F.RUNTIME_BINARY)
+
     def test_required_ci_failure_never_writes_completion(self):
         self.pr["statusCheckRollup"][1]["state"] = "FAILURE"
         result = A.reconcile(self.args(), github=self.github, now=self.now)
