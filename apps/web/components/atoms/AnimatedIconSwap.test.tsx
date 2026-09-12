@@ -15,6 +15,17 @@ describe('AnimatedIconSwap', () => {
     expect(getByTestId('copy-icon')).not.toBeNull();
   });
 
+  it('renders the initial icon without hidden motion state on the server', () => {
+    const html = renderToString(
+      <AnimatedIconSwap activeKey='copy'>
+        <svg data-testid='copy-icon' />
+      </AnimatedIconSwap>
+    );
+
+    expect(html).not.toContain('opacity:0');
+    expect(html).not.toContain('scale(0.25)');
+  });
+
   it('mounts the incoming child when activeKey changes', () => {
     const { rerender, getByTestId } = render(
       <AnimatedIconSwap activeKey='copy'>

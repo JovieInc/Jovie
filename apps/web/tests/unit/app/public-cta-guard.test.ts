@@ -125,6 +125,9 @@ describe('public CTA guard', () => {
     );
     expect(headerNav).toContain('blur(var(--blur-header))');
     expect(headerNav).not.toContain('--linear-blur-header');
+    expect(headerNav).toContain("return 'max-w-public-content lg:px-0'");
+    expect(headerNav).not.toContain('max-w-linear-content');
+    expect(headerNav).not.toContain('max-w-[calc(var(--linear-content-max)');
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
     );
@@ -134,7 +137,7 @@ describe('public CTA guard', () => {
     expect(marketingNavigation).toContain("label: 'Log in'");
     expect(marketingNavigation).toContain("label: 'Find yourself'");
     expect(marketingHeader).toContain(
-      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
+      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
   });
 
