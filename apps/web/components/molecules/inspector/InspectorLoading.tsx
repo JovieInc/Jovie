@@ -1,6 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/components/molecules/inspector/InspectorRail.test.tsx
 import { Skeleton } from '@jovie/ui';
 import type { CSSProperties } from 'react';
 
