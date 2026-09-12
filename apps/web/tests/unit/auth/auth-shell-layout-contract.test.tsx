@@ -127,6 +127,10 @@ describe('auth shell layout contract', () => {
       AUTH_SPLIT_MIN_WIDTH_PX
     );
     expect(productionCss).toContain(`min-width: ${AUTH_SPLIT_MIN_WIDTH_PX}px`);
+    expect(productionCss).toContain('[data-auth-shell]');
+    expect(productionCss).toContain('env(safe-area-inset-left)');
+    expect(productionCss).toContain('.auth-form-max-width');
+    expect(productionCss).toContain('.auth-form-stack-offset');
   });
 
   it('keeps AuthLayout split on the desktop-only editorial wrapper', () => {

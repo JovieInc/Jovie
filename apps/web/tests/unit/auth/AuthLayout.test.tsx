@@ -185,7 +185,11 @@ describe('AuthLayout', () => {
     const defaultColumn = container.querySelector('[data-auth-form-column]');
     expect(defaultColumn).not.toBeNull();
     expect(defaultColumn).toHaveClass('justify-start');
+    expect(defaultColumn).toHaveClass('auth-form-stack-offset');
     expect(defaultColumn).not.toHaveClass('justify-center');
+    expect(container.querySelector('[data-auth-shell]')).not.toHaveAttribute(
+      'data-auth-keyboard-visible'
+    );
 
     rerender(
       <AuthLayout
@@ -218,6 +222,22 @@ describe('AuthLayout', () => {
     expect(logoLink).toHaveAttribute('aria-hidden', 'true');
     expect(logoLink).toHaveAttribute('tabIndex', '-1');
     expect(logoLink).toHaveClass('opacity-0');
+  });
+
+  it('marks the shell when the mobile keyboard is visible', async () => {
+    keyboardVisible = true;
+    const { container } = render(
+      <AuthLayout formTitle='Sign In'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    expect(container.querySelector('[data-auth-shell]')).toHaveAttribute(
+      'data-auth-keyboard-visible'
+    );
+    expect(container.querySelector('[data-auth-form-column]')).toHaveClass(
+      'auth-form-stack-offset'
+    );
   });
 
   it('hides non-form chrome while the mobile keyboard is visible', async () => {
