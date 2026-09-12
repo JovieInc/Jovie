@@ -14,6 +14,7 @@ const hoisted = vi.hoisted(() => {
     .fn()
     .mockResolvedValue(undefined);
   const captureErrorMock = vi.fn();
+  const attributeLeadSignupMock = vi.fn().mockResolvedValue(undefined);
   const getCachedAuthMock = vi.fn().mockResolvedValue({ userId: 'clerk_123' });
   const trackServerEventMock = vi.fn();
   const revalidatePathMock = vi.fn();
@@ -62,6 +63,7 @@ const hoisted = vi.hoisted(() => {
 
   return {
     captureErrorMock,
+    attributeLeadSignupMock,
     getCachedAuthMock,
     isBlacklistedSpotifyIdMock,
     noStoreMock,
@@ -104,6 +106,10 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
   ne: vi.fn(),
   sql: vi.fn(),
+}));
+
+vi.mock('@/lib/leads/funnel-events', () => ({
+  attributeLeadSignupFromAppUserId: hoisted.attributeLeadSignupMock,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -229,6 +235,7 @@ function queueLatestSettings(settings: Record<string, unknown> = {}) {
 describe('connectOnboardingSpotifyArtist', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.attributeLeadSignupMock.mockResolvedValue(undefined);
     hoisted.selectResults.length = 0;
     hoisted.updateSetArgs.length = 0;
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'clerk_123' });
@@ -409,6 +416,111 @@ describe('connectOnboardingSpotifyArtist', () => {
         source: 'direct_profile_spotify_match',
       })
     );
+    expect(hoisted.attributeLeadSignupMock).toHaveBeenCalledWith('clerk_123');
+    expect(
+      hoisted.attributeLeadSignupMock.mock.invocationCallOrder[0]
+    ).toBeLessThan(hoisted.cookiesSetMock.mock.invocationCallOrder[0]);
+    expect(hoisted.clearPendingClaimContextMock).toHaveBeenCalled();
+    expect(hoisted.cookiesSetMock).toHaveBeenCalledWith(
+      'jovie_onboarding_complete',
+      '1',
+      expect.objectContaining({
+        httpOnly: true,
+        maxAge: 120,
+        path: '/',
+      })
+    );
+    expect(hoisted.finalizePostOnboardingMock).toHaveBeenCalledWith(
+      'clerk_123',
+      'artist'
+    );
+  });
+
+  it('does not report direct claim success when activation receipt persistence fails', async () => {
+    queueOwnedProfile();
+    queueNoExistingClaim();
+    queueLatestSettings({ spotifyImportStatus: 'importing' });
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: 'artist_spotify_id',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    hoisted.syncReleasesFromSpotifyMock.mockResolvedValue({
+      imported: 1,
+      releases: [{ id: 'release_1' }],
+      success: true,
+      total: 1,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    hoisted.attributeLeadSignupMock.mockRejectedValueOnce(
+      new Error('receipt unavailable')
+    );
+    await expect(
+      connectOnboardingSpotifyArtist({
+        artistName: 'Artist Name',
+        profileId: 'profile_123',
+        spotifyArtistId: 'artist_spotify_id',
+        spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+      })
+    ).rejects.toThrow('Your profile is saved. Please retry to confirm setup.');
+    expect(hoisted.claimPrebuiltProfileForUserMock).toHaveBeenCalled();
+    expect(hoisted.cookiesSetMock).not.toHaveBeenCalled();
+    expect(hoisted.clearPendingClaimContextMock).not.toHaveBeenCalled();
+    expect(hoisted.finalizePostOnboardingMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a receipt retry after the direct profile was already committed', async () => {
+    hoisted.selectResults.push([
+      {
+        dbUserId: 'db_user_123',
+        handle: 'artist',
+        id: 'profile_123',
+        isClaimed: true,
+        settings: {},
+        spotifyId: 'artist_spotify_id',
+      },
+    ]);
+    queueNoExistingClaim();
+    queueLatestSettings({ spotifyImportStatus: 'importing' });
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: 'artist_spotify_id',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    hoisted.syncReleasesFromSpotifyMock.mockResolvedValue({
+      imported: 1,
+      releases: [{ id: 'release_1' }],
+      success: true,
+      total: 1,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.attributeLeadSignupMock).toHaveBeenCalledWith('clerk_123');
+    expect(
+      hoisted.attributeLeadSignupMock.mock.invocationCallOrder[0]
+    ).toBeLessThan(hoisted.cookiesSetMock.mock.invocationCallOrder[0]);
     expect(hoisted.clearPendingClaimContextMock).toHaveBeenCalled();
     expect(hoisted.cookiesSetMock).toHaveBeenCalledWith(
       'jovie_onboarding_complete',
