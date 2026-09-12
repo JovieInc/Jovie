@@ -240,6 +240,13 @@ apps/desktop/src/*
 !.agents/skills/gstack/ship/
 .agents/skills/gstack/ship/*
 !.agents/skills/gstack/ship/SKILL.md
+!.agents/skills/gstack/design-review/
+.agents/skills/gstack/design-review/*
+!.agents/skills/gstack/design-review/SKILL.md
+!.agents/skills/gstack/design-review/SKILL.md.tmpl
+!.agents/skills/gstack/design-review/references/
+.agents/skills/gstack/design-review/references/*
+!.agents/skills/gstack/design-review/references/web-interface-gaps.md
 !.agents/skills/gstack/test/changelog-eval.test.ts
 !.agents/skills/gstack/test/gen-skill-docs.test.ts
 

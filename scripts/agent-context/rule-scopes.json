@@ -39,7 +39,7 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "7e266ad340bec06bb14412854b8bd8ca081f140022469d39506517ee0a8b5126"
+    "bodySha256": "2524497e7f69a6fc2fe20bee4b1735bc3797d5c375d38ced0bb34c2090ac1142"
   },
   {
     "file": ".claude/rules/hermes-air.md",
