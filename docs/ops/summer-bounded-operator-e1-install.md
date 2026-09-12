@@ -61,6 +61,25 @@ python3 /tmp/jov-6163-attestation/scripts/symphony/tests/gem-service-attestation
 - Summer admission receipt showing attestation freshness OK
 - Explicit statement that the 600s freshness gate was not weakened
 
+### Post-install proof command (required)
+
+After collecting two attestation JSON files from Gem (independent, each ≤600s),
+run Summer's observation gate — same evaluator + governed-dispatch predicates:
+
+```bash
+node scripts/summer-commissioning/verify-e1-attestation-observations.mjs \
+  --observation-a /path/to/observation-a.json \
+  --observation-b /path/to/observation-b.json
+# writes /opt/cursor/artifacts/e1-attestation-observations-receipt.json
+# exit 0 = E1 close-path PASS (Symphony restored); exit 2 = observations failed
+```
+
+Local readiness only (does **not** close E1):
+
+```bash
+node scripts/summer-commissioning/verify-e1-attestation-observations.mjs --self-test
+```
+
 ## Repair-to-runtime bridge (this branch)
 
 Summer bottleneck heartbeat evaluates runner-source attestation, then runs

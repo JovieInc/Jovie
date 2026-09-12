@@ -101,6 +101,13 @@ run(
 );
 
 run(
+  'E1 close-path readiness (Summer observation gate self-test)',
+  'pnpm',
+  ['exec', 'vitest', 'run', 'tests/e1-attestation-observation-gate.test.ts'],
+  { cwd: resolve(root, 'apps/eve-pilot'), requirePassed: true }
+);
+
+run(
   'E5 identity packs',
   'pnpm',
   [
@@ -133,7 +140,12 @@ console.log(`
 EXTERNAL GATE: land/install PR #17725 on Gem, prove two ≤600s fresh observations,
 then confirm Summer no longer holds on runner-source-attestation-unavailable.
 Operator install packet: docs/ops/summer-bounded-operator-e1-install.md
+Post-install proof (same Summer predicates):
+  node scripts/summer-commissioning/verify-e1-attestation-observations.mjs \\
+    --observation-a obs-a.json --observation-b obs-b.json
 Local publisher tests live on branch codex/jov-6163-runtime-attestation.
+Local close-path readiness (--self-test) is covered by the E1 observation gate suite above;
+that does NOT close E1 without real Gem observations.
 `);
 
 console.log('Local strict evals E2–E5: GREEN');
