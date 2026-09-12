@@ -126,7 +126,11 @@ function createFixture() {
     'docs/vendor/vercel-labs/web-interface-guidelines/command.md',
     uiDoc
   );
-  write(root, 'docs/vendor/vercel-labs/writing-guidelines/command.md', writingDoc);
+  write(
+    root,
+    'docs/vendor/vercel-labs/writing-guidelines/command.md',
+    writingDoc
+  );
   write(
     root,
     'docs/vendor/vercel-labs/pins.json',
@@ -441,7 +445,10 @@ test('blocks runtime fetches of mutable vercel-labs handbook main', () => {
       readFileSync(join(root, '.claude/skills/find-skills/SKILL.md'), 'utf8')
     );
     const errors = evaluateSkillGovernance({ root }).join('\n');
-    assert.match(errors, /must not fetch mutable vercel-labs handbook docs from main/);
+    assert.match(
+      errors,
+      /must not fetch mutable vercel-labs handbook docs from main/
+    );
   } finally {
     rmSync(root, { force: true, recursive: true });
   }
