@@ -315,6 +315,10 @@ describe('DashboardNav', () => {
       'text-(--color-bg-base)'
     );
     expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
+    expect(chatLink.querySelector('svg')).toHaveClass('text-accent-teal!');
+    expect(chatLink.querySelector('span')?.className).not.toContain(
+      'mask-image:linear-gradient'
+    );
     expect(chatLink).not.toHaveAttribute('aria-current');
   });
 
