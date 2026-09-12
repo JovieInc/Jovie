@@ -34,7 +34,7 @@ import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { createOnboardingReceiptPendingError } from '@/lib/errors/onboarding';
-import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
+import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { lockSpotifyProfileIdentity } from '@/lib/profile/spotify-profile-identity';
 import {
@@ -389,7 +389,7 @@ export async function connectOnboardingSpotifyArtist(
   // The direct claim is now persisted. Also reconcile on retry when the
   // profile is already claimed but the attribution cookie survived a failure.
   try {
-    await attributeLeadSignupFromClerkUserId(userId);
+    await attributeLeadSignupFromAppUserId(userId);
   } catch (error) {
     throw createOnboardingReceiptPendingError(error);
   }

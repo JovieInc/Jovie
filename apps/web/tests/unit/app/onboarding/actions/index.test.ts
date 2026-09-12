@@ -12,7 +12,7 @@ const hoisted = vi.hoisted(() => {
   const fetchExistingProfileMock = vi.fn();
   const cacheHandleAvailabilityMock = vi.fn();
   const invalidateProxyUserStateCacheMock = vi.fn();
-  const attributeLeadSignupFromClerkUserIdMock = vi.fn();
+  const attributeLeadSignupFromAppUserIdMock = vi.fn();
   const invalidateProfileCacheMock = vi.fn();
   const markWaitlistSignedUpInTxMock = vi.fn();
   const enforceOnboardingRateLimitMock = vi.fn();
@@ -20,7 +20,7 @@ const hoisted = vi.hoisted(() => {
   const captureErrorMock = vi.fn();
 
   return {
-    attributeLeadSignupFromClerkUserIdMock,
+    attributeLeadSignupFromAppUserIdMock,
     cacheHandleAvailabilityMock,
     captureErrorMock,
     cookiesMock,
@@ -95,8 +95,8 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
-  attributeLeadSignupFromClerkUserId:
-    hoisted.attributeLeadSignupFromClerkUserIdMock,
+  attributeLeadSignupFromAppUserId:
+    hoisted.attributeLeadSignupFromAppUserIdMock,
 }));
 
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
@@ -172,7 +172,7 @@ describe('completeOnboarding', () => {
     hoisted.enforceOnboardingRateLimitMock.mockResolvedValue(undefined);
     hoisted.cacheHandleAvailabilityMock.mockResolvedValue(undefined);
     hoisted.invalidateProxyUserStateCacheMock.mockResolvedValue(undefined);
-    hoisted.attributeLeadSignupFromClerkUserIdMock.mockResolvedValue(undefined);
+    hoisted.attributeLeadSignupFromAppUserIdMock.mockResolvedValue(undefined);
     hoisted.invalidateProfileCacheMock.mockResolvedValue(undefined);
     hoisted.withDbSessionTxMock.mockImplementation(async operation => {
       return operation({} as never, 'clerk_123');
@@ -185,7 +185,7 @@ describe('completeOnboarding', () => {
       profileId: 'profile_123',
       status: 'complete',
     });
-    hoisted.attributeLeadSignupFromClerkUserIdMock.mockRejectedValueOnce(
+    hoisted.attributeLeadSignupFromAppUserIdMock.mockRejectedValueOnce(
       new Error('receipt unavailable')
     );
     await expect(
@@ -214,9 +214,9 @@ describe('completeOnboarding', () => {
         redirectToDashboard: false,
       })
     ).resolves.toMatchObject({ profileId: 'profile_123', status: 'complete' });
-    expect(
-      hoisted.attributeLeadSignupFromClerkUserIdMock
-    ).toHaveBeenCalledTimes(2);
+    expect(hoisted.attributeLeadSignupFromAppUserIdMock).toHaveBeenCalledTimes(
+      2
+    );
   });
 
   it('recovers as success when a concurrent duplicate handle belongs to the same user', async () => {

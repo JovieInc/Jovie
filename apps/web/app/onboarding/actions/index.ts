@@ -34,7 +34,7 @@ import {
   OnboardingErrorCode,
   onboardingErrorToError,
 } from '@/lib/errors/onboarding';
-import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
+import { attributeLeadSignupFromAppUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { isTokenBackedClaimFixture } from '@/lib/profile/public-profile-identity-policy';
@@ -404,7 +404,7 @@ export async function completeOnboarding({
     // Required receipts are awaited before reporting success. Failure keeps
     // the attribution cookie so the completed transaction can be reconciled.
     try {
-      await attributeLeadSignupFromClerkUserId(userId);
+      await attributeLeadSignupFromAppUserId(userId);
     } catch (error) {
       throw createOnboardingReceiptPendingError(error);
     }

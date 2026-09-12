@@ -109,7 +109,7 @@ vi.mock('drizzle-orm', () => ({
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
-  attributeLeadSignupFromClerkUserId: hoisted.attributeLeadSignupMock,
+  attributeLeadSignupFromAppUserId: hoisted.attributeLeadSignupMock,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({

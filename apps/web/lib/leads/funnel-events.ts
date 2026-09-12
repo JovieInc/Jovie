@@ -3,6 +3,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { and, desc, sql as drizzleSql, eq, gt, isNull, or } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -272,8 +273,8 @@ export async function setLeadAttributionCookieFromToken(
   });
 }
 
-export async function attributeLeadSignupFromClerkUserId(
-  clerkUserId: string
+export async function attributeLeadSignupFromAppUserId(
+  appUserId: string
 ): Promise<{ leadId: string | null; userId: string | null }> {
   const attribution = await getLeadAttributionCookie();
   if (!attribution) {
@@ -283,11 +284,11 @@ export async function attributeLeadSignupFromClerkUserId(
   const [user] = await db
     .select({ id: users.id, activeProfileId: users.activeProfileId })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(appUserIdFilter(appUserId))
     .limit(1);
 
   if (!user) {
-    return { leadId: attribution.leadId, userId: null };
+    throw new Error('Authenticated app user not found for signup attribution');
   }
 
   const [lead] = await db
