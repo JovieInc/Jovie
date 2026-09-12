@@ -23,12 +23,12 @@ describe('recommendPlan', () => {
     expect(recommendPlan(MAX_FOLLOWER_THRESHOLD - 1)).toBe('pro');
   });
 
-  it('returns max at the threshold', () => {
-    expect(recommendPlan(MAX_FOLLOWER_THRESHOLD)).toBe('max');
+  it('keeps the public Pro offer at the legacy Max threshold', () => {
+    expect(recommendPlan(MAX_FOLLOWER_THRESHOLD)).toBe('pro');
   });
 
-  it('returns max above the threshold', () => {
-    expect(recommendPlan(50_000)).toBe('max');
+  it('keeps the public Pro offer above the legacy Max threshold', () => {
+    expect(recommendPlan(50_000)).toBe('pro');
   });
 });
 
