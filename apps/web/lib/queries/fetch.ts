@@ -15,73 +15,292 @@ import {
   shouldAttachCsrfHeader,
 } from '@/lib/security/csrf';
 
-interface FetchOptions extends RequestInit {
+/**
+ * Approved JSON response budget. Matches `DEFAULT_MAX_BODY_SIZE` in
+ * `lib/http/parse-json.ts` (1MB). Do not invent a second limit.
+ */
+export const DEFAULT_JSON_MAX_BYTES = 1024 * 1024;
+
+const DEADLINE_REASON = Symbol('jovie-fetch-deadline');
+
+export type FetchFailureKind =
+  | 'canceled'
+  | 'deadline'
+  | 'http'
+  | 'network'
+  | 'decode'
+  | 'payload-limit';
+
+export type FetchResponseSchema<T> = {
+  parse(data: unknown): T;
+};
+
+interface FetchOptions<T = unknown> extends RequestInit {
   /**
    * Timeout in milliseconds. Defaults to 10 seconds.
+   * JSON helpers keep this deadline through body read + decode.
+   * `fetchWithTimeoutResponse` uses it as a first-byte deadline only;
+   * the caller then owns the Response and must consume or cancel it.
    */
   timeout?: number;
+  /**
+   * Maximum decoded JSON response size in bytes.
+   * Defaults to {@link DEFAULT_JSON_MAX_BYTES}.
+   */
+  maxBytes?: number;
+  /**
+   * Optional domain decoder. When provided, parsed JSON is validated
+   * before it can be returned or written to a Query cache.
+   */
+  schema?: FetchResponseSchema<T>;
 }
 
-/**
- * Edge-compatible fetch with timeout and error handling.
- * Works in both Edge and Node runtimes.
- */
-export async function fetchWithTimeout<T>(
-  url: string,
-  options: FetchOptions = {}
-): Promise<T> {
-  const response = await fetchWithTimeoutResponse(url, options);
+type FetchSession = {
+  readonly controller: AbortController;
+  readonly externalSignal: AbortSignal | undefined;
+  deadlineFired: boolean;
+  dispose: () => void;
+};
 
-  // Parse JSON with error handling for malformed responses
-  let data: T;
-  try {
-    data = (await response.json()) as T;
-  } catch (parseError) {
-    if (parseError instanceof SyntaxError) {
-      throw new FetchError('Invalid JSON response', 502, response);
-    }
-    throw parseError;
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+function abortErrorFrom(signal: AbortSignal): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return Object.assign(error, { cause: signal.reason });
+}
+
+function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(abortErrorFrom(signal));
   }
-  return data;
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(abortErrorFrom(signal));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      value => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
 }
 
-/**
- * Edge-compatible fetch with timeout that returns the raw Response.
- *
- * Useful for call sites that need non-JSON response handling (e.g. blobs)
- * while preserving timeout/cancellation behavior and status normalization.
- */
+function cancelResponseBody(response: Response | undefined): void {
+  const cancel = response?.body?.cancel?.();
+  if (cancel) {
+    void cancel.catch(() => {});
+  }
+}
+
 /** Link an external AbortSignal to a local AbortController. */
 function linkSignal(
   controller: AbortController,
   externalSignal: AbortSignal | undefined
-): void {
-  if (!externalSignal) return;
+): () => void {
+  if (!externalSignal) return () => {};
   if (externalSignal.aborted) {
-    controller.abort();
-  } else {
-    externalSignal.addEventListener('abort', () => controller.abort(), {
-      once: true,
-    });
+    controller.abort(externalSignal.reason);
+    return () => {};
+  }
+
+  const onAbort = () => {
+    controller.abort(externalSignal.reason);
+  };
+  externalSignal.addEventListener('abort', onAbort, { once: true });
+  return () => {
+    externalSignal.removeEventListener('abort', onAbort);
+  };
+}
+
+function createFetchSession(
+  timeoutMs: number,
+  externalSignal: AbortSignal | undefined
+): FetchSession {
+  const controller = new AbortController();
+  const session: FetchSession = {
+    controller,
+    externalSignal,
+    deadlineFired: false,
+    dispose() {},
+  };
+
+  if (externalSignal?.aborted) {
+    controller.abort(externalSignal.reason);
+    return session;
+  }
+
+  const timeoutId = setTimeout(() => {
+    session.deadlineFired = true;
+    controller.abort(DEADLINE_REASON);
+  }, timeoutMs);
+  const unlink = linkSignal(controller, externalSignal);
+
+  session.dispose = () => {
+    clearTimeout(timeoutId);
+    unlink();
+  };
+  return session;
+}
+
+function classifyFetchFailure(error: unknown, session: FetchSession): never {
+  if (error instanceof FetchError) throw error;
+  if (isAbortError(error)) {
+    if (session.externalSignal?.aborted) {
+      throw new FetchCanceledError(
+        'Request canceled',
+        session.externalSignal.reason
+      );
+    }
+    if (
+      session.deadlineFired ||
+      session.controller.signal.reason === DEADLINE_REASON
+    ) {
+      throw new FetchDeadlineError('Request timeout', error);
+    }
+    throw new FetchCanceledError('Request canceled', error);
+  }
+  if (error instanceof TypeError) {
+    throw new FetchNetworkError('Network request failed', error);
+  }
+  throw error;
+}
+
+function isNoContentStatus(status: number): boolean {
+  return status === 204 || status === 205;
+}
+
+async function readFallbackJson(response: Response): Promise<unknown> {
+  if (typeof response.json === 'function') {
+    return response.json();
+  }
+  if (typeof response.text === 'function') {
+    const text = await response.text();
+    if (text.trim().length === 0) return undefined;
+    return JSON.parse(text) as unknown;
+  }
+  return undefined;
+}
+
+async function readResponseText(
+  response: Response,
+  maxBytes: number,
+  signal: AbortSignal
+): Promise<string> {
+  const contentLengthHeader =
+    typeof response.headers?.get === 'function'
+      ? response.headers.get('content-length')
+      : null;
+  if (contentLengthHeader) {
+    const declared = Number.parseInt(contentLengthHeader, 10);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      cancelResponseBody(response);
+      throw new FetchPayloadLimitError();
+    }
+  }
+
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    if (typeof response.text === 'function') {
+      return raceAbort(response.text(), signal);
+    }
+    const parsed = await raceAbort(readFallbackJson(response), signal);
+    return parsed === undefined ? '' : JSON.stringify(parsed);
+  }
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      if (signal.aborted) {
+        await reader.cancel().catch(() => {});
+        throw abortErrorFrom(signal);
+      }
+
+      const { done, value } = await raceAbort(reader.read(), signal);
+      if (done) break;
+      if (!value) continue;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new FetchPayloadLimitError();
+      }
+      chunks.push(value);
+    }
+
+    const combined = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder('utf-8').decode(combined);
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // Already released after cancel.
+    }
+  }
+}
+
+function decodeJsonText(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new FetchDecodeError('Invalid JSON response', error);
+    }
+    throw error;
+  }
+}
+
+function applySchema<T>(
+  data: unknown,
+  schema: FetchResponseSchema<T> | undefined
+): T {
+  if (!schema) {
+    return data as T;
+  }
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    throw new FetchDecodeError('Invalid response shape', error);
   }
 }
 
 /** Try to extract a user-facing error message from a 4xx response body. */
-async function extractClientErrorMessage(response: Response): Promise<{
+async function extractClientErrorMessage(
+  response: Response,
+  maxBytes: number,
+  signal: AbortSignal
+): Promise<{
   message: string | undefined;
   parsedBody: Record<string, unknown> | undefined;
 }> {
   try {
-    const parsedBody = (await response.clone().json()) as Record<
-      string,
-      unknown
-    >;
+    const cloned = response.clone();
+    const text = await readResponseText(cloned, maxBytes, signal);
+    const parsedBody = decodeJsonText(text) as Record<string, unknown>;
     const message =
       parsedBody?.error && typeof parsedBody.error === 'string'
         ? parsedBody.error
         : undefined;
     return { message, parsedBody };
-  } catch {
+  } catch (error) {
+    if (isAbortError(error) || error instanceof FetchDeadlineError) {
+      throw error;
+    }
     return { message: undefined, parsedBody: undefined };
   }
 }
@@ -106,58 +325,155 @@ function getRequestHeaders(
   return csrfHeaders;
 }
 
-async function throwFetchErrorForResponse(response: Response): Promise<never> {
+async function throwFetchErrorForResponse(
+  response: Response,
+  maxBytes: number,
+  signal: AbortSignal
+): Promise<never> {
   let message = getFetchErrorMessage(response);
   let parsedBody: Record<string, unknown> | undefined;
 
-  if (response.status >= 400 && response.status < 500) {
-    const extracted = await extractClientErrorMessage(response);
-    if (extracted.message) message = extracted.message;
-    parsedBody = extracted.parsedBody;
+  try {
+    if (response.status >= 400 && response.status < 500) {
+      const extracted = await extractClientErrorMessage(
+        response,
+        maxBytes,
+        signal
+      );
+      if (extracted.message) message = extracted.message;
+      parsedBody = extracted.parsedBody;
+    }
+    throw new FetchError(message, response.status, response, parsedBody, {
+      kind: 'http',
+    });
+  } finally {
+    cancelResponseBody(response);
   }
-
-  throw new FetchError(message, response.status, response, parsedBody);
 }
 
-function normalizeFetchError(error: unknown): never {
-  if (error instanceof FetchError) throw error;
-  if (error instanceof Error && error.name === 'AbortError') {
-    throw new FetchError('Request timeout', 408);
-  }
-  throw error;
+function toRequestInit(options: FetchOptions): RequestInit {
+  const fetchOptions: RequestInit = { ...options };
+  delete (fetchOptions as FetchOptions).timeout;
+  delete (fetchOptions as FetchOptions).maxBytes;
+  delete (fetchOptions as FetchOptions).schema;
+  delete fetchOptions.signal;
+  return fetchOptions;
 }
 
+async function fetchOkResponse(
+  url: string,
+  options: FetchOptions,
+  session: FetchSession
+): Promise<Response> {
+  const fetchOptions = toRequestInit(options);
+  const maxBytes = options.maxBytes;
+  const headers = getRequestHeaders(url, fetchOptions);
+  const requestInit: RequestInit = {
+    ...fetchOptions,
+    signal: session.controller.signal,
+  };
+  if (headers !== undefined) {
+    requestInit.headers = headers;
+  }
+
+  const response = await fetch(url, requestInit);
+  if (!response.ok) {
+    await throwFetchErrorForResponse(
+      response,
+      maxBytes ?? DEFAULT_JSON_MAX_BYTES,
+      session.controller.signal
+    );
+  }
+  return response;
+}
+
+/**
+ * Edge-compatible fetch with timeout and error handling.
+ * Works in both Edge and Node runtimes.
+ *
+ * The deadline stays active through body consumption and JSON/schema decode.
+ * Synchronous `JSON.parse` / schema.parse work is not preempted by the timer.
+ */
+export async function fetchWithTimeout<T>(
+  url: string,
+  options: FetchOptions<T> = {}
+): Promise<T> {
+  const {
+    timeout = 10000,
+    signal: externalSignal,
+    maxBytes = DEFAULT_JSON_MAX_BYTES,
+    schema,
+  } = options;
+
+  if (externalSignal?.aborted) {
+    throw new FetchCanceledError('Request canceled', externalSignal.reason);
+  }
+
+  const session = createFetchSession(timeout, externalSignal ?? undefined);
+  try {
+    const response = await fetchOkResponse(url, options, session);
+
+    if (isNoContentStatus(response.status)) {
+      cancelResponseBody(response);
+      return applySchema(undefined, schema);
+    }
+
+    const hasStreamBody =
+      response.body != null && typeof response.body.getReader === 'function';
+    let data: unknown;
+    if (!hasStreamBody && typeof response.json === 'function') {
+      try {
+        data = await raceAbort(response.json(), session.controller.signal);
+      } catch (parseError) {
+        if (parseError instanceof SyntaxError) {
+          throw new FetchDecodeError('Invalid JSON response', parseError);
+        }
+        throw parseError;
+      }
+    } else {
+      const text = await readResponseText(
+        response,
+        maxBytes,
+        session.controller.signal
+      );
+      if (text.trim().length === 0) {
+        return applySchema(undefined, schema);
+      }
+      data = decodeJsonText(text);
+    }
+
+    return applySchema(data, schema);
+  } catch (error) {
+    classifyFetchFailure(error, session);
+  } finally {
+    session.dispose();
+  }
+}
+
+/**
+ * Edge-compatible fetch with timeout that returns the raw Response.
+ *
+ * First-byte deadline only. After this resolves, the caller owns the
+ * Response and must read or `body.cancel()` it. Idle/total stream time is
+ * not bounded here so legitimate downloads and streams can outlive `timeout`.
+ */
 export async function fetchWithTimeoutResponse(
   url: string,
   options: FetchOptions = {}
 ): Promise<Response> {
-  const { timeout = 10000, signal: externalSignal, ...fetchOptions } = options;
+  const { timeout = 10000, signal: externalSignal } = options;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  linkSignal(controller, externalSignal ?? undefined);
+  if (externalSignal?.aborted) {
+    throw new FetchCanceledError('Request canceled', externalSignal.reason);
+  }
 
+  const session = createFetchSession(timeout, externalSignal ?? undefined);
   try {
-    const headers = getRequestHeaders(url, fetchOptions);
-    const requestInit: RequestInit = {
-      ...fetchOptions,
-      signal: controller.signal,
-    };
-    if (headers !== undefined) {
-      requestInit.headers = headers;
-    }
-
-    const response = await fetch(url, requestInit);
-
-    if (!response.ok) {
-      await throwFetchErrorForResponse(response);
-    }
-
-    return response;
+    return await fetchOkResponse(url, options, session);
   } catch (error) {
-    normalizeFetchError(error);
+    classifyFetchFailure(error, session);
   } finally {
-    clearTimeout(timeoutId);
+    session.dispose();
   }
 }
 
@@ -187,15 +503,23 @@ export class FetchError extends Error {
   public readonly body?: string;
   /** Parsed JSON body from the error response (available for 4xx errors). */
   public readonly parsedBody?: Record<string, unknown>;
+  public readonly kind: FetchFailureKind;
+  public override readonly cause?: unknown;
 
   constructor(
     message: string,
     public readonly status: number,
     responseOrBody?: Response | string,
-    parsedBody?: Record<string, unknown>
+    parsedBody?: Record<string, unknown>,
+    options?: { kind?: FetchFailureKind; cause?: unknown }
   ) {
-    super(message);
+    super(
+      message,
+      options?.cause !== undefined ? { cause: options.cause } : undefined
+    );
     this.name = 'FetchError';
+    this.kind = options?.kind ?? 'http';
+    this.cause = options?.cause;
     if (typeof responseOrBody === 'string') {
       this.body = responseOrBody;
     } else {
@@ -222,11 +546,70 @@ export class FetchError extends Error {
    * Check if error is retryable (network issues, 5xx, 429)
    */
   isRetryable(): boolean {
+    if (
+      this.kind === 'canceled' ||
+      this.kind === 'decode' ||
+      this.kind === 'payload-limit'
+    ) {
+      return false;
+    }
+    if (this.kind === 'deadline' || this.kind === 'network') {
+      return true;
+    }
     return (
       this.status === 408 || // Timeout
       this.status === 429 || // Rate limit
       this.status >= 500 // Server errors
     );
+  }
+}
+
+export class FetchCanceledError extends FetchError {
+  constructor(message = 'Request canceled', cause?: unknown) {
+    super(message, 0, undefined, undefined, { kind: 'canceled', cause });
+    // Keep AbortError identity so TanStack Query treats unmount/cancel as
+    // cancellation rather than a retryable failure.
+    this.name = 'AbortError';
+  }
+}
+
+export class FetchDeadlineError extends FetchError {
+  constructor(message = 'Request timeout', cause?: unknown) {
+    super(message, 408, undefined, undefined, { kind: 'deadline', cause });
+    this.name = 'FetchDeadlineError';
+  }
+}
+
+export class FetchHttpError extends FetchError {
+  constructor(
+    message: string,
+    status: number,
+    response?: Response,
+    parsedBody?: Record<string, unknown>
+  ) {
+    super(message, status, response, parsedBody, { kind: 'http' });
+    this.name = 'FetchHttpError';
+  }
+}
+
+export class FetchNetworkError extends FetchError {
+  constructor(message = 'Network request failed', cause?: unknown) {
+    super(message, 0, undefined, undefined, { kind: 'network', cause });
+    this.name = 'FetchNetworkError';
+  }
+}
+
+export class FetchDecodeError extends FetchError {
+  constructor(message = 'Invalid JSON response', cause?: unknown) {
+    super(message, 502, undefined, undefined, { kind: 'decode', cause });
+    this.name = 'FetchDecodeError';
+  }
+}
+
+export class FetchPayloadLimitError extends FetchError {
+  constructor(message = 'Response exceeded size limit', cause?: unknown) {
+    super(message, 413, undefined, undefined, { kind: 'payload-limit', cause });
+    this.name = 'FetchPayloadLimitError';
   }
 }
 
@@ -244,7 +627,7 @@ export class FetchError extends Error {
  */
 export function createQueryFn<T>(
   url: string,
-  options?: Omit<FetchOptions, 'signal'>
+  options?: Omit<FetchOptions<T>, 'signal'>
 ) {
   return async ({ signal }: { signal?: AbortSignal }): Promise<T> => {
     // Pass the signal directly to fetchWithTimeout which handles
@@ -272,7 +655,7 @@ export function createQueryFn<T>(
 export function createMutationFn<TInput, TOutput>(
   url: string,
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'POST',
-  options?: Omit<FetchOptions, 'method' | 'body' | 'signal'>
+  options?: Omit<FetchOptions<TOutput>, 'method' | 'body' | 'signal'>
 ) {
   return async (input: TInput): Promise<TOutput> => {
     return fetchWithTimeout<TOutput>(url, {
