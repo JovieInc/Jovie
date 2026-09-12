@@ -1020,7 +1020,7 @@ class FallbackSeatPathTests(unittest.TestCase):
         script_dir = pathlib.Path(MODULE.__file__).resolve().parent
         expected = script_dir / "config" / "model-registry.json"
         if expected.is_file():
-            self.assertIs(found, expected)
+            self.assertEqual(found, expected)
         else:
             self.assertIsNone(found)
 
