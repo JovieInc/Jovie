@@ -164,6 +164,13 @@ def configured_executable(model, prefix=""):
         home = pathlib.Path.home()
         candidates.append(str(home / ".local/bin/grok"))
         candidates.append(str(home / ".grok/bin/grok"))
+    if model.get("provider") == "cursor":
+        alias = os.environ.get("GEM_CURSOR_BIN")
+        if alias:
+            candidates.append(alias)
+        home = pathlib.Path.home()
+        candidates.append(str(home / ".local/bin/cursor-agent-std"))
+        candidates.append(str(home / ".local/bin/cursor-agent"))
     if default:
         candidates.append(str(default))
     for candidate in candidates:

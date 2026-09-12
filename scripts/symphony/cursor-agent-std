@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Cursor CLI wrapper that bans Fast mode.
+"""Cursor CLI wrapper that preserves live catalog ids.
 
-The official `cursor-agent` binary stays in ~/.local/share/cursor-agent/versions.
-This wrapper is the PATH / GEM_CURSOR_EXECUTABLE entry: it rewrites --model
-so *-fast slugs never reach the binary. Do not inject [fast=false] — Cursor
-catalog ids like cursor-grok-4.6-high are distinct from the parameterized
-form cursor-grok-4.6-high[fast=false], which live JOV-5235 rejected.
+PATH / GEM_CURSOR_EXECUTABLE wrapper. Keep live `*-fast` catalog ids.
+Strip only bracketed `fast=`. Refuse silent Codex/Opus/auto/composer.
 """
 from __future__ import annotations
 
@@ -15,6 +12,10 @@ import re
 import sys
 
 VERSIONS = pathlib.Path.home() / ".local/share/cursor-agent/versions"
+SILENT_ALTERNATIVE_MARKERS = frozenset({
+    "opus", "newest", "auto", "codex", "composer", "claude",
+    "live-cheapest-capable", "cheapest", "sonnet",
+})
 PASSTHROUGH = {
     "login",
     "logout",
@@ -57,9 +58,8 @@ def real_binary() -> pathlib.Path:
 
 
 def lock_model(name: str) -> str:
-    """Map Fast catalog ids to the non-fast id without bracket injection."""
+    """Keep live catalog ids; drop only bracketed fast= parameters."""
     name = name.strip()
-    name = re.sub(r"-fast(?=(?:\[|$))", "", name)
     match = re.match(r"^(.*)\[(.*)\]$", name)
     if not match:
         return name
@@ -70,6 +70,38 @@ def lock_model(name: str) -> str:
         if part.strip() and not re.match(r"fast\s*=", part.strip(), re.I)
     ]
     return f"{base}[{','.join(kept)}]" if kept else base
+
+
+def is_silent_alternative(name: str) -> bool:
+    text = (name or "").strip().lower()
+    if not text:
+        return False
+    if text in SILENT_ALTERNATIVE_MARKERS:
+        return True
+    parts = re.split(r"[-_\[\]=,\s/.]+", text)
+    return any(part in SILENT_ALTERNATIVE_MARKERS for part in parts if part)
+
+
+def refused_model(argv: list[str]):
+    tokens = [arg for arg in argv if not arg.startswith("-")]
+    if tokens and tokens[0] in PASSTHROUGH:
+        return None
+    rewritten = rewrite(argv)
+    index = 0
+    while index < len(rewritten):
+        arg = rewritten[index]
+        if arg == "--model" and index + 1 < len(rewritten):
+            model = rewritten[index + 1]
+            if is_silent_alternative(model):
+                return model
+            index += 2
+            continue
+        if arg.startswith("--model="):
+            model = arg.split("=", 1)[1]
+            if is_silent_alternative(model):
+                return model
+        index += 1
+    return None
 
 
 def rewrite(argv: list[str]) -> list[str]:
@@ -94,6 +126,10 @@ def rewrite(argv: list[str]) -> list[str]:
 
 
 def main() -> int:
+    refused = refused_model(sys.argv[1:])
+    if refused:
+        print(f"REFUSED silent Cursor alternative: {refused}", file=sys.stderr)
+        return 2
     binary = real_binary()
     os.execv(str(binary), [str(binary), *rewrite(sys.argv[1:])])
     return 1

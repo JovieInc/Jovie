@@ -284,6 +284,18 @@ def _kimi_executable() -> str | None:
     return _provider_executable(("GEM_KIMI_BIN", "GEM_KIMI_EXECUTABLE"), "kimi")
 
 
+def _cursor_executable() -> str | None:
+    home_std = str(pathlib.Path.home() / ".local/bin/cursor-agent-std")
+    found = _provider_executable(("GEM_CURSOR_EXECUTABLE", "GEM_CURSOR_BIN"), home_std)
+    if found:
+        return found
+    # An invalid GEM_CURSOR_* path is fail-closed for that value, but the
+    # known-good wrapper and PATH binary remain valid recoveries.
+    if os.access(home_std, os.X_OK):
+        return home_std
+    return _provider_executable((), "cursor-agent")
+
+
 def _grok_canary_ready() -> tuple[bool, str]:
     """Prove the fallback provider can answer before releasing Symphony."""
     executable = _grok_executable()
@@ -413,6 +425,10 @@ def _model_router_selection(
     if kimi_exe:
         env.setdefault("GEM_KIMI_EXECUTABLE", kimi_exe)
         env.setdefault("GEM_KIMI_BIN", kimi_exe)
+    cursor_exe = _cursor_executable()
+    if cursor_exe:
+        env.setdefault("GEM_CURSOR_EXECUTABLE", cursor_exe)
+        env.setdefault("GEM_CURSOR_BIN", cursor_exe)
     command = [
         sys.executable,
         str(router),
@@ -1035,7 +1051,7 @@ def _provider_measured_capacity(provider: str) -> int:
     if provider == "cursor":
         # The registry proves the CLI executor, while one installed Cursor
         # session is the only portable seat observation available here.
-        return 1 if _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") else 0
+        return 1 if _cursor_executable() else 0
     return 0
 
 
@@ -2605,7 +2621,7 @@ def _grok_command(
     unit = _fallback_unit(identifier, issue_revision)
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     kimi_exe = _kimi_executable() or str(pathlib.Path.home() / ".local/bin/kimi")
-    cursor_exe = _provider_executable(("GEM_CURSOR_EXECUTABLE",), "cursor-agent") or "cursor-agent"
+    cursor_exe = _cursor_executable() or str(pathlib.Path.home() / ".local/bin/cursor-agent-std")
     provider = _selection_provider(selection) or "grok"
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",

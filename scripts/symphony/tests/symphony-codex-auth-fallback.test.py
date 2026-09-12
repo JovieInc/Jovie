@@ -3115,20 +3115,38 @@ PY
             self.assertIsNone(module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service"))
 
     def test_cursor_agent_std_does_not_inject_fast_false(self):
-        """Live JOV-5235: wrapper turned cursor-grok-4.6-high-fast into [fast=false]."""
+        """Live inventory is cursor-grok-4.6-high-fast; never inject [fast=false]."""
         loader = importlib.machinery.SourceFileLoader("cursor_agent_std", str(CURSOR_STD))
         module = loader.load_module()
-        self.assertEqual(module.lock_model("cursor-grok-4.6-high-fast"), "cursor-grok-4.6-high")
+        self.assertEqual(module.lock_model("cursor-grok-4.6-high-fast"), "cursor-grok-4.6-high-fast")
         self.assertEqual(module.lock_model("cursor-grok-4.6-high"), "cursor-grok-4.6-high")
         self.assertEqual(module.lock_model("grok-4.6[fast=true]"), "grok-4.6")
+        self.assertEqual(module.lock_model("cursor-grok-4.6-high[fast=false]"), "cursor-grok-4.6-high")
         self.assertEqual(
             module.lock_model("claude-opus-4-8[context=1m,fast=true]"),
             "claude-opus-4-8[context=1m]",
         )
         self.assertEqual(
             module.rewrite(["-p", "--force", "--model", "cursor-grok-4.6-high-fast", "fix it"]),
-            ["-p", "--force", "--model", "cursor-grok-4.6-high", "fix it"],
+            ["-p", "--force", "--model", "cursor-grok-4.6-high-fast", "fix it"],
         )
+        self.assertFalse(module.is_silent_alternative("cursor-grok-4.6-high-fast"))
+        self.assertFalse(module.is_silent_alternative("gpt-5.6-luna"))
+        self.assertTrue(module.is_silent_alternative("auto"))
+        self.assertTrue(module.is_silent_alternative("codex"))
+        self.assertTrue(module.is_silent_alternative("claude-opus-4-8"))
+        self.assertEqual(
+            module.refused_model(["-p", "--force", "--model", "auto", "fix it"]),
+            "auto",
+        )
+        self.assertEqual(
+            module.refused_model(["-p", "--force", "--model", "composer-2.5", "fix it"]),
+            "composer-2.5",
+        )
+        self.assertIsNone(
+            module.refused_model(["-p", "--force", "--model", "cursor-grok-4.6-high-fast", "fix it"])
+        )
+        self.assertIsNone(module.refused_model(["models"]))
 
     def test_grok_ship_one_changelog_push_failure_still_invokes_grok(self):
         """Live JOV-5238: changelog autoresolve then pre-push typecheck failed, no END."""

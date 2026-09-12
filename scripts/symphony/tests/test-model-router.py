@@ -105,6 +105,11 @@ class RegistryTests(unittest.TestCase):
             cfg["route_chains"]["remediation"][:3],
             ["grok-4.6", "kimi-k3", "cursor-grok-4.6"],
         )
+        cursor = next(model for model in cfg["models"] if model["id"] == "cursor-grok-4.6")
+        self.assertEqual(cursor["model"], "cursor-grok-4.6-high-fast")
+        self.assertEqual(cursor["executable_default"], "cursor-agent-std")
+        luna = next(model for model in cfg["models"] if model["id"] == "cursor-luna")
+        self.assertEqual(luna["model"], "gpt-5.6-luna-high")
         self.assertGreater(
             cfg["route_chains"]["new_pr"].index("qwen-coder-local"),
             cfg["route_chains"]["new_pr"].index("cursor-luna"),
@@ -286,6 +291,7 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(selected["id"], "cursor-grok-4.6")
             self.assertEqual(selected["pool"], "cursor-models")
             self.assertEqual(selected["provider"], "cursor")
+            self.assertEqual(selected["model"], "cursor-grok-4.6-high-fast")
 
     def test_exhausted_cursor_pool_degrades_to_grok_build_then_kimi(self):
         with tempfile.TemporaryDirectory() as td:

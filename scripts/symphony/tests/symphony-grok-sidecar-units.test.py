@@ -65,6 +65,7 @@ class UnitContractTests(unittest.TestCase):
         self.assertEqual(ini_value(text, "Type"), "oneshot")
         self.assertEqual(ini_value(text, "ExecStart"), "%h/.local/bin/symphony-grok-sidecar")
         self.assertIn("SYMPHONY_OAUTH_SEATS_PROBE=1", text)
+        self.assertIn("GEM_CURSOR_EXECUTABLE=%h/.local/bin/cursor-agent-std", text)
         success = set((ini_value(text, "SuccessExitStatus") or "").split())
         self.assertEqual(
             success,
@@ -166,6 +167,29 @@ class ExitClassificationTests(unittest.TestCase):
                     mock.patch.object(module, "_control", side_effect=control),
                 ):
                     self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
+
+    def test_exhausted_codex_dequeues_cursor_without_codex_retry(self):
+        module, controls, launched = self.module, [], {"fallback-ship-JOV-1.service"}
+        selected = {"id": "cursor-grok-4.6", "provider": "cursor", "model": "cursor-grok-4.6-high-fast", "pool": "cursor-models", "executor": {"executable": "/bin/true", "argv": ["{prompt}"]}}
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_admitted_or_remount_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], list(launched)]),
+            mock.patch.object(module, "_oauth_fallback_selections", return_value=({"cursor": {"schema_version": 1, "deterministic_first": True, "selected": selected}}, "oauth_ready")),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "gate_ready")),
+            mock.patch.object(module, "_provider_measured_capacity", side_effect=lambda provider: 1 if provider == "cursor" else 0),
+            mock.patch.object(module, "_launch_fallback_workers", return_value=(launched, 1)),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=list(launched)),
+            mock.patch.object(module, "_jov_active", return_value=True),
+            mock.patch.object(module, "_control", side_effect=lambda command: controls.append(command) or True),
+            mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as stderr,
+        ):
+            self.assertEqual(module.reconcile(), 0)
+        self.assertFalse(any("elixir" in " ".join(command) for command in controls if command[:3] == ["systemctl", "--user", "start"]))
+        self.assertIn("codex_exhausted", stderr.getvalue())
+        self.assertNotIn("codex_not_exhausted", stderr.getvalue())
 
     def test_ready_codex_drains_included_pools_without_stopping_symphony(self):
         module = self.module

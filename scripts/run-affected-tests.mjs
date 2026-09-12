@@ -614,8 +614,26 @@ const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/symphony/tests/gem-checkin-hud.test.py',
   'scripts/symphony/tests/symphony-burrito-workflow.test.py',
 ]);
+const CURSOR_CLI_WORKER_PRIMARY_INPUTS = new Set([
+  'scripts/symphony/cursor-agent-std',
+  'scripts/symphony/cursor-cli-worker.py',
+  'scripts/symphony/install-cursor-cli-worker.sh',
+  'scripts/symphony/systemd/cursor-cli-worker.service',
+  'scripts/symphony/systemd/cursor-cli-worker.timer',
+  'scripts/symphony/tests/cursor-cli-worker.test.py',
+]);
+const CURSOR_CLI_WORKER_LANE = new Set([
+  ...CURSOR_CLI_WORKER_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+]);
+const CURSOR_CLI_WORKER_PYTHON_TESTS = [
+  'scripts/symphony/tests/cursor-cli-worker.test.py',
+];
 const GEM_CHECKIN_HUD_LANE = new Set([
   ...GEM_CHECKIN_HUD_PRIMARY_INPUTS,
+  ...CURSOR_CLI_WORKER_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
   '.github/workflows/reusable-ci-lint.yml',
 ]);
@@ -1181,6 +1199,25 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: [
         'scripts/symphony/tests/hyperagent-lifecycle.test.py',
       ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [],
+    };
+  }
+  const isBoundedCursorCliWorkerChange =
+    files.some(file => CURSOR_CLI_WORKER_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => CURSOR_CLI_WORKER_LANE.has(file));
+  if (isBoundedCursorCliWorkerChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: CURSOR_CLI_WORKER_PYTHON_TESTS,
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
