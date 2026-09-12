@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 
@@ -31,15 +32,12 @@ describe('MarketingPricingPlans', () => {
       screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/signup?plan=free');
     expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=pro');
-    expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=max');
+      screen.getByRole('link', { name: 'Start 14-day Pro trial' })
+    ).toHaveAttribute('href', '/signup?plan=pro&interval=month');
+    expect(screen.getByRole('link', { name: 'Get Max' })).toHaveAttribute(
+      'href',
+      '/signup?plan=max&interval=month'
+    );
     expect(
       screen.getAllByRole('link').map(link => link.getAttribute('href'))
     ).not.toContain('/signup?plan=team');
@@ -72,7 +70,10 @@ describe('MarketingPricingPlans', () => {
     expect(
       screen.getByTestId('marketing-pricing-plan-free').parentElement
     ).toHaveAttribute('data-marketing-variant', 'tier-cards-neutral');
-    for (const plan of ['free', 'pro', 'max']) {
+    expect(
+      within(screen.getByTestId('marketing-pricing-plan-pro')).getByRole('link')
+    ).toHaveAttribute('data-variant', 'primary');
+    for (const plan of ['free', 'max']) {
       const card = screen.getByTestId(`marketing-pricing-plan-${plan}`);
       expect(card).toHaveAttribute('data-recommended', 'false');
       const cta = within(card).getByRole('link');
@@ -106,5 +107,36 @@ describe('MarketingPricingPlans', () => {
         'ghost'
       );
     }
+  });
+
+  it('switches annual prices and checkout intent from the plan-area selector', async () => {
+    const user = userEvent.setup();
+    render(
+      <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
+    );
+
+    expect(screen.getByTestId('marketing-pricing-plan-pro')).toHaveTextContent(
+      '$39'
+    );
+    await user.click(screen.getByRole('button', { name: 'Annual' }));
+
+    const proCard = screen.getByTestId('marketing-pricing-plan-pro');
+    expect(proCard).toHaveTextContent('$375');
+    expect(proCard).toHaveTextContent('$31.25/mo billed annually');
+    expect(proCard).toHaveTextContent('14-day Pro trial');
+    expect(within(proCard).getByRole('link')).toHaveAttribute(
+      'href',
+      '/signup?plan=pro&interval=year'
+    );
+
+    const maxCard = screen.getByTestId('marketing-pricing-plan-max');
+    expect(maxCard).toHaveTextContent('$1430');
+    expect(maxCard).toHaveTextContent('$119.17/mo billed annually');
+    expect(maxCard).toHaveTextContent('No Max trial');
+    expect(within(maxCard).getByRole('link')).toHaveAttribute(
+      'href',
+      '/signup?plan=max&interval=year'
+    );
+    expect(within(maxCard).getByRole('link')).toHaveTextContent('Get Max');
   });
 });

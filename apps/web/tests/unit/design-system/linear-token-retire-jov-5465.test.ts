@@ -38,6 +38,16 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
     expect(source).not.toMatch(/--linear-shadow-/);
   });
 
+  it('keeps PricingSection CTAs on the canonical Button and offer-truth copy', () => {
+    const source = readSource('components/features/home/PricingSection.tsx');
+    // JOV-6202: plan CTAs route through the published offer truth, never a
+    // hand-rolled href, and the canonical atom renders them.
+    expect(source).toContain("getPlanSignupHref('free')");
+    expect(source).toContain("getPlanCtaLabel('free')");
+    expect(source).toContain('PRO_TRIAL_TRUTH');
+    expect(source).not.toContain('Request Access');
+  });
+
   it('keeps ReleaseNotificationsSection on canonical shadow and duration tokens', () => {
     const source = readSource(
       'components/features/home/ReleaseNotificationsSection.tsx'

@@ -6,6 +6,7 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
+import { getPlanCtaLabel, getPlanSignupHref } from '@/lib/billing/offer-truth';
 
 const STORY_CARDS = [
   {
@@ -126,18 +127,18 @@ export function PricingRecipeBody({
             <p className='system-b-pricing-final-copy'>{requestAccessCopy}</p>
             <div className='system-b-pricing-actions system-b-pricing-actions--center'>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=free`}
+                href={getPlanSignupHref('free')}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
-                Claim your profile
+                {getPlanCtaLabel('free')}
               </Link>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=pro`}
+                href={getPlanSignupHref('pro')}
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
-                Start Pro trial
+                {getPlanCtaLabel('pro')}
               </Link>
             </div>
           </div>

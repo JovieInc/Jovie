@@ -4,7 +4,12 @@ import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { APP_ROUTES } from '@/constants/routes';
+import {
+  FREE_PROFILE_TRUTH,
+  getPlanCtaLabel,
+  getPlanSignupHref,
+  PRO_TRIAL_TRUTH,
+} from '@/lib/billing/offer-truth';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 const FREE_OUTCOMES = [
@@ -59,9 +64,9 @@ export function PricingSection() {
               </h2>
             </div>
             <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
-              Request access for smart links and your artist profile. Upgrade
-              when you want release notifications, deeper audience intelligence,
-              and stronger fan ownership.
+              Your profile stays free. Start a 14-day Pro trial when you want
+              release notifications, deeper audience intelligence, and stronger
+              fan ownership.
             </p>
           </div>
 
@@ -87,7 +92,7 @@ export function PricingSection() {
                 <span className='text-sm text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                Smart links, your artist profile, and the core launch surface.
+                {FREE_PROFILE_TRUTH}
               </p>
 
               <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
@@ -117,8 +122,8 @@ export function PricingSection() {
                 size='xl'
                 className='mt-7 w-full'
               >
-                <Link href={`${APP_ROUTES.SIGNUP}?plan=free`}>
-                  Request Access
+                <Link href={getPlanSignupHref('free')}>
+                  {getPlanCtaLabel('free')}
                 </Link>
               </Button>
             </div>
@@ -146,8 +151,7 @@ export function PricingSection() {
                 <span className='text-sm text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                Release notifications, audience intelligence, contact export,
-                and deeper fan ownership.
+                {PRO_TRIAL_TRUTH}
               </p>
 
               <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
@@ -177,7 +181,9 @@ export function PricingSection() {
                 size='xl'
                 className='mt-7 w-full'
               >
-                <Link href={`${APP_ROUTES.SIGNUP}?plan=pro`}>Choose Pro</Link>
+                <Link href={getPlanSignupHref('pro')}>
+                  {getPlanCtaLabel('pro')}
+                </Link>
               </Button>
             </div>
           </div>

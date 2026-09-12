@@ -1645,6 +1645,31 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   margin-top: var(--space-12);
 }
 
+:where(.system-b-pricing-page .marketing-pricing-offer) {
+  gap: var(--space-5);
+}
+
+:where(.system-b-pricing-page .marketing-pricing-interval__control) {
+  border-color: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 10%,
+    transparent
+  );
+  background: transparent;
+}
+
+:where(.system-b-pricing-page .marketing-pricing-interval__option) {
+  color: color-mix(in oklab, var(--system-b-text-primary) 56%, transparent);
+}
+
+:where(
+  .system-b-pricing-page
+    .marketing-pricing-interval__option[data-selected='true']
+) {
+  background: color-mix(in oklab, var(--system-b-text-primary) 6%, transparent);
+  color: var(--system-b-text-primary);
+}
+
 :where(.system-b-pricing-page .marketing-pricing-plans) {
   gap: var(--space-px);
   overflow: hidden;
@@ -1724,6 +1749,11 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   font-size: var(--text-base);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0;
+}
+
+:where(.system-b-pricing-page .marketing-pricing-plan-card__equivalent),
+:where(.system-b-pricing-page .marketing-pricing-plan-card__offer-note) {
+  color: color-mix(in oklab, var(--system-b-text-primary) 52%, transparent);
 }
 
 :where(.system-b-pricing-page .marketing-pricing-plan-card__cta) {

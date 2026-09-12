@@ -28,7 +28,20 @@ const {
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
+  redirect: vi.fn(),
 }));
+
+vi.mock('@/lib/auth/gate', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/auth/gate')>('@/lib/auth/gate');
+  return {
+    ...actual,
+    resolveUserState: vi.fn().mockResolvedValue({
+      state: actual.CanonicalUserState.UNAUTHENTICATED,
+      clerkUserId: null,
+    }),
+  };
+});
 
 vi.mock('@/features/auth', async () => {
   const reactModule = await import('react');
@@ -49,6 +62,8 @@ vi.mock('@/features/auth', async () => {
       authShellMock(props);
       return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
     },
+    AuthOfferSummary: () =>
+      reactModule.createElement('div', { 'data-testid': 'auth-offer-summary' }),
   };
 });
 
@@ -56,10 +71,17 @@ vi.mock('@/lib/analytics', () => ({
   track: trackMock,
 }));
 
-vi.mock('@/lib/auth/plan-intent', () => ({
-  setPlanIntent: setPlanIntentMock,
-  validatePlan: validatePlanMock,
-}));
+vi.mock('@/lib/auth/plan-intent', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/auth/plan-intent')>(
+    '@/lib/auth/plan-intent'
+  );
+  return {
+    ...actual,
+    setPlanIntent: setPlanIntentMock,
+    persistOfferIntentFromSearchParams: vi.fn(),
+    validatePlan: validatePlanMock,
+  };
+});
 
 vi.mock('@/lib/auth/signup-claim-storage', () => ({
   clearSignupClaimValue: clearSignupClaimValueMock,
@@ -71,8 +93,20 @@ vi.mock('@/lib/auth/signup-claim-storage', () => ({
 
 global.fetch = fetchMock as unknown as typeof fetch;
 
+import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import SignUpPage from '../../../app/(auth)/signup/page';
+
+async function renderSignupPage() {
+  return render(
+    await SignUpPage({
+      searchParams: Promise.resolve(
+        Object.fromEntries(new URLSearchParams(searchParamsState.value))
+      ),
+    })
+  );
+}
 
 describe('signup page', () => {
   beforeEach(() => {
@@ -87,15 +121,24 @@ describe('signup page', () => {
     routerPrefetchMock.mockReset();
     searchParamsState.value = '';
     setPlanIntentMock.mockReset();
+    vi.mocked(redirect).mockReset();
     sessionStorage.clear();
     trackMock.mockReset();
     validatePlanMock.mockReset();
-    validatePlanMock.mockImplementation(plan => plan);
+    validatePlanMock.mockImplementation(plan =>
+      plan === 'free' ||
+      plan === 'pro' ||
+      plan === 'max' ||
+      plan === 'team' ||
+      plan === 'enterprise'
+        ? plan
+        : null
+    );
     globalThis.history.replaceState(null, '', '/signup');
   });
 
-  it('renders AuthShell with the expected auth props', () => {
-    render(<SignUpPage />);
+  it('renders AuthShell with the expected auth props', async () => {
+    await renderSignupPage();
 
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
     expect(authLayoutMock).toHaveBeenCalledWith(
@@ -125,7 +168,7 @@ describe('signup page', () => {
   it('shows handle availability without writing pending claim session state', async () => {
     searchParamsState.value = 'handle=TestHandle';
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -152,7 +195,7 @@ describe('signup page', () => {
     );
     const replaceStateSpy = vi.spyOn(globalThis.history, 'replaceState');
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'An account with this email already exists. Try signing in instead.'
@@ -185,7 +228,7 @@ describe('signup page', () => {
       '/signup?oauth_error=account_exists&desktop_return=%2Fapp%2Fsettings'
     );
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(
       screen.getByRole('link', { name: 'Sign in instead' })
@@ -195,7 +238,7 @@ describe('signup page', () => {
   it('preserves redirect_url on the Clerk sign-in footer link', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -208,7 +251,7 @@ describe('signup page', () => {
   it('uses desktop_return for desktop browser auth fallback and sign-in link', async () => {
     searchParamsState.value = 'desktop_return=%2Fstart%3Fintent_id%3Dabc';
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -221,7 +264,7 @@ describe('signup page', () => {
   it('uses mobile_return for mobile browser auth fallback and sign-in link', async () => {
     searchParamsState.value = 'mobile_return=%2Fapp';
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -231,11 +274,41 @@ describe('signup page', () => {
     );
   });
 
+  it('sends existing subscribers with paid intent to billing instead of a new trial', async () => {
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: CanonicalUserState.ACTIVE,
+      clerkUserId: 'user_existing',
+    } as Awaited<ReturnType<typeof resolveUserState>>);
+
+    await SignUpPage({
+      searchParams: Promise.resolve({ plan: 'pro', interval: 'year' }),
+    });
+
+    expect(redirect).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_BILLING);
+  });
+
+  it('captures plan and interval from pricing checkout intent', async () => {
+    searchParamsState.value = 'plan=pro&interval=year';
+
+    await renderSignupPage();
+
+    expect(setPlanIntentMock).toHaveBeenCalledWith('pro', 'year');
+    expect(trackMock).toHaveBeenCalledWith(
+      'plan_intent_captured',
+      expect.objectContaining({
+        plan: 'pro',
+        interval: 'year',
+        source: 'pricing',
+      })
+    );
+    expect(screen.getByTestId('auth-offer-summary')).toBeInTheDocument();
+  });
+
   it('ignores invalid plan values and does not track plan intent', async () => {
     searchParamsState.value = 'plan=not-a-plan&handle=TestHandle';
     validatePlanMock.mockReturnValue(null);
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(validatePlanMock).toHaveBeenCalledWith('not-a-plan');
     expect(setPlanIntentMock).not.toHaveBeenCalled();
@@ -250,7 +323,7 @@ describe('signup page', () => {
         throw new Error('quota exceeded');
       });
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -271,7 +344,7 @@ describe('signup page', () => {
       json: async () => ({ available: false }),
     });
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(
       await screen.findByText(
@@ -284,7 +357,7 @@ describe('signup page', () => {
     searchParamsState.value = 'handle=BrokenHandle';
     fetchMock.mockRejectedValueOnce(new Error('network down'));
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(
       await screen.findByText(
@@ -302,7 +375,7 @@ describe('signup page', () => {
       '/signup?oauth_error=access_denied&redirect_url=%2Fonboarding%3Fhandle%3Dartist'
     );
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Sign-in was cancelled. Try again, or pick a different method.'
@@ -330,7 +403,7 @@ describe('signup page', () => {
       '/signup?oauth_error=account_exists&email=artist%40example.com'
     );
 
-    render(<SignUpPage />);
+    await renderSignupPage();
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('artist@example.com');

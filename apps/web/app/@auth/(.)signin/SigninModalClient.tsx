@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
+import { AuthOfferSummary } from '@/components/features/auth/AuthOfferSummary';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
@@ -24,6 +25,7 @@ export function SigninModalClient() {
   return (
     <AuthenticatedAuthEntryGuard>
       <AuthModalShell ariaLabel='Sign in to Jovie'>
+        <AuthOfferSummary mode='sign-in' />
         <AuthShell
           mode='sign-in'
           compact

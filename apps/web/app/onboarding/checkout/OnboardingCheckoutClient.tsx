@@ -11,6 +11,7 @@ import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
+import type { BillingInterval } from '@/lib/billing/offer-truth';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ interface OnboardingCheckoutClientProps {
   readonly avatarUrl: string | null;
   readonly spotifyFollowers: number | null;
   readonly isDefaultUpsell: boolean;
+  readonly initialInterval?: BillingInterval;
 }
 
 // formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
@@ -190,6 +192,7 @@ export function OnboardingCheckoutClient({
   avatarUrl,
   spotifyFollowers,
   isDefaultUpsell,
+  initialInterval,
 }: OnboardingCheckoutClientProps) {
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
@@ -197,7 +200,11 @@ export function OnboardingCheckoutClient({
   const annualSavingsPercent = hasAnnualOption
     ? getAnnualSavingsPercent(monthlyAmount, annualAmount)
     : 0;
-  const [isAnnual, setIsAnnual] = useState(annualSavingsPercent > 25);
+  const [isAnnual, setIsAnnual] = useState(() => {
+    if (initialInterval === 'year' && hasAnnualOption) return true;
+    if (initialInterval === 'month') return false;
+    return annualSavingsPercent > 25;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

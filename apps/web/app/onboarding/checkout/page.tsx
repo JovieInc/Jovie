@@ -11,11 +11,13 @@ import {
 import type { PlanIntentTier } from '@/lib/auth/plan-intent';
 import {
   DEFAULT_UPSELL_PLAN,
+  getBillingIntervalFromCookies,
   getPlanIntentFromCookies,
   isPaidIntent,
   recommendPlan,
   validatePlan,
 } from '@/lib/auth/plan-intent';
+import { validateBillingInterval } from '@/lib/billing/offer-truth';
 import { PRICING } from '@/lib/config/pricing';
 import { isMaxPlanEnabled } from '@/lib/stripe/config';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
@@ -85,6 +87,11 @@ export default async function OnboardingCheckoutPage({
     const planParam = typeof params.plan === 'string' ? params.plan : null;
     planIntent = validatePlan(planParam);
   }
+  const intervalParam =
+    typeof params.interval === 'string' ? params.interval : null;
+  const billingInterval =
+    validateBillingInterval(intervalParam) ??
+    getBillingIntervalFromCookies(cookieHeader);
 
   // Determine if this is an organic upsell vs explicit paid intent
   // source= query param is authoritative (set by navigateAfterOnboarding)
@@ -164,6 +171,7 @@ export default async function OnboardingCheckoutPage({
       avatarUrl={profileData.avatarUrl}
       spotifyFollowers={profileData.spotifyFollowers}
       isDefaultUpsell={isDefaultUpsell}
+      initialInterval={billingInterval}
     />
   );
 }
