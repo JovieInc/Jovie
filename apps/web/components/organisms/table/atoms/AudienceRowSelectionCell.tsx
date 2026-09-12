@@ -25,7 +25,7 @@ export function AudienceRowSelectionCell({
         className
       )}
     >
-      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation only — nested Checkbox owns the real control; a <button> here would nest interactives. */}
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation only — nested Checkbox owns the real control; a raw button element here would nest interactives. */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: same wrapper; not a click target. */}
       <div
         className='relative flex h-5 w-5 items-center justify-center'
