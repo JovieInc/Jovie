@@ -37,19 +37,22 @@ describe('stale consumer action links cannot mutate Ovie captures', () => {
   it.each([
     ['reject', reject, '<>', 'workflow_capture.request'],
     ['next-step', nextStep, '=', 'experiment.report'],
-  ] as const)('%s restricts both mutation and retry lookup by owned kind', async (_name, action, operator, kind) => {
-    const response = await action(
-      new Request('https://jov.ie/api', { method: 'POST' }),
-      { params: Promise.resolve({ id: 'capture' }) }
-    );
-    expect(response.status).toBe(404);
-    for (const mock of [mocks.updateWhere, mocks.readWhere]) {
-      const query = new PgDialect().sqlToQuery(mock.mock.calls[0][0]);
-      expect(query.sql).toContain(`"suggested_actions"."kind" ${operator}`);
-      expect(query.params).toContain(kind);
-      expect(query.params).toContain('owner');
-      expect(query.params).toContain('capture');
+  ] as const)(
+    '%s restricts both mutation and retry lookup by owned kind',
+    async (_name, action, operator, kind) => {
+      const response = await action(
+        new Request('https://jov.ie/api', { method: 'POST' }),
+        { params: Promise.resolve({ id: 'capture' }) }
+      );
+      expect(response.status).toBe(404);
+      for (const mock of [mocks.updateWhere, mocks.readWhere]) {
+        const query = new PgDialect().sqlToQuery(mock.mock.calls[0][0]);
+        expect(query.sql).toContain(`"suggested_actions"."kind" ${operator}`);
+        expect(query.params).toContain(kind);
+        expect(query.params).toContain('owner');
+        expect(query.params).toContain('capture');
+      }
+      expect(mocks.record).not.toHaveBeenCalled();
     }
-    expect(mocks.record).not.toHaveBeenCalled();
-  });
+  );
 });

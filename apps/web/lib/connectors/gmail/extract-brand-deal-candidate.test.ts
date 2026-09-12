@@ -67,9 +67,12 @@ describe('extractGmailBrandDealCandidate', () => {
     'A7X3 current paid creator campaign brief',
     'Creator economy current paid creator campaign brief',
     'Influencer activation current paid creator campaign brief',
-  ])('rejects adjacent work instead of treating it as a personal deal: %s', subject => {
-    expect(extractWith({ subject })).toBeNull();
-  });
+  ])(
+    'rejects adjacent work instead of treating it as a personal deal: %s',
+    subject => {
+      expect(extractWith({ subject })).toBeNull();
+    }
+  );
 
   it('rejects forbidden commercial terms', () => {
     expect(

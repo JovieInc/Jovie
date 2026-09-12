@@ -68,29 +68,27 @@ describe('authoritative pinned opportunity context', () => {
 });
 
 describe('consumer card contract', () => {
-  it.each([
-    'suggestion',
-    'tour_date',
-    'report',
-    'brand_deal',
-  ])('preserves %s including optional action evidence', category => {
-    expect(
-      normalizeCustomerPinnedOpportunity({
-        id: ' x ',
-        title: ' Verified ',
-        category,
-        primaryActionLabel: ' Review ',
-        signalType: ' other ',
-      })
-    ).toEqual({
-      id: 'x',
-      title: 'Verified',
-      why: '',
-      typeLabel: '',
-      primaryActionLabel: 'Review',
-      signalType: 'other',
-    });
-  });
+  it.each(['suggestion', 'tour_date', 'report', 'brand_deal'])(
+    'preserves %s including optional action evidence',
+    category => {
+      expect(
+        normalizeCustomerPinnedOpportunity({
+          id: ' x ',
+          title: ' Verified ',
+          category,
+          primaryActionLabel: ' Review ',
+          signalType: ' other ',
+        })
+      ).toEqual({
+        id: 'x',
+        title: 'Verified',
+        why: '',
+        typeLabel: '',
+        primaryActionLabel: 'Review',
+        signalType: 'other',
+      });
+    }
+  );
   it('rejects malformed authoritative cards and ID hints', () => {
     for (const value of [
       null,

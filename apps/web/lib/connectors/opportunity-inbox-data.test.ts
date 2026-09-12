@@ -47,19 +47,19 @@ function expectConsumerQuery(call: number) {
 }
 
 describe('consumer opportunity storage boundary', () => {
-  it.each([
-    false,
-    true,
-  ])('keeps founder/admin=%s on the consumer read policy', async isAdmin => {
-    mocks.user.mockResolvedValue({ id: 'owner', isAdmin });
-    const response = await GET();
-    expect(response.status).toBe(200);
-    expect(
-      (await response.json()).cards.map((c: { id: string }) => c.id)
-    ).toEqual(['creator-opportunity']);
-    expectConsumerQuery(0);
-    expect(mocks.limit).toHaveBeenCalledWith(50);
-  });
+  it.each([false, true])(
+    'keeps founder/admin=%s on the consumer read policy',
+    async isAdmin => {
+      mocks.user.mockResolvedValue({ id: 'owner', isAdmin });
+      const response = await GET();
+      expect(response.status).toBe(200);
+      expect(
+        (await response.json()).cards.map((c: { id: string }) => c.id)
+      ).toEqual(['creator-opportunity']);
+      expectConsumerQuery(0);
+      expect(mocks.limit).toHaveBeenCalledWith(50);
+    }
+  );
   it('uses the same owner and audience restriction through migration fallback and mobile', async () => {
     mocks.limit.mockRejectedValueOnce(
       new Error('column signal_type does not exist')
