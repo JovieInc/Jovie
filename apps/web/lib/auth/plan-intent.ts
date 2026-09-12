@@ -45,11 +45,57 @@ export function validatePlan(
   return value as PlanIntentTier;
 }
 
+export type AuthBillingInterval = 'monthly' | 'annual';
+
+export type PlanIntentRecord = {
+  readonly plan: PlanIntentTier;
+  readonly interval: AuthBillingInterval | null;
+  readonly artist: string | null;
+};
+
+type PlanIntentStoragePayload = {
+  readonly plan?: string;
+  readonly ts?: number;
+  readonly interval?: string;
+  readonly artist?: string;
+};
+
+function parseBillingInterval(
+  value: string | null | undefined
+): AuthBillingInterval | null {
+  if (value === 'monthly' || value === 'annual') return value;
+  return null;
+}
+
+function parseStoredPlanIntent(
+  raw: string,
+  now = Date.now()
+): PlanIntentRecord | null {
+  const parsed = JSON.parse(raw) as PlanIntentStoragePayload;
+  if (parsed.ts && now - parsed.ts > PLAN_INTENT_TTL_MS) {
+    return null;
+  }
+  const plan = validatePlan(parsed.plan);
+  if (!plan) return null;
+  return {
+    plan,
+    interval: parseBillingInterval(parsed.interval),
+    artist: parsed.artist?.trim() ? parsed.artist : null,
+  };
+}
+
 /**
  * Store plan intent in cookie + sessionStorage.
  * Called when user arrives at /signup with a ?plan= param.
+ * Cookie stays plan-only so existing server readers keep working.
  */
-export function setPlanIntent(plan: string): void {
+export function setPlanIntent(
+  plan: string,
+  extras?: {
+    readonly interval?: AuthBillingInterval | null;
+    readonly artist?: string | null;
+  }
+): void {
   const validated = validatePlan(plan);
   if (!validated) return;
 
@@ -61,11 +107,16 @@ export function setPlanIntent(plan: string): void {
     // SSR or restricted context
   }
 
-  // Backup in sessionStorage
+  // Backup in sessionStorage — extras survive OAuth/email interrupts
   try {
     globalThis.sessionStorage?.setItem(
       PLAN_INTENT_KEY,
-      JSON.stringify({ plan: validated, ts: Date.now() })
+      JSON.stringify({
+        plan: validated,
+        ts: Date.now(),
+        ...(extras?.interval ? { interval: extras.interval } : {}),
+        ...(extras?.artist ? { artist: extras.artist } : {}),
+      })
     );
   } catch {
     // sessionStorage unavailable
@@ -77,35 +128,49 @@ export function setPlanIntent(plan: string): void {
  * Returns the validated plan tier or null if absent/expired/invalid.
  */
 export function getPlanIntent(): PlanIntentTier | null {
+  return getPlanIntentRecord()?.plan ?? null;
+}
+
+/**
+ * Read the full plan-intent record (tier + billing interval + artist)
+ * from cookie/sessionStorage. Cookie is plan-only; extras live in storage.
+ */
+export function getPlanIntentRecord(): PlanIntentRecord | null {
+  let cookiePlan: PlanIntentTier | null = null;
+
   // Try cookie first
   try {
     const cookies = readCookieTokens(document.cookie);
     const match = cookies.find(c => c.startsWith(`${PLAN_INTENT_KEY}=`));
     if (match) {
-      const value = match.split('=')[1];
-      const validated = validatePlan(value);
-      if (validated) return validated;
+      cookiePlan = validatePlan(match.split('=')[1]);
     }
   } catch {
     // SSR or restricted context
   }
 
-  // Fall back to sessionStorage
+  // Fall back to sessionStorage for extras (and plan if cookie missing)
   try {
     const raw = globalThis.sessionStorage?.getItem(PLAN_INTENT_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as { plan?: string; ts?: number };
-      if (parsed.ts && Date.now() - parsed.ts > PLAN_INTENT_TTL_MS) {
+      const stored = parseStoredPlanIntent(raw);
+      if (!stored) {
         globalThis.sessionStorage?.removeItem(PLAN_INTENT_KEY);
-        return null;
+        return cookiePlan
+          ? { plan: cookiePlan, interval: null, artist: null }
+          : null;
       }
-      return validatePlan(parsed.plan);
+      return {
+        plan: cookiePlan ?? stored.plan,
+        interval: stored.interval,
+        artist: stored.artist,
+      };
     }
   } catch {
     // sessionStorage unavailable or corrupt
   }
 
-  return null;
+  return cookiePlan ? { plan: cookiePlan, interval: null, artist: null } : null;
 }
 
 /**

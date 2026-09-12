@@ -27,10 +27,13 @@ describe('access route matrix (JOV-3087)', () => {
         false,
         APP_ROUTES.USER_CREATION_ERROR,
       ],
-    ])('maps %s to app-shell access %s and /start redirect %s', (state, expectedAppAccess, expectedStartRedirect) => {
-      expect(canAccessAppShell(state)).toBe(expectedAppAccess);
-      expect(getStartRouteRedirect(state)).toBe(expectedStartRedirect);
-    });
+    ])(
+      'maps %s to app-shell access %s and /start redirect %s',
+      (state, expectedAppAccess, expectedStartRedirect) => {
+        expect(canAccessAppShell(state)).toBe(expectedAppAccess);
+        expect(getStartRouteRedirect(state)).toBe(expectedStartRedirect);
+      }
+    );
 
     it.each([
       [CanonicalUserState.UNAUTHENTICATED, APP_ROUTES.SIGNIN],
@@ -68,6 +71,38 @@ describe('access route matrix (JOV-3087)', () => {
       expect(
         getClientAuthenticatedAuthEntryRedirect(new URLSearchParams())
       ).toBe(APP_ROUTES.DASHBOARD);
+    });
+
+    it('sends paid-offer arrivals to checkout and existing subscribers to billing', () => {
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(
+          new URLSearchParams('plan=pro&interval=annual&artist_name=Motion')
+        )
+      ).toBe(
+        `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=annual&artist_name=Motion`
+      );
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(
+          new URLSearchParams('plan=max'),
+          { isPaidSubscriber: true }
+        )
+      ).toBe(APP_ROUTES.SETTINGS_BILLING);
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.ACTIVE, {
+          isPaidSubscriber: true,
+          offerSearchParams: new URLSearchParams('plan=pro'),
+        })
+      ).toBe(APP_ROUTES.SETTINGS_BILLING);
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.NEEDS_ONBOARDING, {
+          offerSearchParams: new URLSearchParams('plan=pro&billing=yearly'),
+        })
+      ).toBe(`${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=pro&interval=annual`);
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.WAITLIST_PENDING, {
+          offerSearchParams: new URLSearchParams('plan=pro'),
+        })
+      ).toBe(APP_ROUTES.WAITLIST);
     });
 
     it('preserves safe redirect_url values for client auth-entry redirects', () => {
@@ -139,16 +174,17 @@ describe('access route matrix (JOV-3087)', () => {
       expect(getWaitlistRouteRedirect(state)).toBe(expected);
     });
 
-    it.each(
-      allStates
-    )('does not bounce %s in a /start ↔ /waitlist redirect loop', state => {
-      const startRedirect = getStartRouteRedirect(state);
-      const waitlistRedirect = getWaitlistRouteRedirect(state);
-      const loops =
-        startRedirect === APP_ROUTES.WAITLIST &&
-        waitlistRedirect === APP_ROUTES.START;
-      expect(loops).toBe(false);
-    });
+    it.each(allStates)(
+      'does not bounce %s in a /start ↔ /waitlist redirect loop',
+      state => {
+        const startRedirect = getStartRouteRedirect(state);
+        const waitlistRedirect = getWaitlistRouteRedirect(state);
+        const loops =
+          startRedirect === APP_ROUTES.WAITLIST &&
+          waitlistRedirect === APP_ROUTES.START;
+        expect(loops).toBe(false);
+      }
+    );
 
     it('projects pre-receipt waitlist states as onboarding, not waitlist, for proxy', () => {
       expect(

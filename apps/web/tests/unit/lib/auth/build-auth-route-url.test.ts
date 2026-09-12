@@ -40,6 +40,24 @@ describe('buildAuthRouteUrl', () => {
       '/path?redirect_url=%2Fonboarding'
     );
   });
+
+  it('forwards paid plan, billing interval, and artist through auth cross-links', () => {
+    const searchParams = new URLSearchParams(
+      'plan=pro&interval=annual&artist_name=Motion&email=you%40example.com&oauth_error=account_exists'
+    );
+
+    expect(buildAuthRouteUrl('/signin', searchParams)).toBe(
+      '/signin?plan=pro&interval=annual&artist_name=Motion'
+    );
+  });
+
+  it('drops unknown plans and invented billing intervals', () => {
+    const searchParams = new URLSearchParams(
+      'plan=founding&billing=lifetime&artist=https%3A%2F%2Fevil.example'
+    );
+
+    expect(buildAuthRouteUrl('/signup', searchParams)).toBe('/signup');
+  });
 });
 
 describe('buildProtectedAuthRedirectUrl', () => {

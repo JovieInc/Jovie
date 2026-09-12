@@ -19,6 +19,12 @@ import {
   resolveAuthShellIntent,
 } from '@/lib/auth/auth-shell-intent';
 import {
+  type AuthOfferSummary,
+  persistAuthOfferFromSearchParams,
+  readAuthOfferHandoff,
+  resolveAuthOfferSummary,
+} from '@/lib/auth/auth-shell-offer';
+import {
   buildAuthRouteUrl,
   getDefaultSignUpFallbackRedirectUrl,
 } from '@/lib/auth/build-auth-route-url';
@@ -49,13 +55,25 @@ function resolveLegalHref(value: string | undefined, fallback: string) {
  * mode-aware so a denied-at-Google lands back on the right auth page with
  * `?error=` for the `SignInOauthErrorBanner` to classify (audit row 19).
  */
-function getCallbackUrl(mode: AuthShellMode): string {
-  return mode === 'sign-up' ? APP_ROUTES.SIGNUP : APP_ROUTES.SIGNIN;
+function getCallbackUrl(
+  mode: AuthShellMode,
+  searchParams: Pick<URLSearchParams, 'get'>
+): string {
+  return buildAuthRouteUrl(
+    mode === 'sign-up' ? APP_ROUTES.SIGNUP : APP_ROUTES.SIGNIN,
+    searchParams
+  );
 }
 
-function getErrorCallbackUrl(mode: AuthShellMode, callbackURL: string): string {
-  const base = getCallbackUrl(mode);
-  const errorUrl = new URL(base, 'https://jov.ie');
+function getErrorCallbackUrl(
+  mode: AuthShellMode,
+  callbackURL: string,
+  searchParams: Pick<URLSearchParams, 'get'>
+): string {
+  const errorUrl = new URL(
+    getCallbackUrl(mode, searchParams),
+    'https://jov.ie'
+  );
   const callback = new URL(callbackURL, 'https://jov.ie');
   if (callback.pathname === '/auth/callback') {
     const state = callback.searchParams.get('state');
@@ -181,6 +199,17 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   const back = compact
     ? null
     : (backProp ?? resolveAuthShellBackLink(searchParams));
+  const offer = useMemo(
+    () =>
+      resolveAuthOfferSummary({
+        handoff: readAuthOfferHandoff(searchParams),
+      }),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    persistAuthOfferFromSearchParams(searchParams);
+  }, [searchParams]);
 
   useEffect(() => {
     setHasHydrated(true);
@@ -210,8 +239,13 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       // (staging OAuth runtime proof / real users on slow first paint).
       if (!hasHydrated || pendingProvider) return;
 
-      const callbackURL = fallbackRedirectUrl ?? getCallbackUrl(mode);
-      const errorCallbackURL = getErrorCallbackUrl(mode, callbackURL);
+      const callbackURL =
+        fallbackRedirectUrl ?? getCallbackUrl(mode, searchParams);
+      const errorCallbackURL = getErrorCallbackUrl(
+        mode,
+        callbackURL,
+        searchParams
+      );
       const newUserCallbackURL = fallbackRedirectUrl ?? getNewUserCallbackUrl();
       const attempt = ++oauthAttemptRef.current;
 
@@ -258,7 +292,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         );
       }
     },
-    [fallbackRedirectUrl, hasHydrated, mode, pendingProvider]
+    [fallbackRedirectUrl, hasHydrated, mode, pendingProvider, searchParams]
   );
 
   if (hasHydrated && isAuthLoaded && isSignedIn) {
@@ -290,6 +324,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           intent={intent}
           claimHandle={claimHandle}
           back={back}
+          offer={offer}
           oppositeModeUrl={crossLinkUrl}
           forceHardNavigation={forceOppositeModeHardNavigation}
           providers={enabledOAuthProviders}
@@ -329,6 +364,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         intent={intent}
         claimHandle={claimHandle}
         back={back}
+        offer={offer}
         oppositeModeUrl={crossLinkUrl}
         forceHardNavigation={forceOppositeModeHardNavigation}
         providers={enabledOAuthProviders}
@@ -362,14 +398,35 @@ function AuthQuietBackLink({ href, label }: Readonly<AuthShellBackLink>) {
   );
 }
 
+function AuthShellOfferSummary({
+  offer,
+}: Readonly<{ offer: AuthOfferSummary }>) {
+  return (
+    <p
+      data-auth-offer-summary
+      data-auth-offer-kind={offer.kind}
+      className='mt-2 text-sm leading-5 text-secondary-token'
+    >
+      <span className='block font-medium text-primary-token'>
+        {offer.title}
+      </span>
+      {'detail' in offer ? (
+        <span className='mt-0.5 block'>{offer.detail}</span>
+      ) : null}
+    </p>
+  );
+}
+
 function AuthShellIdentity({
   intent,
   claimHandle,
   back,
+  offer,
 }: Readonly<{
   intent: AuthShellIntent;
   claimHandle?: string;
   back: AuthShellBackLink | null;
+  offer: AuthOfferSummary | null;
 }>) {
   return (
     <div
@@ -387,6 +444,7 @@ function AuthShellIdentity({
       <h1 className='text-xl font-semibold leading-tight tracking-tight text-primary-token'>
         {getAuthShellHeading(intent, claimHandle)}
       </h1>
+      {offer ? <AuthShellOfferSummary offer={offer} /> : null}
     </div>
   );
 }
@@ -396,6 +454,7 @@ function AuthOAuthStartSurface({
   intent,
   claimHandle,
   back,
+  offer,
   oppositeModeUrl,
   forceHardNavigation,
   providers,
@@ -411,6 +470,7 @@ function AuthOAuthStartSurface({
   intent: AuthShellIntent;
   claimHandle?: string;
   back: AuthShellBackLink | null;
+  offer: AuthOfferSummary | null;
   oppositeModeUrl: string;
   forceHardNavigation: boolean;
   providers: readonly PrimaryAuthOAuthProvider[];
@@ -435,6 +495,7 @@ function AuthOAuthStartSurface({
         intent={intent}
         claimHandle={claimHandle}
         back={back}
+        offer={offer}
       />
 
       {hasProviders ? (

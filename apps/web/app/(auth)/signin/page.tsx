@@ -24,6 +24,10 @@ export default async function SignInPage({
       getAuthenticatedAuthRouteRedirect(authResult.state, {
         redirectUrl,
         authState,
+        isPaidSubscriber: authResult.context.isPro,
+        offerSearchParams: {
+          get: key => (typeof params[key] === 'string' ? params[key] : null),
+        },
       })
     );
   }

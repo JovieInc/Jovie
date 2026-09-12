@@ -91,7 +91,7 @@ describe('desktop auth return helpers', () => {
           'desktop_return=%2Fapp%2Fsettings&redirect_url=%2Fignored'
         )
       )
-    ).toBe('/signup?desktop_return=%2Fapp%2Fsettings');
+    ).toBe('/signup?redirect_url=%2Fignored&desktop_return=%2Fapp%2Fsettings');
 
     expect(
       buildAuthRouteUrlWithDesktopReturn(

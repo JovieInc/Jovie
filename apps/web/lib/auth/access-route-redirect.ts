@@ -2,6 +2,10 @@ import { AUTH_STATE_PARAM } from '@jovie/auth-routing';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import {
+  readAuthOfferHandoff,
+  resolveAuthenticatedOfferRedirect,
+} from './auth-shell-offer';
+import {
   CanonicalUserState,
   getRedirectForState,
 } from './canonical-user-state';
@@ -48,6 +52,8 @@ export function getAuthenticatedAuthRouteRedirect(
   options?: {
     readonly redirectUrl?: string | null;
     readonly authState?: string | null;
+    readonly offerSearchParams?: { get(name: string): string | null };
+    readonly isPaidSubscriber?: boolean;
   }
 ): string {
   const sanitizedRedirect = sanitizeRedirectUrl(options?.redirectUrl ?? null);
@@ -74,6 +80,19 @@ export function getAuthenticatedAuthRouteRedirect(
     return sanitizedRedirect;
   }
 
+  const offerRedirect =
+    options?.offerSearchParams &&
+    (state === CanonicalUserState.ACTIVE ||
+      state === CanonicalUserState.NEEDS_ONBOARDING)
+      ? resolveAuthenticatedOfferRedirect({
+          handoff: readAuthOfferHandoff(options.offerSearchParams),
+          isPaidSubscriber: options.isPaidSubscriber,
+        })
+      : null;
+  if (offerRedirect) {
+    return offerRedirect;
+  }
+
   if (stateRedirect) {
     return stateRedirect;
   }
@@ -96,7 +115,8 @@ type AuthEntrySearchParams = {
  * `getAuthenticatedAuthRouteRedirect` without a canonical state lookup.
  */
 export function getClientAuthenticatedAuthEntryRedirect(
-  searchParams: AuthEntrySearchParams
+  searchParams: AuthEntrySearchParams,
+  options?: { readonly isPaidSubscriber?: boolean }
 ): string {
   const nativeCallback = getCentralAuthCallbackPath(searchParams);
   if (nativeCallback) {
@@ -109,6 +129,14 @@ export function getClientAuthenticatedAuthEntryRedirect(
 
   if (sanitizedRedirect && isWaitlistInviteRedirect(sanitizedRedirect)) {
     return sanitizedRedirect;
+  }
+
+  const offerRedirect = resolveAuthenticatedOfferRedirect({
+    handoff: readAuthOfferHandoff(searchParams),
+    isPaidSubscriber: options?.isPaidSubscriber,
+  });
+  if (offerRedirect) {
+    return offerRedirect;
   }
 
   if (sanitizedRedirect && !isAuthEntryRedirect(sanitizedRedirect)) {

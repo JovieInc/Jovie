@@ -3,6 +3,7 @@ import {
   getElectronAuthCompleteProtocolForOrigin,
 } from '@jovie/auth-routing';
 import { APP_ROUTES } from '@/constants/routes';
+import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 
 export const DESKTOP_RETURN_PARAM = 'desktop_return';
 export const DESKTOP_AUTH_RETURN_PATH = APP_ROUTES.AUTH_RETURN;
@@ -141,7 +142,10 @@ export function buildAuthRouteUrlWithDesktopReturn(
   pathname: string,
   searchParams: SearchParamReader
 ): string {
-  const routeUrl = new URL(pathname, 'https://jov.ie');
+  const routeUrl = new URL(
+    buildAuthRouteUrl(pathname, searchParams),
+    'https://jov.ie'
+  );
   const desktopReturn = sanitizeDesktopReturnRoute(
     searchParams.get(DESKTOP_RETURN_PARAM)
   );
