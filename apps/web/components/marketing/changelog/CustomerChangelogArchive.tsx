@@ -116,7 +116,7 @@ function MonthSection({
     >
       <h2
         id={`changelog-month-${group.monthKey}`}
-        className='text-sm font-medium text-tertiary-token'
+        className='truncate text-sm font-medium text-tertiary-token'
       >
         {group.label}
       </h2>
