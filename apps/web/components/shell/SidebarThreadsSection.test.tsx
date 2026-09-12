@@ -419,11 +419,8 @@ describe('founder-locked calm sidebar history', () => {
         collapsed={false}
       />
     );
-    expect(
-      screen
-        .getByRole('button', { name: 'Filter Unread Chats' })
-        .querySelector('svg')
-    ).not.toBeNull();
+    const filter = screen.getByRole('button', { name: 'Filter Unread Chats' });
+    expect(filter.querySelector('svg')).not.toBeNull();
     expect(screen.getByText('TODAY')).toBeInTheDocument();
     expect(screen.getByText('EARLIER')).toBeInTheDocument();
     expect(screen.getByText('2m')).toHaveAttribute(
@@ -434,14 +431,10 @@ describe('founder-locked calm sidebar history', () => {
       'href',
       APP_ROUTES.CHATS
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Filter Unread Chats' })
-    );
+    fireEvent.click(filter);
     expect(screen.getByText('Release rollout')).toBeInTheDocument();
     expect(screen.queryByText('Pitch tasks')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Filter Unread Chats' })
-    ).toHaveAttribute('aria-pressed', 'true');
+    expect(filter).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('retains retry and context actions and hides history when collapsed', () => {
