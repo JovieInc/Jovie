@@ -2,15 +2,10 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 import { StaticArtistPage } from './StaticArtistPage';
 
-const meta: Meta<typeof StaticArtistPage> = {
+const meta = {
   title: 'Profile/StaticArtistPage',
   component: StaticArtistPage,
-  parameters: {
-    layout: 'fullscreen',
-    jovie: {
-      uncoveredProps: ['disabled'],
-    },
-  },
+  parameters: { layout: 'fullscreen', jovie: { uncoveredProps: ['disabled'] } },
   args: {
     mode: 'profile',
     artist: PROFILE_STORY_ARTIST,
@@ -31,7 +26,7 @@ const meta: Meta<typeof StaticArtistPage> = {
       },
     ],
   },
-};
+} satisfies Meta<typeof StaticArtistPage>;
 
 export default meta;
 

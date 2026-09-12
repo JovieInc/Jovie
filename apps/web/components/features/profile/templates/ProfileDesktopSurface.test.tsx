@@ -333,8 +333,6 @@ describe('ProfileDesktopSurface', () => {
 
     const listenGrid = screen.getByTestId('profile-listen-desktop-grid');
     expect(listenGrid).toHaveClass(PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME);
-    // JOV-6197: with no imported catalog the Listen card takes the releases
-    // column; the DSP column carries the Latest Release / Pay sidebar.
     expect(
       screen.getByTestId('profile-primary-tab-artist-streaming')
     ).toHaveClass(PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME);

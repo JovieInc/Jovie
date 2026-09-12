@@ -10,18 +10,21 @@ const contentPrefs: Record<NotificationContentType, boolean> = {
   general: false,
 };
 
+const viewProps = {
+  presentation: 'embedded' as const,
+  contentPrefs,
+  onUnsubscribe: vi.fn(),
+  isUnsubscribing: false,
+};
+
 describe('AlertsSettingsView', () => {
   it('keeps preference switches inside Manage after signup', () => {
     const onTogglePref = vi.fn<(key: NotificationContentType) => void>();
-
     render(
       <AlertsSettingsView
-        presentation='embedded'
+        {...viewProps}
         isSubscribed
-        contentPrefs={contentPrefs}
         onTogglePref={onTogglePref}
-        onUnsubscribe={vi.fn()}
-        isUnsubscribing={false}
       />
     );
 
@@ -37,15 +40,11 @@ describe('AlertsSettingsView', () => {
 
   it('does not expose preference switches as live controls before signup', () => {
     const onTogglePref = vi.fn();
-
     render(
       <AlertsSettingsView
-        presentation='embedded'
+        {...viewProps}
         isSubscribed={false}
-        contentPrefs={contentPrefs}
         onTogglePref={onTogglePref}
-        onUnsubscribe={vi.fn()}
-        isUnsubscribing={false}
       />
     );
 

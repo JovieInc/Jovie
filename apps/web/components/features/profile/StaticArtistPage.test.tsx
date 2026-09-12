@@ -30,7 +30,6 @@ describe('StaticArtistPage', () => {
         releases={[]}
       />
     );
-
     expect(screen.getByTestId('mock-compact-template')).toHaveAttribute(
       'data-catalog-load-failed',
       'true'

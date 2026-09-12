@@ -5,13 +5,12 @@ import type { NotificationContentType } from '@/types/notifications';
 
 const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
 
-function SettingsToggle({
-  checked,
-  disabled,
-}: Readonly<{
+type ToggleProps = Readonly<{
   checked: boolean;
   disabled?: boolean;
-}>) {
+}>;
+
+function SettingsToggle({ checked, disabled }: ToggleProps) {
   return (
     <span
       className={cn(
@@ -35,19 +34,21 @@ function SettingsToggle({
   );
 }
 
+type RowProps = Readonly<{
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}>;
+
 function AlertsSettingsRow({
   label,
   description,
   checked,
   disabled,
   onClick,
-}: Readonly<{
-  label: string;
-  description: string;
-  checked: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}>) {
+}: RowProps) {
   return (
     <button
       type='button'
@@ -71,6 +72,22 @@ function AlertsSettingsRow({
   );
 }
 
+const PREFERENCE_ROWS = [
+  ['New Music', 'Singles, albums, and videos.', 'newMusic'],
+  ['Events', 'Tour dates and ticket updates.', 'tourDates'],
+  ['Merch', 'Drops, restocks, and low-stock updates.', 'merch'],
+  ['General', 'Occasional artist updates.', 'general'],
+] as const;
+
+type ViewProps = Readonly<{
+  isSubscribed: boolean;
+  contentPrefs: Record<NotificationContentType, boolean>;
+  onTogglePref: (key: NotificationContentType) => void;
+  onUnsubscribe: () => void;
+  isUnsubscribing: boolean;
+  presentation?: 'panel' | 'embedded';
+}>;
+
 export function AlertsSettingsView({
   isSubscribed,
   contentPrefs,
@@ -78,14 +95,7 @@ export function AlertsSettingsView({
   onUnsubscribe,
   isUnsubscribing,
   presentation = 'panel',
-}: Readonly<{
-  isSubscribed: boolean;
-  contentPrefs: Record<NotificationContentType, boolean>;
-  onTogglePref: (key: NotificationContentType) => void;
-  onUnsubscribe: () => void;
-  isUnsubscribing: boolean;
-  presentation?: 'panel' | 'embedded';
-}>) {
+}: ViewProps) {
   const disabled = !isSubscribed;
 
   return (
@@ -105,34 +115,16 @@ export function AlertsSettingsView({
       ) : null}
 
       <div className='border-y border-white/[0.075]'>
-        <AlertsSettingsRow
-          label='New Music'
-          description='Singles, albums, and videos.'
-          checked={contentPrefs.newMusic}
-          disabled={disabled}
-          onClick={() => onTogglePref('newMusic')}
-        />
-        <AlertsSettingsRow
-          label='Events'
-          description='Tour dates and ticket updates.'
-          checked={contentPrefs.tourDates}
-          disabled={disabled}
-          onClick={() => onTogglePref('tourDates')}
-        />
-        <AlertsSettingsRow
-          label='Merch'
-          description='Drops, restocks, and low-stock updates.'
-          checked={contentPrefs.merch}
-          disabled={disabled}
-          onClick={() => onTogglePref('merch')}
-        />
-        <AlertsSettingsRow
-          label='General'
-          description='Occasional artist updates.'
-          checked={contentPrefs.general}
-          disabled={disabled}
-          onClick={() => onTogglePref('general')}
-        />
+        {PREFERENCE_ROWS.map(([label, description, key]) => (
+          <AlertsSettingsRow
+            key={key}
+            label={label}
+            description={description}
+            checked={contentPrefs[key]}
+            disabled={disabled}
+            onClick={() => onTogglePref(key)}
+          />
+        ))}
       </div>
 
       {isSubscribed ? (

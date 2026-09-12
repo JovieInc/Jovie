@@ -5,15 +5,10 @@ import {
   profileStoryNoop,
 } from './profile-story-fixture';
 
-const meta: Meta<typeof AlertsSettingsView> = {
+const meta = {
   title: 'Profile/AlertsSettingsView',
   component: AlertsSettingsView,
-  parameters: {
-    layout: 'centered',
-    jovie: {
-      uncoveredProps: ['disabled'],
-    },
-  },
+  parameters: { layout: 'centered', jovie: { uncoveredProps: ['disabled'] } },
   args: {
     presentation: 'embedded',
     isSubscribed: true,
@@ -22,7 +17,7 @@ const meta: Meta<typeof AlertsSettingsView> = {
     onUnsubscribe: profileStoryNoop,
     isUnsubscribing: false,
   },
-};
+} satisfies Meta<typeof AlertsSettingsView>;
 
 export default meta;
 
