@@ -257,14 +257,21 @@ The source export is preparatory; deployment and commissioning require separate 
           '../vendor/agent-transport-contracts/index'
         )
     );
-    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json'])
-      put(
-        `vendor/agent-transport-contracts/${path}`,
-        readFileSync(
-          resolve(pilot, '../../packages/agent-transport-contracts', path),
-          'utf8'
-        )
+    for (const path of ['index.ts', 'symphony-outage.ts', 'package.json']) {
+      let contents = readFileSync(
+        resolve(pilot, '../../packages/agent-transport-contracts', path),
+        'utf8'
       );
+      if (path === 'index.ts') {
+        // Workspace source uses a bundler specifier so Next/Turbopack can
+        // consume the package. Isolated NodeNext copies need the .js target.
+        contents = contents.replace(
+          /from ['"]\.\/symphony-outage(?:\.ts)?['"]/gu,
+          "from './symphony-outage.js'"
+        );
+      }
+      put(`vendor/agent-transport-contracts/${path}`, contents);
+    }
   }
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: source,

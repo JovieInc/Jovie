@@ -47,4 +47,4 @@ export function signSummerBottleneckSnapshot<T extends Readonly<object>>(
   }
 }
 
-export * from './symphony-outage.js';
+export * from './symphony-outage';
