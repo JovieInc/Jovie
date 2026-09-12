@@ -117,6 +117,7 @@ interface ProfileCompactTemplateProps {
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly viewerCountryCode?: string | null;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
@@ -266,6 +267,7 @@ export function ProfileCompactTemplate({
   showSubscriptionConfirmedBanner = false,
   viewerCountryCode,
   releases,
+  catalogLoadFailed = false,
   merchCards = [],
   hideJovieBranding = false,
   hideMoreMenu = false,
@@ -946,6 +948,7 @@ export function ProfileCompactTemplate({
                   revealNotificationsRef.current?.();
                 }}
                 releases={releases}
+                catalogLoadFailed={catalogLoadFailed}
               />
             </div>
           </div>
@@ -969,6 +972,7 @@ export function ProfileCompactTemplate({
             tourDates={tourDates}
             viewerCountryCode={viewerCountryCode}
             releases={releases}
+            catalogLoadFailed={catalogLoadFailed}
             drawerOpen={drawerOpen}
             drawerView={drawerView}
             activeMode={requestedMode}

@@ -131,11 +131,15 @@ async function getPublicTourDates(
   }
 }
 
-async function getPublicReleases(
-  profileId: string
-): Promise<Awaited<ReturnType<typeof getReleasesForProfileLite>>> {
+async function getPublicReleases(profileId: string): Promise<{
+  readonly releases: Awaited<ReturnType<typeof getReleasesForProfileLite>>;
+  readonly failed: boolean;
+}> {
   try {
-    return await getReleasesForProfileLite(profileId);
+    return {
+      releases: await getReleasesForProfileLite(profileId),
+      failed: false,
+    };
   } catch (error) {
     logger.error(
       'Error fetching public profile releases',
@@ -146,7 +150,7 @@ async function getPublicReleases(
       },
       'public-profile'
     );
-    return [];
+    return { releases: [], failed: true };
   }
 }
 
@@ -333,11 +337,13 @@ async function ArtistPageContent({
     profile.avatar_url
   );
 
-  // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
+  // Await tour dates + releases (started above, non-blocking). Tour failures
+  // still degrade to an empty list; catalog failures stay marked so Music
+  // can show a recoverable error instead of a false empty catalog.
   // Sort server-side so the client doesn't need a useMemo sort
   const [
     tourDatesRaw,
-    allReleases,
+    catalogResult,
     merchCards,
     alertOptInVariant,
     profilePacAssignment,
@@ -360,6 +366,8 @@ async function ArtistPageContent({
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
+  const allReleases = catalogResult.releases;
+  const catalogLoadFailed = catalogResult.failed;
 
   schedulePublicCollaboratorProfileReconciliation({
     creatorProfileId: profile.id,
@@ -496,6 +504,7 @@ async function ArtistPageContent({
         }}
         featuredPlaylistFallback={featuredPlaylistFallback}
         releases={releases}
+        catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
       />
       <ProfileAeoContent

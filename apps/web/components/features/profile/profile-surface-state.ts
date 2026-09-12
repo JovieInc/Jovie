@@ -62,6 +62,57 @@ export interface ProfileSurfaceState {
   };
 }
 
+export const PUBLIC_MUSIC_EMPTY_HEADING = 'No releases listed yet';
+export const PUBLIC_MUSIC_EMPTY_DESCRIPTION =
+  'Get a note when the first release lands.';
+export const PUBLIC_MUSIC_ERROR_HEADING = "Couldn't load releases";
+export const PUBLIC_MUSIC_ERROR_DESCRIPTION = 'Try again in a moment.';
+export const PUBLIC_EVENTS_NO_UPCOMING_HEADING = 'No upcoming shows';
+export const PUBLIC_EVENTS_NO_UPCOMING = `${PUBLIC_EVENTS_NO_UPCOMING_HEADING}.`;
+export const PUBLIC_EVENTS_NO_SURFACE = 'No live shows listed.';
+
+export type PublicMusicSurface =
+  | {
+      readonly kind: 'catalog';
+      readonly visibleReleases: readonly PublicRelease[];
+    }
+  | { readonly kind: 'artist-streaming' }
+  | { readonly kind: 'empty' }
+  | { readonly kind: 'error' };
+
+export function getVisiblePublicReleases(
+  releases: readonly PublicRelease[] | undefined
+): PublicRelease[] {
+  return (releases ?? []).filter(release => Boolean(release.slug));
+}
+
+export function resolvePublicMusicSurface(params: {
+  readonly releases?: readonly PublicRelease[];
+  readonly hasPlayableDestinations: boolean;
+  readonly catalogLoadFailed?: boolean;
+}): PublicMusicSurface {
+  if (params.catalogLoadFailed) {
+    return { kind: 'error' };
+  }
+
+  const visibleReleases = getVisiblePublicReleases(params.releases);
+  if (visibleReleases.length > 0) {
+    return { kind: 'catalog', visibleReleases };
+  }
+
+  if (params.hasPlayableDestinations) {
+    return { kind: 'artist-streaming' };
+  }
+
+  return { kind: 'empty' };
+}
+
+export function shouldOfferPublicEventsDestination(
+  upcomingTourDateCount: number
+): boolean {
+  return upcomingTourDateCount > 0;
+}
+
 function unwrapNextImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
 
@@ -230,17 +281,20 @@ function resolveStatusPill(params: {
 function resolveEmptyState(params: {
   readonly isSubscribed: boolean;
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+  readonly catalogLoadFailed?: boolean;
 }): ProfileSurfaceState['emptyState'] {
-  const { isSubscribed, featuredPlaylistFallback } = params;
+  const { isSubscribed, featuredPlaylistFallback, catalogLoadFailed } = params;
 
   return {
-    release: isSubscribed
-      ? 'New music alerts are on.'
-      : 'Follow for the next release.',
-    tour: 'No upcoming shows.',
+    release: catalogLoadFailed
+      ? `${PUBLIC_MUSIC_ERROR_HEADING}.`
+      : `${PUBLIC_MUSIC_EMPTY_HEADING}.`,
+    tour: PUBLIC_EVENTS_NO_UPCOMING,
     homeProof: featuredPlaylistFallback
       ? 'Featured playlist ready.'
-      : 'Follow for new music and show updates.',
+      : isSubscribed
+        ? 'Updates are on.'
+        : 'Follow for new music and show updates.',
   };
 }
 
@@ -260,6 +314,7 @@ export function resolveProfileSurfaceState(params: {
   readonly viewerCountryCode?: string | null;
   readonly socialLinkLimit?: number;
   readonly now?: Date;
+  readonly catalogLoadFailed?: boolean;
 }): ProfileSurfaceState {
   const {
     artist,
@@ -277,6 +332,7 @@ export function resolveProfileSurfaceState(params: {
     viewerCountryCode,
     socialLinkLimit = 2,
     now,
+    catalogLoadFailed = false,
   } = params;
 
   const rawHeroImageUrl = unwrapNextImageUrl(
@@ -297,7 +353,7 @@ export function resolveProfileSurfaceState(params: {
     releaseVisibility?.show && latestRelease ? latestRelease : null;
   const upcomingTourDates = getUpcomingTourDates(tourDates, now);
   const nextShow = upcomingTourDates[0] ?? null;
-  const visibleReleases = releases.filter(release => Boolean(release.slug));
+  const visibleReleases = getVisiblePublicReleases(releases);
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
   const heroSubtitle = resolveHeroSubtitle(artist, activeSubtitle);
@@ -334,6 +390,7 @@ export function resolveProfileSurfaceState(params: {
     emptyState: resolveEmptyState({
       isSubscribed,
       featuredPlaylistFallback,
+      catalogLoadFailed,
     }),
   };
 }

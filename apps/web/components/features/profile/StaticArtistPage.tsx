@@ -50,6 +50,7 @@ export interface StaticArtistPageProps {
   readonly viewerCountryCode?: string | null;
   readonly presentation?: StaticArtistPagePresentation;
   readonly releases?: readonly PublicRelease[];
+  readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
@@ -87,6 +88,7 @@ export function StaticArtistPage({
   viewerCountryCode,
   presentation = 'full-public',
   releases,
+  catalogLoadFailed = false,
   merchCards,
   hideJovieBranding = false,
   hideMoreMenu = false,
@@ -152,6 +154,7 @@ export function StaticArtistPage({
       featuredPlaylistFallback={viewModel.featuredPlaylistFallback}
       viewerCountryCode={viewerCountryCode}
       releases={releases}
+      catalogLoadFailed={catalogLoadFailed}
       merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}

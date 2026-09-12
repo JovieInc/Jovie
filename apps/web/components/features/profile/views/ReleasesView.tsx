@@ -2,7 +2,6 @@
 
 // @coverage-via apps/web/tests/unit/profile/ReleasesView.test.tsx
 
-import { Play } from 'lucide-react';
 import { useMemo } from 'react';
 import {
   ARTWORK_FIT_CLASSNAME,
@@ -202,10 +201,6 @@ export function ReleasesView({
                   {meta}
                 </p>
               </div>
-
-              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white dark:bg-surface-1 text-black dark:text-white transition-opacity duration-subtle group-hover:opacity-90'>
-                <Play className='ml-0.5 h-3 w-3 fill-current' />
-              </span>
             </a>
           </div>
         );
