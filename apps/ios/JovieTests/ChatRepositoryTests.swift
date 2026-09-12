@@ -803,7 +803,17 @@ struct ChatRepositoryTests {
 
     #expect(client.sendCount == 2)
     #expect(repository.timeline.map(\.role) == [.user, .user, .assistant])
-    #expect(repository.timeline.map(\.content) == ["First", "Steer", ""])
+    // The replacement turn is the current generation, so its post-stream
+    // guard applies: GateableSendChatClient returns no terminal event, and a
+    // stream that finishes without one marks the assistant row failed
+    // ("Summer did not confirm a terminal state for this turn.").
+    #expect(
+      repository.timeline.map(\.content) == [
+        "First",
+        "Steer",
+        "Summer did not confirm a terminal state for this turn.",
+      ]
+    )
     #expect(repository.isSending == false)
   }
 
@@ -1494,7 +1504,7 @@ private final class GatedFetchChatClient: MobileChatClientProtocol, @unchecked S
     []
   }
 
-  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+  func fetchConversation(id: String, limit: Int, before: String?) async throws -> MobileConversationDetailResponse {
     fetchRequested = true
     if !released {
       await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
