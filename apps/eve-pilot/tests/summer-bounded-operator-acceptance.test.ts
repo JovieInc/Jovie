@@ -4,8 +4,8 @@
  * ownership preserved → remaining human decision reported.
  *
  * The primary path is request-outcome → router launch via
- * `dispatchSummerGovernedRequest` (not an ad-hoc recovery call). Writes a durable
- * receipt under /opt/cursor/artifacts when assertions pass.
+ * `dispatchSummerGovernedRequest` (not an ad-hoc recovery call). Best-effort
+ * durable receipt under /opt/cursor/artifacts when that path is writable.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -78,10 +78,9 @@ function freshReceipt(nowMs: number) {
 }
 
 describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
-  it(
-    'proves Gem-down → governed Cursor alternate → recovery → ownership → human decision',
-    { timeout: 20_000 },
-    async () => {
+  it('proves Gem-down → governed Cursor alternate → recovery → ownership → human decision', {
+    timeout: 20_000,
+  }, async () => {
     const nowMs = Date.parse('2026-09-12T17:00:00.000Z');
     const store = memoryStore();
 
@@ -305,11 +304,16 @@ describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
       result: 'PASS',
     };
 
-    await mkdir('/opt/cursor/artifacts', { recursive: true });
-    await writeFile(
-      '/opt/cursor/artifacts/summer-bounded-operator-acceptance-receipt.json',
-      `${JSON.stringify(receipt, null, 2)}\n`,
-      'utf8'
-    );
+    try {
+      await mkdir('/opt/cursor/artifacts', { recursive: true });
+      await writeFile(
+        '/opt/cursor/artifacts/summer-bounded-operator-acceptance-receipt.json',
+        `${JSON.stringify(receipt, null, 2)}\n`,
+        'utf8'
+      );
+    } catch {
+      // Cloud agents may write receipts here; GitHub CI runners often cannot.
+      // Acceptance assertions above are the merge gate — receipt is optional.
+    }
   });
 });
