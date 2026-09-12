@@ -128,6 +128,10 @@ describe('PostReleasePanel', () => {
     );
     expect(screen.getAllByText('Not connected')).toHaveLength(2);
     expect(screen.queryByText(/license/u)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Email gate/u)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Update/u })
+    ).not.toBeInTheDocument();
   });
 
   it('opens a claimable surface but keeps the repair open', async () => {
@@ -147,7 +151,7 @@ describe('PostReleasePanel', () => {
       </TooltipProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Update/u }));
+    fireEvent.click(screen.getByRole('button', { name: /Open/u }));
 
     await waitFor(() => {
       expect(globalThis.open).toHaveBeenCalledWith(

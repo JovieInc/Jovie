@@ -82,7 +82,8 @@ describe('TrackSidebar', () => {
 
     await user.click(screen.getByTestId('drawer-tab-platforms'));
 
-    expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Find' }).length).toBe(3);
+    expect(screen.queryByText('Not found')).not.toBeInTheDocument();
   });
 
   it('uses one compact entity header and shares actions with the rail context menu', async () => {

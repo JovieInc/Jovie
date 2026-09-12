@@ -28,7 +28,6 @@ import {
   Check,
   ChevronDown,
   Disc3,
-  ExternalLink,
   FileAudio2,
   FileText,
   Filter,
@@ -86,6 +85,10 @@ import {
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  DspQuietRow,
+  isDspQuietListScope,
+} from '@/components/molecules/inspector';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
@@ -2069,7 +2072,6 @@ function AssetDrawer({
     : isYouTubeVideo
       ? 'relationships'
       : 'details';
-  const closedInteractiveProps = open ? {} : { tabIndex: -1 };
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
   const isPreviewPlaying =
@@ -2380,7 +2382,7 @@ function AssetDrawer({
                 </dl>
               </DrawerSection>
 
-              {!isMerch ? (
+              {isDspQuietListScope(getLibraryItemKind(current)) ? (
                 <DrawerSection
                   sectionId='providers'
                   surface='card'
@@ -2388,35 +2390,24 @@ function AssetDrawer({
                   defaultOpen={false}
                 >
                   {current.providers.length > 0 ? (
-                    <div className='space-y-1'>
+                    <div className='space-y-0.5'>
                       {current.providers.map(provider => (
-                        <a
+                        <DspQuietRow
                           key={`${current.id}-${provider.key}`}
+                          className='system-b-library-provider-link'
+                          label={provider.label}
                           href={provider.url}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          {...closedInteractiveProps}
-                          className={cn(
-                            'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
-                            LIBRARY_CARD_FOCUS_CLASS
-                          )}
-                        >
-                          <ProviderIcon
-                            provider={provider.key as ProviderKey}
-                            className='h-3.5 w-3.5'
-                          />
-                          <span className='min-w-0 flex-1 truncate'>
-                            {provider.label}
-                          </span>
-                          <ExternalLink className='h-3 w-3 text-tertiary-token' />
-                        </a>
+                          closedTabIndex={closedTabIndex}
+                          icon={
+                            <ProviderIcon
+                              provider={provider.key as ProviderKey}
+                              className='h-3.5 w-3.5'
+                            />
+                          }
+                        />
                       ))}
                     </div>
-                  ) : (
-                    <p className='system-b-library-provider-empty leading-5 text-secondary-token'>
-                      No provider links are connected for this release yet.
-                    </p>
-                  )}
+                  ) : null}
                 </DrawerSection>
               ) : null}
             </div>
