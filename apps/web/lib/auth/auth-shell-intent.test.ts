@@ -49,6 +49,14 @@ describe('auth shell intent', () => {
       label: 'Back to chat',
     });
     expect(
+      resolveAuthShellBackLink(
+        new URLSearchParams('redirect_url=%2Fonboarding%3Fhandle%3Dmotion')
+      )
+    ).toEqual({
+      href: '/onboarding?handle=motion',
+      label: 'Back to chat',
+    });
+    expect(
       resolveAuthShellBackLink(new URLSearchParams('redirect_url=%2Fapp'))
     ).toBeNull();
   });
