@@ -197,6 +197,7 @@ export function formatChangedLineCoverage(result) {
   return `Changed-line coverage: ${result.coveredLines}/${result.coverableLines} (${result.percentage}%; required ${result.minimum}%).`;
 }
 
+/** @param {*} [options] */
 export function planChangedLineCoverage({
   base,
   head,
@@ -214,6 +215,7 @@ export function planChangedLineCoverage({
   };
 }
 
+/** @param {*} options */
 export function runChangedLineCoverageCheck({
   base,
   head,
