@@ -13,9 +13,10 @@ import {
   TooltipTrigger,
   useTabOverflow,
 } from '@jovie/ui';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { handleTabListKeyDown } from './tab-list-keyboard';
 
 /** Classname constants for drawer-variant tab styling (re-exported by DrawerTabs) */
 export const TAB_BAR_RAIL_CLASSNAME =
@@ -33,12 +34,19 @@ export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
 export const TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME =
   'bg-surface-0 font-semibold text-primary-token';
 
+export const TAB_BAR_UNDERLINE_TRIGGER_CLASSNAME =
+  'inline-flex min-h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-none border-0 border-b-2 border-transparent bg-transparent px-2.5 py-1 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0/70 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
+
+export const TAB_BAR_UNDERLINE_TRIGGER_ACTIVE_CLASSNAME =
+  'border-accent bg-surface-0/80 font-medium text-primary-token';
+
 const TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME =
   'h-8 w-8 sm:before:h-8 sm:before:w-8';
 
 const TAB_BAR_OVERFLOW_TRIGGER_CLASSNAME_BY_VARIANT = {
   drawer: undefined,
   segment: TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME,
+  underline: undefined,
 } as const;
 
 export interface TabBarProps<T extends string> {
@@ -49,7 +57,8 @@ export interface TabBarProps<T extends string> {
   readonly overflowMode?: 'collapse' | 'scroll' | 'wrap';
   readonly distribution?: 'intrinsic' | 'fill';
   readonly actions?: ReactNode;
-  readonly variant?: 'drawer' | 'segment';
+  readonly variant?: 'drawer' | 'segment' | 'underline';
+  readonly panelId?: string;
   readonly className?: string;
   readonly triggerClassName?: string;
   readonly actionsClassName?: string;
@@ -64,20 +73,26 @@ export function TabBar<T extends string>({
   distribution = 'intrinsic',
   actions,
   variant = 'drawer',
+  panelId,
   className,
   triggerClassName,
   actionsClassName,
 }: TabBarProps<T>) {
   const triggerClass =
-    variant === 'drawer'
-      ? TAB_BAR_DRAWER_TRIGGER_CLASSNAME
-      : TAB_BAR_SEGMENT_TRIGGER_CLASSNAME;
+    variant === 'underline'
+      ? TAB_BAR_UNDERLINE_TRIGGER_CLASSNAME
+      : variant === 'drawer'
+        ? TAB_BAR_DRAWER_TRIGGER_CLASSNAME
+        : TAB_BAR_SEGMENT_TRIGGER_CLASSNAME;
   const activeClass =
-    variant === 'drawer'
-      ? TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME
-      : TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME;
+    variant === 'underline'
+      ? TAB_BAR_UNDERLINE_TRIGGER_ACTIVE_CLASSNAME
+      : variant === 'drawer'
+        ? TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME
+        : TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME;
   const overflowTriggerClassName =
     TAB_BAR_OVERFLOW_TRIGGER_CLASSNAME_BY_VARIANT[variant];
+  const overflowTriggerVariant = variant === 'underline' ? 'drawer' : variant;
 
   const isCollapseMode = overflowMode === 'collapse';
   const isScrollMode = overflowMode === 'scroll';
@@ -122,6 +137,7 @@ export function TabBar<T extends string>({
         onValueChange={onValueChange}
         options={options}
         ariaLabel={ariaLabel}
+        panelId={panelId}
         isScrollMode={isScrollMode}
         actions={actions}
         className={className}
@@ -159,6 +175,9 @@ export function TabBar<T extends string>({
           <div
             role='tablist'
             aria-label={ariaLabel}
+            onKeyDown={(event: KeyboardEvent<HTMLDivElement>) =>
+              handleTabListKeyDown(event, options, value, onValueChange)
+            }
             className={cn(
               TAB_BAR_RAIL_CLASSNAME,
               usesFillDistribution && 'w-full',
@@ -173,6 +192,8 @@ export function TabBar<T extends string>({
                 role='tab'
                 data-testid={`drawer-tab-${option.value}`}
                 aria-selected={value === option.value}
+                aria-controls={panelId}
+                tabIndex={value === option.value ? 0 : -1}
                 disabled={option.disabled}
                 onClick={() => onValueChange(option.value)}
                 className={cn(
@@ -213,7 +234,7 @@ export function TabBar<T extends string>({
                     <OverflowMenuTrigger
                       ref={moreButtonRef}
                       hasActiveOverflow={activeInOverflow}
-                      variant={variant}
+                      variant={overflowTriggerVariant}
                       className={overflowTriggerClassName}
                     />
                   </DropdownMenuTrigger>
@@ -247,7 +268,7 @@ export function TabBar<T extends string>({
             <OverflowMenuTrigger
               ref={moreButtonRef}
               hasActiveOverflow={false}
-              variant={variant}
+              variant={overflowTriggerVariant}
               className={cn('invisible absolute', overflowTriggerClassName)}
               aria-hidden='true'
               tabIndex={-1}
@@ -276,6 +297,7 @@ function LegacyTabBar<T extends string>({
   onValueChange,
   options,
   ariaLabel,
+  panelId,
   isScrollMode,
   actions,
   className,
@@ -290,6 +312,7 @@ function LegacyTabBar<T extends string>({
   onValueChange: (value: T) => void;
   options: readonly SegmentControlOption<T>[];
   ariaLabel: string;
+  panelId?: string;
   isScrollMode: boolean;
   actions?: ReactNode;
   className?: string;
@@ -305,6 +328,9 @@ function LegacyTabBar<T extends string>({
     <div
       role='tablist'
       aria-label={ariaLabel}
+      onKeyDown={(event: KeyboardEvent<HTMLDivElement>) =>
+        handleTabListKeyDown(event, options, value, onValueChange)
+      }
       className={cn(
         TAB_BAR_RAIL_CLASSNAME,
         isScrollMode &&
@@ -326,6 +352,8 @@ function LegacyTabBar<T extends string>({
           role='tab'
           data-testid={`drawer-tab-${option.value}`}
           aria-selected={value === option.value}
+          aria-controls={panelId}
+          tabIndex={value === option.value ? 0 : -1}
           disabled={option.disabled}
           onClick={() => onValueChange(option.value)}
           className={cn(

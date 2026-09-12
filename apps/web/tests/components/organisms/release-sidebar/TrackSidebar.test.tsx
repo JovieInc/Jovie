@@ -46,7 +46,7 @@ function buildTrack(
 }
 
 describe('TrackSidebar', () => {
-  it('shows playback content by default and switches to platforms tab', async () => {
+  it('shows details by default and switches to assets and links tabs', async () => {
     const user = userEvent.setup();
 
     render(
@@ -59,12 +59,23 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getAllByText('USRC17607839').length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole('tab', { name: 'Presence' })
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-assets'));
+
     expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Providers: 1 canonical, 0 fallback, 3 unknown/i)
     ).toBeInTheDocument();
 
-    await user.click(screen.getByTestId('drawer-tab-platforms'));
+    await user.click(screen.getByTestId('drawer-tab-links'));
 
     expect(screen.getByText(/Canonical DSPs/i)).toBeInTheDocument();
   });
@@ -80,7 +91,7 @@ describe('TrackSidebar', () => {
       />
     );
 
-    await user.click(screen.getByTestId('drawer-tab-platforms'));
+    await user.click(screen.getByTestId('drawer-tab-links'));
 
     expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
   });
@@ -99,16 +110,20 @@ describe('TrackSidebar', () => {
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
     expect(screen.getByTitle('Copy Track Link')).toBeInTheDocument();
-    expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
     const header = screen.getByTestId('track-entity-header');
-    const details = screen.getByTestId('track-tabbed-card');
     expect(header).toContainElement(screen.getByTitle('Copy Track Link'));
-    expect(
-      header.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
     expect(
       screen.queryByTestId('drawer-card-action-bar')
     ).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('drawer-tab-assets'));
+
+    expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
+    const assets = screen.getByTestId('track-tabbed-card');
+    expect(
+      header.compareDocumentPosition(assets) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(assets).toHaveAttribute('data-surface-variant', 'flat');
 
     await user.click(screen.getByRole('button', { name: 'More actions' }));
 
@@ -118,10 +133,6 @@ describe('TrackSidebar', () => {
     expect(
       screen.getByRole('menuitem', { name: 'Open Track Link' })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('track-tabbed-card')).toHaveAttribute(
-      'data-surface-variant',
-      'card'
-    );
   });
 
   it('uses a compact 44px artwork thumbnail in the entity header', () => {
@@ -167,10 +178,12 @@ describe('TrackSidebar', () => {
       />
     );
 
+    await user.click(screen.getByTestId('drawer-tab-assets'));
+
     expect(screen.getByText(/Preview Not Checked/i)).toBeInTheDocument();
     expect(screen.queryByText(/Verified Preview/i)).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId('drawer-tab-platforms'));
+    await user.click(screen.getByTestId('drawer-tab-links'));
 
     expect(screen.getByText(/Unverified DSPs/i)).toBeInTheDocument();
   });

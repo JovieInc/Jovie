@@ -11,17 +11,18 @@ describe('LibrarySurface shared right rail contract', () => {
   it('registers the asset detail drawer with the authenticated shell', () => {
     const source = readFileSync(SOURCE_PATH, 'utf8');
 
-    expect(source).toContain('EntitySidebarShell');
+    expect(source).toContain('InspectorShell');
     expect(source).toContain(
       "import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';"
     );
     expect(source).toContain('useRegisterRightPanel(assetDrawerPanel);');
-    expect(source).toContain('<EntitySidebarShell');
+    expect(source).toContain('<InspectorShell');
     expect(source).toContain("ariaLabel='Library asset details'");
-    expect(source).toContain("headerMode='minimal'");
-    expect(source).toContain("entityHeaderSurface='flat'");
-    expect(source).toContain("scrollStrategy='shell'");
+    expect(source).toContain('LIBRARY_INSPECTOR_TABS');
     expect(source).toContain("data-testid='library-asset-entity-header'");
+    expect(source).not.toContain('DrawerSectionGroup');
+    expect(source).not.toContain('<DrawerSection');
+    expect(source).toContain("finding.subjectType !== 'artist'");
   });
 
   it('does not retain the route-local drawer layout implementation', () => {
