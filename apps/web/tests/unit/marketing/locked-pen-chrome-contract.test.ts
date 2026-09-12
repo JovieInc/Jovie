@@ -49,6 +49,15 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(header).toContain("? 'sm'");
     expect(headerNavCss).toContain('min-height: 2rem');
     expect(header).not.toContain("from '@/components/organisms/HeaderNav.css'");
+
+    const ownership = readFileSync(
+      resolve(
+        process.cwd(),
+        '../../docs/design-system/component-ownership.json'
+      ),
+      'utf8'
+    );
+    expect(ownership).toContain('apps/web/components/site/MarketingHeader.css');
   });
 
   it('moves footer chrome onto jhV4a / CCDnQ noir-ion anatomy', () => {
