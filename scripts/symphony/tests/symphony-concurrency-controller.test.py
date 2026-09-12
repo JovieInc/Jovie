@@ -562,7 +562,7 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
     def test_high_runtime_concurrency_preserves_workflow_identity(self):
         self.assertEqual(MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("128")), 128)
 
-    def test_fleet_installer_attests_high_overlay_and_rejects_other_drift(self):
+    def test_fleet_installer_verifies_configuration_without_overwriting_runtime_identity(self):
         installer = ROOT / "scripts/symphony/install-gem-fleet-controller.sh"
         code = installer.read_text().rsplit("python3 - <<'PY'\n", 1)[1].split("\nPY", 1)[0]
         with tempfile.TemporaryDirectory() as tmp:
@@ -576,8 +576,13 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
             with mock.patch.dict(MODULE.os.environ, env):
                 for value in ("1", "41", "128"):
                     installed.write_text(self.overlay(value))
-                    exec(compile(code, str(installer), "exec"), {})
-                    receipt = json.loads((root / "state/gem-service-attestation.json").read_text())
+                    namespace = {}
+                    with mock.patch("builtins.print"):
+                        exec(compile(code, str(installer), "exec"), namespace)
+                    receipt = namespace["receipt"]
+                    self.assertEqual(receipt["schema"], "gem-fleet-configuration-verification/v1")
+                    self.assertNotIn("sourceRevision", receipt)
+                    self.assertFalse((root / "state/gem-service-attestation.json").exists())
                     self.assertTrue(receipt["workflow"]["matches"])
                     self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], int(value))
                 for text in (self.overlay("01"), self.overlay("0"), self.overlay("41").replace("max_turns: 24", "max_turns: 99")):

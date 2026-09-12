@@ -787,7 +787,18 @@ exit 0
         self.assertNotEqual(process.returncode, 0)
         self.assertIn("cannot import name 'bounded_selection'", process.stderr)
 
-    def test_install_attests_the_exact_runtime_policy(self):
+    def test_install_preserves_existing_runtime_observation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            paths["attestation"].parent.mkdir(parents=True, exist_ok=True)
+            prior = '{"sourceRevision":"running-symphony","observedAt":"prior-observation"}'
+            paths["attestation"].write_text(prior)
+            process = self._install(fixture, env)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual(paths["attestation"].read_text(), prior)
+
+    def test_install_verifies_configuration_the_exact_runtime_policy(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
@@ -796,7 +807,10 @@ exit 0
             installed_closure = paths["closure"].read_bytes()
             installed_registry = paths["registry_module"].read_bytes()
             installed_registry_config = paths["registry_config"].read_bytes()
-            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+            attestation = next(json.loads(line) for line in process.stdout.splitlines() if line.startswith('{"'))
+            self.assertEqual(attestation["schema"], "gem-fleet-configuration-verification/v1")
+            self.assertNotIn("sourceRevision", attestation)
+            self.assertFalse(paths["attestation"].exists())
 
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertEqual(
@@ -829,13 +843,16 @@ exit 0
         self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
         self.assertEqual(attestation["listener"]["pid"], 4242)
 
-    def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
+    def test_install_verifies_configuration_controller_owned_bounded_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
             process = self._install(fixture, env, workflow_overlay="1")
             installed_workflow = paths["workflow"].read_text(encoding="utf-8")
-            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+            attestation = next(json.loads(line) for line in process.stdout.splitlines() if line.startswith('{"'))
+            self.assertEqual(attestation["schema"], "gem-fleet-configuration-verification/v1")
+            self.assertNotIn("sourceRevision", attestation)
+            self.assertFalse(paths["attestation"].exists())
 
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("max_concurrent_agents: 1", installed_workflow)
@@ -850,12 +867,15 @@ exit 0
             attestation["workflow"]["installedSha256"],
         )
 
-    def test_install_attests_concurrency_above_source_default(self):
+    def test_install_verifies_configuration_concurrency_above_source_default(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
             process = self._install(fixture, env, workflow_overlay="128")
-            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+            attestation = next(json.loads(line) for line in process.stdout.splitlines() if line.startswith('{"'))
+            self.assertEqual(attestation["schema"], "gem-fleet-configuration-verification/v1")
+            self.assertNotIn("sourceRevision", attestation)
+            self.assertFalse(paths["attestation"].exists())
 
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertTrue(attestation["workflow"]["matches"])
@@ -873,7 +893,7 @@ exit 0
         self.assertNotEqual(process.returncode, 0)
         self.assertEqual(restored_workflow, "old workflow\n")
         self.assertFalse(attestation_exists)
-        self.assertIn("refusing stale Gem service attestation", process.stderr)
+        self.assertIn("refusing unmatched Gem configuration", process.stderr)
 
     def test_install_rejects_unrelated_workflow_drift(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -886,7 +906,7 @@ exit 0
         self.assertNotEqual(process.returncode, 0)
         self.assertEqual(restored_workflow, "old workflow\n")
         self.assertFalse(attestation_exists)
-        self.assertIn("refusing stale Gem service attestation", process.stderr)
+        self.assertIn("refusing unmatched Gem configuration", process.stderr)
 
     def test_install_refuses_unhealthy_official_service_before_writes(self):
         with tempfile.TemporaryDirectory() as directory:

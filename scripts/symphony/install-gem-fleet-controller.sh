@@ -300,10 +300,10 @@ LISTENER_PID="$(
 [[ "${LISTENER_PID}" =~ ^[1-9][0-9]*$ ]]
 grep -Fq "${SERVICE_CONTROL_GROUP}" "${PROC_ROOT}/${LISTENER_PID}/cgroup"
 
-# File writes are not runtime proof. Attest the exact source revision and both
-# deployed configuration surfaces only after daemon-reload, service activation,
-# and the local state endpoint have all succeeded. This receipt contains hashes
-# and state only; it never serializes credentials or configuration contents.
+# Verify the configuration install, not the running application's source SHA.
+# The source-owned service attestation publisher separately observes the runtime.
+# Installation must not compete with that publisher or substitute a Jovie config
+# revision for a Symphony application revision.
 UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"
 UNIT_TARGET_SHA="$(sha256sum "${SERVICE_UNIT_TARGET}" | awk '{print $1}')"
 POLICY_SOURCE_SHA="$(sha256sum "${POLICY_SOURCE}" | awk '{print $1}')"
@@ -337,9 +337,8 @@ import re
 from datetime import datetime, timezone
 
 root = pathlib.Path(os.environ["GEM_ROOT"])
-destination = root / "state" / "gem-service-attestation.json"
-destination.parent.mkdir(parents=True, exist_ok=True)
-temporary = destination.with_suffix(".json.tmp")
+# This verification is emitted to installer output only. No runtime receipt is
+# written: that belongs exclusively to emit_gem_service_attestation.py.
 
 # The pressure controller owns exactly one bounded runtime overlay. It may
 # update this value while the official workflow hot-reloads, so attest that
@@ -378,9 +377,9 @@ if len(source_matches) == 1 and len(installed_matches) == 1:
         )
 
 receipt = {
-    "schema": "gem-service-attestation/v1",
+    "schema": "gem-fleet-configuration-verification/v1",
     "observedAt": datetime.now(timezone.utc).isoformat(),
-    "sourceRevision": os.environ["SOURCE_REVISION"],
+    "configurationSourceRevision": os.environ["SOURCE_REVISION"],
     "daemonReloaded": True,
     "service": "symphony-elixir.service",
     "active": True,
@@ -425,9 +424,8 @@ if not all(
     receipt[artifact]["matches"]
     for artifact in ("workflow", "unit", "policy", "gate", "closureHealth")
 ):
-    raise SystemExit("refusing stale Gem service attestation")
-temporary.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
-temporary.replace(destination)
+    raise SystemExit("refusing unmatched Gem configuration")
+print(json.dumps(receipt, sort_keys=True))
 PY
 
 if [[ "${timer_was_active}" == true ]]; then
