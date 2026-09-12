@@ -5,7 +5,9 @@
 
 import { NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
+import { stripe } from '@/lib/stripe/client';
 import { getAvailablePricing, isMaxPlanEnabled } from '@/lib/stripe/config';
+import { assertCheckoutPriceContract } from '@/lib/stripe/price-contract';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -15,6 +17,14 @@ export async function GET() {
   try {
     const options = getAvailablePricing().filter(
       option => isMaxPlanEnabled() || option.plan !== 'max'
+    );
+
+    await Promise.all(
+      options.map(option =>
+        assertCheckoutPriceContract(option.priceId, id =>
+          stripe.prices.retrieve(id)
+        )
+      )
     );
 
     const pricingOptions = options.map(option => ({

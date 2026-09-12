@@ -16,8 +16,8 @@ import {
   recommendPlan,
   validatePlan,
 } from '@/lib/auth/plan-intent';
+import { isSelfServiceOffer } from '@/lib/billing/offer-truth';
 import { PRICING } from '@/lib/config/pricing';
-import { isMaxPlanEnabled } from '@/lib/stripe/config';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -34,16 +34,9 @@ function resolvePriceIds(plan: PlanIntentTier): {
     case 'pro':
       return {
         monthlyPriceId: PRICING.pro.monthly.priceId || '',
-        annualPriceId: PRICING.pro.annual.priceId || null,
+        annualPriceId: null,
         monthlyAmount: PRICING.pro.monthly.amount,
-        annualAmount: PRICING.pro.annual.amount,
-      };
-    case 'max':
-      return {
-        monthlyPriceId: PRICING.max.monthly.priceId || '',
-        annualPriceId: PRICING.max.annual.priceId || null,
-        monthlyAmount: PRICING.max.monthly.amount,
-        annualAmount: PRICING.max.annual.amount,
+        annualAmount: null,
       };
     default:
       return {
@@ -96,6 +89,17 @@ export default async function OnboardingCheckoutPage({
     planIntent = DEFAULT_UPSELL_PLAN;
   }
 
+  const interval =
+    params.interval ??
+    cookieStore.get('jovie_billing_interval')?.value ??
+    'month';
+  if (
+    typeof interval !== 'string' ||
+    !isSelfServiceOffer(planIntent, interval)
+  ) {
+    redirect(APP_ROUTES.PRICING);
+  }
+
   // Get profile data for the value preview
   let profileData: {
     displayName: string;
@@ -135,7 +139,7 @@ export default async function OnboardingCheckoutPage({
   );
   if (isDefaultUpsell && !hadPaidIntentFromCookie) {
     let recommended = recommendPlan(profileData.spotifyFollowers);
-    if (recommended === 'max' && !isMaxPlanEnabled()) {
+    if (!isSelfServiceOffer(recommended)) {
       recommended = DEFAULT_UPSELL_PLAN;
     }
     planIntent = recommended;
