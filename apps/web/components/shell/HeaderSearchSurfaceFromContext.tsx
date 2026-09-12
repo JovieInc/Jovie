@@ -18,8 +18,10 @@ import {
  */
 export function HeaderSearchSurfaceFromContext({
   className,
+  calm = false,
 }: {
   readonly className?: string;
+  readonly calm?: boolean;
 }) {
   const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
     useHeaderActions();
@@ -51,6 +53,7 @@ export function HeaderSearchSurfaceFromContext({
       className={cn(
         getSidebarNavRowClassName({}),
         'grid-cols-[18px_minmax(0,1fr)_auto] text-left',
+        calm && 'h-9 min-w-0 flex-1 rounded-full pl-3.5 pr-0 text-[13px]',
         className
       )}
       aria-label='Search Jovie'
@@ -61,7 +64,9 @@ export function HeaderSearchSurfaceFromContext({
         aria-hidden='true'
         strokeWidth={2.25}
       />
-      <span className='min-w-0 flex-1 truncate'>Search</span>
+      <span className='min-w-0 flex-1 truncate'>
+        {calm ? 'Search chats' : 'Search'}
+      </span>
       <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>
     </button>
   );

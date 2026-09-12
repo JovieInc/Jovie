@@ -1,10 +1,10 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-
+import { ListFilter } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
@@ -50,6 +50,7 @@ export interface SidebarThread {
 }
 
 export interface SidebarThreadsSectionProps {
+  readonly calm?: boolean;
   readonly threads: readonly SidebarThread[];
   readonly activeThreadId: string | null;
   readonly allThreadsActive?: boolean;
@@ -183,12 +184,14 @@ function SidebarThreadStatusRow({
 // canonical focus rings. Prevents unnecessary re-renders on thread list churn.
 const SidebarThreadRow = React.memo(function SidebarThreadRow({
   thread,
+  calm,
   active,
   unread,
   tight,
   onSelect,
   onThreadContextMenu,
 }: {
+  readonly calm?: boolean;
   readonly thread: SidebarThread;
   readonly active: boolean;
   readonly unread: boolean;
@@ -206,13 +209,16 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       trailingOverlay: Boolean(onThreadContextMenu),
     }),
     'text-left',
+    calm && 'h-9 grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg text-[12.5px]',
     active ? undefined : unread ? 'text-primary-token' : 'text-secondary-token'
   );
   const rowContent = (
     <>
       <span
         className={cn(
-          'h-1.5 w-1.5 rounded-full shrink-0 justify-self-center',
+          calm
+            ? 'sr-only'
+            : 'h-1.5 w-1.5 rounded-full shrink-0 justify-self-center',
           thread.status === 'running'
             ? 'bg-cyan-300/85 anim-calm-breath'
             : thread.status === 'errored'
@@ -228,19 +234,28 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
           // fade (with the WebKit property for every supported shell) makes
           // truncation read as intentional rather than a hard crop.
           'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
-          'text-xs',
+          calm ? 'text-[12.5px]' : 'text-xs',
           unread && 'font-medium'
         )}
       >
         {thread.title}
       </span>
+      {calm ? (
+        <time
+          aria-hidden='true'
+          dateTime={thread.updatedAt}
+          className='shrink-0 text-[11px] text-tertiary-token'
+        >
+          {formatSidebarThreadTime(thread.updatedAt)}
+        </time>
+      ) : null}
     </>
   );
   return (
     <div
       className={cn(
         'group/thread relative flex items-center',
-        tight ? 'h-6' : 'h-7'
+        calm ? 'h-9' : tight ? 'h-6' : 'h-7'
       )}
     >
       <Tooltip label={thread.title} side='right' block>
@@ -302,12 +317,31 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
 
 export { SidebarThreadRow };
 
+export function formatSidebarThreadTime(
+  value: string,
+  now = new Date(Date.now())
+): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const minutes = Math.max(
+    0,
+    Math.floor((now.getTime() - date.getTime()) / 60_000)
+  );
+  if (minutes < 60) return `${Math.max(1, minutes)}m`;
+  if (date.toDateString() === now.toDateString())
+    return `${Math.floor(minutes / 60)}h`;
+  if (minutes < 7 * 24 * 60)
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 // Status dot tones:
 //   running → cyan, anim-calm-breath
 //   errored → rose
 //   unread  → cyan static
 //   read    → dim white
 export function SidebarThreadsSection({
+  calm = false,
   threads,
   activeThreadId,
   allThreadsActive = false,
@@ -319,6 +353,7 @@ export function SidebarThreadsSection({
   tight,
   collapsed,
 }: SidebarThreadsSectionProps) {
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const sorted = useMemo(
     () => [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [threads]
@@ -327,17 +362,43 @@ export function SidebarThreadsSection({
   if (collapsed) return null;
   if (state === 'idle' && sorted.length === 0 && !onNewThread) return null;
 
-  const visible = sorted.slice(0, 5);
+  const visible = sorted
+    .filter(thread => !unreadOnly || thread.unread)
+    .slice(0, 5);
+  const today = new Date(Date.now()).toDateString();
   const unreadCount = sorted.filter(t => t.unread).length;
   const hasThreads = sorted.length > 0;
 
   return (
-    <div className='space-y-1.5'>
+    <div className={calm ? 'space-y-2' : 'space-y-1.5'}>
       <div className='flex items-center justify-between px-2.5 pb-0.5 pt-2'>
-        <span className='text-xs font-caption tracking-normal text-sidebar-muted/90'>
-          Recent
+        <span
+          className={
+            calm
+              ? 'text-[10px] font-bold tracking-widest text-sidebar-muted'
+              : 'text-xs font-caption tracking-normal text-sidebar-muted/90'
+          }
+        >
+          {calm
+            ? visible.some(
+                thread => new Date(thread.updatedAt).toDateString() === today
+              )
+              ? 'TODAY'
+              : 'EARLIER'
+            : 'Recent'}
         </span>
-        {unreadCount > 0 && (
+        {calm ? (
+          <button
+            type='button'
+            aria-label='Filter Unread Chats'
+            aria-pressed={unreadOnly}
+            onClick={() => setUnreadOnly(value => !value)}
+            className='relative flex size-4 items-center justify-center text-sidebar-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-3.5 after:lg:hidden'
+          >
+            <ListFilter className='size-3.5' aria-hidden='true' />
+          </button>
+        ) : null}
+        {!calm && unreadCount > 0 && (
           <NavBadge
             variant='count'
             count={unreadCount}
@@ -346,7 +407,7 @@ export function SidebarThreadsSection({
         )}
       </div>
 
-      <div className='flex flex-col gap-px'>
+      <div className={calm ? 'flex flex-col gap-0.5' : 'flex flex-col gap-px'}>
         {state === 'loading' && !hasThreads ? (
           <SidebarThreadStatusRow
             tight={tight}
@@ -417,19 +478,33 @@ export function SidebarThreadsSection({
             </span>
           </Button>
         ) : null}
-        {visible.map(t => {
+        {unreadOnly && visible.length === 0 ? (
+          <p className='px-2.5 text-xs text-tertiary-token'>No unread chats</p>
+        ) : null}
+        {visible.map((t, index) => {
           const active = activeThreadId === t.id;
           const unread = !!t.unread && !active;
           return (
-            <SidebarThreadRow
-              key={t.id}
-              thread={t}
-              active={active}
-              unread={unread}
-              tight={tight}
-              onSelect={onSelect}
-              onThreadContextMenu={onThreadContextMenu}
-            />
+            <React.Fragment key={t.id}>
+              {calm &&
+              index > 0 &&
+              new Date(t.updatedAt).toDateString() !== today &&
+              new Date(visible[index - 1].updatedAt).toDateString() ===
+                today ? (
+                <div className='px-2.5 pb-2 pt-6 text-[10px] font-bold tracking-widest text-sidebar-muted'>
+                  EARLIER
+                </div>
+              ) : null}
+              <SidebarThreadRow
+                calm={calm}
+                thread={t}
+                active={active}
+                unread={unread}
+                tight={tight}
+                onSelect={onSelect}
+                onThreadContextMenu={onThreadContextMenu}
+              />
+            </React.Fragment>
           );
         })}
         {hasThreads ? (
@@ -441,7 +516,7 @@ export function SidebarThreadsSection({
                 active: allThreadsActive,
                 tight,
               }),
-              'text-left'
+              calm ? 'mt-3 h-9 flex justify-end text-[12.5px]' : 'text-left'
             )}
           >
             <Icon
@@ -451,7 +526,7 @@ export function SidebarThreadsSection({
               strokeWidth={2.25}
             />
             <span className='min-w-0 truncate justify-self-start'>
-              All Chats
+              {calm ? 'All chats' : 'All Chats'}
             </span>
           </Link>
         ) : null}

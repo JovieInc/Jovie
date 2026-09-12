@@ -97,7 +97,7 @@
   /* Shell V1 canonical app-shell tokens — app chrome should prefer these
      names when touching shared shell geometry. Values are centralized here
      (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below. */
-  --app-shell-sidebar-width: 224px;
+  --app-shell-sidebar-width: 280px;
   --app-shell-header-height: 40px;
   --app-shell-header-height-compact: 36px;
   --app-shell-header-padding-x: 12px;

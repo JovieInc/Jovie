@@ -317,20 +317,18 @@ function SidebarHeaderNav({
         return (
           <div
             className={cn(
-              'flex h-7 w-full items-center gap-1.5 px-2.5',
+              'flex h-7 w-full items-center gap-1.5',
               'group-data-[collapsible=icon]:justify-center'
             )}
           >
             <BrandLogo
-              size='chrome'
+              size={24}
               tone='auto'
               variant={variant}
               rounded={false}
               className='rounded-sm shrink-0'
             />
-            <span className='truncate text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
-              {BRAND_WORDMARKS[variant]}
-            </span>
+            {variant === 'ov' ? <span>{BRAND_WORDMARKS[variant]}</span> : null}
           </div>
         );
       })()}
@@ -486,7 +484,9 @@ export function UnifiedSidebar({
         data-electron-drag-region='true'
         className={cn(
           'relative justify-center gap-0 px-2.5',
-          'h-(--app-shell-header-height-compact) py-0.5'
+          isRouteSidebar || isOperatorSection
+            ? 'h-(--app-shell-header-height-compact) py-0.5'
+            : 'h-16 pl-4 pr-3 pt-5 pb-4'
         )}
       >
         <SidebarHeaderNav
@@ -501,7 +501,7 @@ export function UnifiedSidebar({
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <SidebarContent className='min-h-0 flex-1 px-2 pb-2.5 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
             {section === 'ov' ? (
@@ -512,7 +512,7 @@ export function UnifiedSidebar({
               sidebarOverride.content
             ) : (
               <DashboardNav>
-                <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
+                <HeaderSearchSurfaceFromContext calm />
               </DashboardNav>
             )}
           </SidebarGroupContent>
@@ -540,9 +540,12 @@ export function UnifiedSidebar({
         // SidebarFooter is shrink-0; with the restored full-height flex chain
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so media and the protected account panel pin bottom.
-        <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
+        <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-2.5 pb-3.5'>
           <SidebarBottomNowPlayingBridge />
-          <SidebarIdentityGroup profileHref={profileHref} />
+          <SidebarIdentityGroup
+            calm={!isRouteSidebar}
+            profileHref={profileHref}
+          />
         </SidebarFooter>
       )}
     </Sidebar>
