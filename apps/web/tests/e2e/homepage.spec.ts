@@ -491,6 +491,70 @@ test.describe('Homepage', () => {
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
+  test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoHomepage(page);
+    await page.evaluate(() => document.fonts.ready);
+
+    const proof = page.getByTestId('marketing-section-logo-cloud');
+    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-presentation',
+      'inline-strip'
+    );
+    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
+
+    const logoBoxes = await proof.locator('svg').evaluateAll(svgs =>
+      svgs.map(svg => {
+        const box = svg.getBoundingClientRect();
+        return {
+          label: svg.getAttribute('aria-label') ?? svg.textContent ?? '',
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        };
+      })
+    );
+    expect(logoBoxes).toHaveLength(4);
+    for (let index = 0; index < logoBoxes.length; index += 1) {
+      for (let other = index + 1; other < logoBoxes.length; other += 1) {
+        const a = logoBoxes[index];
+        const b = logoBoxes[other];
+        const overlaps =
+          a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        expect(
+          overlaps,
+          `${a.label} overlaps ${b.label} at 1280px`
+        ).toBe(false);
+      }
+    }
+
+    const headerBottom = await page.getByTestId('header-nav').evaluate(header => {
+      const shell = header.querySelector('.marketing-glass-header__shell');
+      return (shell ?? header).getBoundingClientRect().bottom;
+    });
+
+    const headings = page.locator('[data-homepage-section-heading]');
+    const headingCount = await headings.count();
+    expect(headingCount).toBeGreaterThanOrEqual(7);
+
+    for (let index = 0; index < headingCount; index += 1) {
+      const heading = headings.nth(index);
+      const name = (await heading.innerText()).trim();
+      await heading.evaluate(element => {
+        element.scrollIntoView({ block: 'start', inline: 'nearest' });
+      });
+      const top = await heading.evaluate(
+        element => element.getBoundingClientRect().top
+      );
+      expect(top, `${name} must clear the sticky nav`).toBeGreaterThanOrEqual(
+        headerBottom - 0.5
+      );
+    }
+  });
+
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
     page,
   }) => {
