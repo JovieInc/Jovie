@@ -821,6 +821,50 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('materializes an empty path artifact for typed no-op merge groups', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const noopStart = detectStep.indexOf(
+      'if [[ "${IS_NOOP:-}" == "true" ]]; then'
+    );
+    const noopEnd = detectStep.indexOf('exit 0', noopStart);
+    const noopBranch = detectStep.slice(noopStart, noopEnd);
+    expect(noopStart).toBeGreaterThanOrEqual(0);
+    expect(noopEnd).toBeGreaterThan(noopStart);
+    expect(noopBranch).toContain(
+      'PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"'
+    );
+    expect(noopBranch).toContain('mkdir -p "$PRODUCT_LANE_DIR"');
+    expect(noopBranch).toContain(': > "$PRODUCT_LANE_DIR/changed-paths.txt"');
+
+    const homepageVisualScript = getStepRunScript(
+      pathChanges,
+      'Select rendered homepage visual gate'
+    );
+    const testRoot = mkdtempSync(join(tmpdir(), 'noop-path-artifact-'));
+    const productLaneDir = join(testRoot, 'product-lane-classification');
+    const visualOutput = join(testRoot, 'visual-output');
+    mkdirSync(productLaneDir, { recursive: true });
+    writeFileSync(join(productLaneDir, 'changed-paths.txt'), '');
+    writeFileSync(visualOutput, '');
+
+    const visual = spawnSync('bash', ['-c', homepageVisualScript], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: visualOutput,
+        RUNNER_TEMP: testRoot,
+      },
+    });
+    expect(visual.status, visual.stderr || visual.stdout).toBe(0);
+    expect(readFileSync(visualOutput, 'utf8')).toContain(
+      'run_homepage_visual=false'
+    );
+  });
+
   it('materializes the path artifact before a manual dispatch exits', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectScript = materializeWorkflowDispatchScript(
@@ -1611,43 +1655,46 @@ ${selectedGateScript}`,
   it.each([
     ['fork', FORK_GATE_WORKFLOW, 'merge-group-gate'],
     ['size', SIZE_GUARD_WORKFLOW, 'merge-group-size'],
-  ])('loads the complete %s policy import closure from its sparse checkout', (_policy, workflow, job) => {
-    const block = getJobBlock(workflow, job);
-    const sparse = block.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
-    expect(sparse, 'trusted policy sparse checkout').not.toBeNull();
-    const paths = sparse[1]
-      .trim()
-      .split('\n')
-      .map(line => line.trim());
-    const root = mkdtempSync(join(tmpdir(), 'jovie-policy-checkout-'));
-    const load = () =>
-      spawnSync(
-        process.execPath,
-        [
-          '--input-type=module',
-          '-e',
-          "await import('./scripts/lib/merge-group-member-policy.mjs')",
-        ],
-        { cwd: root, encoding: 'utf8' }
-      );
-    try {
-      for (const path of paths) {
-        const target = resolve(root, path);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, readFileSync(resolve(REPO_ROOT, path)));
+  ])(
+    'loads the complete %s policy import closure from its sparse checkout',
+    (_policy, workflow, job) => {
+      const block = getJobBlock(workflow, job);
+      const sparse = block.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+      expect(sparse, 'trusted policy sparse checkout').not.toBeNull();
+      const paths = sparse[1]
+        .trim()
+        .split('\n')
+        .map(line => line.trim());
+      const root = mkdtempSync(join(tmpdir(), 'jovie-policy-checkout-'));
+      const load = () =>
+        spawnSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '-e',
+            "await import('./scripts/lib/merge-group-member-policy.mjs')",
+          ],
+          { cwd: root, encoding: 'utf8' }
+        );
+      try {
+        for (const path of paths) {
+          const target = resolve(root, path);
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, readFileSync(resolve(REPO_ROOT, path)));
+        }
+        // Node discovers all transitive static imports in the actual policy.
+        const complete = load();
+        expect(complete.status, complete.stderr).toBe(0);
+        rmSync(resolve(root, 'scripts/lib/repo-hygiene-limits.mjs'));
+        const incomplete = load();
+        expect(incomplete.status).not.toBe(0);
+        expect(incomplete.stderr).toContain('ERR_MODULE_NOT_FOUND');
+        expect(incomplete.stderr).toContain('repo-hygiene-limits.mjs');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
       }
-      // Node discovers all transitive static imports in the actual policy.
-      const complete = load();
-      expect(complete.status, complete.stderr).toBe(0);
-      rmSync(resolve(root, 'scripts/lib/repo-hygiene-limits.mjs'));
-      const incomplete = load();
-      expect(incomplete.status).not.toBe(0);
-      expect(incomplete.stderr).toContain('ERR_MODULE_NOT_FOUND');
-      expect(incomplete.stderr).toContain('repo-hygiene-limits.mjs');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
     }
-  });
+  );
 
   it('revalidates mutable member policy on the exact combined head', () => {
     expect(FORK_GATE_WORKFLOW).toMatch(
