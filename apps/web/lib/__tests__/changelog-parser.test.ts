@@ -100,15 +100,18 @@ describe('parseChangelog', () => {
     'Merch confirmation actions use a neutral System B primary button surface.',
     'Infra train version bump for desktop release guard.',
     'VERSION: bumps train integration so desktop security ships with DMG handling.',
-  ])('filters implementation copy observed in the rendered timeline: %s', internal => {
-    const releases = parseChangelog(
-      `## [1.0.0] - 2026-03-20\n> ${internal}\n### Fixed\n- ${internal}\n- Your profile keeps your privacy choices.\n`
-    );
-    expect(releases[0].summary).toBe('');
-    expect(releases[0].sections.fixed).toEqual([
-      'Your profile keeps your privacy choices.',
-    ]);
-  });
+  ])(
+    'filters implementation copy observed in the rendered timeline: %s',
+    internal => {
+      const releases = parseChangelog(
+        `## [1.0.0] - 2026-03-20\n> ${internal}\n### Fixed\n- ${internal}\n- Your profile keeps your privacy choices.\n`
+      );
+      expect(releases[0].summary).toBe('');
+      expect(releases[0].sections.fixed).toEqual([
+        'Your profile keeps your privacy choices.',
+      ]);
+    }
+  );
   it('parses releases with version and date', () => {
     const releases = parseChangelog(BASIC_CHANGELOG);
     expect(releases).toHaveLength(2);
