@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { readFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
+import postcss from 'postcss';
+import ts from 'typescript';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -88,15 +90,30 @@ function scanTailwindFile(filePath, content) {
 }
 
 function scanCssFile(filePath, content) {
-  const relativePath = relative(repoRoot, filePath);
-  if (auditedCssFullBleedFiles.has(relativePath)) {
+  if (auditedCssFullBleedFiles.has(filePath)) {
     return [];
   }
 
-  const match = cssRiskPattern.exec(content);
-  if (!match) return [];
+  const scannedContent = omitAuditedOverlayUtility(filePath, content);
+  const applyMatch = /@apply\b[^;{}]*\bw-overlay-viewport\b/.exec(
+    scannedContent
+  );
+  const violations = applyMatch
+    ? [
+        {
+          filePath,
+          line: getLineNumber(content, applyMatch.index),
+          rule: 'unaudited w-overlay-viewport consumer',
+          detail:
+            'The viewport utility is audited only in the centered overlay source owner, not in new CSS compositions.',
+        },
+      ]
+    : [];
+  const match = cssRiskPattern.exec(scannedContent);
+  if (!match) return violations;
 
   return [
+    ...violations,
     {
       filePath,
       line: getLineNumber(content, match.index),
@@ -107,41 +124,153 @@ function scanCssFile(filePath, content) {
   ];
 }
 
-const files = await glob(scannedFilePatterns, {
-  cwd: repoRoot,
-  absolute: true,
-  ignore: ignoredPatterns,
-  nodir: true,
-});
-
-const violations = [];
-
-for (const filePath of files) {
-  const content = readFileSync(filePath, 'utf8');
-
-  if (isTsLikeFile(filePath)) {
-    violations.push(...scanTailwindFile(filePath, content));
-  }
-
-  if (isCssFile(filePath)) {
-    violations.push(...scanCssFile(filePath, content));
-  }
-}
-
-if (violations.length > 0) {
-  console.error('Mobile overflow guard failed.');
-  console.error(
-    'Remove risky viewport-width classes/declarations or audit a true full-bleed exception.'
+/**
+ * Width-only audit: audits/jovie-overlay-native-width-proof-and-focus-hold-2026-09-05.
+ * Native manifest sha256:daa5d5d5b8e61c9abb0a62be6535208d1f29437e3e7f3b4f9344fb1bd16936cc.
+ * This does not certify Dialog focus behavior or arbitrary caller overrides.
+ * Remove only the exact, top-level, single-declaration utility; scan all other
+ * declarations normally. Never exempt globals.css as a file.
+ */
+function omitAuditedOverlayUtility(filePath, content) {
+  if (filePath !== 'apps/web/app/globals.css') return content;
+  const css = postcss.parse(content);
+  const utilities = [];
+  css.walkAtRules('utility', rule => {
+    if (rule.params.trim() === 'w-overlay-viewport') utilities.push(rule);
+  });
+  if (utilities.length !== 1) return content;
+  const utility = utilities[0];
+  const declaration = utility.nodes?.[0];
+  if (
+    utility.parent !== css ||
+    utility.nodes?.length !== 1 ||
+    declaration.type !== 'decl' ||
+    declaration.prop !== 'width' ||
+    declaration.important ||
+    !/^calc\(\s*100vw\s+-\s+var\(\s*--space-8\s*\)\s*\)$/.test(
+      declaration.value
+    )
+  )
+    return content;
+  const start = utility.source.start.offset;
+  const end = utility.source.end.offset + 1;
+  return (
+    content.slice(0, start) +
+    content.slice(start, end).replace(/[^\n]/g, ' ') +
+    content.slice(end)
   );
-
-  for (const violation of violations) {
-    console.error(
-      `- ${relative(repoRoot, violation.filePath)}:${violation.line} ${violation.rule}`
-    );
-    console.error(`  ${violation.detail}`);
-  }
-
-  process.exit(1);
 }
 
-console.log('Mobile overflow guard passed.');
+function hasAuditedOverlayDeclaration(content) {
+  const source = ts.createSourceFile(
+    'overlay-styles.ts',
+    content,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  if (source.parseDiagnostics.length) return false;
+  let uses = 0;
+  const countUses = node => {
+    if (ts.isStringLiteral(node) || ts.isTemplateLiteralToken(node))
+      uses += [...node.text.matchAll(/\bw-overlay-viewport\b/g)].length;
+    ts.forEachChild(node, countUses);
+  };
+  countUses(source);
+  if (uses !== 1) return false;
+  const declarations = source.statements
+    .filter(ts.isVariableStatement)
+    .flatMap(statement => statement.declarationList.declarations)
+    .filter(
+      declaration =>
+        ts.isIdentifier(declaration.name) &&
+        declaration.name.text === 'centeredContentStyles'
+    );
+  if (declarations.length !== 1) return false;
+  const initializer = declarations[0].initializer;
+  const object =
+    initializer && ts.isAsExpression(initializer)
+      ? initializer.expression
+      : initializer;
+  if (
+    !object ||
+    !ts.isObjectLiteralExpression(object) ||
+    object.properties.some(ts.isSpreadAssignment)
+  )
+    return false;
+  return Object.entries({
+    position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
+    layout:
+      'grid max-h-overlay-viewport w-overlay-viewport max-w-lg gap-5 overflow-y-auto overscroll-contain',
+  }).every(([name, value]) => {
+    const properties = object.properties.filter(
+      property => property.name?.getText(source) === name
+    );
+    return (
+      properties.length === 1 &&
+      ts.isPropertyAssignment(properties[0]) &&
+      ts.isStringLiteral(properties[0].initializer) &&
+      properties[0].initializer.text === value
+    );
+  });
+}
+
+function scanOverlayConsumer(filePath, content) {
+  const match = /\bw-overlay-viewport\b/.exec(content);
+  if (!match) return [];
+  const isAuditedOwner =
+    filePath === 'packages/ui/lib/overlay-styles.ts' &&
+    hasAuditedOverlayDeclaration(content);
+  if (isAuditedOwner) return [];
+  return [
+    {
+      filePath,
+      line: getLineNumber(content, match.index),
+      rule: 'unaudited w-overlay-viewport consumer',
+      detail:
+        'This viewport width is audited only in the constrained centered overlay owner; audit changed placement or new consumers before reuse.',
+    },
+  ];
+}
+
+export function scanSourceFile(filePath, content) {
+  if (isTsLikeFile(filePath))
+    return [
+      ...scanTailwindFile(filePath, content),
+      ...scanOverlayConsumer(filePath, content),
+    ];
+  if (isCssFile(filePath)) return scanCssFile(filePath, content);
+  return [];
+}
+
+export async function findMobileOverflowViolations(root = repoRoot) {
+  const files = await glob(scannedFilePatterns, {
+    cwd: root,
+    absolute: true,
+    ignore: ignoredPatterns,
+    nodir: true,
+  });
+  return files.flatMap(filePath =>
+    scanSourceFile(relative(root, filePath), readFileSync(filePath, 'utf8'))
+  );
+}
+
+async function main() {
+  const violations = await findMobileOverflowViolations();
+  if (violations.length > 0) {
+    console.error('Mobile overflow guard failed.');
+    console.error(
+      'Remove risky viewport-width classes/declarations or audit a true full-bleed exception.'
+    );
+    for (const violation of violations) {
+      console.error(
+        `- ${violation.filePath}:${violation.line} ${violation.rule}`
+      );
+      console.error(`  ${violation.detail}`);
+    }
+    process.exitCode = 1;
+    return;
+  }
+  console.log('Mobile overflow guard passed.');
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === __filename) await main();
