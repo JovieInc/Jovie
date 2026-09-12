@@ -6,7 +6,12 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
-import { ProfileDesktopSurface } from './ProfileDesktopSurface';
+import {
+  PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
+  PROFILE_LISTEN_DSP_COLUMN_CLASSNAME,
+  PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME,
+  ProfileDesktopSurface,
+} from './ProfileDesktopSurface';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -324,6 +329,17 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByAltText('Never Say A Word')).toHaveAttribute(
       'data-priority',
       'true'
+    );
+
+    const listenGrid = screen.getByTestId('profile-listen-desktop-grid');
+    expect(listenGrid).toHaveClass(PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME);
+    // JOV-6197: with no imported catalog the Listen card takes the releases
+    // column; the DSP column carries the Latest Release / Pay sidebar.
+    expect(
+      screen.getByTestId('profile-primary-tab-artist-streaming')
+    ).toHaveClass(PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME);
+    expect(screen.getByTestId('profile-listen-dsp-column')).toHaveClass(
+      PROFILE_LISTEN_DSP_COLUMN_CLASSNAME
     );
   });
 

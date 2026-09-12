@@ -63,6 +63,20 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
 
+/**
+ * JOV-6201 listen-mode desktop split. Apply on every desktop listen branch
+ * (JOV-6197 `listenTabContent` copies). Reuses the grandfathered 360px track;
+ * only the 1180px hand-off and min-w-0 are new. Do not invent a new grid-cols
+ * identity or revert the listen split to `xl:` only.
+ */
+export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
+  'grid min-h-0 min-w-0 flex-1 items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1.3fr)_360px]';
+
+export const PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME =
+  'min-h-0 min-w-0 overflow-hidden isolate';
+
+export const PROFILE_LISTEN_DSP_COLUMN_CLASSNAME = 'grid min-w-0 gap-3.5';
+
 const PRIMARY_TABS: ReadonlyArray<{
   mode: ProfilePrimaryTab;
   label: string;
@@ -734,7 +748,10 @@ export function ProfileDesktopSurface({
   );
 
   const catalogListenSidebar = (
-    <div className='grid gap-3.5'>
+    <div
+      className={PROFILE_LISTEN_DSP_COLUMN_CLASSNAME}
+      data-testid='profile-listen-dsp-column'
+    >
       <DesktopSurfaceCard title='Latest Release'>
         <div className='space-y-4'>
           <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
@@ -782,10 +799,13 @@ export function ProfileDesktopSurface({
   let listenTabContent: React.ReactNode;
   if (musicSurface.kind === 'catalog') {
     listenTabContent = (
-      <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.3fr)_360px]'>
+      <div
+        className={PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME}
+        data-testid='profile-listen-desktop-grid'
+      >
         <DesktopSurfaceCard
           title='Releases'
-          className='min-h-0'
+          className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
           testId='profile-primary-tab-releases'
         >
           <ReleasesView
@@ -802,7 +822,7 @@ export function ProfileDesktopSurface({
     const artistStreamingListen = (
       <DesktopSurfaceCard
         title='Listen'
-        className='min-h-0'
+        className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
         testId='profile-primary-tab-artist-streaming'
       >
         <StaticListenInterface
@@ -817,7 +837,10 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     );
     listenTabContent = latestVisibleRelease ? (
-      <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.3fr)_360px]'>
+      <div
+        className={PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME}
+        data-testid='profile-listen-desktop-grid'
+      >
         {artistStreamingListen}
         {catalogListenSidebar}
       </div>
