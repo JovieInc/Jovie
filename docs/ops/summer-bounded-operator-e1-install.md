@@ -61,6 +61,25 @@ python3 /tmp/jov-6163-attestation/scripts/symphony/tests/gem-service-attestation
 - Summer admission receipt showing attestation freshness OK
 - Explicit statement that the 600s freshness gate was not weakened
 
+## Repair-to-runtime bridge (this branch)
+
+Summer bottleneck heartbeat now evaluates runner-source attestation before the
+Gem-dark recovery cycle:
+
+1. Load `SUMMER_RUNNER_SOURCE_ATTESTATION_JSON` or the file at
+   `SUMMER_RUNNER_SOURCE_ATTESTATION_PATH`.
+2. `resolveGemDarkTrigger` admits the Cursor outbox lane when the receipt is
+   missing/invalid/stale/unhealthy/unbound (**including age >600s**), or when
+   `SUMMER_GEM_DARK` is explicitly dark.
+3. Fresh ≤600s attestations keep the normal symphony path authoritative.
+4. `SUMMER_GEM_DARK=live` wins over a missing receipt (operator override).
+5. PATH alone (without loading the file) does **not** imply dark — avoids
+   accidental Cursor spend; the heartbeat always loads first.
+
+Schema match (must equal Symphony concurrency controller):
+`gem-service-attestation/v1` + `sourceRevision` (40 hex) + `observedAt` +
+`active`/`healthy` + `listener.port===4041` + `listener.boundToService===true`.
+
 ## Named external blocker
 
 **Owner:** Gem operator / Symphony fleet owner  

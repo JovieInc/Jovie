@@ -186,18 +186,184 @@ export async function runGemDarkRecoveryCycle(
   };
 }
 
-/** Environment-backed Gem liveness probe used by the heartbeat. */
-export function isGemDarkFromEnvironment(
-  environment: Readonly<Record<string, string | undefined>> = process.env
-): boolean {
+/** Matches Symphony concurrency-controller evidence window (JOV-6163). */
+export const RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS = 600_000 as const;
+
+export type RunnerSourceAttestationProbe =
+  | {
+      readonly status: 'fresh';
+      readonly observedAt: string;
+      readonly sourceRevision: string;
+    }
+  | {
+      readonly status: 'unavailable';
+      readonly reason:
+        | 'missing'
+        | 'invalid-schema'
+        | 'stale'
+        | 'unhealthy'
+        | 'unbound-listener'
+        | 'invalid-revision';
+    };
+
+/**
+ * Evaluate a gem-service-attestation/v1 receipt the same way the concurrency
+ * controller does: schema, active+healthy, port 4041 bound, and ≤600s fresh.
+ * Does not weaken the 600s gate.
+ */
+export function evaluateRunnerSourceAttestation(
+  receipt: unknown,
+  nowMs: number = Date.now()
+): RunnerSourceAttestationProbe {
+  if (receipt == null || typeof receipt !== 'object' || Array.isArray(receipt)) {
+    return { status: 'unavailable', reason: 'missing' };
+  }
+  const value = receipt as Record<string, unknown>;
+  if (value.schema !== 'gem-service-attestation/v1') {
+    return { status: 'unavailable', reason: 'invalid-schema' };
+  }
+  const revision = value.sourceRevision;
+  if (typeof revision !== 'string' || !/^[a-f0-9]{40}$/u.test(revision)) {
+    return { status: 'unavailable', reason: 'invalid-revision' };
+  }
+  const observedAt = value.observedAt;
+  if (typeof observedAt !== 'string') {
+    return { status: 'unavailable', reason: 'invalid-schema' };
+  }
+  const observedMs = Date.parse(observedAt);
+  if (!Number.isFinite(observedMs)) {
+    return { status: 'unavailable', reason: 'invalid-schema' };
+  }
+  const ageMs = nowMs - observedMs;
+  if (ageMs < 0 || ageMs > RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS) {
+    return { status: 'unavailable', reason: 'stale' };
+  }
+  if (value.active !== true || value.healthy !== true) {
+    return { status: 'unavailable', reason: 'unhealthy' };
+  }
+  const listener = value.listener;
+  if (
+    listener == null ||
+    typeof listener !== 'object' ||
+    Array.isArray(listener) ||
+    (listener as Record<string, unknown>).port !== 4041 ||
+    (listener as Record<string, unknown>).boundToService !== true
+  ) {
+    return { status: 'unavailable', reason: 'unbound-listener' };
+  }
+  return { status: 'fresh', observedAt, sourceRevision: revision };
+}
+
+export type GemDarkTriggerDecision =
+  | {
+      readonly dark: true;
+      readonly reason: 'explicit-env' | 'runner-source-attestation-unavailable';
+      readonly attestation?: RunnerSourceAttestationProbe;
+    }
+  | {
+      readonly dark: false;
+      readonly reason: 'explicit-env-live' | 'attestation-fresh' | 'unknown-fail-closed';
+      readonly attestation?: RunnerSourceAttestationProbe;
+    };
+
+/**
+ * Resolve whether Summer should enter the Gem-independent Cursor recovery lane.
+ *
+ * Priority:
+ * 1. SUMMER_GEM_DARK explicit override
+ * 2. Configured runner-source attestation receipt (path/env JSON) — unavailable/stale → dark
+ * 3. Otherwise fail closed toward "not dark" (no accidental Cursor spend)
+ */
+export function resolveGemDarkTrigger(input: {
+  readonly environment?: Readonly<Record<string, string | undefined>>;
+  readonly attestationReceipt?: unknown;
+  readonly nowMs?: number;
+}): GemDarkTriggerDecision {
+  const environment = input.environment ?? process.env;
   const explicit = environment.SUMMER_GEM_DARK?.trim().toLowerCase();
   if (explicit === '1' || explicit === 'true' || explicit === 'dark') {
-    return true;
+    return { dark: true, reason: 'explicit-env' };
   }
   if (explicit === '0' || explicit === 'false' || explicit === 'live') {
-    return false;
+    return { dark: false, reason: 'explicit-env-live' };
   }
-  // Fail closed toward "not dark" unless explicitly marked — avoids accidental
-  // Cursor spend when Gem state is unknown in this runtime.
-  return false;
+
+  // PATH alone is not a sync signal — callers must load via
+  // loadRunnerSourceAttestationFromEnvironment and pass attestationReceipt.
+  const hasAttestationInput =
+    input.attestationReceipt !== undefined ||
+    Boolean(environment.SUMMER_RUNNER_SOURCE_ATTESTATION_JSON?.trim());
+
+  if (!hasAttestationInput) {
+    // No probe configured and no explicit dark flag.
+    return { dark: false, reason: 'unknown-fail-closed' };
+  }
+
+  let receipt = input.attestationReceipt;
+  if (receipt === undefined) {
+    const inline = environment.SUMMER_RUNNER_SOURCE_ATTESTATION_JSON?.trim();
+    if (inline) {
+      try {
+        receipt = JSON.parse(inline) as unknown;
+      } catch {
+        receipt = null;
+      }
+    }
+  }
+
+  const attestation = evaluateRunnerSourceAttestation(
+    receipt ?? null,
+    input.nowMs ?? Date.now()
+  );
+  if (attestation.status === 'fresh') {
+    return { dark: false, reason: 'attestation-fresh', attestation };
+  }
+  return {
+    dark: true,
+    reason: 'runner-source-attestation-unavailable',
+    attestation,
+  };
+}
+
+/** Environment-backed Gem liveness probe used by the heartbeat. */
+export function isGemDarkFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+  options: {
+    readonly attestationReceipt?: unknown;
+    readonly nowMs?: number;
+  } = {}
+): boolean {
+  return resolveGemDarkTrigger({
+    environment,
+    attestationReceipt: options.attestationReceipt,
+    nowMs: options.nowMs,
+  }).dark;
+}
+
+/**
+ * Load attestation JSON from SUMMER_RUNNER_SOURCE_ATTESTATION_PATH when set.
+ * Missing/unreadable files count as unavailable (caller decides dark policy).
+ */
+export async function loadRunnerSourceAttestationFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+  readFile: (path: string) => Promise<string> = async path => {
+    const { readFile: fsRead } = await import('node:fs/promises');
+    return fsRead(path, 'utf8');
+  }
+): Promise<unknown> {
+  const inline = environment.SUMMER_RUNNER_SOURCE_ATTESTATION_JSON?.trim();
+  if (inline) {
+    try {
+      return JSON.parse(inline) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  const path = environment.SUMMER_RUNNER_SOURCE_ATTESTATION_PATH?.trim();
+  if (!path) return undefined;
+  try {
+    return JSON.parse(await readFile(path)) as unknown;
+  } catch {
+    return null;
+  }
 }

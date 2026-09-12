@@ -5,8 +5,12 @@ import type {
 } from '../agent/lib/summer-bottleneck-loop';
 import {
   type GemDarkRecoveryDependencies,
+  evaluateRunnerSourceAttestation,
   gemDarkAdmissionContext,
+  loadRunnerSourceAttestationFromEnvironment,
   persistCursorRecoveryOutbox,
+  resolveGemDarkTrigger,
+  RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
   runGemDarkRecoveryCycle,
 } from '../agent/lib/summer-gem-dark-recovery';
 
@@ -191,4 +195,152 @@ describe('Summer Gem-dark recovery wiring', () => {
     expect(result.receipt?.status).toBe('completed');
     expect(result.report.remainingHumanDecision).toMatch(/Review|approve/i);
   });
+});
+
+describe('Runner-source attestation → Gem-dark trigger (JOV-6163 bridge)', () => {
+  const nowMs = Date.parse('2026-09-12T17:00:00.000Z');
+  const freshObservedAt = '2026-09-12T16:55:00.000Z'; // 5 min old
+  const staleObservedAt = '2026-09-12T16:49:00.000Z'; // 11 min old
+
+  function freshReceipt(overrides: Record<string, unknown> = {}) {
+    return {
+      schema: 'gem-service-attestation/v1',
+      sourceRevision: 'a'.repeat(40),
+      observedAt: freshObservedAt,
+      active: true,
+      healthy: true,
+      listener: { port: 4041, boundToService: true },
+      ...overrides,
+    };
+  }
+
+  it('accepts a fresh ≤600s attestation receipt', () => {
+    const probe = evaluateRunnerSourceAttestation(freshReceipt(), nowMs);
+    expect(probe).toMatchObject({
+      status: 'fresh',
+      sourceRevision: 'a'.repeat(40),
+    });
+  });
+
+  it('rejects attestation older than 600s without weakening the gate', () => {
+    const probe = evaluateRunnerSourceAttestation(
+      freshReceipt({ observedAt: staleObservedAt }),
+      nowMs
+    );
+    expect(probe).toEqual({ status: 'unavailable', reason: 'stale' });
+    expect(nowMs - Date.parse(staleObservedAt)).toBeGreaterThan(
+      RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS
+    );
+  });
+
+  it('rejects exactly-at-boundary+1ms as stale (600s hard ceiling)', () => {
+    const observedAt = new Date(
+      nowMs - RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS - 1
+    ).toISOString();
+    const probe = evaluateRunnerSourceAttestation(
+      freshReceipt({ observedAt }),
+      nowMs
+    );
+    expect(probe).toEqual({ status: 'unavailable', reason: 'stale' });
+  });
+
+  it('triggers Gem-dark recovery when attestation is unavailable', async () => {
+    const store = memoryStore();
+    const trigger = resolveGemDarkTrigger({
+      attestationReceipt: null,
+      nowMs,
+    });
+    expect(trigger).toMatchObject({
+      dark: true,
+      reason: 'runner-source-attestation-unavailable',
+    });
+
+    const result = await runGemDarkRecoveryCycle(
+      { store, isGemDark: () => trigger.dark },
+      {
+        objective: 'Prepare JOV-6163 publisher install packet',
+        evidenceRefs: [
+          'runner-source-attestation-unavailable',
+          `gem-dark-trigger:${trigger.reason}`,
+        ],
+        idempotencyKey: 'attest-unavail-1',
+      }
+    );
+    expect(result.status).toBe('outbox-ready');
+    if (result.status !== 'outbox-ready') return;
+    expect(result.outbox.destination).toBe('cursor-cloud');
+    expect(result.outbox.route.selectedRoute.tuple.provider).not.toBe('gem');
+  });
+
+  it('does not enter Cursor recovery when attestation is fresh', () => {
+    const trigger = resolveGemDarkTrigger({
+      attestationReceipt: freshReceipt(),
+      nowMs,
+    });
+    expect(trigger).toMatchObject({
+      dark: false,
+      reason: 'attestation-fresh',
+    });
+  });
+
+  it('explicit SUMMER_GEM_DARK=live wins over missing attestation', () => {
+    const trigger = resolveGemDarkTrigger({
+      environment: { SUMMER_GEM_DARK: 'live' },
+      attestationReceipt: null,
+      nowMs,
+    });
+    expect(trigger).toMatchObject({ dark: false, reason: 'explicit-env-live' });
+  });
+
+  it('loadRunnerSourceAttestationFromEnvironment returns null for missing PATH', async () => {
+    const receipt = await loadRunnerSourceAttestationFromEnvironment(
+      { SUMMER_RUNNER_SOURCE_ATTESTATION_PATH: '/tmp/does-not-exist-attestation.json' },
+      async () => {
+        throw new Error('ENOENT');
+      }
+    );
+    expect(receipt).toBeNull();
+    const trigger = resolveGemDarkTrigger({
+      attestationReceipt: receipt,
+      nowMs,
+    });
+    expect(trigger).toMatchObject({
+      dark: true,
+      reason: 'runner-source-attestation-unavailable',
+    });
+  });
+
+  it('PATH alone without loaded receipt does not spend Cursor (caller must load)', () => {
+    const trigger = resolveGemDarkTrigger({
+      environment: {
+        SUMMER_RUNNER_SOURCE_ATTESTATION_PATH: '/tmp/attest.json',
+      },
+      nowMs,
+    });
+    expect(trigger).toMatchObject({ dark: false, reason: 'unknown-fail-closed' });
+  });
+
+  it('inline JSON attestation drives live/dark without PATH', () => {
+    const live = resolveGemDarkTrigger({
+      environment: {
+        SUMMER_RUNNER_SOURCE_ATTESTATION_JSON: JSON.stringify(freshReceipt()),
+      },
+      nowMs,
+    });
+    expect(live).toMatchObject({ dark: false, reason: 'attestation-fresh' });
+
+    const dark = resolveGemDarkTrigger({
+      environment: {
+        SUMMER_RUNNER_SOURCE_ATTESTATION_JSON: JSON.stringify(
+          freshReceipt({ observedAt: staleObservedAt })
+        ),
+      },
+      nowMs,
+    });
+    expect(dark).toMatchObject({
+      dark: true,
+      reason: 'runner-source-attestation-unavailable',
+    });
+  });
+
 });
