@@ -537,6 +537,10 @@ Before declaring design work complete, report pass/fail for:
   feature grids, or template copy.
 - Evidence: screenshots, mockups, test output, or component/file evidence included
   in the PR or final handoff.
+- Forms, overflow, media, l10n, browser, and a11y gaps: load
+  `.agents/skills/gstack/design-review/references/web-interface-gaps.md`.
+  One canonical review path. Do not fetch handbook `main`. Do not invoke
+  `web-design-guidelines` as a parallel skill.
 
 ## Output Contract
 
@@ -546,7 +550,7 @@ For design-related PRs, include:
 Design-read: Reading this as: ...
 Dials: DESIGN_VARIANCE=..., MOTION_INTENSITY=..., VISUAL_DENSITY=...
 Before/after evidence: <screenshots, mockups, or component evidence>
-Checklist: contrast <pass/fail>, states <pass/fail>, layout <pass/fail>, motion <pass/fail>, icons <pass/fail>, anti-slop <pass/fail>, evidence <pass/fail>
+Checklist: contrast <pass/fail>, states <pass/fail>, layout <pass/fail>, motion <pass/fail>, icons <pass/fail>, anti-slop <pass/fail>, evidence <pass/fail>, forms <pass/fail>, overflow <pass/fail>, media <pass/fail>, l10n <pass/fail>, browser <pass/fail>, a11y <pass/fail>
 Verification: <exact commands and output>
 ```
 

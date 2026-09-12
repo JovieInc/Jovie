@@ -15,6 +15,7 @@ import {
   buildProfileSaveState,
 } from '@/features/profile/view-models';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import type { AutoSaveAttemptMeta } from '@/lib/pacer/hooks';
 import { useAutoSave } from '@/lib/pacer/hooks';
 import {
   useProfileMutation,
@@ -145,7 +146,8 @@ export function useSettingsProfile({
     isPending,
     error: saveError,
   } = useAutoSave<ProfileUpdateData>({
-    saveFn: async data => {
+    resourceKey: artist.id,
+    saveFn: async (data, meta: AutoSaveAttemptMeta) => {
       const displayName = data.displayName?.trim() ?? '';
       const username = data.username?.trim() ?? '';
       const location = normalizePlace(data.location);
@@ -188,7 +190,7 @@ export function useSettingsProfile({
       try {
         // Use TanStack Query mutation via ref to get latest function
         response = await saveProfileMutationRef.current({
-          profileId: artistRef.current.id,
+          profileId: meta.resourceKey,
           updates: {
             username,
             displayName,
@@ -209,6 +211,10 @@ export function useSettingsProfile({
         setProfileSaveStatus({ saving: false, success: false, error: message });
         // Re-throw so useAutoSave calls onError (which shows the toast)
         throw error;
+      }
+
+      if (!meta.isLatest) {
+        return;
       }
 
       // Update cache
@@ -338,7 +344,9 @@ export function useSettingsProfile({
   );
 
   const flushSave = useCallback(() => {
-    void flush();
+    void flush().catch(() => {
+      // onError already reported a truthful failure.
+    });
   }, [flush]);
 
   const cancelSave = useCallback(() => {

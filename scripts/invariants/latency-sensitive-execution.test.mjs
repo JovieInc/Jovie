@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  DESKTOP_ENTRY_POINTS,
   diffAllowlist,
   LATENCY_SENSITIVE_CHECK_CLASS,
   LATENCY_SENSITIVE_INVARIANT_ID,
@@ -12,6 +13,7 @@ import {
   LATENCY_SENSITIVE_SLUG,
   ROUTE_LATENCY_CHECK_CLASS,
   ROUTE_LATENCY_CONTRACT,
+  RUNTIME_ROOTS,
   scanFixture,
   scanRuntime,
   validateEslintSelectors,
@@ -98,6 +100,49 @@ describe('JOV-INV-031 latency-sensitive-execution-v1', () => {
     assert.deepEqual(scanFixture('green-bounded'), []);
     assert.deepEqual(scanFixture('green-tooling'), []);
     assert.deepEqual(scanFixture('green-exists-toplevel'), []);
+  });
+
+  it('scans Electron main/preload roots without a blanket desktop exemption', () => {
+    assert.ok(RUNTIME_ROOTS.includes('apps/desktop/src'));
+    assert.deepEqual(DESKTOP_ENTRY_POINTS, [
+      'apps/desktop/src/main.ts',
+      'apps/desktop/src/preload.ts',
+    ]);
+    assert.equal(
+      RUNTIME_ROOTS.filter(root => root.startsWith('apps/desktop')).length,
+      1
+    );
+  });
+
+  it('rejects hidden spawnSync in an imported desktop helper', () => {
+    const hits = scanFixture('red-desktop-imported-helper');
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].callee, 'spawnSync');
+    assert.equal(hits[0].path, 'apps/desktop/helpers/hidden-spawn.ts');
+  });
+
+  it('rejects spawnSync in a worker-named folder imported by Electron main', () => {
+    const hits = scanFixture('red-desktop-worker-folder');
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].callee, 'spawnSync');
+    assert.equal(hits[0].path, 'workers/desktop-hidden-spawn.ts');
+  });
+
+  it('keeps isolated workers and desktop build scripts green', () => {
+    assert.deepEqual(scanFixture('green-desktop-isolated-worker'), []);
+    assert.deepEqual(scanFixture('green-desktop-build-script'), []);
+  });
+
+  it('follows import reachability so an in-memory worker helper cannot hide', () => {
+    const hits = scanRuntime('/tmp/jovie-inv-031-reachability', {
+      'apps/desktop/src/main.ts':
+        "import { hideSync } from '../../../workers/hidden-spawn';\nexport async function boot() { return hideSync(); }\n",
+      'workers/hidden-spawn.ts':
+        "import { spawnSync } from 'node:child_process';\nexport async function hideSync() { return spawnSync('true'); }\n",
+    });
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].callee, 'spawnSync');
+    assert.equal(hits[0].path, 'workers/hidden-spawn.ts');
   });
 
   it('treats a count increase as a new violation and a decrease as stale allowlist', () => {
