@@ -308,7 +308,9 @@ function assertCoverageMap(root, errors) {
   if (!text) return;
   for (const phrase of REQUIRED_COVERAGE_MAP_PHRASES) {
     if (!text.includes(phrase)) {
-      errors.push(`${COVERAGE_MAP_PATH}: missing required coverage phrase: ${phrase}`);
+      errors.push(
+        `${COVERAGE_MAP_PATH}: missing required coverage phrase: ${phrase}`
+      );
     }
   }
 }
@@ -327,7 +329,9 @@ function assertPinnedHandbooks(root, errors) {
   for (const name of REQUIRED_HANDBOOK_PINS) {
     const pin = handbooks[name];
     if (!pin?.ref || !pin.sha256 || !pin.path) {
-      errors.push(`${VERCEL_LABS_PINS_PATH}: missing a complete pin for ${name}`);
+      errors.push(
+        `${VERCEL_LABS_PINS_PATH}: missing a complete pin for ${name}`
+      );
       continue;
     }
     const absolute = resolve(root, pin.path);
@@ -357,7 +361,9 @@ function assertDesignGapFold(root, errors) {
     '## Accessibility gaps',
   ]) {
     if (!text.includes(phrase)) {
-      errors.push(`${WEB_INTERFACE_GAPS_PATH}: missing required fold: ${phrase}`);
+      errors.push(
+        `${WEB_INTERFACE_GAPS_PATH}: missing required fold: ${phrase}`
+      );
     }
   }
 }
