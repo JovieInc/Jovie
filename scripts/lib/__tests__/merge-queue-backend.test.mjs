@@ -1,3 +1,4 @@
+// biome-ignore-all format: keep origin/main layout under PR Size Guard
 import { execFile, spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -595,47 +596,44 @@ describe('merge queue backend resolution', () => {
     ['controller-repair-only', 1],
     ['isolated-only', 1],
     ['deferred-release-only', 1],
-  ])(
-    'the real drain preserves pending intent only for unleased mode %s',
-    (mode, expectedStatus) => {
-      const drain = readFileSync(
-        join(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
-        'utf8'
-      );
-      const expression = drain.match(
-        /if ! jq -e --arg expected_head "\$expected_head" --arg promotion_mode "\$DRAIN_PROMOTION_MODE" '([\s\S]*?)' <<</
-      )?.[1];
-      expect(expression).toBeTruthy();
-      const result = spawnSync(
-        'jq',
-        [
-          '-e',
-          '--arg',
-          'expected_head',
-          HEAD,
-          '--arg',
-          'promotion_mode',
-          mode,
-          expression ?? 'error("missing predicate")',
-        ],
-        {
-          encoding: 'utf8',
-          input: JSON.stringify({
-            disposition: 'auto-merge-pending',
-            state: {
-              state: 'OPEN',
-              isDraft: false,
-              headRefOid: HEAD,
-              isInMergeQueue: false,
-              mergeQueueEntry: null,
-              autoMergeRequest: AUTO_MERGE,
-            },
-          }),
-        }
-      );
-      expect(result.status, result.stderr).toBe(expectedStatus);
-    }
-  );
+  ])('the real drain preserves pending intent only for unleased mode %s', (mode, expectedStatus) => {
+    const drain = readFileSync(
+      join(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    const expression = drain.match(
+      /if ! jq -e --arg expected_head "\$expected_head" --arg promotion_mode "\$DRAIN_PROMOTION_MODE" '([\s\S]*?)' <<</
+    )?.[1];
+    expect(expression).toBeTruthy();
+    const result = spawnSync(
+      'jq',
+      [
+        '-e',
+        '--arg',
+        'expected_head',
+        HEAD,
+        '--arg',
+        'promotion_mode',
+        mode,
+        expression ?? 'error("missing predicate")',
+      ],
+      {
+        encoding: 'utf8',
+        input: JSON.stringify({
+          disposition: 'auto-merge-pending',
+          state: {
+            state: 'OPEN',
+            isDraft: false,
+            headRefOid: HEAD,
+            isInMergeQueue: false,
+            mergeQueueEntry: null,
+            autoMergeRequest: AUTO_MERGE,
+          },
+        }),
+      }
+    );
+    expect(result.status, result.stderr).toBe(expectedStatus);
+  });
 
   it('defaults bare callers to the live native backend', () => {
     expect(DEFAULT_MERGE_QUEUE_BACKEND).toBe('native');
@@ -643,16 +641,16 @@ describe('merge queue backend resolution', () => {
     expect(resolveMergeQueueBackend('native')).toBe('native');
   });
 
-  it.each(['graphite', 'github'])(
-    'rejects retired or unknown backend %s before any command can run',
-    async backend => {
-      const runner = vi.fn();
-      await expect(
-        preflightMergeQueue({ backend, repository: REPOSITORY, runner })
-      ).rejects.toMatchObject({ code: 'unknown_backend' });
-      expect(runner).not.toHaveBeenCalled();
-    }
-  );
+  it.each([
+    'graphite',
+    'github',
+  ])('rejects retired or unknown backend %s before any command can run', async backend => {
+    const runner = vi.fn();
+    await expect(
+      preflightMergeQueue({ backend, repository: REPOSITORY, runner })
+    ).rejects.toMatchObject({ code: 'unknown_backend' });
+    expect(runner).not.toHaveBeenCalled();
+  });
 
   it('refuses native CLI mutation without the dedicated authorization', async () => {
     const runner = vi.fn();
@@ -750,48 +748,45 @@ describe('queue workflow mutation safety', () => {
       false,
       '0',
     ],
-  ])(
-    'classifies a %s Production Controller run at %s',
-    (conclusion, path, admitted, recoverHolds) => {
-      const workflow = readRepoFile(
-        '.github/workflows/merge-queue-autoenroll.yml'
-      );
-      const condition = workflowJobCondition(workflow, 'enroll');
-      const scope = workflowStep(workflow, 'Resolve exact admission scope');
-      const dynamicRunName = `Production Controller ${HEAD} from CI 31699642425 attempt 1`;
-      const outputs = executeAdmissionScope({
-        path,
-        conclusion,
-        name: dynamicRunName,
-      });
+  ])('classifies a %s Production Controller run at %s', (conclusion, path, admitted, recoverHolds) => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const condition = workflowJobCondition(workflow, 'enroll');
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const dynamicRunName = `Production Controller ${HEAD} from CI 31699642425 attempt 1`;
+    const outputs = executeAdmissionScope({
+      path,
+      conclusion,
+      name: dynamicRunName,
+    });
 
-      expect(dynamicRunName).not.toBe('Production Controller');
-      expect(workflow).not.toContain('github.event.workflow_run.name');
-      expect(scope).not.toContain('.workflow_run.name');
-      expect(
-        evaluateWorkflowJobCondition(condition, {
-          eventName: 'workflow_run',
-          conclusion,
-          path,
-          workflowEvent: 'workflow_run',
-        })
-      ).toBe(admitted);
-      expect(outputs).toEqual(
-        expect.objectContaining({
-          pr_number: '',
-          head_sha: '',
-          recover_holds: recoverHolds,
-        })
-      );
-      expect(scope).toContain('workflow_path="${workflow_path%%@*}"');
-      expect(scope).toContain(
-        '[[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]'
-      );
-      expect(scope).toContain(
-        '[[ "$workflow_conclusion" == "success" ]] && recover_holds=1'
-      );
-    }
-  );
+    expect(dynamicRunName).not.toBe('Production Controller');
+    expect(workflow).not.toContain('github.event.workflow_run.name');
+    expect(scope).not.toContain('.workflow_run.name');
+    expect(
+      evaluateWorkflowJobCondition(condition, {
+        eventName: 'workflow_run',
+        conclusion,
+        path,
+        workflowEvent: 'workflow_run',
+      })
+    ).toBe(admitted);
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        pr_number: '',
+        head_sha: '',
+        recover_holds: recoverHolds,
+      })
+    );
+    expect(scope).toContain('workflow_path="${workflow_path%%@*}"');
+    expect(scope).toContain(
+      '[[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]'
+    );
+    expect(scope).toContain(
+      '[[ "$workflow_conclusion" == "success" ]] && recover_holds=1'
+    );
+  });
 
   it('scopes each new admission to the triggering PR and exact published head', () => {
     const workflow = readRepoFile(
@@ -919,34 +914,31 @@ describe('queue workflow mutation safety', () => {
     ['failed', 'failure', false, 'ci-not-successful'],
     ['pending', 'pending', false, 'ci-not-successful'],
     ['incomplete', null, false, 'ci-not-successful'],
-  ])(
-    'treats a %s CI completion as typed neutral',
-    (_kind, conclusion, isDraft, reason) => {
-      const outputs = executeAdmissionScope({
-        path: '.github/workflows/ci.yml',
-        conclusion,
-        name: 'CI',
-        pullRequests: [
-          {
-            number: 16510,
-            head: { sha: HEAD },
-            base: { ref: 'main' },
-            draft: isDraft,
-          },
-        ],
-      });
+  ])('treats a %s CI completion as typed neutral', (_kind, conclusion, isDraft, reason) => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion,
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16510,
+          head: { sha: HEAD },
+          base: { ref: 'main' },
+          draft: isDraft,
+        },
+      ],
+    });
 
-      expect(outputs).toEqual(
-        expect.objectContaining({
-          disposition: 'neutral',
-          reason,
-          pr_number: '',
-          head_sha: '',
-          reconcile_queue_reentry: '0',
-        })
-      );
-    }
-  );
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason,
+        pr_number: '',
+        head_sha: '',
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
 
   it('treats successful CI for a superseded source ref as typed neutral', () => {
     const outputs = executeAdmissionScope({
@@ -1069,40 +1061,41 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
   });
 
-  it.each(['normal', 'hold-intake', 'controller-repair-only'])(
-    'admits an exact qualified candidate in %s while prior deployment is pending',
-    fleetPromotionMode => {
-      const workflow = readRepoFile(
-        '.github/workflows/merge-queue-autoenroll.yml'
-      );
-      const scope = workflowStep(workflow, 'Resolve exact admission scope');
-      const enroll = workflowStep(workflow, 'Enroll clean PRs');
-      const admitted = executeAdmissionScope({
-        productionAdmissionAllowed: false,
-        fleetPromotionMode,
-        pullRequestEvent: {
-          action: 'labeled',
-          label: { name: 'ready-to-merge' },
-          sender: { login: 'jovie-bot[bot]' },
-          pull_request: {
-            number: 16546,
-            base: { ref: 'main' },
-            head: { sha: HEAD },
-          },
+  it.each([
+    'normal',
+    'hold-intake',
+    'controller-repair-only',
+  ])('admits an exact qualified candidate in %s while prior deployment is pending', fleetPromotionMode => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const admitted = executeAdmissionScope({
+      productionAdmissionAllowed: false,
+      fleetPromotionMode,
+      pullRequestEvent: {
+        action: 'labeled',
+        label: { name: 'ready-to-merge' },
+        sender: { login: 'jovie-bot[bot]' },
+        pull_request: {
+          number: 16546,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
         },
-      });
-      expect(admitted).toMatchObject({
-        disposition: 'candidate',
-        reason: 'pull-request-exact-head',
-        pr_number: '16546',
-        head_sha: HEAD,
-      });
-      expect(scope).not.toContain('PRODUCTION_ADMISSION_ALLOWED');
-      expect(enroll).not.toContain('DRAIN_PRODUCTION_CHECKPOINT_STATE');
-      expect(enroll).toContain('DRAIN_PROMOTION_MODE:');
-      expect(enroll).toContain('needs.fleet-policy.outputs.mode');
-    }
-  );
+      },
+    });
+    expect(admitted).toMatchObject({
+      disposition: 'candidate',
+      reason: 'pull-request-exact-head',
+      pr_number: '16546',
+      head_sha: HEAD,
+    });
+    expect(scope).not.toContain('PRODUCTION_ADMISSION_ALLOWED');
+    expect(enroll).not.toContain('DRAIN_PRODUCTION_CHECKPOINT_STATE');
+    expect(enroll).toContain('DRAIN_PROMOTION_MODE:');
+    expect(enroll).toContain('needs.fleet-policy.outputs.mode');
+  });
 
   it('observes production verification without making it merge authority', () => {
     const workflow = readRepoFile(
@@ -1148,16 +1141,13 @@ describe('queue workflow mutation safety', () => {
     { readerExit: 1 },
     { markerOutput: 'not-json' },
     { markerOutput: 'null' },
-  ])(
-    'keeps admission running when release observation is unavailable: %j',
-    failure => {
-      expect(executeReleaseCheckpoint(failure).outputs).toMatchObject({
-        verified: 'false',
-        state: 'unavailable',
-        reason: 'checkpoint-unavailable',
-      });
-    }
-  );
+  ])('keeps admission running when release observation is unavailable: %j', failure => {
+    expect(executeReleaseCheckpoint(failure).outputs).toMatchObject({
+      verified: 'false',
+      state: 'unavailable',
+      reason: 'checkpoint-unavailable',
+    });
+  });
 
   it('accepts only exact trusted production marker evidence at the checkpoint', () => {
     expect(
@@ -1609,34 +1599,71 @@ describe('native live preflight', () => {
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
   });
 
-  it.each([1, 2])(
-    'allows supported build count %s during rollout and rollback with truthful readback',
-    buildCount => {
-      const result = validateNativePreflightEvidence({
-        ruleset: VALID_RULESET,
-        repository: VALID_REPOSITORY,
-        workflowYaml: VALID_WORKFLOW,
-        branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
-        liveQueueConfiguration: {
-          ...VALID_LIVE_QUEUE_CONFIGURATION,
-          maximumEntriesToBuild: buildCount,
-        },
-      });
-      expect(result.ok).toBe(true);
-      expect(result.policyReadback.observed.max_entries_to_build).toBe(
-        buildCount
-      );
-      expect(result.policyReadback.matched).toBe(buildCount === 2);
-      expect(result.policyReadback.drift).toEqual(
-        buildCount === 1 ? ['max_entries_to_build'] : []
-      );
-    }
-  );
+  it.each([
+    1, 2,
+  ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
+    const result = validateNativePreflightEvidence({
+      ruleset: VALID_RULESET,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      liveQueueConfiguration: {
+        ...VALID_LIVE_QUEUE_CONFIGURATION,
+        maximumEntriesToBuild: buildCount,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.policyReadback.observed.max_entries_to_build).toBe(
+      buildCount
+    );
+    expect(result.policyReadback.matched).toBe(buildCount === 2);
+    expect(result.policyReadback.drift).toEqual(
+      buildCount === 1 ? ['max_entries_to_build'] : []
+    );
+  });
 
-  it.each([0, 3, 100, -1, 1.5, '2', null, undefined, true])(
-    'rejects unqualified or malformed build count %s',
-    buildCount => {
-      const ruleset = {
+  it.each([
+    0,
+    3,
+    100,
+    -1,
+    1.5,
+    '2',
+    null,
+    undefined,
+    true,
+  ])('rejects unqualified or malformed build count %s', buildCount => {
+    const ruleset = {
+      ...VALID_RULESET,
+      rules: VALID_RULESET.rules.map(rule =>
+        rule.type === 'merge_queue'
+          ? {
+              ...rule,
+              parameters: {
+                ...rule.parameters,
+                max_entries_to_build: buildCount,
+              },
+            }
+          : rule
+      ),
+    };
+    const result = validateNativePreflightEvidence({
+      ruleset,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain('max_entries_to_build');
+  });
+
+  it.each([
+    ['check_response_timeout_minutes', 21],
+    ['grouping_strategy', 'HEADGREEN'],
+    ['max_entries_to_merge', 6],
+  ])('still rejects %s drift while using rollback build concurrency', (field, value) => {
+    const result = validateNativePreflightEvidence({
+      ruleset: {
         ...VALID_RULESET,
         rules: VALID_RULESET.rules.map(rule =>
           rule.type === 'merge_queue'
@@ -1644,54 +1671,20 @@ describe('native live preflight', () => {
                 ...rule,
                 parameters: {
                   ...rule.parameters,
-                  max_entries_to_build: buildCount,
+                  max_entries_to_build: 1,
+                  [field]: value,
                 },
               }
             : rule
         ),
-      };
-      const result = validateNativePreflightEvidence({
-        ruleset,
-        repository: VALID_REPOSITORY,
-        workflowYaml: VALID_WORKFLOW,
-        branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
-      });
-      expect(result.ok).toBe(false);
-      expect(result.errors.join('\n')).toContain('max_entries_to_build');
-    }
-  );
-
-  it.each([
-    ['check_response_timeout_minutes', 21],
-    ['grouping_strategy', 'HEADGREEN'],
-    ['max_entries_to_merge', 6],
-  ])(
-    'still rejects %s drift while using rollback build concurrency',
-    (field, value) => {
-      const result = validateNativePreflightEvidence({
-        ruleset: {
-          ...VALID_RULESET,
-          rules: VALID_RULESET.rules.map(rule =>
-            rule.type === 'merge_queue'
-              ? {
-                  ...rule,
-                  parameters: {
-                    ...rule.parameters,
-                    max_entries_to_build: 1,
-                    [field]: value,
-                  },
-                }
-              : rule
-          ),
-        },
-        repository: VALID_REPOSITORY,
-        workflowYaml: VALID_WORKFLOW,
-        branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
-      });
-      expect(result.ok).toBe(false);
-      expect(result.errors.join('\n')).toContain(field);
-    }
-  );
+      },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain(field);
+  });
 
   it('does not fail enroll preflight when GraphQL live max_entries_to_build matches the lock', () => {
     const staleRest = {
@@ -1945,17 +1938,17 @@ describe('native live preflight', () => {
     expect(queryText(protectionCall)).not.toContain('pushAllowances');
   });
 
-  it.each([undefined, {}])(
-    'fails closed when bypass_actors is missing or malformed',
-    bypass_actors => {
-      const result = validateNativePreflightEvidence({
-        ruleset: { ...structuredClone(VALID_RULESET), bypass_actors },
-        repository: VALID_REPOSITORY,
-        workflowYaml: VALID_WORKFLOW,
-      });
-      expect(result.errors).toContain('ruleset bypass_actors must be an array');
-    }
-  );
+  it.each([
+    undefined,
+    {},
+  ])('fails closed when bypass_actors is missing or malformed', bypass_actors => {
+    const result = validateNativePreflightEvidence({
+      ruleset: { ...structuredClone(VALID_RULESET), bypass_actors },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+    });
+    expect(result.errors).toContain('ruleset bypass_actors must be an array');
+  });
 
   it('allows unavailable bypass actors only for an explicit controller preflight', () => {
     const result = validateNativePreflightEvidence({
@@ -1969,38 +1962,37 @@ describe('native live preflight', () => {
     expect(result.evidence.bypassActorsVisible).toBe(false);
   });
 
-  it.each([null, {}])(
-    'rejects a visible malformed bypass_actors value in controller mode',
-    bypass_actors => {
-      const result = validateNativePreflightEvidence({
-        ruleset: { ...structuredClone(VALID_RULESET), bypass_actors },
-        repository: VALID_REPOSITORY,
-        workflowYaml: VALID_WORKFLOW,
-        branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
-        allowUnavailableBypassActors: true,
-      });
-      expect(result.errors).toContain('ruleset bypass_actors must be an array');
-    }
-  );
+  it.each([
+    null,
+    {},
+  ])('rejects a visible malformed bypass_actors value in controller mode', bypass_actors => {
+    const result = validateNativePreflightEvidence({
+      ruleset: { ...structuredClone(VALID_RULESET), bypass_actors },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      allowUnavailableBypassActors: true,
+    });
+    expect(result.errors).toContain('ruleset bypass_actors must be an array');
+  });
 
-  it.each([158384, 2934433])(
-    'rejects non-empty bypass_actors including actor %s',
-    actor_id => {
-      const result = validateNativePreflightEvidence({
-        ruleset: {
-          ...structuredClone(VALID_RULESET),
-          bypass_actors: [{ actor_id, actor_type: 'Integration' }],
-        },
-        repository: VALID_REPOSITORY,
-        workflowYaml: VALID_WORKFLOW,
-        branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
-        allowUnavailableBypassActors: true,
-      });
-      expect(result.errors).toContain(
-        'ruleset bypass_actors must be empty before native enrollment'
-      );
-    }
-  );
+  it.each([
+    158384, 2934433,
+  ])('rejects non-empty bypass_actors including actor %s', actor_id => {
+    const result = validateNativePreflightEvidence({
+      ruleset: {
+        ...structuredClone(VALID_RULESET),
+        bypass_actors: [{ actor_id, actor_type: 'Integration' }],
+      },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      allowUnavailableBypassActors: true,
+    });
+    expect(result.errors).toContain(
+      'ruleset bypass_actors must be empty before native enrollment'
+    );
+  });
 
   it('keeps direct preflight strict while an explicit controller can proceed', async () => {
     const ruleset = structuredClone(VALID_RULESET);
@@ -2213,20 +2205,17 @@ describe('native mutation actor boundary', () => {
   it.each([
     ['enroll', runner => enroll(runner)],
     ['dequeue', runner => dequeue(runner)],
-  ])(
-    'protects direct %s imports from bypassing actor identity',
-    async (_name, invoke) => {
-      const runner = createNativeRunner({
-        viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
-      });
+  ])('protects direct %s imports from bypassing actor identity', async (_name, invoke) => {
+    const runner = createNativeRunner({
+      viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
+    });
 
-      await expect(invoke(runner)).rejects.toMatchObject({
-        code: 'native_mutation_actor_unauthorized',
-      });
-      expect(runner.mock.calls).toHaveLength(1);
-      expect(invokedNativeMutation(runner)).toBe(false);
-    }
-  );
+    await expect(invoke(runner)).rejects.toMatchObject({
+      code: 'native_mutation_actor_unauthorized',
+    });
+    expect(runner.mock.calls).toHaveLength(1);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
 
   it.each([
     [
@@ -2491,124 +2480,121 @@ describe('canonical admission membership binding', () => {
       rmSync(config, { recursive: true, force: true });
     }
   });
-  it.each(['2026-07-14T23:59:59Z', '2026-07-15T00:00:00Z'])(
-    'reuses same-run status only since this entry (%s)',
-    updatedAt => {
-      const source = readRepoFile('scripts/drain-pr-queue.sh');
-      const start = source.indexOf('queue_reentry_receipt_is_recoverable() {');
-      const end =
-        source.indexOf(
-          '\n}\n',
-          source.indexOf('record_queue_reentry_receipt() {')
-        ) + 2;
-      const target = 'https://github.com/JovieInc/Jovie/actions/runs/1';
-      const status = {
-        id: 1,
-        context: 'jovie-queue-admission/v2',
-        state: 'success',
-        description: `checkpoint=source-qualified;main=${HEAD};pr=14359`,
-        target_url: target,
-        updated_at: updatedAt,
-        creator: { type: 'Bot', login: CANONICAL_NATIVE_MUTATION_ACTOR },
-      };
-      const result = spawnSync(
-        'bash',
-        [
-          '-c',
-          `${source.slice(start, end)}
+  it.each([
+    '2026-07-14T23:59:59Z',
+    '2026-07-15T00:00:00Z',
+  ])('reuses same-run status only since this entry (%s)', updatedAt => {
+    const source = readRepoFile('scripts/drain-pr-queue.sh');
+    const start = source.indexOf('queue_reentry_receipt_is_recoverable() {');
+    const end =
+      source.indexOf(
+        '\n}\n',
+        source.indexOf('record_queue_reentry_receipt() {')
+      ) + 2;
+    const target = 'https://github.com/JovieInc/Jovie/actions/runs/1';
+    const status = {
+      id: 1,
+      context: 'jovie-queue-admission/v2',
+      state: 'success',
+      description: `checkpoint=source-qualified;main=${HEAD};pr=14359`,
+      target_url: target,
+      updated_at: updatedAt,
+      creator: { type: 'Bot', login: CANONICAL_NATIVE_MUTATION_ACTOR },
+    };
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        `${source.slice(start, end)}
 fleet_hold_target_url() { echo "$TARGET"; }
 gh_retry() { printf '%s' "$STATUSES"; }
 node() { return 0; }
 gh_mutate_retry() { echo STATUS_WRITE >&2; }
 record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-15T00:00:00Z"
 `,
-        ],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            DRY_RUN: '0',
-            DRAIN_PROMOTION_MODE: 'normal',
-            FLEET_POLICY_MAIN_SHA: HEAD,
-            EXPECTED_HEAD: HEAD,
-            EXPECTED_ENTRY: ENTRY_ID,
-            REPO: REPOSITORY,
-            QUEUE_REENTRY_CONTEXT: 'jovie-queue-admission/v2',
-            FLEET_HOLD_APP_USER: CANONICAL_NATIVE_MUTATION_ACTOR,
-            TARGET: target,
-            STATUSES: JSON.stringify([[status]]),
-          },
-        }
-      );
-      expect(result.status).toBe(0);
-      expect(result.stderr.includes('STATUS_WRITE')).toBe(
-        updatedAt < QUEUE_ENTRY.enqueuedAt
-      );
-      expect(result.stdout.includes('already recorded')).toBe(
-        updatedAt === QUEUE_ENTRY.enqueuedAt
-      );
-    }
-  );
-  it.each([false, true])(
-    'never publishes or reuses a receipt after failed membership proof (reuse=%s)',
-    reuse => {
-      const source = readRepoFile('scripts/drain-pr-queue.sh');
-      const start = source.indexOf('record_queue_reentry_receipt() {');
-      const end = source.indexOf('\n}\n', start) + 2;
-      const result = spawnSync(
-        'bash',
-        [
-          '-c',
-          `${source.slice(start, end)}
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          DRY_RUN: '0',
+          DRAIN_PROMOTION_MODE: 'normal',
+          FLEET_POLICY_MAIN_SHA: HEAD,
+          EXPECTED_HEAD: HEAD,
+          EXPECTED_ENTRY: ENTRY_ID,
+          REPO: REPOSITORY,
+          QUEUE_REENTRY_CONTEXT: 'jovie-queue-admission/v2',
+          FLEET_HOLD_APP_USER: CANONICAL_NATIVE_MUTATION_ACTOR,
+          TARGET: target,
+          STATUSES: JSON.stringify([[status]]),
+        },
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stderr.includes('STATUS_WRITE')).toBe(
+      updatedAt < QUEUE_ENTRY.enqueuedAt
+    );
+    expect(result.stdout.includes('already recorded')).toBe(
+      updatedAt === QUEUE_ENTRY.enqueuedAt
+    );
+  });
+  it.each([
+    false,
+    true,
+  ])('never publishes or reuses a receipt after failed membership proof (reuse=%s)', reuse => {
+    const source = readRepoFile('scripts/drain-pr-queue.sh');
+    const start = source.indexOf('record_queue_reentry_receipt() {');
+    const end = source.indexOf('\n}\n', start) + 2;
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        `${source.slice(start, end)}
 fleet_hold_target_url() { echo https://github.com/JovieInc/Jovie/actions/runs/1; }
 queue_reentry_receipt_is_recoverable() { lookup_finished=1; return ${reuse ? 0 : 1}; }
 node() { [[ "$lookup_finished" == 1 ]] || return 0; printf '%s\\n' "$*" >&2; return 1; }
 gh_mutate_retry() { echo STATUS_WRITE; }
 record_queue_reentry_receipt 14359 "$EXPECTED_HEAD" "$EXPECTED_ENTRY" "2026-07-15T00:00:00Z"
 `,
-        ],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            DRY_RUN: '0',
-            DRAIN_PROMOTION_MODE: 'normal',
-            FLEET_POLICY_MAIN_SHA: HEAD,
-            EXPECTED_HEAD: HEAD,
-            EXPECTED_ENTRY: ENTRY_ID,
-          },
-        }
-      );
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        `prove-admission 14359 ${HEAD} ${ENTRY_ID}`
-      );
-      expect(result.stdout).not.toMatch(/STATUS_WRITE|already recorded/);
-    }
-  );
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          DRY_RUN: '0',
+          DRAIN_PROMOTION_MODE: 'normal',
+          FLEET_POLICY_MAIN_SHA: HEAD,
+          EXPECTED_HEAD: HEAD,
+          EXPECTED_ENTRY: ENTRY_ID,
+        },
+      }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      `prove-admission 14359 ${HEAD} ${ENTRY_ID}`
+    );
+    expect(result.stdout).not.toMatch(/STATUS_WRITE|already recorded/);
+  });
   const queued = () =>
     prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY });
-  it.each(['existing', 'racing'])(
-    'rejects %s human membership despite an authenticated bot caller',
-    async phase => {
-      const payload = canonicalMembership(queued());
-      Object.assign(
-        payload.data.repository.pullRequest.timelineItems.nodes[0],
-        {
-          actor: { __typename: 'User', login: 'itstimwhite' },
-          enqueuer: { login: 'itstimwhite' },
-        }
-      );
-      const runner = createNativeRunner({
-        states: phase === 'existing' ? [queued()] : [prState(), queued()],
-        membershipPayload: payload,
-      });
-      await expect(enroll(runner)).rejects.toMatchObject({
-        code: 'noncanonical_queue_membership',
-      });
-      expect(invokedEnrollment(runner)).toBe(phase === 'racing');
-    }
-  );
+  it.each([
+    'existing',
+    'racing',
+  ])('rejects %s human membership despite an authenticated bot caller', async phase => {
+    const payload = canonicalMembership(queued());
+    Object.assign(payload.data.repository.pullRequest.timelineItems.nodes[0], {
+      actor: { __typename: 'User', login: 'itstimwhite' },
+      enqueuer: { login: 'itstimwhite' },
+    });
+    const runner = createNativeRunner({
+      states: phase === 'existing' ? [queued()] : [prState(), queued()],
+      membershipPayload: payload,
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'noncanonical_queue_membership',
+    });
+    expect(invokedEnrollment(runner)).toBe(phase === 'racing');
+  });
   it.each([
     'head',
     'entry',
@@ -2785,19 +2771,21 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
-  it.each(['queue-deferred', 'hold', 'gated', 'incident'])(
-    'refuses the machine hold %s before invoking enrollment',
-    async label => {
-      const runner = createNativeRunner({
-        states: [prState({ labels: { nodes: [{ name: label }] } })],
-      });
-      await expect(enroll(runner)).rejects.toMatchObject({
-        code: 'held_pull_request',
-        details: { labels: [label] },
-      });
-      expect(invokedEnrollment(runner)).toBe(false);
-    }
-  );
+  it.each([
+    'queue-deferred',
+    'hold',
+    'gated',
+    'incident',
+  ])('refuses the machine hold %s before invoking enrollment', async label => {
+    const runner = createNativeRunner({
+      states: [prState({ labels: { nodes: [{ name: label }] } })],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: [label] },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
 
   it.each([
     'human-review-required',
@@ -2910,19 +2898,16 @@ describe('native enrollment', () => {
     ['zero position', { ...QUEUE_ENTRY, position: 0 }],
     ['negative position', { ...QUEUE_ENTRY, position: -1 }],
     ['fractional position', { ...QUEUE_ENTRY, position: 1.5 }],
-  ])(
-    'fails closed on a queue entry with %s',
-    async (_name, mergeQueueEntry) => {
-      const runner = createNativeRunner({
-        states: [prState({ isInMergeQueue: true, mergeQueueEntry })],
-      });
+  ])('fails closed on a queue entry with %s', async (_name, mergeQueueEntry) => {
+    const runner = createNativeRunner({
+      states: [prState({ isInMergeQueue: true, mergeQueueEntry })],
+    });
 
-      await expect(enroll(runner)).rejects.toMatchObject({
-        code: 'incomplete_queue_state',
-      });
-      expect(invokedEnrollment(runner)).toBe(false);
-    }
-  );
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'incomplete_queue_state',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
 
   it('reconciles an errored mutation only when a later read proves queue membership', async () => {
     const runner = createNativeRunner({
@@ -2995,35 +2980,38 @@ describe('native enrollment', () => {
     expect(wait).toHaveBeenCalledTimes(1);
   });
 
-  it.each([{}, { enabledAt: 'invalid' }, { enabledAt: null }])(
-    'rejects malformed native intent %j without claiming membership',
-    async autoMergeRequest => {
-      const runner = createNativeRunner({
-        states: [prState(), prState({ autoMergeRequest })],
-      });
-      await expect(
-        enroll(runner, { postconditionAttempts: 1 })
-      ).rejects.toMatchObject({ code: 'enrollment_postcondition_failed' });
-    }
-  );
+  it.each([
+    {},
+    { enabledAt: 'invalid' },
+    { enabledAt: null },
+  ])('rejects malformed native intent %j without claiming membership', async autoMergeRequest => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ autoMergeRequest })],
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({ code: 'enrollment_postcondition_failed' });
+  });
 
-  it.each(['hold', 'gated', 'incident', 'queue-deferred'])(
-    'rejects pending intent when %s appears after the mutation',
-    async label => {
-      const runner = createNativeRunner({
-        states: [
-          prState(),
-          prState({
-            autoMergeRequest: AUTO_MERGE,
-            labels: { nodes: [{ name: label }] },
-          }),
-        ],
-      });
-      await expect(
-        enroll(runner, { postconditionAttempts: 1 })
-      ).rejects.toMatchObject({ code: 'held_pull_request' });
-    }
-  );
+  it.each([
+    'hold',
+    'gated',
+    'incident',
+    'queue-deferred',
+  ])('rejects pending intent when %s appears after the mutation', async label => {
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({
+          autoMergeRequest: AUTO_MERGE,
+          labels: { nodes: [{ name: label }] },
+        }),
+      ],
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({ code: 'held_pull_request' });
+  });
 
   it('reconciles a transport error only when exact native intent is observed', async () => {
     const runner = createNativeRunner({
@@ -3190,46 +3178,43 @@ describe('native dequeue', () => {
   it.each([
     ['id', { id: 'MQE_kwDO_replacement_entry' }],
     ['enqueuedAt', { enqueuedAt: '2026-07-15T00:01:00Z' }],
-  ])(
-    'suppresses mutation when the live queue entry %s changed after observation',
-    async (_field, replacement) => {
-      const queued = prState({
-        isInMergeQueue: true,
-        mergeQueueEntry: QUEUE_ENTRY,
-      });
-      const replaced = prState({
-        isInMergeQueue: true,
-        mergeQueueEntry: {
-          ...QUEUE_ENTRY,
-          ...replacement,
-        },
-      });
-      const readRunner = createNativeRunner({ states: [queued, replaced] });
-      const mutationRunner = createNativeRunner();
+  ])('suppresses mutation when the live queue entry %s changed after observation', async (_field, replacement) => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const replaced = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: {
+        ...QUEUE_ENTRY,
+        ...replacement,
+      },
+    });
+    const readRunner = createNativeRunner({ states: [queued, replaced] });
+    const mutationRunner = createNativeRunner();
 
-      await expect(
-        runCli(['dequeue-ineligible', '14359', HEAD], {
-          env: {
-            MERGE_QUEUE_BACKEND: 'native',
-            GITHUB_REPOSITORY: REPOSITORY,
-            MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
-          },
-          runner: readRunner,
-          mutationRunner,
-          write: vi.fn(),
-        })
-      ).resolves.toMatchObject({
-        changed: false,
-        skipped: true,
-        reason: 'queue-entry-changed',
-        guardedQueueEntry: {
-          id: ENTRY_ID,
-          enqueuedAt: QUEUE_ENTRY.enqueuedAt,
+    await expect(
+      runCli(['dequeue-ineligible', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
         },
-      });
-      expect(invokedNativeMutation(mutationRunner)).toBe(false);
-    }
-  );
+        runner: readRunner,
+        mutationRunner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'queue-entry-changed',
+      guardedQueueEntry: {
+        id: ENTRY_ID,
+        enqueuedAt: QUEUE_ENTRY.enqueuedAt,
+      },
+    });
+    expect(invokedNativeMutation(mutationRunner)).toBe(false);
+  });
 
   it('reports a head race after dequeue without mutating replacement auto-merge', async () => {
     const queued = prState({
@@ -3538,22 +3523,23 @@ describe('exact-head queue receipt proof', () => {
     }
   });
 
-  it.each(['hold', 'gated', 'incident'])(
-    'blocks exact-head selection on the machine hold %s',
-    label => {
-      expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(true);
-      expect(HARD_HOLD_LABELS.has(label)).toBe(true);
-      expect(
-        explainExactHeadAdmissionSelector({
-          snapshot: [{ ...selectorRow, L: [label] }],
-          admissionPr: 16068,
-          admissionHead: HEAD,
-          promotionMode: 'normal',
-          enrollSlots: 15,
-        })
-      ).toMatchObject({ eligible: false, reason: `held-by=${label}` });
-    }
-  );
+  it.each([
+    'hold',
+    'gated',
+    'incident',
+  ])('blocks exact-head selection on the machine hold %s', label => {
+    expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(true);
+    expect(HARD_HOLD_LABELS.has(label)).toBe(true);
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, L: [label] }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'normal',
+        enrollSlots: 15,
+      })
+    ).toMatchObject({ eligible: false, reason: `held-by=${label}` });
+  });
 
   it.each([
     'human-review-required',
@@ -3680,18 +3666,15 @@ describe('canonical current-entry ownership and event ordering', () => {
     '2026-07-15T00:00:00Z',
     '2026-07-15T00:00:01Z',
     '2026-07-15T00:00:02Z',
-  ])(
-    'accepts canonical current ownership with independently created event %s',
-    async createdAt => {
-      const value = payload();
-      value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
-        createdAt;
-      await expect(prove(value)).resolves.toMatchObject({
-        entryId: ENTRY_ID,
-        eventId: 'event-current',
-      });
-    }
-  );
+  ])('accepts canonical current ownership with independently created event %s', async createdAt => {
+    const value = payload();
+    value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
+      createdAt;
+    await expect(prove(value)).resolves.toMatchObject({
+      entryId: ENTRY_ID,
+      eventId: 'event-current',
+    });
+  });
 
   it('captures observation time after the read completes', async () => {
     let completed = false;
@@ -3759,33 +3742,32 @@ describe('canonical current-entry ownership and event ordering', () => {
     });
   });
 
-  it.each([0, 1000])(
-    'observes future timestamps without adding a delivery veto (offset=%s)',
-    async offset => {
-      const value = payload();
-      value.data.repository.pullRequest.mergeQueueEntry.enqueuedAt =
-        '2026-07-15T00:00:03Z';
-      value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
-        new Date(observedAt + 1000 + offset).toISOString();
-      const observe = vi.fn();
-      await expect(
-        proveCanonicalMembership({
-          ...nativeOptions(async () => ok(value)),
-          expectedHeadOid: HEAD,
-          expectedEntryId: ENTRY_ID,
-          now: () => observedAt,
-          observe,
-        })
-      ).resolves.toMatchObject({ entryId: ENTRY_ID });
-      expect(observe).toHaveBeenCalledWith(
-        expect.objectContaining({
-          schema: 'jovie-canonical-membership-observation/v1',
-          failedPredicates: [],
-          observationIssues: ['entryNotFuture', 'eventNotFuture'],
-        })
-      );
-    }
-  );
+  it.each([
+    0, 1000,
+  ])('observes future timestamps without adding a delivery veto (offset=%s)', async offset => {
+    const value = payload();
+    value.data.repository.pullRequest.mergeQueueEntry.enqueuedAt =
+      '2026-07-15T00:00:03Z';
+    value.data.repository.pullRequest.timelineItems.nodes[0].createdAt =
+      new Date(observedAt + 1000 + offset).toISOString();
+    const observe = vi.fn();
+    await expect(
+      proveCanonicalMembership({
+        ...nativeOptions(async () => ok(value)),
+        expectedHeadOid: HEAD,
+        expectedEntryId: ENTRY_ID,
+        now: () => observedAt,
+        observe,
+      })
+    ).resolves.toMatchObject({ entryId: ENTRY_ID });
+    expect(observe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schema: 'jovie-canonical-membership-observation/v1',
+        failedPredicates: [],
+        observationIssues: ['entryNotFuture', 'eventNotFuture'],
+      })
+    );
+  });
   it('invalid observation clock and failed observation sink cannot veto admission', async () => {
     const observe = vi.fn(() => {
       throw new Error('sink unavailable');
