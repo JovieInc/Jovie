@@ -1598,6 +1598,92 @@ def _lifecycle_action(
     }
 
 
+def _draft_qualification(pr: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """Project declared handoff metadata; never authorize review or promotion.
+
+    The qualification owner replaces one <!-- draft-qualification:{JSON} -->
+    body marker through the existing handoff. Required fields: headOid (current
+    40-character head), observedAt (timezone-qualified ISO timestamp, <=7 days),
+    state (technical-dependency/pending-agent-review/changes-required), owner,
+    nextAction, and evidence (nonempty strings). Technical dependencies also
+    require dependencyPr. These are declarations, never verified approvals.
+    A single structured body marker uses the existing GitHub inventory read.
+    Multiple markers are ambiguous, including an older receipt beside its
+    replacement: never resurrect superseded evidence by picking a valid one.
+    """
+    result: dict[str, Any] = {
+        "number": pr.get("number"),
+        "headOid": pr.get("headRefOid"),
+        "state": "unknown",
+        "owner": "UNKNOWN",
+        "nextAction": "assign-agent-and-record-exact-head-qualification",
+        "ageSeconds": None,
+        "dependencyPr": None,
+        "evidenceStatus": "missing",
+        "authoritativeApproval": False,
+    }
+    body = pr.get("body")
+    markers = re.findall(
+        r"<!--\s*draft-qualification:([\s\S]*?)-->",
+        body if isinstance(body, str) else "",
+    )
+    if not markers:
+        return result
+    result.update(
+        evidenceStatus="invalid-or-stale",
+        nextAction="refresh-exact-head-agent-qualification",
+    )
+    if len(markers) != 1 or pr.get("isCrossRepository") is not False:
+        return result
+    try:
+        receipt = json.loads(markers[0])
+    except ValueError:
+        return result
+    if not isinstance(receipt, dict):
+        return result
+    observed_value = receipt.get("observedAt")
+    observed = parse_time(observed_value)
+    state = receipt.get("state")
+    dependency = receipt.get("dependencyPr")
+    if (
+        not _valid_oid(pr.get("headRefOid"))
+        or receipt.get("headOid") != pr.get("headRefOid")
+        or observed is None
+        or not re.search(r"(?:Z|[+-]\d{2}:\d{2})$", observed_value)
+        or not timedelta(0) <= now - observed <= HOLD_EXPIRY
+        or not isinstance(state, str)
+        or state not in {"technical-dependency", "pending-agent-review", "changes-required"}
+        or receipt.get("superseded", False) is not False
+        or any(
+            not isinstance(receipt.get(key), str)
+            or not receipt[key].strip()
+            or len(receipt[key]) > 512
+            for key in ("owner", "nextAction", "evidence")
+        )
+        or (
+            state == "technical-dependency"
+            and (
+                not isinstance(dependency, int)
+                or isinstance(dependency, bool)
+                or dependency <= 0
+                or dependency == pr.get("number")
+            )
+        )
+    ):
+        return result
+    result.update(
+        state=state,
+        owner=receipt["owner"].strip(),
+        nextAction=receipt["nextAction"].strip(),
+        ageSeconds=int((now - observed).total_seconds()),
+        dependencyPr=dependency if state == "technical-dependency" else None,
+        evidenceStatus="current-declaration",
+        evidence=receipt["evidence"].strip(),
+        observedAt=isoformat(observed),
+    )
+    return result
+
+
 def classify_open_prs(
     prs: list[dict[str, Any]], now: datetime, repository: str = "JovieInc/Jovie"
 ) -> dict[str, Any]:
@@ -1779,6 +1865,9 @@ def classify_open_prs(
         "repairActions": stack_health["repairActions"],
         "lifecycleActions": lifecycle_actions,
         "promotionEvidence": promotion_evidence,
+        "draftQualifications": [
+            _draft_qualification(pr, now) for pr in prs if pr.get("isDraft") is True
+        ],
     }
 
 

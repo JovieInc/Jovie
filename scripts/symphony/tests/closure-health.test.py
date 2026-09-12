@@ -261,6 +261,92 @@ def stack_health(layers: list[dict[str, object]]) -> tuple[dict[str, object], di
     )
 
 
+class DraftQualificationTests(unittest.TestCase):
+    def receipt(self, row, **overrides):
+        value = {
+            "headOid": row["headRefOid"],
+            "observedAt": (NOW - timedelta(hours=2)).isoformat(),
+            "state": "pending-agent-review",
+            "owner": "01a070c1-4238-74a2-8a8d-96aebac2566a",
+            "nextAction": "Complete exact-head agent review and runner coverage",
+            "evidence": "qualification-audit/pr17523-independent-review.md",
+        }
+        value.update(overrides)
+        return "<!-- draft-qualification:" + json.dumps(value) + " -->"
+
+    def project(self, row):
+        result = MODULE.classify_open_prs([row], NOW)
+        self.assertEqual(result["dispositions"][0]["state"], "held")
+        self.assertEqual(result["counts"]["promote"], 0)
+        return result["draftQualifications"][0]
+
+    def test_exact_dependency_and_agent_review_are_distinct_and_stay_held(self):
+        for number, head, state, dependency in [
+            (17542, "13965125acbdbbcbed8f79562b84b0eabae31dc5", "technical-dependency", 17511),
+            (17523, "a95df93418be0e753faeb928bf7054e13625034b", "pending-agent-review", None),
+            (17523, "a95df93418be0e753faeb928bf7054e13625034b", "changes-required", None),
+        ]:
+            with self.subTest(state=state):
+                row = pr(number, title="draft", draft=True, head_oid=head)
+                row["body"] = self.receipt(row, state=state, dependencyPr=dependency)
+                item = self.project(row)
+                self.assertEqual(item["state"], state)
+                self.assertEqual(item["owner"], "01a070c1-4238-74a2-8a8d-96aebac2566a")
+                self.assertEqual(item["ageSeconds"], 7200)
+                self.assertEqual(item["dependencyPr"], dependency)
+                self.assertFalse(item["authoritativeApproval"])
+
+    def test_missing_metadata_never_uses_author_or_free_form_approval(self):
+        row = pr(17523, title="draft", draft=True, body="APPROVED by author; STOP FOR REVIEW")
+        item = self.project(row)
+        self.assertEqual(item["owner"], "UNKNOWN")
+        self.assertEqual(item["state"], "unknown")
+        self.assertEqual(item["nextAction"], "assign-agent-and-record-exact-head-qualification")
+        self.assertIsNone(item["ageSeconds"])
+
+    def test_invalid_stale_superseded_or_unbound_evidence_fails_unknown(self):
+        row = pr(17523, title="draft", draft=True)
+        for override in [
+            {"headOid": "a" * 40}, {"headOid": None}, {"owner": ""},
+            {"observedAt": (NOW - timedelta(days=8)).isoformat()},
+            {"observedAt": (NOW + timedelta(seconds=1)).isoformat()},
+            {"observedAt": "bad"}, {"observedAt": None},
+            {"observedAt": NOW.replace(tzinfo=None).isoformat()},
+            {"state": []}, {"state": {}}, {"state": None},
+            {"state": "approved"}, {"state": "superseded"},
+            {"superseded": True}, {"nextAction": ""}, {"evidence": ""},
+            {"state": "technical-dependency", "dependencyPr": None},
+            {"state": "technical-dependency", "dependencyPr": True},
+            {"state": "technical-dependency", "dependencyPr": 17523},
+        ]:
+            with self.subTest(override=override):
+                row["body"] = self.receipt(row, **override)
+                item = self.project(row)
+                self.assertEqual(item["owner"], "UNKNOWN")
+                self.assertEqual(item["state"], "unknown")
+                self.assertEqual(item["nextAction"], "refresh-exact-head-agent-qualification")
+
+    def test_ambiguous_or_malformed_markers_cannot_revive_old_evidence(self):
+        row = pr(17523, title="draft", draft=True)
+        current = self.receipt(row)
+        for body in [
+            current + self.receipt(row, state="superseded"),
+            "<!-- draft-qualification:{bad} -->",
+            "<!-- draft-qualification:[] -->",
+            "<!-- draft-qualification:null -->",
+        ]:
+            with self.subTest(body=body):
+                row["body"] = body
+                self.assertEqual(self.project(row)["owner"], "UNKNOWN")
+
+    def test_foreign_metadata_and_non_drafts_cannot_assert_qualification(self):
+        row = pr(17523, title="draft", draft=True, cross_repository=True)
+        row["body"] = self.receipt(row)
+        self.assertEqual(self.project(row)["owner"], "UNKNOWN")
+        row["isDraft"] = False
+        self.assertEqual(MODULE.classify_open_prs([row], NOW)["draftQualifications"], [])
+
+
 class ClosureClassificationTests(unittest.TestCase):
     def test_ready_ancestors_are_resolved_but_only_draft_groups_are_enforced(self):
         root = stack_pr(91, "main", draft=False)
