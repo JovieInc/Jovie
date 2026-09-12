@@ -771,10 +771,13 @@ export function ProfileDesktopSurface({
 
   const nonHomeContent =
     activePrimaryTab === 'listen' ? (
-      <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.3fr)_360px]'>
+      <div
+        className='grid min-h-0 min-w-0 flex-1 items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]'
+        data-testid='profile-listen-desktop-grid'
+      >
         <DesktopSurfaceCard
           title='Releases'
-          className='min-h-0'
+          className='min-h-0 min-w-0 overflow-hidden isolate'
           testId='profile-primary-tab-releases'
         >
           {visibleReleases.length > 0 ? (
@@ -788,8 +791,14 @@ export function ProfileDesktopSurface({
             <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
           )}
         </DesktopSurfaceCard>
-        <div className='grid gap-3.5'>
-          <DesktopSurfaceCard title='Listen'>
+        <div
+          className='grid min-w-0 gap-3.5'
+          data-testid='profile-listen-dsp-column'
+        >
+          <DesktopSurfaceCard
+            title='Listen'
+            className='min-w-0 overflow-hidden'
+          >
             <StaticListenInterface
               artist={artist}
               handle={artist.handle}

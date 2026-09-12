@@ -111,4 +111,39 @@ describe('ReleasesView', () => {
       })
     );
   });
+
+  it('contains year separators so they cannot bleed into the DSP column', () => {
+    const catalog = Array.from({ length: 16 }, (_, index) => ({
+      id: `release-${index}`,
+      title: `Very Long Release Title That Must Truncate ${index}`,
+      slug: `song-${index}`,
+      releaseType: 'single',
+      releaseDate:
+        index < 8 ? '2026-01-01T00:00:00.000Z' : '2024-06-01T00:00:00.000Z',
+      artworkUrl: null,
+      artistNames: ['Tim White'],
+    })) satisfies PublicRelease[];
+
+    render(
+      <ReleasesView
+        releases={catalog}
+        artistId='artist-1'
+        artistHandle='tim'
+        artistName='Tim White'
+      />
+    );
+
+    const list = screen.getByTestId('profile-mode-drawer-releases');
+    expect(list).toHaveClass('min-w-0', 'overflow-hidden', 'isolate');
+    expect(list.className).toContain('[contain:layout_style_paint]');
+
+    const yearHeaders = screen.getAllByTestId('release-year-header');
+    expect(yearHeaders).toHaveLength(2);
+    expect(yearHeaders[0]).toHaveTextContent('2026');
+    expect(yearHeaders[1]).toHaveTextContent('2024');
+    for (const header of yearHeaders) {
+      expect(header).toHaveClass('min-w-0', 'overflow-hidden', 'truncate');
+      expect(header.className).not.toMatch(/animate-|transition-transform/);
+    }
+  });
 });

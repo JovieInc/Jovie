@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
@@ -324,6 +326,21 @@ describe('ProfileDesktopSurface', () => {
       'data-priority',
       'true'
     );
+
+    const listenGrid = screen.getByTestId('profile-listen-desktop-grid');
+    expect(listenGrid).toHaveClass('min-w-0', 'items-start');
+    expect(listenGrid.className).toContain(
+      '[@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]'
+    );
+    expect(listenGrid.className).not.toContain('xl:grid-cols');
+    expect(screen.getByTestId('profile-primary-tab-releases')).toHaveClass(
+      'min-w-0',
+      'overflow-hidden',
+      'isolate'
+    );
+    expect(screen.getByTestId('profile-listen-dsp-column')).toHaveClass(
+      'min-w-0'
+    );
   });
 
   it('omits fan-capture actions when fan capture is disabled', () => {
@@ -548,5 +565,21 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByRole('link', { name: 'Follow Tim White on Tiktok' })
     ).toBeNull();
+  });
+});
+
+describe('desktop listen grid contract', () => {
+  it('splits releases and DSP columns at the 1180px desktop hand-off', () => {
+    const source = readFileSync(
+      join(__dirname, 'ProfileDesktopSurface.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("data-testid='profile-listen-desktop-grid'");
+    expect(source).toContain(
+      '[@media(min-width:1180px)]:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]'
+    );
+    expect(source).not.toContain('xl:grid-cols-[minmax(0,1.3fr)_360px]');
+    expect(source).toContain("data-testid='profile-listen-dsp-column'");
   });
 });
