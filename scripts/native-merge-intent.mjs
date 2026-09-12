@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// JOV-INV-022: owning writer records exact native intent with ready proof.
 // JOV-INV-029: owning writer records exact native intent before mutation.
 // JOV-INV-023: source intent does not depend on fleet or production observations.
 import { execFileSync } from 'node:child_process';
