@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy formatting while adding bounded evidence.
 /** No-model plan and admission gate orchestration. */
 
 import {
@@ -88,6 +89,64 @@ function cleanList(value) {
     .slice(0, 12);
 }
 
+function valueQualification(description) {
+  const entries = Object.fromEntries(
+    section(description, ['Value', 'Value justification'])
+      .split('\n')
+      .map(line =>
+        /^\s*[-*]?\s*([a-zA-Z][\w-]*)\s*:\s*(.+?)\s*$/.exec(line)
+      )
+      .filter(Boolean)
+      .map(match => [
+        match[1].replace(/-([a-z])/g, (_all, char) => char.toUpperCase()),
+        match[2],
+      ])
+  );
+  /**
+   * String admission fields plus the structured operating-sanity block
+   * (value.sanity); Object.fromEntries only infers the string side.
+   * @type {Record<string, string | {
+   *   basis: string,
+   *   concurrency: number,
+   *   demandPerDay: number,
+   *   criticalPath: { stage: string, durationMs: number }[],
+   *   bottleneck: string,
+   *   simplification: string,
+   *   owner: string,
+   * }>}
+   */
+  const value = Object.fromEntries(
+    [
+      'authority',
+      'decisionId',
+      'rationale',
+      'expectedBenefit',
+      'validation',
+      'customerSignal',
+      'dependencies',
+      'cost',
+      'timebox',
+    ]
+      .filter(field => entries[field])
+      .map(field => [field, entries[field]])
+  );
+  const stages = String(entries.criticalPath || '')
+    .split(',')
+    .map(item => /^\s*([^=]+)=([0-9]+)\s*$/.exec(item))
+    .filter(Boolean)
+    .map(match => ({ stage: match[1].trim(), durationMs: Number(match[2]) }));
+  value.sanity = {
+    basis: entries.basis,
+    concurrency: Number(entries.concurrency),
+    demandPerDay: Number(entries.demandPerDay),
+    criticalPath: stages,
+    bottleneck: entries.bottleneck,
+    simplification: entries.simplification,
+    owner: entries.owner,
+  };
+  return value;
+}
+
 export function validateDeterministicPlanCandidate(
   issue,
   { now = new Date().toISOString() } = {}
@@ -136,6 +195,8 @@ export function validateDeterministicPlanCandidate(
     return 'scope-section-missing';
   if (!section(issue.description, ['Acceptance', 'Acceptance criteria']))
     return 'acceptance-section-missing';
+  if (!section(issue.description, ['Value', 'Value justification']))
+    return 'value-justification-section-missing';
   const targeting = resolveAdmissionTarget(issue);
   if (targeting.decision !== 'admit')
     return targeting.reason || 'no-jovie-artifact';
@@ -186,6 +247,7 @@ export function buildDeterministicPlanEvidence(issue) {
       ],
       rollback:
         'Revert the single issue-scoped commit or pull request. This gate does not merge or deploy.',
+      value: valueQualification(issue.description),
       target,
       optimization,
     },

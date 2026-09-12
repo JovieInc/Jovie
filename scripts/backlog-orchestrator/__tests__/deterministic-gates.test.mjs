@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { validateOptimizationContract } from '../../invariants/optimization-contract.mjs';
@@ -21,6 +22,20 @@ Normalize the unstable token before sending the event.
 ## Optimization exception
 - Class: non-product
 - Justification: This control-plane alert normalization ships no user-facing page, link, asset, campaign, recommendation, or content variant.
+
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
 
 ## Acceptance criteria
 * Repeated events group into one issue.
@@ -96,12 +111,47 @@ A user-facing variant needs implementation.
 ## Proposed fix
 Change the public page CTA.
 
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
+
 ## Acceptance criteria
 * The CTA renders.`,
       })
     );
     assert.equal(result.evidence, null);
     assert.equal(result.reason, 'optimization-contract-missing');
+  });
+
+  it('rejects an issue that omits value justification', () => {
+    const result = deterministicGates.buildDeterministicPlanEvidence(
+      issue({
+        description: `## Problem
+One deterministic alert fingerprint fans out.
+
+## Proposed fix
+Normalize the unstable token before sending the event.
+
+## Optimization exception
+- Class: non-product
+- Justification: This control-plane alert normalization ships no user-facing page, link, asset, campaign, recommendation, or content variant.
+
+## Acceptance criteria
+* Repeated events group into one issue.`,
+      })
+    );
+    assert.equal(result.evidence, null);
+    assert.equal(result.reason, 'value-justification-section-missing');
   });
 
   it('accepts agent-ready as durable evidence without requiring more labels', () => {
@@ -186,6 +236,20 @@ Change the public page CTA.
 - Cadence: weekly decision with writeback
 - Decision writeback: model-experiment promotion receipt
 - Rollback or control: restore the control gesture mapping
+
+**Value**
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
 
 **Acceptance** — Drag positions map linearly from zero to one.`,
     });

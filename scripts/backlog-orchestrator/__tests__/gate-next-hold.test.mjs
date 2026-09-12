@@ -1,3 +1,4 @@
+// biome-ignore-all format: Preserve legacy fixture formatting.
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -22,6 +23,20 @@ One deterministic alert fingerprint fans out.
 
 ## Proposed fix
 Normalize the unstable token before sending the event.
+
+## Value
+- authority: founder-request
+- decision-id: task-01a082d7-9630-7563-b733-de90db5170f0
+- rationale: Make real shipping ownership and delay visible
+- expected-benefit: Shorten time from approved work to proven production
+- validation: One exact task has a complete source-to-production receipt chain
+- basis: measured
+- concurrency: 1
+- demand-per-day: 4
+- critical-path: implementation=3600000,review-and-ci=1800000
+- bottleneck: single implementation slot
+- simplification: reuse existing plan and delivery receipts
+- owner: Summer
 
 ## Acceptance criteria
 * Repeated events group into one issue.
