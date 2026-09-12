@@ -103,6 +103,7 @@ describe('Summer bottleneck heartbeat — JOV-6163 attestation bridge', () => {
       dark: false,
       reason: 'attestation-fresh',
     });
+    expect(result.governedDispatch.outcome).toBe('symphony-route');
     expect(result.gemDarkRecovery).toEqual({
       status: 'skipped',
       reason: 'gem-live',
@@ -121,6 +122,15 @@ describe('Summer bottleneck heartbeat — JOV-6163 attestation bridge', () => {
       dark: true,
       reason: 'runner-source-attestation-unavailable',
     });
+    expect(result.governedDispatch.outcome).toBe('cursor-recovery-request');
+    if (result.governedDispatch.outcome === 'cursor-recovery-request') {
+      expect(result.governedDispatch.route.selectedRoute.tuple.provider).toBe(
+        'cursor-cloud'
+      );
+      expect(
+        result.governedDispatch.route.selectedRoute.tuple.provider
+      ).not.toBe('gem');
+    }
     expect(result.gemDarkRecovery.status).toBe('outbox-ready');
     if (result.gemDarkRecovery.status !== 'outbox-ready') return;
     expect(result.gemDarkRecovery.outbox.destination).toBe('cursor-cloud');
@@ -145,6 +155,7 @@ describe('Summer bottleneck heartbeat — JOV-6163 attestation bridge', () => {
       dark: false,
       reason: 'unknown-fail-closed',
     });
+    expect(result.governedDispatch.outcome).toBe('hold');
     expect(result.gemDarkRecovery).toEqual({
       status: 'skipped',
       reason: 'gem-live',
