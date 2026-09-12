@@ -293,7 +293,7 @@ test.describe('Homepage', () => {
         const shadow = await action.evaluate(
           element => getComputedStyle(element).boxShadow
         );
-        expect(shadow).toMatch(/rgb\((?:17, 175, 255|37, 99, 255)\)/);
+        expect(shadow).toContain('rgb(17, 175, 255)');
       }
 
       // Text-only enlargement must grow the native control, not clip its label.
