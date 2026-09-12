@@ -53,11 +53,9 @@ const summer = [
     'telegram-fallback',
     'vercel-blob-bottleneck-runtime',
     'vercel-blob-shadow-store',
-    'cursor-recovery',
-    'summer-gem-dark-recovery',
-    'summer-governed-dispatch',
-    'summer-bounded-operator-acceptance',
-    'jov-6163-attestation-interop',
+    // Eval-only suites land in stacked recovery-evals PR:
+    // cursor-recovery, summer-gem-dark-recovery, summer-governed-dispatch,
+    // summer-bounded-operator-acceptance, jov-6163-attestation-interop
   ].map(name => `tests/${name}.test.ts`),
   'tests/commercial-fixture.ts',
 ];
