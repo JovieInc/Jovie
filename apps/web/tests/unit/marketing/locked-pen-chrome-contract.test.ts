@@ -35,14 +35,40 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(marketingLayout).toContain('<PublicPageShell');
   });
 
-  it('keeps footer chrome on noir-ion atoms instead of a parallel hex ladder', () => {
-    const footerCss = readWebSource('components/site/MarketingFooter.css');
+  it('moves header chrome onto GTcgO / eoUUU optical-grid atoms without editing HeaderNav', () => {
+    const headerCss = readWebSource('components/site/MarketingHeader.css');
+    const headerNavCss = readWebSource('components/organisms/HeaderNav.css');
+    const header = readWebSource('components/site/MarketingHeader.tsx');
 
-    expect(footerCss).toContain('background: var(--noir-ion-shell)');
+    expect(headerCss).toContain('--marketing-glass-height: 2.75rem');
+    expect(headerCss).toContain('min-height: 1.75rem');
+    expect(headerCss).toContain('min-width: 2.75rem');
+    expect(headerCss).toContain('outline: 2px solid var(--noir-ion-ion)');
+    expect(headerCss).toContain('var(--space-2-5)');
+    expect(headerCss).toContain('var(--space-6)');
+    expect(header).toContain("? 'sm'");
+    expect(headerNavCss).toContain('min-height: 2rem');
+    expect(header).not.toContain("from '@/components/organisms/HeaderNav.css'");
+  });
+
+  it('moves footer chrome onto jhV4a / CCDnQ noir-ion anatomy', () => {
+    const footerCss = readWebSource('components/site/MarketingFooter.css');
+    const footer = readWebSource('components/site/MarketingFooter.tsx');
+
+    expect(footerCss).toContain('var(--noir-ion-canvas)');
+    expect(footerCss).toContain('var(--noir-ion-shell)');
+    expect(footerCss).toContain('var(--noir-ion-floating)');
     expect(footerCss).toContain('--mf-hairline: var(--noir-ion-border-subtle)');
     expect(footerCss).toContain('--mf-text: var(--noir-ion-text-primary)');
+    expect(footerCss).toContain('font-size: 0.625rem');
+    expect(footerCss).toContain('letter-spacing: 0.22em');
+    expect(footerCss).toContain('outline: 2px solid var(--noir-ion-ion)');
     expect(footerCss).not.toContain('#06070a');
     expect(footerCss).not.toContain('rgba(255, 255, 255, 0.07)');
+    expect(footer).not.toContain('Built for artists. By artists.');
+    expect(footer).not.toContain('mf-mark-tagline');
+    expect(footer).toContain('mf-baseband--minimal');
+    expect(footer).toContain("size='chrome'");
   });
 
   it('does not reopen the locked homepage IA or Find me conversion', () => {

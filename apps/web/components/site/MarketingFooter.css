@@ -5,26 +5,36 @@
   --mf-text: var(--noir-ion-text-primary);
   --mf-text-secondary: var(--noir-ion-text-secondary);
   --mf-text-tertiary: var(--noir-ion-text-tertiary);
-  --mf-text-muted: var(--noir-ion-text-disabled);
+  --mf-text-muted: var(--noir-ion-text-muted);
   --mf-hairline: var(--noir-ion-border-subtle);
   --mf-hairline-strong: var(--noir-ion-border-default);
-  background: var(--noir-ion-shell);
+  background:
+    radial-gradient(
+      ellipse 80% 40% at 50% 0%,
+      color-mix(in oklab, var(--noir-ion-floating) 22%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      var(--noir-ion-canvas) 0%,
+      var(--noir-ion-shell) 42%
+    );
   color: var(--mf-text);
   border-top: 1px solid var(--mf-hairline);
 }
 
 .marketing-footer-premium .mf-eyebrow {
   display: block;
-  font-size: 0.6875rem;
-  color: var(--mf-text-tertiary);
+  font-size: 0.625rem;
+  color: var(--mf-text-muted);
   line-height: 1;
-  margin-bottom: 1.25rem;
+  margin-bottom: var(--space-5);
 }
 
 .marketing-footer-premium .mf-eyebrow--caps {
   text-transform: uppercase;
-  font-weight: 500;
-  letter-spacing: 0.2em;
+  font-weight: 600;
+  letter-spacing: 0.22em;
 }
 
 .marketing-footer-premium .mf-link {
@@ -44,20 +54,43 @@
 }
 
 .marketing-footer-premium .mf-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline: 2px solid var(--noir-ion-ion);
   outline-offset: 2px;
 }
 
-.marketing-footer-premium .mf-baseband {
-  border-top: 1px solid var(--mf-hairline);
-  margin-top: clamp(3rem, 5.5vw, 4.5rem);
-  padding-top: clamp(1.5rem, 2.5vw, 2rem);
+.marketing-footer-premium .mf-logo-link:focus-visible {
+  outline: 2px solid var(--noir-ion-ion);
+  outline-offset: 2px;
 }
 
-/* Minimal variant (pricing/legal): tighter gap between the mark and the
-   baseband. 1.75rem = --space-6 + --space-1 (no --space-7 token exists). */
+.marketing-footer-premium .mf-copyright {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: var(--mf-text-tertiary);
+}
+
+.marketing-footer-premium .mf-baseband {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-7);
+  border-top: 1px solid var(--mf-hairline);
+  margin-top: clamp(var(--space-12), 5.5vw, var(--space-16));
+  padding-top: var(--space-6);
+}
+
 .marketing-footer-premium .mf-baseband--minimal {
-  margin-top: calc(var(--space-6) + var(--space-1));
+  margin-top: var(--space-6);
+}
+
+.marketing-footer-premium .mf-baseband__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+  margin-left: auto;
 }
 
 .marketing-footer-premium .mf-legal-link {
@@ -76,17 +109,8 @@
 }
 
 .marketing-footer-premium .mf-legal-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline: 2px solid var(--noir-ion-ion);
   outline-offset: 2px;
-}
-
-.marketing-footer-premium .mf-mark-tagline {
-  font-size: 0.75rem;
-  line-height: 1.5;
-  letter-spacing: 0;
-  color: var(--mf-text-tertiary);
-  max-width: 16rem;
-  margin-top: 1.25rem;
 }
 
 /* A terminal CTA needs a deliberate stage instead of collapsing into the

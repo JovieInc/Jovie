@@ -18,18 +18,14 @@ import { cn } from '@/lib/utils';
 import { MarketingFooterCta } from './MarketingFooterCta';
 
 /**
- * Marketing footer — locked Pen node `jhV4a` (JOV-6179).
+ * Marketing footer — locked Pen node `jhV4a` → master `CCDnQ` (JOV-6179).
  *
  * Visual contract:
- * - Noir-ion shell canvas, hairline `--noir-ion-border-subtle` top border.
- * - 4-column nav with caps eyebrow headers (11px / 0.2em tracking / muted),
- *   14px caption-weight links.
- * - Hairline-separated bottom band with copyright + legal — a sub-band, not
- *   a separate footer row.
- * - Wordmark column carries a small tagline below the mark for editorial
- *   weight.
- * - Minimal variant collapses to mark + bottom band only (used on
- *   /pricing, /legal/*).
+ * - Canvas→shell linear fill + soft floating glow on noir-ion atoms.
+ * - Column nav with caps eyebrows (10px / 600 / 0.22em / `$atom-text-muted`).
+ * - Full: chrome mark + columns, no slogan; copyright left, legal right.
+ * - Compact: chrome mark in the legal row; copyright + legal right.
+ * - Keep production nav from `marketingNavigation`. Do not invent columns.
  */
 
 const MINIMAL_FOOTER_PATHS = new Set<string>([
@@ -76,11 +72,11 @@ function resolveFooterVariant(
 }
 
 const markLinkClassName =
-  '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-subtle hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-logo-link -m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-subtle hover:opacity-75';
 const footerLinkClassName =
-  'mf-link inline-flex w-fit rounded-md text-mid leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-link inline-flex w-fit rounded-md text-mid leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white';
 const footerLegalLinkClassName =
-  'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-tight text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-legal-link inline-flex w-fit rounded-md text-xs leading-5 tracking-tight text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70';
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
@@ -93,6 +89,36 @@ function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
     >
       {link.label}
     </Link>
+  );
+}
+
+function FooterBrandMark() {
+  return (
+    <Link
+      href={APP_ROUTES.HOME}
+      prefetch={false}
+      aria-label='Jovie Home'
+      className={markLinkClassName}
+    >
+      <BrandLogo size='chrome' tone='white' rounded={false} aria-hidden />
+    </Link>
+  );
+}
+
+function FooterLegalNav() {
+  return (
+    <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
+      {MARKETING_LEGAL_LINKS.map(link => (
+        <Link
+          key={link.href}
+          href={link.href}
+          prefetch={false}
+          className={footerLegalLinkClassName}
+        >
+          {link.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
 
@@ -138,32 +164,10 @@ export function MarketingFooter({
           </div>
         ) : null}
 
-        {isMinimal ? (
-          <Link
-            href={APP_ROUTES.HOME}
-            prefetch={false}
-            aria-label='Jovie Home'
-            className={markLinkClassName}
-          >
-            <BrandLogo size='chrome' tone='white' rounded={false} aria-hidden />
-          </Link>
-        ) : (
+        {isMinimal ? null : (
           <div className='grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] md:gap-x-16 md:gap-y-14 lg:gap-x-24'>
             <div className='min-w-0'>
-              <Link
-                href={APP_ROUTES.HOME}
-                prefetch={false}
-                aria-label='Jovie Home'
-                className={markLinkClassName}
-              >
-                <BrandLogo
-                  size='chrome'
-                  tone='white'
-                  rounded={false}
-                  aria-hidden
-                />
-              </Link>
-              <p className='mf-mark-tagline'>Built for artists. By artists.</p>
+              <FooterBrandMark />
             </div>
 
             <nav
@@ -200,30 +204,29 @@ export function MarketingFooter({
             isMinimal && 'mf-baseband--minimal'
           )}
         >
-          <span className='text-xs leading-[1.45] tracking-[-0.005em] text-white/[0.5]'>
-            © {new Date().getFullYear()} Jovie Technology Inc.
-          </span>
+          {isMinimal ? <FooterBrandMark /> : null}
           {isMinimal ? (
-            <nav
-              aria-label='Resources'
-              className='flex flex-wrap items-center gap-6'
-            >
-              <FooterLink link={MARKETING_DEVELOPER_LINK} />
-              <FooterLink link={MARKETING_CLI_LINK} />
-            </nav>
-          ) : null}
-          <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
-            {MARKETING_LEGAL_LINKS.map(link => (
-              <Link
-                key={link.href}
-                href={link.href}
-                prefetch={false}
-                className={footerLegalLinkClassName}
+            <div className='mf-baseband__meta'>
+              <span className='mf-copyright'>
+                © {new Date().getFullYear()} Jovie Technology Inc.
+              </span>
+              <nav
+                aria-label='Resources'
+                className='flex flex-wrap items-center gap-6'
               >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+                <FooterLink link={MARKETING_DEVELOPER_LINK} />
+                <FooterLink link={MARKETING_CLI_LINK} />
+              </nav>
+              <FooterLegalNav />
+            </div>
+          ) : (
+            <>
+              <span className='mf-copyright'>
+                © {new Date().getFullYear()} Jovie Technology Inc.
+              </span>
+              <FooterLegalNav />
+            </>
+          )}
         </div>
       </div>
     </footer>

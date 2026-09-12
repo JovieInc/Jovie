@@ -72,7 +72,7 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText('Built for artists. By artists.')
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Connect' })
     ).not.toBeInTheDocument();
@@ -91,11 +91,12 @@ describe('MarketingFooter', () => {
       'href',
       '/cli'
     );
-    expect(
-      screen
-        .getByRole('link', { name: 'Jovie Home' })
-        .querySelector('[data-brand-mark-size]')
-    ).toHaveAttribute('data-brand-mark-size', '20');
+    const homeLink = screen.getByRole('link', { name: 'Jovie Home' });
+    expect(homeLink.querySelector('[data-brand-mark-size]')).toHaveAttribute(
+      'data-brand-mark-size',
+      '20'
+    );
+    expect(document.querySelector('.mf-baseband')).toContainElement(homeLink);
   });
 
   it.each(['/artist-profiles', '/artist-profile'])(
