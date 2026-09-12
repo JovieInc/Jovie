@@ -13,7 +13,7 @@ const meta = {
     layout: 'centered',
     backgrounds: { default: 'dark' },
     jovie: {
-      uncoveredProps: ['icon', 'className', 'ariaLabel', 'onClick'],
+      uncoveredProps: ['icon', 'className', 'ariaLabel', 'onClick', 'event'],
     },
   },
   args: {
