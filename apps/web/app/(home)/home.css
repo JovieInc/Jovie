@@ -22,7 +22,26 @@ body:has(.home-viewport) {
 }
 
 html:has(.home-viewport) {
+  /* Matches marketing-glass sticky chrome so hash / scrollIntoView /
+     find-in-page never park a heading under the pill. */
+  --homepage-sticky-nav-offset: clamp(0.42rem, 0.8vw, 0.62rem);
+  --homepage-sticky-nav-height: 2.72rem;
+  --homepage-sticky-nav-clearance: calc(
+    var(--homepage-sticky-nav-offset) +
+    var(--homepage-sticky-nav-height) +
+    env(safe-area-inset-top, 0px) +
+    var(--space-6)
+  );
+
   position: relative;
+  scroll-padding-top: var(--homepage-sticky-nav-clearance);
+}
+
+@media (max-width: 767px) {
+  html:has(.home-viewport) {
+    --homepage-sticky-nav-offset: 0.6rem;
+    --homepage-sticky-nav-height: 3.15rem;
+  }
 }
 
 html:has(.home-viewport)::-webkit-scrollbar,
@@ -2261,6 +2280,46 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin-top: 0;
 }
 
+/* homepage-proof-no-card-v1: four logos sit on the page background (no
+   frosted card). Desktop spacing matches /pricing compact card:
+   flex + gap-x-8 + lg nowrap / space-between. The shared trust-strip
+   primitive stays a 5-track grid for other mounts. */
+.homepage-certified-proof
+  .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+  overflow: visible;
+}
+
+@media (min-width: 768px) {
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-5) var(--space-8);
+    grid-template-columns: none;
+  }
+
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo-slot {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: max-content;
+    height: auto;
+    overflow: visible;
+  }
+
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo {
+    max-width: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .homepage-certified-proof .system-b-mounted-home-trust-strip-logo-grid {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: var(--space-8);
+  }
+}
+
 .homepage-certified-section__inner,
 .homepage-close__inner {
   width: min(
@@ -2304,6 +2363,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-certified-section__headline {
   font-size: var(--ds-marketing-title-size);
+}
+
+.home-viewport .homepage-certified-section,
+.home-viewport .homepage-close,
+.home-viewport .homepage-certified-section__headline,
+.home-viewport .homepage-close__headline,
+.home-viewport [data-homepage-section-heading] {
+  scroll-margin-top: var(--homepage-sticky-nav-clearance);
 }
 
 .homepage-certified-section__body {

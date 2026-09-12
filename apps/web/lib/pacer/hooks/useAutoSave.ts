@@ -196,7 +196,9 @@ export function useAutoSave<TData>({
           await attempt.saveFn(attempt.data, {
             revision: attempt.revision,
             resourceKey: attempt.resourceKey,
-            isLatest: isLatestAttempt(attempt),
+            get isLatest() {
+              return isLatestAttempt(attempt);
+            },
           });
         },
         {

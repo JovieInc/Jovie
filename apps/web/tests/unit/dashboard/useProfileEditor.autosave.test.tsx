@@ -166,4 +166,49 @@ describe('useProfileEditor autosave binding', () => {
       },
     });
   });
+
+  it('clears the saving indicator when a stale acknowledgment is skipped', async () => {
+    let resolveUpdate: ((value: unknown) => void) | undefined;
+    mockMutateAsync.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveUpdate = resolve;
+        })
+    );
+
+    const { result } = renderHook(() => useProfileEditor({ debounceMs: 50 }));
+
+    act(() => {
+      result.current.setEditingField('displayName');
+      result.current.handleDisplayNameChange('Older Name');
+    });
+
+    let flushPromise!: Promise<void>;
+    act(() => {
+      flushPromise = result.current.debouncedProfileSave.flush();
+    });
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      result.current.handleDisplayNameChange('Original Name');
+    });
+
+    await act(async () => {
+      resolveUpdate?.({
+        profile: {
+          id: 'profile_a',
+          displayName: 'Older Name',
+          username: 'original-handle',
+          avatarUrl: null,
+          creatorType: 'artist',
+          isPublic: true,
+        },
+      });
+      await flushPromise;
+    });
+
+    expect(result.current.profileDisplayName).toBe('Original Name');
+    expect(result.current.profileSaveStatus.saving).toBe(false);
+    expect(result.current.profileSaveStatus.success).not.toBe(true);
+  });
 });

@@ -157,4 +157,63 @@ describe('useSettingsProfile autosave binding', () => {
 
     expect(result.current.formData.displayName).not.toBe('Older');
   });
+
+  it('clears the saving indicator when a stale acknowledgment is skipped', async () => {
+    let resolveFirst: ((value: unknown) => void) | undefined;
+    const firstPromise = new Promise(resolve => {
+      resolveFirst = resolve;
+    });
+    mockSaveProfile.mockImplementationOnce(() => firstPromise);
+
+    const artistA = makeArtist();
+    const { result } = renderHook(() =>
+      useSettingsProfile({
+        artist: artistA,
+        onArtistUpdate: mockOnArtistUpdate,
+        onRefresh: mockOnRefresh,
+      })
+    );
+
+    act(() => {
+      result.current.saveProfile({
+        displayName: 'Older',
+        username: 'alice',
+        location: 'NYC',
+        hometown: 'Boston',
+        careerHighlights: 'sold out',
+        targetPlaylists: 'rapcaviar',
+      });
+      result.current.flushSave();
+    });
+
+    act(() => {
+      result.current.saveProfile({
+        displayName: 'Alice',
+        username: 'alice',
+        location: 'NYC',
+        hometown: 'Boston',
+        careerHighlights: 'sold out',
+        targetPlaylists: 'rapcaviar',
+      });
+    });
+
+    await act(async () => {
+      resolveFirst?.({
+        profile: {
+          username: 'alice',
+          displayName: 'Older',
+          location: 'NYC',
+          settings: { hometown: 'Boston' },
+        },
+      });
+      await firstPromise;
+      result.current.flushSave();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.formData.displayName).not.toBe('Older');
+    expect(result.current.profileSaveStatus.saving).toBe(false);
+    expect(result.current.profileSaveStatus.success).not.toBe(true);
+  });
 });

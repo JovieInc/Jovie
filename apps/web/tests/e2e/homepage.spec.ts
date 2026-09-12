@@ -120,9 +120,12 @@ test.describe('Homepage', () => {
       'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
+    await expect(
+      header.getByRole('link', { name: 'Customers' })
+    ).toHaveAttribute('href', '/artists');
     await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
@@ -130,18 +133,16 @@ test.describe('Homepage', () => {
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Find yourself' })
-    ).toHaveAttribute('href', '/start');
+      header.getByRole('link', { name: 'Get started' })
+    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
   });
 
-  test('canonical header flyouts stay closed until requested', async ({
-    page,
-  }) => {
+  test('canonical header has no flyout menus', async ({ page }) => {
     const header = page.getByTestId('header-nav');
     const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
     await expect(toolsFlyout).toHaveCount(0);
   });
 
@@ -491,6 +492,74 @@ test.describe('Homepage', () => {
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
+  test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoHomepage(page);
+    await page.evaluate(() => document.fonts.ready);
+
+    const proof = page.getByTestId('marketing-section-logo-cloud');
+    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-presentation',
+      'inline-strip'
+    );
+    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
+
+    const logoBoxes = await proof.locator('svg').evaluateAll(svgs =>
+      svgs.map(svg => {
+        const box = svg.getBoundingClientRect();
+        return {
+          label: svg.getAttribute('aria-label') ?? svg.textContent ?? '',
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+        };
+      })
+    );
+    expect(logoBoxes).toHaveLength(4);
+    for (let index = 0; index < logoBoxes.length; index += 1) {
+      for (let other = index + 1; other < logoBoxes.length; other += 1) {
+        const a = logoBoxes[index];
+        const b = logoBoxes[other];
+        const overlaps =
+          a.left < b.right &&
+          a.right > b.left &&
+          a.top < b.bottom &&
+          a.bottom > b.top;
+        expect(overlaps, `${a.label} overlaps ${b.label} at 1280px`).toBe(
+          false
+        );
+      }
+    }
+
+    const headerBottom = await page
+      .getByTestId('header-nav')
+      .evaluate(header => {
+        const shell = header.querySelector('.marketing-glass-header__shell');
+        return (shell ?? header).getBoundingClientRect().bottom;
+      });
+
+    const headings = page.locator('[data-homepage-section-heading]');
+    const headingCount = await headings.count();
+    expect(headingCount).toBeGreaterThanOrEqual(7);
+
+    for (let index = 0; index < headingCount; index += 1) {
+      const heading = headings.nth(index);
+      const name = (await heading.innerText()).trim();
+      await heading.evaluate(element => {
+        element.scrollIntoView({ block: 'start', inline: 'nearest' });
+      });
+      const top = await heading.evaluate(
+        element => element.getBoundingClientRect().top
+      );
+      expect(top, `${name} must clear the sticky nav`).toBeGreaterThanOrEqual(
+        headerBottom - 0.5
+      );
+    }
+  });
+
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
     page,
   }) => {
@@ -588,17 +657,14 @@ test.describe('Homepage', () => {
     const mobileNav = page.locator('#mobile-nav-panel');
     await expect(mobileNav).toBeVisible();
     await expect(
-      header.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveCount(0);
-    await expect(
       header.getByRole('link', { name: 'Find yourself', exact: true })
     ).toHaveCount(0);
     await expect(
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
-    ).toHaveAttribute('href', '/start');
+      mobileNav.getByRole('link', { name: 'Get started', exact: true })
+    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
   });
 
   test('has no horizontal overflow across common viewports', async ({

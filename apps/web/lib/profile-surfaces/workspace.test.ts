@@ -51,7 +51,7 @@ function connector(
 }
 
 describe('connections workspace helpers', () => {
-  it('keeps Sources, Websites, and Jovie as distinct Presence filters', () => {
+  it('groups Presence filters by artist outcome (JOV-6170)', () => {
     const rows = [
       surface({
         id: 'source',
@@ -64,17 +64,19 @@ describe('connections workspace helpers', () => {
         platform: 'website',
       }),
       surface({ id: 'jovie', kind: 'jovie', platform: 'jovie' }),
+      surface({ id: 'dsp-row', kind: 'dsp', platform: 'spotify' }),
+      surface({ id: 'social-row', kind: 'social', platform: 'instagram' }),
     ];
 
     expect(
-      filterProfileWorkspaceRows(rows, 'source').map(row => row.id)
+      filterProfileWorkspaceRows(rows, 'identity').map(row => row.id)
+    ).toEqual(['website', 'jovie']);
+    expect(
+      filterProfileWorkspaceRows(rows, 'profiles').map(row => row.id)
+    ).toEqual(['dsp-row', 'social-row']);
+    expect(
+      filterProfileWorkspaceRows(rows, 'catalog').map(row => row.id)
     ).toEqual(['source']);
-    expect(
-      filterProfileWorkspaceRows(rows, 'website').map(row => row.id)
-    ).toEqual(['website']);
-    expect(
-      filterProfileWorkspaceRows(rows, 'jovie').map(row => row.id)
-    ).toEqual(['jovie']);
   });
 
   it('surfaces actionable connection issues before healthy rows', () => {

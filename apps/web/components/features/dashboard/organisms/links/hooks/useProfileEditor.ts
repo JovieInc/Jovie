@@ -281,6 +281,15 @@ export function useProfileEditor(
     },
   });
 
+  // Stale acknowledgments return before saveProfile clears `saving`.
+  useEffect(() => {
+    setProfileSaveStatus(prev =>
+      prev.saving === autoSave.isSaving
+        ? prev
+        : { ...prev, saving: autoSave.isSaving }
+    );
+  }, [autoSave.isSaving]);
+
   // Clear success status after delay
   useEffect(() => {
     if (!profileSaveStatus.success) return;

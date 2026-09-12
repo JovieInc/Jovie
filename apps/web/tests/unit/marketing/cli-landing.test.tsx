@@ -24,7 +24,7 @@ function readWebSource(path: string): string {
 }
 
 describe('CLI landing page', () => {
-  it('documents only verified CLI commands and the unpublished install path', () => {
+  it('documents only the verified read-only CLI surface', () => {
     render(<CliLandingPage />);
 
     expect(
@@ -34,7 +34,10 @@ describe('CLI landing page', () => {
       screen.getByRole('heading', { level: 2, name: 'Install' })
     ).toHaveClass('line-clamp-2');
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Commands' })
+      screen.getByRole('heading', { level: 2, name: 'What you can do' })
+    ).toHaveClass('line-clamp-2');
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'CLI reference' })
     ).toHaveClass('line-clamp-2');
     expect(screen.getByText(CLI_SUBTITLE)).toBeVisible();
     expect(screen.getByTestId('cli-hero-install')).toHaveAttribute(
@@ -49,10 +52,17 @@ describe('CLI landing page', () => {
     expect(pageText).toContain('npm install --global @jovie/cli');
     expect(pageText).toContain('jovie --help');
     expect(pageText).toContain('jovie --version');
-    expect(pageText).toContain('After a versioned release is published to npm');
+    expect(pageText).toContain('No account');
+    expect(pageText).toContain('No API key');
+    expect(pageText).toContain('Read-only');
+    expect(pageText).toContain('JSON output');
+    expect(pageText).toContain('Get an artist');
+    expect(pageText).toContain('Give an artist to an agent');
+    expect(pageText).toContain('Build against Jovie');
+    expect(pageText).toContain('Give Jovie to an agent');
 
     for (const item of CLI_DOCUMENTED_COMMANDS) {
-      expect(screen.getByText(item.command)).toBeVisible();
+      expect(screen.getAllByText(item.command).length).toBeGreaterThan(0);
       expect(screen.getByText(item.request)).toBeVisible();
     }
 

@@ -6,13 +6,15 @@ import type { ProviderKey } from '@/lib/discography/types';
 
 import { createMockRelease } from '@/tests/test-utils/factories';
 
-vi.mock('@jovie/ui', async () => {
+vi.mock('@jovie/ui', async importOriginal => {
   const React = await import('react');
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
   const SelectContext = React.createContext<
     ((value: string) => void) | undefined
   >(undefined);
 
   return {
+    ...actual,
     Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
       <button type='button' {...props}>
         {children}
@@ -279,8 +281,48 @@ describe('ReleaseDspLinks interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for Spotify' })
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Remove Spotify' }));
     expect(onRemoveLink).toHaveBeenCalledWith('spotify');
+  });
+
+  it('turns unresolved DSPs into Find instead of Not found', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ReleaseDspLinks
+        release={{
+          ...createMockRelease(),
+          providerCounts: {
+            canonical: 0,
+            searchFallback: 0,
+            unknown: 0,
+            unresolvedProviders: ['youtube'],
+          },
+        }}
+        providerConfig={providerConfig}
+        isEditable
+        isAddingLink={false}
+        newLinkUrl=''
+        selectedProvider={null}
+        isAddingDspLink={false}
+        isRemovingDspLink={null}
+        onSetIsAddingLink={onSetIsAddingLink}
+        onSetNewLinkUrl={onSetNewLinkUrl}
+        onSetSelectedProvider={onSetSelectedProvider}
+        onAddLink={onAddLink}
+        onRemoveLink={onRemoveLink}
+        onNewLinkKeyDown={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText('Not found')).not.toBeInTheDocument();
+    expect(screen.queryByText('Missing')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Find' }));
+    expect(onSetSelectedProvider).toHaveBeenCalledWith('youtube');
+    expect(onSetIsAddingLink).toHaveBeenCalledWith(true);
   });
 
   it('shows a retryable inline error when a DSP mutation fails', async () => {

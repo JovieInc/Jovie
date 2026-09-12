@@ -8,10 +8,10 @@ import {
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 
-export const CLI_HEADLINE = 'Read public Jovie data from a terminal.';
+export const CLI_HEADLINE = 'Artist data, from your terminal.';
 export const CLI_SUBTITLE =
-  'Fetch public artist profiles, OpenAPI, and llms.txt. No login, keys, or writes.';
-export const CLI_PRIMARY_CTA_LABEL = 'Install';
+  'Read public artist profiles, agent-ready context, and Jovie’s API contract. No account, API key, or writes.';
+export const CLI_PRIMARY_CTA_LABEL = 'Install the CLI';
 
 export const CLI_DOCUMENTED_COMMANDS = [
   {
@@ -38,7 +38,7 @@ export const CLI_DOCUMENTED_COMMANDS = [
 
 export const CLI_FAQ_ITEMS = [
   {
-    question: 'Does the CLI require an API key?',
+    question: 'Does the CLI require an account or API key?',
     answer:
       'No. Every command uses anonymous GET routes. The CLI does not log in, accept API keys or OAuth credentials, write files, cache responses, send telemetry, or mutate Jovie data.',
   },
@@ -62,6 +62,29 @@ export const CLI_FAQ_ITEMS = [
 const INSTALL_COMMANDS = `npm install --global @jovie/cli
 jovie --help
 jovie --version`;
+
+const CLI_JOBS = [
+  {
+    title: 'Get an artist',
+    command: 'jovie artist get <username>',
+    body: 'Fetch the structured public artist profile for a real Jovie username. Add --json when you want to pipe the response into another tool.',
+  },
+  {
+    title: 'Give an artist to an agent',
+    command: 'jovie artist llms <username>',
+    body: 'Fetch the artist’s public llms.txt context so an agent can understand the artist without scraping a profile page.',
+  },
+  {
+    title: 'Build against Jovie',
+    command: 'jovie api openapi',
+    body: 'Read the canonical public OpenAPI contract directly from the terminal.',
+  },
+  {
+    title: 'Give Jovie to an agent',
+    command: 'jovie docs llms',
+    body: 'Fetch Jovie’s machine-readable documentation. Use --full when the complete documentation context is useful.',
+  },
+] as const;
 
 export function CliLandingPage() {
   return (
@@ -99,17 +122,18 @@ export function CliLandingPage() {
               Install
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              After a versioned release is published to npm, install the CLI
-              globally. The commands below are the verified first-run path.
+              Install globally, then ask Jovie for public artist data from any
+              terminal. The CLI is anonymous and read-only.
             </p>
             <pre className='mt-6 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-5 text-sm leading-relaxed text-secondary-token'>
               <code>{INSTALL_COMMANDS}</code>
             </pre>
-            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              Publication is main-only, provenance-required, and does not happen
-              from a feature branch. A local checkout can run the same commands
-              with <code>pnpm --filter @jovie/cli dev</code>.
-            </p>
+            <div className='mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-secondary-token'>
+              <span>No account</span>
+              <span>No API key</span>
+              <span>Read-only</span>
+              <span>JSON output</span>
+            </div>
           </section>
 
           <section id='commands' aria-labelledby='commands-heading'>
@@ -117,11 +141,37 @@ export function CliLandingPage() {
               id='commands-heading'
               className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
-              Commands
+              What you can do
+            </h2>
+            <div className='mt-6 space-y-8'>
+              {CLI_JOBS.map(item => (
+                <article key={item.title}>
+                  <h3 className='text-base font-semibold text-primary-token'>
+                    {item.title}
+                  </h3>
+                  <pre className='mt-3 overflow-x-auto rounded-xl border border-subtle bg-surface-0 p-4 text-sm leading-relaxed text-primary-token'>
+                    <code>{item.command}</code>
+                  </pre>
+                  <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
+                    {item.body}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section id='reference' aria-labelledby='reference-heading'>
+            <h2
+              id='reference-heading'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
+            >
+              CLI reference
             </h2>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-              The CLI documents only these read-only commands. Angle-bracket
-              values are placeholders for a real public artist username.
+              Every command accepts <code>--base-url</code> and{' '}
+              <code>--json</code>. <code>--json</code> emits JSON for API
+              responses and wraps text resources as{' '}
+              <code>{'{"content":"..."}'}</code>.
             </p>
             <dl className='mt-6 space-y-5'>
               {CLI_DOCUMENTED_COMMANDS.map(item => (
@@ -137,11 +187,10 @@ export function CliLandingPage() {
                 </div>
               ))}
             </dl>
-            <p className='mt-6 text-base leading-relaxed text-secondary-token'>
-              Every command accepts <code>--base-url</code> and{' '}
-              <code>--json</code>. <code>--json</code> emits JSON for API
-              responses and wraps text resources as{' '}
-              <code>{'{"content":"..."}'}</code>.
+            <p className='mt-6 text-sm leading-relaxed text-secondary-token'>
+              Maintainer note: package publication is main-only and
+              provenance-required. A local checkout can run the same command
+              surface with <code>pnpm --filter @jovie/cli dev</code>.
             </p>
           </section>
         </div>
@@ -155,8 +204,8 @@ export function CliLandingPage() {
       />
 
       <MarketingFooterCta
-        title='Install the Jovie CLI.'
-        body='Read-only public artist data from your terminal.'
+        title='Artist data, from your terminal.'
+        body='Install the read-only Jovie CLI and start with a public artist username.'
         ctaLabel={CLI_PRIMARY_CTA_LABEL}
         ctaHref='#install'
         ctaAnalyticsEvent='cli_install_cta'
