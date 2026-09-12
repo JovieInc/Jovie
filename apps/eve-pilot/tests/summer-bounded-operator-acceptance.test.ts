@@ -1,9 +1,11 @@
 /**
  * Strict failure-case acceptance narrative for the Summer bounded-operator goal:
- * Gem down → authorized alternate route → useful recovery → ownership preserved
- * → remaining human decision reported.
+ * Gem down → governed dispatch selects authorized alternate → useful recovery →
+ * ownership preserved → remaining human decision reported.
  *
- * Writes a durable receipt under /opt/cursor/artifacts when assertions pass.
+ * The primary path is request-outcome → router launch via
+ * `dispatchSummerGovernedRequest` (not an ad-hoc recovery call). Writes a durable
+ * receipt under /opt/cursor/artifacts when assertions pass.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -11,14 +13,15 @@ import {
   buildGemDarkExerciseReport,
   disposeGemDarkRecovery,
 } from '../agent/lib/cursor-recovery';
+import type { DecisionJob } from '../agent/lib/governor-route';
 import type {
   SummerBottleneckRecord,
   SummerBottleneckStore,
 } from '../agent/lib/summer-bottleneck-loop';
+import { dispatchSummerGovernedRequest } from '../agent/lib/summer-governed-dispatch';
 import {
   evaluateRunnerSourceAttestation,
   RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS,
-  resolveGemDarkTrigger,
   runGemDarkRecoveryCycle,
 } from '../agent/lib/summer-gem-dark-recovery';
 
@@ -45,8 +48,35 @@ function memoryStore(): SummerBottleneckStore & {
   };
 }
 
+function acceptanceDecisionJob(overrides: Partial<DecisionJob> = {}): DecisionJob {
+  return {
+    kind: 'decision',
+    id: 'acceptance-gem-down-1',
+    jobClass: 'ambiguous-product-reasoning',
+    riskTier: 'medium',
+    objective:
+      'Gem-down acceptance: prepare isolated JOV-6163 recovery artifacts',
+    requiredCapabilities: ['reasoning', 'product'],
+    certificationPredicate: 'source-bound-signed-rate-limited',
+    authority: 'automation',
+    evidenceRefs: ['acceptance:gem-down', 'jov-6163'],
+    ...overrides,
+  };
+}
+
+function freshReceipt(nowMs: number) {
+  return {
+    schema: 'gem-service-attestation/v1',
+    sourceRevision: 'a'.repeat(40),
+    observedAt: new Date(nowMs - 45_000).toISOString(),
+    active: true,
+    healthy: true,
+    listener: { port: 4041, boundToService: true },
+  };
+}
+
 describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
-  it('proves Gem-down → Cursor alternate → recovery → ownership → human decision', async () => {
+  it('proves Gem-down → governed Cursor alternate → recovery → ownership → human decision', async () => {
     const nowMs = Date.parse('2026-09-12T17:00:00.000Z');
     const store = memoryStore();
 
@@ -54,38 +84,78 @@ describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
     const staleObservedAt = new Date(
       nowMs - RUNNER_SOURCE_ATTESTATION_MAX_AGE_MS - 1
     ).toISOString();
-    const staleProbe = evaluateRunnerSourceAttestation(
-      {
-        schema: 'gem-service-attestation/v1',
-        sourceRevision: 'b'.repeat(40),
-        observedAt: staleObservedAt,
-        active: true,
-        healthy: true,
-        listener: { port: 4041, boundToService: true },
-      },
-      nowMs
-    );
+    const staleReceipt = {
+      schema: 'gem-service-attestation/v1',
+      sourceRevision: 'b'.repeat(40),
+      observedAt: staleObservedAt,
+      active: true,
+      healthy: true,
+      listener: { port: 4041, boundToService: true },
+    };
+    const staleProbe = evaluateRunnerSourceAttestation(staleReceipt, nowMs);
     expect(staleProbe).toEqual({ status: 'unavailable', reason: 'stale' });
 
-    const trigger = resolveGemDarkTrigger({
-      attestationReceipt: null,
+    // 2) Governed dispatch: request outcome → router launch (primary path)
+    const gemDownDispatch = dispatchSummerGovernedRequest({
+      decisionJob: acceptanceDecisionJob(),
+      attestationReceipt: staleReceipt,
       nowMs,
     });
-    expect(trigger).toMatchObject({
+    expect(gemDownDispatch.outcome).toBe('cursor-recovery-request');
+    if (gemDownDispatch.outcome !== 'cursor-recovery-request') return;
+    expect(gemDownDispatch.trigger).toMatchObject({
       dark: true,
       reason: 'runner-source-attestation-unavailable',
     });
+    expect(gemDownDispatch.route.selectedRoute.tuple.provider).toBe(
+      'cursor-cloud'
+    );
+    expect(gemDownDispatch.route.selectedRoute.tuple.provider).not.toBe('gem');
+    expect(gemDownDispatch.route.selectedRoute.tuple.provider).not.toBe(
+      'symphony'
+    );
+    expect(gemDownDispatch.recoveryJobId).toContain('cursor-recovery:');
 
-    // 2) Authorized alternate route: Cursor cloud outbox (never gem/symphony)
+    // Hold when no probe is configured — no accidental Cursor spend
+    const holdDispatch = dispatchSummerGovernedRequest({
+      decisionJob: acceptanceDecisionJob({ id: 'acceptance-hold' }),
+      nowMs,
+    });
+    expect(holdDispatch.outcome).toBe('hold');
+    if (holdDispatch.outcome === 'hold') {
+      expect(holdDispatch.trigger.reason).toBe('unknown-fail-closed');
+      expect(holdDispatch.remainingHumanDecision).toMatch(
+        /SUMMER_RUNNER_SOURCE_ATTESTATION|SUMMER_GEM_DARK/i
+      );
+    }
+
+    // Fresh attestation keeps Symphony authoritative (not Cursor recovery)
+    const symphonyDispatch = dispatchSummerGovernedRequest({
+      decisionJob: acceptanceDecisionJob({ id: 'acceptance-fresh' }),
+      attestationReceipt: freshReceipt(nowMs),
+      nowMs,
+    });
+    expect(symphonyDispatch.outcome).toBe('symphony-route');
+    if (symphonyDispatch.outcome === 'symphony-route') {
+      expect(symphonyDispatch.trigger.reason).toBe('attestation-fresh');
+      expect(symphonyDispatch.route.selectedRoute.tuple.provider).not.toBe(
+        'cursor-cloud'
+      );
+    }
+
+    // 3) Useful recovery: durable Cursor outbox launched from governed outcome
     const recovery = await runGemDarkRecoveryCycle(
-      { store, isGemDark: () => trigger.dark },
+      { store, isGemDark: () => true },
       {
-        objective:
-          'Gem-down acceptance: prepare isolated JOV-6163 recovery artifacts',
+        objective: gemDownDispatch.trigger.reason
+          ? `Gem-down acceptance via governed dispatch (${gemDownDispatch.trigger.reason})`
+          : 'Gem-down acceptance via governed dispatch',
         evidenceRefs: [
           'acceptance:gem-down',
           'runner-source-attestation-unavailable',
-          `gem-dark-trigger:${trigger.reason}`,
+          `governed-dispatch:${gemDownDispatch.outcome}`,
+          `recovery-job:${gemDownDispatch.recoveryJobId}`,
+          `gem-dark-trigger:${gemDownDispatch.trigger.reason}`,
         ],
         idempotencyKey: 'acceptance-gem-down-1',
       }
@@ -98,8 +168,6 @@ describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
     );
     expect(recovery.outbox.route.selectedRoute.tuple.provider).not.toBe('gem');
     expect(recovery.report.isolatedRecoveryAdmitted).toBe(true);
-
-    // 3) Useful recovery surface exists (durable outbox record)
     expect(store.records.has(recovery.outboxPath)).toBe(true);
 
     // 4) Ownership preserved — deny live takeover / self-expansion; hold gem-live mutation
@@ -164,7 +232,7 @@ describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
       observedAt: new Date().toISOString(),
       narrative: [
         'gem-down',
-        'authorized-alternate-route',
+        'governed-dispatch-authorized-alternate',
         'useful-recovery',
         'ownership-preserved',
         'remaining-human-decision-reported',
@@ -172,15 +240,27 @@ describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
       steps: {
         gemDown: {
           attestation: staleProbe,
-          trigger,
         },
-        authorizedAlternateRoute: {
-          destination: recovery.outbox.destination,
-          provider: recovery.outbox.route.selectedRoute.tuple.provider,
+        governedDispatch: {
+          gemDown: {
+            outcome: gemDownDispatch.outcome,
+            trigger: gemDownDispatch.trigger.reason,
+            provider: gemDownDispatch.route.selectedRoute.tuple.provider,
+            recoveryJobId: gemDownDispatch.recoveryJobId,
+          },
+          holdWithoutProbe: {
+            outcome: holdDispatch.outcome,
+            trigger: holdDispatch.trigger.reason,
+          },
+          freshKeepsSymphony: {
+            outcome: symphonyDispatch.outcome,
+            trigger: symphonyDispatch.trigger.reason,
+          },
         },
         usefulRecovery: {
           status: recovery.status,
           outboxPath: recovery.outboxPath,
+          destination: recovery.outbox.destination,
           isolatedRecoveryAdmitted: recovery.report.isolatedRecoveryAdmitted,
         },
         ownershipPreserved: {
@@ -211,8 +291,12 @@ describe('Summer bounded-operator acceptance (Gem-down narrative)', () => {
         weakened600sGate: false,
         privilegedGbrainWrite: false,
         symphonyHeal: false,
+        recoveryNeverRoutedToGem: true,
+        holdPreventsAccidentalCursorSpend: holdDispatch.outcome === 'hold',
       },
       e1External: true,
+      e1Note:
+        'Gem install of PR #17725 attestation publisher + two ≤600s observations still required',
       result: 'PASS',
     };
 
