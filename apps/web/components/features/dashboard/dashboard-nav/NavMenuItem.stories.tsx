@@ -5,7 +5,22 @@ import { NavMenuItem } from './NavMenuItem';
 const meta: Meta<typeof NavMenuItem> = {
   title: 'Dashboard/Navigation/Item',
   component: NavMenuItem,
-  parameters: { layout: 'centered' },
+  parameters: {
+    layout: 'centered',
+    jovie: {
+      // The ship-gate required-props heuristic unions every *Props* block in
+      // the component file, including the internal
+      // NavMenuInteractiveElementProps wiring that NavMenuItem never exposes.
+      // None of these are part of the nav-row story contract.
+      uncoveredProps: [
+        'preventNavigation',
+        'renderAsButton',
+        'onButtonClick',
+        'onLinkClick',
+        'onPressStart',
+      ],
+    },
+  },
   decorators: [
     Story => (
       <div className='w-60 bg-sidebar p-3'>
