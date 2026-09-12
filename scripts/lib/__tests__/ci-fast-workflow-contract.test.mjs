@@ -704,6 +704,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'tests/unit/lib/entitlements/creator-plan.test.ts'
     );
     expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
+      'tests/unit/lib/stripe/customer-sync.queries.test.ts'
+    );
+    expect(BILLING_PROVENANCE_COVERAGE_COMMAND).toContain(
       '--coverage.thresholds.perFile=true'
     );
     expect(FAN_SEND_SAFETY_COVERAGE_COMMAND).toContain(
