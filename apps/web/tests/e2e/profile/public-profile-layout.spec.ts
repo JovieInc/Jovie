@@ -38,12 +38,16 @@ const VIEWPORTS: readonly LayoutViewport[] = [
   { id: '430x932', width: 430, height: 932, isMobile: true },
   { id: '768x1024', width: 768, height: 1024, isMobile: false },
   { id: '1024x768', width: 1024, height: 768, isMobile: false },
+  { id: '1179x932', width: 1179, height: 932, isMobile: false },
+  { id: '1180x932', width: 1180, height: 932, isMobile: false },
   { id: '1280x800', width: 1280, height: 800, isMobile: false },
   { id: '1440x900', width: 1440, height: 900, isMobile: false },
+  { id: '1512x932', width: 1512, height: 932, isMobile: false },
 ];
 
 const READY_SELECTORS = [
   '[data-testid="profile-compact-surface"]',
+  '[data-testid="profile-desktop-surface"]',
   '[data-testid="profile-header"]',
   '[data-testid="profile-compact-shell"]',
 ] as const;
@@ -141,8 +145,8 @@ async function collectLayoutMetrics(page: Page) {
       : isVisibleBox(shell)
         ? shell
         : (shell ?? desktopShell);
-    const cover = document.querySelector<HTMLElement>(
-      '[data-testid="profile-cover"], [data-testid="profile-desktop-cover"]'
+    const compactCover = document.querySelector<HTMLElement>(
+      '[data-testid="profile-cover"]'
     );
     const scroll = document.querySelector<HTMLElement>(
       '[data-testid="profile-content-scroll"]'
@@ -156,6 +160,7 @@ async function collectLayoutMetrics(page: Page) {
     const desktopCover = document.querySelector<HTMLElement>(
       '[data-testid="profile-desktop-cover"]'
     );
+    const cover = isVisibleBox(desktopCover) ? desktopCover : compactCover;
     const desktopAlerts = document.querySelector<HTMLElement>(
       '[data-testid="profile-desktop-alerts-card"]'
     );
@@ -211,6 +216,8 @@ async function collectLayoutMetrics(page: Page) {
           '[data-testid="profile-home-alerts-row"]',
           '[data-testid="profile-home-alerts-fallback-card"]',
           '[data-testid="profile-tab-bar"] button',
+          '[data-testid="profile-desktop-surface"] nav button',
+          '[data-testid="profile-desktop-surface"] button[aria-label="Menu"]',
           'article a',
           'article button',
         ].join(', ')
@@ -270,6 +277,9 @@ async function collectLayoutMetrics(page: Page) {
       desktopAlerts: box(desktopAlerts),
       desktopSecondaryGrid: box(desktopSecondaryGrid),
       scroll: box(scroll),
+      scrollPaddingBottom: scroll
+        ? Number.parseFloat(window.getComputedStyle(scroll).paddingBottom)
+        : null,
       nav: box(nav),
       navRail: box(navRail),
       visibleLargeImages,
@@ -418,9 +428,9 @@ test.describe('Public profile /tim layout hardening @regression', () => {
 
       if (metrics.nav && metrics.scroll) {
         expect(
-          metrics.nav.top - metrics.scroll.bottom,
-          `${viewport.id} bottom nav should not cover scroll content`
-        ).toBeGreaterThanOrEqual(-2);
+          metrics.scrollPaddingBottom ?? 0,
+          `${viewport.id} scroll content should reserve the floating bottom nav`
+        ).toBeGreaterThanOrEqual(metrics.nav.height);
       }
 
       if (metrics.desktopCover && metrics.desktopAlerts) {

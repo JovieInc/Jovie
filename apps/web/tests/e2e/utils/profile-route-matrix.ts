@@ -117,9 +117,8 @@ export interface ProfileViewportBreakpoint {
 
 /**
  * The exact viewport set called out in JOV-2028 — iPhone SE (375), iPhone
- * 13/14 (390), Pixel/Android (412), iPhone Pro Max (430), tablet (768), and
- * desktop (1280). Mobile (<=430) already has dedicated specs; this matrix
- * adds the wider breakpoints that aren't covered today.
+ * 13/14 (390), Pixel/Android (412), iPhone Pro Max (430), and a representative
+ * set of tablet/desktop widths through 1512px.
  */
 export const PROFILE_RESPONSIVE_VIEWPORTS: readonly ProfileViewportBreakpoint[] =
   [
@@ -159,10 +158,24 @@ export const PROFILE_RESPONSIVE_VIEWPORTS: readonly ProfileViewportBreakpoint[] 
       isMobile: false,
     },
     {
+      id: 'tablet-landscape',
+      label: 'Tablet landscape (1024)',
+      width: 1024,
+      height: 768,
+      isMobile: false,
+    },
+    {
       id: 'desktop',
       label: 'Desktop (1280)',
       width: 1280,
       height: 800,
+      isMobile: false,
+    },
+    {
+      id: 'desktop-wide',
+      label: 'Desktop wide (1512)',
+      width: 1512,
+      height: 932,
       isMobile: false,
     },
   ] as const;
