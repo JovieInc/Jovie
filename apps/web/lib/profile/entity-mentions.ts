@@ -22,6 +22,8 @@ export interface EntityMentionArtist {
 export interface EntityMentionContext {
   /** Handle of the profile the text belongs to (release links hang off it). */
   readonly ownHandle: string;
+  /** Own display name is ambiguous in prose when another profile shares it. */
+  readonly ownName?: string;
   readonly releases?: readonly EntityMentionRelease[];
   readonly artists?: readonly EntityMentionArtist[];
 }
@@ -81,7 +83,11 @@ function buildCandidates(context: EntityMentionContext): MentionCandidate[] {
     // Self-mentions stay plain text: an artist's own bio mentioning their own
     // name must not link back to this profile (or to a duplicate profile row
     // carrying the same handle) — the page already IS that entity.
-    if (handle === context.ownHandle) continue;
+    if (
+      handle.toLowerCase() === context.ownHandle.trim().toLowerCase() ||
+      name.toLowerCase() === context.ownName?.trim().toLowerCase()
+    )
+      continue;
     const lower = name.toLowerCase();
     if (seen.has(lower)) continue;
     seen.add(lower);

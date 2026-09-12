@@ -403,6 +403,7 @@ async function ArtistPageContent({
   // credited artists with public Jovie profiles (→ /{handle}).
   const entityMentionContext: EntityMentionContext = {
     ownHandle: artist.handle,
+    ownName: artist.name,
     releases: releases.map(release => ({
       title: release.title,
       slug: release.slug,
