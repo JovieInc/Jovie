@@ -31,4 +31,25 @@ describe('NavMenuItem', () => {
     expect(label.className).toContain('mask-image:linear-gradient');
     expect(label.className).not.toContain('justify-self-start');
   });
+
+  it('does not mask-fade the compact New Chat primary label', () => {
+    render(
+      <NavMenuItem
+        item={{
+          id: 'chat',
+          name: 'New Chat',
+          href: '/app/chat',
+          icon: Music,
+          tone: 'primary',
+        }}
+        isActive={false}
+      />
+    );
+
+    const label = screen.getByText('New Chat');
+    expect(label.className).not.toContain('mask-image:linear-gradient');
+    expect(label.className).not.toContain('-webkit-mask-image:linear-gradient');
+    expect(label.className).toContain('overflow-hidden');
+    expect(label.className).toContain('justify-self-stretch');
+  });
 });

@@ -18,11 +18,15 @@ export interface ShellNavItem {
   readonly onActivate?: () => void;
 }
 
+export type SidebarNavTone = 'default' | 'secondary' | 'primary';
+
 export interface SidebarNavItemProps {
   readonly item: ShellNavItem;
   readonly collapsed: boolean;
   readonly nested?: boolean;
   readonly tight?: boolean;
+  readonly tone?: SidebarNavTone;
+  readonly trailingOverlay?: boolean;
 }
 
 interface SidebarNavChromeOptions {
@@ -32,7 +36,7 @@ interface SidebarNavChromeOptions {
   readonly tight?: boolean;
   /** An absolute trailing action layers over the label's faded edge. */
   readonly trailingOverlay?: boolean;
-  readonly tone?: 'default' | 'secondary' | 'primary';
+  readonly tone?: SidebarNavTone;
   readonly className?: string;
 }
 
@@ -103,6 +107,40 @@ export function getSidebarNavRowClassName({
   );
 }
 
+const SIDEBAR_CREATE_TONES = new Set(['primary', 'secondary']);
+
+const SIDEBAR_LABEL_FADE_MASK =
+  '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]';
+
+export function sidebarNavLabelNeedsFade({
+  tone = 'default',
+  trailingOverlay,
+}: Pick<SidebarNavChromeOptions, 'tone' | 'trailingOverlay'>): boolean {
+  // Compact create pills size to their label. A right-edge fade therefore
+  // eats ~1rem of short copy like "New Chat" even when the rail has space.
+  if (SIDEBAR_CREATE_TONES.has(tone)) {
+    return false;
+  }
+
+  // Full-width default rows keep the fade for long labels and for an
+  // explicit trailing overlay sitting on the reserved edge.
+  return trailingOverlay !== false;
+}
+
+export function getSidebarNavLabelClassName({
+  tone = 'default',
+  trailingOverlay,
+  className,
+}: SidebarNavChromeOptions) {
+  return cn(
+    'min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left',
+    sidebarNavLabelNeedsFade({ tone, trailingOverlay })
+      ? SIDEBAR_LABEL_FADE_MASK
+      : undefined,
+    className
+  );
+}
+
 export function getSidebarNavIconClassName({
   active,
   nested,
@@ -133,6 +171,8 @@ export function SidebarNavItem({
   collapsed,
   nested,
   tight,
+  tone,
+  trailingOverlay,
 }: SidebarNavItemProps) {
   const button = (
     <button
@@ -143,6 +183,8 @@ export function SidebarNavItem({
         collapsed,
         nested,
         tight,
+        tone,
+        trailingOverlay,
       })}
     >
       <item.icon
@@ -150,11 +192,17 @@ export function SidebarNavItem({
           active: item.active,
           nested,
           tight,
+          tone,
         })}
         strokeWidth={2}
       />
       {!collapsed && (
-        <span className='min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]'>
+        <span
+          className={getSidebarNavLabelClassName({
+            tone,
+            trailingOverlay,
+          })}
+        >
           {item.label}
         </span>
       )}

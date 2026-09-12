@@ -2,8 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   getSidebarNavIconClassName,
+  getSidebarNavLabelClassName,
   getSidebarNavRowClassName,
   SidebarNavItem,
+  sidebarNavLabelNeedsFade,
 } from './SidebarNavItem';
 
 describe('SidebarNavItem active chrome', () => {
@@ -32,6 +34,41 @@ describe('SidebarNavItem active chrome', () => {
     expect(icon).not.toContain('text-sidebar-muted/70');
   });
 
+  it('does not mask-fade compact create labels like New Chat', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+
+    expect(sidebarNavLabelNeedsFade({ tone: 'primary' })).toBe(false);
+    expect(sidebarNavLabelNeedsFade({ tone: 'secondary' })).toBe(false);
+    expect(
+      sidebarNavLabelNeedsFade({ tone: 'primary', trailingOverlay: true })
+    ).toBe(false);
+    expect(getSidebarNavLabelClassName({ tone: 'primary' })).not.toContain(
+      'mask-image:linear-gradient'
+    );
+    expect(getSidebarNavLabelClassName({ tone: 'secondary' })).not.toContain(
+      'mask-image:linear-gradient'
+    );
+
+    render(
+      <SidebarNavItem
+        item={{ icon: TestIcon, label: 'New Chat' }}
+        collapsed={false}
+        tone='primary'
+      />
+    );
+
+    const label = screen.getByText('New Chat');
+    expect(label.className).not.toContain('mask-image:linear-gradient');
+    expect(label.className).not.toContain('-webkit-mask-image:linear-gradient');
+    expect(label.className).toContain('overflow-hidden');
+    expect(label.className).toContain('text-clip');
+    expect(sidebarNavLabelNeedsFade({})).toBe(true);
+    expect(sidebarNavLabelNeedsFade({ trailingOverlay: true })).toBe(true);
+    expect(getSidebarNavLabelClassName({})).toContain(
+      'mask-image:linear-gradient'
+    );
+  });
+
   it('keeps long labels inside the grid and preserves keyboard focus chrome', () => {
     const longLabel =
       'A deliberately long navigation destination that must fade instead of overflowing';
@@ -56,5 +93,10 @@ describe('SidebarNavItem active chrome', () => {
     expect(label.className).toContain('justify-self-stretch');
     expect(label.className).not.toContain('justify-self-start');
     expect(label.className).toContain('mask-image:linear-gradient');
+    expect(sidebarNavLabelNeedsFade({})).toBe(true);
+    expect(sidebarNavLabelNeedsFade({ trailingOverlay: true })).toBe(true);
+    expect(getSidebarNavLabelClassName({})).toContain(
+      'mask-image:linear-gradient'
+    );
   });
 });
