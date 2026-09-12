@@ -421,7 +421,7 @@ export function EmailCodeAuthForm({
       <div className='flex flex-col gap-1.5'>
         <label
           htmlFor='auth-email'
-          className='text-sm font-[510] text-primary-token'
+          className='text-sm font-medium text-primary-token'
         >
           Email
         </label>

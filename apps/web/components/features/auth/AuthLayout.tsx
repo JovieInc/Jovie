@@ -177,9 +177,7 @@ function StackLayoutContent(props: AuthLayoutInnerProps) {
         AUTH_FORM_MAX_WIDTH_CLASS,
         props.contentPlacement === 'center'
           ? 'flex-1 justify-center'
-          : props.isKeyboardVisible
-            ? 'justify-start pt-2'
-            : 'justify-start pt-[min(18vh,7.5rem)]'
+          : 'justify-start auth-form-stack-offset'
       )}
     />
   );
@@ -237,14 +235,10 @@ export function AuthLayout({
       }
       data-auth-layout-variant={isSplitVariant ? 'split' : 'stack'}
       data-auth-chrome={chrome}
+      data-auth-keyboard-visible={isKeyboardVisible ? '' : undefined}
       className={cn(
         'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white dark:text-white [color-scheme:dark]',
         'bg-(--color-bg-base)',
-        'px-6 py-6',
-        isKeyboardVisible && 'pt-2 pb-2',
-        'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
-        'pl-[max(1.5rem,env(safe-area-inset-left))]',
-        'pr-[max(1.5rem,env(safe-area-inset-right))]',
         'transition-[padding] duration-subtle ease-subtle'
       )}
     >
