@@ -126,7 +126,7 @@ export function ReleasesView({
 
   return (
     <div
-      className='min-w-0 overflow-hidden isolate border-y border-white/[0.075] [contain:layout_style_paint]'
+      className='border-y border-white/[0.075] [contain:layout_style]'
       data-testid='profile-mode-drawer-releases'
     >
       {visibleReleases.map((release, index) => {
@@ -144,7 +144,7 @@ export function ReleasesView({
           <div key={release.id}>
             {showHeader ? (
               <div
-                className='font-caption min-w-0 overflow-hidden truncate px-4 pb-2 pt-5 text-2xs font-medium tracking-[0.02em] text-white/28 motion-reduce:transition-none'
+                className='font-caption px-4 pb-2 pt-5 text-2xs font-medium tracking-[0.02em] text-white/28'
                 data-testid='release-year-header'
               >
                 {year}
