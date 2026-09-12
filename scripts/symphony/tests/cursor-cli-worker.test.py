@@ -100,7 +100,8 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
         self.assertEqual(missing["status"], "unhealthy")
         self.assertTrue({"wrapper_missing", "binary_missing"} <= set(missing["reasons"]))
         env = self._healthy_env()
-        payload = self.module.probe_health(env)
+        now = time.mktime(time.strptime("2026.09.07", "%Y.%m.%d"))
+        payload = self.module.probe_health(env, now=now)
         self.assertEqual(payload["status"], "ready", payload)
         self.assertEqual(payload["throughput"], "unknown")
         self.assertEqual(payload["throughputSchema"], self.module.THROUGHPUT_SCHEMA)
@@ -129,7 +130,6 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
             "case \"$1\" in\n  --version) echo cursor-agent 2026.08.11-e8db854;;\n"
             "  status|whoami) echo logged in;;\n  models) echo cursor-grok-4.6-high-fast;;\n  *) exit 2;;\nesac\n"
         )
-        now = time.mktime(time.strptime("2026.09.07", "%Y.%m.%d"))
         self.assertIn("binary_stale", self.module.probe_health(stale, now=now)["reasons"])
         env = self._healthy_env()
         self._write_json(env["GEM_FLEET_GATE_RECEIPT"], {
@@ -137,7 +137,7 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
             "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
             "concurrency": {"gem": {"maxConcurrent": 0}},
         })
-        held = self.module.probe_health(env)
+        held = self.module.probe_health(env, now=now)
         self.assertEqual((held["status"], held["throughput"], held["admissionGate"]), ("admission_held", "admission_held", "JOV-5492"))
         self.assertNotIn("usefulCompletions", held)
         self._write_json(env["GEM_FLEET_GATE_RECEIPT"], {"schema": self.module.FLEET_GATE_SCHEMA, "concurrency": {"gem": {"maxConcurrent": 1}}, "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True}})
@@ -172,7 +172,8 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
             "chmod 755 \"$HOME/.local/share/cursor-agent/versions/2026.09.07/cursor-agent\"\n",
             name="official-install",
         )
-        code, payload = self.module.reconcile({**self.env, "CURSOR_AGENT_INSTALL_BIN": str(installer)})
+        now = time.mktime(time.strptime("2026.09.07", "%Y.%m.%d"))
+        code, payload = self.module.reconcile({**self.env, "CURSOR_AGENT_INSTALL_BIN": str(installer)}, now=now)
         self.assertEqual(code, self.module.EXIT_OK, payload)
         self.assertTrue((self.home / ".local/bin/cursor-agent-std").is_file())
         newest = self.home / ".local/share/cursor-agent/versions/2026.09.07/cursor-agent"
@@ -191,7 +192,7 @@ class CursorCliWorkerBehaviorTests(unittest.TestCase):
             "case \"$1\" in\n  --version) echo cursor-agent 2026.09.07-abcd;;\n  status|whoami) echo logged in;;\n"
             f"  models) echo cursor-grok-4.6-high-fast;;\n  update) echo updated > {marker};;\n  *) exit 2;;\nesac\n"
         )
-        code, payload = self.module.reconcile({**self.env, "CURSOR_AGENT_REAL": str(binary), "CURSOR_AGENT_UPDATE": "1"})
+        code, payload = self.module.reconcile({**self.env, "CURSOR_AGENT_REAL": str(binary), "CURSOR_AGENT_UPDATE": "1"}, now=now)
         self.assertEqual(code, self.module.EXIT_OK, payload)
         self.assertTrue(marker.is_file())
 
