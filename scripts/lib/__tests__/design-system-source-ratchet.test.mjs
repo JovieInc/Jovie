@@ -226,6 +226,41 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
     }
   });
 
+  it('limits a documented server regex exception to its exact file and value', () => {
+    const { repoRoot, webRoot } = makeFixture();
+    try {
+      seedBaseline(repoRoot);
+      const source = 'export const identifier = /^JOV-[1-9][0-9]*$/u;';
+      writeFileSync(join(webRoot, 'lib', 'repair.ts'), source);
+      writeJson(repoRoot, IDENTITY_ALLOWLIST_RELATIVE, {
+        schema: IDENTITY_SCHEMA,
+        identities: [
+          {
+            file: 'apps/web/lib/repair.ts',
+            rule: 'arbitrary-value',
+            value: 'JOV-[1-9]',
+            reason: 'Server identifier regex; no CSS.',
+          },
+        ],
+      });
+      expect(evaluateDesignSystemSourceRatchet({ repoRoot }).ok).toBe(true);
+      writeFileSync(
+        join(webRoot, 'lib', 'repair.ts'),
+        `${source} export const css = 'w-[999px]';`
+      );
+      expect(
+        evaluateDesignSystemSourceRatchet({ repoRoot }).issues.join('\n')
+      ).toContain('w-[999px]');
+      writeFileSync(join(webRoot, 'lib', 'repair.ts'), source);
+      writeFileSync(join(webRoot, 'lib', 'other.ts'), source);
+      expect(
+        evaluateDesignSystemSourceRatchet({ repoRoot }).issues.join('\n')
+      ).toContain('apps/web/lib/other.ts');
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('keeps the committed identity baseline compact for the source-PR size cap', () => {
     const baseline = readFileSync(
       resolve(REPO_ROOT, IDENTITY_BASELINE_RELATIVE),

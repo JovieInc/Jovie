@@ -92,6 +92,28 @@ const ciAuditSchema = z
     }
   });
 
+// References an existing host grant; signing this snapshot does not grant execution.
+const existingRepairSchema = z
+  .object({
+    mode: z.literal('isolated-cli'),
+    identifier: z.string().regex(/^JOV-[1-9][0-9]*$/u),
+    issueId: z.uuid(),
+    ownerId: z.uuid(),
+    issueRevision: timestamp,
+    repository: z.literal('JovieInc/Jovie'),
+    pr: z.number().int().positive().safe(),
+    head: exactSha,
+    workspace: z
+      .string()
+      .min(2)
+      .max(1024)
+      .regex(/^\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\0\r\n]+$/u),
+    writerUnit: z.string().regex(/^[a-zA-Z0-9_.@-]+\.service$/u),
+    assignmentDigest: z.string().regex(DIGEST),
+    expiresAt: timestamp,
+  })
+  .strict();
+
 const unsignedSnapshotSchema = z
   .object({
     schema: z.literal('jovie.eve.summer-bottleneck-snapshot/v1'),
@@ -146,6 +168,7 @@ const unsignedSnapshotSchema = z
         ciAudit: ciAuditSchema.nullable(),
         productPaths: summerProductPathsSchema.optional(),
         admissions: summerAdmissionsSchema.optional(),
+        existingRepair: existingRepairSchema.optional(),
       })
       .strict(),
   })
