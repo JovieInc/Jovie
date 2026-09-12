@@ -1,3 +1,11 @@
+import {
+  advanceCacheGeneration,
+  getCacheGeneration,
+  getCacheScope,
+  registerIsolatedCacheSurface,
+} from '@/lib/queries/cache-isolation';
+import { FetchError } from '@/lib/queries/fetch';
+
 /**
  * Request Deduplication Utility
  *
@@ -73,8 +81,30 @@ const MAX_CACHE_SIZE = 200;
 // Response cache: stores successful responses with TTL
 const responseCache = new Map<string, CacheEntry>();
 
+interface InflightRecord {
+  readonly generation: number;
+  readonly promise: Promise<unknown>;
+}
+
 // In-flight requests: tracks ongoing fetches to deduplicate concurrent calls
-const inflightRequests = new Map<string, Promise<unknown>>();
+const inflightRequests = new Map<string, InflightRecord>();
+
+registerIsolatedCacheSurface(() => {
+  responseCache.clear();
+});
+
+function scopePrefix(): string {
+  const scope = getCacheScope();
+  return `${scope.userId ?? 'anon'}:${scope.profileId ?? 'none'}:${scope.impersonationSubject ?? 'self'}`;
+}
+
+function isSideEffectingMethod(method: string): boolean {
+  return method !== 'GET' && method !== 'HEAD';
+}
+
+function resolveMethod(options?: DedupedFetchOptions): string {
+  return options?.method?.toUpperCase() ?? 'GET';
+}
 
 /**
  * Prune expired entries and enforce max cache size using LRU eviction.
@@ -106,24 +136,24 @@ function pruneCache(): void {
  * Generate a cache key from URL and request options
  */
 function generateCacheKey(url: string, options?: DedupedFetchOptions): string {
-  if (options?.key) {
-    return options.key;
-  }
+  const rawKey = options?.key
+    ? options.key
+    : (() => {
+        const method = resolveMethod(options);
+        if (method === 'GET' || method === 'HEAD') {
+          return url;
+        }
+        const getBodyString = (): string => {
+          if (!options?.body) return '';
+          if (typeof options.body === 'object')
+            return JSON.stringify(options.body);
+          return String(options.body);
+        };
+        const bodyHash = options?.body ? hashCode(getBodyString()) : '';
+        return `${method}:${url}:${bodyHash}`;
+      })();
 
-  // For GET requests (or no method specified), use URL as key
-  const method = options?.method?.toUpperCase() ?? 'GET';
-  if (method === 'GET') {
-    return url;
-  }
-
-  // For other methods, include method and body hash in key
-  const getBodyString = (): string => {
-    if (!options?.body) return '';
-    if (typeof options.body === 'object') return JSON.stringify(options.body);
-    return String(options.body);
-  };
-  const bodyHash = options?.body ? hashCode(getBodyString()) : '';
-  return `${method}:${url}:${bodyHash}`;
+  return `${scopePrefix()}::${rawKey}`;
 }
 
 /**
@@ -169,20 +199,59 @@ export async function dedupedFetch<T = unknown>(
  * @param options - Fetch options plus caching configuration
  * @returns Promise resolving to result with metadata
  */
+async function fetchJsonOnce<T>(
+  url: string,
+  fetchOptions: RequestInit
+): Promise<T> {
+  const response = await fetch(url, fetchOptions);
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    throw new FetchError(
+      `Request failed: ${response.status} ${response.statusText}`,
+      response.status,
+      errorBody
+    );
+  }
+
+  return (await response.json()) as T;
+}
+
 export async function dedupedFetchWithMeta<T = unknown>(
   url: string,
   options?: DedupedFetchOptions
 ): Promise<DedupedFetchResult<T>> {
+  const method = resolveMethod(options);
+  const {
+    key: _key,
+    ttlMs: _ttlMs,
+    forceRefresh: _forceRefresh,
+    signal: callerSignal,
+    ...fetchOptions
+  } = options ?? {};
+
+  if (isSideEffectingMethod(method)) {
+    const data = await fetchJsonOnce<T>(url, {
+      ...fetchOptions,
+      method,
+      signal: callerSignal,
+    });
+    return {
+      data,
+      fromCache: false,
+      fetchedAt: Date.now(),
+    };
+  }
+
+  const startedGeneration = getCacheGeneration();
   const key = generateCacheKey(url, options);
   const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
   const forceRefresh = options?.forceRefresh ?? false;
   const now = Date.now();
 
-  // Check cache first (unless force refresh)
   if (!forceRefresh) {
     const cached = responseCache.get(key);
     if (cached && cached.expiresAt > now) {
-      // Refresh access order for true LRU semantics
       responseCache.delete(key);
       responseCache.set(key, cached);
       return {
@@ -193,62 +262,50 @@ export async function dedupedFetchWithMeta<T = unknown>(
     }
   }
 
-  // Check for in-flight request
   const inflight = inflightRequests.get(key);
-  if (inflight && !forceRefresh) {
-    // Return the existing promise - all callers share the same result
-    const data = (await inflight) as T;
+  if (inflight && !forceRefresh && inflight.generation === startedGeneration) {
+    const data = (await inflight.promise) as T;
     const cached = responseCache.get(key);
     return {
       data,
-      fromCache: false, // It was in-flight, not from cache
+      fromCache: false,
       fetchedAt: cached?.fetchedAt ?? Date.now(),
     };
   }
 
-  // Create new fetch request
-  const {
-    key: _key,
-    ttlMs: _ttlMs,
-    forceRefresh: _forceRefresh,
-    ...fetchOptions
-  } = options ?? {};
-
   const fetchPromise = (async (): Promise<T> => {
     try {
-      const response = await fetch(url, fetchOptions);
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => '');
-        throw new FetchError(
-          `Request failed: ${response.status} ${response.statusText}`,
-          response.status,
-          errorBody
-        );
-      }
-
-      const data = (await response.json()) as T;
+      const data = await fetchJsonOnce<T>(url, {
+        ...fetchOptions,
+        method,
+        // Shared GETs must not take one subscriber's AbortSignal. Cancelling
+        // one observer cannot abort a still-needed sibling (JOV-6186).
+        signal: undefined,
+      });
       const fetchedAt = Date.now();
 
-      // Prune cache before adding new entry to prevent memory leaks
-      pruneCache();
-
-      // Cache successful response
-      responseCache.set(key, {
-        data,
-        expiresAt: fetchedAt + ttlMs,
-        fetchedAt,
-      });
+      if (getCacheGeneration() === startedGeneration) {
+        pruneCache();
+        responseCache.set(key, {
+          data,
+          expiresAt: fetchedAt + ttlMs,
+          fetchedAt,
+        });
+      }
 
       return data;
     } finally {
-      // Always remove from in-flight map when done
-      inflightRequests.delete(key);
+      const current = inflightRequests.get(key);
+      if (current?.promise === fetchPromise) {
+        inflightRequests.delete(key);
+      }
     }
   })();
 
-  // Track as in-flight
-  inflightRequests.set(key, fetchPromise);
+  inflightRequests.set(key, {
+    generation: startedGeneration,
+    promise: fetchPromise,
+  });
 
   const data = await fetchPromise;
   const cached = responseCache.get(key);
@@ -260,10 +317,6 @@ export async function dedupedFetchWithMeta<T = unknown>(
   };
 }
 
-// Use the canonical FetchError from lib/queries/fetch
-import { FetchError } from '@/lib/queries/fetch';
-
-// Re-export for backwards compatibility
 export { FetchError } from '@/lib/queries/fetch';
 
 /**
@@ -273,6 +326,7 @@ export { FetchError } from '@/lib/queries/fetch';
  */
 export function invalidateCache(keyOrUrl: string): void {
   responseCache.delete(keyOrUrl);
+  responseCache.delete(`${scopePrefix()}::${keyOrUrl}`);
 }
 
 /**
@@ -295,6 +349,7 @@ export function invalidateCacheMatching(
  */
 export function clearCache(): void {
   responseCache.clear();
+  advanceCacheGeneration('manual');
 }
 
 /**
