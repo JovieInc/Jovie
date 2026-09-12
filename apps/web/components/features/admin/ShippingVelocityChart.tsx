@@ -9,6 +9,10 @@ import type {
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
+import {
+  ContentChartFrame,
+  ContentChartSkeleton,
+} from '@/components/molecules/ContentChartState';
 import type { HudObservationState } from '@/lib/hud/observation';
 import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
 
@@ -66,43 +70,13 @@ function formatTooltipDate(dateStr: string): string {
   });
 }
 
-// Skeleton lines to show while loading
-const SKELETON_LINE_KEYS = ['skel-a', 'skel-b', 'skel-c'];
-
-function ChartSkeleton() {
+function ShippingVelocityChartSkeleton() {
   return (
-    <div className='h-50 w-full rounded-lg bg-surface-0' aria-hidden='true'>
-      <svg
-        role='img'
-        aria-label='Loading Chart'
-        width='100%'
-        height='100%'
-        viewBox='0 0 400 200'
-        preserveAspectRatio='none'
-      >
-        {SKELETON_LINE_KEYS.map((key, index) => {
-          const yOffset = 60 + index * 40;
-          const amplitude = 15 - index * 4;
-          const path = `M0,${yOffset} Q50,${yOffset - amplitude} 100,${yOffset} T200,${yOffset} T300,${yOffset} T400,${yOffset}`;
-          return (
-            <path
-              key={key}
-              d={path}
-              stroke={
-                index === 0
-                  ? SERIES_COLORS.merged
-                  : index === 1
-                    ? SERIES_COLORS.opened
-                    : SERIES_COLORS.closed
-              }
-              strokeWidth='1.5'
-              fill='none'
-              opacity='0.2'
-            />
-          );
-        })}
-      </svg>
-    </div>
+    <ContentChartSkeleton
+      heightClassName='h-50'
+      label='Loading Shipping Velocity Chart'
+      testId='shipping-velocity-loading'
+    />
   );
 }
 
@@ -294,7 +268,7 @@ const LazyVelocityChart = dynamic(
     }),
   {
     ssr: false,
-    loading: () => <ChartSkeleton />,
+    loading: () => <ShippingVelocityChartSkeleton />,
   }
 );
 
@@ -599,26 +573,26 @@ export function ShippingVelocityChart({
 
       {/* Chart area */}
       {isLoading && data.length === 0 ? (
-        <ChartSkeleton />
+        <ShippingVelocityChartSkeleton />
       ) : observation === 'not_configured' ? (
-        <div className='flex h-50 items-center'>
+        <ContentChartFrame heightClassName='h-50'>
           <HudObservationStatus
             state='not_configured'
             message={error ?? 'GitHub is not configured for shipping velocity.'}
             testId='hud-shipping-velocity-observation'
           />
-        </div>
+        </ContentChartFrame>
       ) : observation === 'empty' ? (
-        <div className='flex h-50 items-center'>
+        <ContentChartFrame heightClassName='h-50'>
           <HudObservationStatus
             state='empty'
             message='No PRs in this period. Zero is shown only after a successful observation.'
             freshnessLabel={freshnessLabel}
             testId='hud-shipping-velocity-observation'
           />
-        </div>
+        </ContentChartFrame>
       ) : observation === 'unavailable' && data.length === 0 ? (
-        <div className='flex h-50 items-center'>
+        <ContentChartFrame heightClassName='h-50'>
           <HudObservationStatus
             state='unavailable'
             message={error ?? 'Shipping velocity is unavailable.'}
@@ -626,7 +600,7 @@ export function ShippingVelocityChart({
             onRetry={handleRetry}
             testId='hud-shipping-velocity-observation'
           />
-        </div>
+        </ContentChartFrame>
       ) : showChart ? (
         <>
           <div className='min-h-14' data-testid='shipping-velocity-status-slot'>
@@ -664,7 +638,7 @@ export function ShippingVelocityChart({
           </figure>
         </>
       ) : (
-        <ChartSkeleton />
+        <ShippingVelocityChartSkeleton />
       )}
 
       {/* Footer */}

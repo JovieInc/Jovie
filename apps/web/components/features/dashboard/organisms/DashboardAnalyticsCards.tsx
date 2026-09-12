@@ -3,8 +3,17 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { BarChart3, HelpCircle, Users } from 'lucide-react';
 import Link from 'next/link';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { APP_ROUTES } from '@/constants/routes';
 import { getTimeRangeLabel } from '@/lib/analytics/time-range';
@@ -26,52 +35,60 @@ const REDUCED_FRAME_INTERVAL_MS = 50;
 
 // Reusable number formatter (created once, not on every render)
 const numberFormatter = new Intl.NumberFormat();
+const OVERVIEW_METRIC_KEYS = ['profile-views', 'unique-visitors'] as const;
 
-function SkeletonCards() {
-  const skeletonMetric = (
-    <div className='space-y-1 py-1'>
-      <div className='flex items-center gap-1.5'>
-        <div className='h-6 w-6 rounded-md skeleton' />
-        <div className='h-3 w-20 rounded skeleton' />
-      </div>
-      <div className='h-8 w-16 rounded skeleton' />
-      <div className='h-3 w-24 rounded skeleton' />
-    </div>
-  );
+function OverviewMetricGrid({
+  children,
+  role,
+  statusLabel,
+}: Readonly<{
+  children: ReactNode;
+  role?: string;
+  statusLabel?: string;
+}>) {
   return (
-    <div className='grid grid-cols-2 gap-2'>
-      {skeletonMetric}
-      {skeletonMetric}
+    <div className='grid grid-cols-2 gap-2' role={role}>
+      {statusLabel ? <span className='sr-only'>{statusLabel}</span> : null}
+      {children}
     </div>
   );
 }
 
-function ErrorCards() {
+function DashboardAnalyticsOverviewLoading() {
   return (
-    <div className='grid grid-cols-2 gap-2'>
-      <div className='space-y-1 py-1'>
-        <div className='flex items-center gap-1.5'>
-          <div className='flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15'>
-            <BarChart3 className='h-3.5 w-3.5 text-sky-600 dark:text-sky-400' />
-          </div>
-          <p className='text-app font-caption text-secondary-token'>
-            Profile views
-          </p>
-        </div>
-        <p className='text-app text-tertiary-token'>Temporarily unavailable</p>
-      </div>
-      <div className='space-y-1 py-1'>
-        <div className='flex items-center gap-1.5'>
-          <div className='flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10 dark:bg-emerald-500/15'>
-            <Users className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
-          </div>
-          <p className='text-app font-caption text-secondary-token'>
-            Unique visitors
-          </p>
-        </div>
-        <p className='text-app text-tertiary-token'>Temporarily unavailable</p>
-      </div>
-    </div>
+    <OverviewMetricGrid role='status' statusLabel='Loading Analytics Overview'>
+      {OVERVIEW_METRIC_KEYS.map(key => (
+        <ContentMetricCardSkeleton key={key} className='py-3.5' />
+      ))}
+    </OverviewMetricGrid>
+  );
+}
+
+function DashboardAnalyticsOverviewError() {
+  return (
+    <OverviewMetricGrid
+      role='alert'
+      statusLabel='Analytics Overview Unavailable'
+    >
+      <ContentMetricCard
+        as='section'
+        label='Profile views'
+        value='Temporarily unavailable'
+        icon={BarChart3}
+        iconClassName='text-info'
+        valueClassName='text-app font-book leading-5 tracking-normal text-tertiary-token'
+        aria-label='Profile views metric unavailable'
+      />
+      <ContentMetricCard
+        as='section'
+        label='Unique visitors'
+        value='Temporarily unavailable'
+        icon={Users}
+        iconClassName='text-success'
+        valueClassName='text-app font-book leading-5 tracking-normal text-tertiary-token'
+        aria-label='Unique visitors metric unavailable'
+      />
+    </OverviewMetricGrid>
   );
 }
 
@@ -229,8 +246,8 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     (data?.unique_users ?? 0) === 0;
 
   const renderContent = () => {
-    if (showInitialSkeleton) return <SkeletonCards />;
-    if (error) return <ErrorCards />;
+    if (showInitialSkeleton) return <DashboardAnalyticsOverviewLoading />;
+    if (error) return <DashboardAnalyticsOverviewError />;
     if (showEmpty) {
       return (
         <EmptyState
@@ -254,8 +271,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             value={profileViewsLabel}
             metadata={rangeLabel}
             icon={BarChart3}
-            iconClassName='text-sky-600 dark:text-sky-400'
-            iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
+            iconClassName='text-info'
             headerRight={
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -281,8 +297,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             value={uniqueUsersLabel}
             metadata={rangeLabel}
             icon={Users}
-            iconClassName='text-emerald-600 dark:text-emerald-400'
-            iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
+            iconClassName='text-success'
             headerRight={
               <Tooltip>
                 <TooltipTrigger asChild>

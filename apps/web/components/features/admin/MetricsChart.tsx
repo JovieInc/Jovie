@@ -1,8 +1,13 @@
 'use client';
 
-import { TrendingDown, TrendingUp } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
+import {
+  ContentChartSkeleton,
+  ContentChartState,
+} from '@/components/molecules/ContentChartState';
+import { ContentMetricDelta } from '@/components/molecules/ContentMetricDelta';
+import { ContentMetricStat } from '@/components/molecules/ContentMetricStat';
 import type { AdminUsagePoint } from '@/lib/admin/types';
 
 const LazyLineChart = dynamic(
@@ -64,7 +69,10 @@ const LazyLineChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className='h-64 animate-pulse rounded-lg bg-surface-1' />
+      <ContentChartSkeleton
+        label='Loading Daily Active Users Chart'
+        testId='admin-usage-chart-loading'
+      />
     ),
   }
 );
@@ -100,15 +108,13 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
   if (!stats) {
     return (
       <div className='space-y-3'>
-        <div>
-          <h3 className='text-sm font-medium text-primary-token'>
-            Daily active users
-          </h3>
-          <p className='text-2xs text-tertiary-token'>Last 14 days</p>
-        </div>
-        <p className='text-sm text-secondary-token'>
-          No usage data available yet.
-        </p>
+        <MetricsChartHeader />
+        <ContentChartState
+          state='empty'
+          title='No usage data'
+          message='No usage data available yet.'
+          testId='admin-usage-chart-empty'
+        />
       </div>
     );
   }
@@ -116,25 +122,14 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
   return (
     <div className='space-y-4'>
       <div className='flex items-start justify-between'>
-        <div>
-          <h3 className='text-sm font-medium text-primary-token'>
-            Daily active users
-          </h3>
-          <p className='text-2xs text-tertiary-token'>Last 14 days</p>
-        </div>
-        <div
-          className={`flex items-center gap-1.5 text-app font-medium tabular-nums ${
-            stats.deltaPct >= 0 ? 'text-success' : 'text-error'
-          }`}
-        >
-          {stats.deltaPct >= 0 ? (
-            <TrendingUp className='h-4 w-4' />
-          ) : (
-            <TrendingDown className='h-4 w-4' />
-          )}
-          {stats.deltaPct >= 0 ? '+' : ''}
-          {stats.deltaPct.toFixed(1)}%
-        </div>
+        <MetricsChartHeader />
+        <ContentMetricDelta
+          direction={
+            stats.deltaPct > 0 ? 'up' : stats.deltaPct < 0 ? 'down' : 'flat'
+          }
+          value={`${stats.deltaPct >= 0 ? '+' : ''}${stats.deltaPct.toFixed(1)}%`}
+          aria-label={`Daily active users changed by ${stats.deltaPct.toFixed(1)}%`}
+        />
       </div>
 
       <div className='h-64'>
@@ -142,25 +137,33 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
       </div>
 
       <div className='grid gap-4 sm:grid-cols-3'>
-        <div>
-          <p className='text-2xs text-tertiary-token'>Current DAU</p>
-          <p className='text-2xl font-semibold tabular-nums text-primary-token'>
-            {stats.latest.users.toLocaleString()}
-          </p>
-        </div>
-        <div>
-          <p className='text-2xs text-tertiary-token'>14d Average</p>
-          <p className='text-2xl font-semibold tabular-nums text-primary-token'>
-            {stats.avgUsers.toLocaleString()}
-          </p>
-        </div>
-        <div>
-          <p className='text-2xs text-tertiary-token'>Peak day</p>
-          <p className='text-2xl font-semibold tabular-nums text-primary-token'>
-            {stats.maxUsers.toLocaleString()}
-          </p>
-        </div>
+        <ContentMetricStat
+          label='Current DAU'
+          value={stats.latest.users.toLocaleString()}
+          valueClassName='text-2xl'
+        />
+        <ContentMetricStat
+          label='14d Average'
+          value={stats.avgUsers.toLocaleString()}
+          valueClassName='text-2xl'
+        />
+        <ContentMetricStat
+          label='Peak day'
+          value={stats.maxUsers.toLocaleString()}
+          valueClassName='text-2xl'
+        />
       </div>
+    </div>
+  );
+}
+
+function MetricsChartHeader() {
+  return (
+    <div>
+      <h3 className='text-sm font-medium text-primary-token'>
+        Daily active users
+      </h3>
+      <p className='text-2xs text-tertiary-token'>Last 14 days</p>
     </div>
   );
 }

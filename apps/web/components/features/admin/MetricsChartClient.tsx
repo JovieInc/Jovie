@@ -1,17 +1,15 @@
 'use client';
 
-import { Skeleton } from '@jovie/ui';
 import dynamic from 'next/dynamic';
+import { ContentChartSkeleton } from '@/components/molecules/ContentChartState';
+import { ContentMetricStatSkeleton } from '@/components/molecules/ContentMetricStat';
 import type { AdminUsagePoint } from '@/lib/admin/types';
 
 interface MetricsChartClientProps {
   readonly points: AdminUsagePoint[];
 }
 
-const METRICS_CHART_LOADING_CARD_KEYS = Array.from(
-  { length: 3 },
-  (_, i) => `metrics-loading-card-${i + 1}`
-);
+const METRIC_STAT_SKELETON_KEYS = ['current-dau', 'average', 'peak'] as const;
 
 /**
  * Client-side wrapper for MetricsChart with lazy-loaded Recharts.
@@ -29,18 +27,15 @@ const MetricsChartImpl = dynamic(
       <div className='space-y-4'>
         <div className='flex items-start justify-between'>
           <div className='space-y-2'>
-            <Skeleton className='h-4 w-40 rounded' />
-            <Skeleton className='h-3 w-24 rounded' />
+            <div className='h-4 w-40 rounded skeleton' />
+            <div className='h-3 w-24 rounded skeleton' />
           </div>
-          <Skeleton className='h-4 w-16 rounded' />
+          <div className='h-4 w-16 rounded skeleton' />
         </div>
-        <Skeleton className='h-64 rounded-lg' />
+        <ContentChartSkeleton label='Loading Daily Active Users Chart' />
         <div className='grid gap-4 sm:grid-cols-3'>
-          {METRICS_CHART_LOADING_CARD_KEYS.map(key => (
-            <div key={key} className='space-y-2'>
-              <Skeleton className='h-3 w-20 rounded' />
-              <Skeleton className='h-8 w-16 rounded' />
-            </div>
+          {METRIC_STAT_SKELETON_KEYS.map(key => (
+            <ContentMetricStatSkeleton key={key} />
           ))}
         </div>
       </div>
