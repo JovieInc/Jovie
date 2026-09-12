@@ -72,6 +72,21 @@ run(
   { requirePassed: true, forbidNoMatch: true }
 );
 
+
+run(
+  'E5 linear coordination',
+  'pnpm',
+  [
+    '--filter',
+    '@jovie/web',
+    'exec',
+    'vitest',
+    'run',
+    'tests/unit/ovie/linear-coordination.test.ts',
+  ],
+  { requirePassed: true, forbidNoMatch: true }
+);
+
 console.log(`
 == E1 attestation delivery ==
 EXTERNAL GATE: land/install PR #17725 on Gem, prove two ≤600s fresh observations,

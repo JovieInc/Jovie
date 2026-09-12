@@ -19,6 +19,7 @@ export const SUMMER_SAFE_TOOLS = [
   'search_gbrain',
   'get_gbrain_page',
   'record_operational_memory',
+  'coordinate_linear_work',
 ] as const;
 
 export type SummerSafeTool = (typeof SUMMER_SAFE_TOOLS)[number];

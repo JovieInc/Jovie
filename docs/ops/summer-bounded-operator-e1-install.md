@@ -6,27 +6,53 @@ Close the JOV-6163 / PR #17725 repair-to-runtime gap so Summer can admit work
 from fresh runner-source attestations (≤600s) without holding on
 `runner-source-attestation-unavailable`.
 
-## Prerequisites
+## Local readiness (completed in this branch)
 
-- PR https://github.com/JovieInc/Jovie/pull/17725 is mergeable and CI-green
-  (runtime attestation publisher bound to live release source).
-- Operator has Gem install authority for the Summer/Symphony control plane.
-- Wall-clock observation window available for two independent freshness checks.
+| Check | Result |
+|---|---|
+| PR [#17725](https://github.com/JovieInc/Jovie/pull/17725) open on `codex/jov-6163-runtime-attestation` | OPEN |
+| CI `Validate exact PR head proof v2` | SUCCESS |
+| Publisher unit tests `scripts/symphony/tests/gem-service-attestation.test.py` | **9 passed** (2026-09-12) |
+| 600s freshness gate weakened? | **No** |
 
-## Install steps
+Local publisher proof command (from PR head):
 
-1. Merge or cherry-pick PR #17725 onto the Gem runtime release channel that
-   Summer reads for runner-source attestation.
-2. Deploy/restart the attestation publisher on Gem so it emits signed
-   observations for the live release source (not a stale fixture channel).
-3. Confirm publisher health: at least one attestation record with
-   `observedAt` within the last 600 seconds and a valid signature over the
-   live release digest.
-4. From an independent observer (not the publisher process), record
-   observation A: attestation present, fresh (≤600s), signature valid.
-5. Wait >0s and ≤600s, then record observation B with the same predicates.
-6. Exercise Summer admission against a harmless read-only decision job and
-   confirm it no longer holds on `runner-source-attestation-unavailable`.
+```bash
+git fetch origin codex/jov-6163-runtime-attestation
+git worktree add /tmp/jov-6163-attestation origin/codex/jov-6163-runtime-attestation
+python3 /tmp/jov-6163-attestation/scripts/symphony/tests/gem-service-attestation.test.py
+```
+
+## Prerequisites (operator)
+
+- Merge authority for PR #17725 onto the Gem runtime release channel Summer reads.
+- Gem host install authority (SSH / fleet installer).
+- Operator-selected nonsecret values in `~/.config/symphony/runner-source.env`:
+  - `SYMPHONY_RELEASE_PROVENANCE=/absolute/path/to/verified-release.provenance.json`
+  - `JOVIE_CONFIGURATION_SOURCE_ROOT=/absolute/path/to/jovie-git-repository`
+  - `JOVIE_CONFIGURATION_SOURCE_REVISION=<full-40-character-configuration-commit>`
+
+## Install steps (Gem — external authority)
+
+1. Merge or cherry-pick PR #17725 onto the Gem runtime release channel.
+2. Before replacement, run:
+   `emit_gem_service_attestation.py --check --provenance … --source-root … --source-revision …`
+   - exit 0 = measured inputs match
+   - exit 2 = observed but unhealthy
+   - exit 78 = observation could not be verified
+3. Install `emit_gem_service_attestation.py` at
+   `~/gem-workspace/scripts/emit-gem-service-attestation.py` with its
+   `symphony_proof_context.py` and `gem_gate_contract.py` dependencies.
+4. Install checked-in `systemd/gem-service-attestation.service` over the existing
+   user unit. Preserve a rollback copy of the prior publisher and unit.
+5. Pause only the existing attestation timer while installing; do **not** restart
+   Symphony. Reload user units and resume the same timer.
+6. Confirm publisher health: attestation with `observedAt` ≤600s and valid
+   signature over the live release digest.
+7. Independent observer A: present + fresh + signature valid.
+8. Wait >0s and ≤600s; independent observer B with the same predicates.
+9. Exercise Summer admission on a harmless read-only decision job; confirm it
+   no longer holds on `runner-source-attestation-unavailable`.
 
 ## Acceptance evidence to attach
 
@@ -35,14 +61,21 @@ from fresh runner-source attestations (≤600s) without holding on
 - Summer admission receipt showing attestation freshness OK
 - Explicit statement that the 600s freshness gate was not weakened
 
+## Named external blocker
+
+**Owner:** Gem operator / Symphony fleet owner  
+**Blocker:** This agent cannot SSH Gem or select live release provenance.  
+**Unblock when:** Steps 1–9 above produce two ≤600s observations and Summer
+admission no longer holds on `runner-source-attestation-unavailable`.
+
 ## Out of scope / do not
 
 - Do not bypass or extend the 600s attestation freshness window
 - Do not grant Summer privileged GBrain write or Symphony heal
 - Do not claim E1 green from local unit tests alone — Gem install is required
 
-## Related local gates (already automated)
+## Related local gates (automated)
 
-- E2/E5 operational memory + identity: `pnpm --filter @jovie/web exec vitest run tests/unit/ovie/operational-memory.test.ts tests/unit/ovie/identity.test.ts`
-- E3/E4 Cursor recovery: `pnpm --filter @jovie/eve-pilot exec vitest run tests/cursor-recovery.test.ts`
-- Combined local gate: `node scripts/summer-commissioning/bounded-operator-evals.mjs`
+```bash
+node scripts/summer-commissioning/bounded-operator-evals.mjs
+```

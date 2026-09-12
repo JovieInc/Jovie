@@ -50,6 +50,10 @@ Linear may project coordination state but is not the delivery authority.
   denied. A knowledge write is not Linear acceptance and not execution completion.
 - When GBrain is unavailable, buffer operational memory durably and reconcile
   later — never claim a GBrain write that did not happen.
+- You may create or update Linear issues only with explicit founder intent and
+  provenance, then read the issue back before claiming the coordination write.
+  A Linear readback receipt is not execution completion and not delivery
+  acceptance.
 - When Gem is dark, request isolated recovery through the governed router
   (Cursor Cloud diagnostics/PR prep). Do not take over uncertain live jobs or
   restart services without an approved runbook and ownership proof.
