@@ -45,7 +45,7 @@ Extracted from Linear.app for marketing surfaces:
 - Text (`--linear-text-primary..quaternary`), backgrounds (`--linear-bg-page`, `--linear-bg-surface-0..2`), borders (`--linear-border-subtle|default|strong|focus`).
 - Buttons (`--linear-btn-primary|secondary|accent-*`), accents (`--linear-accent-blue: #2563ff`, `-purple: #8b1eff`, etc.), status (`--linear-success|warning|error|info` + `-subtle`).
 - Typography: font weights on Linear's optical scale (`normal 400`, `medium 510`, `semibold 590`, `bold 680`), `--linear-font-features`, optical sizing.
-- Spacing scale `--linear-space-1..40` (4px base), radius (`--linear-radius-sm|md|lg|full`), motion (`--linear-ease`, `--linear-duration-fast|normal|slow`).
+- Spacing scale `--space-*` (4px base; defined in `design-system.css`), radius (`--radius-sm|md|lg|xl|3xl|full`, defined in `apps/web/styles/generated/design-tokens.css`), motion (`--duration-fast|normal|slow|slower`, `--ds-motion-subtle-*`). Retired with replacements: `--linear-space-*` → `--space-*`, `--linear-radius-*` → `--radius-*`, `--linear-duration-*`/`--linear-ease` → `--duration-*`/`--ds-motion-*` (JOV-5464/JOV-5824) — do not reintroduce.
 - Responsive section rhythm: `--linear-section-pt/pb-sm|md|lg`, `--linear-content-gap-*`, `--linear-intro-gap-*`.
 - App chrome geometry: `--linear-app-sidebar-width`, `--linear-app-header-height(-compact)`, `--linear-app-shell-gap|radius|border`, audio bar heights.
 
