@@ -2,13 +2,13 @@
    as /brand do not depend on app/(home)/home.css side effects. */
 
 .marketing-footer-premium {
-  --mf-text: rgba(255, 255, 255, 0.92);
-  --mf-text-secondary: rgba(255, 255, 255, 0.6);
-  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
-  --mf-text-muted: rgba(255, 255, 255, 0.22);
-  --mf-hairline: rgba(255, 255, 255, 0.07);
-  --mf-hairline-strong: rgba(255, 255, 255, 0.12);
-  background: #06070a;
+  --mf-text: var(--noir-ion-text-primary);
+  --mf-text-secondary: var(--noir-ion-text-secondary);
+  --mf-text-tertiary: var(--noir-ion-text-tertiary);
+  --mf-text-muted: var(--noir-ion-text-disabled);
+  --mf-hairline: var(--noir-ion-border-subtle);
+  --mf-hairline-strong: var(--noir-ion-border-default);
+  background: var(--noir-ion-shell);
   color: var(--mf-text);
   border-top: 1px solid var(--mf-hairline);
 }

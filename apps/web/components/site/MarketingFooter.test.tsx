@@ -39,6 +39,7 @@ describe('MarketingFooter', () => {
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.shell.footer
     );
+    expect(MARKETING_PEN_CONTRACT_IDS.shell.footer).toBe('jhV4a');
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',

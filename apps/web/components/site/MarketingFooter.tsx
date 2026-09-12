@@ -18,11 +18,10 @@ import { cn } from '@/lib/utils';
 import { MarketingFooterCta } from './MarketingFooterCta';
 
 /**
- * Marketing footer — frame.io-inspired premium density.
+ * Marketing footer — locked Pen node `jhV4a` (JOV-6179).
  *
  * Visual contract:
- * - #06070a base, hairline rgba(255,255,255,0.07) top border, subtle 220px
- *   ambient edge-glow at the seam.
+ * - Noir-ion shell canvas, hairline `--noir-ion-border-subtle` top border.
  * - 4-column nav with caps eyebrow headers (11px / 0.2em tracking / muted),
  *   14px caption-weight links.
  * - Hairline-separated bottom band with copyright + legal — a sub-band, not
