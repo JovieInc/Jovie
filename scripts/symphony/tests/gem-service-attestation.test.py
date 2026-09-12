@@ -92,6 +92,7 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(receipt["sourceRevision"], REV)
         self.assertEqual(receipt["configurationSourceRevision"], CONFIG)
         self.assertEqual(receipt["listener"]["pid"], 456)
+        self.assertEqual(receipt["runtime"]["workflowPath"], str(self.workflow))
         self.assertEqual(json.loads(dest.read_text()), receipt)
         self.assertNotEqual(receipt["runtime"]["packageSha256"], receipt["runtime"]["executableSha256"])
         self.state["generated_at"] = (NOW + timedelta(seconds=301)).isoformat()
