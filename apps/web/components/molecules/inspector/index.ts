@@ -14,9 +14,9 @@ export {
 } from './InspectorLoading';
 export {
   INSPECTOR_TAB_PANEL_ID,
+  type InspectorRailProps as InspectorShellProps,
   InspectorShell,
-  type InspectorShellProps,
-} from './InspectorShell';
+} from './InspectorRail';
 export { InspectorRow, type InspectorRowProps } from './InspectorRow';
 export {
   InspectorSection,
