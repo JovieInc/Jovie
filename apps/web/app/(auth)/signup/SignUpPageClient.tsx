@@ -5,12 +5,21 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
+import {
+  AuthLayout,
+  AuthOfferSummary,
+  AuthRoutePrefetch,
+  AuthShell,
+} from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
-import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
+import {
+  persistOfferIntentFromSearchParams,
+  setPlanIntent,
+  validatePlan,
+} from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
   persistSignupClaimValue,
@@ -48,16 +57,22 @@ function SignUpClaimDataPersistence() {
     const spotifyUrl = searchParams.get('spotify_url');
     const artistName = searchParams.get('artist_name');
     const plan = searchParams.get('plan');
+    const interval = searchParams.get('interval');
 
-    // Capture plan intent from pricing CTA (e.g., /signup?plan=founding)
+    // Capture plan + interval from pricing CTA (e.g., /signup?plan=pro&interval=year)
     if (plan) {
       const validatedPlan = validatePlan(plan);
       if (validatedPlan) {
-        setPlanIntent(validatedPlan);
+        setPlanIntent(validatedPlan, interval);
+        persistOfferIntentFromSearchParams(searchParams);
         let source = 'pricing';
         if (spotifyUrl) source = 'hero_spotify';
         else if (handle) source = 'hero_claim';
-        track('plan_intent_captured', { plan: validatedPlan, source });
+        track('plan_intent_captured', {
+          plan: validatedPlan,
+          interval: interval ?? 'month',
+          source,
+        });
       }
     }
 
@@ -284,6 +299,7 @@ export function SignUpPageClient() {
       <AuthRoutePrefetch href={signInUrl} />
       <SignUpOauthErrorBanner signInUrl={signInUrl} />
       <SignUpClaimDataPersistence />
+      <AuthOfferSummary mode='sign-up' />
       <AuthShell
         mode='sign-up'
         forceOppositeModeHardNavigation

@@ -49,6 +49,8 @@ vi.mock('@/features/auth', async () => {
       authShellMock(props);
       return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
     },
+    AuthOfferSummary: () =>
+      reactModule.createElement('div', { 'data-testid': 'auth-offer-summary' }),
   };
 });
 
@@ -58,6 +60,7 @@ vi.mock('@/lib/analytics', () => ({
 
 vi.mock('@/lib/auth/plan-intent', () => ({
   setPlanIntent: setPlanIntentMock,
+  persistOfferIntentFromSearchParams: vi.fn(),
   validatePlan: validatePlanMock,
 }));
 
@@ -90,7 +93,15 @@ describe('signup page', () => {
     sessionStorage.clear();
     trackMock.mockReset();
     validatePlanMock.mockReset();
-    validatePlanMock.mockImplementation(plan => plan);
+    validatePlanMock.mockImplementation(plan =>
+      plan === 'free' ||
+      plan === 'pro' ||
+      plan === 'max' ||
+      plan === 'team' ||
+      plan === 'enterprise'
+        ? plan
+        : null
+    );
     globalThis.history.replaceState(null, '', '/signup');
   });
 
@@ -229,6 +240,23 @@ describe('signup page', () => {
         fallbackRedirectUrl: '/mobile-auth-return?route=%2Fapp',
       })
     );
+  });
+
+  it('captures plan and interval from pricing checkout intent', async () => {
+    searchParamsState.value = 'plan=pro&interval=year';
+
+    render(<SignUpPage />);
+
+    expect(setPlanIntentMock).toHaveBeenCalledWith('pro', 'year');
+    expect(trackMock).toHaveBeenCalledWith(
+      'plan_intent_captured',
+      expect.objectContaining({
+        plan: 'pro',
+        interval: 'year',
+        source: 'pricing',
+      })
+    );
+    expect(screen.getByTestId('auth-offer-summary')).toBeInTheDocument();
   });
 
   it('ignores invalid plan values and does not track plan intent', async () => {
