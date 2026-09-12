@@ -77,14 +77,22 @@ export function resolveAuthShellBackLink(
   const redirect = sanitizeRedirectUrl(params.get('redirect_url'));
   if (!redirect) return null;
 
-  if (redirect === '/start' || redirect.startsWith('/start?')) {
-    return { href: redirect, label: 'Back to chat' };
-  }
-  if (redirect === '/onboarding' || redirect.startsWith('/onboarding/')) {
+  if (
+    isAuthShellChatReturnPath(redirect, '/start') ||
+    isAuthShellChatReturnPath(redirect, '/onboarding')
+  ) {
     return { href: redirect, label: 'Back to chat' };
   }
 
   return null;
+}
+
+function isAuthShellChatReturnPath(redirect: string, path: string): boolean {
+  return (
+    redirect === path ||
+    redirect.startsWith(`${path}/`) ||
+    redirect.startsWith(`${path}?`)
+  );
 }
 
 /** Auth-entry mailbox check. Does not apply scraper host denylists. */
