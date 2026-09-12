@@ -109,11 +109,10 @@ export function StatefulAssetSlot({
           className={cn(
             PANEL,
             'flex min-h-30 w-full flex-col items-center justify-center border-dashed py-4 text-center',
-            dragging &&
-              'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-border-focus)_8%,var(--linear-bg-surface-0))]',
+            dragging && 'border-default bg-surface-1',
             !disabled &&
               onFile &&
-              'hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+              'hover:border-default hover:bg-surface-1 focus-ring-themed'
           )}
         >
           <Upload className='h-5 w-5 text-tertiary-token' aria-hidden />
