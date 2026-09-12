@@ -19,14 +19,28 @@ import {
   resolveAuthShellIntent,
 } from '@/lib/auth/auth-shell-intent';
 import {
+  persistAuthOfferFromSearchParams,
+  readAuthOfferHandoff,
+  resolveAuthOfferSummary,
+} from '@/lib/auth/auth-shell-offer';
+import {
   buildAuthRouteUrl,
   getDefaultSignUpFallbackRedirectUrl,
 } from '@/lib/auth/build-auth-route-url';
+import { isCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import { authClient } from '@/lib/auth/client';
 import {
   getEnabledAuthOAuthProviders,
   type PrimaryAuthOAuthProvider,
 } from '@/lib/auth/oauth-providers';
+import {
+  DESKTOP_RETURN_PARAM,
+  sanitizeDesktopReturnRoute,
+} from '@/lib/desktop/auth-return';
+import {
+  MOBILE_RETURN_PARAM,
+  sanitizeMobileReturnRoute,
+} from '@/lib/mobile/auth-return';
 import { logger } from '@/lib/utils/logger';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 import { GoogleOneTap } from './GoogleOneTap';
@@ -53,9 +67,26 @@ function getCallbackUrl(mode: AuthShellMode): string {
   return mode === 'sign-up' ? APP_ROUTES.SIGNUP : APP_ROUTES.SIGNIN;
 }
 
-function getErrorCallbackUrl(mode: AuthShellMode, callbackURL: string): string {
+function getErrorCallbackUrl(
+  mode: AuthShellMode,
+  callbackURL: string,
+  searchParams: { get(key: string): string | null }
+): string {
   const base = getCallbackUrl(mode);
-  const errorUrl = new URL(base, 'https://jov.ie');
+  const errorUrl = new URL(
+    buildAuthRouteUrl(base, searchParams),
+    'https://jov.ie'
+  );
+  const desktopReturn = sanitizeDesktopReturnRoute(
+    searchParams.get(DESKTOP_RETURN_PARAM)
+  );
+  const mobileReturn = sanitizeMobileReturnRoute(
+    searchParams.get(MOBILE_RETURN_PARAM)
+  );
+  if (desktopReturn)
+    errorUrl.searchParams.set(DESKTOP_RETURN_PARAM, desktopReturn);
+  if (mobileReturn)
+    errorUrl.searchParams.set(MOBILE_RETURN_PARAM, mobileReturn);
   const callback = new URL(callbackURL, 'https://jov.ie');
   if (callback.pathname === '/auth/callback') {
     const state = callback.searchParams.get('state');
@@ -167,7 +198,20 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   const defaultRedirect = isSignUp
     ? getDefaultSignUpFallbackRedirectUrl()
     : APP_ROUTES.DASHBOARD;
-  const resolvedRedirect = fallbackRedirectUrl ?? defaultRedirect;
+  const handoff = readAuthOfferHandoff(searchParams);
+  const offerSummary = resolveAuthOfferSummary({ handoff });
+  // Return through a server auth entry for canonical access/subscriber resolution.
+  // Native and explicit callback destinations retain their existing precedence.
+  const offerCallback =
+    handoff &&
+    !searchParams.get('auth_state') &&
+    !searchParams.get('desktop_return') &&
+    !searchParams.get('mobile_return') &&
+    !(fallbackRedirectUrl && isCentralAuthCallbackPath(fallbackRedirectUrl))
+      ? buildAuthRouteUrl(getCallbackUrl(mode), searchParams)
+      : null;
+  const resolvedRedirect =
+    offerCallback ?? fallbackRedirectUrl ?? defaultRedirect;
   const enabledOAuthProviders = useMemo(
     () => getEnabledAuthOAuthProviders(),
     []
@@ -183,8 +227,9 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     : (backProp ?? resolveAuthShellBackLink(searchParams));
 
   useEffect(() => {
+    persistAuthOfferFromSearchParams(searchParams);
     setHasHydrated(true);
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     const restoreAuthActions = (event: PageTransitionEvent) => {
@@ -210,9 +255,16 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       // (staging OAuth runtime proof / real users on slow first paint).
       if (!hasHydrated || pendingProvider) return;
 
-      const callbackURL = fallbackRedirectUrl ?? getCallbackUrl(mode);
-      const errorCallbackURL = getErrorCallbackUrl(mode, callbackURL);
-      const newUserCallbackURL = fallbackRedirectUrl ?? getNewUserCallbackUrl();
+      persistAuthOfferFromSearchParams(searchParams);
+      const callbackURL =
+        offerCallback ?? fallbackRedirectUrl ?? getCallbackUrl(mode);
+      const errorCallbackURL = getErrorCallbackUrl(
+        mode,
+        callbackURL,
+        searchParams
+      );
+      const newUserCallbackURL =
+        offerCallback ?? fallbackRedirectUrl ?? getNewUserCallbackUrl();
       const attempt = ++oauthAttemptRef.current;
 
       setPendingProvider(provider);
@@ -258,7 +310,14 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         );
       }
     },
-    [fallbackRedirectUrl, hasHydrated, mode, pendingProvider]
+    [
+      fallbackRedirectUrl,
+      hasHydrated,
+      mode,
+      pendingProvider,
+      offerCallback,
+      searchParams,
+    ]
   );
 
   if (hasHydrated && isAuthLoaded && isSignedIn) {
@@ -290,6 +349,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           intent={intent}
           claimHandle={claimHandle}
           back={back}
+          offerSummary={offerSummary}
           oppositeModeUrl={crossLinkUrl}
           forceHardNavigation={forceOppositeModeHardNavigation}
           providers={enabledOAuthProviders}
@@ -322,13 +382,14 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           pendingProvider !== null ||
           otpStepActive
         }
-        callbackURL={fallbackRedirectUrl}
+        callbackURL={offerCallback ?? fallbackRedirectUrl}
       />
       <AuthOAuthStartSurface
         mode={mode}
         intent={intent}
         claimHandle={claimHandle}
         back={back}
+        offerSummary={offerSummary}
         oppositeModeUrl={crossLinkUrl}
         forceHardNavigation={forceOppositeModeHardNavigation}
         providers={enabledOAuthProviders}
@@ -396,6 +457,7 @@ function AuthOAuthStartSurface({
   intent,
   claimHandle,
   back,
+  offerSummary,
   oppositeModeUrl,
   forceHardNavigation,
   providers,
@@ -411,6 +473,7 @@ function AuthOAuthStartSurface({
   intent: AuthShellIntent;
   claimHandle?: string;
   back: AuthShellBackLink | null;
+  offerSummary: ReturnType<typeof resolveAuthOfferSummary>;
   oppositeModeUrl: string;
   forceHardNavigation: boolean;
   providers: readonly PrimaryAuthOAuthProvider[];
@@ -436,6 +499,15 @@ function AuthOAuthStartSurface({
         claimHandle={claimHandle}
         back={back}
       />
+      {offerSummary ? (
+        <div
+          data-auth-offer-summary
+          className='mb-4 text-center text-secondary-token'
+        >
+          <p>{offerSummary.title}</p>
+          {offerSummary.detail ? <p>{offerSummary.detail}</p> : null}
+        </div>
+      ) : null}
 
       {hasProviders ? (
         <fieldset

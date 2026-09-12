@@ -56,7 +56,8 @@ vi.mock('@/lib/analytics', () => ({
   track: trackMock,
 }));
 
-vi.mock('@/lib/auth/plan-intent', () => ({
+vi.mock('@/lib/auth/plan-intent', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/auth/plan-intent')>()),
   setPlanIntent: setPlanIntentMock,
   validatePlan: validatePlanMock,
 }));
@@ -72,7 +73,7 @@ vi.mock('@/lib/auth/signup-claim-storage', () => ({
 global.fetch = fetchMock as unknown as typeof fetch;
 
 import { APP_ROUTES } from '@/constants/routes';
-import SignUpPage from '../../../app/(auth)/signup/page';
+import { SignUpPageClient as SignUpPage } from '../../../app/(auth)/signup/SignUpPageClient';
 
 describe('signup page', () => {
   beforeEach(() => {
@@ -90,8 +91,31 @@ describe('signup page', () => {
     sessionStorage.clear();
     trackMock.mockReset();
     validatePlanMock.mockReset();
-    validatePlanMock.mockImplementation(plan => plan);
+    validatePlanMock.mockImplementation(plan =>
+      ['free', 'pro', 'max', 'team', 'enterprise'].includes(plan) ? plan : null
+    );
     globalThis.history.replaceState(null, '', '/signup');
+  });
+
+  it('does not overwrite offer extras while capturing the signup claim', () => {
+    searchParamsState.value = 'plan=pro&interval=monthly&artist=Tim%20White';
+    render(<SignUpPage />);
+    expect(setPlanIntentMock).toHaveBeenCalledWith('pro', {
+      interval: 'monthly',
+      artist: 'Tim White',
+    });
+    expect(persistSignupClaimValueMock).toHaveBeenCalledWith(
+      'signup_artist_name',
+      'Tim White',
+      expect.any(Number)
+    );
+  });
+
+  it('keeps a recovered artist claim when signup resumes without query context', () => {
+    render(<SignUpPage />);
+    expect(clearSignupClaimValueMock).not.toHaveBeenCalledWith(
+      'signup_artist_name'
+    );
   });
 
   it('renders AuthShell with the expected auth props', () => {
