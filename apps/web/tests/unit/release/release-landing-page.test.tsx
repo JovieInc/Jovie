@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE } from '@/lib/profile/opaque-internal-profile-handle';
 
 // ---------------------------------------------------------------------------
 // Type helpers for mock props
@@ -307,6 +308,31 @@ describe('@critical ReleaseLandingPage', () => {
     render(<ReleaseLandingPage {...defaultProps} />);
     const artistLink = screen.getByText('Tim White');
     expect(artistLink.closest('a')?.getAttribute('href')).toBe('/timwhite');
+  });
+
+  it('Never Say a Word artist name links to canonical /tim not the opaque ID', () => {
+    const fixture = NEVER_SAY_A_WORD_OPAQUE_PROFILE_FIXTURE;
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        artist={{
+          name: fixture.ownerName,
+          handle: fixture.ownerHandle,
+          avatarUrl: null,
+        }}
+        primaryArtists={[
+          { name: fixture.artistName, handle: fixture.opaqueHandle },
+        ]}
+      />
+    );
+
+    const artistLink = screen.getByText(fixture.artistName);
+    expect(artistLink.closest('a')?.getAttribute('href')).toBe(
+      `/${fixture.ownerHandle}`
+    );
+    expect(artistLink.closest('a')?.getAttribute('href')).not.toBe(
+      fixture.opaqueProfilePath
+    );
   });
 
   it('artist name is plain text when handle is null', () => {

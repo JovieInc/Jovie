@@ -31,7 +31,8 @@
       "ownerFiles": [
         "apps/web/components/organisms/HeaderNav.tsx",
         "apps/web/components/organisms/HeaderNav.css",
-        "apps/web/components/site/MarketingHeader.tsx"
+        "apps/web/components/site/MarketingHeader.tsx",
+        "apps/web/components/site/MarketingHeader.css"
       ],
       "internalPrefixes": ["marketing-glass-header__"]
     },

@@ -77,6 +77,7 @@ function buildCirclePng(size: number, withDot: boolean): Buffer {
   return Buffer.concat([
     PNG_SIG,
     pngChunk('IHDR', ihdr),
+    // 44×44 in-memory encode; keep this exact-site bounded CPU exception.
     pngChunk('IDAT', deflateSync(raw)),
     pngChunk('IEND', Buffer.alloc(0)),
   ]);

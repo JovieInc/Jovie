@@ -36,6 +36,7 @@ CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
 PROVIDER_CAPACITY = SOURCE_DIR / "provider_capacity.py"
+EXISTING_PR_REPAIR = SOURCE_DIR / "existing_pr_repair.py"
 PROMOTION_SCRIPT = ROOT / "scripts/writer-owned-pr-promote.sh"
 PROMOTION_LIB = ROOT / "scripts/lib/writer-owned-pr-promotion.mjs"
 QUEUE_DEFERRAL_LIB = ROOT / "scripts/lib/queue-deferral-receipt.mjs"
@@ -49,6 +50,7 @@ RUNTIME_ARTIFACTS = (
     MODEL_ROUTER,
     MODEL_REGISTRY,
     PROVIDER_CAPACITY,
+    EXISTING_PR_REPAIR,
     PROMOTION_SCRIPT,
     PROMOTION_LIB,
     QUEUE_DEFERRAL_LIB,

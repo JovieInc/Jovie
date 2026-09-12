@@ -4,6 +4,12 @@
   "siblingCheckClass": "route-response-latency",
   "note": "Existing request-path thread-blocking calls. Counts may only decrease. Not a route-response-latency budget.",
   "entries": {
+    "apps/desktop/src/main.ts": {
+      "readFileSync": 1
+    },
+    "apps/desktop/src/tray.ts": {
+      "deflateSync": 1
+    },
     "apps/web/app/(marketing)/changelog/feed.xml/route.ts": {
       "existsSync": 1,
       "readFileSync": 1

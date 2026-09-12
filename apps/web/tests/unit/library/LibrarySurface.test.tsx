@@ -355,6 +355,7 @@ describe('LibrarySurface', () => {
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('ReleaseAudioAssetPanel');
+    expect(source).toContain('LibraryInspectorAssetSlots');
     expect(source).toContain('function LibraryFilterPanel');
     expect(source).toContain("data-testid='library-filter-active-indicator'");
     expect(source).toContain("surfaceMode='table'");
@@ -1249,13 +1250,19 @@ describe('LibrarySurface', () => {
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
     expect(overflowButton.className).toContain('focus-visible:ring-ring');
+    expect(previewButton.className).toContain(
+      'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+    );
+    expect(previewButton.className).toContain(
+      'focus-visible:ring-offset-(--app-shell-content-surface)'
+    );
+    // DSP quiet rows are new surfaces on the canonical ring token (the
+    // source-identity ratchet bars the --linear-border-focus identity there)
+    // and render without a ring offset — focus-visible:bg-surface-1 replaces it.
+    expect(providerLink.className).toContain(
+      'focus-visible:ring-2 focus-visible:ring-ring/55'
+    );
     for (const element of [previewButton, providerLink]) {
-      expect(element.className).toContain(
-        'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
-      );
-      expect(element.className).toContain(
-        'focus-visible:ring-offset-(--app-shell-content-surface)'
-      );
       expect(element.className).not.toContain('focus-visible:shadow');
     }
   });
@@ -1464,6 +1471,8 @@ describe('LibrarySurface', () => {
       screen.getByLabelText('Upload audio for Take Me Over')
     ).toHaveAttribute('accept', expect.stringContaining('audio/mpeg'));
     expect(screen.queryByTestId('library-audio-ready')).not.toBeInTheDocument();
+    expect(screen.getByTestId('library-artwork-object')).toBeInTheDocument();
+    expect(screen.queryByTestId('library-artwork-dropzone')).toBeNull();
   });
 
   it('uploads missing drawer audio and reveals persistent-player controls', async () => {

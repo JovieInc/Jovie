@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+import { isOpaqueInternalProfileHandle } from './opaque-internal-profile-handle';
 import {
   getPublicProfileIdentityExclusionReason,
   type PublicProfileIdentityExclusionReason,
@@ -42,16 +43,12 @@ export function getPublicProfileIndexingExclusionReason(
  * never looks like `tmoc` + ~15 chars of base36, and real display names do not
  * end in the `+clerk test` suffix. Revisit only if a genuine collision appears.
  */
-const QA_MACHINE_HANDLE_PATTERN = /^tmoc[0-9a-z]{10,}$/;
 const QA_CLERK_TEST_DISPLAY_NAME_PATTERN = /\+clerk test$/;
 
 function getQaMachineHandleIndexingExclusionReason(
   handle: string
 ): 'qa_machine_handle' | null {
-  const normalized = handle.trim().toLowerCase();
-  return QA_MACHINE_HANDLE_PATTERN.test(normalized)
-    ? 'qa_machine_handle'
-    : null;
+  return isOpaqueInternalProfileHandle(handle) ? 'qa_machine_handle' : null;
 }
 
 function matchesQaClerkTestDisplayName(displayName: string): boolean {

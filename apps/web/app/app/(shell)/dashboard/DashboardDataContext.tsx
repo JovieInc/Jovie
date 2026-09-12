@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { UNKNOWN_INBOX_NAVIGATION_AVAILABILITY } from '@/lib/inbox/navigation-availability';
 import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
+import { applyCacheScope } from '@/lib/queries/cache-isolation';
 import type { DashboardData } from './actions';
 
 interface DashboardDataContextValue extends DashboardData {
@@ -55,6 +56,12 @@ export function DashboardDataProvider({
   useEffect(() => {
     setSelectedProfile(value.selectedProfile);
   }, [value.selectedProfile]);
+
+  useEffect(() => {
+    applyCacheScope({
+      profileId: selectedProfile?.id ?? null,
+    });
+  }, [selectedProfile?.id]);
 
   const updateSelectedProfileSettings = useCallback(
     (profileId: string, settings: Record<string, unknown>) => {

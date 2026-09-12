@@ -1,5 +1,5 @@
 import { type Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
@@ -48,6 +48,8 @@ import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,
 } from '@/lib/profile/metadata';
+import { opaqueInternalProfileRedirectPath } from '@/lib/profile/opaque-internal-profile-handle';
+import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
@@ -109,6 +111,16 @@ function assertValidProfileUsername(username: string) {
     isReservedUsername(username)
   ) {
     notFound();
+  }
+}
+
+async function enforceCanonicalPublicProfileUsername(username: string) {
+  const decision = await resolveOpaqueInternalProfileUsername(username);
+  if (decision.action === 'not_found') {
+    notFound();
+  }
+  if (decision.action === 'redirect') {
+    permanentRedirect(opaqueInternalProfileRedirectPath(decision));
   }
 }
 
@@ -516,6 +528,7 @@ async function ArtistPageContent({
 export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
+  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return <UnfazedProfileClient />;
@@ -550,6 +563,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   assertValidProfileUsername(username);
+  await enforceCanonicalPublicProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
     return {

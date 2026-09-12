@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-09-12",
+  "issue": "JOV-6188",
+  "catalogSource": {
+    "repo": "vercel-labs/agent-skills",
+    "ref": "063bee94c3f4df8453406c830b0a7df0f2860278"
+  },
+  "handbooks": {
+    "vercel-labs/web-interface-guidelines": {
+      "ref": "e3d624baaf29dc1fc645aff3e38f03e564d2d6b1",
+      "path": "docs/vendor/vercel-labs/web-interface-guidelines/command.md",
+      "sourcePath": "command.md",
+      "sha256": "5a775e6411f790f518dbc9c1fa7c50a89e6873502d9a3530a6eb223a590bcfe8",
+      "role": "pinned-ui-handbook",
+      "productSkill": false,
+      "note": "Fetched mutable main is forbidden. Uncovered checks are folded into design-review."
+    },
+    "vercel-labs/writing-guidelines": {
+      "ref": "83e2316b034cf572400513538e4e4da01c4cc742",
+      "path": "docs/vendor/vercel-labs/writing-guidelines/command.md",
+      "sourcePath": "command.md",
+      "sha256": "fb638d7821bb4472e4492aedcfb51f2636c7d31d34ff9f01cca5bcdce9b1841f",
+      "role": "pinned-docs-handbook",
+      "productSkill": false,
+      "note": "Docs-only pin. Not a product skill. Jovie VOICE.md remains authoritative."
+    }
+  }
+}

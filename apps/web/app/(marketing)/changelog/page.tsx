@@ -2,53 +2,53 @@ import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
+import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { getChangelogReleases } from '@/lib/changelog-source';
+import {
+  groupCustomerChangelogByMonth,
+  projectCustomerChangelog,
+} from '@/lib/customer-changelog';
 import { ChangelogEmailSignup } from './ChangelogEmailSignup';
 
 export const revalidate = false;
 
-// ---------------------------------------------------------------------------
-// Metadata
-// ---------------------------------------------------------------------------
-
 export const metadata: Metadata = {
-  title: "What's New",
-  description: `Product updates and improvements to ${APP_NAME}. See what we've been shipping.`,
+  title: "What's new in Jovie",
+  description: `Audience and control updates in ${APP_NAME}. What got better for you — not every deploy.`,
   alternates: {
-    canonical: `${BASE_URL}/changelog`,
+    canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
     types: {
-      'application/atom+xml': `${BASE_URL}/changelog/feed.xml`,
-      'application/feed+json': `${BASE_URL}/changelog/feed.json`,
+      'application/atom+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.xml`,
+      'application/feed+json': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.json`,
     },
   },
 };
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
 export default async function ChangelogPage() {
   const releases = await getChangelogReleases();
+  const months = groupCustomerChangelogByMonth(
+    projectCustomerChangelog(releases)
+  );
 
-  // Count releases in current month for velocity counter
   const now = new Date();
   const currentMonthPrefix = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-  const thisMonthCount = releases.filter(r =>
-    r.date.startsWith(currentMonthPrefix)
-  ).length;
+  const thisMonthCount = months
+    .filter(group => group.monthKey === currentMonthPrefix)
+    .reduce((total, group) => total + group.entries.length, 0);
 
   return (
     <section className='min-h-screen bg-page text-primary-token'>
-      {/* Header */}
       <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Changelog</p>
-        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-xs text-primary-token line-clamp-2'>
-          What&apos;s New
+        {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- sentence-case marketing heading */}
+        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
+          What&apos;s new in Jovie
         </h1>
         <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>
-          Follow our journey building the future of music.
+          Audience and control updates that change what you can do. Not a log of
+          every deploy.
         </p>
         <div className='flex flex-wrap items-center gap-3'>
           {thisMonthCount > 0 && (
@@ -58,13 +58,13 @@ export default async function ChangelogPage() {
             </Badge>
           )}
           <Link
-            href='/changelog/feed.xml'
+            href={`${APP_ROUTES.CHANGELOG}/feed.xml`}
             className='text-xs text-secondary-token transition-colors hover:text-primary-token'
           >
             RSS Feed
           </Link>
           <Link
-            href='/changelog/feed.json'
+            href={`${APP_ROUTES.CHANGELOG}/feed.json`}
             className='text-xs text-secondary-token transition-colors hover:text-primary-token'
           >
             JSON Feed
@@ -72,12 +72,10 @@ export default async function ChangelogPage() {
         </div>
       </MarketingHero>
 
-      {/* Releases timeline */}
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>
         <div className='marketing-divider mb-10' />
-        <ChangelogTimeline releases={releases} />
+        <CustomerChangelogArchive months={months} />
 
-        {/* Email signup */}
         <div className='mt-16 max-w-xl'>
           <ChangelogEmailSignup />
         </div>

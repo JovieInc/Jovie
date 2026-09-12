@@ -58,6 +58,10 @@ describe('ReleaseAudioAssetPanel', () => {
     });
     expect(screen.getByTestId('audio-waveform-editor')).toBeInTheDocument();
     expect(
+      screen.queryByTestId('release-audio-dropzone')
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace' })).toBeInTheDocument();
+    expect(
       screen.getByRole('button', { name: 'Play waveform preview' })
     ).toBeInTheDocument();
   });

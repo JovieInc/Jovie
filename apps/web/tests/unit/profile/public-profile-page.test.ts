@@ -166,7 +166,7 @@ describe('Public Profile Page Logic', () => {
 
     it('resolves missing profiles before the streamed page boundary', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        "import { notFound } from 'next/navigation'"
+        "import { notFound, permanentRedirect } from 'next/navigation'"
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         'const profileResult = await getProfileAndLinks(username)'
@@ -183,6 +183,15 @@ describe('Public Profile Page Logic', () => {
         )
       );
       expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+    });
+
+    it('redirects or 404s opaque internal-ID profile URLs before rendering junk', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'resolveOpaqueInternalProfileUsername'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'not_found'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("action === 'redirect'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('permanentRedirect');
     });
 
     it('keeps the transient profile error state out of the client graph', () => {

@@ -37,13 +37,13 @@ describe('library share action System B styling', () => {
   });
 
   it('uses canonical secondary buttons for the live Library copy and revoke actions', () => {
-    for (const source of [
-      creatorSource,
-      assetShareUrlCellSource,
-      assetSharePanelSource,
-    ]) {
+    for (const source of [creatorSource, assetShareUrlCellSource]) {
       expect(source).not.toContain("variant='outline'");
       expect(source).toContain("variant='secondary'");
     }
+
+    expect(assetSharePanelSource).not.toContain("variant='outline'");
+    expect(assetSharePanelSource).toContain('OverflowMenu');
+    expect(assetSharePanelSource).toContain('CopyLinkInput');
   });
 });

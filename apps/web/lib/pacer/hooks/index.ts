@@ -22,7 +22,11 @@ export type {
 } from './useAsyncValidation';
 export { useAsyncValidation } from './useAsyncValidation';
 // Auto-save hook
-export type { UseAutoSaveOptions, UseAutoSaveReturn } from './useAutoSave';
+export type {
+  AutoSaveAttemptMeta,
+  UseAutoSaveOptions,
+  UseAutoSaveReturn,
+} from './useAutoSave';
 export { useAutoSave } from './useAutoSave';
 // Debounced Input hook
 export type {

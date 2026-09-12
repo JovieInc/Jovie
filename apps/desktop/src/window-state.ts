@@ -14,7 +14,7 @@ export interface DisplayBounds {
   readonly height: number;
 }
 
-const DEFAULT_WINDOW_STATE: WindowState = {
+export const DEFAULT_WINDOW_STATE: WindowState = {
   width: 1280,
   height: 800,
 };

@@ -1,9 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import {
   DashboardDataProvider,
   useDashboardData,
 } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import {
+  applyCacheScope,
+  getCacheScope,
+  resetCacheIsolationForTests,
+  subscribeCacheFence,
+} from '@/lib/queries/cache-isolation';
 import { fastRender } from '@/tests/utils/fast-render';
 
 const baseDashboardData: DashboardData = {
@@ -39,6 +45,14 @@ function ProfileCompletionProbe() {
 }
 
 describe('DashboardDataContext', () => {
+  beforeEach(() => {
+    resetCacheIsolationForTests();
+  });
+
+  afterEach(() => {
+    resetCacheIsolationForTests();
+  });
+
   it('normalizes missing profileCompletion to a safe default object', () => {
     const { getByText } = fastRender(
       <DashboardDataProvider
@@ -53,5 +67,48 @@ describe('DashboardDataContext', () => {
     );
 
     expect(getByText('0%')).toBeDefined();
+  });
+
+  it('fences cache identity when the selected profile changes', () => {
+    applyCacheScope({
+      userId: 'user-a',
+      sessionId: 'sess-a',
+      profileId: 'profile-1',
+      ready: true,
+    });
+    const fences: string[] = [];
+    const unsubscribe = subscribeCacheFence(event => {
+      fences.push(event.reason);
+    });
+
+    const { rerender } = fastRender(
+      <DashboardDataProvider
+        value={{
+          ...baseDashboardData,
+          selectedProfile: {
+            id: 'profile-1',
+          } as DashboardData['selectedProfile'],
+        }}
+      >
+        <ProfileCompletionProbe />
+      </DashboardDataProvider>
+    );
+
+    rerender(
+      <DashboardDataProvider
+        value={{
+          ...baseDashboardData,
+          selectedProfile: {
+            id: 'profile-2',
+          } as DashboardData['selectedProfile'],
+        }}
+      >
+        <ProfileCompletionProbe />
+      </DashboardDataProvider>
+    );
+
+    expect(getCacheScope().profileId).toBe('profile-2');
+    expect(fences).toContain('profile-switch');
+    unsubscribe();
   });
 });

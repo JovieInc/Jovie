@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { type MouseEvent, useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
@@ -87,12 +87,21 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   // NOTE: SVG logos from DSP_CONFIGS are trusted internal constants (not user content).
   // No sanitization needed - this removes the ~70KB isomorphic-dompurify dependency.
 
-  const handleDSPClick = async (dsp: AvailableDSP) => {
+  const handleDSPClick = async (
+    dsp: AvailableDSP,
+    event?: MouseEvent<HTMLAnchorElement | HTMLButtonElement>
+  ) => {
     if (renderMode !== 'interactive') {
+      event?.preventDefault();
       return;
     }
 
-    if (isLoading) return;
+    if (isLoading) {
+      event?.preventDefault();
+      return;
+    }
+
+    event?.preventDefault();
 
     setIsLoading(true);
     setSelectedDSP(dsp.key);
@@ -156,7 +165,11 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   return (
     <div className={cn('w-full max-w-sm', containerClassName)}>
       {/* DSP Buttons */}
-      <div className='space-y-3'>
+      <nav
+        className='space-y-3'
+        aria-label='Listen on streaming services'
+        data-testid='profile-listen-dsp-links'
+      >
         {availableDSPs.length === 0 ? (
           <div
             className={cn(
@@ -181,10 +194,12 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             return (
               <SmartLinkProviderButton
                 key={dsp.key}
-                onClick={() => {
-                  void handleDSPClick(dsp);
+                href={isPreview ? undefined : dsp.url}
+                onClick={event => {
+                  void handleDSPClick(dsp, event);
                 }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
+                ariaLabel={`Listen on ${dsp.name}`}
                 providerKey={dsp.key}
                 disabled={isLoading}
                 iconPath={logoConfig?.iconPath}
@@ -194,7 +209,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             );
           })
         )}
-      </div>
+      </nav>
 
       {/* Help text */}
       {hideHelpText ? null : (

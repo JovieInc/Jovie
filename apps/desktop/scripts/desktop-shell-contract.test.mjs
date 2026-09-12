@@ -609,8 +609,19 @@ test('desktop bridge exposes bounded dictation support', async () => {
     'utf8'
   );
   assert.match(mainSource, /from '\.\/desktop-auto-update'/);
+  assert.match(mainSource, /from '\.\/nightly-update-launch-agent'/);
+  assert.match(mainSource, /from '\.\/bounded-process'/);
+  assert.match(mainSource, /from '\.\/window-state-store'/);
   assert.match(mainSource, /hasNightlyUpdateFlag/);
   assert.match(mainSource, /installNightlyUpdateLaunchAgent/);
+  assert.match(mainSource, /scheduleNightlyUpdateLaunchAgent/);
+  assert.match(
+    mainSource,
+    /await hydrateWindowState\(\);[\s\S]*createWindow\([\s\S]*scheduleNightlyUpdateLaunchAgent\(\)/
+  );
+  assert.doesNotMatch(mainSource, /spawnSync/);
+  assert.doesNotMatch(mainSource, /writeFileSync/);
+  assert.match(mainSource, /runBoundedProcess/);
   assert.match(mainSource, /shouldScheduleDesktopAutoUpdate\(/);
   assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
@@ -621,7 +632,11 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(autoUpdateSource, /app\.jov\.ie\.nightly-update/);
   assert.match(autoUpdateSource, /appEnv === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowPrerelease = true/);
-  assert.match(mainSource, /sanitizeWindowState/);
+  const windowStateStoreSource = await readFile(
+    join(desktopRoot, 'src/window-state-store.ts'),
+    'utf8'
+  );
+  assert.match(windowStateStoreSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
   assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
   assert.match(mainSource, /!app\.isPackaged/);
