@@ -176,9 +176,7 @@ describe('useProfileEditor autosave binding', () => {
         })
     );
 
-    const { result } = renderHook(() =>
-      useProfileEditor({ debounceMs: 50 })
-    );
+    const { result } = renderHook(() => useProfileEditor({ debounceMs: 50 }));
 
     act(() => {
       result.current.setEditingField('displayName');
