@@ -186,7 +186,7 @@ describe('public CTA guard', () => {
     expect(marketingNavigation).toContain("label: 'Log in'");
     expect(marketingNavigation).toContain("label: 'Find yourself'");
     expect(marketingHeader).toContain(
-      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
+      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
   });
 
