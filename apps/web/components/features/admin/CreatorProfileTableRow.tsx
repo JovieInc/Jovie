@@ -1,7 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/tests/components/admin/CreatorProfileTableRow.test.tsx
-
 import {
   Checkbox,
   ContextMenu,
