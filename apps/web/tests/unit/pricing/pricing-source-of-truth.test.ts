@@ -97,6 +97,24 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', 
         `Plan "${plan.id}" signupHref must include ?plan= so onboarding can read intent`
       ).toContain(`plan=${plan.id}`);
     }
+    expect(
+      CANONICAL_PLANS.find(plan => plan.id === 'pro')?.signupHref
+    ).toContain('interval=month');
+    expect(
+      CANONICAL_PLANS.find(plan => plan.id === 'max')?.signupHref
+    ).toContain('interval=month');
+  });
+
+  it('uses distinct Pro trial and Max purchase CTAs', () => {
+    expect(CANONICAL_PLANS.find(plan => plan.id === 'pro')?.ctaLabel).toBe(
+      'Start 14-day Pro trial'
+    );
+    expect(CANONICAL_PLANS.find(plan => plan.id === 'max')?.ctaLabel).not.toBe(
+      CANONICAL_PLANS.find(plan => plan.id === 'pro')?.ctaLabel
+    );
+    expect(
+      CANONICAL_PLANS.find(plan => plan.id === 'max')?.ctaLabel
+    ).not.toMatch(/trial/i);
   });
 
   it('no CTA label uses banned waitlist/request-access phrases', () => {

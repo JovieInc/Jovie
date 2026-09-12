@@ -1141,6 +1141,55 @@ body {
       0 0 0 2px rgba(0, 0, 0, 0.85),
       0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 72%, transparent);
   }
+  .marketing-pricing-offer {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    gap: var(--space-5);
+  }
+  .marketing-pricing-interval {
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    border: 0;
+    padding: 0;
+  }
+  .marketing-pricing-interval__control {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: var(--space-1);
+    border: var(--space-px) solid var(--color-border-subtle);
+    border-radius: var(--radius-pill);
+    padding: var(--space-1);
+    background: transparent;
+  }
+  .marketing-pricing-interval__option {
+    display: inline-flex;
+    min-height: 28px;
+    min-width: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius-pill);
+    padding: 0 var(--space-4);
+    background: transparent;
+    color: var(--color-text-secondary-token);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .marketing-pricing-interval__option:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(0, 0, 0, 0.85),
+      0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 72%, transparent);
+  }
+  .marketing-pricing-interval__option[data-selected="true"] {
+    background: var(--color-bg-surface-2);
+    color: var(--color-text-primary-token);
+  }
   .marketing-pricing-plans {
     display: grid;
     width: 100%;
@@ -1230,6 +1279,13 @@ body {
     font-size: var(--text-sm);
     font-weight: var(--font-weight-normal);
     letter-spacing: 0;
+  }
+  .marketing-pricing-plan-card__equivalent,
+  .marketing-pricing-plan-card__offer-note {
+    margin: var(--space-2) 0 0;
+    color: var(--color-text-tertiary-token);
+    font-size: var(--text-xs);
+    line-height: var(--leading-normal);
   }
   .marketing-pricing-plan-card__cta {
     width: 100%;

@@ -56,8 +56,8 @@ describe('PricingRecipeBody', () => {
       screen.getByRole('link', { name: 'Claim your profile' })
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Start Pro trial' })
-    ).toHaveAttribute('href', '/signup?plan=pro');
+      screen.getByRole('link', { name: 'Start 14-day Pro trial' })
+    ).toHaveAttribute('href', '/signup?plan=pro&interval=month');
   });
 
   it('keeps the story closing copy derived from exact production plan data', () => {
@@ -90,9 +90,9 @@ describe('PricingRecipeBody', () => {
     expect(proPlan?.price).toBeDefined();
     expect(proCard?.textContent).toContain(proPlan?.price ?? '');
     expect(proCard?.textContent).toContain('/mo');
-    expect(proCard?.textContent).toContain('Start Free Trial');
+    expect(proCard?.textContent).toContain('Start 14-day Pro trial');
     expect(proCard?.querySelector('a')?.getAttribute('href')).toBe(
-      '/signup?plan=pro'
+      '/signup?plan=pro&interval=month'
     );
   });
 

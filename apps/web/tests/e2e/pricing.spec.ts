@@ -64,16 +64,16 @@ test.describe('Pricing Page', () => {
       'Recommended'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Start Free Trial'
+      'Start 14-day Pro trial'
     );
     await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
       'Max'
     );
     await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
-      'Full stack'
+      'Paid plan'
     );
     await expect(page.getByTestId('marketing-pricing-plan-max')).toContainText(
-      'Start Free Trial'
+      'Get Max'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
@@ -108,14 +108,14 @@ test.describe('Pricing Page', () => {
     await expect(freeTierCta).toHaveAttribute('href', /\/signup\?plan=free/);
     await expect(
       page.getByTestId('marketing-pricing-plan-pro').getByRole('link', {
-        name: 'Start Free Trial',
+        name: 'Start 14-day Pro trial',
       })
-    ).toHaveAttribute('href', '/signup?plan=pro');
+    ).toHaveAttribute('href', '/signup?plan=pro&interval=month');
     await expect(
       page.getByTestId('marketing-pricing-plan-max').getByRole('link', {
-        name: 'Start Free Trial',
+        name: 'Get Max',
       })
-    ).toHaveAttribute('href', '/signup?plan=max');
+    ).toHaveAttribute('href', '/signup?plan=max&interval=month');
     const pricingCardCtasAreCentered = await page
       .locator('.marketing-pricing-plan-card')
       .evaluateAll(cards =>

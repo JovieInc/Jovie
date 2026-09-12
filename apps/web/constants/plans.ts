@@ -16,7 +16,7 @@
  * - Prices must come from `PLAN_PRICES` in `@/lib/config/plan-prices`
  */
 
-import { APP_ROUTES } from '@/constants/routes';
+import { getPlanCtaLabel, getPlanSignupHref } from '@/lib/billing/offer-truth';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
@@ -54,8 +54,8 @@ export const CANONICAL_PLANS: readonly CanonicalPlan[] = [
     yearlyPriceUsd: null,
     monthlyPriceLabel: '$0',
     features: ENTITLEMENT_REGISTRY.free.marketing.features,
-    ctaLabel: 'Claim your profile',
-    signupHref: `${APP_ROUTES.SIGNUP}?plan=free`,
+    ctaLabel: getPlanCtaLabel('free'),
+    signupHref: getPlanSignupHref('free'),
   },
   {
     id: 'pro',
@@ -65,8 +65,8 @@ export const CANONICAL_PLANS: readonly CanonicalPlan[] = [
     yearlyPriceUsd: PLAN_PRICES.pro.yearly,
     monthlyPriceLabel: `$${PLAN_PRICES.pro.monthly}`,
     features: ENTITLEMENT_REGISTRY.pro.marketing.features,
-    ctaLabel: 'Start Free Trial',
-    signupHref: `${APP_ROUTES.SIGNUP}?plan=pro`,
+    ctaLabel: getPlanCtaLabel('pro'),
+    signupHref: getPlanSignupHref('pro'),
   },
   {
     id: 'max',
@@ -76,8 +76,8 @@ export const CANONICAL_PLANS: readonly CanonicalPlan[] = [
     yearlyPriceUsd: PLAN_PRICES.max.yearly,
     monthlyPriceLabel: `$${PLAN_PRICES.max.monthly}`,
     features: ENTITLEMENT_REGISTRY.max.marketing.features,
-    ctaLabel: 'Start Free Trial',
-    signupHref: `${APP_ROUTES.SIGNUP}?plan=max`,
+    ctaLabel: getPlanCtaLabel('max'),
+    signupHref: getPlanSignupHref('max'),
   },
 ] as const;
 

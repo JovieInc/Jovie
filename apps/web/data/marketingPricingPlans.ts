@@ -1,4 +1,12 @@
-import { APP_ROUTES } from '@/constants/routes';
+import {
+  type BillingInterval,
+  formatUsdAmount,
+  getMaxOfferBadge,
+  getPlanCtaLabel,
+  getPlanOfferNote,
+  getPlanSignupHref,
+  type PublicOfferPlan,
+} from '@/lib/billing/offer-truth';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
 /**
@@ -34,6 +42,7 @@ export interface MarketingPricingPlan {
   readonly accent: 'cyan' | 'blue' | 'pink' | 'violet';
   readonly ctaLabel: string;
   readonly ctaHref: string;
+  readonly offerNote: string;
 }
 
 export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
@@ -52,13 +61,14 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'Manual release creation',
     ],
     accent: 'cyan',
-    ctaLabel: 'Claim your profile',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=free`,
+    ctaLabel: getPlanCtaLabel('free'),
+    ctaHref: getPlanSignupHref('free'),
+    offerNote: getPlanOfferNote('free'),
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: `$${PLAN_PRICES.pro.monthly}`,
+    price: formatUsdAmount(PLAN_PRICES.pro.monthly),
     cadence: '/mo',
     badge: 'Recommended',
     body: 'Fan notifications, presaves, and deeper release analytics.',
@@ -75,15 +85,16 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'AI assistant (70 messages/week)',
     ],
     accent: 'blue',
-    ctaLabel: 'Start Free Trial',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=pro`,
+    ctaLabel: getPlanCtaLabel('pro'),
+    ctaHref: getPlanSignupHref('pro'),
+    offerNote: getPlanOfferNote('pro'),
   },
   {
     id: 'max',
     name: 'Max',
-    price: `$${PLAN_PRICES.max.monthly}`,
+    price: formatUsdAmount(PLAN_PRICES.max.monthly),
     cadence: '/mo',
-    badge: 'Full stack',
+    badge: getMaxOfferBadge(),
     body: 'Your entire release operation, automated end to end.',
     features: [
       'Everything in Pro',
@@ -95,13 +106,17 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'AI assistant (250 messages/week)',
     ],
     accent: 'violet',
-    ctaLabel: 'Start Free Trial',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=max`,
+    ctaLabel: getPlanCtaLabel('max'),
+    ctaHref: getPlanSignupHref('max'),
+    offerNote: getPlanOfferNote('max'),
   },
 ] as const;
 
-export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {
-  return `${APP_ROUTES.SIGNUP}?plan=${planId}`;
+export function getMarketingPlanHref(
+  planId: MarketingPricingPlanId,
+  interval: BillingInterval = 'month'
+): string {
+  return getPlanSignupHref(planId, interval);
 }
 
 export function isMarketingPlanActive(
@@ -123,5 +138,14 @@ export function getVisibleMarketingPricingPlans(): readonly MarketingPricingPlan
 }
 
 export function getMarketingPlanCtaLabel(plan: MarketingPricingPlan): string {
-  return plan.ctaLabel;
+  return getPlanCtaLabel(plan.id);
+}
+
+export function resolveMarketingPlanId(
+  planId: string | null | undefined
+): PublicOfferPlan | null {
+  if (planId === 'free' || planId === 'pro' || planId === 'max') {
+    return planId;
+  }
+  return null;
 }

@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
+import { isMaxPurchaseEnabled } from '@/lib/billing/offer-truth';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
@@ -29,7 +30,9 @@ export const PLAN_FEATURES = {
   },
   max: {
     name: ENTITLEMENT_REGISTRY.max.marketing.displayName,
-    tagline: `${ENTITLEMENT_REGISTRY.max.marketing.tagline} — Early Access`,
+    tagline: isMaxPurchaseEnabled()
+      ? ENTITLEMENT_REGISTRY.max.marketing.tagline
+      : `${ENTITLEMENT_REGISTRY.max.marketing.tagline} — Early Access`,
     features: ENTITLEMENT_REGISTRY.max.marketing.features.map(f => {
       const match = FEATURE_DETAIL_REGEX.exec(f);
       return match ? { label: match[1], detail: match[2] } : { label: f };

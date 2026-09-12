@@ -7,6 +7,11 @@ import { useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import {
+  type BillingInterval,
+  formatAnnualMonthlyEquivalent,
+  isMaxPurchaseEnabled,
+} from '@/lib/billing/offer-truth';
 import type { PricingOption } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatAmountNoCents } from '@/lib/utils/format-number';
@@ -54,7 +59,7 @@ function renderCtaButton({
       </Button>
     );
   }
-  if (planKey === 'max') {
+  if (planKey === 'max' && !isMaxPurchaseEnabled()) {
     return (
       <Button
         variant='secondary'
@@ -62,7 +67,7 @@ function renderCtaButton({
         onClick={() => setGrowthModalOpen(true)}
       >
         <Sparkles className='mr-2 h-4 w-4' />
-        Request Early Access
+        Join Max early access
       </Button>
     );
   }
@@ -96,7 +101,8 @@ export function PlanComparisonSection({
   readonly currentPlan: string | null;
   readonly defaultPriceId: string | undefined;
 }) {
-  const billingInterval = 'month' as const;
+  const [billingInterval, setBillingInterval] =
+    useState<BillingInterval>('month');
   const [growthModalOpen, setGrowthModalOpen] = useState(false);
   const activePlan = currentPlan ?? 'free';
 
@@ -112,6 +118,36 @@ export function PlanComparisonSection({
         subtitle='Choose the plan that fits your needs.'
         className='min-h-0 px-0 py-0'
       />
+
+      <fieldset data-testid='billing-plan-interval'>
+        <legend className='sr-only'>Billing interval</legend>
+        <div className='flex items-center justify-center gap-2'>
+          <button
+            type='button'
+            className={cn(
+              'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-subtle bg-transparent px-4 text-sm text-secondary-token',
+              billingInterval === 'month' &&
+                'border-default bg-surface-1 text-primary-token'
+            )}
+            aria-pressed={billingInterval === 'month'}
+            onClick={() => setBillingInterval('month')}
+          >
+            Monthly
+          </button>
+          <button
+            type='button'
+            className={cn(
+              'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-subtle bg-transparent px-4 text-sm text-secondary-token',
+              billingInterval === 'year' &&
+                'border-default bg-surface-1 text-primary-token'
+            )}
+            aria-pressed={billingInterval === 'year'}
+            onClick={() => setBillingInterval('year')}
+          >
+            Annual
+          </button>
+        </div>
+      </fieldset>
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
         {PLAN_KEYS.map(planKey => {
@@ -179,6 +215,21 @@ export function PlanComparisonSection({
                     </>
                   )}
                 </div>
+                {planKey !== 'free' &&
+                billingInterval === 'year' &&
+                priceOption ? (
+                  <p className='mt-1 text-app text-tertiary-token'>
+                    {formatAnnualMonthlyEquivalent(priceOption.amount / 100)}{' '}
+                    billed annually
+                  </p>
+                ) : null}
+                {planKey === 'max' ? (
+                  <p className='mt-2 text-app text-tertiary-token'>
+                    {isMaxPurchaseEnabled()
+                      ? 'Paid Max plan. No Max trial.'
+                      : 'Max is early access. No Max trial.'}
+                  </p>
+                ) : null}
 
                 <div className='mt-5'>
                   {renderCtaButton({
