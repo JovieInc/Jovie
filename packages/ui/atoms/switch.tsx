@@ -44,7 +44,7 @@ const Switch = React.forwardRef<
         'disabled:cursor-not-allowed disabled:opacity-[var(--state-disabled-opacity)]',
         'data-[state=unchecked]:bg-surface-2 data-[state=unchecked]:border data-[state=unchecked]:border-subtle data-[state=unchecked]:hover:bg-surface-3 disabled:data-[state=unchecked]:hover:bg-surface-2',
         'data-[state=checked]:bg-btn-primary data-[state=checked]:hover:bg-btn-primary-hover disabled:data-[state=checked]:hover:bg-btn-primary',
-        'aria-[invalid=true]:border-error aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-error/35',
+        'aria-[invalid=true]:!border aria-[invalid=true]:!border-error aria-[invalid=true]:!ring-0',
         className
       )}
       {...props}
