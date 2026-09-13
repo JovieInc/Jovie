@@ -15,7 +15,9 @@ from pathlib import Path
 import re
 import stat
 import subprocess
+import tempfile
 import time
+import uuid
 from datetime import datetime, timezone
 
 SCHEMA = "symphony-existing-pr-repair/v1"
@@ -26,6 +28,14 @@ GUARD = Path.home() / ".local/bin/symphony-lease-guard"
 MAX_SECONDS = 5400
 REPOS = {"JOV": "JovieInc/Jovie", "LYB": "JovieInc/LogYourBody"}
 UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
+PROVIDER_GRANT_SCHEMA = "symphony-provider-grant/v1"
+QUALIFICATION_SCHEMA = "symphony-provider-qualification/v1"
+GROK_PROVIDER = "grok"
+GROK_MODEL = "grok-4.6"
+PROVIDER_GRANT_ID = r"[A-Za-z0-9][A-Za-z0-9._:-]{7,127}"
+MAX_PROVIDER_OUTPUT_BYTES = 128 * 1024
+MAX_QUALIFICATION_AGE_SECONDS = 10 * 60
+EXECUTION_EVIDENCE_SCHEMA = "symphony-existing-repair-evidence/v1"
 # This is an authorization-policy binding, not a provider model identifier.
 # The owner must explicitly attest the Fable 5.1 last-resort exception while
 # leaving the router-selected model opaque to this repair contract.
@@ -115,12 +125,324 @@ def assignment_digest(payload):
                                      ensure_ascii=False).encode()).hexdigest()
 
 
-def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None):
-    """Existing consumer adapter. Default is held, never an inferred live executor.
+def _iso_now():
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    Executor injection is for regression tests until the owner qualifies and installs
-    an adapter using the canonical router. It must expose qualify and execute; a
-    Summer class admission or model name is not an executor capability receipt.
+
+def _digest(value):
+    return assignment_digest(value)
+
+
+def _receipt_path(identifier, suffix):
+    return ROOT / f"{identifier}.{suffix}.json"
+
+
+def _replace_private(path, payload):
+    """Atomically replace one host-owned receipt and fsync its directory."""
+    private_directory()
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=ROOT)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as handle:
+            json.dump(payload, handle, sort_keys=True, ensure_ascii=False)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        directory = os.open(ROOT, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _trusted_file(path_value, expected_digest, label, *, executable=False):
+    require(isinstance(path_value, str) and Path(path_value).is_absolute(),
+            f"{label}-path-invalid")
+    path = Path(path_value)
+    require(path.resolve() == path and not path.is_symlink(),
+            f"{label}-path-untrusted")
+    info = path.stat()
+    require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+            and not (stat.S_IMODE(info.st_mode) & 0o022),
+            f"{label}-file-untrusted")
+    if executable:
+        require(os.access(path, os.X_OK), f"{label}-not-executable")
+    require(isinstance(expected_digest, str) and re.fullmatch(r"[a-f0-9]{64}", expected_digest)
+            and hashlib.sha256(path.read_bytes()).hexdigest() == expected_digest,
+            f"{label}-digest-mismatch")
+    return path
+
+
+def _grant_time(value, label):
+    require(type(value) in (int, float) and math.isfinite(value),
+            f"provider-grant-{label}-invalid")
+    return float(value)
+
+
+def validate_provider_grant(payload, now=None):
+    """Validate the operator-owned provider grant without claiming or executing.
+
+    The grant is deliberately nested in the private assignment. Its digest is
+    therefore already covered by the v3 assignmentDigest carried on the wire,
+    while these checks bind the selected provider to the exact host, account,
+    workspace, issue, PR, and source files that will execute.
+    """
+    grant = payload.get("providerGrant") if isinstance(payload, dict) else None
+    require(isinstance(grant, dict) and grant.get("schema") == PROVIDER_GRANT_SCHEMA,
+            "provider-grant-missing")
+    required = {
+        "schema", "grantId", "provider", "model", "routerId", "routerPath",
+        "routerDigest", "accountUserId", "authPoolIdentity", "authStatePath",
+        "authStateSha256", "executablePath", "executableSha256", "qualification",
+        "identifier", "issueId", "repository", "pr", "head", "workspace",
+        "issuedAt", "expiresAt", "funding", "taskAppropriate", "costAppropriate",
+        "delegationPolicyBound",
+    }
+    require(set(grant) == required, "provider-grant-fields-invalid")
+    require(isinstance(grant.get("grantId"), str)
+            and re.fullmatch(PROVIDER_GRANT_ID, grant["grantId"]),
+            "provider-grant-id-invalid")
+    require(grant.get("provider") == GROK_PROVIDER and grant.get("model") == GROK_MODEL,
+            "provider-grant-route-invalid")
+    require(isinstance(grant.get("routerId"), str)
+            and 1 <= len(grant["routerId"]) <= 128,
+            "provider-grant-router-invalid")
+    require(isinstance(grant.get("accountUserId"), str)
+            and re.fullmatch(UUID, grant["accountUserId"]),
+            "provider-grant-account-invalid")
+    for key in ("authPoolIdentity", "routerDigest", "authStateSha256", "executableSha256"):
+        require(isinstance(grant.get(key), str)
+                and re.fullmatch(r"[a-f0-9]{64}", grant[key]),
+                f"provider-grant-{key}-invalid")
+    for key, expected in (("identifier", payload.get("identifier")),
+                          ("issueId", payload.get("issueId")),
+                          ("repository", payload.get("repository")),
+                          ("pr", payload.get("pr")),
+                          ("head", payload.get("head")),
+                          ("workspace", payload.get("workspace"))):
+        require(grant.get(key) == expected, f"provider-grant-{key}-mismatch")
+    require(grant.get("funding") == "included-local"
+            and grant.get("taskAppropriate") is True
+            and grant.get("costAppropriate") is True
+            and grant.get("delegationPolicyBound") is True,
+            "provider-grant-policy-invalid")
+    issued = _grant_time(grant.get("issuedAt"), "issued-at")
+    expires = _grant_time(grant.get("expiresAt"), "expires-at")
+    current = time.time() if now is None else float(now)
+    assignment_issued = _grant_time(payload.get("issuedAt"), "assignment-issued-at")
+    assignment_expires = _grant_time(payload.get("expiresAt"), "assignment-expires-at")
+    require(0 < assignment_expires - assignment_issued <= MAX_SECONDS
+            and assignment_issued <= current < assignment_expires,
+            "provider-grant-assignment-window-invalid")
+    require(0 < expires - issued <= MAX_SECONDS and issued <= current < expires,
+            "provider-grant-expired-or-future")
+    require(issued >= assignment_issued and expires <= assignment_expires,
+            "provider-grant-assignment-window-invalid")
+    qualification = grant.get("qualification")
+    qualification_required = {
+        "schema", "marker", "provider", "model", "cliVersion", "observedAt",
+        "outputDigest", "accountUserId", "authPoolIdentity", "includedRemainingPercent",
+    }
+    require(isinstance(qualification, dict)
+            and set(qualification) == qualification_required
+            and qualification.get("schema") == QUALIFICATION_SCHEMA
+            and qualification.get("marker") == "GEM_GROK_QUALIFIED"
+            and qualification.get("provider") == GROK_PROVIDER
+            and qualification.get("model") == GROK_MODEL
+            and isinstance(qualification.get("cliVersion"), str)
+            and 1 <= len(qualification["cliVersion"]) <= 32
+            and isinstance(qualification.get("outputDigest"), str)
+            and re.fullmatch(r"[a-f0-9]{64}", qualification["outputDigest"])
+            and qualification.get("accountUserId") == grant["accountUserId"]
+            and qualification.get("authPoolIdentity") == grant["authPoolIdentity"]
+            and type(qualification.get("includedRemainingPercent")) is int
+            and 0 < qualification["includedRemainingPercent"] <= 100,
+            "provider-grant-qualification-invalid")
+    try:
+        qualified_datetime = datetime.fromisoformat(
+            qualification["observedAt"].replace("Z", "+00:00")
+        )
+        require(qualified_datetime.tzinfo is not None
+                and qualified_datetime.utcoffset() is not None,
+                "provider-grant-qualification-time-invalid")
+        qualified_at = qualified_datetime.timestamp()
+    except (AttributeError, TypeError, ValueError):
+        raise ValueError("provider-grant-qualification-time-invalid")
+    require(current - qualified_at <= MAX_QUALIFICATION_AGE_SECONDS
+            and qualified_at - current <= 60,
+            "provider-grant-qualification-stale")
+    _trusted_file(grant["routerPath"], grant["routerDigest"], "provider-grant-router")
+    _trusted_file(grant["authStatePath"], grant["authStateSha256"], "provider-grant-auth")
+    executable = _trusted_file(
+        grant["executablePath"], grant["executableSha256"],
+        "provider-grant-executable", executable=True
+    )
+    return grant, executable
+
+
+def load_validated_candidate(identifier, controller):
+    """Read one complete, provider-qualified assignment without side effects."""
+    payload = load_isolated(identifier, controller)
+    validate_provider_grant(payload)
+    require(not _assignment_consumed(identifier), "assignment-consumed")
+    return payload
+
+
+def _assignment_consumed(identifier):
+    """Return whether the host ledger has already consumed this assignment."""
+    assignment_path(identifier)
+    return any(os.path.lexists(ROOT / path) for path in (
+        f"{identifier}.claim",
+        f"{identifier}.execution.json",
+    ))
+
+
+def _lease_digest(payload):
+    return _digest({"identifier": payload["identifier"], "leaseIdentity": payload["leaseIdentity"]})
+
+
+def _execution_evidence_digest(execution):
+    unsigned = {key: value for key, value in execution.items() if key != "evidenceDigest"}
+    return _digest({"schema": EXECUTION_EVIDENCE_SCHEMA, **unsigned})
+
+
+def _repair_prompt(task, payload):
+    target = task["existingRepair"]
+    return "\n".join((
+        "You are the bounded worker for one already-owned existing PR repair.",
+        f"Issue: {target['identifier']} ({target['issueId']})",
+        f"Repository: {target['repository']}, PR: {target['pr']}",
+        f"Workspace: {target['workspace']}",
+        f"Starting head: {target['head']}",
+        f"Task fingerprint: {task['taskKey']}",
+        f"Selected bottleneck: {task['selected']['id']}",
+        f"Source revision: {task['source']['sourceVersion']}",
+        "Work only in this exact checkout and existing PR branch.",
+        "Make the smallest correct repair, run the relevant tests, commit, and push the existing branch.",
+        "Do not create an issue or PR, change issue ownership, merge, deploy, alter queue policy, or use another workspace.",
+        "Do not weaken tests or gates. If the repair cannot be completed, exit nonzero after preserving the exact reason.",
+    ))
+
+
+class GrokOwnedRepairExecutor:
+    """The installed, grant-bound Grok CLI worker for existing PR repairs."""
+
+    def __init__(self, run=subprocess.run):
+        self.run = run
+
+    def qualify(self, task, payload):
+        grant, executable = validate_provider_grant(payload)
+        require(task.get("existingRepair", {}).get("assignmentDigest")
+                == assignment_digest(payload), "provider-grant-assignment-mismatch")
+        return {
+            "qualified": True,
+            "provider": grant["provider"],
+            "model": grant["model"],
+            "funding": grant["funding"],
+            "taskAppropriate": grant["taskAppropriate"],
+            "costAppropriate": grant["costAppropriate"],
+            "delegationPolicyBound": grant["delegationPolicyBound"],
+            "expiresAt": grant["expiresAt"],
+            "authPoolIdentity": grant["authPoolIdentity"],
+            "grantDigest": assignment_digest(grant),
+            "routerId": grant["routerId"],
+            "routerDigest": grant["routerDigest"],
+            "accountUserId": grant["accountUserId"],
+            "executablePath": str(executable),
+        }
+
+    def execute(self, task, payload, eligibility, *, lease_fd=9):
+        require(lease_fd == 9 and os.environ.get("SYMPHONY_ISSUE_LEASE_FD") == "9",
+                "provider-grant-lease-missing")
+        grant, executable = validate_provider_grant(payload)
+        require(eligibility.get("provider") == grant["provider"]
+                and eligibility.get("model") == grant["model"]
+                and eligibility.get("authPoolIdentity") == grant["authPoolIdentity"],
+                "provider-grant-qualification-drift")
+        workspace = Path(payload["workspace"])
+        base_head = _git_head(workspace)
+        environment = os.environ.copy()
+        for secret in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "LINEAR_API_KEY", "GITHUB_TOKEN", "GH_TOKEN"):
+            environment.pop(secret, None)
+        command = [
+            str(executable), "-m", grant["model"], "--always-approve",
+            "--cwd", str(workspace), "--disable-web-search", "--no-subagents",
+            "-p", _repair_prompt(task, payload),
+        ]
+        run_id = eligibility.get("runId")
+        require(isinstance(run_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", run_id),
+                "provider-run-id-missing")
+        output_digest = None
+        exit_code = None
+        detail = "grok-execution-failed"
+        status = "failed"
+        try:
+            completed = self.run(
+                command, cwd=str(workspace), env=environment, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                timeout=MAX_SECONDS, check=False, pass_fds=(9,),
+            )
+            stdout = completed.stdout or ""
+            stderr = completed.stderr or ""
+            output_digest = _digest({"stdout": stdout[-MAX_PROVIDER_OUTPUT_BYTES:],
+                                     "stderr": stderr[-MAX_PROVIDER_OUTPUT_BYTES:]})
+            exit_code = completed.returncode
+            if len(stdout.encode()) > MAX_PROVIDER_OUTPUT_BYTES or len(stderr.encode()) > MAX_PROVIDER_OUTPUT_BYTES:
+                detail = "grok-execution-output-too-large"
+            elif exit_code == 0:
+                detail = "grok-execution-succeeded"
+                status = "succeeded"
+            else:
+                detail = f"grok-execution-exit-{exit_code}"
+        except subprocess.TimeoutExpired:
+            output_digest = _digest({"timeout": True, "runId": run_id})
+            detail = "grok-execution-timeout"
+        except (OSError, subprocess.SubprocessError):
+            output_digest = _digest({"launch": "failed", "runId": run_id})
+            detail = "grok-execution-launch-failed"
+        try:
+            final_head = _git_head(workspace)
+        except (OSError, subprocess.SubprocessError, ValueError):
+            final_head = base_head
+            detail = "grok-final-head-unavailable"
+            status = "failed"
+        if status == "succeeded" and final_head == base_head:
+            detail = "grok-execution-no-source-change"
+            status = "failed"
+        return {
+            "status": status,
+            "detail": detail,
+            "completedAt": _iso_now(),
+            "_executionObservation": {
+                "baseHead": base_head,
+                "finalHead": final_head,
+                "outputDigest": output_digest or _digest({"runId": run_id}),
+                "exitCode": exit_code,
+                "headChanged": final_head != base_head,
+            },
+        }
+
+
+def _git_head(workspace):
+    result = subprocess.run(
+        ["git", "-C", str(workspace), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True, timeout=10,
+    )
+    head = result.stdout.strip()
+    require(re.fullmatch(r"[0-9a-f]{40}", head), "provider-workspace-head-invalid")
+    return head
+
+
+def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None):
+    """Run one signed, assigned repair under the shared issue lease.
+
+    The live path requires the host-owned provider grant and uses the installed
+    Grok adapter. Test callers may inject a qualification/execution double; that
+    path never becomes an admission source for production.
     """
     require(isinstance(task, dict) and task.get("schema") == "jovie-symphony-repair-task/v3"
             and task.get("action") == "execute-existing-owned-repair"
@@ -144,11 +466,36 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
                 receipt.get("assignmentDigest") == target["assignmentDigest"], "isolated-repair-result-cross-bound")
         return receipt["result"]
     if os.path.lexists(ROOT / f"{identifier}.claim"):
+        acceptance_path = _receipt_path(identifier, "acceptance")
+        run_path = _receipt_path(identifier, "run")
+        recovery_path = _receipt_path(identifier, "recovery")
+        acceptance = read_private(acceptance_path) if os.path.lexists(acceptance_path) else None
+        run = read_private(run_path) if os.path.lexists(run_path) else None
+        recovery = {
+            "schema": "symphony-existing-repair-recovery/v1",
+            "taskKey": task["taskKey"],
+            "assignmentDigest": target["assignmentDigest"],
+            "identifier": identifier,
+            "state": "unknown",
+            "reason": "claimed-execution-without-terminal-result",
+            "runId": (run or acceptance or {}).get("runId"),
+            "observedAt": _iso_now(),
+        }
+        if os.path.lexists(recovery_path):
+            stored = read_private(recovery_path)
+            require(stored.get("taskKey") == recovery["taskKey"] and
+                    stored.get("assignmentDigest") == recovery["assignmentDigest"],
+                    "isolated-repair-recovery-cross-bound")
+        else:
+            exclusive_write(recovery_path, recovery)
         return {"status": "held", "reason": "isolated-repair-claimed-outcome-unknown"}
-    # No real adapter is qualified by this source change. Do not fall through to
-    # generic issue reconciliation (which writes Linear and chooses a workspace).
-    if executor is None:
-        return {"status": "held", "reason": "qualified-isolated-repair-executor-unavailable"}
+    live = executor is None
+    if live:
+        try:
+            validate_provider_grant(payload)
+        except (OSError, ValueError, KeyError, TypeError):
+            return {"status": "held", "reason": "qualified-isolated-repair-executor-unavailable"}
+        executor = GrokOwnedRepairExecutor()
     eligibility = executor.qualify(task, payload)
     require(isinstance(eligibility, dict) and eligibility.get("qualified") is True
             and isinstance(eligibility.get("provider"), str)
@@ -197,10 +544,108 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
             check_workspace(payload, mapped[0])
             check_writer(payload, inherited=True)
             require(executor.qualify(task, payload) == eligibility, "isolated-repair-router-changed")
-            exclusive_write(ROOT / f"{identifier}.claim", {**payload, "taskKey": task["taskKey"], "task": task, "eligibility": eligibility})
-            # The one-use claim remains on uncertainty; no automatic repeat of work.
-            result = executor.execute(task, payload, eligibility, lease_fd=9)
+            claim_payload = {**payload, "taskKey": task["taskKey"], "task": task, "eligibility": eligibility}
+            exclusive_write(ROOT / f"{identifier}.claim", claim_payload)
+            run_id = f"{identifier}-{uuid.uuid4().hex}"
+            provider_grant = payload.get("providerGrant")
+            provider_grant_digest = (
+                _digest(provider_grant) if isinstance(provider_grant, dict)
+                else eligibility.get("grantDigest") or _digest({"injected": True, "taskKey": task["taskKey"]})
+            )
+            lease_digest = _lease_digest(payload)
+            acceptance = {
+                "schema": "symphony-existing-repair-acceptance/v1",
+                "taskKey": task["taskKey"],
+                "assignmentDigest": target["assignmentDigest"],
+                "providerGrantDigest": provider_grant_digest,
+                "runId": run_id,
+                "provider": eligibility["provider"],
+                "model": eligibility["model"],
+                "authPoolIdentity": eligibility["authPoolIdentity"],
+                "leaseIdentity": lease_digest,
+                "identifier": identifier,
+                "issueId": payload["issueId"],
+                "repository": payload["repository"],
+                "pr": payload["pr"],
+                "head": payload["head"],
+                "workspace": payload["workspace"],
+                "acceptedAt": _iso_now(),
+            }
+            acceptance_path = _receipt_path(identifier, "acceptance")
+            exclusive_write(acceptance_path, acceptance)
+            run_started = {
+                "schema": "symphony-existing-repair-run/v1",
+                "taskKey": task["taskKey"],
+                "assignmentDigest": target["assignmentDigest"],
+                "providerGrantDigest": provider_grant_digest,
+                "runId": run_id,
+                "provider": eligibility["provider"],
+                "model": eligibility["model"],
+                "authPoolIdentity": eligibility["authPoolIdentity"],
+                "leaseIdentity": lease_digest,
+                "status": "started",
+                "startedAt": _iso_now(),
+            }
+            run_path = _receipt_path(identifier, "run")
+            exclusive_write(run_path, run_started)
+            # The one-use claim, acceptance, and run receipt remain on uncertainty;
+            # a restart records recovery and never starts the provider twice.
+            execution_input = {**eligibility, "runId": run_id}
+            result = executor.execute(task, payload, execution_input, lease_fd=9)
+            require(isinstance(result, dict) and result.get("status") in ("succeeded", "failed"),
+                    "isolated-repair-result-invalid")
+            observation = result.pop("_executionObservation", {}) if isinstance(result, dict) else {}
+            base_head = observation.get("baseHead", payload["head"])
+            final_head = observation.get("finalHead", base_head)
+            require(re.fullmatch(r"[0-9a-f]{40}", base_head)
+                    and re.fullmatch(r"[0-9a-f]{40}", final_head),
+                    "isolated-repair-result-head-invalid")
+            output_digest = observation.get("outputDigest") or _digest({"runId": run_id})
+            require(re.fullmatch(r"[a-f0-9]{64}", output_digest), "isolated-repair-result-evidence-invalid")
+            run_terminal = {
+                **run_started,
+                "status": result["status"],
+                "completedAt": result.get("completedAt") or _iso_now(),
+                "baseHead": base_head,
+                "finalHead": final_head,
+                "outputDigest": output_digest,
+                "exitCode": observation.get("exitCode"),
+            }
+            run_digest = _digest(run_terminal)
+            verification = {
+                "schema": EXECUTION_EVIDENCE_SCHEMA,
+                "claimRecorded": True,
+                "acceptanceRecorded": True,
+                "runStarted": True,
+                "runTerminal": True,
+                "resultPersisted": True,
+                "leaseHeld": True,
+                "workspaceBound": True,
+                "headObserved": True,
+                "headChanged": final_head != base_head,
+            }
+            execution = {
+                "runId": run_id,
+                "provider": eligibility["provider"],
+                "model": eligibility["model"],
+                "authPoolIdentity": eligibility["authPoolIdentity"],
+                "leaseIdentity": lease_digest,
+                "evidenceDigest": "0" * 64,
+                "assignmentDigest": target["assignmentDigest"],
+                "providerGrantDigest": provider_grant_digest,
+                "acceptanceDigest": _digest(acceptance),
+                "runDigest": run_digest,
+                "baseHead": base_head,
+                "finalHead": final_head,
+                "outputDigest": output_digest,
+                "verification": verification,
+            }
+            execution["evidenceDigest"] = _execution_evidence_digest(execution)
+            result["completedAt"] = run_terminal["completedAt"]
+            result["detail"] = str(result.get("detail") or "isolated-repair-completed")[:240]
+            result["execution"] = execution
             exclusive_write(result_path, {"taskKey": task["taskKey"], "assignmentDigest": target["assignmentDigest"], "result": result})
+            _replace_private(run_path, run_terminal)
             return result
         finally:
             if original is None:
@@ -221,6 +666,8 @@ def candidates(controller):
     for path in ROOT.glob("*.json"):
         try:
             payload = read_private(path)
+            if _assignment_consumed(path.stem):
+                continue
             result.append(validate_isolated(payload, path.stem, controller) if payload.get("schema") == ISOLATED_SCHEMA
                           else validate(payload, path.stem, controller))
         except (OSError, ValueError, KeyError, TypeError):
