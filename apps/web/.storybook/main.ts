@@ -10,6 +10,7 @@ const LIVE_CERT_STORIES = [
   '../../../packages/ui/atoms/badge.stories.tsx',
   '../../../packages/ui/atoms/button.stories.tsx',
   '../../../packages/ui/atoms/Card.stories.tsx',
+  '../../../packages/ui/atoms/switch.stories.tsx',
 ] as const;
 
 const FULL_CATALOG_STORIES = [

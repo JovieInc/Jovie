@@ -332,6 +332,9 @@ describe('live Storybook component certification', () => {
     expect(storyIdFromTitleAndExport('UI/Atoms/Card', 'Hoverable')).toBe(
       'ui-atoms-card--hoverable'
     );
+    expect(
+      storyIdFromTitleAndExport('UI/Atoms/Switch', 'ConformanceMatrix')
+    ).toBe('ui-atoms-switch--conformance-matrix');
   });
 
   it('validates exact canonical story ids and import paths before evaluation', () => {
@@ -343,6 +346,7 @@ describe('live Storybook component certification', () => {
       'shadcn-button--primary',
       'ui-atoms-card--default',
       'ui-atoms-card--hoverable',
+      'ui-atoms-switch--conformance-matrix',
     ]);
     const broken = clone(CANONICAL_LIVE_STORIES);
     broken[0].id = 'ui-atoms-badge--wrong';
@@ -376,7 +380,7 @@ describe('live Storybook component certification', () => {
     expect(result.issues.join('\n')).toMatch(/Default is not declared|missing/);
   });
 
-  it('accepts five seeded primitive stories at desktop and compact viewports', () => {
+  it('accepts six seeded primitive stories at desktop and compact viewports', () => {
     const samples = seededPassingObservations();
     expect(samples).toHaveLength(
       CANONICAL_LIVE_STORIES.length * LIVE_VIEWPORTS.length
@@ -392,7 +396,7 @@ describe('live Storybook component certification', () => {
     expect(result.ok).toBe(true);
     expect(result.receipt.liveVisualCertification).toMatchObject({
       status: 'certified',
-      certified: 5,
+      certified: 6,
       claimBoundary: 'enrolled-canonical-primitive-stories-only',
       viewports: ['desktop', 'compact'],
     });
@@ -507,6 +511,11 @@ describe('live Storybook component certification', () => {
         item => item.id
       )
     ).toEqual(['ui-atoms-badge--default', 'ui-atoms-badge--tones']);
+    expect(
+      selectLiveStoriesForChanges(['packages/ui/atoms/switch.tsx']).map(
+        item => item.id
+      )
+    ).toEqual(['ui-atoms-switch--conformance-matrix']);
 
     const docsOnly = runLiveStorybookCertification({
       headSha: HEAD,

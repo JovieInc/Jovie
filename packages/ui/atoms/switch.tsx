@@ -5,6 +5,16 @@ import * as React from 'react';
 
 import { cn } from '../lib/utils';
 
+type SwitchProps = Omit<
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>,
+  'children'
+> & {
+  /** Optional styling hook for a feature-specific thumb treatment. */
+  readonly thumbClassName?: string;
+  /** Optional content rendered inside the thumb, such as a theme icon. */
+  readonly thumbChildren?: React.ReactNode;
+};
+
 /**
  * System B switch component.
  * 28×16px track, 12×12px thumb, tokenized 150ms state transition.
@@ -12,8 +22,8 @@ import { cn } from '../lib/utils';
  */
 const Switch = React.forwardRef<
   React.ComponentRef<typeof SwitchPrimitives.Root>,
-  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
->(({ className, ...props }, ref) => (
+  SwitchProps
+>(({ className, thumbClassName, thumbChildren, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
       'peer relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full px-0.5 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
@@ -31,9 +41,12 @@ const Switch = React.forwardRef<
       className={cn(
         'pointer-events-none block h-3 w-3 rounded-full bg-btn-primary-foreground shadow-sm ring-0',
         'transition-transform duration-subtle ease-subtle motion-reduce:transition-none',
-        'data-[state=checked]:translate-x-3'
+        'data-[state=checked]:translate-x-3',
+        thumbClassName
       )}
-    />
+    >
+      {thumbChildren}
+    </SwitchPrimitives.Thumb>
   </SwitchPrimitives.Root>
 ));
 Switch.displayName = SwitchPrimitives.Root.displayName;

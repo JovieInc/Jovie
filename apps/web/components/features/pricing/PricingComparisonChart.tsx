@@ -1,5 +1,6 @@
 'use client';
 
+import { Switch } from '@jovie/ui';
 import { Check, Minus } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import {
@@ -157,17 +158,13 @@ export function PricingComparisonChart() {
         >
           Monthly
         </span>
-        <button
-          type='button'
-          role='switch'
-          aria-checked={isAnnual}
+        <Switch
+          checked={isAnnual}
+          onCheckedChange={setIsAnnual}
           aria-label='Toggle Annual Billing'
-          onClick={() => setIsAnnual(value => !value)}
           className='system-b-pricing-switch'
-          data-state={isAnnual ? 'annual' : 'monthly'}
-        >
-          <span className='system-b-pricing-switch-thumb' />
-        </button>
+          thumbClassName='system-b-pricing-switch-thumb'
+        />
         <span
           className='system-b-pricing-billing-label'
           data-active={isAnnual ? 'true' : undefined}

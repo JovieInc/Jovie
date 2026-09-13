@@ -1,6 +1,6 @@
 'use client';
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Switch, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 import { MoonIcon, SunIcon } from './ThemeIcons';
@@ -161,30 +161,24 @@ function ThemeToggleButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type='button'
+        <Switch
+          checked={isDark}
+          onCheckedChange={() => onToggle()}
           disabled={isUpdating}
-          onClick={onToggle}
+          aria-label={srText}
           className={cn(
             'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-subtle transition-colors duration-subtle ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
             isDark ? 'bg-(--linear-border-focus)' : 'bg-surface-0',
-            'p-0.5'
+            'p-0.5',
+            'data-[state=checked]:bg-(--linear-border-focus) data-[state=unchecked]:bg-surface-0'
           )}
-          role='switch'
-          aria-checked={isDark}
-        >
-          <span className='sr-only'>{srText}</span>
-          <span
-            aria-hidden='true'
-            className={cn(
-              'flex h-5 w-5 transform items-center justify-center rounded-full bg-surface-1 shadow ring-0 transition duration-subtle ease-out',
-              isDark ? 'translate-x-5' : 'translate-x-0',
-              isUpdating && 'animate-pulse motion-reduce:animate-none'
-            )}
-          >
-            <ThemeIcon className='h-3 w-3 text-primary-token' />
-          </span>
-        </button>
+          thumbClassName={cn(
+            'flex h-5 w-5 transform items-center justify-center rounded-full bg-surface-1 shadow ring-0 transition duration-subtle ease-out',
+            'data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0',
+            isUpdating && 'animate-pulse motion-reduce:animate-none'
+          )}
+          thumbChildren={<ThemeIcon className='h-3 w-3 text-primary-token' />}
+        />
       </TooltipTrigger>
       <TooltipContent side='right'>{tooltipText}</TooltipContent>
     </Tooltip>
