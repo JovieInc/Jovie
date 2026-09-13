@@ -1,7 +1,7 @@
 {
   "confirm": "install-jov-6163-publisher",
-  "reason": "JOV-6163 E1 — Cursor GitHub App lacks actions:write (workflow_dispatch 403). Landing this signal on main starts gem-publisher-commission via push trigger; tip_sha is the merge commit.",
-  "requestedAt": "2026-09-13T02:25:00Z",
+  "reason": "JOV-6163 E1 — re-fire after bare-mirror align fix. Cursor GitHub App lacks actions:write (workflow_dispatch 403). Landing this signal on main starts gem-publisher-commission via push trigger; tip_sha is the merge commit.",
+  "requestedAt": "2026-09-13T05:25:00Z",
   "requestedBy": "cursor-agent",
   "linear": "JOV-6163"
 }
