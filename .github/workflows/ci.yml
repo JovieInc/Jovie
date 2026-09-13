@@ -4014,12 +4014,14 @@ jobs:
     # Run V8 coverage on the exact source head and exact synthetic merge-group
     # head. Docs-only heads keep an explicit green no-code receipt without
     # spending a runner on an empty coverage pass.
+    # Job timeout must fail before GitHub merge-queue
+    # check_response_timeout_minutes=20 (policy-locked in merge-queue-guard).
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
       (github.event_name == 'pull_request' || github.event_name == 'merge_group')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 18
     permissions:
       contents: read
     steps:
@@ -4084,7 +4086,14 @@ jobs:
               echo 'No coverable web product source; non-applicable exact-head coverage receipt.'
               exit 0
             fi
-            pnpm --filter @jovie/web test:coverage -- --changed \"\$COVERAGE_BASE\"
+            include=\$(printf '%s' \"\$plan_json\" | jq -r '.coverageInclude[]')
+            if [[ -z \"\$include\" ]]; then
+              echo 'Applicable exact-head coverage plan produced no include paths.'
+              exit 1
+            fi
+            export JOVIE_COVERAGE_INCLUDE=\"\$include\"
+            timeout --kill-after=20s 15m \
+              pnpm --filter @jovie/web test:coverage -- --changed \"\$COVERAGE_BASE\" --bail 1
             node scripts/check-changed-test-coverage.mjs \
               --base \"\$COVERAGE_BASE\" \
               --head \"\$EXPECTED_HEAD\"

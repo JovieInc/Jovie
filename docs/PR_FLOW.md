@@ -371,7 +371,8 @@ existed. Contract:
    Per-PR concurrency cancels superseded runs.
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
-   repeats it on the synthetic combined head. Non-web heads emit an explicit
+   repeats it on the synthetic combined head and must finish inside the
+   20-minute merge-queue check budget. Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.
    Regression receipt: source run 32547855063 spent 3180.55 seconds collecting
