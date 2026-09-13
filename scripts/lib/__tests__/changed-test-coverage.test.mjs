@@ -142,6 +142,7 @@ describe('changed test coverage', () => {
     expect(coverage).toContain(
       'Applicable exact-head coverage plan produced no include paths.'
     );
+    expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
     expect(coverage).toContain(
       `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
     );

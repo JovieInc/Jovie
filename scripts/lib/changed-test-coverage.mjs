@@ -7,7 +7,8 @@ const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 export const MIN_CHANGED_LINE_COVERAGE = 60;
 /** Must fail before GitHub merge-queue check_response_timeout_minutes=20. */
 export const EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES = 18;
-export const EXACT_HEAD_COVERAGE_STEP_TIMEOUT = '15m';
+/** Must stay in lockstep with ci.yml Exact-head Coverage `timeout --kill-after=20s`. */
+export const EXACT_HEAD_COVERAGE_STEP_TIMEOUT = '17m';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const WEB_SOURCE_PREFIX = 'apps/web/';
 
