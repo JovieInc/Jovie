@@ -7,6 +7,8 @@
  * NO server-only imports — this file must be client-importable.
  */
 
+import { SUPPORT_EMAIL } from '@/constants/domains';
+
 /** Current public offer. Legacy annual/Max prices below only resolve existing plans. */
 export const ARTIST_VISIBILITY_OFFER = {
   free: {
@@ -29,6 +31,7 @@ export const ARTIST_VISIBILITY_OFFER = {
   enterprise: {
     displayName: 'Enterprise',
     cta: 'Contact sales',
+    href: `mailto:${SUPPORT_EMAIL}`,
     checkout: false,
   },
   fanSends: {
