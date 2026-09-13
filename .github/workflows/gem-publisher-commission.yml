@@ -1,5 +1,7 @@
 name: Gem Publisher Commission (JOV-6163 E1)
 # Publisher-only install on jovie-fixed when activation coalesces past Install.
+# workflow_dispatch needs actions:write. Push of ops/signals/gem-publisher-commission.request
+# lets MQ land the same confirm gate when the dispatcher lacks actions:write.
 on:
   workflow_dispatch:
     inputs:
@@ -11,6 +13,10 @@ on:
         description: Type install-jov-6163-publisher to confirm
         required: true
         type: string
+  push:
+    branches: [main]
+    paths:
+      - 'ops/signals/gem-publisher-commission.request'
 permissions:
   contents: read
 concurrency:
@@ -19,19 +25,46 @@ concurrency:
 jobs:
   commission:
     name: Install JOV-6163 publisher on Gem
-    if: github.event.inputs.confirm == 'install-jov-6163-publisher'
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.confirm == 'install-jov-6163-publisher') ||
+      github.event_name == 'push'
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 10
     steps:
       - name: Checkout exact tip
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.inputs.tip_sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tip_sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Resolve tip + confirm
+        id: req
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TIP: ${{ github.event.inputs.tip_sha }}
+          DISPATCH_CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            tip_sha="$DISPATCH_TIP"
+            confirm="$DISPATCH_CONFIRM"
+          else
+            signal=ops/signals/gem-publisher-commission.request
+            test -f "$signal"
+            confirm="$(jq -r '.confirm // empty' "$signal")"
+            tip_sha="$(git rev-parse HEAD)"
+          fi
+          if [[ "$confirm" != install-jov-6163-publisher ]]; then
+            echo "::error::confirm must be install-jov-6163-publisher (got ${confirm:-empty})"
+            exit 2
+          fi
+          [[ "$tip_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "tip_sha=$tip_sha" >> "$GITHUB_OUTPUT"
+          echo "confirm=$confirm" >> "$GITHUB_OUTPUT"
       - name: Refuse tip drift / wrong host
         env:
-          TIP_SHA: ${{ github.event.inputs.tip_sha }}
+          TIP_SHA: ${{ steps.req.outputs.tip_sha }}
         run: |
           set -euo pipefail
           test "$(id -un)" = timwhite
@@ -58,7 +91,7 @@ jobs:
           } >> "${GITHUB_ENV}"
       - name: Align runner-source revision
         env:
-          TIP_SHA: ${{ github.event.inputs.tip_sha }}
+          TIP_SHA: ${{ steps.req.outputs.tip_sha }}
           ALIGN_ALLOW_CHECKOUT: '1'
         run: bash scripts/symphony/align-runner-source-revision.sh "$TIP_SHA"
       - name: Install publisher onto attestation timer
@@ -68,7 +101,7 @@ jobs:
             bash scripts/symphony/install-gem-service-attestation.sh "$GITHUB_WORKSPACE"
       - name: Verify + two ≤600s observations
         env:
-          TIP_SHA: ${{ github.event.inputs.tip_sha }}
+          TIP_SHA: ${{ steps.req.outputs.tip_sha }}
           GEM_WORKSPACE: /home/timwhite/gem-workspace
         run: |
           set -euo pipefail
