@@ -59,10 +59,9 @@ describe('ChatEmptyStateOpportunityCards', () => {
     expect(
       screen.getByTestId('chat-empty-state-opportunity-cards')
     ).toBeTruthy();
-    expect(screen.getByTestId('chat-empty-opportunity-card-card-1')).toHaveAttribute(
-      'data-opportunity-format',
-      'compact'
-    );
+    expect(
+      screen.getByTestId('chat-empty-opportunity-card-card-1')
+    ).toHaveAttribute('data-opportunity-format', 'compact');
     expect(screen.getByText('Detroit listeners up 340%')).toBeTruthy();
     expect(screen.getByText('Playlist window this week')).toBeTruthy();
     expect(screen.getByText('Campaign results')).toBeTruthy();
