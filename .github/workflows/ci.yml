@@ -2241,6 +2241,7 @@ jobs:
                   tests/e2e/storybook-marketing-faq.spec.ts \
                   tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
+                  tests/e2e/storybook-sheet.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
               exit 0
             fi

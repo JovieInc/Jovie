@@ -53,6 +53,21 @@
       "testSources": ["packages/ui/atoms/input.test.tsx"],
       "penRootId": null,
       "sourceDigest": "baa12303f361963cfc88c69049bf7f08ec3fd47fb27cfa4eae3888f46c35d3aa"
+    },
+    {
+      "id": "atom.sheet",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/sheet.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/sheet.stories.tsx"],
+      "testSources": [
+        "apps/web/tests/e2e/storybook-sheet.spec.ts",
+        "packages/ui/atoms/sheet.test.tsx"
+      ],
+      "penRootId": null,
+      "sourceDigest": "26024026b935734507f62fbca31f53067d93fb7adaed217547210de05368de94"
     }
   ],
   "legacy": {
