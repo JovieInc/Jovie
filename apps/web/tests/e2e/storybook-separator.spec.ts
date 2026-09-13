@@ -147,7 +147,7 @@ async function measureSeparators(page: Page) {
     tokenProbe.style.visibility = 'hidden';
     tokenProbe.style.width = '1px';
     document.body.append(tokenProbe);
-    const tokenPaint = getComputedStyle(tokenProbe).backgroundColor;
+    const borderColorPaint = getComputedStyle(tokenProbe).backgroundColor;
     tokenProbe.remove();
 
     return {
@@ -162,13 +162,13 @@ async function measureSeparators(page: Page) {
         colorScheme: html.style.colorScheme,
       },
       surfaceBackground: surfaceStyle?.backgroundColor ?? null,
-      tokenDeclaration: root
+      borderColorDeclaration: root
         ? getComputedStyle(root)
             .getPropertyValue('--color-border-subtle')
             .trim()
         : '',
-      tokenPaint,
-      tokenPaintHasVisibleAlpha: hasVisiblePaintAlpha(tokenPaint),
+      borderColorPaint,
+      borderColorPaintHasVisibleAlpha: hasVisiblePaintAlpha(borderColorPaint),
       verticalDecorative: find('separator-vertical-decorative'),
       verticalSemantic: find('separator-vertical-semantic'),
     };
@@ -186,9 +186,9 @@ async function assertSeparatorContract(
   expect(measurement.rootTheme.className.split(/\s+/)).toContain(theme);
   expect(measurement.rootTheme.colorScheme).toBe(theme);
   expect(measurement.surfaceBackground).not.toBeNull();
-  expect(measurement.tokenDeclaration).not.toBe('');
-  expect(measurement.tokenPaint).not.toBe('');
-  expect(measurement.tokenPaintHasVisibleAlpha).toBe(true);
+  expect(measurement.borderColorDeclaration).not.toBe('');
+  expect(measurement.borderColorPaint).not.toBe('');
+  expect(measurement.borderColorPaintHasVisibleAlpha).toBe(true);
 
   expect(measurement.horizontalDecorative.role).toBe('none');
   expect(measurement.horizontalDecorative.dataOrientation).toBe('horizontal');
@@ -211,7 +211,7 @@ async function assertSeparatorContract(
       true
     );
     expect(separator.backgroundColor, `${label} token paint`).toBe(
-      measurement.tokenPaint
+      measurement.borderColorPaint
     );
   }
 
