@@ -374,6 +374,55 @@ describe('Profile AEO content', () => {
     ).toContain('description-identity-missing');
   });
 
+  it('preserves accepted source spans around unsupported claims', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        name: 'Al',
+        handle: 'al',
+        tagline: 'International producer',
+        career_highlights: [
+          'Raised $1.5 million in 2024.',
+          "The world's greatest artist.",
+          'Visit example.com.',
+          'U.S. producer with A/B testing.',
+          'Track "The Greatest Artist, Vol. 1" is in the catalog.',
+        ].join(' '),
+      },
+      now,
+    });
+
+    expect(
+      content.descriptionBlocks.find(block => block.kind === 'highlight')?.text
+    ).toBe(
+      'Al\'s profile highlights: Raised $1.5 million in 2024. Visit example.com. U.S. producer with A/B testing. Track "The Greatest Artist, Vol. 1" is in the catalog.'
+    );
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const compatibilityName: ProfileAeoContentModel = {
+      ...content,
+      artistName: 'Ａｌ',
+      description: content.description.map((paragraph, index) =>
+        index === 1 ? paragraph.replaceAll('Al', 'Ａｌ') : paragraph
+      ),
+      descriptionBlocks: content.descriptionBlocks.map((block, index) =>
+        index === 1
+          ? { ...block, text: block.text.replaceAll('Al', 'Ａｌ') }
+          : block
+      ),
+      descriptionSegments: content.descriptionSegments.map((segments, index) =>
+        index === 1
+          ? segments.map(segment => ({
+              ...segment,
+              text: segment.text.replaceAll('Al', 'Ａｌ'),
+            }))
+          : segments
+      ),
+    };
+
+    expect(validateProfileAeoContent(compatibilityName)).toEqual([]);
+  });
+
   it('builds the facts strip from genres, active year, hometown, and based-in', () => {
     const content = buildContent();
 

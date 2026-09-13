@@ -161,10 +161,13 @@ const STANDALONE_NUMBER_PATTERN =
 const STANDALONE_YEAR_PATTERN = /^\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\.?$/;
 const MONTH_DATE_PATTERN = /^[a-z]{3,9}\s+\d{1,2}(?:,\s*\d{4})?\.?$/i;
 
-function splitSentences(value: string): string[] {
-  return (
-    value.match(/[^.!?]+(?:[.!?]+|$)/g)?.map(sentence => sentence.trim()) ?? []
-  ).filter(Boolean);
+function segmentSentences(value: string): string[] {
+  const Segmenter = Intl.Segmenter;
+  if (!Segmenter) return [value];
+
+  return [
+    ...new Segmenter('en', { granularity: 'sentence' }).segment(value),
+  ].map(({ segment }) => segment);
 }
 
 function removeQuotedText(value: string): string {
@@ -174,7 +177,7 @@ function removeQuotedText(value: string): string {
 }
 
 function isUnsupportedSuperlativeClaim(value: string): boolean {
-  return splitSentences(value).some(sentence => {
+  return segmentSentences(value).some(sentence => {
     const searchableValue = removeQuotedText(sentence);
     return (
       UNSUPPORTED_SUPERLATIVE_PATTERN.test(searchableValue) ||
@@ -201,14 +204,17 @@ function isStandaloneQuantitativeClaim(value: string): boolean {
 }
 
 function sanitizeFreeformClaim(value: string): string | null {
-  const retainedSentences = splitSentences(value).filter(sentence => {
+  const retainedSentences = segmentSentences(value).filter(sentence => {
     return (
       !isUnsupportedSuperlativeClaim(sentence) &&
       !isStandaloneQuantitativeClaim(sentence)
     );
   });
 
-  return cleanText(retainedSentences.join(' '));
+  // Keep the native segment text unchanged. In particular, do not rebuild
+  // sentences from punctuation-delimited tokens: decimals, URLs, initials,
+  // abbreviations, and titles are all valid source text.
+  return cleanText(retainedSentences.join(''));
 }
 
 function ensureSubjectContext(artistName: string, value: string): string {
@@ -1028,15 +1034,15 @@ function escapeRegExp(value: string): string {
 }
 
 function containsArtistIdentity(value: string, artistName: string): boolean {
-  const normalizedValue = cleanText(value);
-  const normalizedName = cleanText(artistName);
+  const normalizedValue = cleanText(value)?.normalize('NFKC');
+  const normalizedName = cleanText(artistName)?.normalize('NFKC');
   if (!normalizedValue || !normalizedName) return false;
 
   const identityPattern = new RegExp(
     `(^|[^\\p{L}\\p{N}])${escapeRegExp(normalizedName)}(?=$|[^\\p{L}\\p{N}])`,
     'iu'
   );
-  return identityPattern.test(normalizedValue.normalize('NFKC'));
+  return identityPattern.test(normalizedValue);
 }
 
 function isValidHttpUrl(value: string): boolean {
