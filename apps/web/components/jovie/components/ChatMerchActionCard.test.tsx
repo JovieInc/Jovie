@@ -56,6 +56,13 @@ describe('ChatMerchActionCard', () => {
 
     await user.click(screen.getByRole('button', { name: /Cancel Action/i }));
     expect(screen.getByText('Cancelled')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-merch-dismiss-undo')).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
   });
 
   it('nested mode uses flat surface (no card-in-card)', () => {

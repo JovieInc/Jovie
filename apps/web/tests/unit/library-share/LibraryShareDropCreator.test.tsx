@@ -80,6 +80,13 @@ describe('LibraryShareDropCreator', () => {
     expect(
       screen.getByTestId('library-share-created-panel')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('library-share-done-button')).toHaveClass(
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
   });
 
   it('hides the asset picker for a single-release drop', () => {
