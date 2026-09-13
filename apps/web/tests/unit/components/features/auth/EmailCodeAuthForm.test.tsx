@@ -61,8 +61,8 @@ async function renderAndAdvanceToCodeStep(
 ) {
   render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-  await user.type(screen.getByLabelText('Email Address'), 'artist@example.com');
-  await user.click(screen.getByRole('button', { name: /email me a code/i }));
+  await user.type(screen.getByLabelText('Email'), 'artist@example.com');
+  await user.click(screen.getByRole('button', { name: /send sign-in code/i }));
 
   await screen.findByText(/enter the code sent to/i);
 }
@@ -84,7 +84,7 @@ describe('EmailCodeAuthForm', () => {
     const serverMarkup = renderToStaticMarkup(
       <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
     );
-    expect(serverMarkup).toContain('Email Address');
+    expect(serverMarkup).toContain('Email');
 
     const { container } = render(
       <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
@@ -100,12 +100,9 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email Address'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
-        screen.getByRole('button', { name: /email me a code/i })
+        screen.getByRole('button', { name: /send sign-in code/i })
       );
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -127,12 +124,9 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email Address'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
-        screen.getByRole('button', { name: /email me a code/i })
+        screen.getByRole('button', { name: /send sign-in code/i })
       );
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -147,12 +141,9 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email Address'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
-        screen.getByRole('button', { name: /email me a code/i })
+        screen.getByRole('button', { name: /send sign-in code/i })
       );
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -167,12 +158,9 @@ describe('EmailCodeAuthForm', () => {
       });
       render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />);
 
-      await user.type(
-        screen.getByLabelText('Email Address'),
-        'artist@example.com'
-      );
+      await user.type(screen.getByLabelText('Email'), 'artist@example.com');
       await user.click(
-        screen.getByRole('button', { name: /email me a code/i })
+        screen.getByRole('button', { name: /send sign-in code/i })
       );
 
       // readErrorCode() should regex-extract `rate_limit_exceeded` from the
@@ -280,7 +268,7 @@ describe('EmailCodeAuthForm', () => {
         screen.getByRole('button', { name: /request a new code/i })
       );
 
-      expect(await screen.findByLabelText('Email Address')).toBeInTheDocument();
+      expect(await screen.findByLabelText('Email')).toBeInTheDocument();
       expect(
         screen.queryByText(/too many incorrect attempts/i)
       ).not.toBeInTheDocument();
