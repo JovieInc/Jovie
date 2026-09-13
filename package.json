@@ -83,7 +83,8 @@
       "playwright-core": "1.60.0"
     },
     "patchedDependencies": {
-      "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
+      "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch",
+      "@vitest/coverage-v8@5.0.0": "patches/@vitest__coverage-v8@5.0.0.patch"
     }
   },
   "scripts": {
