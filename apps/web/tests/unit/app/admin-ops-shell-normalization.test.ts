@@ -70,6 +70,10 @@ describe('admin ops shell normalization', () => {
     expect(hudShell).toContain("export const runtime = 'nodejs'");
     expect(hudShell).not.toMatch(/export\s*\{[^}]*\bdynamic\b/);
     expect(hudShell).not.toMatch(/export\s*\{[^}]*\bruntime\b/);
+    expect(hudShell).toContain(
+      "import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';"
+    );
+    expect(hudShell).toContain('await requireCurrentAdminPageAccess();');
   });
 
   it('mounts the consolidated operational control panel below the HUD dashboard', () => {
