@@ -273,6 +273,11 @@ describe('product lane classifier', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
       ]).selectedLanes
     ).toEqual(['operations']);
+    expect(
+      classifyProductLanes([
+        'ops/signals/gem-publisher-commission.request',
+      ]).selectedLanes
+    ).toEqual(['operations']);
   });
 
   it('evaluates failures without admitting skipped products', () => {

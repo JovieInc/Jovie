@@ -127,6 +127,10 @@ const LANE_PREFIXES = Object.freeze([
     lanes: [CI_LANES.SUMMER_OPS],
   },
   {
+    prefix: 'ops/',
+    lanes: [CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
     prefix: '.github/',
     lanes: [CI_LANES.JOVIE_PRODUCT, CI_LANES.SYMPHONY_CONTROL],
   },
