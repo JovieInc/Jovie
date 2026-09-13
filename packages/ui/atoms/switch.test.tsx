@@ -323,9 +323,7 @@ describe('Switch', () => {
       );
       const switchElement = screen.getByTestId('switch');
       expect(switchElement).toHaveAttribute('aria-invalid', 'true');
-      expect(switchElement.className).toContain(
-        'aria-[invalid=true]:!border-error'
-      );
+      expect(switchElement.className).toContain('aria-invalid:!border-error');
     });
   });
 
