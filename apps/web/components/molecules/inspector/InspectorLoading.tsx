@@ -21,7 +21,7 @@ export function InspectorLoading({ rows = 4 }: InspectorLoadingProps) {
   return (
     <div
       data-testid='inspector-loading'
-      className='space-y-2 px-3 py-2.5'
+      className='space-y-2 px-3 py-3'
       aria-busy='true'
       aria-live='polite'
     >

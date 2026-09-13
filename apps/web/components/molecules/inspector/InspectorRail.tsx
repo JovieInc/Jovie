@@ -94,7 +94,7 @@ export function InspectorShell<T extends string>({
             role='tabpanel'
             data-testid='inspector-tab-panel'
             data-scroll-mode='internal'
-            className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-2.5'
+            className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3'
           >
             {children ?? <InspectorEmpty message='Nothing to show yet.' />}
           </div>
