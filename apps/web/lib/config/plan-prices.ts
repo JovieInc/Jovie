@@ -7,9 +7,43 @@
  * NO server-only imports — this file must be client-importable.
  */
 
+/** Current public offer. Legacy annual/Max prices below only resolve existing plans. */
+export const ARTIST_VISIBILITY_OFFER = {
+  free: {
+    displayName: 'Free',
+    profileLifetime: 'forever',
+    downgrade: 'branded',
+    audienceCapture: true,
+  },
+  pro: {
+    displayName: 'Pro',
+    monthlyUsd: 199,
+    currency: 'usd',
+    interval: 'month',
+    outcomes: [
+      'Continuous visibility monitoring',
+      'Prioritized opportunities',
+      'Agentic fixes',
+    ],
+  },
+  enterprise: {
+    displayName: 'Enterprise',
+    cta: 'Contact sales',
+    checkout: false,
+  },
+  fanSends: {
+    billing: 'separately_metered',
+    currency: 'usd',
+    freeTrialEmailAllowance: 50,
+    recurringAllowance: null,
+    defaultSpendCapUsd: 0,
+    paidSendingEnabled: false,
+  },
+} as const;
+
 export const PLAN_PRICES = {
   pro: {
-    monthly: 39,
+    monthly: ARTIST_VISIBILITY_OFFER.pro.monthlyUsd,
     yearly: 375,
   },
   max: {

@@ -187,9 +187,10 @@ describe('field selection constants', () => {
     expect(BILLING_FIELDS_FULL).toContain('stripeCustomerId');
     expect(BILLING_FIELDS_FULL).toContain('stripeSubscriptionId');
     expect(BILLING_FIELDS_FULL).toContain('stripePriceId');
+    expect(BILLING_FIELDS_FULL).toContain('trialEndsAt');
     expect(BILLING_FIELDS_FULL).toContain('billingVersion');
     expect(BILLING_FIELDS_FULL).toContain('lastBillingEventAt');
-    expect(BILLING_FIELDS_FULL).toHaveLength(10);
+    expect(BILLING_FIELDS_FULL).toHaveLength(11);
   });
 
   it('BILLING_FIELDS_STATUS contains fields without email/isAdmin', () => {

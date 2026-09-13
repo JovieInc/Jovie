@@ -58,6 +58,7 @@ import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import { FALLBACK_VERIFIED_PRICE_LABEL } from '@/lib/billing/verified-upgrade';
 import {
   useBillingStatusQuery,
   useChatUsageQuery,
@@ -88,6 +89,7 @@ const mockUseRouter = vi.mocked(useRouter);
 const mockUsePathname = vi.mocked(usePathname);
 
 const originalLocation = window.location;
+const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
 
 describe('UserButton billing actions', () => {
   let fetchMock: Mock;
@@ -279,7 +281,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown menu to render
-    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
+    const upgradeButton = await screen.findByText(UPGRADE_CTA);
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -335,7 +337,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
+    const upgradeButton = await screen.findByText(UPGRADE_CTA);
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -383,7 +385,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Get Verified — $39/mo');
+    const upgradeButton = await screen.findByText(UPGRADE_CTA);
     await user.click(upgradeButton);
 
     await flushMicrotasks();

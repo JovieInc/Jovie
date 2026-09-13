@@ -9,9 +9,18 @@ vi.mock('@/lib/stripe/config', () => ({
   isMaxPlanEnabled: mockIsMaxPlanEnabled,
 }));
 
+const mockAssertPrice = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/stripe/price-contract', () => ({
+  assertCheckoutPriceContract: mockAssertPrice,
+}));
+vi.mock('@/lib/stripe/client', () => ({
+  stripe: { prices: { retrieve: vi.fn() } },
+}));
+
 describe('GET /api/stripe/pricing-options', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAssertPrice.mockResolvedValue(undefined);
     vi.resetModules();
     mockIsMaxPlanEnabled.mockReturnValue(true);
   });
@@ -73,5 +82,17 @@ describe('GET /api/stripe/pricing-options', () => {
     expect(response.status).toBe(200);
     expect(data.options).toBeDefined();
     expect(Array.isArray(data.options)).toBe(true);
+  });
+  it('does not publish an option whose actual Stripe price fails validation', async () => {
+    mockGetAvailablePricing.mockReturnValue([
+      { priceId: 'price_old', plan: 'pro' },
+    ]);
+    mockAssertPrice.mockRejectedValue(
+      new Error('Billing price does not match')
+    );
+    const { GET } = await import('@/app/api/stripe/pricing-options/route');
+    const response = await GET();
+    expect(response.status).toBe(500);
+    expect(await response.json()).not.toHaveProperty('options');
   });
 });

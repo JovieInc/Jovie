@@ -32,6 +32,8 @@ export async function getUserBillingInfo(): Promise<{
     plan: string;
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;
+    stripePriceId: string | null;
+    trialEndsAt: Date | null;
     billingVersion: number;
     lastBillingEventAt: Date | null;
   };
@@ -63,6 +65,7 @@ export async function getUserBillingInfo(): Promise<{
   // - Ensure isPro is never null (use false)
   // - Ensure isAdmin is never null (use false)
   // - Ensure plan is never null (use 'free')
+  // - Preserve the trial end timestamp for entitlement normalization
   // - Ensure billingVersion is never null (use 1)
   const data = result.data;
   return {
@@ -75,6 +78,8 @@ export async function getUserBillingInfo(): Promise<{
       plan: data.plan || 'free',
       stripeCustomerId: data.stripeCustomerId,
       stripeSubscriptionId: data.stripeSubscriptionId,
+      stripePriceId: data.stripePriceId,
+      trialEndsAt: data.trialEndsAt ?? null,
       billingVersion: data.billingVersion ?? 1,
       lastBillingEventAt: data.lastBillingEventAt ?? null,
     },
@@ -108,6 +113,7 @@ export async function getUserBillingInfoByClerkId(
     isPro: boolean;
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;
+    trialEndsAt: Date | null;
     billingVersion: number;
     lastBillingEventAt: Date | null;
   };
@@ -130,6 +136,7 @@ export async function getUserBillingInfoByClerkId(
   // Transform the result to match the expected public API format:
   // - Ensure email is never null (use empty string)
   // - Ensure isPro is never null (use false)
+  // - Preserve the trial end timestamp for webhook consumers
   // - Ensure billingVersion is never null (use 1)
   const data = result.data;
   return {
@@ -140,6 +147,7 @@ export async function getUserBillingInfoByClerkId(
       isPro: data.isPro || false,
       stripeCustomerId: data.stripeCustomerId,
       stripeSubscriptionId: data.stripeSubscriptionId,
+      trialEndsAt: data.trialEndsAt ?? null,
       billingVersion: data.billingVersion ?? 1,
       lastBillingEventAt: data.lastBillingEventAt ?? null,
     },

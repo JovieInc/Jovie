@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { PLAN_PRICES, toCents } from '@/lib/config/plan-prices';
+import {
+  ARTIST_VISIBILITY_OFFER,
+  PLAN_PRICES,
+  toCents,
+} from '@/lib/config/plan-prices';
 
 describe('toCents', () => {
   it('converts whole dollars to cents', () => {
@@ -41,8 +45,14 @@ describe('PLAN_PRICES', () => {
     }
   });
 
-  it('pro is cheaper than max', () => {
-    expect(PLAN_PRICES.pro.monthly).toBeLessThan(PLAN_PRICES.max.monthly);
-    expect(PLAN_PRICES.pro.yearly).toBeLessThan(PLAN_PRICES.max.yearly);
+  it('Artist Visibility Pro is the $199 monthly public offer', () => {
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(199);
+    expect(PLAN_PRICES.pro.monthly).toBe(199);
+    expect(PLAN_PRICES.pro.monthly).toBe(
+      ARTIST_VISIBILITY_OFFER.pro.monthlyUsd
+    );
+    // Max stays a legacy/contact-sales price; do not require Pro < Max.
+    expect(PLAN_PRICES.max.monthly).toBe(149);
+    expect(PLAN_PRICES.pro.monthly).not.toBe(PLAN_PRICES.max.monthly);
   });
 });

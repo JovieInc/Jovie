@@ -22,6 +22,8 @@ const hoisted = vi.hoisted(() => {
       plan: Symbol('users.plan'),
       stripeCustomerId: Symbol('users.stripeCustomerId'),
       stripeSubscriptionId: Symbol('users.stripeSubscriptionId'),
+      stripePriceId: Symbol('users.stripePriceId'),
+      trialEndsAt: Symbol('users.trialEndsAt'),
       billingVersion: Symbol('users.billingVersion'),
       lastBillingEventAt: Symbol('users.lastBillingEventAt'),
     },
