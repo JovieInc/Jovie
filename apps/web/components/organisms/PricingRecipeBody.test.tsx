@@ -58,6 +58,10 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.getByRole('link', { name: 'Start Pro trial' })
     ).toHaveAttribute('href', '/signup?plan=pro');
+    expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
+      'href',
+      'mailto:support@jov.ie'
+    );
   });
 
   it('keeps the story closing copy derived from exact production plan data', () => {
