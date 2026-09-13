@@ -1,5 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+  ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+} from '@jovie/ui/atoms/button-contract';
 import { describe, expect, it } from 'vitest';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
@@ -100,7 +104,11 @@ describe('cross-surface UI ownership registry', () => {
       main: 'panel',
     });
     expect(item('molecule.profile-primary-cta').visibleControlGeometry).toEqual(
-      { visiblePx: 32, hitTargetPx: 44, appliesTo: 'marketing-control' }
+      {
+        visiblePx: ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+        hitTargetPx: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+        appliesTo: 'marketing-control',
+      }
     );
     const iconButton = item('atom.icon-button');
     expect(iconButton.sourceAuthority).toEqual({
@@ -188,6 +196,18 @@ describe('cross-surface UI ownership registry', () => {
         testEvidence: ['apps/ios/JovieTests/AppShellTabBarTests.swift'],
       },
     ]);
+  });
+
+  it('RED: rejects a legacy 32px equivalent CTA geometry', () => {
+    expectIssue(
+      mutate('molecule.profile-primary-cta', entry => ({
+        visibleControlGeometry: {
+          ...entry.visibleControlGeometry,
+          visiblePx: 32,
+        } as Entry['visibleControlGeometry'],
+      })),
+      'invalid-visible-control-geometry'
+    );
   });
 
   it('resolves authenticated recipes and ownership to one content-panel owner', () => {
