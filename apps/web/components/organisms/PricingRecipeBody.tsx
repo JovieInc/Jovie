@@ -5,6 +5,7 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
+import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 
 const STORY_CARDS = [
@@ -139,6 +140,12 @@ export function PricingRecipeBody({
               >
                 Start Pro trial
               </Link>
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className='system-b-pricing-secondary-link'
+              >
+                Contact sales
+              </a>
             </div>
           </div>
         </MarketingContainer>
