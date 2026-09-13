@@ -11,52 +11,24 @@ import { qualifyLead } from '@/lib/leads/qualify';
 import { spotifyEnrichLead } from '@/lib/leads/spotify-enrich-lead';
 
 vi.mock('@/lib/db', () => ({ db: {} }));
-
 vi.mock('@/lib/leads/qualify', () => ({
   qualifyLead: vi.fn(),
 }));
-
 vi.mock('@/lib/leads/spotify-enrich-lead', () => ({
   spotifyEnrichLead: vi.fn(),
 }));
-
 const mockQualifyLead = vi.mocked(qualifyLead);
 const mockSpotifyEnrichLead = vi.mocked(spotifyEnrichLead);
-
 const FIXED_NOW = new Date('2026-09-12T22:30:00.000Z');
-
 function lead(): PublicLeadRecord {
   return {
     id: 'lead-rhirhi',
     linktreeHandle: 'rhirhimusic',
     linktreeUrl: 'https://linktr.ee/rhirhimusic',
-    displayName: null,
-    bio: null,
-    avatarUrl: null,
-    hasPaidTier: null,
-    isLinktreeVerified: null,
-    hasSpotifyLink: false,
-    spotifyUrl: null,
-    hasInstagram: false,
-    instagramHandle: null,
-    musicToolsDetected: [],
-    hasTrackingPixels: false,
-    trackingPixelPlatforms: [],
-    allLinks: null,
-    signalSnapshot: null,
-    fitScore: null,
-    fitScoreBreakdown: null,
     status: 'discovered',
-    disqualificationReason: null,
-    spotifyPopularity: null,
-    spotifyFollowers: null,
-    releaseCount: null,
-    latestReleaseDate: null,
-    priorityScore: null,
     hasRepresentation: false,
-  };
+  } as PublicLeadRecord;
 }
-
 function qualification() {
   return {
     status: 'qualified' as const,
@@ -90,7 +62,6 @@ function qualification() {
     disqualificationReason: null,
   };
 }
-
 function spotify() {
   return {
     status: 'enriched' as const,
