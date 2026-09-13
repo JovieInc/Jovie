@@ -13,6 +13,7 @@ export const DESIGN_SYSTEM_COMPONENT_IDS = [
   'atom.input',
   'atom.separator',
   'atom.switch',
+  'atom.kbd',
   'atom.icon-button',
   'atom.link',
   'atom.brand-logo',
@@ -155,6 +156,25 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
     variantAxes: {
       state: ['unchecked', 'checked', 'focus-visible', 'disabled', 'invalid'],
       presentation: ['default', 'feature-thumb'],
+    },
+  },
+  {
+    id: 'atom.kbd',
+    layer: 'atom',
+    source: 'packages/ui/atoms/kbd.tsx',
+    exportName: 'Kbd',
+    storySource: 'packages/ui/atoms/kbd.stories.tsx',
+    storybookTitle: 'UI/Atoms/Kbd',
+    storyExport: 'ShortcutSequence',
+    testSources: ['packages/ui/atoms/kbd.test.tsx'],
+    dependsOn: [],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'No source-mapped Pen Kbd root exists; source ownership remains authoritative until Pen promotion.',
+    variantAxes: {
+      variant: ['default', 'tooltip'],
     },
   },
   {
