@@ -427,22 +427,25 @@ describe('runSocialReplyBatch execution and receipts', () => {
       }),
       'invalid-verification-result',
     ],
-  ])('halts on %s and marks later targets unattempted', async (_label, verifyReply, reason) => {
-    const adapter = adapterWith({ verifyReply });
+  ])(
+    'halts on %s and marks later targets unattempted',
+    async (_label, verifyReply, reason) => {
+      const adapter = adapterWith({ verifyReply });
 
-    const receipt = await runSocialReplyBatch(
-      approvedRequest([target(1), target(2)]),
-      { youtube: adapter },
-      { now: fixedNow }
-    );
+      const receipt = await runSocialReplyBatch(
+        approvedRequest([target(1), target(2)]),
+        { youtube: adapter },
+        { now: fixedNow }
+      );
 
-    expect(receipt.haltReason).toBe(reason);
-    expect(receipt.items.map(item => item.failureReason)).toEqual([
-      reason,
-      'batch-halted',
-    ]);
-    expect(adapter.writeReply).toHaveBeenCalledTimes(1);
-  });
+      expect(receipt.haltReason).toBe(reason);
+      expect(receipt.items.map(item => item.failureReason)).toEqual([
+        reason,
+        'batch-halted',
+      ]);
+      expect(adapter.writeReply).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each([
     [
@@ -456,24 +459,27 @@ describe('runSocialReplyBatch execution and receipts', () => {
         verifiedText: 'A different reply',
       },
     ],
-  ])('halts when exact verification mismatches %s', async (_label, mismatch) => {
-    const adapter = adapterWith({
-      verifyReply: vi.fn(async () => ({
-        status: 'verified' as const,
-        ...mismatch,
-        verifiedAt: CHECKED_AT,
-        providerMetadata: {},
-      })),
-    });
+  ])(
+    'halts when exact verification mismatches %s',
+    async (_label, mismatch) => {
+      const adapter = adapterWith({
+        verifyReply: vi.fn(async () => ({
+          status: 'verified' as const,
+          ...mismatch,
+          verifiedAt: CHECKED_AT,
+          providerMetadata: {},
+        })),
+      });
 
-    const receipt = await runSocialReplyBatch(
-      approvedRequest([target(1), target(2)]),
-      { youtube: adapter },
-      { now: fixedNow }
-    );
+      const receipt = await runSocialReplyBatch(
+        approvedRequest([target(1), target(2)]),
+        { youtube: adapter },
+        { now: fixedNow }
+      );
 
-    expect(receipt.haltReason).toBe('verification-mismatch');
-    expect(receipt.items[0]?.status).toBe('ambiguous');
-    expect(receipt.items[1]?.failureReason).toBe('batch-halted');
-  });
+      expect(receipt.haltReason).toBe('verification-mismatch');
+      expect(receipt.items[0]?.status).toBe('ambiguous');
+      expect(receipt.items[1]?.failureReason).toBe('batch-halted');
+    }
+  );
 });
