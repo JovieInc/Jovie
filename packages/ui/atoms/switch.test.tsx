@@ -54,6 +54,30 @@ describe('Switch', () => {
         'data-[state=checked]:translate-x-3'
       );
     });
+
+    it('lets owner variants supply complete checked and unchecked paints', () => {
+      render(
+        <Switch
+          aria-label='Owner-painted toggle'
+          stateStyling='owner'
+          thumbClassName='bg-surface-1'
+        />
+      );
+
+      const switchElement = screen.getByRole('switch');
+      const thumb = switchElement.firstChild;
+
+      expect(switchElement.className).not.toContain(
+        'data-[state=checked]:bg-btn-primary'
+      );
+      expect(switchElement.className).not.toContain(
+        'data-[state=unchecked]:bg-surface-2'
+      );
+      expect(thumb?.className || '').not.toContain(
+        'data-[state=unchecked]:bg-btn-primary'
+      );
+      expect(thumb?.className || '').toContain('bg-surface-1');
+    });
   });
 
   describe('States', () => {

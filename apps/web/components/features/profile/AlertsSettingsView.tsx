@@ -32,6 +32,7 @@ function SettingsToggle({
       onCheckedChange={onCheckedChange}
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
+      stateStyling='owner'
       className={cn(
         'relative h-7 w-11 shrink-0 items-center rounded-full border p-0.5 transition-colors duration-subtle',
         checked
