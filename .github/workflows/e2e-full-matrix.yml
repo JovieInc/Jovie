@@ -45,6 +45,7 @@ jobs:
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
+          parent_branch: main
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
           expires_in_hours: '3'
