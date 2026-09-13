@@ -157,7 +157,10 @@ describe('changed test coverage', () => {
     expect(webPkg.scripts['test:coverage']).toContain('--coverage');
     expect(webPkg.scripts['test:coverage']).not.toBe('vitest run --coverage');
     const wrapper = readFileSync(
-      resolve(import.meta.dirname, '../../../apps/web/scripts/vitest-wrapper.mjs'),
+      resolve(
+        import.meta.dirname,
+        '../../../apps/web/scripts/vitest-wrapper.mjs'
+      ),
       'utf8'
     );
     expect(wrapper).toContain("rawArgs[0] === '--'");
