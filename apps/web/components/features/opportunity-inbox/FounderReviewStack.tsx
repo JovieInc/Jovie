@@ -21,6 +21,11 @@ export interface FounderReviewStackProps {
   readonly keyboardControlRef?: RefObject<HTMLButtonElement | null>;
 }
 
+/**
+ * Ovie-only review stack. Customer opportunity feeds must use
+ * OpportunityCardStack so founder capture controls never cross the shell
+ * boundary.
+ */
 export function FounderReviewStack({
   cards,
   onApprove,

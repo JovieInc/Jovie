@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
+  requireAdmin: vi.fn(),
   requireAuth: vi.fn(),
   createReview: vi.fn(),
   listReviews: vi.fn(),
@@ -9,6 +10,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/require-auth', () => ({
   requireAuth: hoisted.requireAuth,
+}));
+
+vi.mock('@/lib/hud/require-admin-hud-api', () => ({
+  requireAdminHudApiAccess: hoisted.requireAdmin,
 }));
 
 vi.mock('@/lib/founder-review/server', () => ({
@@ -59,6 +64,7 @@ const VALID_REVIEW = {
 describe('/api/inbox/founder-reviews', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.requireAdmin.mockResolvedValue(null);
     hoisted.requireAuth.mockResolvedValue({ userId: 'auth-user', error: null });
     hoisted.resolveUserId.mockResolvedValue('app-user');
     hoisted.listReviews.mockResolvedValue([{ id: 'receipt-1' }]);
@@ -77,6 +83,36 @@ describe('/api/inbox/founder-reviews', () => {
     expect(hoisted.listReviews).toHaveBeenCalledWith({
       userIdentity: 'app-user',
     });
+  });
+
+  it('denies customer-role access before reading founder receipts', async () => {
+    hoisted.requireAdmin.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    );
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect(hoisted.requireAuth).not.toHaveBeenCalled();
+    expect(hoisted.listReviews).not.toHaveBeenCalled();
+  });
+
+  it('denies customer-role receipt creation before parsing or persisting', async () => {
+    hoisted.requireAdmin.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    );
+
+    const response = await POST(
+      new Request('https://jov.ie/api/inbox/founder-reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(VALID_REVIEW),
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(hoisted.requireAuth).not.toHaveBeenCalled();
+    expect(hoisted.createReview).not.toHaveBeenCalled();
   });
 
   it('persists a validated receipt before returning success', async () => {

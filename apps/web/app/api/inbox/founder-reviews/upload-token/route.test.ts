@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
+  requireAdmin: vi.fn(),
   requireAuth: vi.fn(),
   handleUpload: vi.fn(),
   resolveUserId: vi.fn(),
@@ -11,6 +12,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/require-auth', () => ({
   requireAuth: hoisted.requireAuth,
+}));
+
+vi.mock('@/lib/hud/require-admin-hud-api', () => ({
+  requireAdminHudApiAccess: hoisted.requireAdmin,
 }));
 
 vi.mock('@vercel/blob/client', () => ({ handleUpload: hoisted.handleUpload }));
@@ -50,6 +55,7 @@ function request() {
 describe('founder review private upload token', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.requireAdmin.mockResolvedValue(null);
     hoisted.requireAuth.mockResolvedValue({ userId: 'auth-user', error: null });
     hoisted.resolveUserId.mockResolvedValue('app-user');
     hoisted.assertTargetOwnership.mockResolvedValue(undefined);
@@ -87,6 +93,18 @@ describe('founder review private upload token', () => {
         sourceKind: 'youtube.thumbnail_candidate',
       }),
     });
+  });
+
+  it('denies customer-role token generation before resolving ownership', async () => {
+    hoisted.requireAdmin.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    );
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(403);
+    expect(hoisted.requireAuth).not.toHaveBeenCalled();
+    expect(hoisted.handleUpload).not.toHaveBeenCalled();
   });
 
   it('rejects cross-user or cross-segment pathnames', async () => {
@@ -135,6 +153,7 @@ describe('founder review private upload token', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(hoisted.requireAdmin).not.toHaveBeenCalled();
     expect(hoisted.requireAuth).not.toHaveBeenCalled();
     expect(hoisted.recordLease).toHaveBeenCalledWith(upload);
   });

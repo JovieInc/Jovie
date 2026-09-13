@@ -15,6 +15,7 @@ import {
   resolveFounderReviewUserId,
 } from '@/lib/founder-review/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { requireAdminHudApiAccess } from '@/lib/hud/require-admin-hud-api';
 
 export const runtime = 'nodejs';
 
@@ -37,6 +38,8 @@ export async function POST(request: NextRequest) {
         }
       | undefined;
     if (body.type === 'blob.generate-client-token') {
+      const denied = await requireAdminHudApiAccess();
+      if (denied) return denied;
       const { userId, error } = await requireAuth();
       if (error) return error;
       const query = UploadQuerySchema.safeParse({

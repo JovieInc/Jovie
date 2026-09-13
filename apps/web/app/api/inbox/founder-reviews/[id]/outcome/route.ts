@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { founderReviewErrorResponse } from '@/lib/founder-review/route-error';
 import { updateFounderReviewActionOutcome } from '@/lib/founder-review/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { requireAdminHudApiAccess } from '@/lib/hud/require-admin-hud-api';
 
 export const runtime = 'nodejs';
 
@@ -17,6 +18,8 @@ interface RouteParams {
 }
 
 export async function PATCH(request: Request, { params }: RouteParams) {
+  const denied = await requireAdminHudApiAccess();
+  if (denied) return denied;
   const { userId, error } = await requireAuth();
   if (error) return error;
   const parsed = OutcomeSchema.safeParse(

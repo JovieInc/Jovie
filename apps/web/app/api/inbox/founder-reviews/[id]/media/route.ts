@@ -6,6 +6,7 @@ import {
   getFounderReviewMedia,
 } from '@/lib/founder-review/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { requireAdminHudApiAccess } from '@/lib/hud/require-admin-hud-api';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +15,8 @@ interface RouteParams {
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
+  const denied = await requireAdminHudApiAccess();
+  if (denied) return denied;
   const { userId, error } = await requireAuth();
   if (error) return error;
   const { id } = await params;
@@ -46,6 +49,8 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 export async function DELETE(_request: Request, { params }: RouteParams) {
+  const denied = await requireAdminHudApiAccess();
+  if (denied) return denied;
   const { userId, error } = await requireAuth();
   if (error) return error;
   const { id } = await params;

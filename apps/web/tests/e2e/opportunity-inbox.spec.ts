@@ -6,10 +6,7 @@
 
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  fillControlledInputUntilEnabled,
-  setTestAuthBypassSession,
-} from '../helpers/clerk-auth';
+import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import { installAppFlagOverrides } from './helpers/app-flag-overrides';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
@@ -34,7 +31,7 @@ test.describe('Opportunity Inbox', () => {
     await expect(feed.or(emptyState)).toBeVisible();
   });
 
-  test('founder brain dump survives a reload as a durable receipt', async ({
+  test('customer home keeps founder review out of the shell and API', async ({
     page,
   }) => {
     await installAppFlagOverrides(page, { INBOX_HOME: true });
@@ -44,25 +41,15 @@ test.describe('Opportunity Inbox', () => {
     });
 
     await expect(
-      page.getByRole('heading', { name: 'Start A Brain Dump' })
+      page.getByRole('heading', { name: 'Your Inbox Is Clear' })
     ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Start A Brain Dump')).not.toBeVisible();
+    await expect(page.getByText('Founder Review')).not.toBeVisible();
 
-    const typedFallback = page.getByLabel('Typed fallback or refinement');
-    const save = page.getByRole('button', { name: 'Save Brain Dump' });
-    await fillControlledInputUntilEnabled(
-      typedFallback,
-      save,
-      'Keep the thumbnail decision calm, legible, and source-bound.'
+    const founderReviews = await page.request.get(
+      new URL('/api/inbox/founder-reviews', page.url()).toString()
     );
-    await save.click();
-
-    const receipt = page.getByText(
-      'Saved · Inbox Brain Dump · transcript only'
-    );
-    await expect(receipt).toBeVisible({ timeout: 30_000 });
-
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(receipt).toBeVisible({ timeout: 30_000 });
+    expect(founderReviews.status()).toBe(403);
 
     const screenshotPath = process.env.FOUNDER_REVIEW_QA_SCREENSHOT;
     if (screenshotPath) {

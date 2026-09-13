@@ -12,11 +12,14 @@ import {
 } from '@/lib/founder-review/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { requireAdminHudApiAccess } from '@/lib/hud/require-admin-hud-api';
 
 export const runtime = 'nodejs';
 const MAX_REVIEW_BODY_BYTES = 64 * 1024;
 
 export async function GET() {
+  const denied = await requireAdminHudApiAccess();
+  if (denied) return denied;
   const { userId, error } = await requireAuth();
   if (error) return error;
   try {
@@ -35,6 +38,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdminHudApiAccess();
+  if (denied) return denied;
   const { userId, error } = await requireAuth();
   if (error) return error;
   try {

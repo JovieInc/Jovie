@@ -10,7 +10,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const mutateMock = vi.fn();
-const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
 let inboxHomeEnabled = false;
 
 vi.mock('next/navigation', () => ({
@@ -24,43 +23,6 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => inboxHomeEnabled,
-}));
-
-vi.mock('@/lib/founder-review/client', () => ({
-  listFounderReviewReceipts: vi.fn().mockResolvedValue([]),
-  deleteFounderReviewAudio: vi.fn(),
-  uploadFounderReviewAudio: vi.fn(),
-  createFounderReviewClient: vi.fn().mockImplementation(async review => ({
-    id: review.segmentId,
-    target: review.target,
-    decision: review.decision,
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status:
-        review.decision === 'approved' || review.decision === 'rejected'
-          ? 'pending'
-          : 'not-applicable',
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: null,
-    },
-  })),
-  updateFounderReviewActionOutcome: vi.fn().mockImplementation(async input => ({
-    id: input.receiptId,
-    target: {
-      type: 'inbox-card',
-      id: 'card-1',
-      title: 'Saved founder review',
-      sourceKind: 'test.suggestion',
-      category: 'suggestion',
-    },
-    decision: 'approved',
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status: input.status,
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: input.errorCode,
-    },
-  })),
 }));
 
 vi.mock('@/lib/chat/transcriber', () => ({
@@ -91,25 +53,21 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
     },
     dismissMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
     },
     feedbackMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
     },
     nextStepMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
     },
   }),
 }));
@@ -151,8 +109,6 @@ describe('OpportunityInboxPageClient', () => {
   afterEach(() => {
     inboxHomeEnabled = false;
     mutateMock.mockReset();
-    mutateAsyncMock.mockReset();
-    mutateAsyncMock.mockResolvedValue({ ok: true });
     tourDateMutateMock.mockReset();
   });
 
@@ -275,6 +231,7 @@ describe('OpportunityInboxPageClient', () => {
   });
 
   it('renders the empty state when there are no cards', () => {
+    inboxHomeEnabled = true;
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -297,6 +254,8 @@ describe('OpportunityInboxPageClient', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
+    expect(screen.queryByText('Start A Brain Dump')).not.toBeInTheDocument();
+    expect(screen.queryByText('Founder Review')).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Connect Spotify' })
     ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
@@ -617,7 +576,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
   });
 
   it('returns focus to recovery after completing the last report next step', async () => {
@@ -662,12 +621,14 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Run on 3 more videos' })
+    );
 
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
   });
 
   it('does not restore stack focus after a failed report next step', async () => {
@@ -676,7 +637,6 @@ describe('OpportunityInboxPageClient', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
-    mutateAsyncMock.mockRejectedValueOnce(new Error('next step failed'));
 
     render(
       <OpportunityInboxPageClient
@@ -713,7 +673,9 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Run on 3 more videos' })
+    );
     const songs = screen.getByRole('button', { name: 'Songs' });
     await user.click(songs);
 
@@ -730,7 +692,6 @@ describe('OpportunityInboxPageClient', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
-    mutateAsyncMock.mockRejectedValueOnce(new Error('decision failed'));
 
     render(
       <OpportunityInboxPageClient
@@ -767,12 +728,9 @@ describe('OpportunityInboxPageClient', () => {
     const user = userEvent.setup();
     inboxHomeEnabled = true;
     let rejectAction: (() => void) | undefined;
-    mutateAsyncMock.mockImplementationOnce(
-      () =>
-        new Promise((_resolve, reject) => {
-          rejectAction = () => reject(new Error('decision failed'));
-        })
-    );
+    mutateMock.mockImplementationOnce((_id, options) => {
+      rejectAction = options?.onError;
+    });
 
     render(
       <OpportunityInboxPageClient
@@ -798,7 +756,7 @@ describe('OpportunityInboxPageClient', () => {
 
     screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
 
     act(() => {
       rejectAction?.();

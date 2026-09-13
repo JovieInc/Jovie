@@ -5,17 +5,14 @@ import { OpportunityRow } from '@/components/organisms/opportunity-card/Opportun
 import type { OpportunityRowState } from '@/components/organisms/opportunity-card/types';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
-import { FounderReviewStack } from './FounderReviewStack';
+import { OpportunityCardStack } from './OpportunityCardStack';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
 import { WorkflowCaptureInboxCard } from './WorkflowCaptureInboxCard';
 
 export interface OpportunityInboxFeedProps {
   readonly cards: readonly OpportunityInboxCardViewModel[];
-  readonly onApprove: (id: string) => void | Promise<void>;
-  readonly onDismiss: (id: string) => void | Promise<void>;
-  readonly onRecordedApprove?: (id: string) => Promise<void>;
-  readonly onRecordedDismiss?: (id: string) => Promise<void>;
-  readonly onRecordedNextStep?: (id: string) => Promise<void>;
+  readonly onApprove: (id: string) => void;
+  readonly onDismiss: (id: string) => void;
   readonly onOpen?: (id: string) => void;
   readonly onFeedback: (
     id: string,
@@ -26,7 +23,7 @@ export interface OpportunityInboxFeedProps {
   readonly pendingActionId?: string | null;
   readonly pendingFeedbackId?: string | null;
   readonly pendingNextStepId?: string | null;
-  /** When true, render the swipe/keyboard card stack (JOV-3932). */
+  /** When true, render the customer swipe/keyboard card stack (JOV-3932). */
   readonly enableStackInteractions?: boolean;
   /** Restores focus to the current stack control after a stack action. */
   readonly stackKeyboardControlRef?: RefObject<HTMLButtonElement | null>;
@@ -52,9 +49,6 @@ export function OpportunityInboxFeed({
   cards,
   onApprove,
   onDismiss,
-  onRecordedApprove,
-  onRecordedDismiss,
-  onRecordedNextStep,
   onOpen,
   onFeedback: _onFeedback,
   onNextStep,
@@ -73,11 +67,7 @@ export function OpportunityInboxFeed({
       card => card.category === 'workflow_capture'
     );
     const stackCards = cards.filter(
-      (
-        card
-      ): card is OpportunityInboxCardViewModel & {
-        readonly sourceKind: string;
-      } => card.category !== 'workflow_capture' && Boolean(card.sourceKind)
+      card => card.category !== 'workflow_capture'
     );
     return (
       <div className={className}>
@@ -89,28 +79,24 @@ export function OpportunityInboxFeed({
             onComplete={onCaptureCompleted ?? onDismiss}
           />
         ))}
-        <FounderReviewStack
+        <OpportunityCardStack
           cards={stackCards}
-          onApprove={id => {
+          onAccept={id => {
             onStackActionInitiated?.(id);
-            const card = stackCards.find(candidate => candidate.id === id);
-            if (card?.category === 'report') {
-              return (
-                onRecordedNextStep ??
-                onStackNextStep ??
-                onNextStep ??
-                onApprove
-              )(id);
-            } else {
-              return (onRecordedApprove ?? onApprove)(id);
-            }
+            onApprove(id);
           }}
           onReject={id => {
             onStackActionInitiated?.(id);
-            return (onRecordedDismiss ?? onDismiss)(id);
+            onDismiss(id);
           }}
-          onOpen={onOpen}
+          onOpen={id => {
+            (onOpen ?? onApprove)(id);
+          }}
+          onNextStep={id => {
+            (onStackNextStep ?? onNextStep ?? onApprove)(id);
+          }}
           pendingActionId={pendingActionId}
+          pendingNextStepId={pendingNextStepId}
           keyboardControlRef={stackKeyboardControlRef}
         />
       </div>

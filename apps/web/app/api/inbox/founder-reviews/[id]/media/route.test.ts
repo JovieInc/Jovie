@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
+  requireAdmin: vi.fn(),
   requireAuth: vi.fn(),
   getMedia: vi.fn(),
   deleteMedia: vi.fn(),
@@ -8,6 +9,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/require-auth', () => ({
   requireAuth: hoisted.requireAuth,
+}));
+
+vi.mock('@/lib/hud/require-admin-hud-api', () => ({
+  requireAdminHudApiAccess: hoisted.requireAdmin,
 }));
 
 vi.mock('@/lib/founder-review/server', () => ({
@@ -24,6 +29,7 @@ const params = { params: Promise.resolve({ id: 'review-1' }) };
 describe('founder review retained audio route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.requireAdmin.mockResolvedValue(null);
     hoisted.requireAuth.mockResolvedValue({ userId: 'user-1', error: null });
     hoisted.getMedia.mockResolvedValue({
       stream: new ReadableStream({
@@ -39,6 +45,38 @@ describe('founder review retained audio route', () => {
       id: 'review-1',
       recording: { mediaAvailable: false },
     });
+  });
+
+  it('denies customer-role media access before reading the blob', async () => {
+    hoisted.requireAdmin.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    );
+
+    const response = await GET(
+      new Request('https://jov.ie/api/inbox/founder-reviews/review-1/media'),
+      params
+    );
+
+    expect(response.status).toBe(403);
+    expect(hoisted.requireAuth).not.toHaveBeenCalled();
+    expect(hoisted.getMedia).not.toHaveBeenCalled();
+  });
+
+  it('denies customer-role media deletion before mutating the receipt', async () => {
+    hoisted.requireAdmin.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    );
+
+    const response = await DELETE(
+      new Request('https://jov.ie/api/inbox/founder-reviews/review-1/media', {
+        method: 'DELETE',
+      }),
+      params
+    );
+
+    expect(response.status).toBe(403);
+    expect(hoisted.requireAuth).not.toHaveBeenCalled();
+    expect(hoisted.deleteMedia).not.toHaveBeenCalled();
   });
 
   it('preserves byte-range semantics for private audio playback', async () => {

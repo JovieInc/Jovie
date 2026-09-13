@@ -5,6 +5,7 @@ import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-crea
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
 import { AdminFeedbackTable } from '@/components/features/admin/feedback-table/AdminFeedbackTable';
+import { OvieFounderReviewSurface } from '@/components/features/admin/founder-review/OvieFounderReviewSurface';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { WaitlistMetrics } from '@/components/features/admin/WaitlistMetrics';
 import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
@@ -25,6 +26,7 @@ import {
   getWaitlistIntegritySummary,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
+import { loadOpportunityInboxData } from '@/lib/connectors/opportunity-inbox-data';
 import { getAdminFeedbackItemsResult } from '@/lib/feedback';
 import {
   type AdminCreatorsSort,
@@ -77,7 +79,8 @@ function resolveReleaseSort(sort: AdminPeopleSort): AdminReleasesSort {
 
 async function renderPeopleView(
   view: AdminPeopleView,
-  params: Awaited<ReturnType<typeof adminPeopleSearchParams.parse>>
+  params: Awaited<ReturnType<typeof adminPeopleSearchParams.parse>>,
+  clerkUserId: string
 ) {
   const pageSize = params.pageSize;
   const page = params.page;
@@ -181,22 +184,37 @@ async function renderPeopleView(
     }
     case 'feedback':
     default: {
-      const { items, error } = await getAdminFeedbackItemsResult(200);
+      const [{ items, error }, founderInboxResult] = await Promise.all([
+        getAdminFeedbackItemsResult(200),
+        loadOpportunityInboxData(clerkUserId)
+          .then(data =>
+            data
+              ? { cards: data.cards, loadError: false }
+              : { cards: [], loadError: true }
+          )
+          .catch(() => ({ cards: [], loadError: true })),
+      ]);
 
       return (
-        <AdminFeedbackTable
-          loadError={error}
-          items={items.map(item => ({
-            id: item.id,
-            message: item.message,
-            source: item.source,
-            status: item.status,
-            context: item.context,
-            dismissedAtIso: item.dismissedAt?.toISOString() ?? null,
-            createdAtIso: item.createdAt.toISOString(),
-            user: item.user,
-          }))}
-        />
+        <div className='space-y-4'>
+          <OvieFounderReviewSurface
+            cards={founderInboxResult.cards}
+            loadError={founderInboxResult.loadError}
+          />
+          <AdminFeedbackTable
+            loadError={error}
+            items={items.map(item => ({
+              id: item.id,
+              message: item.message,
+              source: item.source,
+              status: item.status,
+              context: item.context,
+              dismissedAtIso: item.dismissedAt?.toISOString() ?? null,
+              createdAtIso: item.createdAt.toISOString(),
+              user: item.user,
+            }))}
+          />
+        </div>
       );
     }
   }
@@ -205,11 +223,11 @@ async function renderPeopleView(
 export default async function AdminPeoplePage({
   searchParams,
 }: Readonly<AdminPeoplePageProps>) {
-  await requireCurrentAdminPageAccess();
+  const clerkUserId = await requireCurrentAdminPageAccess();
 
   const params = await adminPeopleSearchParams.parse(searchParams);
   const view = resolvePeopleView(params.view);
-  const content = await renderPeopleView(view, params);
+  const content = await renderPeopleView(view, params, clerkUserId);
 
   return (
     <AdminPage
