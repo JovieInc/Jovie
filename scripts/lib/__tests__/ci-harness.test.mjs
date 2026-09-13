@@ -36,6 +36,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Visual Snapshot Compare',
   'Migration Guard',
   'Unit Tests',
+  'Exact-head Coverage',
   'Build + Layout (combined)',
   'iOS Fast Unit + Coverage (combined)',
   'Mac Build + Test (combined)',
@@ -209,7 +210,7 @@ describe('ci-harness manifest', () => {
     );
   });
 
-  it('keeps required source PR Ready deterministic and runner-light', () => {
+  it('keeps required source PR Ready deterministic and exact-head coverage gated', () => {
     const workflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),
       'utf8'
@@ -217,8 +218,9 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]'
     );
+    expect(prReady).toContain('needs.ci-exact-head-coverage.result');
     expect(prReady).toContain('Evaluate deterministic source PR checks');
     expect(prReady).toContain('All deterministic source PR checks passed.');
     expect(workflow).not.toContain('withgraphite/graphite-ci-action');

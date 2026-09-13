@@ -498,6 +498,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).not.toContain('!cancelled()');
     expect(aggregate).toContain('ci-fast');
     expect(aggregate).toContain('ci-unit-tests');
+    expect(aggregate).toContain('ci-exact-head-coverage');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');

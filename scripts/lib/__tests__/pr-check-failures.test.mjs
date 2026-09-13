@@ -202,44 +202,44 @@ describe('pr-check-failures', () => {
       }
     });
 
-    it.each([
-      'missing',
-      'equal',
-    ])('retains advisory identity through %s timestamp ambiguity', timestamps => {
-      const clock =
-        timestamps === 'equal'
-          ? {
-              startedAt: '2026-09-04T23:00:00Z',
-              completedAt: '2026-09-04T23:01:00Z',
-            }
-          : {};
-      const attempts = [
-        { ...sweep, ...clock },
-        { ...sweep, ...clock, bucket: 'pass', state: 'SUCCESS' },
-      ];
-      expect(collapseNewestCheckAttempts(attempts).ambiguousNames).toEqual([
-        'sweep',
-      ]);
-      expect(classifyQueueCheckBlockers([...required, ...attempts])).toEqual(
-        []
-      );
-      const safety = attempts.map(check => ({
-        ...check,
-        workflow: 'Real Safety Workflow',
-      }));
-      expect(
-        classifyQueueCheckBlockers([...required, ...attempts, ...safety])
-      ).toContain('sweep (ambiguous latest attempt)');
-      for (const { name } of required) {
-        const others = required.filter(check => check.name !== name);
+    it.each(['missing', 'equal'])(
+      'retains advisory identity through %s timestamp ambiguity',
+      timestamps => {
+        const clock =
+          timestamps === 'equal'
+            ? {
+                startedAt: '2026-09-04T23:00:00Z',
+                completedAt: '2026-09-04T23:01:00Z',
+              }
+            : {};
+        const attempts = [
+          { ...sweep, ...clock },
+          { ...sweep, ...clock, bucket: 'pass', state: 'SUCCESS' },
+        ];
+        expect(collapseNewestCheckAttempts(attempts).ambiguousNames).toEqual([
+          'sweep',
+        ]);
+        expect(classifyQueueCheckBlockers([...required, ...attempts])).toEqual(
+          []
+        );
+        const safety = attempts.map(check => ({
+          ...check,
+          workflow: 'Real Safety Workflow',
+        }));
         expect(
-          classifyQueueCheckBlockers([
-            ...others,
-            ...attempts.map(check => ({ ...check, name })),
-          ])
-        ).toContain(`${name} (ambiguous latest attempt)`);
+          classifyQueueCheckBlockers([...required, ...attempts, ...safety])
+        ).toContain('sweep (ambiguous latest attempt)');
+        for (const { name } of required) {
+          const others = required.filter(check => check.name !== name);
+          expect(
+            classifyQueueCheckBlockers([
+              ...others,
+              ...attempts.map(check => ({ ...check, name })),
+            ])
+          ).toContain(`${name} (ambiguous latest attempt)`);
+        }
       }
-    });
+    );
 
     it('does not make another job in the recovery workflow advisory', () => {
       const safety = { ...sweep, name: 'Release Safety Gate' };
@@ -249,19 +249,20 @@ describe('pr-check-failures', () => {
       ]);
     });
 
-    it.each(
-      required.map(check => check.name)
-    )('never filters required %s from failure extraction', name => {
-      for (const workflow of [
-        sweep.workflow,
-        'Merge Queue Auto-Enroll',
-        'Fleet Gate Refresh',
-      ]) {
-        const failure = { ...sweep, name, workflow };
-        expect(isAdvisoryCheck(failure)).toBe(false);
-        expect(extractTerminalFailures([failure])).toEqual([name]);
+    it.each(required.map(check => check.name))(
+      'never filters required %s from failure extraction',
+      name => {
+        for (const workflow of [
+          sweep.workflow,
+          'Merge Queue Auto-Enroll',
+          'Fleet Gate Refresh',
+        ]) {
+          const failure = { ...sweep, name, workflow };
+          expect(isAdvisoryCheck(failure)).toBe(false);
+          expect(extractTerminalFailures([failure])).toEqual([name]);
+        }
       }
-    });
+    );
 
     it('preserves required-only CLI failures for both JSON success and nonzero results', async () => {
       const root = mkdtempSync(join(tmpdir(), 'jovie-required-checks-'));
@@ -292,30 +293,31 @@ describe('pr-check-failures', () => {
       }
     });
 
-    it.each(
-      required.map(check => check.name)
-    )('preserves required failure, missing and pending for %s', name => {
-      const others = required.filter(check => check.name !== name);
-      for (const workflow of ['CI', sweep.workflow]) {
+    it.each(required.map(check => check.name))(
+      'preserves required failure, missing and pending for %s',
+      name => {
+        const others = required.filter(check => check.name !== name);
+        for (const workflow of ['CI', sweep.workflow]) {
+          expect(
+            classifyQueueCheckBlockers([
+              ...others,
+              sweep,
+              { name, workflow, bucket: 'fail', state: 'FAILURE' },
+            ])
+          ).toContain(`${name} (not successful)`);
+        }
+        expect(classifyQueueCheckBlockers([...others, sweep])).toContain(
+          `${name} (missing)`
+        );
         expect(
           classifyQueueCheckBlockers([
             ...others,
             sweep,
-            { name, workflow, bucket: 'fail', state: 'FAILURE' },
+            { name, bucket: 'pending', state: 'PENDING' },
           ])
-        ).toContain(`${name} (not successful)`);
+        ).toContain(`${name} (pending)`);
       }
-      expect(classifyQueueCheckBlockers([...others, sweep])).toContain(
-        `${name} (missing)`
-      );
-      expect(
-        classifyQueueCheckBlockers([
-          ...others,
-          sweep,
-          { name, bucket: 'pending', state: 'PENDING' },
-        ])
-      ).toContain(`${name} (pending)`);
-    });
+    );
   });
 
   it('treats a red Fork PR Gate Controller receipt with SKIPPED twin as advisory (JOV-4782)', () => {
@@ -385,6 +387,7 @@ describe('pr-check-failures', () => {
       'Secret Scan (gitleaks + trufflehog)',
       'Golden Path Lock',
       'Migration Guard',
+      'Exact-head Coverage',
     ]);
     expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy');
     expect(ADVISORY_CHECK_NAMES).toContain(
