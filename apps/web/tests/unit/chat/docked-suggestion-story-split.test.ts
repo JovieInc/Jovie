@@ -27,7 +27,11 @@ describe('docked suggestion story split', () => {
     );
     expect(cardStories).not.toContain('ChatInput');
     expect(cardStories).not.toContain('AboveComposer');
+    expect(regionStories).not.toContain("from './ChatInput'");
+    expect(regionStories).not.toContain('import { ChatInput }');
     expect(regionStories).toContain('export const AboveComposer');
+    expect(regionStories).toContain('chat-composer-surface');
+    expect(regionStories).toContain('CHAT_COMPOSER_ATTACH_ARIA_LABEL');
     expect(elevation).toContain(
       'chat-emptystate-composerregion--above-composer'
     );

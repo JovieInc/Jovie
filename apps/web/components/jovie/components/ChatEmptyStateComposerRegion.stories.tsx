@@ -1,22 +1,57 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
+import {
+  CHAT_COMPOSER_ATTACH_ARIA_LABEL,
+  CHAT_COMPOSER_INPUT_ARIA_LABEL,
+} from '../chat-composer-copy';
 import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from '../chat-empty-starters';
 import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
 import { ChatEmptyStateOpportunityCards } from './ChatEmptyStateOpportunityCards';
-import { ChatInput } from './ChatInput';
 
-function StoryComposerDock() {
+function StoryComposerDock({
+  value = '',
+  onChange,
+  pickerOpen = false,
+  onPickerOpenChange,
+}: {
+  readonly value?: string;
+  readonly onChange?: (next: string) => void;
+  readonly pickerOpen?: boolean;
+  readonly onPickerOpenChange?: (open: boolean) => void;
+}) {
   return (
-    <label className='system-b-chat-content-shell block rounded-2xl bg-surface-1 px-3 py-2 text-sm text-secondary-token'>
-      Message
-      <textarea
-        className='mt-1 w-full resize-none bg-transparent text-primary-token'
-        rows={2}
-        placeholder='Ask anything'
-        aria-label='Message'
-      />
-    </label>
+    <div
+      className='system-b-chat-content-shell rounded-2xl bg-surface-1 px-3 py-2'
+      data-testid='chat-composer-surface'
+    >
+      <div className='flex items-end gap-2'>
+        <button
+          type='button'
+          aria-label={CHAT_COMPOSER_ATTACH_ARIA_LABEL}
+          aria-expanded={pickerOpen}
+          className='shrink-0 rounded-md px-2 py-1 text-sm'
+          onClick={() => onPickerOpenChange?.(!pickerOpen)}
+        >
+          +
+        </button>
+        <textarea
+          className='min-h-9 w-full resize-none bg-transparent text-sm text-primary-token'
+          rows={2}
+          placeholder='Ask anything'
+          aria-label={CHAT_COMPOSER_INPUT_ARIA_LABEL}
+          value={value}
+          onChange={event => onChange?.(event.target.value)}
+        />
+      </div>
+      {pickerOpen ? (
+        <div role='menu' className='mt-2'>
+          <button type='button' role='menuitem'>
+            Upload file
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -62,35 +97,37 @@ export const JustAskDocked: Story = {
 
 function DockedSuggestions() {
   const [value, setValue] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
   return (
     <div className='h-screen'>
       <ChatEmptyStateComposerRegion
         stableDocked
         above={
-          <ChatEmptyStateOpportunityCards
-            cards={[
-              {
-                id: 'release-checklist',
-                signalType: 'other',
-                typeLabel: 'Suggestion',
-                title: 'Review your release checklist',
-                why: 'Check artwork, credits and links before the release.',
-                createdAt: '2026-01-15T12:00:00.000Z',
-                primaryActionLabel: 'Review',
-                status: 'pending',
-                category: 'suggestion',
-              },
-            ]}
-            onSelect={card => setValue(card.title)}
-          />
+          pickerOpen ? undefined : (
+            <ChatEmptyStateOpportunityCards
+              cards={[
+                {
+                  id: 'release-checklist',
+                  signalType: 'other',
+                  typeLabel: 'Suggestion',
+                  title: 'Review your release checklist',
+                  why: 'Check artwork, credits and links before the release.',
+                  createdAt: '2026-01-15T12:00:00.000Z',
+                  primaryActionLabel: 'Review',
+                  status: 'pending',
+                  category: 'suggestion',
+                },
+              ]}
+              onSelect={card => setValue(card.title)}
+            />
+          )
         }
       >
-        <ChatInput
+        <StoryComposerDock
           value={value}
           onChange={setValue}
-          onSubmit={fn()}
-          onFileAttach={fn()}
-          variant='hero'
+          pickerOpen={pickerOpen}
+          onPickerOpenChange={setPickerOpen}
         />
       </ChatEmptyStateComposerRegion>
     </div>
