@@ -9,7 +9,7 @@ import {
 } from '@/components/atoms/ArtworkFrame';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
-import { AudioPlayButton } from './AudioPlayButton';
+import { AudioPlayButton } from './AudioPlayControl';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 
 /**

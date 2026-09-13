@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { AudioPlayButton } from './AudioPlayButton';
+import { AudioPlayButton } from './AudioPlayControl';
 
 describe('AudioPlayButton', () => {
   it('uses the playback state for its accessible action', () => {
@@ -27,29 +27,23 @@ describe('AudioPlayButton', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it('uses canonical primary tokens for compact player controls', () => {
+  it('reuses the canonical primary Button for compact player controls', () => {
     render(<AudioPlayButton isPlaying={false} onClick={vi.fn()} />);
 
     const button = screen.getByRole('button', { name: 'Play' });
-    expect(button).toHaveClass('border-btn-primary', 'transition-colors');
-    expect(button.className).not.toMatch(/--linear-/);
-    expect(button.className).not.toMatch(/content-\[/);
-    expect(button.className).not.toMatch(/transition-\[/);
+    expect(button).toHaveAttribute('data-variant', 'primary');
+    expect(button).toHaveAttribute('data-size', 'icon');
+    expect(button).toHaveClass('bg-btn-primary', 'text-btn-primary-foreground');
   });
 
-  it('uses canonical tokens for the persistent compact control', () => {
+  it('reuses the canonical Button hit target for the persistent compact control', () => {
     render(
       <AudioPlayButton isPlaying={false} onClick={vi.fn()} size='persistent' />
     );
 
     const button = screen.getByRole('button', { name: 'Play' });
-    expect(button).toHaveClass(
-      'transition-colors',
-      'before:h-11',
-      'before:min-w-11'
-    );
-    expect(button.className).not.toMatch(/content-\[/);
-    expect(button.className).not.toMatch(/transition-\[/);
-    expect(button.className).not.toMatch(/--linear-/);
+    expect(button).toHaveAttribute('data-variant', 'ghost');
+    expect(button).toHaveAttribute('data-size', 'icon-sm');
+    expect(button).toHaveClass('before:h-11');
   });
 });

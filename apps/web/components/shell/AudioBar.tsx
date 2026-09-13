@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
-import { AudioPlayButton } from './AudioPlayButton';
+import { AudioPlayButton } from './AudioPlayControl';
 import { IconBtn } from './IconBtn';
 import { LoopBtn, type LoopMode } from './LoopBtn';
 import {

@@ -14,7 +14,7 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
-import { AudioPlayButton } from '@/components/shell/AudioPlayButton';
+import { AudioPlayButton } from '@/components/shell/AudioPlayControl';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {

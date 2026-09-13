@@ -7,7 +7,7 @@ import {
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
-import { AudioPlayButton } from './AudioPlayButton';
+import { AudioPlayButton } from './AudioPlayControl';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 
 /**

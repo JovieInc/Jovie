@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
-import { AudioPlayButton } from './AudioPlayButton';
+import { AudioPlayButton } from './AudioPlayControl';
 
 const meta = {
   title: 'Shell/AudioPlayButton',
