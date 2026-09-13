@@ -33,11 +33,11 @@ export const Checked: Story = {
 export const Disabled: Story = {
   render: () => (
     <div className='grid gap-4'>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch id='sw-off-dis' disabled />
         <Label htmlFor='sw-off-dis'>Disabled</Label>
       </div>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch id='sw-on-dis' disabled defaultChecked />
         <Label htmlFor='sw-on-dis'>Disabled and enabled</Label>
       </div>
@@ -48,11 +48,11 @@ export const Disabled: Story = {
 export const StateMatrix: Story = {
   render: () => (
     <div className='grid gap-4'>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch id='sw-matrix-off' />
         <Label htmlFor='sw-matrix-off'>Off</Label>
       </div>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch id='sw-matrix-on' defaultChecked />
         <Label htmlFor='sw-matrix-on'>On</Label>
       </div>
@@ -63,11 +63,11 @@ export const StateMatrix: Story = {
 export const ConformanceMatrix: Story = {
   render: () => (
     <div className='grid gap-4' data-testid='switch-conformance'>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch id='sw-conformance-keyboard' aria-label='Keyboard toggle' />
         <Label htmlFor='sw-conformance-keyboard'>Keyboard toggle</Label>
       </div>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch
           id='sw-conformance-checked'
           aria-label='Checked toggle'
@@ -75,7 +75,7 @@ export const ConformanceMatrix: Story = {
         />
         <Label htmlFor='sw-conformance-checked'>Checked</Label>
       </div>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch
           id='sw-conformance-disabled'
           aria-label='Disabled toggle'
@@ -83,7 +83,7 @@ export const ConformanceMatrix: Story = {
         />
         <Label htmlFor='sw-conformance-disabled'>Disabled</Label>
       </div>
-      <div className='flex items-center gap-2'>
+      <div className='flex min-h-11 items-center gap-2'>
         <Switch
           id='sw-conformance-invalid'
           aria-label='Invalid toggle'

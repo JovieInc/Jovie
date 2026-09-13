@@ -164,6 +164,7 @@ export function PricingComparisonChart() {
           aria-label='Toggle Annual Billing'
           className='system-b-pricing-switch'
           thumbClassName='system-b-pricing-switch-thumb'
+          thumbTranslation='owner'
         />
         <span
           className='system-b-pricing-billing-label'

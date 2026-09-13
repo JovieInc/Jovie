@@ -177,6 +177,7 @@ function ThemeToggleButton({
             'data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0',
             isUpdating && 'animate-pulse motion-reduce:animate-none'
           )}
+          thumbTranslation='owner'
           thumbChildren={<ThemeIcon className='h-3 w-3 text-primary-token' />}
         />
       </TooltipTrigger>

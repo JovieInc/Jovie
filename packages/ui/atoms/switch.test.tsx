@@ -43,6 +43,17 @@ describe('Switch', () => {
       ).toBeVisible();
       expect(screen.getByTestId('thumb-icon')).toBeInTheDocument();
     });
+
+    it('lets owner variants supply their own checked thumb translation', () => {
+      render(
+        <Switch aria-label='Owner-positioned toggle' thumbTranslation='owner' />
+      );
+
+      const thumb = screen.getByRole('switch').firstChild;
+      expect(thumb?.className || '').not.toContain(
+        'data-[state=checked]:translate-x-3'
+      );
+    });
   });
 
   describe('States', () => {

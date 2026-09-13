@@ -42,11 +42,11 @@ function SettingsToggle({
       )}
       thumbClassName={cn(
         'block h-6 w-6 rounded-full shadow-sm transition-transform duration-subtle',
-        checked
-          ? 'translate-x-4 bg-black dark:bg-black'
-          : 'translate-x-0 bg-white dark:bg-surface-1',
+        checked ? 'translate-x-4' : 'translate-x-0',
+        'data-[state=checked]:bg-white data-[state=unchecked]:bg-btn-primary',
         'data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0'
       )}
+      thumbTranslation='owner'
     />
   );
 }
