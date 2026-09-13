@@ -58,7 +58,7 @@ function DashboardAnalyticsOverviewLoading() {
   return (
     <OverviewMetricGrid role='status' statusLabel='Loading Analytics Overview'>
       {OVERVIEW_METRIC_KEYS.map(key => (
-        <ContentMetricCardSkeleton key={key} className='py-3.5' />
+        <ContentMetricCardSkeleton key={key} className='py-3' />
       ))}
     </OverviewMetricGrid>
   );
