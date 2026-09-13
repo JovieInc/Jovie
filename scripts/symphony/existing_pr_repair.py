@@ -288,7 +288,17 @@ def load_validated_candidate(identifier, controller):
     """Read one complete, provider-qualified assignment without side effects."""
     payload = load_isolated(identifier, controller)
     validate_provider_grant(payload)
+    require(not _assignment_consumed(identifier), "assignment-consumed")
     return payload
+
+
+def _assignment_consumed(identifier):
+    """Return whether the host ledger has already consumed this assignment."""
+    assignment_path(identifier)
+    return any(os.path.lexists(ROOT / path) for path in (
+        f"{identifier}.claim",
+        f"{identifier}.execution.json",
+    ))
 
 
 def _lease_digest(payload):
@@ -656,6 +666,8 @@ def candidates(controller):
     for path in ROOT.glob("*.json"):
         try:
             payload = read_private(path)
+            if _assignment_consumed(path.stem):
+                continue
             result.append(validate_isolated(payload, path.stem, controller) if payload.get("schema") == ISOLATED_SCHEMA
                           else validate(payload, path.stem, controller))
         except (OSError, ValueError, KeyError, TypeError):
