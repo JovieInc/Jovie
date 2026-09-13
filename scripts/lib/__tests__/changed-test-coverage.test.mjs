@@ -150,6 +150,12 @@ describe('changed test coverage', () => {
     expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
     expect(coverage).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).not.toContain(
+      String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
+    );
+    expect(coverage).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    );
     expect(coverage).toContain('--bail 1');
     expect(coverage).toContain('JOVIE_COVERAGE_INCLUDE');
     expect(coverage).toContain('.coverageInclude // [] | .[]');

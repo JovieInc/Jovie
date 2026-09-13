@@ -4092,8 +4092,11 @@ jobs:
               exit 1
             fi
             export JOVIE_COVERAGE_INCLUDE=\"\$include\"
+            # No `--` before --changed: pnpm 9 forwards that separator and
+            # Vitest then treats --changed as a positional, running the full
+            # suite until the 18m job cap.
             timeout --kill-after=20s 17m \
-              pnpm --filter @jovie/web test:coverage -- --changed \"\$COVERAGE_BASE\" --bail 1
+              pnpm --filter @jovie/web test:coverage --changed \"\$COVERAGE_BASE\" --bail 1
             node scripts/check-changed-test-coverage.mjs \
               --base \"\$COVERAGE_BASE\" \
               --head \"\$EXPECTED_HEAD\"
