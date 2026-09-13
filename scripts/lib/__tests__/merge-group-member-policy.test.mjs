@@ -461,8 +461,16 @@ describe('merge-group combined-tree payload policy', () => {
     ).rejects.toThrow(/response exceeded the bounded size/);
   });
 
+  it('pins the combined-tree tracked budget at 185 MiB', () => {
+    const combinedTreeBudget = 185 * 1024 * 1024;
+    expect(combinedTreeBudget).toBe(193986560);
+    expect(HYGIENE_LIMITS.maxTrackedBytes).toBe(combinedTreeBudget);
+  });
+
   it('deliberately rejects an exact combined tree over the absolute budget', async () => {
-    const overBudget = HYGIENE_LIMITS.maxTrackedBytes + 1;
+    const combinedTreeBudget = 185 * 1024 * 1024;
+    expect(HYGIENE_LIMITS.maxTrackedBytes).toBe(combinedTreeBudget);
+    const overBudget = combinedTreeBudget + 1;
     await expect(
       enforceCombinedTreePayload({
         deadlineMs: Date.now() + 1_000,
@@ -480,7 +488,7 @@ describe('merge-group combined-tree payload policy', () => {
         },
       })
     ).rejects.toThrow(
-      `${overBudget} bytes of tracked regular files exceeds the ${HYGIENE_LIMITS.maxTrackedBytes}-byte combined-tree budget`
+      `${overBudget} bytes of tracked regular files exceeds the ${combinedTreeBudget}-byte combined-tree budget`
     );
   });
 });
