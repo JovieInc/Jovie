@@ -506,6 +506,231 @@ class DeploymentContractTests(unittest.TestCase):
             self.assertEqual(receipt["previousInvocation"]["state"], "stale-start")
             self.assertEqual(receipt["previousInvocation"]["runId"], "b" * 32)
 
+    def test_consumer_state_guards_reject_relative_unsafe_and_foreign_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "workspace"
+            root.mkdir(mode=0o700)
+
+            with self.assertRaisesRegex(ValueError, "absolute"):
+                CYCLE.consumer_invocation_receipt_path("relative-workspace")
+
+            root.chmod(0o702)
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._ensure_consumer_receipt_directory(root)
+            root.chmod(0o700)
+
+            state = root / "state"
+            state.mkdir(mode=0o700)
+            private = state / "summer-symphony-consumer"
+            private.mkdir(mode=0o700)
+            private.chmod(0o750)
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._ensure_consumer_receipt_directory(root)
+
+            private.chmod(0o700)
+            with mock.patch.object(CYCLE.os, "getuid", return_value=os.getuid() + 1):
+                with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                    CYCLE._assert_owned_directory(root)
+
+            non_directory = pathlib.Path(directory) / "not-a-directory"
+            non_directory.write_text("file", encoding="utf-8")
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._assert_owned_directory(non_directory)
+
+            linked_state_root = pathlib.Path(directory) / "linked-root"
+            linked_state_root.mkdir(mode=0o700)
+            linked_target = pathlib.Path(directory) / "linked-target"
+            linked_target.mkdir(mode=0o700)
+            os.symlink(linked_target, linked_state_root / "state", target_is_directory=True)
+            with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                CYCLE._ensure_consumer_receipt_directory(linked_state_root)
+
+    def test_consumer_receipt_reader_rejects_malformed_and_unsafe_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            private = workspace / "state" / "summer-symphony-consumer"
+            private.mkdir(mode=0o700, parents=True)
+            receipt_path = private / CYCLE.CONSUMER_INVOCATION_RECEIPT
+            valid = {
+                "schema": CYCLE.CONSUMER_INVOCATION_SCHEMA,
+                "runId": "a" * 32,
+                "startedAt": "2026-09-13T10:00:00.000Z",
+                "invocationState": "started",
+            }
+
+            invalid_records = [
+                "not-json",
+                [],
+                {**valid, "schema": "unknown/v1"},
+                {**valid, "runId": "not-a-run-id"},
+                {**valid, "startedAt": "x" * 41},
+                {**valid, "invocationState": "unknown"},
+            ]
+            for record in invalid_records:
+                with self.subTest(record=record):
+                    receipt_path.write_text(
+                        record if isinstance(record, str) else json.dumps(record),
+                        encoding="utf-8",
+                    )
+                    receipt_path.chmod(0o600)
+                    with self.assertRaisesRegex(
+                        ValueError, "consumer-invocation-receipt-invalid"
+                    ):
+                        CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.write_text(json.dumps(valid), encoding="utf-8")
+            receipt_path.chmod(0o644)
+            with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.chmod(0o600)
+            with mock.patch.object(CYCLE.os, "getuid", return_value=os.getuid() + 1):
+                with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                    CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.unlink()
+            receipt_path.mkdir(mode=0o700)
+            with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                CYCLE._read_consumer_receipt(receipt_path)
+
+            receipt_path.rmdir()
+            target = private / "target.json"
+            target.write_text(json.dumps(valid), encoding="utf-8")
+            target.chmod(0o600)
+            os.symlink(target, receipt_path)
+            with self.assertRaisesRegex(PermissionError, "receipt-unsafe"):
+                CYCLE._read_consumer_receipt(receipt_path)
+
+    def test_consumer_outcome_validation_rejects_unbounded_shapes_and_fields(self):
+        valid_task_key = "a" * 64
+        invalid_cases = [
+            (123, "consumer-output-not-text"),
+            ("[]", "consumer-output-shape-invalid"),
+            (
+                json.dumps({"schema": "unknown/v1", "status": "idle"}),
+                "consumer-output-schema-invalid",
+            ),
+            (
+                json.dumps({"schema": CYCLE.CONSUMER_CYCLE_SCHEMA, "status": "unknown"}),
+                "consumer-output-status-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-held",
+                        "taskKey": valid_task_key,
+                        "reason": 7,
+                    }
+                ),
+                "consumer-output-reason-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-held",
+                        "taskKey": "short",
+                        "reason": "consumer-reason-unknown",
+                    }
+                ),
+                "consumer-output-taskKey-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "projection-recorded",
+                        "taskKey": valid_task_key,
+                        "issueIdentifier": "JOV-0",
+                        "acknowledgement": "recorded",
+                    }
+                ),
+                "consumer-output-issueIdentifier-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-recorded",
+                        "taskKey": valid_task_key,
+                        "acknowledgement": "sent",
+                    }
+                ),
+                "consumer-output-acknowledgement-invalid",
+            ),
+            (
+                json.dumps(
+                    {
+                        "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                        "status": "execution-held",
+                    }
+                ),
+                "consumer-output-fields-missing",
+            ),
+        ]
+        for stdout, expected_error in invalid_cases:
+            with self.subTest(expected_error=expected_error):
+                outcome, error = CYCLE._validated_consumer_outcome(stdout)
+                self.assertIsNone(outcome)
+                self.assertEqual(error, expected_error)
+
+        self.assertIsNone(CYCLE._rejection_reason_code(None))
+        self.assertIsNone(
+            CYCLE._rejection_reason_code(
+                "SUMMER_SYMPHONY_CONSUMER_REJECTED reason=not-json"
+            )
+        )
+        self.assertIsNone(
+            CYCLE._rejection_reason_code(
+                'SUMMER_SYMPHONY_CONSUMER_REJECTED reason=""'
+            )
+        )
+        self.assertIsNone(
+            CYCLE._rejection_reason_code(
+                "SUMMER_SYMPHONY_CONSUMER_REJECTED reason=123"
+            )
+        )
+
+    def test_consumer_receipt_records_spawn_error_and_invalid_return_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            env = {"GEM_WORKSPACE": str(workspace)}
+            with mock.patch.object(
+                CYCLE.subprocess, "run", side_effect=OSError("node unavailable")
+            ), mock.patch.dict(CYCLE.os.environ, env, clear=False):
+                with self.assertRaises(OSError):
+                    CYCLE.run_summer_symphony_consumer()
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "spawn-error")
+            self.assertIsNone(receipt["exitCode"])
+            self.assertEqual(receipt["outcome"]["status"], "spawn-error")
+
+        for invalid_return_code in (True, "0"):
+            with self.subTest(invalid_return_code=invalid_return_code):
+                with tempfile.TemporaryDirectory() as directory:
+                    workspace = pathlib.Path(directory)
+                    env = {"GEM_WORKSPACE": str(workspace)}
+                    with mock.patch.object(
+                        CYCLE.subprocess,
+                        "run",
+                        return_value=SimpleNamespace(
+                            returncode=invalid_return_code,
+                            stdout="",
+                            stderr="",
+                        ),
+                    ), mock.patch.dict(CYCLE.os.environ, env, clear=False):
+                        with self.assertRaises(TypeError):
+                            CYCLE.run_summer_symphony_consumer()
+
+                    receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+                    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                    self.assertEqual(receipt["invocationState"], "invalid-output")
+                    self.assertIsNone(receipt["exitCode"])
+                    self.assertEqual(receipt["outcome"]["status"], "invalid-output")
+
     def test_capacity_projection_runs_even_when_completion_reconcile_fails(self):
         repos = [SimpleNamespace(github="JovieInc/Jovie")]
         calls = []
