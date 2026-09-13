@@ -494,17 +494,40 @@ export function evaluateLiveObservation(sample) {
   }
 
   if (check('aa-contrast')) {
-    const ratio =
-      typeof sample.contrastRatio === 'number'
-        ? sample.contrastRatio
-        : contrastFromPaints(sample.fill, sample.foreground);
-    if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
-      add('aa-contrast', 'contrast ratio is missing; fail closed');
-    } else if (ratio < AA_TEXT_MIN) {
-      add(
-        'aa-contrast',
-        `contrast ${ratio.toFixed(2)}:1 is below WCAG AA ${AA_TEXT_MIN}:1`
-      );
+    if (Array.isArray(sample.contrastPairs)) {
+      if (sample.contrastPairs.length === 0) {
+        add('aa-contrast', 'rendered contrast pairs are missing; fail closed');
+      }
+      for (const pair of sample.contrastPairs) {
+        const ratio = pair?.ratio;
+        const label =
+          typeof pair?.label === 'string' && pair.label.trim()
+            ? pair.label.trim()
+            : typeof pair?.boundary === 'string' && pair.boundary.trim()
+              ? pair.boundary.trim()
+              : 'rendered contrast pair';
+        if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
+          add('aa-contrast', `${label} contrast ratio is missing; fail closed`);
+        } else if (ratio < AA_TEXT_MIN) {
+          add(
+            'aa-contrast',
+            `${label} contrast ${ratio.toFixed(2)}:1 is below WCAG AA ${AA_TEXT_MIN}:1`
+          );
+        }
+      }
+    } else {
+      const ratio =
+        typeof sample.contrastRatio === 'number'
+          ? sample.contrastRatio
+          : contrastFromPaints(sample.fill, sample.foreground);
+      if (typeof ratio !== 'number' || !Number.isFinite(ratio)) {
+        add('aa-contrast', 'contrast ratio is missing; fail closed');
+      } else if (ratio < AA_TEXT_MIN) {
+        add(
+          'aa-contrast',
+          `contrast ${ratio.toFixed(2)}:1 is below WCAG AA ${AA_TEXT_MIN}:1`
+        );
+      }
     }
   }
 
@@ -711,6 +734,18 @@ export function seededPassingObservations() {
         keyboardReached: true,
         padding: { tokens: ['px-0.5'] },
         radius: { token: 'rounded-full', px: 9999 },
+        contrastPairs: [
+          {
+            label: 'checked thumb against track',
+            boundary: 'thumb-track',
+            ratio: 7.2,
+          },
+          {
+            label: 'unchecked thumb against track',
+            boundary: 'thumb-track',
+            ratio: 7.2,
+          },
+        ],
       })
     );
   }
@@ -795,6 +830,24 @@ export const DELIBERATE_RED_LIVE_FIXTURES = Object.freeze([
     variant: 'default',
     contrastRatio: 1.2,
     padding: { tokens: ['px-2', 'py-0.5'] },
+    radius: { token: 'rounded-full', px: 9999 },
+  }),
+  observation(CANONICAL_LIVE_STORIES[5], 'desktop', {
+    id: 'deliberate-red.live.switch-thumb-track-contrast',
+    copy: 'Keyboard toggle',
+    classes: 'relative inline-flex h-4 w-7 rounded-full px-0.5 bg-surface-2',
+    variant: 'default',
+    // Keep the legacy scalar healthy so this fixture proves that the
+    // evaluator uses painted thumb/track evidence instead of root text.
+    contrastRatio: 7.2,
+    contrastPairs: [
+      {
+        label: 'unchecked thumb against track',
+        boundary: 'thumb-track',
+        ratio: 1.2,
+      },
+    ],
+    padding: { tokens: ['px-0.5'] },
     radius: { token: 'rounded-full', px: 9999 },
   }),
   observation(CANONICAL_LIVE_STORIES[0], 'desktop', {

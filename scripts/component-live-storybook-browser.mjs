@@ -22,6 +22,7 @@ import {
   waitForUrl,
   withBoundedLifecycle,
 } from './component-live-storybook-lifecycle.mjs';
+import { oklchToRgb, parseOklch } from './lib/oklch.mjs';
 
 const require = createRequire(import.meta.url);
 const MIME = Object.freeze({
@@ -215,20 +216,37 @@ function extractRadiusToken(className) {
 }
 
 function parseRgb(raw) {
-  const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(
-    raw || ''
-  );
-  if (!rgb) return null;
-  const r = Number(rgb[1]) / 255;
-  const g = Number(rgb[2]) / 255;
-  const b = Number(rgb[3]) / 255;
+  const value = String(raw || '').trim();
+  const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(value);
+  let r;
+  let g;
+  let b;
+  if (rgb) {
+    r = Number(rgb[1]) / 255;
+    g = Number(rgb[2]) / 255;
+    b = Number(rgb[3]) / 255;
+  } else if (/^oklch\(/i.test(value)) {
+    try {
+      const converted = oklchToRgb(parseOklch(value));
+      r = converted.r;
+      g = converted.g;
+      b = converted.b;
+    } catch {
+      return null;
+    }
+  } else {
+    return null;
+  }
+  r = Math.min(1, Math.max(0, r));
+  g = Math.min(1, Math.max(0, g));
+  b = Math.min(1, Math.max(0, b));
   const luminance = 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
   return {
     r,
     g,
     b,
     luminance: luminance < 0.5 ? 'dark' : 'light',
-    raw,
+    raw: value,
   };
 }
 
@@ -307,6 +325,22 @@ async function measureStory(page, story, viewport, axePath) {
       visit(el, 0);
       const classes = [classOf(el), ...paddingClassSource].join(' ');
       const style = getComputedStyle(el);
+      const switchPaints =
+        owner === 'atom.switch'
+          ? [...root.querySelectorAll(ownerSel)].map(node => {
+              const trackStyle = getComputedStyle(node);
+              const thumb = node.firstElementChild;
+              const thumbStyle = thumb ? getComputedStyle(thumb) : null;
+              return {
+                label: node.getAttribute('aria-label') || '',
+                state: node.getAttribute('data-state'),
+                disabled: node.hasAttribute('disabled'),
+                invalid: node.getAttribute('aria-invalid') === 'true',
+                trackBackgroundColor: trackStyle.backgroundColor,
+                thumbBackgroundColor: thumbStyle?.backgroundColor ?? null,
+              };
+            })
+          : [];
       const opaqueBg = node => {
         let current = node;
         while (current && current !== document.documentElement) {
@@ -395,6 +429,7 @@ async function measureStory(page, story, viewport, axePath) {
         pageBackgroundColor: opaqueBg(document.body),
         backgroundColor: opaqueBg(el),
         color: style.color,
+        switchPaints,
         outerRadiusPx: parsePx(style.borderTopLeftRadius),
         innerRadiusPx: cssLengthToPx(
           style.getPropertyValue('--system-b-radius-card-inner')
@@ -497,6 +532,26 @@ async function measureStory(page, story, viewport, axePath) {
   const pageFill = parseRgb(snapshot.pageBackgroundColor);
   const fill = parseRgb(snapshot.backgroundColor);
   const foreground = parseRgb(snapshot.color);
+  const switchPaints = (snapshot.switchPaints ?? []).map(paint => {
+    const track = parseRgb(paint.trackBackgroundColor);
+    const thumb = parseRgb(paint.thumbBackgroundColor);
+    return {
+      id: `${paint.label || 'switch'}:${paint.state || 'unknown'}:thumb-track`,
+      label: paint.label,
+      state: paint.state,
+      disabled: paint.disabled,
+      invalid: paint.invalid,
+      boundary: 'thumb-track',
+      background: track,
+      foreground: thumb,
+      ratio: contrastRatio(track, thumb),
+    };
+  });
+  const switchContrastRatio =
+    switchPaints.length === 0 ||
+    switchPaints.some(item => !Number.isFinite(item.ratio))
+      ? null
+      : Math.min(...switchPaints.map(item => item.ratio));
   const paddingTokens = extractPaddingTokens(snapshot.classes);
   const radiusToken = extractRadiusToken(snapshot.classes);
 
@@ -526,8 +581,14 @@ async function measureStory(page, story, viewport, axePath) {
       arbitrary: Boolean(radiusToken && /\[[^\]]+\]/.test(radiusToken)),
     },
     fill: pageFill ?? fill,
-    foreground,
-    contrastRatio: contrastRatio(fill, foreground),
+    // Switch contrast is measured from its painted thumb/track pair. The
+    // root color is inherited text styling and is intentionally excluded.
+    foreground: story.owner === 'atom.switch' ? null : foreground,
+    contrastRatio:
+      story.owner === 'atom.switch'
+        ? switchContrastRatio
+        : contrastRatio(fill, foreground),
+    contrastPairs: story.owner === 'atom.switch' ? switchPaints : undefined,
     axeViolations: axe,
     overflow: snapshot.overflow,
     zoomOverflow,
