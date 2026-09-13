@@ -151,15 +151,28 @@ const UNSUPPORTED_SUPERLATIVE_PATTERN =
   /\b(?:the\s+)?(?:best|greatest|biggest|most\s+(?:important|influential|popular|successful)|number\s+one|no\.\s*1|#1)\b/i;
 
 /** A lone number/date has no entity, relationship, or qualifier to preserve. */
-const STANDALONE_QUANTITATIVE_PATTERN =
-  /^(?:[$€£]\s*)?(?:\d+(?:[.,]\d+)?(?:\s*%|\s*(?:usd|eur|gbp))?|\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,\s*\d{4})?)\.?$/i;
+const STANDALONE_NUMBER_PATTERN =
+  /^(?:[$€£]\s*)?\d+(?:[.,]\d+)?(?:\s*%|\s*(?:usd|eur|gbp))?\.?$/i;
+const STANDALONE_YEAR_PATTERN = /^\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\.?$/;
+const MONTH_DATE_PATTERN = /^[a-z]{3,9}\s+\d{1,2}(?:,\s*\d{4})?\.?$/i;
 
 function isUnsupportedSuperlativeClaim(value: string): boolean {
   return UNSUPPORTED_SUPERLATIVE_PATTERN.test(value);
 }
 
 function isStandaloneQuantitativeClaim(value: string): boolean {
-  return STANDALONE_QUANTITATIVE_PATTERN.test(value.trim());
+  const normalized = value.trim();
+  if (
+    STANDALONE_NUMBER_PATTERN.test(normalized) ||
+    STANDALONE_YEAR_PATTERN.test(normalized)
+  ) {
+    return true;
+  }
+
+  return (
+    MONTH_DATE_PATTERN.test(normalized) &&
+    !Number.isNaN(Date.parse(normalized.replace(/\.$/, '')))
+  );
 }
 
 function isSafeFreeformClaim(value: string): boolean {
@@ -334,15 +347,26 @@ function selectLatestRelease(
     );
 
   if (datedCandidates.length > 0) {
-    return datedCandidates.reduce((latest, candidate) => {
-      if (candidate.timestamp > latest.timestamp) return candidate;
+    const firstCandidate = datedCandidates[0];
+    if (!firstCandidate) return candidates[0] ?? null;
+
+    let latestCandidate = firstCandidate;
+    for (const candidate of datedCandidates.slice(1)) {
+      if (candidate.timestamp > latestCandidate.timestamp) {
+        latestCandidate = candidate;
+        continue;
+      }
       // The supplied release appears first, so a tie keeps its richer source
       // metadata instead of allowing a catalog row to replace it.
-      return candidate.timestamp === latest.timestamp &&
-        candidate.index < latest.index
-        ? candidate
-        : latest;
-    }).release;
+      if (
+        candidate.timestamp === latestCandidate.timestamp &&
+        candidate.index < latestCandidate.index
+      ) {
+        latestCandidate = candidate;
+      }
+    }
+
+    return latestCandidate.release;
   }
 
   return candidates[0] ?? null;
@@ -537,6 +561,82 @@ function buildLinkSections(
   return { listenLinks, followLinks };
 }
 
+function buildBioDescriptionBlock(
+  artist: Artist
+): ProfileAeoDescriptionBlock | null {
+  const bio = cleanText(artist.tagline);
+  if (!bio || !isSafeFreeformClaim(bio)) return null;
+
+  return {
+    kind: 'bio',
+    text: ensureSubjectContext(artist.name, trimSentence(bio)),
+  };
+}
+
+function buildCatalogDescriptionBlock(params: {
+  readonly artist: Artist;
+  readonly latestRelease: AeoReleaseFact | null;
+  readonly releases: readonly PublicRelease[];
+  readonly tourDates: readonly TourDateViewModel[];
+  readonly merchCards: readonly PublicMerchCard[];
+  readonly now: Date;
+}): ProfileAeoDescriptionBlock | null {
+  const { artist, latestRelease, releases, tourDates, merchCards, now } =
+    params;
+  const upcomingTourDateCount = tourDates.filter(tourDate =>
+    isUpcomingTourDate(tourDate, now)
+  ).length;
+  const catalogFacts = [
+    releases.length > 0 ? pluralize(releases.length, 'listed release') : null,
+    upcomingTourDateCount > 0
+      ? pluralize(upcomingTourDateCount, 'upcoming show')
+      : null,
+    merchCards.length > 0 ? pluralize(merchCards.length, 'merch item') : null,
+  ].filter((value): value is string => Boolean(value));
+
+  if (!latestRelease?.title && catalogFacts.length === 0) return null;
+
+  const releasePhrase = latestRelease?.title
+    ? `${artist.name}'s latest listed release is "${latestRelease.title}"`
+    : `${artist.name}'s public catalog is listed on Jovie`;
+  const catalogPhrase =
+    catalogFacts.length > 0
+      ? `, with ${formatList(catalogFacts)} on the profile`
+      : '';
+
+  return {
+    kind: 'catalog',
+    text: `${releasePhrase}${catalogPhrase}.`,
+  };
+}
+
+function buildHighlightDescriptionBlock(
+  artist: Artist
+): ProfileAeoDescriptionBlock | null {
+  const highlights = cleanText(artist.career_highlights);
+  if (!highlights || !isSafeFreeformClaim(highlights)) return null;
+
+  return {
+    kind: 'highlight',
+    text: `${artist.name}'s profile highlights: ${trimSentence(highlights)}`,
+  };
+}
+
+function buildPlaylistDescriptionBlock(
+  artist: Artist
+): ProfileAeoDescriptionBlock | null {
+  const targetPlaylists = dedupeStrings(artist.target_playlists ?? []).slice(
+    0,
+    3
+  );
+  if (targetPlaylists.length === 0) return null;
+
+  return {
+    kind: 'playlist',
+    text: `Playlist targets listed for ${artist.name} include ${formatList(targetPlaylists)}.`,
+  };
+}
+
 function buildDescription(params: {
   readonly artist: Artist;
   readonly genres: readonly string[];
@@ -570,56 +670,21 @@ function buildDescription(params: {
   const description: ProfileAeoDescriptionBlock[] = [
     { kind: 'identity', text: lead },
   ];
-  const bio = cleanText(artist.tagline);
-  if (bio && isSafeFreeformClaim(bio)) {
-    description.push({
-      kind: 'bio',
-      text: ensureSubjectContext(artist.name, trimSentence(bio)),
-    });
-  }
-
-  const upcomingTourDateCount = tourDates.filter(tourDate =>
-    isUpcomingTourDate(tourDate, now)
-  ).length;
-  const catalogFacts = [
-    releases.length > 0 ? pluralize(releases.length, 'listed release') : null,
-    upcomingTourDateCount > 0
-      ? pluralize(upcomingTourDateCount, 'upcoming show')
-      : null,
-    merchCards.length > 0 ? pluralize(merchCards.length, 'merch item') : null,
-  ].filter((value): value is string => Boolean(value));
-
-  if (latestRelease?.title || catalogFacts.length > 0) {
-    const releasePhrase = latestRelease?.title
-      ? `${artist.name}'s latest listed release is "${latestRelease.title}"`
-      : `${artist.name}'s public catalog is listed on Jovie`;
-    const catalogPhrase =
-      catalogFacts.length > 0
-        ? `, with ${formatList(catalogFacts)} on the profile`
-        : '';
-    description.push({
-      kind: 'catalog',
-      text: `${releasePhrase}${catalogPhrase}.`,
-    });
-  }
-
-  const highlights = cleanText(artist.career_highlights);
-  if (highlights && isSafeFreeformClaim(highlights)) {
-    description.push({
-      kind: 'highlight',
-      text: `${artist.name}'s profile highlights: ${trimSentence(highlights)}`,
-    });
-  }
-
-  const targetPlaylists = dedupeStrings(artist.target_playlists ?? []).slice(
-    0,
-    3
-  );
-  if (targetPlaylists.length > 0) {
-    description.push({
-      kind: 'playlist',
-      text: `Playlist targets listed for ${artist.name} include ${formatList(targetPlaylists)}.`,
-    });
+  const optionalBlocks = [
+    buildBioDescriptionBlock(artist),
+    buildCatalogDescriptionBlock({
+      artist,
+      latestRelease,
+      releases,
+      tourDates,
+      merchCards,
+      now,
+    }),
+    buildHighlightDescriptionBlock(artist),
+    buildPlaylistDescriptionBlock(artist),
+  ];
+  for (const block of optionalBlocks) {
+    if (block) description.push(block);
   }
 
   return description;
