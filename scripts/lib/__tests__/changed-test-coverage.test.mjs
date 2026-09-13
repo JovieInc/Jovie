@@ -2,10 +2,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
+  EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
   evaluateChangedLineCoverage,
   isCoverageSourcePath,
   parseChangedLines,
+  toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
+import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
 
 const path = 'apps/web/lib/example.ts';
 
@@ -71,6 +75,13 @@ describe('changed test coverage', () => {
     expect(result).toMatchObject({ ok: true, percentage: 66.7 });
   });
 
+  it('maps coverable web sources to Vitest coverage.include paths', () => {
+    expect(toWebCoverageIncludePaths([path])).toEqual(['lib/example.ts']);
+    expect(() =>
+      toWebCoverageIncludePaths(['apps/web/lib/example.test.ts'])
+    ).toThrow(/Not a coverable web product path/);
+  });
+
   it('records an explicit non-applicable receipt for non-product changes', () => {
     expect(isCoverageSourcePath('apps/web/proxy.ts')).toBe(true);
     expect(isCoverageSourcePath('apps/web/workflows/example.ts')).toBe(true);
@@ -109,6 +120,19 @@ describe('changed test coverage', () => {
     expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
     expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
     expect(coverage).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);
+    expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).toContain('--bail 1');
+    expect(coverage).toContain('JOVIE_COVERAGE_INCLUDE');
+    expect(coverage).toContain('.coverageInclude[]');
+    expect(coverage).toContain(
+      `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
+    );
+    const jobTimeout = Number(coverage.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+    expect(jobTimeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
+    expect(jobTimeout).toBeLessThan(
+      NATIVE_QUEUE_POLICY.check_response_timeout_minutes
+    );
+    expect(coverage).not.toContain('timeout-minutes: 60');
     expect(coverage).not.toContain('test:coverage:diff');
     expect(coverage).not.toContain('exact-head-coverage-baseline.json');
     expect(coverage).toContain("trap 'stop_coverage; exit 143' TERM");

@@ -13,8 +13,13 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
+import {
+  EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
+  EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
+} from '../changed-test-coverage.mjs';
 import { MERGE_GROUP_ADMISSION_WAIT_MS } from '../merge-group-admission.mjs';
 import { MERGE_GROUP_POLICY_DEADLINE_MS } from '../merge-group-member-policy.mjs';
+import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
 import {
   createGitRunner,
   formatMetaEnv,
@@ -686,6 +691,26 @@ describe('merge_group workflow contract', () => {
       expect(job).not.toContain("github.event_name == 'pull_request'");
       expect(job).toContain('runs-on: ubuntu-latest');
     }
+  });
+
+  it('finishes exact-head coverage inside the native merge-queue check budget', () => {
+    const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
+    const timeout = Number(coverage.match(/timeout-minutes:\s*(\d+)/)?.[1]);
+    expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
+    expect(timeout).toBeLessThan(
+      NATIVE_QUEUE_POLICY.check_response_timeout_minutes
+    );
+    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
+    expect(coverage).toContain("github.event_name == 'merge_group'");
+    expect(coverage).toContain('github.event.merge_group.head_sha');
+    expect(coverage).toContain('.applicable');
+    expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).toContain('--bail 1');
+    expect(coverage).toContain(
+      `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
+    );
+    expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
+    expect(coverage).not.toContain('timeout-minutes: 60');
   });
 
   it('requires one diff-scoped secret scan on source and combined heads', () => {

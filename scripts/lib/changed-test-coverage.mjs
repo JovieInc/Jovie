@@ -5,7 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 export const MIN_CHANGED_LINE_COVERAGE = 60;
+/** Must fail before GitHub merge-queue check_response_timeout_minutes=20. */
+export const EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES = 18;
+export const EXACT_HEAD_COVERAGE_STEP_TIMEOUT = '15m';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+const WEB_SOURCE_PREFIX = 'apps/web/';
 
 const SOURCE_PATH = /^apps\/web\/.*\.(?:[cm]?[jt]sx?)$/;
 const EXCLUDED_SOURCE_PATH =
@@ -13,6 +17,26 @@ const EXCLUDED_SOURCE_PATH =
 
 export function isCoverageSourcePath(path) {
   return SOURCE_PATH.test(path) && !EXCLUDED_SOURCE_PATH.test(path);
+}
+
+export function toWebCoverageIncludePaths(files) {
+  return files.map(filePath => {
+    if (!isCoverageSourcePath(filePath)) {
+      throw new Error(`Not a coverable web product path: ${filePath}`);
+    }
+    if (!filePath.startsWith(WEB_SOURCE_PREFIX)) {
+      throw new Error(`Coverage source is not under apps/web: ${filePath}`);
+    }
+    const relativePath = filePath.slice(WEB_SOURCE_PREFIX.length);
+    if (
+      relativePath.length === 0 ||
+      relativePath.startsWith('/') ||
+      relativePath.split('/').includes('..')
+    ) {
+      throw new Error(`Invalid coverage include path: ${filePath}`);
+    }
+    return relativePath;
+  });
 }
 
 export function parseChangedLines(diff) {
@@ -212,6 +236,7 @@ export function planChangedLineCoverage({
   return {
     applicable: files.length > 0,
     files,
+    coverageInclude: toWebCoverageIncludePaths(files),
   };
 }
 
