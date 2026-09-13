@@ -134,6 +134,18 @@ jobs:
         with:
           client-id: ${{ vars.JOVIE_BOT_CLIENT_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+      - name: Verify Jovie Bot mutation token
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actor="$(gh api user --jq '.login')"
+          if [[ "$actor" != 'jovie-bot[bot]' ]]; then
+            echo "::error::Queue mutation token resolved to $actor; expected jovie-bot[bot]" >&2
+            exit 1
+          fi
+          echo "Queue mutation token actor verified: $actor"
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

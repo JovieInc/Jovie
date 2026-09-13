@@ -1448,6 +1448,7 @@ describe('queue workflow mutation safety', () => {
       );
       expect(job).not.toContain('secrets.GITHUB_TOKEN');
     }
+    expect(enrollJob).toContain('Verify Jovie Bot mutation token');
     for (const step of [enroll, rebasePreflight, rebaseMutation]) {
       expect(step).not.toContain('secrets.GITHUB_TOKEN');
     }
