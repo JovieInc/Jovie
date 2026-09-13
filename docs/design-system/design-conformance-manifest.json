@@ -40,7 +40,7 @@
       "storySources": ["packages/ui/atoms/button.stories.tsx"],
       "testSources": ["packages/ui/atoms/button.test.tsx"],
       "penRootId": "g3IC1",
-      "sourceDigest": "e1e6c48763be8efa6cfe05f94c65765467003eccb3d9345a70a1696a7b28425d"
+      "sourceDigest": "6560a9f588bc381555854e4599e82ca9c25bc1adeaac30b28b901056868f8688"
     },
     {
       "id": "atom.input",
