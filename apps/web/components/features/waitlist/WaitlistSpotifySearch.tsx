@@ -220,7 +220,7 @@ export function WaitlistSpotifySearch({
               type='button'
               variant='link'
               onClick={handleBackToSearch}
-              className={cn(AUTH_SURFACE.inlineAction, 'h-auto')}
+              className={cn(AUTH_SURFACE.inlineAction, 'h-7')}
               disabled={isSubmitting}
             >
               Change
@@ -254,7 +254,7 @@ export function WaitlistSpotifySearch({
               type='button'
               variant='link'
               onClick={handleBackToSearch}
-              className={cn(AUTH_SURFACE.inlineAction, 'h-auto')}
+              className={cn(AUTH_SURFACE.inlineAction, 'h-7')}
               disabled={isSubmitting}
             >
               Search For Artist Instead

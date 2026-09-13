@@ -4543,7 +4543,6 @@
 :where(.system-b-chat-tool-surface-cancelled) {
   border-color: var(--system-b-app-frame-seam);
   background: var(--system-b-app-content-surface);
-  opacity: 0.6;
 }
 
 :where(.system-b-chat-tool-surface-flat) {

@@ -172,6 +172,7 @@ export function FeatureIntroCard({
                   <Link
                     data-testid='feature-intro-and-more'
                     href={changelogHref}
+                    className='h-auto min-h-0 before:hidden'
                   >
                     And more
                   </Link>
