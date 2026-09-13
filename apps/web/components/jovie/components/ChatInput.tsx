@@ -259,7 +259,7 @@ function DictationStatusBanner({
         size='sm'
         onClick={onCancel}
         className={DICTATION_BANNER_BUTTON_CLASS}
-        aria-label='Cancel dictation'
+        aria-label='Cancel Dictation'
       >
         Cancel
       </Button>
@@ -900,9 +900,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       >
         <div
           className={dockClass}
-          data-chat-composer-overlay={
-            showComposerOverlay ? 'true' : undefined
-          }
+          data-chat-composer-overlay={showComposerOverlay ? 'true' : undefined}
         >
           {/* ROOT inline picker is absolutely positioned so it does not alter
               the composer surface height and cause layout shift when it opens. */}
