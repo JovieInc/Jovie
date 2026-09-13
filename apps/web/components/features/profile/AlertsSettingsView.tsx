@@ -43,7 +43,7 @@ function SettingsToggle({
       thumbClassName={cn(
         'block h-6 w-6 rounded-full shadow-sm transition-transform duration-subtle',
         checked
-          ? 'bg-white translate-x-4 rtl:-translate-x-4'
+          ? 'bg-(--color-text-tooltip) translate-x-4 rtl:-translate-x-4'
           : 'bg-btn-primary translate-x-0'
       )}
       thumbTranslation='owner'
