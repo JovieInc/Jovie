@@ -314,10 +314,17 @@ describe('Switch', () => {
     });
 
     it('preserves aria-invalid state', () => {
-      render(<Switch aria-label='Invalid toggle' aria-invalid='true' />);
-      expect(screen.getByRole('switch')).toHaveAttribute(
-        'aria-invalid',
-        'true'
+      render(
+        <Switch
+          aria-label='Invalid toggle'
+          aria-invalid='true'
+          data-testid='switch'
+        />
+      );
+      const switchElement = screen.getByTestId('switch');
+      expect(switchElement).toHaveAttribute('aria-invalid', 'true');
+      expect(switchElement.className).toContain(
+        'aria-[invalid=true]:border-error'
       );
     });
   });
