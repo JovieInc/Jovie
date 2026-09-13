@@ -152,6 +152,26 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(screen.getByTestId('composer-child')).toBeTruthy();
   });
 
+  it('bottom-aligns short suggestions and keeps the composer docked', () => {
+    render(
+      <ChatEmptyStateComposerRegion
+        above={<div data-testid='compact-suggestion'>Review release</div>}
+      >
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    const region = screen.getByTestId('chat-empty-state-composer-region');
+    expect(region).toHaveAttribute('data-empty-chat-region', 'true');
+    const suggestions = screen
+      .getByTestId('compact-suggestion')
+      .closest('[data-empty-chat-suggestions="true"]');
+    expect(suggestions).toHaveClass('mt-auto');
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toHaveAttribute('data-dock', 'bottom');
+  });
+
   it('keeps a stable dock while an empty-state affordance is temporarily hidden', () => {
     render(
       <ChatEmptyStateComposerRegion stableDocked>
