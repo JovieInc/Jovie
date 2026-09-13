@@ -1,3 +1,8 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Protected pull_request_target captures exact PR UI evidence without exposing write credentials to candidate code; trusted base review may use the configured advisory backend while capture runs with read-only permissions.
+# removal-trigger: Remove this hop when repository-owned visual evidence can be captured and reviewed at the exact PR head without a protected base workflow boundary.
+
 name: PR Visual Review
 
 # Bounded UI evidence lane. Capture runs on PR code without secrets;

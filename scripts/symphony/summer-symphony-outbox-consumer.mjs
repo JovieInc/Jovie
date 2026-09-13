@@ -453,7 +453,10 @@ export function validateOutcomeV3(outcome, task, publicKey) {
   return outcome;
 }
 
-/** Existing host controller owns qualification and the shared lease; this is transport only. */
+/**
+ * Existing host controller owns qualification and the shared lease; this is transport only.
+ * @param {{run?: (...args: any[]) => any}} [options]
+ */
 export function createOwnedRepairExecutor({ run = spawnSync } = {}) {
   return {
     async execute(task) {

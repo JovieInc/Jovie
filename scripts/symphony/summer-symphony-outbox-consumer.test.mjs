@@ -1017,10 +1017,11 @@ describe('configuration boundaries', () => {
     );
     assert.deepEqual(await transport.writeOutcome(outcome), acknowledgement);
     assert.ok(request);
-    assert.equal(request.url, `https://summer.example${OUTCOME_PATH}`);
-    assert.equal(request.options.method, 'POST');
-    assert.equal(request.options.headers['content-type'], 'application/json');
-    assert.deepEqual(JSON.parse(request.options.body), outcome);
+    const capturedRequest = /** @type {any} */ (request);
+    assert.equal(capturedRequest.url, `https://summer.example${OUTCOME_PATH}`);
+    assert.equal(capturedRequest.options.method, 'POST');
+    assert.equal(capturedRequest.options.headers['content-type'], 'application/json');
+    assert.deepEqual(JSON.parse(capturedRequest.options.body), outcome);
     assert.equal(outcome.schema, OUTCOME_DOMAIN_V3);
   });
 
