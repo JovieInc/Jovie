@@ -6259,6 +6259,10 @@ jobs:
         ci-promptfoo-evals,
         ci-golden-eval-set,
       ]
+    # A queued-forever event=push run on a SHA cannot be cancelled or rerun
+    # (GitHub treats it as both completed and already-running). observe_main
+    # needs a real Main Release Ready attempt on the exact main head, so a new
+    # main SHA is required after that class of ghost run.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
