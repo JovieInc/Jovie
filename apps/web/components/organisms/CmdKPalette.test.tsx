@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { Paperclip } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CmdKPalette } from './CmdKPalette';
@@ -185,5 +186,65 @@ describe('CmdKPalette', () => {
     });
     expect(reopenedInput).toHaveValue('');
     expect(reopenedInput).toHaveFocus();
+  });
+
+  it('filters additional action rows and commits them without a route', () => {
+    pushMock.mockClear();
+    const onAdditionalSelect = vi.fn();
+    const onOpenChange = vi.fn();
+    const onSelect = vi.fn();
+
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        onOpenChange={onOpenChange}
+        additionalSectionsAfter={[
+          {
+            id: 'attachments',
+            label: 'Attachments',
+            items: [
+              {
+                kind: 'action',
+                action: {
+                  id: 'attach-files',
+                  label: 'Attach Files',
+                  description: 'Drop or browse',
+                  icon: Paperclip,
+                  onSelect,
+                },
+              },
+              {
+                kind: 'action',
+                action: {
+                  id: 'upload-audio',
+                  label: 'Upload audio',
+                  description: 'Supported audio files',
+                  icon: Paperclip,
+                  onSelect,
+                },
+              },
+            ],
+          },
+        ]}
+        onAdditionalSelect={onAdditionalSelect}
+      />
+    );
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'browse' } });
+
+    const attach = screen.getByRole('option', { name: /Attach Files/ });
+    expect(attach).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('option', { name: /Upload audio/ })).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onAdditionalSelect).toHaveBeenCalledWith('attach-files');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

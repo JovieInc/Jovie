@@ -7,10 +7,12 @@
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { Paperclip } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
 import {
+  filterAdditionalSections,
   fuzzyMatch,
   PaletteList,
 } from '@/components/organisms/SharedCommandPalette';
@@ -595,5 +597,44 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       { target: { value: 'Chat result' } }
     );
     expect(screen.getAllByText(/^Chat result \d$/)).toHaveLength(7);
+  });
+
+  it('filters additional action items by label and description', () => {
+    const onSelect = vi.fn();
+    const attachments = {
+      id: 'attachments',
+      label: 'Attachments',
+      items: [
+        {
+          kind: 'action' as const,
+          action: {
+            id: 'attach-files',
+            label: 'Attach Files',
+            description: 'Drop or browse',
+            icon: Paperclip,
+            onSelect,
+          },
+        },
+        {
+          kind: 'action' as const,
+          action: {
+            id: 'upload-audio',
+            label: 'Upload audio',
+            description: 'Supported audio files',
+            icon: Paperclip,
+            onSelect,
+          },
+        },
+      ],
+    };
+
+    const matched = filterAdditionalSections('browse', [attachments]);
+    expect(matched).toHaveLength(1);
+    expect(matched[0]?.items).toHaveLength(1);
+    expect(matched[0]?.items[0]).toMatchObject({
+      kind: 'action',
+      action: { id: 'attach-files' },
+    });
+    expect(filterAdditionalSections('missing', [attachments])).toEqual([]);
   });
 });
