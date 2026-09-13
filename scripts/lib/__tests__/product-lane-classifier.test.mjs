@@ -275,8 +275,13 @@ describe('product lane classifier', () => {
     ).toEqual(['operations']);
     expect(
       classifyProductLanes([
-        'ops/signals/gem-publisher-commission.request',
+        'scripts/symphony/signals/gem-publisher-commission.request',
       ]).selectedLanes
+    ).toEqual(['operations']);
+    // ops/ is mapped for future fleet signals; Path Changes still trusts main's
+    // classifier, so new ops/* files need that mapping already on main.
+    expect(
+      classifyProductLanes(['ops/signals/example.request']).selectedLanes
     ).toEqual(['operations']);
   });
 

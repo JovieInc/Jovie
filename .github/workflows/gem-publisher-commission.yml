@@ -1,7 +1,10 @@
 name: Gem Publisher Commission (JOV-6163 E1)
 # Publisher-only install on jovie-fixed when activation coalesces past Install.
-# workflow_dispatch needs actions:write. Push of ops/signals/gem-publisher-commission.request
-# lets MQ land the same confirm gate when the dispatcher lacks actions:write.
+# workflow_dispatch needs actions:write. Push of
+# scripts/symphony/signals/gem-publisher-commission.request lets MQ land the
+# same confirm gate when the dispatcher lacks actions:write.
+# Path lives under scripts/ so main's trusted product-lane classifier admits it
+# without a prior ops/ mapping on main.
 on:
   workflow_dispatch:
     inputs:
@@ -16,7 +19,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'ops/signals/gem-publisher-commission.request'
+      - 'scripts/symphony/signals/gem-publisher-commission.request'
 permissions:
   contents: read
 concurrency:
@@ -50,7 +53,7 @@ jobs:
             tip_sha="$DISPATCH_TIP"
             confirm="$DISPATCH_CONFIRM"
           else
-            signal=ops/signals/gem-publisher-commission.request
+            signal=scripts/symphony/signals/gem-publisher-commission.request
             test -f "$signal"
             confirm="$(jq -r '.confirm // empty' "$signal")"
             tip_sha="$(git rev-parse HEAD)"

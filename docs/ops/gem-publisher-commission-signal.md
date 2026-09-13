@@ -1,6 +1,6 @@
 # Gem publisher commission signal
 
-`ops/signals/gem-publisher-commission.request` starts
+`scripts/symphony/signals/gem-publisher-commission.request` starts
 `.github/workflows/gem-publisher-commission.yml` when it lands on `main`.
 
 ## Why
@@ -8,6 +8,9 @@
 `workflow_dispatch` needs `actions:write`. The Cursor GitHub App does not have
 it (HTTP 403). jovie-bot can still merge a PR that updates this signal file;
 the `push` path then runs commission on `jovie-fixed` without a manual dispatch.
+
+The signal path is under `scripts/symphony/` so Path Changes can admit it using
+main's trusted product-lane classifier (no chicken-and-egg `ops/` mapping).
 
 ## Confirm gate
 

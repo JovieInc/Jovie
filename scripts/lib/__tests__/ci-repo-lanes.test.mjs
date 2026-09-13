@@ -35,12 +35,17 @@ describe('JOV-5288 CI repo lanes', () => {
     expect(plan.lanes).toEqual([CI_LANES.SYMPHONY_CONTROL]);
   });
 
-  it('maps ops/ fleet signals onto Symphony control-plane only', () => {
+  it('maps symphony commission signals onto Symphony control-plane only', () => {
     expect(
-      classifyChangedFile('ops/signals/gem-publisher-commission.request')
+      classifyChangedFile(
+        'scripts/symphony/signals/gem-publisher-commission.request'
+      )
     ).toEqual([CI_LANES.SYMPHONY_CONTROL]);
+    expect(classifyChangedFile('ops/signals/example.request')).toEqual([
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
     const plan = classifyCiRepoLanes([
-      'ops/signals/gem-publisher-commission.request',
+      'scripts/symphony/signals/gem-publisher-commission.request',
     ]);
     expect(plan.runJovieProduct).toBe(false);
     expect(plan.runSymphonyControl).toBe(true);
