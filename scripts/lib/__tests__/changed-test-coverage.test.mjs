@@ -102,12 +102,26 @@ describe('changed test coverage', () => {
     expect(isCoverageSourcePath('apps/web/workflows/example.ts')).toBe(true);
     expect(isCoverageSourcePath('apps/web/vitest.config.fast.mts')).toBe(false);
     expect(isCoverageSourcePath('apps/web/lib/example.test.ts')).toBe(false);
+    expect(
+      isCoverageSourcePath('apps/web/components/atoms/example.stories.tsx')
+    ).toBe(false);
     expect(isCoverageSourcePath('scripts/lib/example.mjs')).toBe(false);
     expect(
       evaluateChangedLineCoverage({
         changedLines: new Map([
           ['apps/web/vitest.config.fast.mts', new Set([1])],
           ['scripts/lib/example.mjs', new Set([1])],
+        ]),
+        coverage: {},
+      })
+    ).toMatchObject({ ok: true, applicable: false });
+  });
+
+  it('treats a stories-only diff as a non-applicable coverage receipt', () => {
+    expect(
+      evaluateChangedLineCoverage({
+        changedLines: new Map([
+          ['apps/web/components/atoms/example.stories.tsx', new Set([1, 2, 3])],
         ]),
         coverage: {},
       })
