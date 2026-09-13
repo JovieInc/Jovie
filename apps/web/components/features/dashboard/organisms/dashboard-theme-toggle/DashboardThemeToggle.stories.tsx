@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { DashboardThemeToggle } from './DashboardThemeToggle';
 
 const meta = {
@@ -7,22 +8,13 @@ const meta = {
   parameters: {
     layout: 'centered',
     jovie: {
-      // onThemeSave is optional at the surface; the remaining names are fields
-      // of the file's internal ThemeOptionGridProps/ThemeToggleButtonProps
-      // helper interfaces and hook-derived state, not passable props — the
-      // toggle, compact, and system-option stories already exercise every
-      // externally controllable prop.
-      uncoveredProps: [
-        'onThemeSave',
-        'onThemeChange',
-        'variant',
-        'theme',
-        'resolvedTheme',
-        'isUpdating',
-        'isDark',
-        'onToggle',
-        'disabled',
-      ],
+      // theme, resolvedTheme, isDark, and onToggle are fields of the file's
+      // internal ThemeOptionGridProps/ThemeToggleButtonProps helper
+      // interfaces, not passable DashboardThemeToggle props. The exported
+      // onThemeChange, onThemeSave, and variant props are exercised below;
+      // Updating drives the hook's isUpdating state and asserts its rendered
+      // disabled state instead of allowlisting either observable state.
+      uncoveredProps: ['theme', 'resolvedTheme', 'isDark', 'onToggle'],
     },
   },
 } satisfies Meta<typeof DashboardThemeToggle>;
@@ -52,4 +44,25 @@ export const WithSystemOption: Story = {
       <DashboardThemeToggle showSystemOption onThemeChange={() => {}} />
     </div>
   ),
+};
+
+export const Updating: Story = {
+  render: () => (
+    <div className='flex min-h-11 items-center gap-3'>
+      <DashboardThemeToggle
+        onThemeChange={() => {}}
+        onThemeSave={() => new Promise<void>(() => {})}
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggle = canvas.getByRole('switch', {
+      name: /Switch to (dark|light) mode/,
+    });
+
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toBeDisabled());
+    await expect(toggle).toHaveAccessibleName('Updating theme...');
+  },
 };
