@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# Align JOVIE_CONFIGURATION_SOURCE_REVISION to tip; checkout source root if allowed.
+# Align JOVIE_CONFIGURATION_SOURCE_REVISION; checkout root if ALIGN_ALLOW_CHECKOUT=1.
 # Usage: ALIGN_ALLOW_CHECKOUT=1 bash scripts/symphony/align-runner-source-revision.sh <40-hex>
 set -euo pipefail
 readonly TIP="${1:-}"
 readonly ENV_FILE="${HOME}/.config/symphony/runner-source.env"
 readonly ALLOW_CHECKOUT="${ALIGN_ALLOW_CHECKOUT:-0}"
-[[ "${TIP}" =~ ^[0-9a-f]{40}$ ]] || { printf 'tip must be full lowercase 40-hex SHA\n' >&2; exit 2; }
-[[ -f "${ENV_FILE}" ]] || { printf 'missing runner-source env: %s\n' "${ENV_FILE}" >&2; exit 2; }
+[[ "${TIP}" =~ ^[0-9a-f]{40}$ ]] || { printf 'tip must be 40-hex\n' >&2; exit 2; }
+[[ -f "${ENV_FILE}" ]] || { printf 'missing %s\n' "${ENV_FILE}" >&2; exit 2; }
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 for required in JOVIE_CONFIGURATION_SOURCE_ROOT JOVIE_CONFIGURATION_SOURCE_REVISION; do
   [[ -n "${!required:-}" ]] || { printf 'runner-source.env missing %s\n' "${required}" >&2; exit 2; }
 done
 [[ -d "${JOVIE_CONFIGURATION_SOURCE_ROOT}/.git" ]] || {
-  printf 'JOVIE_CONFIGURATION_SOURCE_ROOT not a git checkout: %s\n' "${JOVIE_CONFIGURATION_SOURCE_ROOT}" >&2
+  printf 'source root not git: %s\n' "${JOVIE_CONFIGURATION_SOURCE_ROOT}" >&2
   exit 2
 }
 if ! git -C "${JOVIE_CONFIGURATION_SOURCE_ROOT}" diff --quiet \
   || ! git -C "${JOVIE_CONFIGURATION_SOURCE_ROOT}" diff --cached --quiet; then
-  printf 'JOVIE_CONFIGURATION_SOURCE_ROOT dirty; refuse tip %s\n' "${TIP}" >&2
+  printf 'source root dirty; refuse %s\n' "${TIP}" >&2
   exit 2
 fi
 current="$(git -C "${JOVIE_CONFIGURATION_SOURCE_ROOT}" rev-parse HEAD)"
@@ -38,7 +38,7 @@ if [[ "${current}" != "${TIP}" ]]; then
   }
 fi
 if [[ "${JOVIE_CONFIGURATION_SOURCE_REVISION}" == "${TIP}" ]]; then
-  printf 'runner-source revision already aligned to %s\n' "${TIP}"
+  printf 'already aligned to %s\n' "${TIP}"
   exit 0
 fi
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -54,5 +54,4 @@ awk -v tip="${TIP}" '
 ' "${ENV_FILE}" > "${tmp}"
 mv "${tmp}" "${ENV_FILE}"
 chmod 0644 "${ENV_FILE}"
-printf 'aligned JOVIE_CONFIGURATION_SOURCE_REVISION to %s (backup %s)\n' \
-  "${TIP}" "${ENV_FILE}.bak-${stamp}"
+printf 'aligned to %s (backup %s)\n' "${TIP}" "${ENV_FILE}.bak-${stamp}"
