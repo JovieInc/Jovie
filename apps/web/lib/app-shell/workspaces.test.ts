@@ -13,6 +13,7 @@ describe('app shell workspaces', () => {
   it('resolves the current workspace from the canonical route mode', () => {
     expect(getCurrentAppShellWorkspace('/app/tasks').id).toBe('customer');
     expect(getCurrentAppShellWorkspace('/app/ov/ops').id).toBe('ov');
+    expect(getCurrentAppShellWorkspace(APP_ROUTES.HUD).id).toBe('ov');
   });
 
   it('cycles the two shipped workspaces', () => {
