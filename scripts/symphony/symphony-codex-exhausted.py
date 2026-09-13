@@ -2207,6 +2207,22 @@ def repair_preflight_command(identifier, issue_revision):
     return 0
 
 
+def owned_repair_command():
+    """Signed consumer entry. No qualified live repair adapter is installed yet."""
+    try:
+        raw = sys.stdin.read(32769)
+        if len(raw) > 32768:
+            raise ValueError("existing-repair-request-too-large")
+        task = json.loads(raw)
+        result = _repair_module().execute_isolated(task, __file__,
+            lambda identifier: _fetch_single_issue(identifier),
+            lambda repo: _complete_open_prs(repo))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        result = {"status": "held", "reason": str(exc)}
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
 def repair_assign_command(spec_path):
     try:
         spec = json.loads(pathlib.Path(spec_path).read_text())
@@ -3274,6 +3290,7 @@ def main() -> int:
             "native-preflight",
             "repair-preflight",
             "repair-assign",
+            "owned-repair",
         ),
         default=default,
     )
@@ -3288,6 +3305,8 @@ def main() -> int:
         help="Skip admission-gate/v1 receipt (DIRTY/CI-red remount only)",
     )
     args = parser.parse_args()
+    if args.command == "owned-repair":
+        return owned_repair_command()
     if args.command == "repair-preflight":
         return repair_preflight_command(args.identifier, args.issue_revision)
     if args.command == "repair-assign":

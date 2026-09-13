@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import {
   createHash,
   createPrivateKey,
@@ -25,11 +26,13 @@ import {
 } from 'node:fs';
 import { isIP } from 'node:net';
 import { dirname, isAbsolute, join, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const READ_DOMAIN = 'summer.symphony-outbox-read/v1';
 export const OUTBOX_DOMAIN = 'jovie.eve.symphony-repair-outbox/v1';
 export const OUTBOX_DOMAIN_V2 = 'jovie.eve.symphony-repair-outbox/v2';
+export const OUTBOX_DOMAIN_V3 = 'jovie.eve.symphony-repair-outbox/v3';
+export const OUTCOME_DOMAIN_V3 = 'jovie.symphony-repair-outcome/v3';
 export const OUTCOME_DOMAIN_V2 = 'jovie.symphony-repair-outcome/v2';
 export const PAGE_SCHEMA = 'summer.symphony-outbox-page/v1';
 export const STATE_SCHEMA = 'jovie.summer-symphony-consumer-state/v1';
@@ -118,21 +121,60 @@ function validTimestamp(value) {
   );
 }
 
+export function validateExistingRepair(target) {
+  const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
+  if (
+    !exactKeys(target, [
+      'mode',
+      'identifier',
+      'issueId',
+      'ownerId',
+      'issueRevision',
+      'repository',
+      'pr',
+      'head',
+      'workspace',
+      'writerUnit',
+      'assignmentDigest',
+      'expiresAt',
+    ]) ||
+    target.mode !== 'isolated-cli' ||
+    !/^JOV-[1-9][0-9]*$/u.test(target.identifier ?? '') ||
+    !uuid.test(target.issueId ?? '') ||
+    !uuid.test(target.ownerId ?? '') ||
+    !validTimestamp(target.issueRevision) ||
+    target.repository !== 'JovieInc/Jovie' ||
+    !Number.isSafeInteger(target.pr) ||
+    target.pr <= 0 ||
+    !SHA.test(target.head ?? '') ||
+    typeof target.workspace !== 'string' ||
+    target.workspace.length > 1024 ||
+    !/^\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\0\r\n]+$/u.test(target.workspace) ||
+    !/^[a-zA-Z0-9_.@-]+\.service$/u.test(target.writerUnit ?? '') ||
+    !DIGEST.test(target.assignmentDigest ?? '') ||
+    !validTimestamp(target.expiresAt)
+  ) {
+    throw new Error('existing-repair-target-invalid');
+  }
+  return target;
+}
+
 export function validateTask(task) {
   const isV1 = task?.schema === 'jovie-symphony-repair-task/v1';
   const isV2 = task?.schema === 'jovie-symphony-repair-task/v2';
+  const isV3 = task?.schema === 'jovie-symphony-repair-task/v3';
   if (
-    (!isV1 && !isV2) ||
+    (!isV1 && !isV2 && !isV3) ||
     !exactKeys(task, [
       'schema',
       'taskKey',
-      ...(isV2 ? ['decisionFingerprint'] : []),
+      ...(!isV1 ? ['decisionFingerprint'] : []),
       'createdAt',
       'owner',
       'route',
       'authority',
       'action',
-      ...(isV1 ? ['issue'] : ['linearProjection']),
+      ...(isV1 ? ['issue'] : isV2 ? ['linearProjection'] : ['existingRepair']),
       'safety',
       'selected',
       'source',
@@ -145,7 +187,10 @@ export function validateTask(task) {
       task.authority !==
         'source-repair-only-no-direct-pr-queue-or-deploy-mutation') ||
     (isV2 && task.authority !== 'linear-child-projection-only') ||
-    !ACTIONS.has(task.action) ||
+    (isV3
+      ? task.authority !== 'host-assigned-isolated-repair-only' ||
+        task.action !== 'execute-existing-owned-repair'
+      : !ACTIONS.has(task.action)) ||
     (isV1 && task.issue !== 'JOV-5853') ||
     task.safety !==
       'exact-source-ci-native-queue-production-gates-remain-required' ||
@@ -169,12 +214,26 @@ export function validateTask(task) {
   }
   const release = task.selected.id === 'release-certification-starvation';
   if (
-    (release && task.action !== 'reconcile-release-certification-starvation') ||
-    (!release &&
-      (!CI_IDS.has(task.selected.id) ||
-        task.action !== 'remediate-selected-ci-audit-class'))
+    !isV3 &&
+    ((release &&
+      task.action !== 'reconcile-release-certification-starvation') ||
+      (!release &&
+        (!CI_IDS.has(task.selected.id) ||
+          task.action !== 'remediate-selected-ci-audit-class')))
   ) {
     throw new Error('outbox-task-action-cross-bound');
+  }
+  if (isV3) {
+    validateExistingRepair(task.existingRepair);
+    const lifetime =
+      Date.parse(task.existingRepair.expiresAt) - Date.parse(task.createdAt);
+    if (
+      task.decisionFingerprint !== task.taskKey ||
+      lifetime <= 0 ||
+      lifetime > 5400000 ||
+      (!release && !CI_IDS.has(task.selected.id))
+    )
+      throw new Error('existing-repair-task-cross-bound');
   }
   if (isV2) {
     const projection = task.linearProjection;
@@ -259,7 +318,9 @@ export function verifyOutboxRecord(record, keys) {
       ? OUTBOX_DOMAIN
       : record?.schema === OUTBOX_DOMAIN_V2
         ? OUTBOX_DOMAIN_V2
-        : null;
+        : record?.schema === OUTBOX_DOMAIN_V3
+          ? OUTBOX_DOMAIN_V3
+          : null;
   if (
     !exactKeys(record, [
       'schema',
@@ -283,7 +344,9 @@ export function verifyOutboxRecord(record, keys) {
     (domain === OUTBOX_DOMAIN &&
       task.schema !== 'jovie-symphony-repair-task/v1') ||
     (domain === OUTBOX_DOMAIN_V2 &&
-      task.schema !== 'jovie-symphony-repair-task/v2')
+      task.schema !== 'jovie-symphony-repair-task/v2') ||
+    (domain === OUTBOX_DOMAIN_V3 &&
+      task.schema !== 'jovie-symphony-repair-task/v3')
   ) {
     throw new Error('outbox-wire-version-cross-bound');
   }
@@ -303,6 +366,124 @@ export function verifyOutboxRecord(record, keys) {
     throw new Error('outbox-signature-invalid');
   }
   return task;
+}
+
+export function signOutcomeV3(task, result, privateKey, keyId) {
+  const unsigned = {
+    schema: OUTCOME_DOMAIN_V3,
+    taskKey: task.taskKey,
+    decisionFingerprint: task.decisionFingerprint,
+    status: result?.status,
+    detail: result?.detail,
+    completedAt: result?.completedAt,
+    source: { ...task.source, action: task.action },
+    existingRepair: task.existingRepair,
+    execution: result?.execution,
+    signatureKeyId: keyId,
+  };
+  return {
+    ...unsigned,
+    signature: `ed25519=${nodeSign(null, Buffer.from(`${OUTCOME_DOMAIN_V3}\0${canonical(unsigned)}`), privateKey).toString('base64url')}`,
+  };
+}
+
+export function validateOutcomeV3(outcome, task, publicKey) {
+  const execution = outcome?.execution;
+  if (
+    !exactKeys(outcome, [
+      'schema',
+      'taskKey',
+      'decisionFingerprint',
+      'status',
+      'detail',
+      'completedAt',
+      'source',
+      'existingRepair',
+      'execution',
+      'signatureKeyId',
+      'signature',
+    ]) ||
+    outcome.schema !== OUTCOME_DOMAIN_V3 ||
+    outcome.taskKey !== task.taskKey ||
+    outcome.decisionFingerprint !== task.decisionFingerprint ||
+    !['succeeded', 'failed'].includes(outcome.status) ||
+    typeof outcome.detail !== 'string' ||
+    !outcome.detail.length ||
+    outcome.detail.length > 240 ||
+    !validTimestamp(outcome.completedAt) ||
+    Date.parse(outcome.completedAt) < Date.parse(task.createdAt) ||
+    canonical(outcome.source) !==
+      canonical({ ...task.source, action: task.action }) ||
+    canonical(outcome.existingRepair) !== canonical(task.existingRepair) ||
+    !exactKeys(execution, [
+      'runId',
+      'provider',
+      'model',
+      'authPoolIdentity',
+      'leaseIdentity',
+      'evidenceDigest',
+    ]) ||
+    !['runId', 'provider', 'model'].every(
+      key =>
+        typeof execution[key] === 'string' &&
+        execution[key].length > 0 &&
+        execution[key].length <= (key === 'provider' ? 64 : 128)
+    ) ||
+    execution.provider === 'codex' ||
+    !['authPoolIdentity', 'leaseIdentity', 'evidenceDigest'].every(key =>
+      DIGEST.test(execution[key])
+    ) ||
+    !KEY_ID.test(outcome.signatureKeyId ?? '') ||
+    !SIGNATURE.test(outcome.signature ?? '')
+  ) {
+    throw new Error('consumer-execution-outcome-invalid-or-cross-bound');
+  }
+  const { signature, ...unsigned } = outcome;
+  if (
+    !publicKey ||
+    !nodeVerify(
+      null,
+      Buffer.from(`${OUTCOME_DOMAIN_V3}\0${canonical(unsigned)}`),
+      publicKey,
+      Buffer.from(signature.slice(8), 'base64url')
+    )
+  ) {
+    throw new Error('consumer-execution-outcome-signature-invalid');
+  }
+  return outcome;
+}
+
+/**
+ * Existing host controller owns qualification and the shared lease; this is transport only.
+ * @param {{run?: (...args: any[]) => any}} [options]
+ */
+export function createOwnedRepairExecutor({ run = spawnSync } = {}) {
+  return {
+    async execute(task) {
+      validateTask(task);
+      if (task.schema !== 'jovie-symphony-repair-task/v3')
+        throw new Error('existing-repair-v3-required');
+      const result = run(
+        'python3',
+        [
+          join(
+            dirname(fileURLToPath(import.meta.url)),
+            'symphony-codex-exhausted.py'
+          ),
+          'owned-repair',
+        ],
+        {
+          input: JSON.stringify(task),
+          encoding: 'utf8',
+          timeout: 30000,
+          maxBuffer: 32768,
+        }
+      );
+      if (result.error || result.status !== 0)
+        throw new Error('existing-repair-controller-unavailable');
+      return JSON.parse(result.stdout);
+    },
+  };
 }
 
 function unsignedOutcomeV2(task, issue, keyId) {
@@ -503,7 +684,11 @@ export function validateState(state, keys, outcomePublicKey = null) {
     if (!exactKeys(state.active, ['phase', 'taskKey', 'record', 'outcome'])) {
       throw new Error('consumer-state-invalid');
     }
-    validateOutcomeV2(state.active.outcome, task, outcomePublicKey);
+    (task.schema.endsWith('/v3') ? validateOutcomeV3 : validateOutcomeV2)(
+      state.active.outcome,
+      task,
+      outcomePublicKey
+    );
   } else {
     throw new Error('consumer-state-invalid');
   }
@@ -753,6 +938,7 @@ export async function runCycle({
   transport,
   keys,
   projector = null,
+  executor = null,
   outcomePrivateKey = null,
   outcomePublicKey = null,
   outcomeKeyId = null,
@@ -806,6 +992,55 @@ export async function runCycle({
       status: 'execution-held',
       taskKey: state.active.taskKey,
       reason: EXECUTION_HOLD,
+    };
+  }
+  if (task.schema === 'jovie-symphony-repair-task/v3') {
+    if (
+      !outcomePrivateKey ||
+      !outcomePublicKey ||
+      !KEY_ID.test(outcomeKeyId ?? '')
+    )
+      throw new Error('v3-signing-configuration-missing');
+    if (state.active.phase === 'discovered') {
+      if (!executor)
+        return {
+          status: 'execution-held',
+          taskKey: task.taskKey,
+          reason: 'qualified-isolated-repair-executor-unavailable',
+        };
+      const result = await executor.execute(task);
+      if (result?.status === 'held' && typeof result.reason === 'string')
+        return {
+          status: 'execution-held',
+          taskKey: task.taskKey,
+          reason: result.reason,
+        };
+      const outcome = signOutcomeV3(
+        task,
+        result,
+        outcomePrivateKey,
+        outcomeKeyId
+      );
+      validateOutcomeV3(outcome, task, outcomePublicKey);
+      state = {
+        ...state,
+        active: {
+          phase: 'outcome-pending',
+          taskKey: task.taskKey,
+          record: state.active.record,
+          outcome,
+        },
+      };
+      journal.write(state);
+    }
+    validateOutcomeV3(state.active.outcome, task, outcomePublicKey);
+    const acknowledgement = await transport.writeOutcome(state.active.outcome);
+    if (journal.clear) journal.clear(task.taskKey);
+    else journal.write(emptyState());
+    return {
+      status: 'execution-recorded',
+      taskKey: task.taskKey,
+      acknowledgement: acknowledgement.status,
     };
   }
   if (
@@ -1161,6 +1396,7 @@ async function main() {
     ),
     transport: createHttpTransport(config),
     keys: config.keys,
+    executor: createOwnedRepairExecutor(),
     projector: config.linearApiKey ? createLinearProjector(config) : null,
     outcomePrivateKey: config.outcomePrivateKey,
     outcomePublicKey: config.outcomePublicKey,

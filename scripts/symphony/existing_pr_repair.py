@@ -16,14 +16,20 @@ import re
 import stat
 import subprocess
 import time
+from datetime import datetime, timezone
 
 SCHEMA = "symphony-existing-pr-repair/v1"
+ISOLATED_SCHEMA = "symphony-existing-pr-repair/v2"
 ROOT = Path.home() / ".config/symphony/repair-assignments"
 LEASE_ROOT = Path.home() / ".local/state/symphony-fallback/leases"
 GUARD = Path.home() / ".local/bin/symphony-lease-guard"
 MAX_SECONDS = 5400
 REPOS = {"JOV": "JovieInc/Jovie", "LYB": "JovieInc/LogYourBody"}
 UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
+# This is an authorization-policy binding, not a provider model identifier.
+# The owner must explicitly attest the Fable 5.1 last-resort exception while
+# leaving the router-selected model opaque to this repair contract.
+ANTHROPIC_LAST_RESORT_POLICY_EXCEPTION = "anthropic-fable5.1-last-resort"
 
 
 def require(condition, reason):
@@ -88,6 +94,125 @@ def load(identifier, controller):
     return validate(read_private(assignment_path(identifier)), identifier, controller)
 
 
+def load_isolated(identifier, controller):
+    return validate_isolated(read_private(assignment_path(identifier)), identifier, controller)
+
+
+def validate_isolated(payload, identifier, controller):
+    require(payload.get("schema") == ISOLATED_SCHEMA
+            and payload.get("executionMode") == "isolated-cli", "isolated-repair-grant-required")
+    validate({**payload, "schema": SCHEMA}, identifier, controller)
+    require(isinstance(payload.get("ownerId"), str) and re.fullmatch(UUID, payload["ownerId"]),
+            "isolated-repair-owner-invalid")
+    require(isinstance(payload.get("issueRevision"), str), "isolated-repair-revision-invalid")
+    datetime.fromisoformat(payload["issueRevision"].replace("Z", "+00:00"))
+    return payload
+
+
+def assignment_digest(payload):
+    # Host grants contain ASCII keys; canonical JSON is shared with the signed consumer.
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=False).encode()).hexdigest()
+
+
+def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None):
+    """Existing consumer adapter. Default is held, never an inferred live executor.
+
+    Executor injection is for regression tests until the owner qualifies and installs
+    an adapter using the canonical router. It must expose qualify and execute; a
+    Summer class admission or model name is not an executor capability receipt.
+    """
+    require(isinstance(task, dict) and task.get("schema") == "jovie-symphony-repair-task/v3"
+            and task.get("action") == "execute-existing-owned-repair"
+            and task.get("authority") == "host-assigned-isolated-repair-only"
+            and task.get("taskKey") == task.get("decisionFingerprint")
+            and isinstance(task.get("taskKey"), str) and re.fullmatch(r"[a-f0-9]{64}", task["taskKey"]),
+            "isolated-repair-task-invalid")
+    target = task["existingRepair"]
+    identifier = target["identifier"]
+    payload = load_isolated(identifier, controller)
+    require(target.get("mode") == "isolated-cli" and target.get("assignmentDigest") == assignment_digest(payload),
+            "isolated-repair-grant-mismatch")
+    for key in ("identifier", "issueId", "ownerId", "issueRevision", "repository", "pr", "head", "workspace", "writerUnit"):
+        require(target.get(key) == payload.get(key), f"isolated-repair-{key}-mismatch")
+    require(datetime.fromisoformat(target["expiresAt"].replace("Z", "+00:00")).timestamp() == payload["expiresAt"],
+            "isolated-repair-expiry-mismatch")
+    result_path = ROOT / f"{identifier}.execution.json"
+    if os.path.lexists(result_path):
+        receipt = read_private(result_path)
+        require(receipt.get("taskKey") == task["taskKey"] and
+                receipt.get("assignmentDigest") == target["assignmentDigest"], "isolated-repair-result-cross-bound")
+        return receipt["result"]
+    if os.path.lexists(ROOT / f"{identifier}.claim"):
+        return {"status": "held", "reason": "isolated-repair-claimed-outcome-unknown"}
+    # No real adapter is qualified by this source change. Do not fall through to
+    # generic issue reconciliation (which writes Linear and chooses a workspace).
+    if executor is None:
+        return {"status": "held", "reason": "qualified-isolated-repair-executor-unavailable"}
+    eligibility = executor.qualify(task, payload)
+    require(isinstance(eligibility, dict) and eligibility.get("qualified") is True
+            and isinstance(eligibility.get("provider"), str)
+            and 0 < len(eligibility["provider"]) <= 64
+            and eligibility.get("provider") != "codex"
+            and isinstance(eligibility.get("model"), str)
+            and 0 < len(eligibility["model"]) <= 128
+            and eligibility.get("funding") in ("included-local", "funded-credit")
+            and eligibility.get("taskAppropriate") is True
+            and eligibility.get("costAppropriate") is True
+            and eligibility.get("delegationPolicyBound") is True
+            and (eligibility.get("provider") != "anthropic" or (
+                eligibility.get("policyException") == ANTHROPIC_LAST_RESORT_POLICY_EXCEPTION
+                and eligibility.get("lastResortEscalation") is True))
+            and type(eligibility.get("expiresAt")) in (int, float)
+            and time.time() < eligibility["expiresAt"] <= payload["expiresAt"]
+            and isinstance(eligibility.get("authPoolIdentity"), str)
+            and re.fullmatch(r"[a-f0-9]{64}", eligibility["authPoolIdentity"]),
+            "isolated-repair-router-qualification-required")
+    try:
+        os.fstat(9)
+    except OSError:
+        pass
+    else:
+        raise ValueError("isolated-repair-fd9-already-owned")
+    lease = LEASE_ROOT / f"{identifier}.lock"
+    fd = os.open(lease, os.O_RDWR | os.O_NOFOLLOW)
+    try:
+        # Exactly the native/fallback inode, never a parallel lock namespace.
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.dup2(fd, 9)
+        original = os.environ.get("SYMPHONY_ISSUE_LEASE_FD")
+        os.environ["SYMPHONY_ISSUE_LEASE_FD"] = "9"
+        try:
+            current = load_isolated(identifier, controller)
+            require(current == payload, "assignment-replaced")
+            issue = fetch_issue(identifier)
+            require(isinstance(issue, dict) and issue.get("id") == payload["issueId"]
+                    and issue.get("updatedAt") == payload["issueRevision"]
+                    and (issue.get("assignee") or {}).get("id") == payload["ownerId"],
+                    "isolated-repair-tracker-changed")
+            prs = fetch_prs(payload["repository"])
+            require(isinstance(prs, list), "assignment-inventory-unknown")
+            mapped = [pr for pr in prs if identifier in marker_identifiers(pr)]
+            require(len(mapped) == 1 and matches(payload, payload["repository"], mapped[0]), "assignment-pr-mismatch")
+            check_workspace(payload, mapped[0])
+            check_writer(payload, inherited=True)
+            require(executor.qualify(task, payload) == eligibility, "isolated-repair-router-changed")
+            exclusive_write(ROOT / f"{identifier}.claim", {**payload, "taskKey": task["taskKey"], "task": task, "eligibility": eligibility})
+            # The one-use claim remains on uncertainty; no automatic repeat of work.
+            result = executor.execute(task, payload, eligibility, lease_fd=9)
+            exclusive_write(result_path, {"taskKey": task["taskKey"], "assignmentDigest": target["assignmentDigest"], "result": result})
+            return result
+        finally:
+            if original is None:
+                os.environ.pop("SYMPHONY_ISSUE_LEASE_FD", None)
+            else:
+                os.environ["SYMPHONY_ISSUE_LEASE_FD"] = original
+            if fd != 9:
+                os.close(9)
+    finally:
+        os.close(fd)
+
+
 def candidates(controller):
     if not ROOT.exists():
         return []
@@ -95,7 +220,9 @@ def candidates(controller):
     result = []
     for path in ROOT.glob("*.json"):
         try:
-            result.append(load(path.stem, controller))
+            payload = read_private(path)
+            result.append(validate_isolated(payload, path.stem, controller) if payload.get("schema") == ISOLATED_SCHEMA
+                          else validate(payload, path.stem, controller))
         except (OSError, ValueError, KeyError, TypeError):
             # Invalid/expired assignments never contribute discovery authority.
             continue
@@ -199,9 +326,14 @@ def authorize(spec, controller, issue, prs):
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         info = os.fstat(fd)
         require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid(), "assignment-lease-untrusted")
-        payload = {**spec, "schema": SCHEMA, "sourceHashes": source_hashes(controller),
+        isolated = spec.get("executionMode") == "isolated-cli"
+        require(spec.get("executionMode") in (None, "isolated-cli"), "assignment-mode-invalid")
+        payload = {**spec, "schema": ISOLATED_SCHEMA if isolated else SCHEMA, "sourceHashes": source_hashes(controller),
                    "leaseIdentity": {"device": info.st_dev, "inode": info.st_ino}}
-        validate(payload, identifier, controller)
+        (validate_isolated if isolated else validate)(payload, identifier, controller)
+        if isolated:
+            require(issue.get("updatedAt") == payload["issueRevision"] and
+                    (issue.get("assignee") or {}).get("id") == payload["ownerId"], "isolated-repair-tracker-changed")
         require(isinstance(prs, list), "assignment-inventory-unknown")
         mapped = [pr for pr in prs if identifier in marker_identifiers(pr)]
         require(len(mapped) == 1 and matches(payload, payload["repository"], mapped[0]), "assignment-pr-mismatch")

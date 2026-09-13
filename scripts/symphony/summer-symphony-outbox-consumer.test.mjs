@@ -20,19 +20,26 @@ import {
   createFileJournal,
   createHttpTransport,
   createLinearProjector,
+  createOwnedRepairExecutor,
   DISCOVERY_CURSOR_SCHEMA,
   discoverOne,
   EXECUTION_HOLD,
   OUTBOX_DOMAIN,
   OUTBOX_DOMAIN_V2,
+  OUTBOX_DOMAIN_V3,
   OUTBOX_PATH,
+  OUTCOME_DOMAIN_V3,
+  OUTCOME_PATH,
   PAGE_SCHEMA,
   parseVerificationKeys,
   READ_DOMAIN,
   runCycle,
   signedReadHeaders,
   signOutcomeV2,
+  signOutcomeV3,
+  validateOutcomeV3,
   validateState,
+  validateTask,
   verifyOutboxRecord,
 } from './summer-symphony-outbox-consumer.mjs';
 
@@ -53,6 +60,12 @@ const host = pair();
 const foreign = pair();
 const taskKey = 'a'.repeat(64);
 const keys = new Map([['summer-outbox', summer.publicKey]]);
+const existingRepairFixture = JSON.parse(
+  readFileSync(
+    new URL('./test-vectors/symphony-existing-repair-v3.json', import.meta.url),
+    'utf8'
+  )
+);
 
 function task(overrides = {}) {
   return {
@@ -87,9 +100,11 @@ function signedOutbox(
   keyId = 'summer-outbox'
 ) {
   const domain =
-    taskValue.schema === 'jovie-symphony-repair-task/v2'
-      ? OUTBOX_DOMAIN_V2
-      : OUTBOX_DOMAIN;
+    taskValue.schema === 'jovie-symphony-repair-task/v3'
+      ? OUTBOX_DOMAIN_V3
+      : taskValue.schema === 'jovie-symphony-repair-task/v2'
+        ? OUTBOX_DOMAIN_V2
+        : OUTBOX_DOMAIN;
   const unsigned = {
     schema: domain,
     destination: 'symphony',
@@ -975,6 +990,44 @@ describe('configuration boundaries', () => {
     );
   });
 
+  it('posts the signed v3 execution outcome to the dedicated HTTP endpoint', async () => {
+    const outcome = signOutcomeV3(
+      taskV3(),
+      executionResult(),
+      host.privateKey,
+      'host-outcome'
+    );
+    /** @type {any} */
+    let request;
+    const acknowledgement = {
+      schema: 'summer.symphony-outcome-ack/v1',
+      taskKey: outcome.taskKey,
+      status: 'recorded',
+    };
+    const transport = createHttpTransport(
+      {
+        summerOrigin: 'https://summer.example',
+        outcomePrivateKey: host.privateKey,
+        outcomeKeyId: 'host-outcome',
+      },
+      async (url, options) => {
+        request = { url, options };
+        return Response.json(acknowledgement, { status: 201 });
+      }
+    );
+    assert.deepEqual(await transport.writeOutcome(outcome), acknowledgement);
+    assert.ok(request);
+    const capturedRequest = /** @type {any} */ (request);
+    assert.equal(capturedRequest.url, `https://summer.example${OUTCOME_PATH}`);
+    assert.equal(capturedRequest.options.method, 'POST');
+    assert.equal(
+      capturedRequest.options.headers['content-type'],
+      'application/json'
+    );
+    assert.deepEqual(JSON.parse(capturedRequest.options.body), outcome);
+    assert.equal(outcome.schema, OUTCOME_DOMAIN_V3);
+  });
+
   it('deduplicates the exact Linear projection and creates only when absent', async () => {
     const v2Task = taskV2();
     const projection = v2Task.linearProjection;
@@ -1061,5 +1114,130 @@ describe('configuration boundaries', () => {
     assert.equal(result.status, 78);
     assert.match(result.stderr, /SUMMER_SYMPHONY_CONSUMER_REJECTED/);
     assert.doesNotMatch(result.stderr, /PRIVATE KEY|LINEAR_API_KEY/u);
+  });
+});
+
+function taskV3() {
+  return structuredClone(existingRepairFixture.task);
+}
+function executionResult() {
+  return structuredClone(existingRepairFixture.result);
+}
+describe('existing owned repair transport', () => {
+  it('strictly binds signed v3 and rejects widened or native-only authority', () => {
+    const value = taskV3();
+    assert.deepEqual(verifyOutboxRecord(signedOutbox(value), keys), value);
+    for (const mutate of [
+      v => (v.existingRepair.mode = 'native'),
+      v => (v.existingRepair.workspace = '/fixture/../other'),
+      v => (v.existingRepair.expiresAt = '2026-09-08T01:00:00Z'),
+      v => (v.linearProjection = {}),
+      v => (v.decisionFingerprint = '9'.repeat(64)),
+      v => (v.action = 'create-child-issue'),
+    ]) {
+      const changed = structuredClone(value);
+      mutate(changed);
+      assert.throws(() => validateTask(changed));
+    }
+  });
+  it('keeps unqualified execution held without Linear projection or an outcome', async () => {
+    let state = {
+      schema: 'jovie.summer-symphony-consumer-state/v1',
+      active: null,
+    };
+    const journal = { read: () => state, write: next => (state = next) };
+    const result = await runCycle({
+      journal,
+      transport: {
+        readPage: async () => page([signedOutbox(taskV3())]),
+        writeOutcome: () => assert.fail('no outcome'),
+      },
+      keys,
+      projector: { project: () => assert.fail('no Linear mutation') },
+      outcomePrivateKey: host.privateKey,
+      outcomePublicKey: host.publicKey,
+      outcomeKeyId: 'host-outcome',
+    });
+    assert.equal(result.status, 'execution-held');
+    assert.equal(state.active.phase, 'discovered');
+  });
+  it('durably retries the identical signed terminal outcome without a second execution', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'summer-v3-'));
+    roots.push(root);
+    const journal = createFileJournal(root, keys, host.publicKey);
+    let executions = 0;
+    const writes = [];
+    const options = {
+      journal,
+      keys,
+      outcomePrivateKey: host.privateKey,
+      outcomePublicKey: host.publicKey,
+      outcomeKeyId: 'host-outcome',
+      executor: {
+        execute: async () => {
+          executions++;
+          return executionResult();
+        },
+      },
+      transport: {
+        readPage: async () => page([signedOutbox(taskV3())]),
+        writeOutcome: async outcome => {
+          writes.push(outcome);
+          if (writes.length === 1) throw new Error('uncertain persistence');
+          return { status: 'replay' };
+        },
+      },
+    };
+    await assert.rejects(runCycle(options), /uncertain persistence/);
+    assert.equal((await runCycle(options)).status, 'execution-recorded');
+    assert.equal(executions, 1);
+    assert.deepEqual(writes[0], writes[1]);
+    assert.equal(journal.read().active, null);
+  });
+  it('rejects cross-bound execution, source, signature, and premature terminal records', () => {
+    const value = taskV3();
+    const outcome = signOutcomeV3(
+      value,
+      executionResult(),
+      host.privateKey,
+      'host-outcome'
+    );
+    assert.deepEqual(
+      validateOutcomeV3(outcome, value, host.publicKey),
+      outcome
+    );
+    for (const mutate of [
+      v => (v.existingRepair.head = '0'.repeat(40)),
+      v => (v.source.snapshotDigest = '0'.repeat(64)),
+      v => (v.execution.provider = 'codex'),
+      v => (v.completedAt = '2026-09-06T01:00:00Z'),
+      v => (v.execution.runId = 'other'),
+    ]) {
+      const changed = structuredClone(outcome);
+      mutate(changed);
+      assert.throws(() => validateOutcomeV3(changed, value, host.publicKey));
+    }
+  });
+  it('uses the existing controller command and retains unsupported live execution explicitly', async () => {
+    let calls = 0;
+    const executor = createOwnedRepairExecutor({
+      /** @type {any} */
+      run: (binary, args, options) => {
+        calls++;
+        assert.equal(binary, 'python3');
+        assert.equal(args[1], 'owned-repair');
+        assert.match(args[0], /symphony-codex-exhausted.py$/);
+        assert.deepEqual(JSON.parse(options.input), taskV3());
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            status: 'held',
+            reason: 'qualified-isolated-repair-executor-unavailable',
+          }),
+        };
+      },
+    });
+    assert.equal((await executor.execute(taskV3())).status, 'held');
+    assert.equal(calls, 1);
   });
 });
