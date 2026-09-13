@@ -148,7 +148,12 @@ function trimSentence(value: string): string {
  * claim out of answer-engine evidence.
  */
 const UNSUPPORTED_SUPERLATIVE_PATTERN =
-  /\b(?:the\s+)?(?:best|greatest|biggest|most\s+(?:important|influential|popular|successful)|number\s+one|no\.\s*1|#1)\b/i;
+  /\b(?:the\s+world['’]s\s+)?(?:best|greatest|biggest|most\s+(?:important|influential|popular|successful))\s+(?:artist|producer|musician|performer|singer|songwriter|rapper|dj|remixer|band|act)\b/i;
+const COPULAR_SUPERLATIVE_PATTERN =
+  /\b(?:am|are|is|was|were)\s+(?:the\s+)?(?:best|greatest|biggest)\b/i;
+const RELATIONAL_SUPERLATIVE_PATTERN =
+  /\b(?:best|greatest|biggest)\s+friend\b/i;
+const BARE_RANKING_PATTERN = /\b(?:number\s+one|no\.\s*1|#1)\b/i;
 
 /** A lone number/date has no entity, relationship, or qualifier to preserve. */
 const STANDALONE_NUMBER_PATTERN =
@@ -156,8 +161,28 @@ const STANDALONE_NUMBER_PATTERN =
 const STANDALONE_YEAR_PATTERN = /^\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\.?$/;
 const MONTH_DATE_PATTERN = /^[a-z]{3,9}\s+\d{1,2}(?:,\s*\d{4})?\.?$/i;
 
+function splitSentences(value: string): string[] {
+  return (
+    value.match(/[^.!?]+(?:[.!?]+|$)/g)?.map(sentence => sentence.trim()) ?? []
+  ).filter(Boolean);
+}
+
+function removeQuotedText(value: string): string {
+  return value
+    .replace(/"[^"\n]*"|“[^”\n]*”|‘[^’\n]*’/g, ' ')
+    .replace(/(?<![\p{L}\p{N}])'[^'\n]+'(?=$|[^\p{L}\p{N}])/gu, ' ');
+}
+
 function isUnsupportedSuperlativeClaim(value: string): boolean {
-  return UNSUPPORTED_SUPERLATIVE_PATTERN.test(value);
+  return splitSentences(value).some(sentence => {
+    const searchableValue = removeQuotedText(sentence);
+    return (
+      UNSUPPORTED_SUPERLATIVE_PATTERN.test(searchableValue) ||
+      (COPULAR_SUPERLATIVE_PATTERN.test(searchableValue) &&
+        !RELATIONAL_SUPERLATIVE_PATTERN.test(searchableValue)) ||
+      BARE_RANKING_PATTERN.test(searchableValue)
+    );
+  });
 }
 
 function isStandaloneQuantitativeClaim(value: string): boolean {
@@ -175,15 +200,19 @@ function isStandaloneQuantitativeClaim(value: string): boolean {
   );
 }
 
-function isSafeFreeformClaim(value: string): boolean {
-  return (
-    !isUnsupportedSuperlativeClaim(value) &&
-    !isStandaloneQuantitativeClaim(value)
-  );
+function sanitizeFreeformClaim(value: string): string | null {
+  const retainedSentences = splitSentences(value).filter(sentence => {
+    return (
+      !isUnsupportedSuperlativeClaim(sentence) &&
+      !isStandaloneQuantitativeClaim(sentence)
+    );
+  });
+
+  return cleanText(retainedSentences.join(' '));
 }
 
 function ensureSubjectContext(artistName: string, value: string): string {
-  return value.toLocaleLowerCase().includes(artistName.toLocaleLowerCase())
+  return containsArtistIdentity(value, artistName)
     ? value
     : `${artistName}: ${value}`;
 }
@@ -565,11 +594,12 @@ function buildBioDescriptionBlock(
   artist: Artist
 ): ProfileAeoDescriptionBlock | null {
   const bio = cleanText(artist.tagline);
-  if (!bio || !isSafeFreeformClaim(bio)) return null;
+  const safeBio = bio ? sanitizeFreeformClaim(bio) : null;
+  if (!safeBio) return null;
 
   return {
     kind: 'bio',
-    text: ensureSubjectContext(artist.name, trimSentence(bio)),
+    text: ensureSubjectContext(artist.name, trimSentence(safeBio)),
   };
 }
 
@@ -614,11 +644,12 @@ function buildHighlightDescriptionBlock(
   artist: Artist
 ): ProfileAeoDescriptionBlock | null {
   const highlights = cleanText(artist.career_highlights);
-  if (!highlights || !isSafeFreeformClaim(highlights)) return null;
+  const safeHighlights = highlights ? sanitizeFreeformClaim(highlights) : null;
+  if (!safeHighlights) return null;
 
   return {
     kind: 'highlight',
-    text: `${artist.name}'s profile highlights: ${trimSentence(highlights)}`,
+    text: `${artist.name}'s profile highlights: ${trimSentence(safeHighlights)}`,
   };
 }
 
@@ -992,8 +1023,20 @@ export function buildProfileAeoFaqStructuredData(
   };
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function containsArtistIdentity(value: string, artistName: string): boolean {
-  return value.toLocaleLowerCase().includes(artistName.toLocaleLowerCase());
+  const normalizedValue = cleanText(value);
+  const normalizedName = cleanText(artistName);
+  if (!normalizedValue || !normalizedName) return false;
+
+  const identityPattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escapeRegExp(normalizedName)}(?=$|[^\\p{L}\\p{N}])`,
+    'iu'
+  );
+  return identityPattern.test(normalizedValue.normalize('NFKC'));
 }
 
 function isValidHttpUrl(value: string): boolean {

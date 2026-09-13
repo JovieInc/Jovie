@@ -329,6 +329,51 @@ describe('Profile AEO content', () => {
     expect(issueCodes).toContain('orphaned-quantitative-claim');
   });
 
+  it('keeps contextual superlatives and requires token-aware short-name identity', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        name: 'Al',
+        handle: 'al',
+        tagline: 'International producer',
+        career_highlights:
+          'Formed with my best friend in Austin. Track "The Greatest Artist" is in the catalog.',
+      },
+      now,
+    });
+
+    expect(content.descriptionBlocks).toContainEqual({
+      kind: 'bio',
+      text: 'Al: International producer.',
+    });
+    expect(
+      content.descriptionBlocks.find(block => block.kind === 'highlight')?.text
+    ).toContain('best friend');
+    expect(
+      content.descriptionBlocks.find(block => block.kind === 'highlight')?.text
+    ).toContain('Track "The Greatest Artist"');
+    expect(validateProfileAeoContent(content)).toEqual([]);
+
+    const sameNameFragment: ProfileAeoContentModel = {
+      ...content,
+      description: content.description.map((paragraph, index) =>
+        index === 1 ? 'Alpine producer.' : paragraph
+      ),
+      descriptionBlocks: content.descriptionBlocks.map((block, index) =>
+        index === 1 ? { ...block, text: 'Alpine producer.' } : block
+      ),
+      descriptionSegments: content.descriptionSegments.map((segments, index) =>
+        index === 1
+          ? [{ type: 'text' as const, text: 'Alpine producer.' }]
+          : segments
+      ),
+    };
+
+    expect(
+      validateProfileAeoContent(sameNameFragment).map(issue => issue.code)
+    ).toContain('description-identity-missing');
+  });
+
   it('builds the facts strip from genres, active year, hometown, and based-in', () => {
     const content = buildContent();
 
