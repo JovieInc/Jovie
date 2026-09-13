@@ -83,6 +83,26 @@ the existing Slack webhook, exercising one synthetic incident end to end, and
 observing one scheduled heartbeat from outside Vercel. Source and CI evidence do
 not establish any of those runtime receipts.
 
+### Selected external destinations (prepared, not activated)
+
+The adopt-first implementation uses existing provider and repository surfaces.
+These are the exact intended destinations; none of the pending configuration in
+this section is evidence that the path is live.
+
+| Role                                     | Selected destination                                                                                      | Exact configuration                                                                                                                                                                                                                                                                                               | Current receipt                                                                                                                                                                               |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Independent availability observer        | Sentry organization `jovie`, project `jovie-web`                                                          | Create `Jovie production serving` for `https://jov.ie/api/health/build-info` and `Summer production serving` for `https://summer.jov.ie/api/health`; check every five minutes, alert after two consecutive failures, and notify on recovery.                                                                      | The September 13 API readback returned zero monitors. The current token could not read project detectors or member identities (`403`), so no monitor or recipient is configured.              |
+| Signed spend feed                        | Existing Cloudflare Worker `jovie-observability-ingest`                                                   | Extend it with `POST /vercel/spend`; verify the raw request body against Vercel's `x-vercel-signature` HMAC-SHA1 signature; require the expected Vercel team ID; accept only 50%, 75%, 100%, and billing-cycle-end events; persist the stable incident key before dispatch.                                       | The checked-in KV namespace ID is a placeholder and no deployed Worker hostname was found. The receiver is not commissioned, and a hostname must not be invented before deployment.           |
+| Founder notification and acknowledgement | Vercel native Web, Email, Push, and SMS to Tim; Sentry Email to Tim as the independent availability route | Keep Vercel native delivery as the primary pre-pause notification. Bind both Sentry uptime monitors to Tim's verified Sentry member only after an authorized token can resolve that member identity. Treat Summer to iMessage and Ovie activity as recovery-time projections, not as the independent outage path. | Vercel channel selections are enabled, but delivery and human acknowledgement are unverified. The Sentry member ID is unresolved. No machine-readable Tim acknowledgement channel exists yet. |
+| Operational transport                    | Existing Production Slack webhook and Gem delivery-state-machine ingress                                  | Retain HTTP 200 body `ok` as Slack transport acceptance and the stable Gem event as agent ingress.                                                                                                                                                                                                                | Neither receipt proves Tim saw or acknowledged an incident. Do not use either as the founder acknowledgement gate.                                                                            |
+
+The proposed emergency envelope remains inactive: aggregate ceiling `$15`,
+maximum one-time stage `$2`, minimum remaining headroom `$1`, and a 15-minute
+founder acknowledgement window. Activating those values, changing the Vercel
+budget, resuming a project, creating Sentry monitors or recipients, deploying
+the Cloudflare receiver, or setting its secrets are separate operational
+mutations and require their applicable approval and identity receipts.
+
 ---
 
 ## Layer 1: Provider Spend Caps (Checklist)
