@@ -649,6 +649,7 @@ function runStructural() {
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
     'python3 scripts/symphony/tests/run-hud-proof-gate.py',
     'python3 scripts/symphony/tests/run-runtime-proof-gate.py',
+    'python3 scripts/symphony/tests/run-safe-restart-gate.py',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-service-attestation.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-service-attestation.coverage" python3 -m coverage report --include="*/scripts/symphony/emit_gem_service_attestation.py" --show-missing --precision=2 --fail-under=90',
     'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts',
     'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
