@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { ReleaseTaskCompactRow } from './ReleaseTaskCompactRow';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
 
 const task: ReleaseTaskView = {
@@ -58,4 +59,14 @@ export const Done: Story = {
       completedAt: new Date('2026-09-08T00:00:00.000Z'),
     },
   },
+};
+
+export const Compact: Story = {
+  render: args => (
+    <ReleaseTaskCompactRow
+      task={args.task}
+      onNavigate={fn()}
+      onToggle={args.onToggle}
+    />
+  ),
 };
