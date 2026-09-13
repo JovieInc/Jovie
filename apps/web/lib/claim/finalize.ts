@@ -74,7 +74,8 @@ function assertGenerallyClaimableProfileIdentity(username: string): void {
 
 function assertTokenBackedClaimAuthorization(
   profile: ClaimTargetProfile,
-  params: { source: ClaimOperationSource; claimTokenHash?: string | null }
+  params: { source: ClaimOperationSource; claimTokenHash?: string | null },
+  isCompletedOwnerRetry: boolean
 ): void {
   if (!isReservedPublicProfileIdentity(profile.usernameNormalized)) return;
 
@@ -85,8 +86,7 @@ function assertTokenBackedClaimAuthorization(
     profile.claimToken === params.claimTokenHash &&
     profile.claimTokenExpiresAt !== null &&
     profile.claimTokenExpiresAt > new Date() &&
-    !profile.isClaimed &&
-    !profile.userId;
+    ((!profile.isClaimed && !profile.userId) || isCompletedOwnerRetry);
 
   if (!tokenMatches) {
     throw new Error(
@@ -261,9 +261,26 @@ export async function claimPrebuiltProfileForUser(
   if (profile.usernameNormalized !== expectedUsername) {
     throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
   }
-  assertTokenBackedClaimAuthorization(profile, params);
+  // A receipt retry may resume the already committed fixture claim, but
+  // still requires the same valid token and completed authenticated owner.
+  const isCompletedOwnerRetry =
+    isTokenBackedClaimFixture(profile.usernameNormalized) &&
+    params.source === 'token_backed_onboarding' &&
+    params.finalizeOnboarding === true &&
+    profile.isClaimed === true &&
+    profile.userId === params.userId &&
+    profile.onboardingCompletedAt !== null;
+  assertTokenBackedClaimAuthorization(profile, params, isCompletedOwnerRetry);
 
   await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
+
+  if (isCompletedOwnerRetry) {
+    return {
+      profileId: profile.id,
+      username: expectedUsername,
+      status: 'updated',
+    };
+  }
 
   if (profile.userId && profile.userId !== params.userId) {
     throw new Error('[PROFILE_CONFLICT] This profile is no longer available.');
