@@ -135,7 +135,7 @@ describe('Public Artist Visibility acquisition contract', () => {
       'enterprise',
     ]);
     expect(MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro')?.price).toBe(
-      `$${PLAN_PRICES.pro.monthly}`
+      '$199'
     );
     expect(
       MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro')?.cadence
