@@ -8,6 +8,6 @@ export const HYGIENE_LIMITS = Object.freeze({
   maxChangedBinaryFiles: 120,
   maxSnapshotBytes: 12 * MiB,
   maxSnapshotFiles: 100,
-  maxTrackedBytes: 185 * MiB,
+  maxTrackedBytes: 180 * MiB,
   maxTrackedBinaryBytes: 96 * MiB,
 });
