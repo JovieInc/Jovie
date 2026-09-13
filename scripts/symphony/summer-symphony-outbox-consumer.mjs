@@ -47,14 +47,24 @@ const TASK_ACCEPTANCE_SCHEMA = 'symphony-existing-repair-task-acceptance/v1';
 export const SOURCE_EVALUATION_SCHEMA =
   'symphony-existing-repair-source-evaluation/v1';
 const EXECUTION_EVIDENCE_KEYS =
-  'runId provider model authPoolIdentity leaseIdentity evidenceDigest assignmentDigest providerGrantDigest acceptanceDigest runDigest taskAcceptanceDigest baseHead finalHead outputDigest sourceEvaluation verification'.split(' ');
+  'runId provider model authPoolIdentity leaseIdentity evidenceDigest assignmentDigest providerGrantDigest acceptanceDigest runDigest taskAcceptanceDigest baseHead finalHead outputDigest sourceEvaluation verification'.split(
+    ' '
+  );
 const SOURCE_EVALUATION_KEYS =
-  'schema taskKey taskSelectionDigest sourceVersion snapshotDigest targetDigest identifier issueId repository pr baseHead finalHead targetObserved observedIssueId observedIssueRevision observedPrNumber observedPrHead observedRepository prMergeStateStatus mergeable workerAttested selectedEvidence taskResolved reason digest'.split(' ');
+  'schema taskKey taskSelectionDigest sourceVersion snapshotDigest targetDigest identifier issueId repository pr baseHead finalHead targetObserved observedIssueId observedIssueRevision observedPrNumber observedPrHead observedRepository prMergeStateStatus mergeable workerAttested selectedEvidence taskResolved reason digest'.split(
+    ' '
+  );
 const VERIFICATION_KEYS =
-  'schema claimRecorded acceptanceRecorded runStarted runTerminal resultPersisted leaseHeld workspaceBound headObserved headChanged taskAccepted'.split(' ');
+  'schema claimRecorded acceptanceRecorded runStarted runTerminal resultPersisted leaseHeld workspaceBound headObserved headChanged taskAccepted'.split(
+    ' '
+  );
 const SOURCE_EVALUATION_REASONS = new Set([
-  'target-observation-unavailable', 'target-identity-mismatch', 'head-unchanged',
-  'task-check-unresolved', 'task-check-evidence-unavailable', 'task-check-passed',
+  'target-observation-unavailable',
+  'target-identity-mismatch',
+  'head-unchanged',
+  'task-check-unresolved',
+  'task-check-evidence-unavailable',
+  'task-check-passed',
 ]);
 const CONTROLLER_TIMEOUT_MS = (5400 + 30) * 1000;
 const CONTROLLER_OUTPUT_LIMIT = 128 * 1024;
@@ -149,7 +159,13 @@ function exactKeys(value, keys) {
   );
 }
 
-const SELECTED_CHECK_EVIDENCE_KEYS = ['id', 'handle', 'check', 'result', 'source'];
+const SELECTED_CHECK_EVIDENCE_KEYS = [
+  'id',
+  'handle',
+  'check',
+  'result',
+  'source',
+];
 
 function selectedCheckEvidenceShapeValid(value) {
   if (value === null) return true;
@@ -542,7 +558,8 @@ export function validateExecutionEvidenceV3(outcome, boundTask) {
     sourceEvaluation.digest !==
       symphonySourceEvaluationDigestV3(sourceEvaluation) ||
     !sourceObservationMatches ||
-    (sourceEvaluation.taskResolved && sourceEvaluation.reason !== 'task-check-passed') ||
+    (sourceEvaluation.taskResolved &&
+      sourceEvaluation.reason !== 'task-check-passed') ||
     sourceEvaluation.taskResolved !== sourceTaskResolved ||
     verification.taskAccepted !==
       (sourceEvaluation.workerAttested && sourceEvaluation.taskResolved)
@@ -550,7 +567,10 @@ export function validateExecutionEvidenceV3(outcome, boundTask) {
     throw new Error('consumer-execution-evidence-invalid-or-cross-bound');
   }
   const { evidenceDigest: _evidenceDigest, ...unsigned } = execution;
-  const expected = digest({ schema: 'symphony-existing-repair-evidence/v1', ...unsigned });
+  const expected = digest({
+    schema: 'symphony-existing-repair-evidence/v1',
+    ...unsigned,
+  });
   if (expected !== execution.evidenceDigest) {
     throw new Error('consumer-execution-evidence-digest-invalid');
   }
