@@ -145,6 +145,23 @@ describe('changed test coverage', () => {
       'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"'
     );
     expect(coverage).toContain('has_web_coverage_changes');
+    const webPkg = JSON.parse(
+      readFileSync(
+        resolve(import.meta.dirname, '../../../apps/web/package.json'),
+        'utf8'
+      )
+    );
+    // pnpm forwards a leading "--" into test:coverage; vitest then treats
+    // --changed as a filter and Exact-head runs the full tree (~1267 files).
+    expect(webPkg.scripts['test:coverage']).toContain('vitest-wrapper.mjs');
+    expect(webPkg.scripts['test:coverage']).toContain('--coverage');
+    expect(webPkg.scripts['test:coverage']).not.toBe('vitest run --coverage');
+    const wrapper = readFileSync(
+      resolve(import.meta.dirname, '../../../apps/web/scripts/vitest-wrapper.mjs'),
+      'utf8'
+    );
+    expect(wrapper).toContain("rawArgs[0] === '--'");
+    expect(wrapper).toContain('rawArgs.slice(1)');
     expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
     expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
     expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
