@@ -42,8 +42,8 @@ const Switch = React.forwardRef<
         'transition-[background-color,box-shadow] duration-subtle ease-subtle motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page focus-visible:!ring-2 focus-visible:!ring-focus/55 focus-visible:!ring-offset-2 focus-visible:!outline-solid focus-visible:!outline-2 focus-visible:!outline-offset-2 focus-visible:!outline-(--color-text-primary-token)',
         'disabled:cursor-not-allowed disabled:opacity-[var(--state-disabled-opacity)]',
-        'data-[state=unchecked]:bg-surface-2 data-[state=unchecked]:border data-[state=unchecked]:border-subtle data-[state=unchecked]:hover:bg-surface-3 disabled:data-[state=unchecked]:hover:bg-surface-2',
-        'data-[state=checked]:bg-btn-primary data-[state=checked]:hover:bg-btn-primary-hover disabled:data-[state=checked]:hover:bg-btn-primary',
+        'data-[state=unchecked]:bg-surface-2 data-[state=unchecked]:text-btn-primary data-[state=unchecked]:border data-[state=unchecked]:border-subtle data-[state=unchecked]:hover:bg-surface-3 disabled:data-[state=unchecked]:hover:bg-surface-2',
+        'data-[state=checked]:bg-btn-primary data-[state=checked]:text-btn-primary-foreground data-[state=checked]:hover:bg-btn-primary-hover disabled:data-[state=checked]:hover:bg-btn-primary',
         'aria-[invalid=true]:!border aria-[invalid=true]:!border-error aria-[invalid=true]:!ring-0 aria-[invalid=true]:data-[state=unchecked]:hover:!bg-surface-2',
         className
       )}
