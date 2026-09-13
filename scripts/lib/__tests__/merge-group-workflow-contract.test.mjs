@@ -706,6 +706,7 @@ describe('merge_group workflow contract', () => {
     expect(coverage).toContain('.applicable');
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
     expect(coverage).toContain('--bail 1');
+    expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
     expect(coverage).toContain(
       `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
     );
