@@ -415,6 +415,10 @@ describe('live Storybook component certification', () => {
       ['deliberate-red.live.geometry-drift', /anatomy drifted/],
       ['deliberate-red.live.nonconcentric', /outer 16px !== inner 8px/],
       ['deliberate-red.live.aa-contrast', /below WCAG AA/],
+      [
+        'deliberate-red.live.switch-thumb-track-contrast',
+        /unchecked thumb against track contrast .*below WCAG AA/,
+      ],
       ['deliberate-red.live.axe', /axe violations/],
       ['deliberate-red.live.overflow', /overflows the story frame/],
       ['deliberate-red.live.zoom', /200% zoom/],
@@ -432,6 +436,23 @@ describe('live Storybook component certification', () => {
       expect(result.ok).toBe(false);
       expect(details(result)).toMatch(pattern);
     }
+    const switchPass = seededPassingObservations().find(item =>
+      item.id.startsWith('ui-atoms-switch--conformance-matrix@')
+    );
+    expect(switchPass).toBeDefined();
+    const inheritedRootTextOnly = {
+      ...switchPass,
+      contrastRatio: 1.2,
+      foreground: { luminance: 'dark', token: 'inherited-root-text' },
+      contrastPairs: [
+        {
+          label: 'checked thumb against track',
+          boundary: 'thumb-track',
+          ratio: 7.2,
+        },
+      ],
+    };
+    expect(evaluateLiveObservation(inheritedRootTextOnly).ok).toBe(true);
     const leaked = clone(DELIBERATE_RED_LIVE_FIXTURES[1]);
     leaked.fill = { luminance: 'dark', token: 'bg-surface-1' };
     expect(
