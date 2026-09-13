@@ -42,15 +42,15 @@ function classify(overrides = {}) {
 }
 
 describe('Dependabot event policy', () => {
-  it.each([
-    ['version-update:semver-patch'],
-    ['version-update:semver-minor'],
-  ])('queues a safe %s update after a maintainer synchronization', updateType => {
-    expect(classify({ updateType })).toMatchObject({
-      decision: 'queue',
-      reason: 'safe-update-eligible',
-    });
-  });
+  it.each([['version-update:semver-patch'], ['version-update:semver-minor']])(
+    'queues a safe %s update after a maintainer synchronization',
+    updateType => {
+      expect(classify({ updateType })).toMatchObject({
+        decision: 'queue',
+        reason: 'safe-update-eligible',
+      });
+    }
+  );
 
   it('re-enrolls safe updates after another controller removes queue intent', () => {
     expect(classify({ action: 'unlabeled' }).decision).toBe('queue');
@@ -111,35 +111,35 @@ describe('Dependabot event policy', () => {
     });
   });
 
-  it.each([
-    ['closed major', { action: 'closed' }],
-  ])('does not reopen or repeat the hold for an %s', (_name, overrides) => {
-    expect(
-      classify({
-        updateType: 'version-update:semver-major',
-        ...overrides,
-      }).decision
-    ).toBe('noop');
-  });
+  it.each([['closed major', { action: 'closed' }]])(
+    'does not reopen or repeat the hold for an %s',
+    (_name, overrides) => {
+      expect(
+        classify({
+          updateType: 'version-update:semver-major',
+          ...overrides,
+        }).decision
+      ).toBe('noop');
+    }
+  );
 
-  it.each([
-    'needs-human',
-    'human-review-required',
-    'no-auto',
-  ])('ignores retired hold label %s', label => {
-    expect(
-      classify({
-        action: 'closed',
-        pullRequest: pullRequest({ labels: [label] }),
-      }).decision
-    ).toBe('reopen-recreate');
-    expect(
-      classify({
-        updateType: 'version-update:semver-major',
-        pullRequest: pullRequest({ labels: [label] }),
-      }).decision
-    ).toBe('hold-major');
-  });
+  it.each(['needs-human', 'human-review-required', 'no-auto'])(
+    'ignores retired hold label %s',
+    label => {
+      expect(
+        classify({
+          action: 'closed',
+          pullRequest: pullRequest({ labels: [label] }),
+        }).decision
+      ).toBe('reopen-recreate');
+      expect(
+        classify({
+          updateType: 'version-update:semver-major',
+          pullRequest: pullRequest({ labels: [label] }),
+        }).decision
+      ).toBe('hold-major');
+    }
+  );
 
   it('clears the conflict hold only after Dependabot publishes a recreated head', () => {
     expect(
@@ -190,26 +190,25 @@ describe('Dependabot event policy', () => {
     });
   });
 
-  it.each([
-    ...DURABLE_HOLD_LABELS,
-  ])('never queues an update with the durable %s hold', label => {
-    expect(
-      classify({ pullRequest: pullRequest({ labels: [{ name: label }] }) })
-        .decision
-    ).toBe('noop');
-  });
+  it.each([...DURABLE_HOLD_LABELS])(
+    'never queues an update with the durable %s hold',
+    label => {
+      expect(
+        classify({ pullRequest: pullRequest({ labels: [{ name: label }] }) })
+          .decision
+      ).toBe('noop');
+    }
+  );
 
-  it.each([
-    'needs-human-taste',
-    'needs:taste',
-    'taste',
-    'llm-review',
-  ])('keeps the advisory %s label out of the durable hold set', label => {
-    expect(
-      classify({ pullRequest: pullRequest({ labels: [{ name: label }] }) })
-        .decision
-    ).toBe('queue');
-  });
+  it.each(['needs-human-taste', 'needs:taste', 'taste', 'llm-review'])(
+    'keeps the advisory %s label out of the durable hold set',
+    label => {
+      expect(
+        classify({ pullRequest: pullRequest({ labels: [{ name: label }] }) })
+          .decision
+      ).toBe('queue');
+    }
+  );
 });
 
 describe('Dependabot policy runner', () => {
@@ -369,6 +368,34 @@ describe('Dependabot reconciliation workflow contract', () => {
     expect(WORKFLOW).toContain(
       "steps.policy.outputs.decision == 'queue-recovered'"
     );
+  });
+
+  it('skips instead of failing when fetch-metadata cannot certify Dependabot commits', () => {
+    expect(WORKFLOW).toMatch(
+      /id: meta\n\s+continue-on-error: true\n\s+uses: dependabot\/fetch-metadata@/
+    );
+    expect(WORKFLOW).toContain("if: steps.meta.outcome != 'success'");
+    expect(WORKFLOW).toContain("if: steps.meta.outcome == 'success'");
+    expect(WORKFLOW).toContain('Skip uncertified Dependabot head');
+    expect(WORKFLOW).toContain('mergeStateStatus is not UNSTABLE');
+    expect(WORKFLOW).not.toMatch(/skip-commit-verification\s*:/);
+    expect(WORKFLOW).not.toMatch(/^\s*skip-verification\s*:/m);
+    expect(WORKFLOW).not.toContain('gh pr merge --auto');
+  });
+
+  it('keeps patch/minor queue-intent for certified Dependabot-authored heads', () => {
+    expect(WORKFLOW).toContain(
+      'Leave native autoenroll as the queue writer (patch + minor)'
+    );
+    expect(WORKFLOW).toMatch(/steps\.policy\.outputs\.decision == 'queue'$/m);
+    expect(WORKFLOW).toContain(
+      "steps.policy.outputs.decision == 'queue-recovered'"
+    );
+    expect(WORKFLOW).toContain("steps.policy.outputs.decision == 'recreate'");
+    expect(WORKFLOW).toContain(
+      "steps.policy.outputs.decision == 'reopen-recreate'"
+    );
+    expect(WORKFLOW).toContain("steps.policy.outputs.decision == 'hold-major'");
   });
 });
 
