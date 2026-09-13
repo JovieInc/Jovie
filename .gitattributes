@@ -11,4 +11,3 @@
 *.eot binary
 .claude/skills/vercel-composition-patterns/** -whitespace
 .claude/skills/vercel-react-best-practices/** -whitespace
-patches/@vitest__coverage-v8@5.0.0.patch -whitespace
