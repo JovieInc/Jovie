@@ -50,19 +50,70 @@ _CONSUMER_ACKNOWLEDGEMENTS = frozenset({"recorded", "replay"})
 _CONSUMER_REJECTION = re.compile(
     r"^SUMMER_SYMPHONY_CONSUMER_REJECTED reason=(?P<reason>.+)$"
 )
-_REDACTION_PATTERNS = (
-    re.compile(
-        r"(?i)\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]+",
-    ),
-    re.compile(
-        r"(?i)\b(?:[A-Za-z0-9_-]*(?:token|secret|password|api[_-]?key|"
-        r"authorization|private[_-]?key))\s*[:=]\s*[^\s,;]+",
-    ),
-    re.compile(r"(?i)\b(?:ghp|github_pat|xai|sk)-[A-Za-z0-9_-]{8,}\b"),
-    re.compile(
-        r"(?s)-----BEGIN [^-]+-----.*?-----END [^-]+-----",
-    ),
+# The consumer includes an executor supplied reason in an otherwise bounded
+# JSON result, and its rejection path serializes arbitrary error messages. A
+# regex scrub cannot establish a durable privacy boundary: new token formats,
+# names, URLs, or other customer data would survive. Persist only exact codes
+# already emitted by the consumer; all other values become a safe finite code.
+_CONSUMER_REASON_CODES = frozenset(
+    {
+        "v1-missing-explicit-execution-target-and-decision-fingerprint",
+        "qualified-isolated-repair-executor-unavailable",
+        "v2-execution-configuration-missing",
+        "v3-signing-configuration-missing",
+        "outbox-page-limit-exceeded",
+        "outbox-page-invalid",
+        "outbox-cursor-invalid",
+        "outbox-task-invalid-or-cross-bound",
+        "outbox-task-action-cross-bound",
+        "existing-repair-task-cross-bound",
+        "outbox-task-v2-projection-cross-bound",
+        "outbox-verification-keys-invalid",
+        "outbox-record-invalid",
+        "outbox-wire-version-cross-bound",
+        "outbox-task-key-cross-bound",
+        "outbox-signing-key-unknown",
+        "outbox-signature-invalid",
+        "consumer-execution-outcome-invalid-or-cross-bound",
+        "consumer-execution-outcome-signature-invalid",
+        "existing-repair-v3-required",
+        "existing-repair-controller-unavailable",
+        "consumer-outcome-invalid-or-cross-bound",
+        "consumer-outcome-signature-invalid",
+        "read-proof-input-invalid",
+        "consumer-state-invalid",
+        "consumer-state-directory-unsafe",
+        "consumer-state-file-unsafe",
+        "consumer-state-clear-cross-bound",
+        "consumer-discovery-cursor-invalid",
+        "summer-outbox-invalid-json",
+        "summer-outbox-http-400",
+        "summer-outbox-http-401",
+        "summer-outbox-http-403",
+        "summer-outbox-http-404",
+        "summer-outbox-http-409",
+        "summer-outbox-http-429",
+        "summer-outbox-http-500",
+        "summer-outbox-http-502",
+        "summer-outbox-http-503",
+        "summer-outbox-http-504",
+        "linear-graphql-rejected",
+        "linear-projection-result-cross-bound",
+        "linear-projection-v2-required",
+        "linear-projection-destination-unavailable",
+        "linear-projection-replay-conflict",
+        "linear-projection-create-rejected",
+        "summer-outcome-ack-invalid",
+        "outcome-signing-key-invalid",
+        "outcome-key-id-invalid",
+        "outbox-and-outcome-signing-authority-overlap",
+        "existing-repair-target-invalid",
+        "consumer-rejected-unknown",
+        "consumer-reason-unknown",
+    }
 )
+_CONSUMER_UNKNOWN_REASON = "consumer-reason-unknown"
+_CONSUMER_UNKNOWN_REJECTION = "consumer-rejected-unknown"
 
 
 def _utc_timestamp() -> str:
@@ -202,14 +253,14 @@ def _write_consumer_receipt(path: Path, receipt: dict[str, object]) -> None:
             pass
 
 
-def _redact_text(value: str) -> str:
-    text = re.sub(r"\s+", " ", value).strip()
-    for pattern in _REDACTION_PATTERNS:
-        text = pattern.sub("[REDACTED]", text)
-    return text[:240]
+def _reason_code(value: object, fallback: str) -> str:
+    """Return a finite consumer reason code without retaining free-form text."""
+    if isinstance(value, str) and value in _CONSUMER_REASON_CODES:
+        return value
+    return fallback
 
 
-def _rejection_reason(stderr: str) -> str | None:
+def _rejection_reason_code(stderr: str) -> str | None:
     if not isinstance(stderr, str):
         return None
     for line in reversed(stderr.splitlines()):
@@ -221,7 +272,7 @@ def _rejection_reason(stderr: str) -> str | None:
         except json.JSONDecodeError:
             return None
         if isinstance(reason, str) and reason:
-            return _redact_text(reason)
+            return _reason_code(reason, _CONSUMER_UNKNOWN_REJECTION)
     return None
 
 
@@ -262,8 +313,8 @@ def _validated_consumer_outcome(
             return None, "consumer-output-issueIdentifier-invalid"
         if field == "acknowledgement" and value not in _CONSUMER_ACKNOWLEDGEMENTS:
             return None, "consumer-output-acknowledgement-invalid"
-        if field in {"reason", "acknowledgement"}:
-            value = _redact_text(value)
+        if field == "reason":
+            value = _reason_code(value, _CONSUMER_UNKNOWN_REASON)
         outcome[field] = value
 
     required = {
@@ -424,7 +475,7 @@ def run_summer_symphony_consumer() -> int:
         raise TypeError("consumer-return-code-invalid")
 
     outcome, parse_error = _validated_consumer_outcome(consumer.stdout)
-    rejection_reason = _rejection_reason(consumer.stderr)
+    rejection_reason = _rejection_reason_code(consumer.stderr)
     if return_code == CONSUMER_REJECTION_RETURN_CODE:
         outcome = {
             "schema": CONSUMER_CYCLE_SCHEMA,
