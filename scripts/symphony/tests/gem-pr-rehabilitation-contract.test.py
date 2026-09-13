@@ -177,6 +177,14 @@ class DeploymentContractTests(unittest.TestCase):
             "EnvironmentFile=-%h/.config/symphony/runner-source.env",
             service,
         )
+        # The existing outbox consumer requires its dedicated outcome signing
+        # key and Summer outbox verification keys. Keep that credential
+        # boundary on the unattended drain unit so each timer cycle can run
+        # the authenticated consumer instead of exiting with rc=78.
+        self.assertIn(
+            "EnvironmentFile=%h/.config/symphony/summer-bottleneck-signing.env",
+            service,
+        )
         self.assertNotIn("/home/timwhite/Jovie/", service)
 
     def test_jovie_producer_refreshes_once_even_when_jovie_drain_is_disabled(self):
