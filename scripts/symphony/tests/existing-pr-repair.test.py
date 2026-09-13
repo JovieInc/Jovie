@@ -422,6 +422,7 @@ class RepairTests(unittest.TestCase):
         task, executor = self.isolated_fixture()
         first = self.run_isolated(task, executor)
         payload = repair.read_private(self.root / f"{IDENT}.json")
+        self.assertEqual(repair.candidates(controller.__file__), [])
         with mock.patch.object(repair.time, "time", return_value=payload["expiresAt"] + 1):
             replay = self.run_isolated(task, executor)
         self.assertEqual(replay, first)
