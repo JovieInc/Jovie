@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import fcntl
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -135,6 +136,77 @@ class PublisherTests(unittest.TestCase):
         )
         self.assertTrue(all(item["matches"] for item in result["unitOverrides"]))
 
+    def bounded_observation(self):
+        return E.observe(self.sidecar, self.root, CONFIG, self.package, self.gem,
+                         proc_root=self.proc, now=NOW, profile="governor-bounded")
+
+    def install_bounded_fixture(self):
+        source_root = Path(E.__file__).parent / "profiles/governor-bounded"
+        workflow = (source_root / "WORKFLOW.md").read_bytes()
+        self.sources[E.BOUNDED_PROFILE + "/WORKFLOW.md"] = workflow
+        self.workflow.write_bytes(workflow)
+        paths = []
+        for name in sorted(E.BOUNDED_OVERRIDES):
+            body = (source_root / "systemd" / name).read_bytes()
+            self.sources[E.BOUNDED_PROFILE + "/systemd/" + name] = body
+            target = self.root / name
+            target.write_bytes(body)
+            paths.append(str(target))
+        self.fields["DropInPaths"] = " ".join(paths)
+        return workflow
+
+    def test_bounded_profile_requires_explicit_selection_and_all_reviewed_overrides(self):
+        self.install_bounded_fixture()
+        self.assertFalse(self.observe()["healthy"])
+        result = self.bounded_observation()
+        self.assertTrue(result["healthy"])
+        self.assertEqual(result["configurationProfile"], "governor-bounded")
+        for path in self.fields["DropInPaths"].split():
+            with self.subTest(missing=path):
+                with mock.patch.dict(self.fields, DropInPaths=self.fields["DropInPaths"].replace(path, "")):
+                    self.assertFalse(self.bounded_observation()["healthy"])
+        with self.assertRaises(ValueError):
+            E.observe(self.sidecar, self.root, CONFIG, self.package, self.gem, profile="arbitrary")
+
+    def test_bounded_profile_rejects_enrollment_provider_hook_and_restart_drift(self):
+        original = self.install_bounded_fixture()
+        for before, after in [
+            (b"agents: 5", b"agents: 6"),
+            (b"symphony-five-pr-repair-20260908", b"symphony"),
+            (b"project_slug:", b"other_project:"),
+            (b"command: /usr/bin/false", b"command: codex app-server"),
+            (b"native-preflight", b"skip-preflight"),
+        ]:
+            with self.subTest(change=after):
+                self.workflow.write_bytes(original.replace(before, after))
+                self.assertFalse(self.bounded_observation()["healthy"])
+        self.workflow.write_bytes(original.replace(b"agents: 5", b"agents: 1"))
+        self.assertTrue(self.bounded_observation()["healthy"])
+        self.workflow.write_bytes(original)
+        unit = self.root / "governor-restricted.conf"
+        body = unit.read_bytes()
+        for before, after in [(b"RestartSec=20", b"RestartSec=0"),
+                              (b"Restart=always", b"Restart=no")]:
+            unit.write_bytes(body.replace(before, after))
+            self.assertFalse(self.bounded_observation()["healthy"])
+
+    def test_review_candidate_preserves_restrictions_and_uses_continuous_service(self):
+        original = self.install_bounded_fixture()
+        config = original.decode().split("---", 2)[1]
+        for restriction in [
+            '    project_slug: "symphony-ui-pilot-96d6b9c5b2d5"',
+            '  required_labels:\n    - symphony-five-pr-repair-20260908',
+            '  root: /home/timwhite/codex-qualification',
+            '  max_concurrent_agents: 5', '  max_retry_attempts: 1',
+            '  command: /usr/bin/false',
+            'native-preflight "${PWD##*/}" --before-run',
+        ]:
+            self.assertIn(restriction, config)
+        unit = (self.root / "governor-restricted.conf").read_text().splitlines()
+        self.assertIn("Restart=always", unit)
+        self.assertIn("RestartSec=20", unit)
+        self.assertIn("RuntimeMaxSec=infinity", unit)
+
     def test_only_existing_concurrency_overlay_is_accepted(self):
         for value in [1, 41, 128]:
             self.workflow.write_bytes(WORKFLOW.replace(b"agents: 5", f"agents: {value}".encode()))
@@ -219,6 +291,63 @@ class PublisherTests(unittest.TestCase):
         with mock.patch.object(sys, 'argv', args), mock.patch.object(E, 'observe', side_effect=ValueError('secret text')), mock.patch('builtins.print') as output:
             self.assertEqual(E.main(), 78)
             self.assertNotIn('secret text', str(output.call_args))
+
+    def test_operator_profile_environment_and_explicit_override_reach_observer(self):
+        args = ['publisher', '--provenance', str(self.sidecar), '--source-root', str(self.root),
+                '--source-revision', CONFIG, '--check']
+        for extra, expected in [([], 'governor-bounded'), (['--profile', 'canonical'], 'canonical')]:
+            with mock.patch.dict(E.os.environ, JOVIE_CONFIGURATION_PROFILE='governor-bounded'), \
+                 mock.patch.object(sys, 'argv', args + extra), \
+                 mock.patch.object(E, 'observe', return_value={'healthy': False}) as observer, \
+                 mock.patch('builtins.print'):
+                self.assertEqual(E.main(), 2)
+                self.assertEqual(observer.call_args.kwargs['profile'], expected)
+
+    def test_installer_verify_accepts_git_mirror_and_forwards_selected_profile(self):
+        repo = self.root / 'installer-source'
+        repo.mkdir()
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(HOME=str(self.root), GEM_SERVICE_ATTESTATION_VERIFY_ONLY='true')
+        subprocess.run(['git', 'init', '-q', str(repo)], env=env, check=True)
+        base = repo / 'scripts/symphony'
+        (base / 'systemd').mkdir(parents=True)
+        for name in ['emit_gem_service_attestation.py', 'symphony_proof_context.py',
+                     'gem_gate_contract.py', 'systemd/gem-service-attestation.service']:
+            (base / name).write_text('fixture\n')
+        subprocess.run(['git', '-C', str(repo), 'add', '.'], env=env, check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'],
+                       env=env, check=True)
+        mirror = self.root / 'mirror.git'
+        subprocess.run(['git', 'clone', '-q', '--bare', str(repo), str(mirror)], env=env, check=True)
+        config = self.root / '.config/symphony'
+        config.mkdir(parents=True)
+        (config / 'runner-source.env').write_text(
+            f'SYMPHONY_RELEASE_PROVENANCE={self.sidecar}\n'
+            f'JOVIE_CONFIGURATION_SOURCE_ROOT={mirror}\n'
+            f'JOVIE_CONFIGURATION_SOURCE_REVISION={CONFIG}\n'
+            'JOVIE_CONFIGURATION_PROFILE=governor-bounded\n')
+        bins = self.root / 'test-bin'
+        bins.mkdir()
+        (bins / 'systemctl').write_text('#!/bin/sh\nexit 0\n')
+        (bins / 'python3').write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        for executable in bins.iterdir(): executable.chmod(0o755)
+        env['PATH'] = str(bins) + os.pathsep + env['PATH']
+        installer = Path(E.__file__).with_name('install-gem-service-attestation.sh')
+        result = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('--profile\ngovernor-bounded\n', result.stdout)
+        self.assertIn('--source-root\n' + str(mirror) + '\n', result.stdout)
+        self.assertIn('--check\n', result.stdout)
+        self.assertFalse((self.root / 'gem-workspace/scripts/emit-gem-service-attestation.py').exists())
+        not_repo = self.root / 'not-a-repository'
+        not_repo.mkdir()
+        inputs = config / 'runner-source.env'
+        inputs.write_text(inputs.read_text().replace(str(mirror), str(not_repo)))
+        rejected = subprocess.run(['bash', str(installer), str(repo)], env=env, capture_output=True, text=True)
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn('not a git repository', rejected.stderr)
+        self.assertEqual(rejected.stdout, '')
 
 
 if __name__ == '__main__':
