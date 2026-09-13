@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { Paperclip } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { FileAudio2, Paperclip } from 'lucide-react';
+import { type ComponentProps, type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+  CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
+} from '@/components/jovie/chat-composer-copy';
+import type { PickerActionItem } from '@/components/jovie/components/picker-rows';
 import { CmdKPalette } from './CmdKPalette';
 
 const pushMock = vi.fn();
@@ -51,10 +56,44 @@ vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
   }),
 }));
 
+function composerAttachmentActions(
+  onSelectAttach = vi.fn(),
+  onSelectAudio = vi.fn()
+): readonly PickerActionItem[] {
+  return [
+    {
+      kind: 'action',
+      action: {
+        id: 'attach-files',
+        label: 'Attach Files',
+        description: 'Drop or browse',
+        icon: Paperclip,
+        onSelect: onSelectAttach,
+      },
+    },
+    {
+      kind: 'action',
+      action: {
+        id: 'upload-audio',
+        label: CHAT_COMPOSER_UPLOAD_AUDIO_LABEL,
+        description: CHAT_COMPOSER_UPLOAD_AUDIO_HINT,
+        icon: FileAudio2,
+        onSelect: onSelectAudio,
+      },
+    },
+  ];
+}
+
 function MainPlaneHarness({
   onOpenChange = vi.fn(),
+  additionalSectionsAfter,
+  onAdditionalSelect,
 }: {
   onOpenChange?: (open: boolean) => void;
+  additionalSectionsAfter?: ComponentProps<
+    typeof CmdKPalette
+  >['additionalSectionsAfter'];
+  onAdditionalSelect?: (id: string) => void;
 }) {
   const [header, setHeader] = useState<ReactNode>(null);
 
@@ -67,6 +106,8 @@ function MainPlaneHarness({
         onOpenChange={onOpenChange}
         presentation='main'
         onHeaderChange={setHeader}
+        additionalSectionsAfter={additionalSectionsAfter}
+        onAdditionalSelect={onAdditionalSelect}
       />
     </>
   );
@@ -203,28 +244,7 @@ describe('CmdKPalette', () => {
           {
             id: 'attachments',
             label: 'Attachments',
-            items: [
-              {
-                kind: 'action',
-                action: {
-                  id: 'attach-files',
-                  label: 'Attach Files',
-                  description: 'Drop or browse',
-                  icon: Paperclip,
-                  onSelect,
-                },
-              },
-              {
-                kind: 'action',
-                action: {
-                  id: 'upload-audio',
-                  label: 'Upload audio',
-                  description: 'Supported audio files',
-                  icon: Paperclip,
-                  onSelect,
-                },
-              },
-            ],
+            items: composerAttachmentActions(onSelect, onSelect),
           },
         ]}
         onAdditionalSelect={onAdditionalSelect}
@@ -246,5 +266,81 @@ describe('CmdKPalette', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(pushMock).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not prefetch composer actions and commits their action id', () => {
+    pushMock.mockClear();
+    prefetchMock.mockClear();
+    const onOpenChange = vi.fn();
+    const onAdditionalSelect = vi.fn();
+    const onSelectAttach = vi.fn();
+    const onSelectAudio = vi.fn();
+
+    render(
+      <MainPlaneHarness
+        onOpenChange={onOpenChange}
+        additionalSectionsAfter={[
+          {
+            id: 'attachments',
+            label: 'Attachments',
+            items: composerAttachmentActions(onSelectAttach, onSelectAudio),
+          },
+        ]}
+        onAdditionalSelect={onAdditionalSelect}
+      />
+    );
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    prefetchMock.mockClear();
+    fireEvent.change(input, { target: { value: 'flac' } });
+
+    const audio = screen.getByRole('option', {
+      name: `${CHAT_COMPOSER_UPLOAD_AUDIO_LABEL} ${CHAT_COMPOSER_UPLOAD_AUDIO_HINT} ⌘1`,
+    });
+    expect(audio).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('option', { name: /Attach Files/ })).toBeNull();
+    expect(prefetchMock).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onAdditionalSelect).toHaveBeenCalledWith('upload-audio');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onSelectAudio).not.toHaveBeenCalled();
+    expect(onSelectAttach).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('commits Attach Files from the additional composer section by action id', () => {
+    pushMock.mockClear();
+    prefetchMock.mockClear();
+    const onOpenChange = vi.fn();
+    const onAdditionalSelect = vi.fn();
+
+    render(
+      <MainPlaneHarness
+        onOpenChange={onOpenChange}
+        additionalSectionsAfter={[
+          {
+            id: 'attachments',
+            label: 'Attachments',
+            items: composerAttachmentActions(),
+          },
+        ]}
+        onAdditionalSelect={onAdditionalSelect}
+      />
+    );
+
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'Drop or browse' } }
+    );
+
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Attach Files/ }));
+
+    expect(onAdditionalSelect).toHaveBeenCalledWith('attach-files');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });
