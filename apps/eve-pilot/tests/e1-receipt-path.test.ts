@@ -12,7 +12,9 @@ describe('resolveE1ReceiptPath (Gem-writable)', () => {
 
   afterEach(async () => {
     await Promise.all(
-      scratchDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))
+      scratchDirs
+        .splice(0)
+        .map(dir => rm(dir, { recursive: true, force: true }))
     );
   });
 

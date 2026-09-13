@@ -4,10 +4,11 @@
  * E1_RECEIPT_PATH, then RUNNER_TEMP, then /opt/cursor/artifacts when writable,
  * else os.tmpdir().
  */
-import { access, mkdir } from 'node:fs/promises';
+
 import { constants as fsConstants } from 'node:fs';
-import { join } from 'node:path';
+import { access, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 export const E1_RECEIPT_NAME = 'e1-attestation-observations-receipt.json';
 export const OPT_CURSOR_E1_RECEIPT = `/opt/cursor/artifacts/${E1_RECEIPT_NAME}`;
