@@ -68,6 +68,18 @@
       ],
       "penRootId": null,
       "sourceDigest": "1af9a61ba19869d04ee3206c2224fb4776f5fc69b7565eaa733396c191348142"
+    },
+    {
+      "id": "atom.switch",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/switch.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/switch.stories.tsx"],
+      "testSources": ["packages/ui/atoms/switch.test.tsx"],
+      "penRootId": null,
+      "sourceDigest": "7644089c59dad334db0e46bdf1c21fcf082ec7f9299477d1cb31b5d5f5c10b11"
     }
   ],
   "legacy": {
