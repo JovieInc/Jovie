@@ -1,18 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-<<<<<<< HEAD
-import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
-import { HeaderSearchSurfaceFromContext } from './HeaderSearchSurfaceFromContext';
-
-const meta: Meta<typeof HeaderSearchSurfaceFromContext> = {
-  title: 'Shell/HeaderSearchSurfaceFromContext',
-  component: HeaderSearchSurfaceFromContext,
-  parameters: { layout: 'centered' },
-  decorators: [
-    Story => (
-      <HeaderActionsProvider>
-        <div className='w-64 bg-sidebar p-3'>
-          <Story />
-=======
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -25,21 +11,21 @@ function SearchState() {
     <output>{isCommandPaletteOpen ? 'Search open' : 'Search closed'}</output>
   );
 }
-const meta = {
+
+const meta: Meta<typeof HeaderSearchSurfaceFromContext> = {
   title: 'Shell/HeaderSearchSurfaceFromContext',
   component: HeaderSearchSurfaceFromContext,
+  parameters: { layout: 'centered' },
   decorators: [
     Story => (
       <HeaderActionsProvider>
-        <div className='flex items-center gap-3 p-4'>
+        <div className='w-64 bg-sidebar p-3'>
           <Story />
           <SearchState />
->>>>>>> e673466fd (test(shell): connect sidebar interaction evidence)
         </div>
       </HeaderActionsProvider>
     ),
   ],
-<<<<<<< HEAD
   args: {
     calm: true,
   },
@@ -55,10 +41,16 @@ export const Default: Story = {
     calm: false,
   },
 };
-=======
-} satisfies Meta<typeof HeaderSearchSurfaceFromContext>;
-export default meta;
-type Story = StoryObj<typeof meta>;
-export const Row: Story = {};
-export const Compact: Story = { args: { compact: true } };
->>>>>>> e673466fd (test(shell): connect sidebar interaction evidence)
+
+export const Row: Story = {
+  args: {
+    calm: false,
+  },
+};
+
+export const Compact: Story = {
+  args: {
+    calm: false,
+    compact: true,
+  },
+};

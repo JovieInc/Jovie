@@ -7,6 +7,7 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AuthShell } from '@/components/organisms/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
@@ -117,9 +118,11 @@ function renderShell() {
         <DashboardDataProvider value={dashboardData}>
           <TooltipProvider>
             <ShellSidebarOverrideProvider>
-              <AuthShell section='dashboard' breadcrumbs={[]} showMobileTabs>
-                <div>Main Content</div>
-              </AuthShell>
+              <HeaderActionsProvider>
+                <AuthShell section='dashboard' breadcrumbs={[]} showMobileTabs>
+                  <div>Main Content</div>
+                </AuthShell>
+              </HeaderActionsProvider>
             </ShellSidebarOverrideProvider>
           </TooltipProvider>
         </DashboardDataProvider>
