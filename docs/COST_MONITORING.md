@@ -4,18 +4,84 @@
 
 This document covers the cost-anomaly defense layer. It exists because of a real prior incident where a runaway log/API loop cost ~$12k over 12 days while the founder was unavailable.
 
-## Architecture: Three Layers
+## Architecture: Four Layers
 
 | Layer | Mechanism | Coverage | Defense Type |
 |---|---|---|---|
-| **1** | Provider-native spend caps | All providers | **Hard circuit-breaker** — provider stops billing |
+| **0** | Vercel spend notifications + `production-continuity.yml` | Budget thresholds and Jovie/Summer availability | Founder-first alert + bounded agent ingress |
+| **1** | Provider-native spend controls | All providers | Provider-enforced pause/limit; enforcement semantics and lag vary |
 | **2** | `cost-anomaly-gate.yml` | Production event volume | **Alert-only observer** — opens one deduplicated incident |
 | **3** | Provider usage ledger (future) | Per-provider attribution | Per-provider day-over-day anomaly detection |
 
+Layer 0 composes Vercel's event-driven 50%/75%/100% notifications with a
+best-effort five-minute external HTTP probe. GitHub schedules can be delayed or
+disabled, so the probe is fallback detection, not a guaranteed immediate page.
 Layer 1 is independent of GitHub Actions. Layer 2 declares a 15-minute hosted
 schedule, but workflow enablement is an explicit operational step; do not rely
 on it as continuous protection until its enabled state and Production secrets
 have been verified.
+
+### Production-continuity policy
+
+`production-continuity.yml` probes both `jov.ie` and `summer.jov.ie` outside
+Vercel. An exact `x-vercel-error: DEPLOYMENT_PAUSED` is classified separately
+from a runtime 5xx, an HTTP 402 quota failure, and an observer/network failure.
+When any target is unhealthy, the workflow runs two independent paths before it
+preserves a red result:
+
+1. It sends the existing Production Slack webhook a bounded incident packet and
+   requires Slack's HTTP 200 `ok` transport acknowledgement. This proves webhook
+   acceptance only. It does not prove that Tim saw or acknowledged the alert.
+   A successful transport receipt suppresses repeats for the same stable
+   incident key for 30 minutes; absent a human acknowledgement channel, the
+   workflow then sends another reminder. A failed delivery retries on the next
+   observation, and a changed affected target or failure class creates a new key.
+2. It writes one stable `provider-unavailable` receipt through the existing
+   delivery state machine on Gem. That admits a deduplicated Summer/Symphony
+   investigation task without giving the observer Vercel credentials.
+
+Vercel's personal Spend Management notification channels remain the primary
+pre-pause signal. A September 13, 2026 readback showed Tim's SMS, Push, Email,
+and Web selections enabled, but message delivery and human acknowledgement were
+not observable. The Spend Management webhook field was empty. Do not host a
+future receiver on the same Vercel team whose projects the budget can pause.
+The policy library includes a fail-closed spend-rate forecast that returns
+`unknown` for stale, future, reset-cycle, or drifting snapshots. It has no live
+production feed yet: the current external probe detects availability, not
+remaining budget. Commissioning the pre-pause path requires a signed Vercel
+spend webhook or an external usage reader, an independent destination, and an
+acknowledged founder route. Until those are configured and exercised, forecast
+coverage remains explicitly unproven.
+
+Budget policy is founder-first:
+
+- At 50%, notify and observe. No budget mutation.
+- At 75%, notify Tim and begin spend-source diagnosis immediately. No budget
+  mutation.
+- At 100% or a proven production pause, notify Tim and contain the spend source.
+  Tim handles the budget/resume action during the configured acknowledgement
+  window.
+- If Tim is unavailable, an agent may propose one staged increase only after
+  fresh spend evidence, containment proof, an expired acknowledgement window,
+  and explicit numeric values for aggregate emergency ceiling, maximum stage,
+  and minimum headroom. There are no code defaults for money or the window.
+- Never increase a cap while the spend source is uncontained or under attack.
+  One incident key permits at most one in-flight stage. Vercel metering and
+  enforcement can lag, so a configured budget is not a guaranteed maximum bill.
+- Increasing the team budget does not resume projects. Resume each affected
+  project individually, then probe every production endpoint twice and retain
+  the provider, runtime, notification, and agent-ingress receipts separately.
+
+Ship now: the read-only observer, exact failure classification, acknowledged
+Slack transport, and existing agent ingress. Re-evaluate when an external,
+signed Spend Management webhook receiver and a verified Tim acknowledgement
+channel exist. Then replace best-effort pre-pause polling with the signed event
+while retaining the external availability probe as a deadman.
+
+Activation still requires proving which Tim-observed on-call destination owns
+the existing Slack webhook, exercising one synthetic incident end to end, and
+observing one scheduled heartbeat from outside Vercel. Source and CI evidence do
+not establish any of those runtime receipts.
 
 ---
 
@@ -27,9 +93,12 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 
 - Dashboard: **Settings → Billing → Spend Management**
 - Action: enable hard cap (pauses project at limit; does NOT just alert)
-- Recommended: 3-5x current monthly baseline
+- Set from an approved aggregate risk envelope and verified provider semantics;
+  do not infer a safe cap from a blanket baseline multiple.
 - Requires: Vercel Pro plan (Hobby has no spend management)
 - Verify: take a screenshot of the configured cap and attach to the verification PR
+- Verify every production project is individually live after a budget incident;
+  a READY deployment does not override a project-level pause.
 
 ### Anthropic
 
