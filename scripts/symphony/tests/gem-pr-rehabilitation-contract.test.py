@@ -545,6 +545,42 @@ class DeploymentContractTests(unittest.TestCase):
             with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
                 CYCLE._ensure_consumer_receipt_directory(linked_state_root)
 
+    def test_consumer_state_guard_rejects_resolved_path_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "workspace"
+            root.mkdir(mode=0o700)
+            original_resolve = pathlib.Path.resolve
+
+            def resolve(path, *args, **kwargs):
+                resolved = original_resolve(path, *args, **kwargs)
+                if path.name == "summer-symphony-consumer":
+                    return pathlib.Path(directory) / "outside"
+                return resolved
+
+            with mock.patch.object(
+                pathlib.Path, "resolve", autospec=True, side_effect=resolve
+            ):
+                with self.assertRaisesRegex(PermissionError, "directory-unsafe"):
+                    CYCLE._ensure_consumer_receipt_directory(root)
+
+    def test_consumer_receipt_writer_closes_fd_when_fdopen_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private = pathlib.Path(directory) / "state" / "summer-symphony-consumer"
+            private.mkdir(mode=0o700, parents=True)
+            receipt_path = private / CYCLE.CONSUMER_INVOCATION_RECEIPT
+            with mock.patch.object(
+                CYCLE.os, "fdopen", side_effect=OSError("fdopen failed")
+            ), mock.patch.object(CYCLE.os, "close", wraps=CYCLE.os.close) as close:
+                with self.assertRaisesRegex(OSError, "fdopen failed"):
+                    CYCLE._write_consumer_receipt(
+                        receipt_path,
+                        {"schema": CYCLE.CONSUMER_INVOCATION_SCHEMA},
+                    )
+
+            close.assert_called_once()
+            self.assertFalse(list(private.glob("*.tmp")))
+            self.assertFalse(receipt_path.exists())
+
     def test_consumer_receipt_reader_rejects_malformed_and_unsafe_records(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = pathlib.Path(directory)
