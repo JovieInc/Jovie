@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import SettingsLayout from '@/app/app/(shell)/settings/layout';
+import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
 import { AppShellFrame } from './AppShellFrame';
+import { Sidebar, SidebarProvider } from './sidebar';
 
 const meta: Meta<typeof AppShellFrame> = {
   title: 'Organisms/AppShellFrame',
@@ -23,4 +26,37 @@ export const WithInspector: Story = {
   args: {
     rightPanel: <aside className='h-full w-80 p-3'>Entity details</aside>,
   },
+};
+
+export const RouteOwnedHeader: Story = {
+  render: () => (
+    <SidebarProvider>
+      <AppShellFrame
+        sidebar={<Sidebar collapsible='offcanvas'>Jovie</Sidebar>}
+        main={<button type='button'>Route header action</button>}
+      />
+    </SidebarProvider>
+  ),
+};
+
+export const SettingsHeaderAlignment: Story = {
+  render: () => (
+    <SidebarProvider>
+      <AppShellFrame
+        sidebar={<Sidebar collapsible='offcanvas'>Jovie</Sidebar>}
+        main={
+          <SettingsLayout>
+            <SettingsSection
+              id='account'
+              title='Account'
+              description='Security, theme, and notifications.'
+              headerAction={<button type='button'>Save</button>}
+            >
+              <p>Account settings</p>
+            </SettingsSection>
+          </SettingsLayout>
+        }
+      />
+    </SidebarProvider>
+  ),
 };

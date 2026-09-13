@@ -3,11 +3,13 @@
 import { useEffect } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
 } from './SidebarNavItem';
+import { Tooltip } from './Tooltip';
 
 /**
  * Sidebar entry for the one shell-owned search/command surface.
@@ -18,8 +20,10 @@ import {
  */
 export function HeaderSearchSurfaceFromContext({
   className,
+  compact = false,
 }: {
   readonly className?: string;
+  readonly compact?: boolean;
 }) {
   const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
     useHeaderActions();
@@ -43,14 +47,18 @@ export function HeaderSearchSurfaceFromContext({
     };
   }, [closeCommandPalette, isCommandPaletteOpen]);
 
-  return (
+  const trigger = (
     <button
       type='button'
       data-app-search-trigger='true'
       onClick={isCommandPaletteOpen ? closeCommandPalette : openCommandPalette}
       className={cn(
-        getSidebarNavRowClassName({}),
-        'grid-cols-[18px_minmax(0,1fr)_auto] text-left',
+        compact
+          ? 'focus-ring-themed inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
+          : cn(
+              getSidebarNavRowClassName({}),
+              'grid-cols-[18px_minmax(0,1fr)_auto] text-left'
+            ),
         className
       )}
       aria-label='Search Jovie'
@@ -61,8 +69,19 @@ export function HeaderSearchSurfaceFromContext({
         aria-hidden='true'
         strokeWidth={2.25}
       />
-      <span className='min-w-0 flex-1 truncate'>Search</span>
-      <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>
+      {compact ? null : (
+        <>
+          <span className='min-w-0 flex-1 truncate'>Search</span>
+          <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>
+        </>
+      )}
     </button>
+  );
+  return compact ? (
+    <Tooltip label='Search Jovie' shortcut={SHORTCUTS.search} side='bottom'>
+      {trigger}
+    </Tooltip>
+  ) : (
+    trigger
   );
 }

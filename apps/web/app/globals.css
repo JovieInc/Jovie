@@ -105,6 +105,23 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   background: rgb(var(--sidebar-background));
 }
 
+/* Headerless media routes retain a safe area below window controls. */
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:not(
+    :has([data-top-spacing-owner="shell-header"])
+  )
+  [data-app-shell-content-column="true"] {
+  padding-top: var(--electron-titlebar-height);
+}
+
+/* Settings now supplies the shared desktop header inside its route panel. */
+html[data-desktop-runtime="electron"]
+  [data-testid="settings-shell-content"]
+  > div {
+  padding-top: 0;
+  padding-inline: 0;
+}
+
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
   -webkit-app-region: drag;
 }
@@ -129,7 +146,8 @@ html[data-desktop-runtime="electron"]
    p-[--app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
