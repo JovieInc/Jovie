@@ -150,8 +150,16 @@ jobs:
                 sleep 2
               fi
             done
+            # emit exit 0 with a receipt that fails jq is still a hard failure —
+            # never return 0 here or Verify would upload unhealthy observations.
+            # set +e before non-zero return: bash set -e + return ≠0 exits the
+            # whole shell instead of returning to the caller.
             echo "::error::${label} failed after retries (last emit_exit=${status})"
-            return "${status:-2}"
+            set +e
+            if [[ "${status:-1}" -ne 0 ]]; then
+              return "${status}"
+            fi
+            return 2
           }
           emit_ok "observation-a"
           cp "${receipt}" "${RUNNER_TEMP}/e1-observation-a.json"

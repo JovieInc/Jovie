@@ -64,4 +64,49 @@ print(p.parse_args([]).profile)
 )"
 [[ "${fallback}" == "canonical" ]]
 
+# 4) emit_ok fail-closed: emit exit 0 + receipt jq miss must not return 0.
+#    Sentry 16703710: `return "${status:-2}"` masked persistent jq failures.
+grep -q 'never return 0 here' "${WORKFLOW}"
+grep -A6 'failed after retries' "${WORKFLOW}" | grep -q 'return 2'
+
+fail_closed_rc="$(
+  bash -c '
+    set -euo pipefail
+    receipt="$1/receipt.json"
+    printf "%s\n" "{\"healthy\":false}" >"${receipt}"
+    emit() { printf "emitted\n"; return 0; }
+    ok=".healthy==true"
+    emit_ok() {
+      local label="$1" out status attempt jq_rc
+      for attempt in 1 2 3; do
+        set +e
+        out="$(emit 2>&1)"
+        status=$?
+        jq_rc=1
+        if [[ "${status}" -eq 0 ]]; then
+          jq -e "$ok" "${receipt}" >/dev/null
+          jq_rc=$?
+        fi
+        set -e
+        if [[ "${status}" -eq 0 && "${jq_rc}" -eq 0 ]]; then
+          return 0
+        fi
+      done
+      # set +e before non-zero return (bash set -e + return ≠0 exits the shell)
+      set +e
+      if [[ "${status:-1}" -ne 0 ]]; then
+        return "${status}"
+      fi
+      return 2
+    }
+    set +e
+    emit_ok "observation-a"
+    rc=$?
+    set -e
+    printf "%s" "${rc}"
+    exit 0
+  ' bash "${TMP}"
+)"
+[[ "${fail_closed_rc}" == "2" ]]
+
 printf 'commission-verify-profile-export regression OK\n'
