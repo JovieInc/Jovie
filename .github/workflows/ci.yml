@@ -4093,7 +4093,7 @@ jobs:
             fi
             export JOVIE_COVERAGE_INCLUDE=\"\$include\"
             timeout --kill-after=20s 17m \
-              pnpm --filter @jovie/web test:coverage -- --changed \"\$COVERAGE_BASE\" --bail 1
+              pnpm --filter @jovie/web test:coverage --changed \"\$COVERAGE_BASE\" --bail 1
             node scripts/check-changed-test-coverage.mjs \
               --base \"\$COVERAGE_BASE\" \
               --head \"\$EXPECTED_HEAD\"
