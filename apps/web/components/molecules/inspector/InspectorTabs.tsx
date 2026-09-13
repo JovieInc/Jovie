@@ -17,7 +17,7 @@ export interface InspectorTabsProps<T extends string> {
 }
 
 const INSPECTOR_TAB_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 min-w-18 flex-1 shrink-0 items-center justify-center whitespace-nowrap rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 py-1 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0/70 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
+  'inline-flex min-h-7 min-w-18 flex-1 shrink-0 items-center justify-center whitespace-nowrap rounded-none border-0 border-b-2 border-transparent bg-transparent px-2 py-1 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-colors duration-subtle hover:bg-surface-0/70 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
 
 const INSPECTOR_TAB_TRIGGER_ACTIVE_CLASSNAME =
   'border-accent bg-surface-0/80 font-medium text-primary-token';
