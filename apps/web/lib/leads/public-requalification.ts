@@ -99,18 +99,20 @@ function buildLeadUpdate(input: {
     hasPaidTier: input.qualification.hasPaidTier,
     hasSpotifyLink: input.qualification.hasSpotifyLink,
     hasInstagram: input.qualification.hasInstagram,
-    musicToolsDetected: [...input.qualification.musicToolsDetected].sort(),
+    // Public receipt digests use ECMAScript code-unit ordering. localeCompare
+    // would make the immutable receipt identity depend on the host locale.
+    musicToolsDetected: [...input.qualification.musicToolsDetected].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     allLinks: sortLinks(input.qualification.allLinks),
     hasTrackingPixels: input.qualification.hasTrackingPixels,
     trackingPixelPlatforms: [
       ...input.qualification.trackingPixelPlatforms,
-    ].sort(),
+    ].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     discoveryQuery: null,
     sourcePlatform: 'linktree',
     publicObservedAt: input.run.observedAt,
     publicSourceDigest: input.run.sourceDigest,
     publicSourceRevision: input.run.sourceRevision,
-    spotifyGenres: [...input.spotify.spotifyGenres].sort(),
+    spotifyGenres: [...input.spotify.spotifyGenres].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     spotifyEnrichmentStatus: input.spotify.status,
   };
   const update: PublicLeadUpdate = {
@@ -123,11 +125,11 @@ function buildLeadUpdate(input: {
     spotifyUrl: input.qualification.spotifyUrl,
     hasInstagram: input.qualification.hasInstagram,
     instagramHandle: input.qualification.instagramHandle,
-    musicToolsDetected: [...input.qualification.musicToolsDetected].sort(),
+    musicToolsDetected: [...input.qualification.musicToolsDetected].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     hasTrackingPixels: input.qualification.hasTrackingPixels,
     trackingPixelPlatforms: [
       ...input.qualification.trackingPixelPlatforms,
-    ].sort(),
+    ].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     allLinks: [...input.qualification.allLinks],
     signalSnapshot: snapshot,
     fitScore: input.run.fitScore,
