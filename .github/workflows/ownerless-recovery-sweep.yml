@@ -24,6 +24,7 @@ jobs:
           permission-pull-requests: write
           permission-issues: write
           permission-checks: read # Linear/Symphony ownership audit gates mutation.
+          permission-merge-queues: read # isInMergeQueue / mergeQueueEntry GraphQL fields.
       - name: Checkout exact main recovery policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
