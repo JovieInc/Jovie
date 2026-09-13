@@ -185,8 +185,8 @@ jobs:
           bash scripts/symphony/update-symphony-burrito.sh --managed-controller-only
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh
-          # JOV-6163 publisher: install onto the existing attestation timer path.
-          # Fail-closed when runner-source.env is missing or --check is unhealthy.
+          ALIGN_ALLOW_CHECKOUT=1 bash scripts/symphony/align-runner-source-revision.sh "$GEM_CONTROLLER_EXPECTED_REVISION"
+          # JOV-6163: install publisher onto existing attestation timer (fail-closed).
           GEM_WORKSPACE=/home/timwhite/gem-workspace \
             bash scripts/symphony/install-gem-service-attestation.sh "$GITHUB_WORKSPACE"
           install -D -m 0755 scripts/symphony/symphony-concurrency-controller.py "$HOME/.local/bin/symphony-concurrency-controller"

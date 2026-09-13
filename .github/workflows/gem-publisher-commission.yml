@@ -1,0 +1,110 @@
+name: Gem Publisher Commission (JOV-6163 E1)
+# Publisher-only install on jovie-fixed when activation coalesces past Install.
+on:
+  workflow_dispatch:
+    inputs:
+      tip_sha:
+        description: Full lowercase 40-hex main tip as configurationSourceRevision
+        required: true
+        type: string
+      confirm:
+        description: Type install-jov-6163-publisher to confirm
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: gem-publisher-commission
+  cancel-in-progress: false
+jobs:
+  commission:
+    name: Install JOV-6163 publisher on Gem
+    if: github.event.inputs.confirm == 'install-jov-6163-publisher'
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact tip
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.tip_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Refuse tip drift / wrong host
+        env:
+          TIP_SHA: ${{ github.event.inputs.tip_sha }}
+        run: |
+          set -euo pipefail
+          test "$(id -un)" = timwhite
+          [[ "$TIP_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$TIP_SHA"
+          git fetch --quiet origin main
+          tip_now="$(git rev-parse origin/main)"
+          if [[ "$tip_now" != "$TIP_SHA" ]]; then
+            echo "::error::main tip moved to $tip_now; re-dispatch with current tip"
+            exit 2
+          fi
+      - name: Lingering user-systemd session
+        run: |
+          set -euo pipefail
+          uid="$(id -u)"
+          export XDG_RUNTIME_DIR="/run/user/${uid}"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+          test -S "${XDG_RUNTIME_DIR}/bus" || { echo "user bus missing; enable linger" >&2; exit 4; }
+          systemctl --user show-environment >/dev/null
+          {
+            printf 'XDG_RUNTIME_DIR=%s\n' "${XDG_RUNTIME_DIR}"
+            printf 'DBUS_SESSION_BUS_ADDRESS=%s\n' "${DBUS_SESSION_BUS_ADDRESS}"
+            printf 'GEM_SYSTEMD_REQUIRE_BUS_SOCKET=1\n'
+          } >> "${GITHUB_ENV}"
+      - name: Align runner-source revision
+        env:
+          TIP_SHA: ${{ github.event.inputs.tip_sha }}
+          ALIGN_ALLOW_CHECKOUT: '1'
+        run: bash scripts/symphony/align-runner-source-revision.sh "$TIP_SHA"
+      - name: Install publisher onto attestation timer
+        run: |
+          set -euo pipefail
+          GEM_WORKSPACE=/home/timwhite/gem-workspace \
+            bash scripts/symphony/install-gem-service-attestation.sh "$GITHUB_WORKSPACE"
+      - name: Verify + two ≤600s observations
+        env:
+          TIP_SHA: ${{ github.event.inputs.tip_sha }}
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1090
+          source "${HOME}/.config/symphony/runner-source.env"
+          test "$JOVIE_CONFIGURATION_SOURCE_REVISION" = "$TIP_SHA"
+          emit() {
+            python3 "${GEM_WORKSPACE}/scripts/emit-gem-service-attestation.py" \
+              --provenance "${SYMPHONY_RELEASE_PROVENANCE}" \
+              --source-root "${JOVIE_CONFIGURATION_SOURCE_ROOT}" \
+              --source-revision "${JOVIE_CONFIGURATION_SOURCE_REVISION}" \
+              --gem-root "${GEM_WORKSPACE}"
+          }
+          ok='.schema=="gem-service-attestation/v1" and .configurationSourceRevision==$sha and .healthy==true and .active==true and (.sourceRevision|type=="string" and test("^[0-9a-f]{40}$"))'
+          emit >/dev/null
+          jq -e --arg sha "$TIP_SHA" "$ok" "${GEM_WORKSPACE}/state/gem-service-attestation.json" >/dev/null
+          cp "${GEM_WORKSPACE}/state/gem-service-attestation.json" "${RUNNER_TEMP}/e1-observation-a.json"
+          sleep 2
+          emit >/dev/null
+          jq -e --arg sha "$TIP_SHA" "$ok" "${GEM_WORKSPACE}/state/gem-service-attestation.json" >/dev/null
+          cp "${GEM_WORKSPACE}/state/gem-service-attestation.json" "${RUNNER_TEMP}/e1-observation-b.json"
+          a_at="$(jq -r .observedAt "${RUNNER_TEMP}/e1-observation-a.json")"
+          b_at="$(jq -r .observedAt "${RUNNER_TEMP}/e1-observation-b.json")"
+          if [[ "$a_at" == "$b_at" ]]; then
+            echo "::error::observations not independent (identical observedAt)"; exit 2
+          fi
+          node scripts/summer-commissioning/verify-e1-attestation-observations.mjs \
+            --observation-a "${RUNNER_TEMP}/e1-observation-a.json" \
+            --observation-b "${RUNNER_TEMP}/e1-observation-b.json"
+      - name: Upload E1 observations
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e1-publisher-commission-observations
+          path: |
+            ${{ runner.temp }}/e1-observation-a.json
+            ${{ runner.temp }}/e1-observation-b.json
+            /opt/cursor/artifacts/e1-attestation-observations-receipt.json
+          if-no-files-found: warn
