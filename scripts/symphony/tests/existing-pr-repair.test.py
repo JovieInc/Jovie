@@ -227,6 +227,23 @@ class RepairTests(unittest.TestCase):
         self.assertIn("--no-subagents", command)
         self.assertNotIn("OPENAI_API_KEY", runner.call_args.kwargs["env"])
 
+    def test_discovery_excludes_claimed_and_terminal_assignments(self):
+        _task, payload, _executable = self.provider_granted_fixture()
+        self.assertEqual(repair.candidates(controller.__file__), [payload])
+        claim = self.root / f"{IDENT}.claim"
+        claim.write_text("claimed\n", encoding="utf-8")
+        claim.chmod(0o600)
+        self.assertEqual(repair.candidates(controller.__file__), [])
+        with self.assertRaisesRegex(ValueError, "assignment-consumed"):
+            repair.load_validated_candidate(IDENT, controller.__file__)
+        claim.unlink()
+        execution = self.root / f"{IDENT}.execution.json"
+        execution.write_text("terminal\n", encoding="utf-8")
+        execution.chmod(0o600)
+        self.assertEqual(repair.candidates(controller.__file__), [])
+        with self.assertRaisesRegex(ValueError, "assignment-consumed"):
+            repair.load_validated_candidate(IDENT, controller.__file__)
+
     def test_existing_controller_consumes_v3_without_generic_dispatch_or_tracker_write(self):
         task, executor = self.isolated_fixture()
         with mock.patch.object(controller.sys, "stdin", io.StringIO(json.dumps(task))), \
