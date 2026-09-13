@@ -37,7 +37,7 @@ describe('mobile auth return helpers', () => {
           'mobile_return=%2Fapp%2Fsettings&redirect_url=%2Fignored'
         )
       )
-    ).toBe('/signup?mobile_return=%2Fapp%2Fsettings');
+    ).toBe('/signup?redirect_url=%2Fignored&mobile_return=%2Fapp%2Fsettings');
 
     expect(
       buildAuthRouteUrlWithMobileReturn(

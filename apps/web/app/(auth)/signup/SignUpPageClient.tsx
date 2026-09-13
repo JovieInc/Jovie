@@ -7,6 +7,7 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { track } from '@/lib/analytics';
+import { persistAuthOfferFromSearchParams } from '@/lib/auth/auth-shell-offer';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
@@ -48,9 +49,15 @@ function SignUpClaimDataPersistence() {
     const spotifyUrl = searchParams.get('spotify_url');
     const artistName = searchParams.get('artist_name');
     const plan = searchParams.get('plan');
+    const offer = persistAuthOfferFromSearchParams(searchParams);
 
-    // Capture plan intent from pricing CTA (e.g., /signup?plan=founding)
-    if (plan) {
+    // Capture plan intent from pricing CTA (e.g., /signup?plan=pro)
+    if (offer) {
+      let source = 'pricing';
+      if (spotifyUrl) source = 'hero_spotify';
+      else if (handle) source = 'hero_claim';
+      track('plan_intent_captured', { plan: offer.plan, source });
+    } else if (plan) {
       const validatedPlan = validatePlan(plan);
       if (validatedPlan) {
         setPlanIntent(validatedPlan);
@@ -65,8 +72,10 @@ function SignUpClaimDataPersistence() {
       const now = Date.now();
 
       clearSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
-      clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
       clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
+      if (!offer) {
+        clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
+      }
 
       if (spotifyUrl) {
         persistSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY, spotifyUrl, now);

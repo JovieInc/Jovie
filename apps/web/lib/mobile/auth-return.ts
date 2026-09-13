@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { sanitizeDesktopReturnRoute } from '@/lib/desktop/auth-return';
 
 export const MOBILE_RETURN_PARAM = 'mobile_return';
@@ -38,7 +39,10 @@ export function buildAuthRouteUrlWithMobileReturn(
   pathname: string,
   searchParams: SearchParamReader
 ): string {
-  const routeUrl = new URL(pathname, 'https://jov.ie');
+  const routeUrl = new URL(
+    buildAuthRouteUrl(pathname, searchParams),
+    'https://jov.ie'
+  );
   const mobileReturn = sanitizeMobileReturnRoute(
     searchParams.get(MOBILE_RETURN_PARAM)
   );

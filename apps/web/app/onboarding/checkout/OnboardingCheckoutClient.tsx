@@ -9,8 +9,13 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
+import { parseAuthBillingInterval } from '@/lib/auth/auth-shell-offer';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
-import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
+import {
+  clearPlanIntent,
+  getPlanIntentRecord,
+  type PlanIntentTier,
+} from '@/lib/auth/plan-intent';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import { cn } from '@/lib/utils';
@@ -197,7 +202,16 @@ export function OnboardingCheckoutClient({
   const annualSavingsPercent = hasAnnualOption
     ? getAnnualSavingsPercent(monthlyAmount, annualAmount)
     : 0;
-  const [isAnnual, setIsAnnual] = useState(annualSavingsPercent > 25);
+  const [isAnnual, setIsAnnual] = useState(() => {
+    const handedOffInterval =
+      parseAuthBillingInterval(searchParams.get('interval')) ??
+      parseAuthBillingInterval(searchParams.get('billing')) ??
+      getPlanIntentRecord()?.interval ??
+      null;
+    if (handedOffInterval === 'annual') return hasAnnualOption;
+    if (handedOffInterval === 'monthly') return false;
+    return annualSavingsPercent > 25;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
