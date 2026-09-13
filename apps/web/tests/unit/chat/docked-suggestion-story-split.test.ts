@@ -32,6 +32,8 @@ describe('docked suggestion story split', () => {
     expect(regionStories).toContain('export const AboveComposer');
     expect(regionStories).toContain('chat-composer-surface');
     expect(regionStories).toContain('CHAT_COMPOSER_ATTACH_ARIA_LABEL');
+    expect(regionStories).toContain("event.key === 'Escape'");
+    expect(regionStories).toContain('setPickerOpen(false)');
     expect(elevation).toContain(
       'chat-emptystate-composerregion--above-composer'
     );

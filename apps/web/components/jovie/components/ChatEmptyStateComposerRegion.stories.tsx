@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fn } from 'storybook/test';
 import {
   CHAT_COMPOSER_ATTACH_ARIA_LABEL,
@@ -98,6 +98,14 @@ export const JustAskDocked: Story = {
 function DockedSuggestions() {
   const [value, setValue] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPickerOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pickerOpen]);
   return (
     <div className='h-screen'>
       <ChatEmptyStateComposerRegion
