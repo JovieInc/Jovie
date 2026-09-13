@@ -10,11 +10,7 @@ export const runtime = 'nodejs';
 
 export default async function AdminHudPage({
   searchParams,
-}: Readonly<{
-  readonly searchParams: Promise<
-    Record<string, string | string[] | undefined>
-  >;
-}>) {
+}: Readonly<{ readonly searchParams: Promise<Record<string, string | string[] | undefined>> }>) {
   await requireCurrentAdminPageAccess();
   return HudPage({ searchParams });
 }
