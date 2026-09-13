@@ -1,9 +1,41 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
-import {
-  ARTIST_VISIBILITY_OFFER,
-  FREE_PROFILE_TRUTH,
-  formatUsdAmount,
-} from '@/lib/billing/offer-truth';
+import { toCents } from '@/lib/config/plan-prices';
+import { formatAmount, formatAmountNoCents } from '@/lib/utils/format-number';
+
+/**
+ * Public marketing offer copy (JOV-6231).
+ * Billing/checkout contract remains PR #17743 (JOV-6218).
+ */
+const ARTIST_VISIBILITY_OFFER = {
+  free: {
+    displayName: 'Free',
+  },
+  pro: {
+    displayName: 'Pro',
+    monthlyUsd: 199,
+    outcomes: [
+      'Continuous visibility monitoring',
+      'Prioritized opportunities',
+      'Agentic fixes',
+    ],
+  },
+  enterprise: {
+    displayName: 'Enterprise',
+    cta: 'Contact sales',
+  },
+  fanSends: {
+    freeTrialEmailAllowance: 50,
+  },
+} as const;
+
+const FREE_PROFILE_TRUTH =
+  'Your artist profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
+
+function formatUsdAmount(amount: number): string {
+  return Number.isInteger(amount)
+    ? formatAmountNoCents(toCents(amount))
+    : formatAmount(toCents(amount));
+}
 
 /** Public acquisition offers are distinct from legacy subscriber entitlement IDs. */
 export const MARKETING_PRICING_PLAN_IDS = [
