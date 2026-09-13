@@ -4086,7 +4086,7 @@ jobs:
               echo 'No coverable web product source; non-applicable exact-head coverage receipt.'
               exit 0
             fi
-            include=\$(printf '%s' \"\$plan_json\" | jq -r '.coverageInclude[]')
+            include=\$(printf '%s' \"\$plan_json\" | jq -r '.coverageInclude // [] | .[]')
             if [[ -z \"\$include\" ]]; then
               echo 'Applicable exact-head coverage plan produced no include paths.'
               exit 1
