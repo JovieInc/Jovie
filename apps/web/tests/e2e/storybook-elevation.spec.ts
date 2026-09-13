@@ -279,7 +279,7 @@ test.describe('two opportunity formats near the composer', () => {
         await page.setViewportSize({ width, height: 760 });
         await openStory(
           page,
-          'organisms-opportunitycard--above-composer',
+          'chat-emptystate-composerregion--above-composer',
           theme
         );
         const suggestion = page.getByRole('button', {

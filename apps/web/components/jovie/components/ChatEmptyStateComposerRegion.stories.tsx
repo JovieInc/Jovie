@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import { fn } from 'storybook/test';
 import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from '../chat-empty-starters';
 import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
+import { ChatEmptyStateOpportunityCards } from './ChatEmptyStateOpportunityCards';
+import { ChatInput } from './ChatInput';
 
 function StoryComposerDock() {
   return (
@@ -55,4 +58,46 @@ export const JustAskDocked: Story = {
     children: <StoryComposerDock />,
     onSelectSample: fn(),
   },
+};
+
+function DockedSuggestions() {
+  const [value, setValue] = useState('');
+  return (
+    <div className='h-screen'>
+      <ChatEmptyStateComposerRegion
+        stableDocked
+        above={
+          <ChatEmptyStateOpportunityCards
+            cards={[
+              {
+                id: 'release-checklist',
+                signalType: 'other',
+                typeLabel: 'Suggestion',
+                title: 'Review your release checklist',
+                why: 'Check artwork, credits and links before the release.',
+                createdAt: '2026-01-15T12:00:00.000Z',
+                primaryActionLabel: 'Review',
+                status: 'pending',
+                category: 'suggestion',
+              },
+            ]}
+            onSelect={card => setValue(card.title)}
+          />
+        }
+      >
+        <ChatInput
+          value={value}
+          onChange={setValue}
+          onSubmit={fn()}
+          onFileAttach={fn()}
+          variant='hero'
+        />
+      </ChatEmptyStateComposerRegion>
+    </div>
+  );
+}
+
+export const AboveComposer: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => <DockedSuggestions />,
 };
