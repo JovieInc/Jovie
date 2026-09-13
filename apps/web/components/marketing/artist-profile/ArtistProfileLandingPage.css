@@ -1876,6 +1876,14 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   transform: translateX(calc(var(--space-5) - var(--space-0-5)));
 }
 
+:where(
+  [dir="rtl"]
+    .system-b-pricing-switch[data-state="checked"]
+    .system-b-pricing-switch-thumb
+) {
+  transform: translateX(calc(var(--space-0-5) - var(--space-5)));
+}
+
 :where(.system-b-pricing-chart-badge) {
   display: inline-flex;
   min-height: var(--space-5);

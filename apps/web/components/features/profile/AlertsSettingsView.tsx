@@ -44,7 +44,7 @@ function SettingsToggle({
         'block h-6 w-6 rounded-full shadow-sm transition-transform duration-subtle',
         checked ? 'translate-x-4' : 'translate-x-0',
         'data-[state=checked]:bg-white data-[state=unchecked]:bg-btn-primary',
-        'data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0'
+        'data-[state=checked]:translate-x-4 rtl:data-[state=checked]:-translate-x-4 data-[state=unchecked]:translate-x-0'
       )}
       thumbTranslation='owner'
     />

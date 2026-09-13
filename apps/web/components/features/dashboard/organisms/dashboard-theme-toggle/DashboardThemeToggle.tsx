@@ -174,7 +174,7 @@ function ThemeToggleButton({
           )}
           thumbClassName={cn(
             'flex h-5 w-5 transform items-center justify-center rounded-full bg-surface-1 shadow ring-0 transition duration-subtle ease-out',
-            'data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0',
+            'data-[state=checked]:translate-x-5 rtl:data-[state=checked]:-translate-x-5 data-[state=unchecked]:translate-x-0',
             isUpdating && 'animate-pulse motion-reduce:animate-none'
           )}
           thumbTranslation='owner'

@@ -136,7 +136,7 @@ describe('Switch', () => {
         'data-[state=unchecked]:bg-surface-2'
       );
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:ring-subtle'
+        'data-[state=unchecked]:border-subtle'
       );
     });
 
@@ -221,6 +221,9 @@ describe('Switch', () => {
       const thumb = switchElement.firstChild;
       expect(thumb?.className || '').toContain(
         'data-[state=checked]:translate-x-3'
+      );
+      expect(thumb?.className || '').toContain(
+        'rtl:data-[state=checked]:-translate-x-3'
       );
       expect(thumb?.className || '').toContain('transition-transform');
       expect(thumb?.className || '').not.toContain('transition-[margin]');
