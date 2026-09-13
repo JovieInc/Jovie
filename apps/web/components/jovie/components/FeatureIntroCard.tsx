@@ -110,6 +110,7 @@ export function FeatureIntroCard({
           ? presentation.highlight.id
           : presentation.id
       }
+      role='region'
     >
       <div className='flex items-start gap-3'>
         {presentation.kind === 'highlight' ? (

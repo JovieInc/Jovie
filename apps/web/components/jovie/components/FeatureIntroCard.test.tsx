@@ -107,6 +107,10 @@ describe('FeatureIntroCard', () => {
       'whatsNew'
     );
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+      'role',
+      'region'
+    );
+    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
       'data-source-id',
       'changelog:26.8.1'
     );
