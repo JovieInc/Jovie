@@ -53,6 +53,10 @@ export const Todo: Story = {};
 
 export const Automated: Story = {
   args: {
-    task: { ...task, assigneeType: 'ai_workflow' },
+    task: {
+      ...task,
+      assigneeType: 'ai_workflow',
+      aiWorkflowId: 'workflow_1',
+    },
   },
 };

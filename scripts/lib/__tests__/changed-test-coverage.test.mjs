@@ -146,6 +146,12 @@ describe('changed test coverage', () => {
     );
     expect(coverage).toContain('has_web_coverage_changes');
     expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
+    expect(coverage).toContain(
+      'pnpm --filter @jovie/web test:coverage --changed'
+    );
+    expect(coverage).not.toContain(
+      'pnpm --filter @jovie/web test:coverage -- --changed'
+    );
     expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
     expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
     expect(coverage).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);

@@ -70,6 +70,34 @@ function useActiveMobileDrawer(
   return isActive;
 }
 
+function isRestorableFocusTarget(
+  element: HTMLElement | null
+): element is HTMLElement {
+  if (!element?.isConnected) return false;
+  if (element === document.body || element === document.documentElement) {
+    return false;
+  }
+  if (element.closest('[inert], [aria-hidden="true"]')) return false;
+  if ('disabled' in element && Boolean(element.disabled)) return false;
+
+  const style = globalThis.getComputedStyle(element);
+  return (
+    style.display !== 'none' &&
+    style.visibility !== 'hidden' &&
+    typeof element.focus === 'function'
+  );
+}
+
+function findFocusRestorationFallback(
+  drawer: HTMLElement | null
+): HTMLElement | null {
+  return (
+    getFocusableElements(document.body).find(
+      element => !drawer?.contains(element) && isRestorableFocusTarget(element)
+    ) ?? null
+  );
+}
+
 function useMobileDrawerFocus(
   drawerRef: React.RefObject<HTMLElement | null>,
   isOpen: boolean,
@@ -77,15 +105,73 @@ function useMobileDrawerFocus(
   isActive: boolean
 ) {
   const triggerRef = useRef<HTMLElement | null>(null);
+  const drawerElementRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
+  const restorationTokenRef = useRef(0);
+  const mountGenerationRef = useRef(0);
+  const mountedRef = useRef(false);
+  const isCurrentMountGeneration = React.useCallback(
+    (generation: number) => generation === mountGenerationRef.current,
+    []
+  );
+
+  const restoreFocusIfOwned = React.useCallback(() => {
+    const drawer = drawerElementRef.current;
+    const activeElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusBelongsToDrawer =
+      activeElement === document.body ||
+      activeElement === document.documentElement ||
+      !isRestorableFocusTarget(activeElement) ||
+      Boolean(drawer?.contains(activeElement));
+
+    if (!focusBelongsToDrawer) {
+      // A navigation or another live control owns focus now. Returning focus
+      // to a stale drawer trigger would steal that interaction.
+      triggerRef.current = null;
+      drawerElementRef.current = null;
+      wasOpenRef.current = false;
+      return;
+    }
+
+    const target = isRestorableFocusTarget(triggerRef.current)
+      ? triggerRef.current
+      : findFocusRestorationFallback(drawer);
+
+    if (target && target !== activeElement) {
+      target.focus({ preventScroll: true });
+    }
+
+    triggerRef.current = null;
+    drawerElementRef.current = null;
+    wasOpenRef.current = false;
+  }, []);
+
+  const scheduleFocusRestoration = React.useCallback(() => {
+    const token = ++restorationTokenRef.current;
+    globalThis.queueMicrotask(() => {
+      if (token !== restorationTokenRef.current) return;
+      restoreFocusIfOwned();
+    });
+  }, [restoreFocusIfOwned]);
 
   useEffect(() => {
     const drawer = drawerRef.current;
     if (!drawer || !isMobile || !isOpen || !isActive) return;
 
+    // Invalidate a queued close restoration before handling any reopen.
+    restorationTokenRef.current += 1;
+    if (wasOpenRef.current) return;
+
+    drawerElementRef.current = drawer;
+
     const activeElement = document.activeElement;
     triggerRef.current =
-      activeElement instanceof HTMLElement && !drawer.contains(activeElement)
+      activeElement instanceof HTMLElement &&
+      !drawer.contains(activeElement) &&
+      isRestorableFocusTarget(activeElement)
         ? activeElement
         : null;
 
@@ -101,31 +187,51 @@ function useMobileDrawerFocus(
     if (isOpen && !isActive) {
       // A newer mobile rail owns focus now. Do not pull focus back to this
       // rail's trigger when its route later unmounts.
+      restorationTokenRef.current += 1;
       wasOpenRef.current = false;
       triggerRef.current = null;
+      drawerElementRef.current = null;
     }
   }, [isActive, isOpen]);
 
   useEffect(() => {
     if (isOpen || !wasOpenRef.current) return;
 
-    wasOpenRef.current = false;
-    const trigger = triggerRef.current;
-    triggerRef.current = null;
-    if (trigger?.isConnected) {
-      trigger.focus();
-    }
-  }, [isOpen]);
+    scheduleFocusRestoration();
+  }, [isOpen, scheduleFocusRestoration]);
 
-  useModalFocusBoundary(drawerRef, isMobile && isOpen && isActive);
+  useEffect(() => {
+    const generation = ++mountGenerationRef.current;
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      globalThis.queueMicrotask(() => {
+        if (
+          mountedRef.current ||
+          !isCurrentMountGeneration(generation) ||
+          !wasOpenRef.current
+        ) {
+          return;
+        }
+        scheduleFocusRestoration();
+      });
+    };
+  }, [isCurrentMountGeneration, scheduleFocusRestoration]);
+
+  useModalFocusBoundary(drawerRef, isMobile && isOpen && isActive, {
+    restoreFocus: false,
+  });
 }
 
-function hasOpenModalDialog() {
+function hasOpenModalDialog(exclude: HTMLElement | null) {
   return Array.from(
     document.querySelectorAll<HTMLElement>(
       '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]'
     )
   ).some(element => {
+    if (element === exclude) return false;
+
     const style = globalThis.getComputedStyle(element);
     return (
       element.getAttribute('aria-hidden') !== 'true' &&
@@ -189,7 +295,7 @@ export function RightDrawer({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (event.defaultPrevented || hasOpenModalDialog()) {
+        if (event.defaultPrevented || hasOpenModalDialog(asideRef.current)) {
           return;
         }
         onKeyDown(event);

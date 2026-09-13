@@ -704,6 +704,12 @@ describe('merge_group workflow contract', () => {
     expect(coverage).toContain("github.event_name == 'merge_group'");
     expect(coverage).toContain('github.event.merge_group.head_sha');
     expect(coverage).toContain('.applicable');
+    expect(coverage).toContain(
+      'pnpm --filter @jovie/web test:coverage --changed'
+    );
+    expect(coverage).not.toContain(
+      'pnpm --filter @jovie/web test:coverage -- --changed'
+    );
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
     expect(coverage).not.toContain(
       String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
