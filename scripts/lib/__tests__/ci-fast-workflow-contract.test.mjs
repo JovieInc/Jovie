@@ -187,6 +187,25 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('runs Linux restart boundary tests when the helper or its proof changes', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/symphony-elixir-safe-restart',
+      'scripts/symphony/tests/run-safe-restart-gate.py',
+      'scripts/symphony/tests/symphony-safe-restart.test.py',
+    ]) {
+      const result = spawnSync('grep', ['-Eq', pattern], {
+        input: `${path}\n`,
+        encoding: 'utf8',
+      });
+      expect(result.status, path).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/symphony/tests/run-safe-restart-gate.py'"
+    );
+  });
+
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
     const webParts = CI_FAST_SOURCE.slice(
       CI_FAST_SOURCE.indexOf('const webParts = ['),

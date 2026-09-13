@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[3]
 HELPER = ROOT / "scripts/symphony/symphony-elixir-safe-restart"
 GUARD_SOURCE = HELPER.read_text().split("<<'GUARD_PY'\n", 1)[1].split("\nGUARD_PY", 1)[0]
 GUARD_FILENAME = str(HELPER) + ":stop_guard"
-PRODUCTION_LEASE = 'exec 9>"/run/user/$(id -u)/symphony-elixir-safe-restart.lock"'
+PRODUCTION_LEASE = 'lease_file="/run/user/$(id -u)/symphony-elixir-safe-restart.lock"'
 
 class GuardFileTests(unittest.TestCase):
     def test_production_lease_is_fixed_before_all_modes(self):
@@ -52,6 +52,42 @@ class GuardFileTests(unittest.TestCase):
             unit.unlink()
             with self.assertRaises(SystemExit): execute()
 
+class ProcessInspectionTests(unittest.TestCase):
+    def execute(self, root):
+        source = HELPER.read_text().split("<<'PROCESS_REFS_PY'\n", 1)[1].split("\nPROCESS_REFS_PY", 1)[0]
+        source = source.replace('Path("/proc")', 'Path(' + repr(str(root)) + ')')
+        output = io.StringIO()
+        with mock.patch('sys.argv', ['-', '/workspace']), contextlib.redirect_stdout(output):
+            filename = str(HELPER) + ':process_refs'
+            exec(compile(source, filename, 'exec'), {'__file__': filename})
+        return int(output.getvalue())
+
+    def test_actual_scanner_counts_references_and_tolerates_disappeared_descriptors(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'self').mkdir()
+            process = root / '123'
+            (process / 'fd').mkdir(parents=True)
+            (process / 'cwd').symlink_to('/workspace/task')
+            (process / 'fd/1').symlink_to('/unrelated')
+            (root / '456').mkdir()  # disappeared before fd enumeration
+            self.assertEqual(self.execute(root), 1)
+            original = os.readlink
+            def vanished(path, *args, **kwargs):
+                if str(path).endswith('/fd/1'): raise FileNotFoundError()
+                return original(path, *args, **kwargs)
+            with mock.patch('os.readlink', side_effect=vanished):
+                self.assertEqual(self.execute(root), 1)
+
+    def test_actual_scanner_propagates_permission_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / '123/fd').mkdir(parents=True)
+            with mock.patch('os.readlink', side_effect=PermissionError('denied')):
+                with self.assertRaises(PermissionError): self.execute(root)
+            with mock.patch('os.scandir', side_effect=PermissionError('denied')):
+                with self.assertRaises(PermissionError): self.execute(root)
+
 @unittest.skipUnless(shutil.which("flock"), "requires real Linux flock")
 class StopGuardTests(unittest.TestCase):
     def setUp(self):
@@ -68,7 +104,7 @@ class StopGuardTests(unittest.TestCase):
         self.assertEqual(source.count(PRODUCTION_LEASE), 1)
         self.fixture_helper = self.home / "safe-restart"
         self.fixture_helper.write_text(source.replace(PRODUCTION_LEASE,
-            "exec 9>" + shlex.quote(str(self.runtime / "symphony-elixir-safe-restart.lock"))))
+            "lease_file=" + shlex.quote(str(self.runtime / "symphony-elixir-safe-restart.lock"))))
         self.unit = self.home / ".config/systemd/user/symphony-elixir.service"
         self.unit.parent.mkdir(parents=True)
         self.unit.write_text("[Unit]\nDescription=fixture\n[Service]\nRestart=always\n")
@@ -94,7 +130,7 @@ if 'show' in args:
 raise SystemExit(99)
 """)
         self.write("curl", "#!/usr/bin/env python3\nimport os,json\nprint(os.environ.get('API_STATE', json.dumps(dict(running=[],retrying=[],blocked=[]))))\n")
-        self.write("sudo", '#!/usr/bin/env bash\nif [[ "${PROCESS_REFS:-0}" == 1 ]]; then echo reference; fi\n')
+        self.write("sudo", '#!/usr/bin/env bash\nif [[ "${SCAN_FAIL:-0}" != 0 ]]; then exit 1; fi\necho "${PROCESS_REFS:-0}"\n')
 
     def write(self, name, text):
         path = self.bin / name
@@ -126,6 +162,22 @@ raise SystemExit(99)
                 self.assertNotEqual(self.run_helper(**overrides).returncode,0)
                 self.assertFalse(self.guard.exists())
 
+    def test_unknown_api_state_refuses_before_any_change(self):
+        for state in ('{}', 'null', '[]', '{"running":null,"retrying":[],"blocked":[]}',
+                      '{"running":[],"retrying":{},"blocked":[]}',
+                      '{"running":[],"retrying":[]}', 'invalid JSON'):
+            with self.subTest(state=state):
+                result = self.run_helper(API_STATE=state)
+                self.assertEqual(result.returncode, 25, result.stderr)
+                self.assertFalse(self.guard.exists())
+                self.assertFalse(self.events.exists())
+
+    def test_failed_process_inspection_refuses_before_any_change(self):
+        result = self.run_helper(SCAN_FAIL='1')
+        self.assertEqual(result.returncode, 26, result.stderr)
+        self.assertFalse(self.guard.exists())
+        self.assertFalse(self.events.exists())
+
     def test_retry_exhausted_blocked_issues_do_not_hold_restart(self):
         # Blocked entries are terminal retry-exhausted states that can never
         # drain without a restart; holding on them deadlocks recovery.
@@ -147,6 +199,55 @@ raise SystemExit(99)
         self.guard.write_text('foreign')
         self.assertNotEqual(self.run_helper().returncode,0)
         self.assertEqual(self.guard.read_text(),'foreign')
+
+    def test_actual_trial_workspace_is_checked_by_final_helper(self):
+        self.write("sudo", '#!/usr/bin/env bash\nif [[ "$*" == *"/home/timwhite/codex-qualification"* ]]; then echo 1; else echo 0; fi\n')
+        result = self.run_helper()
+        self.assertEqual(result.returncode, 21, result.stderr)
+        self.assertFalse(self.guard.exists())
+
+    def inherited_check(self, descriptor=None, **overrides):
+        env={**os.environ, "HOME":str(self.home), "EVENTS":str(self.events),
+             "PATH":str(self.bin)+os.pathsep+os.environ["PATH"], **overrides}
+        # Duplicate an explicitly inherited fixture descriptor into the public
+        # fd-9 protocol. No production service or production lease is touched.
+        if descriptor is None:
+            command=["bash", str(self.fixture_helper), "--with-held-lease", "--check-only"]
+            return subprocess.run(command, env=env, capture_output=True, text=True, timeout=5)
+        command='exec 9<&'+str(descriptor)+'; exec bash '+shlex.quote(str(self.fixture_helper))+' --with-held-lease --check-only'
+        return subprocess.run(["bash","-c",command], env=env, pass_fds=(descriptor,), capture_output=True, text=True, timeout=5)
+
+    def test_inherited_service_lease_retains_parent_serialization(self):
+        import fcntl
+        self.assertEqual(self.run_helper().returncode, 0)
+        path=self.runtime/"symphony-elixir-safe-restart.lock"
+        with path.open("a+") as lease:
+            fcntl.flock(lease, fcntl.LOCK_EX|fcntl.LOCK_NB)
+            result=self.inherited_check(lease.fileno())
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("safe restart preconditions passed", result.stdout)
+            with path.open("a+") as competitor:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(competitor, fcntl.LOCK_EX|fcntl.LOCK_NB)
+            busy=self.inherited_check(lease.fileno(), API_STATE='{"running":[{}],"retrying":[],"blocked":[]}')
+            self.assertEqual(busy.returncode, 20, busy.stderr)
+
+    def test_missing_or_foreign_inherited_descriptor_refuses_before_service_read(self):
+        missing=self.inherited_check()
+        self.assertEqual(missing.returncode, 66, missing.stderr)
+        with (self.runtime/"foreign.lock").open("w") as foreign:
+            result=self.inherited_check(foreign.fileno())
+        self.assertEqual(result.returncode, 66, result.stderr)
+        self.assertFalse(self.events.exists())
+
+    def test_distinct_descriptor_cannot_bypass_other_holder(self):
+        import fcntl
+        path=self.runtime/"symphony-elixir-safe-restart.lock"
+        with path.open("a+") as holder, path.open("a+") as contender:
+            fcntl.flock(holder, fcntl.LOCK_EX|fcntl.LOCK_NB)
+            result=self.inherited_check(contender.fileno())
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertFalse(self.events.exists())
 
     def test_alternate_xdg_cannot_escape_held_service_lease(self):
         import fcntl

@@ -7,10 +7,16 @@ workspace_roots=(
   /home/timwhite/code/symphony-workspaces
   /home/timwhite/symphony-elixir-workspaces
   /srv/worktrees/jovie
+  /home/timwhite/codex-qualification
 )
 check_only=false
 prepare_stop_guard=false
 maintenance_manifest=""
+inherited_lease=false
+if [[ "${1:-}" == "--with-held-lease" ]]; then
+  inherited_lease=true
+  shift
+fi
 
 if [[ "${1:-}" == "--maintenance-replace" && $# -eq 2 ]]; then
   maintenance_manifest="$2"
@@ -19,11 +25,23 @@ elif [[ "${1:-}" == "--prepare-stop-guard" && $# -eq 1 ]]; then
 elif [[ "${1:-}" == "--check-only" ]]; then
   check_only=true
 elif [[ $# -ne 0 ]]; then
-  echo "usage: symphony-elixir-safe-restart [--check-only] [--prepare-stop-guard] [--maintenance-replace MANIFEST]" >&2
+  echo "usage: symphony-elixir-safe-restart [--with-held-lease] [--check-only] [--prepare-stop-guard] [--maintenance-replace MANIFEST]" >&2
   exit 64
 fi
 
-exec 9>"/run/user/$(id -u)/symphony-elixir-safe-restart.lock"
+lease_file="/run/user/$(id -u)/symphony-elixir-safe-restart.lock"
+if [[ "$inherited_lease" == true ]]; then
+  # A prepared operator transaction may retain this same open-file-description
+  # lock across file promotion and the final idle-checked restart. This does
+  # not pause scheduler admission or claim atomic idle exclusion.
+  if [[ ! -e /proc/$$/fd/9 ]] ||
+     [[ "$(stat -Lc '%d:%i' /proc/$$/fd/9)" != "$(stat -Lc '%d:%i' "$lease_file")" ]]; then
+    echo "refusing restart: inherited fd 9 is not the fixed service lease" >&2
+    exit 66
+  fi
+else
+  exec 9>"$lease_file"
+fi
 flock -n 9 || {
   echo "another safe restart check is already running" >&2
   exit 65
@@ -34,7 +52,11 @@ if [[ -n "$maintenance_manifest" ]]; then
   exec python3 "$helper" --manifest "$maintenance_manifest" --lease-fd 9
 fi
 
-state=$(curl -fsS "$api_url")
+state=$(curl --max-time 5 -fsS "$api_url")
+jq -e 'type == "object" and (.running | type == "array") and (.retrying | type == "array") and (.blocked | type == "array")' <<<"$state" >/dev/null || {
+  echo "refusing restart: runtime work state is unknown" >&2
+  exit 25
+}
 running=$(jq -er '.running | length' <<<"$state")
 retrying=$(jq -er '.retrying | length' <<<"$state")
 blocked=$(jq -er '.blocked | length' <<<"$state")
@@ -51,14 +73,38 @@ if [[ "$blocked" -ne 0 ]]; then
   echo "proceeding with blocked=$blocked retry-exhausted issue(s); the reconciler re-dispatches or dead-letters them after restart"
 fi
 
-refs=$(
-  {
-    for workspace_root in "${workspace_roots[@]}"; do
-      sudo find /proc/[0-9]*/cwd /proc/[0-9]*/fd \
-        -lname "$workspace_root/*" 2>/dev/null || true
-    done
-  } | wc -l
-)
+# Missing processes or descriptors may race this observation. Permission and
+# other inspection failures are UNKNOWN, never an empty workspace.
+refs=$(timeout 15 sudo -n python3 - "${workspace_roots[@]}" <<'PROCESS_REFS_PY'
+import os
+from pathlib import Path
+import sys
+roots = tuple(root.rstrip("/") + "/" for root in sys.argv[1:])
+count = 0
+with os.scandir(Path("/proc")) as processes:
+    for entry in processes:
+        if not entry.name.isdecimal():
+            continue
+        process = Path(entry.path)
+        try:
+            with os.scandir(process / "fd") as descriptors:
+                paths = [process / "cwd", *(Path(item.path) for item in descriptors)]
+            for path in paths:
+                try:
+                    target = os.readlink(path)
+                except (FileNotFoundError, ProcessLookupError):
+                    continue
+                if target.startswith(roots):
+                    count += 1
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+print(count)
+PROCESS_REFS_PY
+) || {
+  echo "refusing restart: workspace process inspection failed" >&2
+  exit 26
+}
+[[ "$refs" =~ ^[0-9]+$ ]] || exit 26
 if [[ "$refs" -ne 0 ]]; then
   echo "refusing restart: api is idle but process_refs=$refs" >&2
   exit 21
@@ -159,7 +205,7 @@ for _ in $(seq 1 "$wait_seconds"); do
   new_pid=$(systemctl --user show "$service" -p MainPID --value)
   if [[ -n "$new_pid" && "$new_pid" != 0 && "$new_pid" != "$old_pid" ]] && \
      systemctl --user is-active --quiet "$service" && \
-     curl -fsS "$api_url" >/dev/null 2>&1; then
+     curl --max-time 2 -fsS "$api_url" >/dev/null 2>&1; then
     echo "safe restart complete: old_pid=$old_pid new_pid=$new_pid"
     exit 0
   fi
