@@ -36,7 +36,12 @@ export function toWebCoverageIncludePaths(files) {
     ) {
       throw new Error(`Invalid coverage include path: ${filePath}`);
     }
-    return relativePath;
+    // Vitest consumes coverage.include entries as glob patterns, but these are
+    // literal repo paths. Route-group segments like "app/app/(shell)/..."
+    // would otherwise be read as glob groups and match nothing, silently
+    // dropping the file from the V8 report. Backslash-escape every glob
+    // metacharacter so each entry matches exactly its own path.
+    return relativePath.replace(/[^A-Za-z0-9/._-]/g, ch => `\\${ch}`);
   });
 }
 
