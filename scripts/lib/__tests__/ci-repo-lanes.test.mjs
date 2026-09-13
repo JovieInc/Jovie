@@ -35,6 +35,23 @@ describe('JOV-5288 CI repo lanes', () => {
     expect(plan.lanes).toEqual([CI_LANES.SYMPHONY_CONTROL]);
   });
 
+  it('maps symphony commission signals onto Symphony control-plane only', () => {
+    expect(
+      classifyChangedFile(
+        'scripts/symphony/signals/gem-publisher-commission.request'
+      )
+    ).toEqual([CI_LANES.SYMPHONY_CONTROL]);
+    expect(classifyChangedFile('ops/signals/example.request')).toEqual([
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
+    const plan = classifyCiRepoLanes([
+      'scripts/symphony/signals/gem-publisher-commission.request',
+    ]);
+    expect(plan.runJovieProduct).toBe(false);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runSummerOps).toBe(false);
+  });
+
   it('classifies ci-fast lane wiring as Symphony control-plane, not Jovie product', () => {
     expect(classifyChangedFile('scripts/ci-fast-lanes.mjs')).toEqual([
       CI_LANES.SYMPHONY_CONTROL,

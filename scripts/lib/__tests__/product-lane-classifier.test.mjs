@@ -273,6 +273,16 @@ describe('product lane classifier', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
       ]).selectedLanes
     ).toEqual(['operations']);
+    expect(
+      classifyProductLanes([
+        'scripts/symphony/signals/gem-publisher-commission.request',
+      ]).selectedLanes
+    ).toEqual(['operations']);
+    // ops/ is mapped for future fleet signals; Path Changes still trusts main's
+    // classifier, so new ops/* files need that mapping already on main.
+    expect(
+      classifyProductLanes(['ops/signals/example.request']).selectedLanes
+    ).toEqual(['operations']);
   });
 
   it('evaluates failures without admitting skipped products', () => {
