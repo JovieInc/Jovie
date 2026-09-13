@@ -25,6 +25,10 @@ describe('OpportunityInboxCard', () => {
       />
     );
 
+    expect(screen.getByRole('article')).toHaveAttribute(
+      'data-opportunity-format',
+      'editorial'
+    );
     expect(
       screen.getByText('Detroit listeners up 340% — book a show')
     ).toBeInTheDocument();
