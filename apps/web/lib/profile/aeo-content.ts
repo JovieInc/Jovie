@@ -674,7 +674,7 @@ function buildDescription(params: {
     buildBioDescriptionBlock(artist),
     buildCatalogDescriptionBlock({
       artist,
-      latestRelease,
+      latestRelease: latestRelease ?? null,
       releases,
       tourDates,
       merchCards,
