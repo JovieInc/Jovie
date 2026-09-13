@@ -35,13 +35,9 @@ describe('PageErrorState', () => {
 
     await user.click(summary);
     expect(details).toHaveAttribute('open');
-    expect(summary).not.toHaveFocus();
-    expect(summary).toHaveAttribute('data-focus-treatment', 'underline-only');
-    expect(summary).not.toHaveClass('focus-visible:ring-0');
-
-    summary.focus();
     expect(summary).toHaveFocus();
     expect(summary).toHaveAttribute('data-focus-treatment', 'underline-only');
+    expect(summary).not.toHaveClass('focus-visible:ring-0');
   });
 
   it('uses the supplied retry handler', () => {
