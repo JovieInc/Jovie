@@ -248,81 +248,83 @@ function SidebarHeaderNav({
   return (
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
       <div className='min-w-0 flex-1'>
-      {(() => {
-        if (isRouteSidebar) {
-          return (
-            <div className='flex w-full items-center gap-2'>
-              <Link
-                href={routeBackHref}
-                aria-label={routeBackLabel}
+        {(() => {
+          if (isRouteSidebar) {
+            return (
+              <div className='flex w-full items-center gap-2'>
+                <Link
+                  href={routeBackHref}
+                  aria-label={routeBackLabel}
+                  className={cn(
+                    'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                    'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                  )}
+                >
+                  <ArrowLeft
+                    className='size-3.5 text-sidebar-item-icon'
+                    aria-hidden='true'
+                  />
+                  <span className='truncate group-data-[collapsible=icon]:hidden'>
+                    {routeBackLabel}
+                  </span>
+                </Link>
+              </div>
+            );
+          }
+          if (isDemoRoute) {
+            return (
+              <div
                 className={cn(
-                  'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-                  'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                  'group-data-[collapsible=icon]:justify-center'
                 )}
               >
-                <ArrowLeft
-                  className='size-3.5 text-sidebar-item-icon'
-                  aria-hidden='true'
+                <BrandLogo
+                  size='chrome'
+                  tone='auto'
+                  rounded={false}
+                  className='rounded-sm shrink-0'
                 />
-                <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  {routeBackLabel}
+                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                  Demo
                 </span>
-              </Link>
-            </div>
-          );
-        }
-        if (isDemoRoute) {
+              </div>
+            );
+          }
+          if (canSwitchWorkspaces) {
+            return (
+              <WorkspaceSelector
+                currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
+                workspaces={APP_SHELL_WORKSPACES}
+              />
+            );
+          }
+          if (hasMultipleProfiles && !isOperatorSection) {
+            return <ProfileSwitcher />;
+          }
+          // Clean header: brand logo + wordmark for identity (matches Linear's
+          // workspace pill pattern). User menu lives in the bottom Settings button.
+          // Wordmark and logo variant are driven by the active brand skin.
           return (
             <div
               className={cn(
-                'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                'flex h-7 w-full items-center gap-1.5',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo
-                size='chrome'
+                size={24}
                 tone='auto'
+                variant={variant}
                 rounded={false}
                 className='rounded-sm shrink-0'
               />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                Demo
-              </span>
+              {variant === 'ov' ? (
+                <span>{BRAND_WORDMARKS[variant]}</span>
+              ) : null}
             </div>
           );
-        }
-        if (canSwitchWorkspaces) {
-          return (
-            <WorkspaceSelector
-              currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
-              workspaces={APP_SHELL_WORKSPACES}
-            />
-          );
-        }
-        if (hasMultipleProfiles && !isOperatorSection) {
-          return <ProfileSwitcher />;
-        }
-        // Clean header: brand logo + wordmark for identity (matches Linear's
-        // workspace pill pattern). User menu lives in the bottom Settings button.
-        // Wordmark and logo variant are driven by the active brand skin.
-        return (
-          <div
-            className={cn(
-              'flex h-7 w-full items-center gap-1.5',
-              'group-data-[collapsible=icon]:justify-center'
-            )}
-          >
-            <BrandLogo
-              size={24}
-              tone='auto'
-              variant={variant}
-              rounded={false}
-              className='rounded-sm shrink-0'
-            />
-            {variant === 'ov' ? <span>{BRAND_WORDMARKS[variant]}</span> : null}
-          </div>
-        );
-      })()}
+        })()}
       </div>
       {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
         <>

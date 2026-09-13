@@ -33,13 +33,7 @@ describe('DashboardNav route warming', () => {
     expect(
       screen.queryByRole('link', { name: 'Inbox' })
     ).not.toBeInTheDocument();
-    for (const label of [
-      'New Chat',
-      'Library',
-      'Contacts',
-      'Calendar',
-      'Tasks',
-    ]) {
+    for (const label of ['New Chat', 'Library', 'Contacts', 'Presence']) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
     }
   });
