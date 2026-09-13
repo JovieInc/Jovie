@@ -25,6 +25,7 @@ import {
   getProfileModeSubtitle,
   profileModes,
 } from '@/features/profile/registry';
+import { buildProfileAeoFaqStructuredData } from '@/lib/profile/aeo-content';
 import { generateProfileStructuredData } from '@/lib/seo/structured-data';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { CreatorProfile } from '@/types/db';
@@ -662,10 +663,34 @@ describe('Public Profile Page Logic', () => {
       // The profile page source must conditionally emit a FAQPage script tag
       // when aeoContent.faqs.length > 0. This feeds AI citation engines and
       // Google FAQ rich results.
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'FAQPage'");
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'Question'");
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain("'@type': 'Answer'");
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'buildProfileAeoFaqStructuredData'
+      );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('aeoContent.faqs');
+
+      const structured = buildProfileAeoFaqStructuredData({
+        faqs: [
+          {
+            question: 'Where is Test Artist from?',
+            answer: 'Test Artist is from Austin, TX.',
+            source: { label: 'Jovie profile', href: '/testartist' },
+          },
+        ],
+      });
+      expect(structured).toMatchObject({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'Where is Test Artist from?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Test Artist is from Austin, TX.',
+            },
+          },
+        ],
+      });
     });
 
     it('guards the FAQPage script tag behind a faqs.length > 0 check', () => {
