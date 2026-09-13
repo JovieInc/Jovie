@@ -168,11 +168,14 @@ export function FeatureIntroCard({
                   aria-hidden='true'
                   className='h-2 w-2 shrink-0 rounded-full bg-tertiary-token'
                 />
-                <Button asChild variant='link'>
+                <Button
+                  asChild
+                  variant='link'
+                  className='h-auto min-h-0 before:hidden'
+                >
                   <Link
                     data-testid='feature-intro-and-more'
                     href={changelogHref}
-                    className='h-auto min-h-0 before:hidden'
                   >
                     And more
                   </Link>
