@@ -488,6 +488,18 @@ exit 0
                 / "gem/scripts/summer-symphony-outbox-consumer.mjs"
             )
             self.assertTrue(installed_consumer.is_file())
+            installed_controller_manifest = (
+                pathlib.Path(directory)
+                / "gem/config/existing-repair-controller-manifest.json"
+            )
+            self.assertEqual(
+                json.loads(installed_controller_manifest.read_text(encoding="utf-8")),
+                json.loads(
+                    (
+                        HERMES / "config/existing-repair-controller-manifest.json"
+                    ).read_text(encoding="utf-8")
+                ),
+            )
             for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py"):
                 self.assertTrue((installed_gate.parent / name).is_file(), name)
             import_check = subprocess.run(
@@ -511,6 +523,9 @@ exit 0
         self.assertEqual(import_check.returncode, 0, import_check.stderr)
         self.assertTrue(receipt["artifacts"]["proofContext"]["matches"])
         self.assertTrue(receipt["artifacts"]["summerSymphonyConsumer"]["matches"])
+        self.assertTrue(
+            receipt["artifacts"]["existingRepairControllerManifest"]["matches"]
+        )
         self.assertTrue(receipt["artifacts"]["acceptedCompletion"]["matches"])
         self.assertTrue(receipt["artifacts"]["capacityEvidence"]["matches"])
         self.assertTrue(receipt["artifacts"]["providerCapacity"]["matches"])
