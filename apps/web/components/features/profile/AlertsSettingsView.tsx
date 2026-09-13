@@ -37,14 +37,13 @@ function SettingsToggle({
         checked
           ? 'border-white/40 bg-white dark:bg-surface-1'
           : 'border-white/14 bg-white/[0.08]',
-        disabled && 'opacity-45',
-        'data-[state=checked]:ring-0 data-[state=unchecked]:ring-0'
+        disabled && 'opacity-45'
       )}
       thumbClassName={cn(
         'block h-6 w-6 rounded-full shadow-sm transition-transform duration-subtle',
-        checked ? 'translate-x-4' : 'translate-x-0',
-        'data-[state=checked]:bg-white data-[state=unchecked]:bg-btn-primary',
-        'data-[state=checked]:translate-x-4 rtl:data-[state=checked]:-translate-x-4 data-[state=unchecked]:translate-x-0'
+        checked
+          ? 'bg-white translate-x-4 rtl:-translate-x-4'
+          : 'bg-btn-primary translate-x-0'
       )}
       thumbTranslation='owner'
     />
