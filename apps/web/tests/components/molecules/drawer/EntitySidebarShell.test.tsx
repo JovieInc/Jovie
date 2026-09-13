@@ -1,14 +1,64 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 
 vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
-  RightDrawer: ({ children }: { children: React.ReactNode }) => (
-    <aside data-testid='right-drawer'>{children}</aside>
+  RightDrawer: ({
+    children,
+    onKeyDown,
+  }: {
+    children: React.ReactNode;
+    onKeyDown?: (event: KeyboardEvent) => void;
+  }) => (
+    <aside
+      data-testid='right-drawer'
+      onKeyDown={event => onKeyDown?.(event.nativeEvent)}
+    >
+      {children}
+    </aside>
   ),
 }));
 
 describe('EntitySidebarShell', () => {
+  it('derives Escape dismissal from the existing close handler', () => {
+    const onClose = vi.fn();
+
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Dismissible drawer'
+        onClose={onClose}
+      >
+        <p>Body content</p>
+      </EntitySidebarShell>
+    );
+
+    fireEvent.keyDown(screen.getByTestId('right-drawer'), { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an explicit keyboard handler ahead of derived Escape dismissal', () => {
+    const onClose = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Explicit keyboard drawer'
+        onClose={onClose}
+        onKeyDown={onKeyDown}
+      >
+        <p>Body content</p>
+      </EntitySidebarShell>
+    );
+
+    fireEvent.keyDown(screen.getByTestId('right-drawer'), { key: 'Escape' });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('keeps the raised workspace flat so RightDrawer owns inspector elevation', () => {
     render(
       <EntitySidebarShell isOpen ariaLabel='Details drawer' title='Details'>

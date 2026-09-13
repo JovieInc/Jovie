@@ -294,6 +294,7 @@ export function AnalyticsSidebarView({
   return (
     <EntityTabbedRail
       isOpen={isOpen}
+      onClose={onClose}
       ariaLabel='Analytics'
       title='Analytics'
       hideMinimalHeaderBar

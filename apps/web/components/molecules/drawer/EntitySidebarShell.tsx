@@ -163,6 +163,15 @@ export function EntitySidebarShell({
   const titleBarActions = actionsInEntityHeader
     ? closeAction
     : (headerActions ?? closeAction);
+  const drawerOnKeyDown =
+    onKeyDown ??
+    (onClose
+      ? (event: KeyboardEvent) => {
+          if (event.key === 'Escape') {
+            onClose();
+          }
+        }
+      : undefined);
   let minimalEntityHeaderContent: ReactNode = null;
   if (isMinimalHeader && !isEmpty && entityHeader) {
     minimalEntityHeaderContent =
@@ -215,7 +224,7 @@ export function EntitySidebarShell({
       isOpen={isOpen}
       width={width}
       ariaLabel={ariaLabel}
-      onKeyDown={onKeyDown}
+      onKeyDown={drawerOnKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid={testId}
       className={drawerClassName}
