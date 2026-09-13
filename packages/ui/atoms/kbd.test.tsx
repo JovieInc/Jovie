@@ -50,7 +50,9 @@ describe('Kbd', () => {
       // Deliberate-red guard: the tooltip keycap must not inherit the card surface.
       expect(kbd.className).not.toContain('bg-(--linear-bg-surface-1)');
       expect(kbd.className).toContain('border-(--linear-border-default)');
-      expect(kbd.className).toContain('text-(--linear-text-primary)');
+      expect(kbd.className).toContain('text-tooltip-foreground');
+      // Tooltip surfaces stay dark in light mode; primary text is dark there.
+      expect(kbd.className).not.toContain('text-(--linear-text-primary)');
     });
 
     it('tooltip variant has dark mode styles', () => {
@@ -150,7 +152,7 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByText('⌘K');
       expect(kbd.className).toContain('bg-surface-tooltip');
-      expect(kbd.className).toContain('text-(--linear-text-primary)');
+      expect(kbd.className).toContain('text-tooltip-foreground');
     });
   });
 });
