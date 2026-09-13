@@ -5,6 +5,11 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import type { ClaimBannerVariant } from '@/app/[username]/_lib/claim-banner-state';
+import {
+  PUBLIC_PROFILE_DESKTOP_CONTEXT,
+  PUBLIC_PROFILE_DESKTOP_EVENTS,
+  readPublicProfileLayout,
+} from '@/data/publicProfileDesktopOptimization';
 import { track } from '@/lib/analytics';
 
 export interface ClaimBannerProps {
@@ -60,9 +65,11 @@ export function ClaimBanner({
     if (trackedImpressionKeys.current.has(impressionKey)) return;
     trackedImpressionKeys.current.add(impressionKey);
 
-    track('profile_claim_banner_impression', {
+    track(PUBLIC_PROFILE_DESKTOP_EVENTS.EXPOSURE, {
       profile_handle: profileHandle,
       variant,
+      layout: readPublicProfileLayout(),
+      ...PUBLIC_PROFILE_DESKTOP_CONTEXT,
     });
   }, [profileHandle, variant]);
 
@@ -94,10 +101,12 @@ export function ClaimBanner({
               data-testid='claim-banner-cta'
               aria-label={`${resolvedCtaLabel} for ${name}`}
               onClick={() => {
-                track('profile_claim_banner_click', {
+                track(PUBLIC_PROFILE_DESKTOP_EVENTS.OUTCOME, {
                   profile_handle: profileHandle,
                   destination: trackedDestination,
                   variant,
+                  layout: readPublicProfileLayout(),
+                  ...PUBLIC_PROFILE_DESKTOP_CONTEXT,
                 });
               }}
             >
