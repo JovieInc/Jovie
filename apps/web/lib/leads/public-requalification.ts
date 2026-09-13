@@ -35,12 +35,15 @@ import {
 } from '@/lib/leads/spotify-enrich-lead';
 
 export {
+  getPublicDspSignals,
   PUBLIC_REQUALIFICATION_CONTRACT,
   PUBLIC_REQUALIFICATION_EVENT_TYPE,
+  PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
   PUBLIC_REQUALIFICATION_SCOPE,
   PUBLIC_REQUALIFICATION_TTL_MS,
   type PublicCandidateObservation,
   type PublicCandidateRun,
+  type PublicDspSignals,
   type PublicLeadRecord,
   type PublicLeadUpdate,
   PublicRequalificationConflictError,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION,
   type PublicCandidateRun,
   type PublicLeadRecord,
   PublicRequalificationConflictError,
@@ -140,6 +141,9 @@ describe('requalifyPublicLead', () => {
     );
 
     expect(result.environment).toBe('dev');
+    expect(result.fitInputVersion).toBe(
+      PUBLIC_REQUALIFICATION_FIT_INPUT_VERSION
+    );
     expect(result.candidateId).toBe('lead-rhirhi');
     expect(result.state).toBe('human_review');
     expect(
