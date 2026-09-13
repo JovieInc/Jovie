@@ -458,11 +458,20 @@ describe('live Storybook component certification', () => {
       item.id.startsWith('ui-atoms-switch--conformance-matrix@')
     );
     expect(switchPass).toBeDefined();
+    // The fixture builder accepts extra observation fields dynamically; keep
+    // the pair shape explicit here so the scripts checkJs lane can verify the
+    // pair mutations without widening the certification implementation.
+    const switchPassWithPairs =
+      /** @type {Readonly<{ contrastPairs: readonly Record<string, unknown>[] }>} */ (
+        /** @type {unknown} */ (switchPass)
+      );
     const inheritedRootTextOnly = {
       ...switchPass,
       contrastRatio: 1.2,
       foreground: { luminance: 'dark', token: 'inherited-root-text' },
-      contrastPairs: switchPass.contrastPairs.map(pair => ({ ...pair })),
+      contrastPairs: switchPassWithPairs.contrastPairs.map(pair => ({
+        ...pair,
+      })),
     };
     expect(evaluateLiveObservation(inheritedRootTextOnly).ok).toBe(true);
     for (const contrastPairs of [undefined, null, 'not-an-array']) {
@@ -479,7 +488,7 @@ describe('live Storybook component certification', () => {
     }
     const missingUnchecked = {
       ...switchPass,
-      contrastPairs: [switchPass.contrastPairs[0]],
+      contrastPairs: [switchPassWithPairs.contrastPairs[0]],
     };
     expect(evaluateLiveObservation(missingUnchecked).ok).toBe(false);
     expect(details(evaluateLiveObservation(missingUnchecked))).toMatch(
@@ -520,6 +529,7 @@ describe('live Storybook component certification', () => {
         .locator('#switch-fixture [role="switch"]')
         .evaluateAll(nodes =>
           nodes.map(node => {
+            const { getComputedStyle } = /** @type {any} */ (globalThis);
             const trackStyle = getComputedStyle(node);
             const thumbStyle = getComputedStyle(node.firstElementChild);
             return {
