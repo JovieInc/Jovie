@@ -26,4 +26,30 @@ describe('AudioPlayButton', () => {
     fireEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
   });
+
+  it('uses canonical primary tokens for compact player controls', () => {
+    render(<AudioPlayButton isPlaying={false} onClick={vi.fn()} />);
+
+    const button = screen.getByRole('button', { name: 'Play' });
+    expect(button).toHaveClass('border-btn-primary', 'transition-colors');
+    expect(button.className).not.toMatch(/--linear-/);
+    expect(button.className).not.toMatch(/content-\[/);
+    expect(button.className).not.toMatch(/transition-\[/);
+  });
+
+  it('uses canonical tokens for the persistent compact control', () => {
+    render(
+      <AudioPlayButton isPlaying={false} onClick={vi.fn()} size='persistent' />
+    );
+
+    const button = screen.getByRole('button', { name: 'Play' });
+    expect(button).toHaveClass(
+      'transition-colors',
+      'before:h-11',
+      'before:min-w-11'
+    );
+    expect(button.className).not.toMatch(/content-\[/);
+    expect(button.className).not.toMatch(/transition-\[/);
+    expect(button.className).not.toMatch(/--linear-/);
+  });
 });

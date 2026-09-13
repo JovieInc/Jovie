@@ -28,12 +28,12 @@ export function AudioPlayButton({
       disabled={isLoading}
       className={cn(
         size === 'bar' &&
-          'h-8 w-8 rounded-full border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+          'h-8 w-8 rounded-full border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-btn-primary-hover hover:bg-btn-primary-hover',
         size === 'compact' &&
-          'h-9 w-9 rounded-full border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+          'h-9 w-9 rounded-full border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-btn-primary-hover hover:bg-btn-primary-hover',
         size === 'persistent' &&
-          'relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]',
-        'grid place-items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none disabled:cursor-wait disabled:opacity-60',
+          'relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-colors duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2',
+        'grid place-items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page outline-none disabled:cursor-wait disabled:opacity-60',
         className
       )}
       aria-label={accessibleLabel}
