@@ -2571,14 +2571,16 @@ html:not(.dark) .smart-link-powered-by {
   outline: none;
 }
 
-:where(
-  input,
-  textarea,
-  select,
-  [contenteditable="true"],
-  [role="textbox"]
-):focus-visible {
-  box-shadow: none;
+@layer base {
+  :where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus-visible {
+    box-shadow: none;
+  }
 }
 
 /* ============================================
