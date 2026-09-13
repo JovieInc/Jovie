@@ -324,12 +324,17 @@ class DeploymentContractTests(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(receipt_path.stat().st_mode), 0o600)
             self.assertEqual(stat.S_IMODE(receipt_path.parent.stat().st_mode), 0o700)
 
-    def test_consumer_receipt_distinguishes_typed_rejection_and_redacts_reason(self):
+    def test_consumer_receipt_distinguishes_typed_rejection_without_persisting_reason(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = pathlib.Path(directory)
+            sensitive_reason = (
+                "v2-execution-configuration-missing; artist=Alex Rivera; "
+                "email=alex.rivera@example.com; unlabeled-token="
+                "ZXhhbXBsZS1zZWNyZXQtOTk5"
+            )
             stderr = (
                 'SUMMER_SYMPHONY_CONSUMER_REJECTED '
-                'reason="v2-execution-configuration-missing token=secret-value"\n'
+                f"reason={json.dumps(sensitive_reason)}\n"
             )
             with mock.patch.object(
                 CYCLE.subprocess,
@@ -347,8 +352,50 @@ class DeploymentContractTests(unittest.TestCase):
             self.assertEqual(receipt["invocationState"], "rejected")
             self.assertEqual(receipt["exitCode"], 78)
             self.assertEqual(receipt["outcome"]["status"], "rejected")
-            self.assertIn("[REDACTED]", receipt["outcome"]["reason"])
-            self.assertNotIn("secret-value", receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                receipt["outcome"]["reason"], CYCLE._CONSUMER_UNKNOWN_REJECTION
+            )
+            receipt_text = receipt_path.read_text(encoding="utf-8")
+            self.assertNotIn("Alex Rivera", receipt_text)
+            self.assertNotIn("alex.rivera@example.com", receipt_text)
+            self.assertNotIn("ZXhhbXBsZS1zZWNyZXQtOTk5", receipt_text)
+
+    def test_consumer_receipt_collapses_unrecognized_outcome_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = pathlib.Path(directory)
+            task_key = "b" * 64
+            sensitive_reason = (
+                "Alex Rivera alex.rivera@example.com "
+                "session=ZXhhbXBsZS1zZWNyZXQtOTk5"
+            )
+            output = json.dumps(
+                {
+                    "schema": CYCLE.CONSUMER_CYCLE_SCHEMA,
+                    "status": "execution-held",
+                    "taskKey": task_key,
+                    "reason": sensitive_reason,
+                }
+            )
+            with mock.patch.object(
+                CYCLE.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=2, stdout=output, stderr=""),
+            ), mock.patch.dict(
+                CYCLE.os.environ,
+                {"GEM_WORKSPACE": str(workspace)},
+                clear=False,
+            ):
+                self.assertEqual(CYCLE.run_summer_symphony_consumer(), 2)
+
+            receipt_path = CYCLE.consumer_invocation_receipt_path(workspace)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["invocationState"], "nonzero")
+            self.assertEqual(receipt["outcome"]["taskKey"], task_key)
+            self.assertEqual(receipt["outcome"]["reason"], CYCLE._CONSUMER_UNKNOWN_REASON)
+            receipt_text = receipt_path.read_text(encoding="utf-8")
+            self.assertNotIn("Alex Rivera", receipt_text)
+            self.assertNotIn("alex.rivera@example.com", receipt_text)
+            self.assertNotIn("ZXhhbXBsZS1zZWNyZXQtOTk5", receipt_text)
 
     def test_consumer_receipt_keeps_validated_outcome_on_nonzero_result(self):
         with tempfile.TemporaryDirectory() as directory:
