@@ -33,4 +33,19 @@ describe('PricingComparisonChart', () => {
       'true'
     );
   });
+
+  it('drives the system-b switch styling from Radix data-state', () => {
+    render(<PricingComparisonChart />);
+
+    const root = screen.getByRole('switch', {
+      name: 'Toggle Annual Billing',
+    }) as HTMLElement;
+    expect(root).toHaveAttribute('data-state', 'unchecked');
+    const thumb = root.firstElementChild;
+    expect(thumb).toHaveClass('system-b-pricing-switch-thumb');
+
+    fireEvent.click(root);
+
+    expect(root).toHaveAttribute('data-state', 'checked');
+  });
 });
