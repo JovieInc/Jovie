@@ -72,7 +72,11 @@ const screenContract = (source: string, enclosingFunction: string) => ({
   nestedCanvasAllowances: [allowance(source, enclosingFunction)],
 });
 describe('app screen canvas source guard', () => {
-  it('runs against production app and component sources', () => {
+  // Exact-head Coverage under merge-group load exceeds Vitest's 12s CI
+  // default (local ~23s).
+  it('runs against production app and component sources', {
+    timeout: 60_000,
+  }, () => {
     const files = sourceRoots.flatMap(sourceRoot =>
       productionSources(sourceRoot)
     );
