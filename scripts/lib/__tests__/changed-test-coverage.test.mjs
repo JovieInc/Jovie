@@ -7,6 +7,7 @@ import {
   evaluateChangedLineCoverage,
   isCoverageSourcePath,
   parseChangedLines,
+  planChangedLineCoverage,
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
@@ -82,6 +83,20 @@ describe('changed test coverage', () => {
     ).toThrow(/Not a coverable web product path/);
   });
 
+  it('serializes coverageInclude as an array from the shipped planner, never null', () => {
+    const emptyPlan = planChangedLineCoverage({ files: [] });
+    const emptySerialized = JSON.parse(JSON.stringify(emptyPlan));
+    expect(emptyPlan.applicable).toBe(false);
+    expect(emptySerialized.coverageInclude).toEqual([]);
+
+    const applicablePlan = planChangedLineCoverage({ files: [path] });
+    const applicableSerialized = JSON.parse(JSON.stringify(applicablePlan));
+    expect(applicablePlan.applicable).toBe(true);
+    expect(applicableSerialized.coverageInclude).toEqual(
+      toWebCoverageIncludePaths([path])
+    );
+  });
+
   it('records an explicit non-applicable receipt for non-product changes', () => {
     expect(isCoverageSourcePath('apps/web/proxy.ts')).toBe(true);
     expect(isCoverageSourcePath('apps/web/workflows/example.ts')).toBe(true);
@@ -123,7 +138,10 @@ describe('changed test coverage', () => {
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
     expect(coverage).toContain('--bail 1');
     expect(coverage).toContain('JOVIE_COVERAGE_INCLUDE');
-    expect(coverage).toContain('.coverageInclude[]');
+    expect(coverage).toContain('.coverageInclude // [] | .[]');
+    expect(coverage).toContain(
+      'Applicable exact-head coverage plan produced no include paths.'
+    );
     expect(coverage).toContain(
       `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
     );

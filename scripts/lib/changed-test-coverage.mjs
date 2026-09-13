@@ -221,22 +221,27 @@ export function formatChangedLineCoverage(result) {
   return `Changed-line coverage: ${result.coveredLines}/${result.coverableLines} (${result.percentage}%; required ${result.minimum}%).`;
 }
 
+function coverageIncludeFromFiles(files) {
+  const coverageInclude = toWebCoverageIncludePaths(files);
+  return Array.isArray(coverageInclude) ? coverageInclude : [];
+}
+
 /** @param {*} [options] */
 export function planChangedLineCoverage({
   base,
   head,
   repoRoot = REPO_ROOT,
+  files: providedFiles,
 } = {}) {
-  const changedLines = parseChangedLines(
-    readExactWebDiff({ base, head, repoRoot })
-  );
-  const files = [...changedLines.keys()].filter(path =>
-    isCoverageSourcePath(path)
-  );
+  const files =
+    providedFiles ??
+    [
+      ...parseChangedLines(readExactWebDiff({ base, head, repoRoot })).keys(),
+    ].filter(path => isCoverageSourcePath(path));
   return {
     applicable: files.length > 0,
     files,
-    coverageInclude: toWebCoverageIncludePaths(files),
+    coverageInclude: coverageIncludeFromFiles(files),
   };
 }
 

@@ -19,7 +19,10 @@ try {
   const head = readArgument('--head');
   if (process.argv.includes('--plan')) {
     const plan = planChangedLineCoverage({ base, head });
-    console.log(JSON.stringify(plan));
+    const coverageInclude = Array.isArray(plan.coverageInclude)
+      ? plan.coverageInclude
+      : [];
+    console.log(JSON.stringify({ ...plan, coverageInclude }));
     process.exitCode = 0;
   } else {
     const result = runChangedLineCoverageCheck({
