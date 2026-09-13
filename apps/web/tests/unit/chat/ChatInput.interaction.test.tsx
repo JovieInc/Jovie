@@ -154,50 +154,52 @@ function ControlledComposer(props: Partial<ComponentProps<typeof ChatInput>>) {
 }
 
 describe('shared composer palette', () => {
-  it.each([
-    'plus',
-    'slash',
-  ])('uses the same ordered attachments and filters audio through %s', async entry => {
-    const user = userEvent.setup();
-    const file = vi.fn();
-    const audio = vi.fn();
-    const submit = vi.fn();
-    render(
-      withProviders(
-        <ControlledComposer
-          onFileAttach={file}
-          onAudioAttach={audio}
-          onSubmit={submit}
-        />
-      )
-    );
-    const textarea = screen.getByRole('textbox', {
-      name: /chat message input/i,
-    });
-    if (entry === 'plus')
-      await user.click(
-        screen.getByRole('button', { name: 'Attachment options' })
+  it.each(['plus', 'slash'])(
+    'uses the same ordered attachments and filters audio through %s',
+    async entry => {
+      const user = userEvent.setup();
+      const file = vi.fn();
+      const audio = vi.fn();
+      const submit = vi.fn();
+      render(
+        withProviders(
+          <ControlledComposer
+            onFileAttach={file}
+            onAudioAttach={audio}
+            onSubmit={submit}
+          />
+        )
       );
-    else await user.type(textarea, '/');
-    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Attach Files');
-    expect(screen.getByText('Skills')).toBeInTheDocument();
-    const filter =
-      entry === 'plus'
-        ? screen.getByLabelText('Filter Commands And References')
-        : textarea;
-    expect(filter).toHaveFocus();
-    await user.type(filter, 'audio');
-    expect(
-      screen.getByRole('option', { name: /Upload audio/ })
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: /Attach Files/ })).toBeNull();
-    await user.keyboard('{Enter}');
-    expect(audio).toHaveBeenCalledOnce();
-    expect(file).not.toHaveBeenCalled();
-    expect(submit).not.toHaveBeenCalled();
-    expect(screen.queryByRole('listbox')).toBeNull();
-    expect(textarea).toHaveValue('');
-  });
+      const textarea = screen.getByRole('textbox', {
+        name: /chat message input/i,
+      });
+      if (entry === 'plus')
+        await user.click(
+          screen.getByRole('button', { name: 'Attachment options' })
+        );
+      else await user.type(textarea, '/');
+      expect(screen.getAllByRole('option')[0]).toHaveTextContent(
+        'Attach Files'
+      );
+      expect(screen.getByText('Skills')).toBeInTheDocument();
+      const filter =
+        entry === 'plus'
+          ? screen.getByLabelText('Filter Commands And References')
+          : textarea;
+      expect(filter).toHaveFocus();
+      await user.type(filter, 'audio');
+      expect(
+        screen.getByRole('option', { name: /Upload audio/ })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: /Attach Files/ })).toBeNull();
+      await user.keyboard('{Enter}');
+      expect(audio).toHaveBeenCalledOnce();
+      expect(file).not.toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(textarea).toHaveValue('');
+    }
+  );
 
   it('preserves the draft and caret when plus filtering is dismissed', async () => {
     const user = userEvent.setup();
