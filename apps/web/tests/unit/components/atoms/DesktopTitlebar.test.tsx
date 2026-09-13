@@ -133,16 +133,16 @@ describe('DesktopTitlebar', () => {
     ).not.toBeInTheDocument();
   });
 
-  it.each([
-    { state: 'closed' as const, open: false },
-    { isMobile: true },
-  ])('reserves main-header space when the sidebar does not own a visible rail', overrides => {
-    renderTitlebar(overrides);
-    expect(screen.getByTestId('electron-titlebar-row')).toHaveAttribute(
-      'data-main-header-inset',
-      'true'
-    );
-  });
+  it.each([{ state: 'closed' as const, open: false }, { isMobile: true }])(
+    'reserves main-header space when the sidebar does not own a visible rail',
+    overrides => {
+      renderTitlebar(overrides);
+      expect(screen.getByTestId('electron-titlebar-row')).toHaveAttribute(
+        'data-main-header-inset',
+        'true'
+      );
+    }
+  );
 
   it('keeps release identity outside the window-control row', () => {
     renderTitlebar();
@@ -155,34 +155,37 @@ describe('DesktopTitlebar', () => {
     ['production', 'Stable'],
     ['staging', 'Canary'],
     ['local', 'Local'],
-  ])('renders the %s build as a persistent %s release identity', async (channel, label) => {
-    const version = channel === 'staging' ? '26.8.2-staging.1.1' : '26.8.1';
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        getBuildIdentity: vi.fn().mockResolvedValue({
-          channel,
-          version,
-          sourceRevision: '8e42ec8d79cbee578971636b78bb80dc32c78b39',
-          builtAt: channel === 'local' ? null : '2026-08-16T18:20:00.000Z',
-          provenance: channel === 'local' ? 'development' : 'verified',
-        }),
-      },
-    });
+  ])(
+    'renders the %s build as a persistent %s release identity',
+    async (channel, label) => {
+      const version = channel === 'staging' ? '26.8.2-staging.1.1' : '26.8.1';
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: {
+          getBuildIdentity: vi.fn().mockResolvedValue({
+            channel,
+            version,
+            sourceRevision: '8e42ec8d79cbee578971636b78bb80dc32c78b39',
+            builtAt: channel === 'local' ? null : '2026-08-16T18:20:00.000Z',
+            provenance: channel === 'local' ? 'development' : 'verified',
+          }),
+        },
+      });
 
-    renderTitlebar();
+      renderTitlebar();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
-        `${label} · ${version} · 8e42ec8`
-      );
-      expect(
-        screen.getByLabelText(
-          `${label} environment, version ${version}, source revision 8e42ec8d79cbee578971636b78bb80dc32c78b39`
-        )
-      ).toBeInTheDocument();
-    });
-  });
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('electron-release-identity')
+        ).toHaveTextContent(`${label} · ${version} · 8e42ec8`);
+        expect(
+          screen.getByLabelText(
+            `${label} environment, version ${version}, source revision 8e42ec8d79cbee578971636b78bb80dc32c78b39`
+          )
+        ).toBeInTheDocument();
+      });
+    }
+  );
 
   it('reads exact package provenance from the validated main-process bridge', async () => {
     Object.defineProperty(window, 'electronAPI', {
@@ -311,23 +314,23 @@ describe('DesktopTitlebar', () => {
     );
   });
 
-  it.each([
-    null,
-    'invalid',
-  ])('fails closed for a non-object identity payload', async value => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: { getBuildIdentity: vi.fn().mockResolvedValue(value) },
-    });
+  it.each([null, 'invalid'])(
+    'fails closed for a non-object identity payload',
+    async value => {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: { getBuildIdentity: vi.fn().mockResolvedValue(value) },
+      });
 
-    renderTitlebar();
+      renderTitlebar();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
-        'Desktop · Version Unknown · Unverified'
-      );
-    });
-  });
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('electron-release-identity')
+        ).toHaveTextContent('Desktop · Version Unknown · Unverified');
+      });
+    }
+  );
 
   it('ignores a stale identity response after the bridge changes', async () => {
     let resolveIdentity: ((value: object) => void) | undefined;
