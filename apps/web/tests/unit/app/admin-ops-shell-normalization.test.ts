@@ -64,7 +64,12 @@ describe('admin ops shell normalization', () => {
     );
     expect(ops).toContain('redirect(APP_ROUTES.HUD)');
     expect(ops).not.toContain('<AdminPage');
-    expect(readSource(HUD_SHELL_PAGE)).toContain("from '@/app/hud/page'");
+    const hudShell = readSource(HUD_SHELL_PAGE);
+    expect(hudShell).toContain("from '@/app/hud/page'");
+    expect(hudShell).toContain("export const dynamic = 'force-dynamic'");
+    expect(hudShell).toContain("export const runtime = 'nodejs'");
+    expect(hudShell).not.toMatch(/export\s*\{[^}]*\bdynamic\b/);
+    expect(hudShell).not.toMatch(/export\s*\{[^}]*\bruntime\b/);
   });
 
   it('mounts the consolidated operational control panel below the HUD dashboard', () => {
