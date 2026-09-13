@@ -20,8 +20,12 @@ const runner = resolve(
   evePilot,
   'scripts/verify-e1-attestation-observations.ts'
 );
-const receiptPath =
-  '/opt/cursor/artifacts/e1-attestation-observations-receipt.json';
+// Actual receipt path is chosen by the TS runner (RUNNER_TEMP-safe on Gem).
+const receiptPathHint =
+  process.env.E1_RECEIPT_PATH ??
+  (process.env.RUNNER_TEMP
+    ? `${process.env.RUNNER_TEMP}/e1-attestation-observations-receipt.json`
+    : '/opt/cursor/artifacts/e1-attestation-observations-receipt.json');
 
 function usage() {
   console.error(`Usage:
@@ -88,6 +92,6 @@ const result = spawnSync('pnpm', ['exec', 'tsx', runner], {
 if (result.stdout) process.stdout.write(result.stdout);
 if (result.stderr) process.stderr.write(result.stderr);
 if (result.status === 0) {
-  console.log(`PASS: E1 observation gate (receipt: ${receiptPath})`);
+  console.log(`PASS: E1 observation gate (receipt hint: ${receiptPathHint})`);
 }
 process.exit(result.status ?? 1);

@@ -182,5 +182,6 @@ jobs:
           path: |
             ${{ runner.temp }}/e1-observation-a.json
             ${{ runner.temp }}/e1-observation-b.json
+            ${{ runner.temp }}/e1-attestation-observations-receipt.json
             /opt/cursor/artifacts/e1-attestation-observations-receipt.json
           if-no-files-found: warn
