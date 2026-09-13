@@ -894,7 +894,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       Boolean(dictationError) ||
       (showDictationHint && Boolean(dictationUnavailableHint));
     const showComposerOverlay =
-      showInlinePicker || plusMenuOpen || showDictationBanner;
+      showInlinePicker || isPickerOpen || showDictationBanner;
     // Container the slash key listener cares about when the picker is closed.
     // (The active-listener inside SlashCommandMenu only mounts while open.)
 
