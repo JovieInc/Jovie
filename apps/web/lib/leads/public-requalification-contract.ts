@@ -239,9 +239,11 @@ function publicQualification(
     spotifyUrl: qualification.spotifyUrl,
     hasInstagram: qualification.hasInstagram,
     instagramHandle: qualification.instagramHandle,
-    musicToolsDetected: [...qualification.musicToolsDetected].sort(),
+    // Public source digests use ECMAScript code-unit ordering. localeCompare
+    // would make the immutable receipt identity depend on the host locale.
+    musicToolsDetected: [...qualification.musicToolsDetected].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     hasTrackingPixels: qualification.hasTrackingPixels,
-    trackingPixelPlatforms: [...qualification.trackingPixelPlatforms].sort(),
+    trackingPixelPlatforms: [...qualification.trackingPixelPlatforms].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     allLinks: sortLinks(qualification.allLinks),
   };
 }
@@ -255,7 +257,7 @@ function publicSpotify(
     artistId: enrichment.artistId,
     popularity: enrichment.spotifyPopularity,
     followers: enrichment.spotifyFollowers,
-    genres: [...enrichment.spotifyGenres].sort(),
+    genres: [...enrichment.spotifyGenres].sort(), // NOSONAR (typescript:S2871) - Canonical digest order is locale-independent ECMAScript code-unit order.
     releaseCount: enrichment.releaseCount,
     latestReleaseDate: enrichment.latestReleaseDate?.toISOString() ?? null,
     priorityScore: enrichment.priorityScore,
