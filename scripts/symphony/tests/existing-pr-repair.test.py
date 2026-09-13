@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -79,6 +80,7 @@ class RepairTests(unittest.TestCase):
         self.stack.enter_context(mock.patch.object(controller, "_complete_open_prs", side_effect=lambda repo: [self.pr]))
         self.stack.enter_context(mock.patch.object(controller, "_fetch_single_issue", side_effect=lambda ident: self.issue))
         self.stack.enter_context(mock.patch.object(controller, "_native_dispatch_prerequisite", return_value=None))
+        self.stack.enter_context(mock.patch.object(controller, "_pr_status_check_rollup", return_value=None))
         self.stack.enter_context(mock.patch.object(controller, "gc_fallback_locks"))
         self.stack.enter_context(mock.patch.object(controller, "_fallback_lock_count", return_value=1))
         self.stack.enter_context(mock.patch.object(controller, "_fallback_lease_dir", return_value=self.leases))
@@ -96,8 +98,10 @@ class RepairTests(unittest.TestCase):
                       expiresAt=repair.datetime.fromtimestamp(payload["expiresAt"], repair.timezone.utc).isoformat())
         task = {"schema": "jovie-symphony-repair-task/v3", "taskKey": "a" * 64, "decisionFingerprint": "a" * 64,
                 "action": "execute-existing-owned-repair", "authority": "host-assigned-isolated-repair-only",
-                "selected": {"id": "affected-only-unit-selection"},
-                "source": {"sourceVersion": "b" * 40}, "existingRepair": target}
+                "selected": {"id": "affected-only-unit-selection", "sourceRevision": "b" * 40,
+                             "sourceDigest": "d" * 64, "owner": "ci-reliability", "handle": "audit:repair"},
+                "source": {"sourceVersion": "b" * 40, "snapshotDigest": "e" * 64},
+                "existingRepair": target}
         eligibility = {"qualified": True, "provider": "fixture-local", "model": "fixture-task-model", "funding": "included-local",
                        "taskAppropriate": True, "costAppropriate": True, "delegationPolicyBound": True,
                        "expiresAt": payload["expiresAt"], "authPoolIdentity": "b" * 64}
@@ -110,12 +114,41 @@ class RepairTests(unittest.TestCase):
                 "baseHead": payload["head"],
                 "finalHead": "b" * 40,
                 "outputDigest": "c" * 64,
+                "taskAcceptanceDigest": repair.task_acceptance_digest(task),
+                "taskAccepted": True,
             },
         }
         return task, executor
 
-    def run_isolated(self, task, executor=None):
-        return repair.execute_isolated(task, controller.__file__, lambda _: self.issue, lambda _: [self.pr], executor=executor)
+    def run_isolated(self, task, executor=None, *, resolved=True, expected_final_head=None,
+                     selected_check=True):
+        observed_calls = 0
+        planned_final_head = None
+
+        def fetch_prs(_repo):
+            nonlocal observed_calls, planned_final_head
+            observed_calls += 1
+            if observed_calls == 1 and executor is not None:
+                result = getattr(executor.execute, "return_value", {})
+                observation = result.get("_executionObservation", {}) if isinstance(result, dict) else {}
+                planned_final_head = expected_final_head or observation.get("finalHead")
+            if observed_calls > 1 and executor is not None:
+                head = planned_final_head or self.pr.get("headRefOid")
+                observation = {**self.pr, "headRefOid": head,
+                               "mergeStateStatus": "CLEAN" if resolved else self.pr.get("mergeStateStatus"),
+                               "mergeable": "MERGEABLE" if resolved else self.pr.get("mergeable")}
+                if resolved and selected_check:
+                    observation["statusCheckRollup"] = [{
+                        "__typename": "CheckRun",
+                        "name": task["selected"]["handle"],
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                    }]
+                return [observation]
+            return [self.pr]
+
+        return repair.execute_isolated(task, controller.__file__, lambda _: self.issue,
+                                       fetch_prs, executor=executor)
 
     def provider_granted_fixture(self):
         task, _executor = self.isolated_fixture()
@@ -182,8 +215,7 @@ class RepairTests(unittest.TestCase):
     def test_provider_grant_validation_and_grok_runner_are_source_and_assignment_bound(self):
         task, payload, executable = self.provider_granted_fixture()
         self.assertEqual(repair.load_validated_candidate(IDENT, controller.__file__), payload)
-        for key, value in (("issuedAt", payload["issuedAt"] - 1),
-                           ("expiresAt", payload["expiresAt"] + 1)):
+        for key, value in (("issuedAt", payload["issuedAt"] - 1), ("expiresAt", payload["expiresAt"] + 1)):
             crossed = copy.deepcopy(payload)
             crossed["providerGrant"][key] = value
             with self.assertRaisesRegex(ValueError, "provider-grant-assignment-window-invalid"):
@@ -198,34 +230,112 @@ class RepairTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "provider-grant-qualification-time-invalid"):
             repair.validate_provider_grant(naive)
         now = time.time()
+        def observed(age):
+            return repair.datetime.fromtimestamp(now - age, repair.timezone.utc).isoformat().replace("+00:00", "Z")
         fresh_edge = copy.deepcopy(payload)
-        fresh_edge["providerGrant"]["qualification"]["observedAt"] = repair.datetime.fromtimestamp(
-            now - repair.MAX_QUALIFICATION_AGE_SECONDS + 1,
-            repair.timezone.utc,
-        ).isoformat().replace("+00:00", "Z")
+        fresh_edge["providerGrant"]["qualification"]["observedAt"] = observed(repair.MAX_QUALIFICATION_AGE_SECONDS - 1)
         repair.validate_provider_grant(fresh_edge, now=now)
         stale = copy.deepcopy(fresh_edge)
-        stale["providerGrant"]["qualification"]["observedAt"] = repair.datetime.fromtimestamp(
-            now - repair.MAX_QUALIFICATION_AGE_SECONDS - 1,
-            repair.timezone.utc,
-        ).isoformat().replace("+00:00", "Z")
+        stale["providerGrant"]["qualification"]["observedAt"] = observed(repair.MAX_QUALIFICATION_AGE_SECONDS + 1)
         with self.assertRaisesRegex(ValueError, "provider-grant-qualification-stale"):
             repair.validate_provider_grant(stale, now=now)
-        runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout="changed", stderr=""))
+        acceptance = repair.task_acceptance_digest(task)
+        runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout=f"changed\n{repair.TASK_ACCEPTANCE_MARKER} {acceptance}\n", stderr=""))
         adapter = repair.GrokOwnedRepairExecutor(run=runner)
         eligibility = adapter.qualify(task, payload)
         self.writer()
-        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9", "OPENAI_API_KEY": "secret"}), \
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9", "OPENAI_API_KEY": "secret",
+                                         "SUMMER_GOVERNOR_ENFORCE_ENABLED": "true",
+                                         "SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY": "secret", "DATABASE_URL": "postgresql://product-secret"}), \
              mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
             result = adapter.execute(task, payload, {**eligibility, "runId": "JOV-5552-run"})
         self.assertEqual(result["status"], "succeeded")
-        self.assertEqual(result["_executionObservation"]["baseHead"], payload["head"])
+        observation = result["_executionObservation"]
+        self.assertEqual(observation["baseHead"], payload["head"])
         command = runner.call_args.args[0]
         self.assertEqual(command[0], str(executable))
         self.assertIn("grok-4.6", command)
         self.assertIn("--disable-web-search", command)
         self.assertIn("--no-subagents", command)
-        self.assertNotIn("OPENAI_API_KEY", runner.call_args.kwargs["env"])
+        child_env = runner.call_args.kwargs["env"]
+        self.assertTrue(set(child_env).issubset(repair.CHILD_ENV_ALLOWLIST))
+        for secret in ("OPENAI_API_KEY", "LINEAR_API_KEY", "SUMMER_GOVERNOR_ENFORCE_ENABLED",
+                       "SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY", "DATABASE_URL"):
+            self.assertNotIn(secret, child_env)
+        self.assertEqual(child_env["HOME"], os.environ["HOME"])
+        self.assertTrue(0 < runner.call_args.kwargs["timeout"] <= payload["providerGrant"]["expiresAt"] - time.time())
+        self.assertTrue(observation["taskAccepted"])
+
+    def test_grok_exit_zero_changed_head_without_exact_task_acceptance_stays_unverified(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout="changed\n", stderr=""))
+        adapter = repair.GrokOwnedRepairExecutor(run=runner)
+        eligibility = adapter.qualify(task, payload)
+        self.writer()
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}), \
+             mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
+            result = adapter.execute(task, payload, {**eligibility, "runId": "JOV-5552-acceptance"})
+        observation = result["_executionObservation"]
+        self.assertEqual((result["status"], result["detail"], observation["taskAccepted"],
+                          observation["taskAcceptanceDigest"]),
+                         ("failed", "grok-execution-task-acceptance-unverified", False,
+                          repair.task_acceptance_digest(task)))
+
+    @unittest.skipUnless(os.name == "posix", "requires process sessions")
+    def test_bounded_runner_stops_descendants_without_touching_unrelated_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            descendant_path = Path(directory) / "descendant.pid"
+            child = ("import os,pathlib,signal,time; c=os.fork(); "
+                     f"p=pathlib.Path({str(descendant_path)!r}); "
+                     "(p.write_text(str(os.getpid())),signal.signal(signal.SIGTERM,signal.SIG_IGN)) if c==0 else None; "
+                     "time.sleep(10)")
+            unrelated = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(10)"], start_new_session=True)
+            try:
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    repair._run_bounded([sys.executable, "-c", child], stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE, text=True, timeout=0.1)
+                self.assertIsNone(unrelated.poll())
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline and not descendant_path.exists():
+                    time.sleep(0.02)
+                self.assertTrue(descendant_path.is_file())
+                while time.monotonic() < deadline:
+                    try:
+                        os.kill(int(descendant_path.read_text()), 0)
+                    except ProcessLookupError:
+                        break
+                    time.sleep(0.02)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(descendant_path.read_text()), 0)
+            finally:
+                unrelated.terminate()
+                unrelated.wait(timeout=5)
+
+    @unittest.skipUnless(os.name == "posix", "requires process sessions")
+    def test_bounded_runner_cleans_descendant_after_successful_leader_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            descendant_path = Path(directory) / "descendant.pid"
+            child = ("import os,pathlib,signal,time; c=os.fork(); "
+                     f"p=pathlib.Path({str(descendant_path)!r}); "
+                     "(signal.signal(signal.SIGTERM,signal.SIG_IGN),"
+                     "p.write_text(str(os.getpid())),os.close(1),os.close(2),time.sleep(10)) if c==0 else os._exit(0)")
+            result = repair._run_bounded([sys.executable, "-c", child],
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                         text=True, timeout=2)
+            self.assertEqual(result.returncode, 0)
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline and not descendant_path.exists():
+                time.sleep(0.02)
+            self.assertTrue(descendant_path.is_file())
+            descendant_pid = int(descendant_path.read_text())
+            while time.monotonic() < deadline:
+                try:
+                    os.kill(descendant_pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.02)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(descendant_pid, 0)
 
     def test_discovery_excludes_claimed_and_terminal_assignments(self):
         _task, payload, _executable = self.provider_granted_fixture()
@@ -257,6 +367,17 @@ class RepairTests(unittest.TestCase):
             control.assert_not_called()
         self.assertFalse((self.root / f"{IDENT}.claim").exists())
 
+    def test_owned_inventory_adds_status_rows_only_to_exact_target_pr(self):
+        task, _executor = self.isolated_fixture()
+        other = {**self.pr, "number": self.pr["number"] + 1}
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        with mock.patch.object(controller, "_complete_open_prs", return_value=[self.pr, other]), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks):
+            rows = controller._owned_repair_pr_inventory(task, "JovieInc/Jovie")
+        self.assertEqual(rows[0]["statusCheckRollup"], checks)
+        self.assertNotIn("statusCheckRollup", rows[1])
+
     def test_isolated_mode_never_enters_native_or_generic_fallback(self):
         task, executor = self.isolated_fixture()
         with self.assertRaisesRegex(ValueError, "assignment-schema-invalid"):
@@ -273,7 +394,7 @@ class RepairTests(unittest.TestCase):
             self.assertEqual(os.fstat(9).st_ino, (self.leases / f"{IDENT}.lock").stat().st_ino)
             code = "import fcntl,sys; f=open(sys.argv[1],'a'); fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)"
             self.assertNotEqual(subprocess.run(["python3", "-c", code, str(self.leases / f"{IDENT}.lock")], capture_output=True).returncode, 0)
-            return {"status": "succeeded"}
+            return executor.execute.return_value
         executor.execute.side_effect = execute
         self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
         self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
@@ -290,10 +411,65 @@ class RepairTests(unittest.TestCase):
             self.run_isolated(task, executor)
         self.assertTrue((self.root / f"{IDENT}.acceptance.json").is_file())
         self.assertEqual(json.loads((self.root / f"{IDENT}.run.json").read_text())["status"], "started")
-        self.assertEqual(self.run_isolated(task, executor)["reason"], "isolated-repair-claimed-outcome-unknown")
+        payload = repair.read_private(self.root / f"{IDENT}.json")
+        with mock.patch.object(repair.time, "time", return_value=payload["expiresAt"] + 1):
+            self.assertEqual(self.run_isolated(task, executor)["reason"], "isolated-repair-claimed-outcome-unknown")
         self.assertEqual(executor.execute.call_count, 1)
         recovery = json.loads((self.root / f"{IDENT}.recovery.json").read_text())
         self.assertEqual(recovery["state"], "unknown")
+
+    def test_isolated_repair_replays_correlated_result_after_expiry_without_rerun(self):
+        task, executor = self.isolated_fixture()
+        first = self.run_isolated(task, executor)
+        payload = repair.read_private(self.root / f"{IDENT}.json")
+        with mock.patch.object(repair.time, "time", return_value=payload["expiresAt"] + 1):
+            replay = self.run_isolated(task, executor)
+        self.assertEqual(replay, first)
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_changed_head_without_task_acceptance_is_recorded_but_unverified(self):
+        task, executor = self.isolated_fixture()
+        executor.execute.return_value["_executionObservation"]["taskAccepted"] = False
+        result = self.run_isolated(task, executor)
+        self.assertEqual((result["status"], result["execution"]["verification"]["headChanged"],
+                          result["execution"]["verification"]["taskAccepted"]), ("succeeded", True, False))
+
+    def test_changed_head_with_worker_marker_but_unfixed_task_stays_unverified(self):
+        task, payload, executable = self.provider_granted_fixture()
+        acceptance = repair.task_acceptance_digest(task)
+        runner = mock.Mock(return_value=mock.Mock(
+            returncode=0,
+            stdout=f"changed\n{repair.TASK_ACCEPTANCE_MARKER} {acceptance}\n",
+            stderr="",
+        ))
+        adapter = repair.GrokOwnedRepairExecutor(run=runner)
+        eligibility = adapter.qualify(task, payload)
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}), \
+             mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
+            result = self.run_isolated(task, adapter, resolved=False, expected_final_head="b" * 40)
+        evaluation, verification = result["execution"]["sourceEvaluation"], result["execution"]["verification"]
+        self.assertEqual((result["status"], result["detail"], evaluation["workerAttested"],
+                          evaluation["taskResolved"], verification["taskAccepted"], evaluation["reason"]),
+                         ("succeeded", "owned-repair-source-evaluation-unverified", True, False, False,
+                          "task-check-unresolved"))
+
+    def test_clean_mergeable_changed_head_without_selected_check_stays_unverified(self):
+        task, executor = self.isolated_fixture()
+        result = self.run_isolated(task, executor, resolved=True, selected_check=False)
+        evaluation = result["execution"]["sourceEvaluation"]
+        verification = result["execution"]["verification"]
+        self.assertEqual((result["status"], result["detail"], evaluation["taskResolved"],
+                          verification["taskAccepted"], evaluation["reason"]),
+                         ("succeeded", "owned-repair-source-evaluation-unverified", False, False,
+                          "task-check-evidence-unavailable"))
+
+    def test_execution_window_reserves_process_cleanup_time(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        grant = payload["providerGrant"]
+        with self.assertRaisesRegex(ValueError, "execution-window-too-short"):
+            repair._remaining_execution_timeout(
+                payload, grant, now=grant["expiresAt"] - repair.PROCESS_CLEANUP_GRACE_SECONDS
+            )
 
     def test_isolated_repair_rejects_competing_lease_and_does_not_claim(self):
         task, executor = self.isolated_fixture()
