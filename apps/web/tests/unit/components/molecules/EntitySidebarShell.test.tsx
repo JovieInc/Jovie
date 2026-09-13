@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
@@ -8,17 +8,21 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
     children,
     ariaLabel,
     className,
+    onKeyDown,
     'data-testid': testId,
   }: {
     readonly children: ReactNode;
     readonly ariaLabel?: string;
     readonly className?: string;
+    readonly onKeyDown?: (event: KeyboardEvent) => void;
     readonly 'data-testid'?: string;
   }) => (
     <aside
       data-testid={testId ?? 'right-drawer'}
       aria-label={ariaLabel}
       className={className}
+      data-keyboard-handler={onKeyDown ? 'present' : 'none'}
+      onKeyDown={event => onKeyDown?.(event.nativeEvent)}
     >
       {children}
     </aside>
@@ -26,6 +30,23 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
 }));
 
 describe('EntitySidebarShell', () => {
+  it('derives the existing close handler into the drawer keyboard path', () => {
+    const onClose = vi.fn();
+
+    render(
+      <EntitySidebarShell isOpen ariaLabel='Entity details' onClose={onClose}>
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const drawer = screen.getByTestId('right-drawer');
+    expect(drawer).toHaveAttribute('data-keyboard-handler', 'present');
+
+    fireEvent.keyDown(drawer, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('defaults entity workspaces to the shared raised surface', () => {
     render(
       <EntitySidebarShell isOpen ariaLabel='Entity details'>

@@ -74,7 +74,10 @@ export function countLinearNamespaceUsage(): {
 }
 
 describe('--linear-* namespace ratchet (shrink-only)', () => {
-  it('does not add new --linear-* usage beyond the baseline', () => {
+  // Source walk of app/components/styles exceeds the 5s local budget.
+  it('does not add new --linear-* usage beyond the baseline', {
+    timeout: 15_000,
+  }, () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
       count: number;
     };
