@@ -7,15 +7,7 @@ const meta = {
   parameters: {
     layout: 'centered',
     jovie: {
-      uncoveredProps: [
-        'theme',
-        'resolvedTheme',
-        'isUpdating',
-        'isDark',
-        'onToggle',
-        'disabled',
-        'onThemeSave',
-      ],
+      uncoveredProps: ['onThemeSave'],
     },
   },
 } satisfies Meta<typeof DashboardThemeToggle>;

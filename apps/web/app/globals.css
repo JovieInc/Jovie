@@ -45,6 +45,10 @@
 @source not "../**/*.test.*";
 @source not "../**/*.spec.*";
 @source not "../**/*.stories.*";
+/* DashboardThemeToggle is rendered by the app shell and has a small
+   route-owned utility set. Re-include only this file so its state paints are
+   present without scanning the dashboard tree into public CSS. */
+@source "../components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx";
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
@@ -129,7 +133,8 @@ html[data-desktop-runtime="electron"]
    p-[--app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);

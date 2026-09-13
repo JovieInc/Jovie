@@ -171,6 +171,7 @@ function ThemeToggleButton({
             isDark ? 'bg-(--linear-border-focus)' : 'bg-surface-0',
             'p-0.5'
           )}
+          stateStyling='owner'
           thumbClassName={cn(
             'flex h-5 w-5 transform items-center justify-center rounded-full bg-surface-1 shadow ring-0 transition duration-subtle ease-out',
             isDark ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0',
