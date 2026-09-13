@@ -1862,7 +1862,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-switch-thumb) {
   position: absolute;
   top: var(--space-0-5);
-  left: var(--space-0-5);
+  inset-inline-start: var(--space-0-5);
   width: var(--space-5);
   height: var(--space-5);
   border-radius: var(--radius-full);
