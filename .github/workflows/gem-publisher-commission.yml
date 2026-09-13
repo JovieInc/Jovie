@@ -152,14 +152,14 @@ jobs:
             done
             # emit exit 0 with a receipt that fails jq is still a hard failure —
             # never return 0 here or Verify would upload unhealthy observations.
-            # set +e before non-zero return: bash set -e + return ≠0 exits the
-            # whole shell instead of returning to the caller.
+            # Use exit (not set +e + return): curly-brace functions share shell
+            # options with the caller, so a sticky set +e would let cp/verify
+            # continue after a failed observation (Sentry 16703781).
             echo "::error::${label} failed after retries (last emit_exit=${status})"
-            set +e
             if [[ "${status:-1}" -ne 0 ]]; then
-              return "${status}"
+              exit "${status}"
             fi
-            return 2
+            exit 2
           }
           emit_ok "observation-a"
           cp "${receipt}" "${RUNNER_TEMP}/e1-observation-a.json"

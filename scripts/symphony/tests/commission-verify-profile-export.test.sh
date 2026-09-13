@@ -64,49 +64,76 @@ print(p.parse_args([]).profile)
 )"
 [[ "${fallback}" == "canonical" ]]
 
-# 4) emit_ok fail-closed: emit exit 0 + receipt jq miss must not return 0.
+# 4) emit_ok fail-closed: emit exit 0 + receipt jq miss must not succeed.
 #    Sentry 16703710: `return "${status:-2}"` masked persistent jq failures.
+#    Sentry 16703781: `set +e` + `return` leaks into the caller so cp/verify
+#    continue after a failed observation — exhausted-retry must `exit`.
 grep -q 'never return 0 here' "${WORKFLOW}"
-grep -A6 'failed after retries' "${WORKFLOW}" | grep -q 'return 2'
+grep -A8 'failed after retries' "${WORKFLOW}" | grep -q 'exit 2'
+if grep -A10 'failed after retries' "${WORKFLOW}" | grep -q 'set +e'; then
+  echo "FAIL: exhausted-retry path still uses set +e (leaks into caller)" >&2
+  exit 1
+fi
 
-fail_closed_rc="$(
-  bash -c '
-    set -euo pipefail
-    receipt="$1/receipt.json"
-    printf "%s\n" "{\"healthy\":false}" >"${receipt}"
-    emit() { printf "emitted\n"; return 0; }
-    ok=".healthy==true"
-    emit_ok() {
-      local label="$1" out status attempt jq_rc
-      for attempt in 1 2 3; do
-        set +e
-        out="$(emit 2>&1)"
-        status=$?
-        jq_rc=1
-        if [[ "${status}" -eq 0 ]]; then
-          jq -e "$ok" "${receipt}" >/dev/null
-          jq_rc=$?
-        fi
-        set -e
-        if [[ "${status}" -eq 0 && "${jq_rc}" -eq 0 ]]; then
-          return 0
-        fi
-      done
-      # set +e before non-zero return (bash set -e + return ≠0 exits the shell)
+fail_closed_rc=0
+bash -c '
+  set -euo pipefail
+  receipt="$1/receipt.json"
+  printf "%s\n" "{\"healthy\":false}" >"${receipt}"
+  emit() { printf "emitted\n"; return 0; }
+  ok=".healthy==true"
+  emit_ok() {
+    local label="$1" out status attempt jq_rc
+    for attempt in 1 2 3; do
       set +e
-      if [[ "${status:-1}" -ne 0 ]]; then
-        return "${status}"
+      out="$(emit 2>&1)"
+      status=$?
+      jq_rc=1
+      if [[ "${status}" -eq 0 ]]; then
+        jq -e "$ok" "${receipt}" >/dev/null
+        jq_rc=$?
       fi
-      return 2
-    }
-    set +e
-    emit_ok "observation-a"
-    rc=$?
-    set -e
-    printf "%s" "${rc}"
-    exit 0
-  ' bash "${TMP}"
-)"
+      set -e
+      if [[ "${status}" -eq 0 && "${jq_rc}" -eq 0 ]]; then
+        return 0
+      fi
+    done
+    # Fail the step — do not set +e + return (sticky options leak).
+    if [[ "${status:-1}" -ne 0 ]]; then
+      exit "${status}"
+    fi
+    exit 2
+  }
+  emit_ok "observation-a"
+  echo SHOULD_NOT_REACH
+  exit 0
+' bash "${TMP}" || fail_closed_rc=$?
 [[ "${fail_closed_rc}" == "2" ]]
+
+# 5) Successful emit_ok must leave set -e intact for subsequent commands.
+set_e_intact_rc=0
+bash -c '
+  set -euo pipefail
+  receipt="$1/receipt.json"
+  printf "%s\n" "{\"healthy\":true}" >"${receipt}"
+  emit() { printf "emitted\n"; return 0; }
+  ok=".healthy==true"
+  emit_ok() {
+    local out status
+    set +e
+    out="$(emit 2>&1)"
+    status=$?
+    set -e
+    if [[ "${status}" -eq 0 ]] && jq -e "$ok" "${receipt}" >/dev/null; then
+      return 0
+    fi
+    exit 2
+  }
+  emit_ok "observation-a"
+  # Under sticky set +e this false would be ignored; under set -e it aborts.
+  false
+  echo SHOULD_NOT_REACH
+' bash "${TMP}" || set_e_intact_rc=$?
+[[ "${set_e_intact_rc}" -ne 0 ]]
 
 printf 'commission-verify-profile-export regression OK\n'
