@@ -67,6 +67,154 @@ def _drain_command(
     return f'{env_prefix}bash "{_DRAIN_SCRIPT}"'
 
 
+def _run_same_token_rest_fixture(
+    tmp_path: Path, *, rest_mode: str, post_hold: bool = False
+) -> tuple[subprocess.CompletedProcess[str], dict[str, Path], str, str]:
+    """Run an exact native admission against controlled REST/GraphQL reads."""
+    head = "b" * 40
+    base = "c" * 40
+    rest_calls = tmp_path / "rest-calls"
+    view_calls = tmp_path / "view-calls"
+    enroll_calls = tmp_path / "enroll-calls"
+    dequeue_calls = tmp_path / "dequeue-calls"
+    for path in (rest_calls, view_calls, enroll_calls, dequeue_calls):
+        path.write_text("0", encoding="utf-8")
+
+    fake_node = tmp_path / "node"
+    fake_node.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            case "${{2:-}}" in
+              preflight) exit 0 ;;
+              prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
+              list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
+              enroll)
+                count=$(<"{enroll_calls}")
+                echo "$((count + 1))" >"{enroll_calls}"
+                echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","enqueuedAt":"2026-08-15T12:00:00Z","state":"AWAITING_CHECKS","position":1}}}}}}'
+                ;;
+              dequeue)
+                count=$(<"{dequeue_calls}")
+                echo "$((count + 1))" >"{dequeue_calls}"
+                echo '{{"state":{{"queued":false}}}}'
+                ;;
+              max-queue-depth) echo 16 ;;
+              unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+              unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+              changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              admission) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","stampPath":false}}' ;;
+              changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+              changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+              explain-selector) echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
+              prove-receipt) echo '{{"ok":false,"explanation":{{"reason":"not-queued"}},"state":{{"queued":false}}}}' ;;
+              --classify-queue) echo '[]' ;;
+              *) echo "unexpected node args: $*" >&2; exit 2 ;;
+            esac
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr checks" ]]; then
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr view" ]]; then
+              count=$(<"{view_calls}")
+              echo "$((count + 1))" >"{view_calls}"
+              labels='[]'
+              if [[ "{str(post_hold).lower()}" == "true" && "$count" -ge 1 ]]; then
+                labels='[{{"name":"hold"}}]'
+              fi
+              printf '%s\\n' '{{"state":"OPEN","isDraft":false,"mergeable":"UNKNOWN","labels":'"$labels"',"headRefOid":"{head}","baseRefName":"main","baseRefOid":"{base}","body":""}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == "user" ]]; then
+              echo '{{"login":"github-actions[bot]","type":"Bot","id":418}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == "repos/JovieInc/Jovie/pulls/101" ]]; then
+              count=$(<"{rest_calls}")
+              next=$((count + 1))
+              echo "$next" >"{rest_calls}"
+              rest_state=open
+              rest_draft=false
+              rest_head={head}
+              rest_base={base}
+              rest_labels='[]'
+              rest_mergeable=true
+              rest_merge_state=clean
+              if [[ "{str(post_hold).lower()}" == "true" && "$next" -ge 3 ]]; then
+                rest_labels='[{{"name":"hold"}}]'
+              fi
+              case "{rest_mode}:$next" in
+                head-mismatch:*) rest_head={'d' * 40} ;;
+                base-mismatch:*) rest_base={'e' * 40} ;;
+                labels-mismatch:*) rest_labels='[{{"name":"hold"}}]' ;;
+                draft-mismatch:*) rest_draft=true ;;
+                state-mismatch:*) rest_state=closed ;;
+                false:*) rest_mergeable=false; rest_merge_state=dirty ;;
+                null:*) rest_mergeable=null; rest_merge_state=unknown ;;
+                read-failure:*) exit 1 ;;
+                flip:1) rest_mergeable=true ;;
+                flip:*) rest_mergeable=false; rest_merge_state=dirty ;;
+              esac
+              printf '%s\\n' '{{"number":101,"state":"'"$rest_state"'","draft":'"$rest_draft"',"mergeable":'"$rest_mergeable"',"mergeable_state":"'"$rest_merge_state"'","head":{{"sha":"'"$rest_head"'","ref":"codex/rest-fallback"}},"base":{{"sha":"'"$rest_base"'","ref":"main"}},"labels":'"$rest_labels"'}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+              echo '{{"statuses":[]}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+              echo '[]'
+              exit 0
+            fi
+            if [[ "$1" == "api" && "$2" == *"/commits/{head}"* ]]; then
+              echo '2026-08-29T20:00:00Z'
+              exit 0
+            fi
+            if [[ "$1" == "api" ]]; then exit 1; fi
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+    result = _run_bash(
+        _drain_command(
+            tmp_path,
+            backend="native",
+            extra_env=(
+                f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=3 "
+                "DRAIN_MERGEABLE_RECHECK_SECONDS=0 "
+                "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+            ),
+        )
+    )
+    return result, {
+        "rest": rest_calls,
+        "view": view_calls,
+        "enroll": enroll_calls,
+        "dequeue": dequeue_calls,
+    }, head, base
+
+
 def _summer_closure_admission(
     *, intake_allowed: bool = True, status: str | None = None
 ) -> dict[str, object]:
@@ -2045,6 +2193,54 @@ class TestDrainPrQueueWiring:
         assert "same-token REST mergeability fallback" in result.stderr
         assert "+native-queue on #101" in result.stdout
         assert int(rest_calls.read_text(encoding="utf-8")) == 3
+
+    @pytest.mark.parametrize(
+        ("rest_mode", "expected_rest_calls"),
+        [
+            ("head-mismatch", 1),
+            ("base-mismatch", 1),
+            ("labels-mismatch", 1),
+            ("draft-mismatch", 1),
+            ("state-mismatch", 1),
+            ("false", 1),
+            ("null", 1),
+            ("read-failure", 1),
+            ("flip", 2),
+        ],
+    )
+    def test_same_token_rest_fallback_rejects_unstable_or_mismatched_evidence(
+        self, tmp_path: Path, rest_mode: str, expected_rest_calls: int
+    ) -> None:
+        result, paths, _, _ = _run_same_token_rest_fixture(
+            tmp_path, rest_mode=rest_mode
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "queue-noop" in result.stderr
+        assert "same-token REST mergeability fallback" not in result.stderr
+        assert "+native-queue on #101" not in result.stdout
+        assert int(paths["rest"].read_text(encoding="utf-8")) == expected_rest_calls
+        assert int(paths["enroll"].read_text(encoding="utf-8")) == 0
+        assert int(paths["dequeue"].read_text(encoding="utf-8")) == 0
+        if rest_mode == "null":
+            assert 'raw_mergeable":null' in result.stderr
+        if rest_mode == "read-failure":
+            assert "transport=failed" in result.stderr
+
+    def test_post_enrollment_hold_is_not_masked_by_rest_fallback(
+        self, tmp_path: Path
+    ) -> None:
+        result, paths, _, _ = _run_same_token_rest_fixture(
+            tmp_path, rest_mode="valid", post_hold=True
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "same-token REST mergeability fallback" in result.stderr
+        assert "eligibility changed during native enrollment" in result.stdout
+        assert "-native-queue on #101" in result.stdout
+        assert int(paths["rest"].read_text(encoding="utf-8")) == 3
+        assert int(paths["enroll"].read_text(encoding="utf-8")) == 1
+        assert int(paths["dequeue"].read_text(encoding="utf-8")) == 1
 
     @pytest.mark.parametrize(
         (
