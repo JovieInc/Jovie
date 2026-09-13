@@ -153,10 +153,11 @@ async function runGh(runner, args, description) {
   }
   const code = result?.code ?? result?.exitCode ?? 0;
   if (code !== 0) {
+    const stderr = String(result?.stderr ?? '').trim();
     throw backendError(
       'gh_command_failed',
-      `${description} failed with exit code ${code}`,
-      { stderr: String(result?.stderr ?? '').trim() }
+      `${description} failed with exit code ${code}${stderr ? `: ${stderr}` : ''}`,
+      { stderr }
     );
   }
   return String(result?.stdout ?? result ?? '');

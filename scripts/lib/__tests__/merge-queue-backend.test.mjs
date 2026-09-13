@@ -1441,7 +1441,8 @@ describe('queue workflow mutation safety', () => {
     for (const job of [enrollJob, rebaseJob]) {
       expect(job).toContain(tokenAction);
       expect(job).toContain('id: app-token');
-      expect(job).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
+      expect(job).toContain('client-id: ${{ vars.JOVIE_BOT_CLIENT_ID }}');
+      expect(job).not.toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
       expect(job).toContain(
         'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
       );
