@@ -84,6 +84,8 @@ describe('MarketingHeader', () => {
     );
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
@@ -116,6 +118,8 @@ describe('MarketingHeader', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {

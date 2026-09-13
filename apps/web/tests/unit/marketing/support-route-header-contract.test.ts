@@ -57,8 +57,13 @@ describe('support route header contract', () => {
   it('keeps public sign-in copy and the shared front-door CTA contract', () => {
     const headerSource = readWebSource('components/site/MarketingHeader.tsx');
 
+    expect(headerSource).toContain(
+      'const useCanonicalSimpleNav = isHomepage || navLinks !== undefined;'
+    );
     expect(headerSource).toContain('minimalAuth={isMinimal}');
     expect(headerSource).toContain("minimalAuthLabel='Sign in'");
+    expect(headerSource).toContain('showContactLink={false}');
+    expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('HOMEPAGE_LAUNCH_COPY.hero.primaryCta');
   });
 

@@ -46,6 +46,10 @@ describe('MobileNav', () => {
       'href',
       '/start'
     );
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
     expect(document.body).toHaveStyle({ overflow: 'hidden' });
   });
 
@@ -71,6 +75,7 @@ describe('MobileNav', () => {
     const source = readFileSync(resolve(__dirname, './MobileNav.tsx'), 'utf8');
     expect(source).toContain('var(--shadow-button)');
     expect(source).not.toContain('--linear-shadow-button');
+    expect(source).not.toContain("label: 'Log In'");
   });
 
   it('documents the sentence-case login label as an intentional casing exception', () => {
