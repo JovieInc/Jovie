@@ -1020,7 +1020,10 @@ describe('configuration boundaries', () => {
     const capturedRequest = /** @type {any} */ (request);
     assert.equal(capturedRequest.url, `https://summer.example${OUTCOME_PATH}`);
     assert.equal(capturedRequest.options.method, 'POST');
-    assert.equal(capturedRequest.options.headers['content-type'], 'application/json');
+    assert.equal(
+      capturedRequest.options.headers['content-type'],
+      'application/json'
+    );
     assert.deepEqual(JSON.parse(capturedRequest.options.body), outcome);
     assert.equal(outcome.schema, OUTCOME_DOMAIN_V3);
   });
