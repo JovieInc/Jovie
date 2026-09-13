@@ -200,11 +200,13 @@ raise SystemExit(99)
         self.assertNotEqual(self.run_helper().returncode,0)
         self.assertEqual(self.guard.read_text(),'foreign')
 
-    def test_actual_trial_workspace_is_checked_by_final_helper(self):
-        self.write("sudo", '#!/usr/bin/env bash\nif [[ "$*" == *"/home/timwhite/codex-qualification"* ]]; then echo 1; else echo 0; fi\n')
-        result = self.run_helper()
-        self.assertEqual(result.returncode, 21, result.stderr)
-        self.assertFalse(self.guard.exists())
+    def test_actual_trial_workspaces_are_checked_by_final_helper(self):
+        for root in ('/home/timwhite/codex-qualification', '/srv/worktrees/codex-qualification'):
+            with self.subTest(root=root):
+                self.write("sudo", '#!/usr/bin/env bash\nif [[ "$*" == *"' + root + '"* ]]; then echo 1; else echo 0; fi\n')
+                result = self.run_helper()
+                self.assertEqual(result.returncode, 21, result.stderr)
+                self.assertFalse(self.guard.exists())
 
     def inherited_check(self, descriptor=None, **overrides):
         env={**os.environ, "HOME":str(self.home), "EVENTS":str(self.events),

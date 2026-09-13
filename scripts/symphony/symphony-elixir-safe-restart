@@ -8,6 +8,7 @@ workspace_roots=(
   /home/timwhite/symphony-elixir-workspaces
   /srv/worktrees/jovie
   /home/timwhite/codex-qualification
+  /srv/worktrees/codex-qualification
 )
 check_only=false
 prepare_stop_guard=false
