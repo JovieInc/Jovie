@@ -20,11 +20,9 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-          permission-issues: write
-          permission-checks: read # Linear/Symphony ownership audit gates mutation.
-          permission-merge-queues: read # isInMergeQueue / mergeQueueEntry GraphQL fields.
+          # Unscoped: inherit the app installation. A permission-* subset
+          # cannot request merge-queues (not granted to this install) and
+          # without it readNativePullRequestState fails on isInMergeQueue.
       - name: Checkout exact main recovery policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

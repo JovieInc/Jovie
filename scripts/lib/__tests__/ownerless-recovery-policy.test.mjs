@@ -413,7 +413,8 @@ describe('tracker scan admission', () => {
     expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
     expect(workflow).not.toContain('ready_for_review');
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('permission-merge-queues: read');
+    expect(workflow).not.toContain('permission-merge-queues');
+    expect(workflow).not.toMatch(/permission-contents:/);
     expect(workflow).toMatch(
       /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
     );
