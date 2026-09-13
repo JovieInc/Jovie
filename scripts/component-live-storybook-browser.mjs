@@ -127,6 +127,7 @@ function assertIndexContainsCanonicalStories(index, repoRoot) {
 function ownerSelector(owner) {
   if (owner === 'atom.button') return 'button, [role="button"]';
   if (owner === 'atom.badge') return 'span[data-variant], span[data-tone]';
+  if (owner === 'atom.switch') return '[role="switch"]';
   return '[data-variant="hoverable"], [data-variant="default"]';
 }
 
@@ -357,24 +358,34 @@ async function measureStory(page, story, viewport, axePath) {
         ? 'light'
         : 'dark';
       const role = el.getAttribute('role') || el.tagName.toLowerCase();
-      const interactive = role === 'button' || el.tagName === 'BUTTON';
+      const interactive =
+        role === 'button' || role === 'switch' || el.tagName === 'BUTTON';
       const matchesOwner =
         owner === 'atom.badge'
           ? el.tagName === 'SPAN' &&
             (el.hasAttribute('data-variant') || el.hasAttribute('data-tone'))
           : owner === 'atom.button'
-            ? interactive
-            : classOf(el).includes('rounded-(--system-b-radius-card)') &&
-              (el.getAttribute('data-variant') === 'default' ||
-                el.getAttribute('data-variant') === 'hoverable');
+            ? role === 'button' || el.tagName === 'BUTTON'
+            : owner === 'atom.switch'
+              ? role === 'switch'
+              : classOf(el).includes('rounded-(--system-b-radius-card)') &&
+                (el.getAttribute('data-variant') === 'default' ||
+                  el.getAttribute('data-variant') === 'hoverable');
 
       return {
         copy:
-          (el.innerText || el.textContent || '').trim().split('\n')[0] || '',
+          (
+            el.innerText ||
+            el.textContent ||
+            el.getAttribute('aria-label') ||
+            ''
+          )
+            .trim()
+            .split('\n')[0] || '',
         classes,
         variant: el.getAttribute('data-variant'),
         tone: el.getAttribute('data-tone'),
-        role: interactive ? 'button' : role,
+        role,
         interactive,
         accessibleName: (
           el.getAttribute('aria-label') ||
@@ -420,7 +431,7 @@ async function measureStory(page, story, viewport, axePath) {
   }
 
   let keyboardReached = false;
-  if (story.owner === 'atom.button') {
+  if (story.owner === 'atom.button' || story.owner === 'atom.switch') {
     await page
       .locator('body')
       .click({ position: { x: 1, y: 1 } })
@@ -433,7 +444,8 @@ async function measureStory(page, story, viewport, axePath) {
         return Boolean(
           active &&
             (active.tagName === 'BUTTON' ||
-              active.getAttribute('role') === 'button')
+              active.getAttribute('role') === 'button' ||
+              active.getAttribute('role') === 'switch')
         );
       });
       if (keyboardReached) break;

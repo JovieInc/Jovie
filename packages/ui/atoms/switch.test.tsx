@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -26,6 +27,21 @@ describe('Switch', () => {
       expect(switchElement.className).toContain('h-4');
       expect(switchElement.className).toContain('w-7');
       expect(switchElement.className).toContain('rounded-full');
+    });
+
+    it('supports an owner-defined thumb presentation', () => {
+      render(
+        <Switch
+          aria-label='Theme toggle'
+          thumbClassName='h-5 w-5'
+          thumbChildren={<span data-testid='thumb-icon' aria-hidden='true' />}
+        />
+      );
+
+      expect(
+        screen.getByRole('switch', { name: 'Theme toggle' })
+      ).toBeVisible();
+      expect(screen.getByTestId('thumb-icon')).toBeInTheDocument();
     });
   });
 
@@ -282,21 +298,29 @@ describe('Switch', () => {
         'true'
       );
     });
+
+    it('preserves aria-invalid state', () => {
+      render(<Switch aria-label='Invalid toggle' aria-invalid='true' />);
+      expect(screen.getByRole('switch')).toHaveAttribute(
+        'aria-invalid',
+        'true'
+      );
+    });
   });
 
   describe('Keyboard Navigation', () => {
-    it('toggles on space key', () => {
+    it('toggles on space key', async () => {
       const onCheckedChange = vi.fn();
       render(<Switch aria-label='Toggle' onCheckedChange={onCheckedChange} />);
       const switchElement = screen.getByRole('switch');
+      const user = userEvent.setup();
 
       switchElement.focus();
       expect(switchElement).toHaveFocus();
 
-      // Radix UI handles keyboard events internally and triggers onClick
-      // fireEvent.keyDown/keyUp doesn't trigger the handler in tests, so we test click
-      fireEvent.click(switchElement);
+      await user.keyboard(' ');
       expect(onCheckedChange).toHaveBeenCalledWith(true);
+      expect(switchElement).toHaveAttribute('aria-checked', 'true');
     });
 
     it('is focusable', () => {
