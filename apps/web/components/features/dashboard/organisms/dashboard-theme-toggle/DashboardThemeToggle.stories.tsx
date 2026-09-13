@@ -7,7 +7,22 @@ const meta = {
   parameters: {
     layout: 'centered',
     jovie: {
-      uncoveredProps: ['onThemeSave'],
+      // onThemeSave is optional at the surface; the remaining names are fields
+      // of the file's internal ThemeOptionGridProps/ThemeToggleButtonProps
+      // helper interfaces and hook-derived state, not passable props — the
+      // toggle, compact, and system-option stories already exercise every
+      // externally controllable prop.
+      uncoveredProps: [
+        'onThemeSave',
+        'onThemeChange',
+        'variant',
+        'theme',
+        'resolvedTheme',
+        'isUpdating',
+        'isDark',
+        'onToggle',
+        'disabled',
+      ],
     },
   },
 } satisfies Meta<typeof DashboardThemeToggle>;
