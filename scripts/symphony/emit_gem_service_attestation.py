@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import urllib.request
 
@@ -216,7 +217,32 @@ def main() -> int:
     try:
         receipt = observe_once() if args.check else publish(args.gem_root / "state/gem-service-attestation.json", observe_once)
         print(json.dumps(receipt, sort_keys=True))
-        return 0 if receipt["healthy"] else 2
+        if receipt["healthy"]:
+            return 0
+        # Surface mismatch summary on stderr so CI verify steps can diagnose
+        # exit 2 without relying on stdout (often redirected to /dev/null).
+        mismatched = [
+            name for name in ("unit", "policy", "gate", "closureHealth", "workflow")
+            if isinstance(receipt.get(name), dict) and not receipt[name].get("matches", True)
+        ]
+        mismatched.extend(
+            f"override:{item.get('name', '?')}"
+            for item in receipt.get("unitOverrides", [])
+            if isinstance(item, dict) and not item.get("matches", True)
+        )
+        print(
+            json.dumps(
+                {
+                    "schema": "gem-service-attestation-unhealthy/v1",
+                    "daemonReloaded": receipt.get("daemonReloaded"),
+                    "configurationProfile": receipt.get("configurationProfile"),
+                    "mismatched": mismatched,
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
+        return 2
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         # Do not serialize exception text: subprocess errors can carry argv.
         print(json.dumps({"schema": "gem-service-attestation-observation-error/v1",
