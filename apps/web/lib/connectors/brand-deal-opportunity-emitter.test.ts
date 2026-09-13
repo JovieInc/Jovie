@@ -186,29 +186,29 @@ describe('emitBrandDealOpportunity', () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
-  it.each([
-    'pending',
-    'approved',
-  ])('refuses a new opportunity while a %s brand-deal slot exists', async _status => {
-    mockSelectResults(
-      [evidenceObject],
-      [connectorAccount],
-      [],
-      [{ id: 'existing-action', status: _status }]
-    );
+  it.each(['pending', 'approved'])(
+    'refuses a new opportunity while a %s brand-deal slot exists',
+    async _status => {
+      mockSelectResults(
+        [evidenceObject],
+        [connectorAccount],
+        [],
+        [{ id: 'existing-action', status: _status }]
+      );
 
-    await expect(
-      emitBrandDealOpportunity({
-        userId: USER_ID,
-        evidenceObjectId: EVIDENCE_OBJECT_ID,
-      })
-    ).resolves.toEqual({
-      created: false,
-      actionId: 'existing-action',
-      reason: 'decision-slot-occupied',
-    });
-    expect(db.insert).not.toHaveBeenCalled();
-  });
+      await expect(
+        emitBrandDealOpportunity({
+          userId: USER_ID,
+          evidenceObjectId: EVIDENCE_OBJECT_ID,
+        })
+      ).resolves.toEqual({
+        created: false,
+        actionId: 'existing-action',
+        reason: 'decision-slot-occupied',
+      });
+      expect(db.insert).not.toHaveBeenCalled();
+    }
+  );
 
   it('refuses a new opportunity when an older approved campaign exists behind a newer rejected decision', async () => {
     mockSelectResults(

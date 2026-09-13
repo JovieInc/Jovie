@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, gte, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, ne, type SQL } from 'drizzle-orm';
 import {
   isMissingConnectorSchemaError,
   isMissingSignalTypeColumnError,
@@ -16,6 +16,8 @@ import type {
   OpportunityInboxData,
   OpportunityInboxTourDates,
 } from './opportunity-inbox-types';
+
+import { WORKFLOW_CAPTURE_REQUEST_KIND } from './suggested-action-kinds';
 
 const EMPTY_INBOX_DATA = buildOpportunityInboxData([]);
 
@@ -48,7 +50,9 @@ const BASE_SELECTION = {
 function pendingForUser(userId: string): SQL | undefined {
   return and(
     eq(suggestedActions.userId, userId),
-    eq(suggestedActions.status, 'pending')
+    eq(suggestedActions.status, 'pending'),
+    // Workflow recordings belong to Ovie, including for founders using Jovie.
+    ne(suggestedActions.kind, WORKFLOW_CAPTURE_REQUEST_KIND)
   );
 }
 
