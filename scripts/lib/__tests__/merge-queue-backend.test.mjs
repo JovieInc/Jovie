@@ -1362,7 +1362,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(drain).toContain('baseRefName,baseRefOid');
     expect(drain).toContain(
-      'json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"'
+      'json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body"'
     );
     expect(drain).toContain('.baseRefName == "main"');
     expect(drain).toContain('and (.base == "main")');

@@ -1944,6 +1944,108 @@ class TestDrainPrQueueWiring:
         assert "+native-queue on #101" in result.stdout
         assert int(view_calls.read_text(encoding="utf-8")) >= 2
 
+    def test_exact_admission_uses_same_token_rest_mergeability_fallback(self, tmp_path: Path) -> None:
+        head = "b" * 40
+        base = "c" * 40
+        rest_calls = tmp_path / "rest-calls"
+        rest_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  prove-admission) [[ -n "${{5:-}}" && "${{5}}" != "null" ]] ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
+                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","enqueuedAt":"2026-08-15T12:00:00Z","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  admission) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","stampPath":false}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  explain-selector) echo '{{"observed":true,"queued":false,"eligible":false,"reason":"mergeable=UNKNOWN"}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  printf '%s\\n' '{{"state":"OPEN","isDraft":false,"mergeable":"UNKNOWN","labels":[],"headRefOid":"{head}","baseRefName":"main","baseRefOid":"{base}","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == "user" ]]; then
+                  echo '{{"login":"github-actions[bot]","type":"Bot","id":418}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == "repos/JovieInc/Jovie/pulls/101" ]]; then
+                  count=$(<"{rest_calls}")
+                  echo "$((count + 1))" >"{rest_calls}"
+                  echo '{{"number":101,"state":"open","draft":false,"mergeable":true,"mergeable_state":"clean","head":{{"sha":"{head}","ref":"codex/rest-fallback"}},"base":{{"sha":"{base}","ref":"main"}},"labels":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+                  echo '{{"statuses":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}"* ]]; then
+                  echo '2026-08-29T20:00:00Z'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=3 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=0 "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert 'raw_mergeable_type":"string"' in result.stderr
+        assert "api=rest" in result.stderr
+        assert "actor=github-actions[bot]/Bot/418" in result.stderr
+        assert "same-token REST mergeability fallback" in result.stderr
+        assert "+native-queue on #101" in result.stdout
+        assert int(rest_calls.read_text(encoding="utf-8")) == 3
+
     @pytest.mark.parametrize(
         (
             "enroll_mode",

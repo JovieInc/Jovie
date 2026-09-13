@@ -247,6 +247,12 @@ UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
 PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"
 PRODUCT_FAILURE_DESCRIPTION="blocked:merge-group-product-failure"
 LAST_ENROLL_SKIP_REASON=""
+# Mergeability can be reported as the GraphQL enum UNKNOWN while the same
+# hosted read token already has an authoritative REST boolean. Keep this
+# fallback bounded and diagnostic-only: native admission still requires the
+# exact current head, base, labels, source checks, and queue postcondition.
+MERGEABILITY_PROBE_ACTOR=""
+MERGEABILITY_DIAGNOSTIC=""
 # Machine-state labels remain authoritative across every queue mutation.
 MACHINE_HOLD_JQ='. == "hold" or . == "gated" or . == "incident"'
 QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
@@ -1288,21 +1294,188 @@ reconcile_deferred_auto_merge_after_main_push() {
   done < <(jq -c '.[]' <<<"$candidates")
 }
 
+# Record the effective read identity without ever printing a token. The
+# workflow's GITHUB_TOKEN and the Jovie Bot mutation token are deliberately
+# separate; this probe is only used to explain a mergeability observation.
+mergeability_probe_actor() {
+  [[ -n "$MERGEABILITY_PROBE_ACTOR" ]] && return 0
+  local identity login type id
+  if identity="$(gh_retry api user --jq '{login:(.login // ""),type:(.type // ""),id:(.id // null)}' 2>/dev/null)" \
+    && jq -e '
+      type == "object"
+      and (.login | type == "string" and length > 0)
+      and (.type | type == "string" and length > 0)
+      and (.id | type == "number" and floor == . and . > 0)
+    ' <<<"$identity" >/dev/null 2>&1; then
+    login="$(jq -r '.login' <<<"$identity")"
+    type="$(jq -r '.type' <<<"$identity")"
+    id="$(jq -r '.id | tostring' <<<"$identity")"
+    MERGEABILITY_PROBE_ACTOR="$login/$type/$id"
+  else
+    MERGEABILITY_PROBE_ACTOR='unavailable'
+  fi
+}
+
+# Keep a compact, non-secret receipt of the exact field returned by the
+# hosted reader. `mergeable=null` and an omitted field are distinct from the
+# literal GraphQL enum UNKNOWN; all three remain non-admitting states.
+record_mergeability_probe() {  # <pr> <api> <transport> <attempt> <json>
+  local n="$1" api="$2" transport="$3" attempt="$4" raw="$5" observed
+  mergeability_probe_actor
+  if observed="$(jq -c '
+    {
+      field_present: has("mergeable"),
+      raw_mergeable: (if has("mergeable") then .mergeable else null end),
+      raw_mergeable_type: (if has("mergeable") then (.mergeable | type) else "omitted" end),
+      merge_state_status: (.mergeStateStatus // .mergeable_state // null),
+      state: (.state // null),
+      draft: (if has("isDraft") then .isDraft elif has("draft") then .draft else null end),
+      head: (.headRefOid // .head.sha // null),
+      base: (.baseRefName // .base.ref // null),
+      base_oid: (.baseRefOid // .base.sha // null)
+    }
+  ' <<<"$raw" 2>/dev/null)"; then
+    MERGEABILITY_DIAGNOSTIC="api=$api transport=$transport actor=$MERGEABILITY_PROBE_ACTOR attempt=$attempt $observed"
+  else
+    MERGEABILITY_DIAGNOSTIC="api=$api transport=$transport actor=$MERGEABILITY_PROBE_ACTOR attempt=$attempt parse=failed"
+  fi
+  echo "::notice::mergeability-probe pr=#$n $MERGEABILITY_DIAGNOSTIC" >&2
+}
+
+# When the GraphQL enum remains UNKNOWN, ask the same read-token identity for
+# the REST pull-request representation. The fallback is authoritative only
+# when the REST response agrees with the GraphQL PR number, exact head/base,
+# open/non-draft state, and current labels. Source checks are re-read by the
+# caller immediately before mutation as a final exact-head gate.
+read_rest_mergeability() {  # <pr> <expected-head> <expected-base-oid> <graphql-json>
+  local n="$1" expected_head="$2" expected_base_oid="$3" graphql="$4" rest
+  if ! rest="$(gh_retry api "repos/$REPO/pulls/$n" 2>/dev/null)"; then
+    record_mergeability_probe "$n" rest failed 1 '{}'
+    return 1
+  fi
+  record_mergeability_probe "$n" rest success 1 "$rest"
+  if ! jq -e \
+    --arg n "$n" \
+    --arg expected_head "$expected_head" \
+    --arg expected_base_oid "$expected_base_oid" \
+    --argjson graphql "$graphql" '
+      (.number | type == "number" and tostring == $n)
+      and .state == "open"
+      and .draft == false
+      and (.head.sha | type == "string" and (ascii_downcase == $expected_head))
+      and .base.ref == "main"
+      and (.base.sha | type == "string")
+      and ($expected_base_oid == "" or ((.base.sha | ascii_downcase) == $expected_base_oid))
+      and (.mergeable | type == "boolean")
+      and (.mergeable_state | type == "string" and length > 0)
+      and (.labels | type == "array")
+      and ($graphql.state == "OPEN")
+      and ($graphql.isDraft == false)
+      and (($graphql.headRefOid // "") | ascii_downcase) == (.head.sha | ascii_downcase)
+      and (($graphql.baseRefName // "") == .base.ref)
+      and (
+        ($expected_base_oid == "")
+        or (($graphql.baseRefOid // "") | ascii_downcase) == (.base.sha | ascii_downcase)
+      )
+      and (
+        ((if ($graphql.labels | type) == "object" then ($graphql.labels.nodes // []) else ($graphql.labels // []) end) | map(.name) | sort)
+        == ((.labels // []) | map(.name) | sort)
+      )
+    ' <<<"$rest" >/dev/null 2>&1; then
+    echo "::notice::mergeability-probe pr=#$n api=rest transport=success actor=$MERGEABILITY_PROBE_ACTOR validation=failed" >&2
+    return 1
+  fi
+  jq -c '
+    {
+      mergeable: (if .mergeable == true then "MERGEABLE" elif .mergeable == false then "CONFLICTING" else "UNKNOWN" end),
+      mergeStateStatus: (.mergeable_state | ascii_upcase),
+      headRefOid: .head.sha,
+      baseRefName: .base.ref,
+      baseRefOid: .base.sha,
+      labels: (.labels // [] | map({name: .name}))
+    }
+  ' <<<"$rest"
+}
+
 # The queue snapshot can be stale by the time enrollment begins. Re-read the
 # authoritative PR state immediately before mutation so a draft conversion or
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
-  local current enrollment_receipt head_oid expected_head json_fields live_head mergeability_attempt mergeability_state queue_position queue_state
+  local current enrollment_receipt head_oid expected_head expected_base_oid json_fields live_head mergeability_attempt mergeability_state queue_position queue_state
+  local rest_fallback_attempted=0 rest_state rest_failures fallback_preconditions post_mergeability_state post_base_oid post_rest_state
   LAST_ENROLL_SKIP_REASON=""
-  json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
+  json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body"
   for ((mergeability_attempt = 1; mergeability_attempt <= DRAIN_MERGEABLE_RECHECK_ATTEMPTS; mergeability_attempt++)); do
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
       --json "$json_fields" 2>/dev/null)"; then
       echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
       return 1
     fi
-    mergeability_state="$(jq -r '.mergeable // "UNKNOWN"' <<<"$current")"
+    if ! mergeability_state="$(jq -r '
+      if has("mergeable") then
+        if .mergeable == null then "NULL"
+        elif (.mergeable | type) == "string" then .mergeable
+        else "INVALID"
+        end
+      else "OMITTED"
+      end
+    ' <<<"$current" 2>/dev/null)"; then
+      echo "    !! could not parse mergeability for #$n; refusing enrollment" >&2
+      return 1
+    fi
+    if [[ "$mergeability_state" == "UNKNOWN" || "$mergeability_state" == "NULL" || "$mergeability_state" == "OMITTED" ]]; then
+      record_mergeability_probe "$n" graphql success "$mergeability_attempt" "$current"
+      if [[ "$rest_fallback_attempted" -eq 0 ]]; then
+        rest_fallback_attempted=1
+        live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+        expected_base_oid="$(jq -r '(.baseRefOid // "") | ascii_downcase' <<<"$current")"
+        fallback_preconditions=1
+        if [[ ! "$live_head" =~ ^[0-9a-f]{40}$ || ! "$expected_base_oid" =~ ^[0-9a-f]{40}$ ]]; then
+          fallback_preconditions=0
+        fi
+        if [[ -n "$authorized_pr" ]] \
+          && [[ "$n" != "$authorized_pr" || "$live_head" != "$authorized_head" ]]; then
+          fallback_preconditions=0
+        fi
+        if ! jq -e '
+          .state == "OPEN"
+          and (.isDraft | not)
+          and .baseRefName == "main"
+          and ([.labels[].name] | any(. == "needs-conflict-resolution" or . == "fast" or '"$MACHINE_HOLD_JQ"') | not)
+        ' <<<"$current" >/dev/null 2>&1; then
+          fallback_preconditions=0
+        fi
+        if [[ "$fallback_preconditions" -eq 1 ]]; then
+          if rest_state="$(read_rest_mergeability "$n" "$live_head" "$expected_base_oid" "$current")"; then
+            if [[ "$(jq -r '.mergeable' <<<"$rest_state")" == "MERGEABLE" ]]; then
+              rest_failures="$(check_failures_for_pr "$n")"
+              if [[ "$(jq 'length' <<<"$rest_failures")" -eq 0 ]] \
+                && rest_state="$(read_rest_mergeability "$n" "$live_head" "$expected_base_oid" "$current")" \
+                && [[ "$(jq -r '.mergeable' <<<"$rest_state")" == "MERGEABLE" ]]; then
+                current="$(jq -c --argjson rest "$rest_state" '
+                  .mergeable = $rest.mergeable
+                  | .mergeStateStatus = $rest.mergeStateStatus
+                  | .headRefOid = $rest.headRefOid
+                  | .baseRefName = $rest.baseRefName
+                  | .baseRefOid = $rest.baseRefOid
+                  | .labels = $rest.labels
+                ' <<<"$current")"
+                mergeability_state='MERGEABLE'
+                echo "    ~ accepted same-token REST mergeability fallback for #$n at $live_head after exact source-check revalidation" >&2
+              else
+                echo "    ~ REST mergeability fallback for #$n was not stable after exact source-check revalidation" >&2
+              fi
+            else
+              current="$(jq -c --argjson rest "$rest_state" '.mergeable = $rest.mergeable | .mergeStateStatus = $rest.mergeStateStatus' <<<"$current")"
+              mergeability_state="$(jq -r '.mergeable' <<<"$current")"
+            fi
+          fi
+        else
+          echo "    ~ REST mergeability fallback preconditions unavailable for #$n (exact head/base/state/draft/labels required)" >&2
+        fi
+      fi
+    fi
     [[ "$mergeability_state" == "MERGEABLE" ]] && break
     [[ "$mergeability_state" == "UNKNOWN" ]] || break
     live_head="$(jq -r '.headRefOid // empty' <<<"$current" | tr '[:upper:]' '[:lower:]')"
@@ -1512,7 +1685,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     # compensate immediately if a gated/held label appeared while the queue
     # mutation was in flight.
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,labels,headRefOid,baseRefName,body 2>/dev/null)"; then
+      --json state,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid,body 2>/dev/null)"; then
       if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
         echo "    !! could not refresh #$n after controller-repair enrollment; attempting expected-head ineligibility compensation" >&2
         if ! dequeue_strict "$n" "$expected_head"; then
@@ -1527,6 +1700,33 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         return 1
       fi
       return 2
+    fi
+    if post_mergeability_state="$(jq -r '
+      if has("mergeable") then
+        if .mergeable == null then "NULL"
+        elif (.mergeable | type) == "string" then .mergeable
+        else "INVALID"
+        end
+      else "OMITTED"
+      end
+    ' <<<"$current" 2>/dev/null)" \
+      && [[ "$post_mergeability_state" == "UNKNOWN" || "$post_mergeability_state" == "NULL" || "$post_mergeability_state" == "OMITTED" ]]; then
+      record_mergeability_probe "$n" graphql success post "$current"
+      post_base_oid="$(jq -r '(.baseRefOid // "") | ascii_downcase' <<<"$current")"
+      if [[ "$post_base_oid" =~ ^[0-9a-f]{40}$ ]]; then
+        if post_rest_state="$(read_rest_mergeability "$n" "$expected_head" "$post_base_oid" "$current")"; then
+          current="$(jq -c --argjson rest "$post_rest_state" '
+            .mergeable = $rest.mergeable
+            | .mergeStateStatus = $rest.mergeStateStatus
+            | .headRefOid = $rest.headRefOid
+            | .baseRefName = $rest.baseRefName
+            | .baseRefOid = $rest.baseRefOid
+            | .labels = $rest.labels
+          ' <<<"$current")"
+        fi
+      else
+        echo "    ~ post-enrollment REST mergeability fallback preconditions unavailable for #$n (exact base OID missing)" >&2
+      fi
     fi
     if ! jq -e --arg expected_head "$expected_head" '
       .state == "OPEN"
