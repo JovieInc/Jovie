@@ -16,6 +16,8 @@ const meta = {
         'onActiveRowChange',
         'promptActions',
         'onSelectPrompt',
+        'loading',
+        'isLoading',
       ],
     },
   },

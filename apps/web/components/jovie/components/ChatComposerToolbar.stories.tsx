@@ -18,6 +18,7 @@ const meta = {
         'isFileProcessing',
         'plusMenuOpen',
         'onOpenChange',
+        'disabled',
       ],
     },
   },
