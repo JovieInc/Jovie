@@ -166,6 +166,16 @@ describe('Switch', () => {
       );
     });
 
+    it('pairs each track state with its semantic foreground token', () => {
+      render(<Switch aria-label='Toggle' data-testid='switch' />);
+      const classes = screen.getByTestId('switch').className;
+
+      expect(classes).toContain('data-[state=unchecked]:text-btn-primary');
+      expect(classes).toContain(
+        'data-[state=checked]:text-btn-primary-foreground'
+      );
+    });
+
     it('applies focus-visible ring styles', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
