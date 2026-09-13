@@ -9,6 +9,7 @@ import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CANONICAL_LIVE_STORIES,
+  LIVE_PAINT_EVIDENCE,
   LIVE_VIEWPORTS,
   REPO_ROOT,
   resolveLiveStoriesForRun,
@@ -263,6 +264,28 @@ function contrastRatio(a, b) {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
+export function extractSwitchContrastPairs(switchPaints) {
+  return (Array.isArray(switchPaints) ? switchPaints : []).map(paint => {
+    const track = parseRgb(paint?.trackBackgroundColor);
+    const thumb = parseRgb(paint?.thumbBackgroundColor);
+    return {
+      id: `${paint?.label || 'switch'}:${paint?.state || 'unknown'}:thumb-track`,
+      label: paint?.label || '',
+      state: paint?.state,
+      disabled: paint?.disabled === true,
+      invalid: paint?.invalid === true,
+      boundary: 'thumb-track',
+      background: track,
+      foreground: thumb,
+      opacity: {
+        track: paint?.trackOpacity ?? null,
+        thumb: paint?.thumbOpacity ?? null,
+      },
+      ratio: contrastRatio(track, thumb),
+    };
+  });
+}
+
 async function measureStory(page, story, viewport, axePath) {
   await page.setViewportSize({
     width: viewport.width,
@@ -338,6 +361,8 @@ async function measureStory(page, story, viewport, axePath) {
                 invalid: node.getAttribute('aria-invalid') === 'true',
                 trackBackgroundColor: trackStyle.backgroundColor,
                 thumbBackgroundColor: thumbStyle?.backgroundColor ?? null,
+                trackOpacity: trackStyle.opacity,
+                thumbOpacity: thumbStyle?.opacity ?? null,
               };
             })
           : [];
@@ -532,21 +557,7 @@ async function measureStory(page, story, viewport, axePath) {
   const pageFill = parseRgb(snapshot.pageBackgroundColor);
   const fill = parseRgb(snapshot.backgroundColor);
   const foreground = parseRgb(snapshot.color);
-  const switchPaints = (snapshot.switchPaints ?? []).map(paint => {
-    const track = parseRgb(paint.trackBackgroundColor);
-    const thumb = parseRgb(paint.thumbBackgroundColor);
-    return {
-      id: `${paint.label || 'switch'}:${paint.state || 'unknown'}:thumb-track`,
-      label: paint.label,
-      state: paint.state,
-      disabled: paint.disabled,
-      invalid: paint.invalid,
-      boundary: 'thumb-track',
-      background: track,
-      foreground: thumb,
-      ratio: contrastRatio(track, thumb),
-    };
-  });
+  const switchPaints = extractSwitchContrastPairs(snapshot.switchPaints);
   const switchContrastRatio =
     switchPaints.length === 0 ||
     switchPaints.some(item => !Number.isFinite(item.ratio))
@@ -589,6 +600,8 @@ async function measureStory(page, story, viewport, axePath) {
         ? switchContrastRatio
         : contrastRatio(fill, foreground),
     contrastPairs: story.owner === 'atom.switch' ? switchPaints : undefined,
+    paintEvidence:
+      story.owner === 'atom.switch' ? LIVE_PAINT_EVIDENCE : undefined,
     axeViolations: axe,
     overflow: snapshot.overflow,
     zoomOverflow,

@@ -8,10 +8,12 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { extractSwitchContrastPairs } from '../../component-live-storybook-browser.mjs';
 import {
   CANONICAL_LIVE_STORIES,
   DELIBERATE_RED_LIVE_FIXTURES,
@@ -47,6 +49,10 @@ const STORYBOOK_CONFIG = resolve(
   '../../../apps/web/.storybook/main.ts'
 );
 const REPO_ROOT = resolve(import.meta.dirname, '../../../');
+const requireFromWeb = createRequire(
+  resolve(import.meta.dirname, '../../../apps/web/package.json')
+);
+const { chromium } = requireFromWeb('playwright');
 const LIFECYCLE_MODULE_URL = pathToFileURL(
   resolve(import.meta.dirname, '../../component-live-storybook-lifecycle.mjs')
 ).href;
@@ -400,6 +406,18 @@ describe('live Storybook component certification', () => {
       claimBoundary: 'enrolled-canonical-primitive-stories-only',
       viewports: ['desktop', 'compact'],
     });
+    expect(result.receipt.paintEvidence).toMatchObject({
+      alphaCompositing: 'not-modeled',
+      opacityCompositing: 'not-modeled',
+    });
+    const switchReceipt = result.receipt.observations.find(item =>
+      item.id.startsWith('ui-atoms-switch--conformance-matrix@')
+    );
+    expect(switchReceipt.contrastPairs).toHaveLength(2);
+    expect(switchReceipt.paintEvidence).toMatchObject({
+      alphaCompositing: 'not-modeled',
+      opacityCompositing: 'not-modeled',
+    });
   });
 
   it('rejects deliberate-red fixtures for every live invariant class', () => {
@@ -444,15 +462,34 @@ describe('live Storybook component certification', () => {
       ...switchPass,
       contrastRatio: 1.2,
       foreground: { luminance: 'dark', token: 'inherited-root-text' },
-      contrastPairs: [
-        {
-          label: 'checked thumb against track',
-          boundary: 'thumb-track',
-          ratio: 7.2,
-        },
-      ],
+      contrastPairs: switchPass.contrastPairs.map(pair => ({ ...pair })),
     };
     expect(evaluateLiveObservation(inheritedRootTextOnly).ok).toBe(true);
+    for (const contrastPairs of [undefined, null, 'not-an-array']) {
+      const missingPairs = {
+        ...switchPass,
+        contrastRatio: 7.2,
+        contrastPairs,
+      };
+      const result = evaluateLiveObservation(missingPairs);
+      expect(result.ok).toBe(false);
+      expect(details(result)).toMatch(
+        /Switch requires nonempty rendered thumb\/track contrast pairs/
+      );
+    }
+    const missingUnchecked = {
+      ...switchPass,
+      contrastPairs: [switchPass.contrastPairs[0]],
+    };
+    expect(evaluateLiveObservation(missingUnchecked).ok).toBe(false);
+    expect(details(evaluateLiveObservation(missingUnchecked))).toMatch(
+      /Switch unchecked thumb\/track contrast pair is missing/
+    );
+    const badgeWithMalformedPairs = {
+      ...seededPassingObservations().find(item => item.owner === 'atom.badge'),
+      contrastPairs: null,
+    };
+    expect(evaluateLiveObservation(badgeWithMalformedPairs).ok).toBe(true);
     const leaked = clone(DELIBERATE_RED_LIVE_FIXTURES[1]);
     leaked.fill = { luminance: 'dark', token: 'bg-surface-1' };
     expect(
@@ -463,6 +500,58 @@ describe('live Storybook component certification', () => {
         redFixtures: [leaked],
       }).ok
     ).toBe(false);
+  });
+
+  it('extracts low-contrast thumb and track paints from a rendered Switch fixture', async () => {
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(`
+        <div id="switch-fixture">
+          <button role="switch" aria-label="Checked toggle" data-state="checked" style="background: rgb(32, 32, 32)">
+            <span style="display: block; width: 12px; height: 12px; background: rgb(32, 32, 32)"></span>
+          </button>
+          <button role="switch" aria-label="Unchecked toggle" data-state="unchecked" style="background: rgb(48, 48, 48)">
+            <span style="display: block; width: 12px; height: 12px; background: rgb(48, 48, 48)"></span>
+          </button>
+        </div>
+      `);
+      const renderedPaints = await page
+        .locator('#switch-fixture [role="switch"]')
+        .evaluateAll(nodes =>
+          nodes.map(node => {
+            const trackStyle = getComputedStyle(node);
+            const thumbStyle = getComputedStyle(node.firstElementChild);
+            return {
+              label: node.getAttribute('aria-label'),
+              state: node.getAttribute('data-state'),
+              disabled: node.hasAttribute('disabled'),
+              invalid: node.getAttribute('aria-invalid') === 'true',
+              trackBackgroundColor: trackStyle.backgroundColor,
+              thumbBackgroundColor: thumbStyle.backgroundColor,
+              trackOpacity: trackStyle.opacity,
+              thumbOpacity: thumbStyle.opacity,
+            };
+          })
+        );
+      const pairs = extractSwitchContrastPairs(renderedPaints);
+      expect(pairs).toHaveLength(2);
+      expect(pairs.map(pair => pair.state)).toEqual(['checked', 'unchecked']);
+      expect(pairs.every(pair => pair.ratio < 4.5)).toBe(true);
+
+      const switchSample = seededPassingObservations().find(
+        item => item.owner === 'atom.switch'
+      );
+      const evaluation = evaluateLiveObservation({
+        ...switchSample,
+        contrastRatio: 7.2,
+        contrastPairs: pairs,
+      });
+      expect(evaluation.ok).toBe(false);
+      expect(details(evaluation)).toMatch(/below WCAG AA/);
+    } finally {
+      await browser.close();
+    }
   });
 
   it('records focused V8 coverage of every live invariant via pass and block paths', () => {
