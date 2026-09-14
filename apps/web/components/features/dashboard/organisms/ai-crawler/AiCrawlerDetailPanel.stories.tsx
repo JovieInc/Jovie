@@ -122,7 +122,7 @@ function AiCrawlerDetailStory({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className='min-h-[720px] w-[360px] overflow-hidden bg-base text-primary-token'>
+      <div className='min-h-180 w-90 overflow-hidden bg-base text-primary-token'>
         <AiCrawlerDetailPanel isOpen onClose={() => undefined} />
       </div>
     </QueryClientProvider>

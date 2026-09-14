@@ -112,7 +112,7 @@ function AiCrawlerCardStory({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className='w-[360px] bg-base p-3 text-primary-token'>
+      <div className='w-90 bg-base p-3 text-primary-token'>
         <AiCrawlerIntelligenceCard onOpenDetail={() => undefined} />
       </div>
     </QueryClientProvider>
