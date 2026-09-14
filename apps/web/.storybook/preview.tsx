@@ -3,6 +3,7 @@ import type { Preview } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
+import { installStorybookMotionFixtures } from './motion-fixtures';
 import { ThemeProvider } from './next-themes-mock';
 import '../app/globals.css';
 
@@ -70,48 +71,7 @@ function installDeterministicFixtures(): void {
     };
   }
 
-  // Inject CSS that freezes animation/transition for Chromatic + a11y runs.
-  const style = document.createElement('style');
-  style.setAttribute('data-jovie-storybook-fixtures', 'true');
-  style.textContent = `
-    *, *::before, *::after {
-      animation-duration: 0s !important;
-      animation-delay: 0s !important;
-      transition-duration: 0s !important;
-      transition-delay: 0s !important;
-      caret-color: transparent !important;
-    }
-    .skeleton, [data-shimmer], [class*="animate-"] {
-      animation: none !important;
-    }
-  `;
-  document.head.appendChild(style);
-
-  // Keep responsive media queries real; only motion is deterministic.
-  const nativeMatchMedia = window.matchMedia.bind(window);
-  try {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      configurable: true,
-      value: (query: string) => {
-        if (!query.includes('prefers-reduced-motion'))
-          return nativeMatchMedia(query);
-        const reduced = true;
-        return {
-          matches: reduced,
-          media: query,
-          onchange: null,
-          addListener: () => undefined,
-          removeListener: () => undefined,
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-          dispatchEvent: () => false,
-        } as MediaQueryList;
-      },
-    });
-  } catch {
-    // ignore if already non-configurable
-  }
+  installStorybookMotionFixtures(window);
 
   // Stable id helper for stories that need an explicit id prop.
   (
