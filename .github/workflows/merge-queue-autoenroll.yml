@@ -199,6 +199,96 @@ jobs:
           else
             echo "::notice::Production release checkpoint is $checkpoint_state ($checkpoint_reason) for current main $MAIN_SHA; release verification remains separate from source and native merge-group admission"
           fi
+      - name: Resolve active production release wave
+        id: release-wave
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          # Bound the admission hold to the documented 30-minute recovery
+          # window. Terminal controller runs release the hold earlier.
+          RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'
+          RELEASE_WAVE_OBSERVATION_HOLD_SECONDS: '300'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The endpoint is read-only. A queued or in-progress controller run
+          # owns the current release lease even when its head is older than the
+          # latest main SHA. That preserves the hold while the old wave drains.
+          controller_runs='[]'
+          read_failed=0
+          for status in queued in_progress; do
+            if ! status_pages="$(gh api --paginate --slurp \
+              "repos/$REPO/actions/workflows/production-controller.yml/runs?branch=main&status=$status&per_page=100" 2>/dev/null)"; then
+              read_failed=1
+              break
+            fi
+            if ! status_runs="$(jq -ce '
+              if type == "array" then
+                [ .[] | if type == "object" then (.workflow_runs // []) else [] end ] | add // []
+              elif type == "object" then
+                (.workflow_runs // [])
+              else []
+              end
+            ' <<<"$status_pages")"; then
+              read_failed=1
+              break
+            fi
+            controller_runs="$(jq -c --argjson additions "$status_runs" '. + $additions' <<<"$controller_runs")"
+          done
+
+          if [[ "$read_failed" -eq 1 ]]; then
+            # Unknown controller state must not open a new admission path. The
+            # fallback is itself bounded and has no durable state, so the next
+            # pass can release it once the read succeeds.
+            unavailable_expiry="$(node -e '
+              const seconds = Number(process.argv[1]);
+              process.stdout.write(new Date(Date.now() + seconds * 1000).toISOString().replace(".000Z", "Z"));
+            ' "$RELEASE_WAVE_OBSERVATION_HOLD_SECONDS")"
+            {
+              echo 'hold=1'
+              echo 'reason=controller-state-unavailable'
+              echo "expires_at=$unavailable_expiry"
+              echo 'run_id=unknown'
+            } >>"$GITHUB_OUTPUT"
+            jq -n \
+              --arg reason controller-state-unavailable \
+              --arg expires_at "$unavailable_expiry" \
+              '{schema:"jovie-release-wave-admission/v1",hold:true,reason:$reason,expiresAt:$expires_at}' \
+              >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if ! decision="$(printf '%s' "$controller_runs" \
+            | node scripts/lib/release-wave-admission.mjs classify \
+                --main-sha "$MAIN_SHA" \
+                --max-age-seconds "$RELEASE_WAVE_HOLD_MAX_AGE_SECONDS")"; then
+            echo '::error::Release-wave admission classifier failed closed' >&2
+            exit 2
+          fi
+          jq -e '
+            .schema == "jovie-release-wave-admission/v1" and
+            (.hold | type == "boolean") and
+            (.reason | type == "string" and test("^[a-z0-9-]+$")) and
+            (.expiresAt == null or (.expiresAt | type == "string"))
+          ' <<<"$decision" >/dev/null
+          hold_value="$(jq -r '.hold | if . then "1" else "0" end' <<<"$decision")"
+          reason_value="$(jq -r '.reason' <<<"$decision")"
+          expires_value="$(jq -r '.expiresAt // empty' <<<"$decision")"
+          run_value="$(jq -r '.activeRunId // empty' <<<"$decision")"
+          {
+            echo "hold=$hold_value"
+            echo "reason=$reason_value"
+            echo "expires_at=$expires_value"
+            echo "run_id=$run_value"
+          } >>"$GITHUB_OUTPUT"
+          {
+            echo '### Release-wave admission receipt'
+            echo '```json'
+            echo "$decision"
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
       - name: Resolve exact admission scope
         id: admission
         env:
@@ -508,6 +598,16 @@ jobs:
           # integer re-caps event + recovery admissions per run.
           DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
           DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'
+          # A live Production Controller release lease pauses only new native
+          # enrollment/re-entry. Existing queue members and every safety
+          # dequeue path remain authoritative. The classifier gives this hold
+          # a terminal/expiry deadline so it can never become indefinite.
+          DRAIN_RELEASE_WAVE_HOLD: ${{ steps.release-wave.outputs.hold }}
+          DRAIN_RELEASE_WAVE_REASON: ${{ steps.release-wave.outputs.reason }}
+          DRAIN_RELEASE_WAVE_EXPIRES_AT: ${{ steps.release-wave.outputs.expires_at }}
+          DRAIN_RELEASE_WAVE_RUN_ID: ${{ steps.release-wave.outputs.run_id }}
+          DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'
+          DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS: '300'
           # A non-draft main PR whose required source checks never registered a
           # check-run on its exact head can never turn green and never enroll
           # (observed 2026-09-03 across multiple open PRs for 24h+). The drain
