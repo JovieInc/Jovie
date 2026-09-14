@@ -24,6 +24,13 @@ it('keeps the external guard bounded, ordered, deduplicated, and credential-free
     /Deduplicate acknowledged alert transport/,
     /production-continuity-dedupe\.mjs/,
     /steps\.dedupe\.outputs\.should_notify == 'true'/,
+    /production-continuity-checkin\.mjs/,
+    /--status=in_progress/,
+    /steps\.probe\.outcome == 'success'/,
+    /steps\.observation_receipt\.outcome == 'success'/,
+    /steps\.observation_summary\.outcome == 'success'/,
+    /--check-in-id="\$CHECK_IN_ID"/,
+    /secrets\.SENTRY_DSN/,
     /contents: read/,
   ])
     assert.match(workflow, required);
@@ -34,6 +41,7 @@ it('keeps the external guard bounded, ordered, deduplicated, and credential-free
     workflow.indexOf('agent-ingress:') < workflow.indexOf('preserve-incident:')
   );
   assert.doesNotMatch(workflow, /VERCEL_TOKEN|\/pause|\/resume|Spend Amount/);
+  assert.doesNotMatch(workflow, /SENTRY_AUTH_TOKEN/);
   assert.doesNotMatch(workflow, /budgetAmountUsd|approvedEmergencyCeilingUsd/);
   assert.doesNotMatch(workflow, /contents: write|actions: write/);
 });
