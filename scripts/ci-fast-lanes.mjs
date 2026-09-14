@@ -736,6 +736,7 @@ function runStructural() {
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage run --branch scripts/symphony/tests/closure-health.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage" python3 -m coverage report --include="*/scripts/symphony/closure_health.py" --show-missing --precision=2 --fail-under=85',
     'python3 scripts/symphony/tests/gem-pr-drain.test.py',
     'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+    'bash scripts/symphony/tests/align-runner-source-revision.test.sh',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage run --branch scripts/symphony/tests/gem-priority-gate.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage" python3 -m coverage report --include="*/scripts/symphony/gem-priority-gate.py" --show-missing --precision=2 --fail-under=84',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage run --branch scripts/symphony/tests/test_fleet_admission_receipt.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage" python3 -m coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
     'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',

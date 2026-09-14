@@ -191,6 +191,26 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('selects and runs alignment regressions for source-only changes', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/align-runner-source-revision.sh',
+      'scripts/symphony/tests/align-runner-source-revision.test.sh',
+    ]) {
+      expect(
+        spawnSync('grep', ['-Eq', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'bash scripts/symphony/tests/align-runner-source-revision.test.sh'"
+    );
+  });
+
   it('runs Linux restart boundary tests when the helper or its proof changes', () => {
     const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
     expect(pattern).toBeTruthy();
