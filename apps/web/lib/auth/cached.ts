@@ -25,10 +25,8 @@ import { attachSentryContext } from '@/lib/sentry/set-user-context';
  * with the Clerk-era contract: `{ userId, sessionId, orgId }` where
  * `userId` is now the app `users.id` UUID (was Clerk's `user_*` id).
  *
- * Clerk stays the live auth path until the proxy flip (commit ⑥) and the
- * client flip (commit ⑦); until then, live users have no BA session cookie
- * so this returns the NULL_AUTH_RESULT and Clerk-era code degrades to
- * signed-out — build-safe, functionally inert until the cutover merge.
+ * Better Auth is the live session path. A missing or invalid Better Auth
+ * session yields NULL_AUTH_RESULT; there is no fallback to the retired provider.
  */
 
 interface AuthResult {
