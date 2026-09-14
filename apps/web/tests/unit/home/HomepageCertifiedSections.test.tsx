@@ -1,9 +1,9 @@
+// @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -29,113 +29,75 @@ vi.mock('next/image', () => ({
   },
 }));
 
-const image = (alt: string) => ({
-  publicUrl: `/product-screenshots/${alt}.png`,
-  width: 780,
-  height: 1688,
-  alt,
-});
-
-const PREVIEWS = {
-  connected: image('listen'),
-  relationships: [image('subscribe'), image('pay'), image('tour')],
-} as const;
-
 describe('HomepageCertifiedSections', () => {
-  it('renders proof logos and sections 2-8 with the locked copy, in order', () => {
-    render(<HomepageCertifiedSections previews={PREVIEWS} />);
+  it('renders the locked connected and relationships sections without unsupported proof', () => {
+    render(<HomepageCertifiedSections />);
 
-    const proof = screen.getByTestId('marketing-section-logo-cloud');
-    expect(proof).toHaveAttribute('data-homepage-testid', 'homepage-proof');
-    expect(proof).toHaveAttribute('data-marketing-variant', 'inline-strip');
-    expect(proof).toHaveAttribute('data-rhythm', 'proof');
     expect(
-      screen.getAllByTestId('marketing-section-feature-split')
-    ).toHaveLength(HOMEPAGE_LAUNCH_COPY.certified.sections.length);
-    for (const row of screen.getAllByTestId(
-      'marketing-section-feature-split'
-    )) {
-      expect(row).toHaveAttribute('data-marketing-variant', 'editorial');
-      expect(row).toHaveAttribute(
-        'data-marketing-owner',
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx'
-      );
-    }
-    expect(proof).not.toHaveTextContent("Proof is earned. We don't borrow it.");
-    expect(proof).toHaveTextContent("BUILT BY PEOPLE WHO'VE CREATED FOR");
-    expect(
-      proof.querySelector('[data-testid="homepage-trust"]')
-    ).toHaveAttribute('data-presentation', 'inline-strip');
-    expect(
-      proof.querySelector('[data-presentation="card"]')
+      screen.queryByTestId('marketing-section-logo-cloud')
     ).not.toBeInTheDocument();
-    expect(proof.querySelectorAll('svg')).toHaveLength(
-      ARTIST_PROFILE_SOCIAL_PROOF.logos.length
-    );
 
-    const headings = screen.getAllByRole('heading', { level: 2 });
-    expect(headings.map(heading => heading.textContent)).toEqual(
-      HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.headline)
-    );
-    for (const section of HOMEPAGE_LAUNCH_COPY.certified.sections) {
-      const region = document.querySelector<HTMLElement>(
-        `[data-homepage-testid="homepage-section-${section.id}"]`
-      )!;
-      expect(region).toHaveTextContent(section.body);
-      expect(region).toHaveAttribute('data-marketing-occurrence', section.id);
-      expect(region).toHaveAttribute(
-        'data-rhythm',
-        section.id === 'connected' || section.id === 'relationships'
-          ? 'product'
-          : 'text'
-      );
-      expect(region).toHaveAttribute(
-        'aria-labelledby',
-        `homepage-section-${section.id}-heading`
-      );
-    }
-
-    const connectedDevice = document.querySelector(
-      '[data-homepage-testid="homepage-section-connected"] .ap-phone-frame'
-    );
-    const relationshipDevices = document.querySelectorAll(
-      '[data-homepage-testid="homepage-section-relationships"] .ap-phone-frame'
-    );
-    expect(connectedDevice).toHaveAttribute('data-size', 'md');
-    expect(relationshipDevices).toHaveLength(3);
-    for (const device of relationshipDevices) {
-      expect(device).toHaveAttribute('data-size', 'sm');
-    }
-
-    // Real product exports only where the copy talks about the profile.
+    const sections = screen.getAllByTestId('marketing-section-feature-split');
+    expect(sections).toHaveLength(2);
     expect(
-      within(
-        document.querySelector<HTMLElement>(
-          '[data-homepage-testid="homepage-section-connected"]'
-        )!
-      ).getAllByRole('img')
-    ).toHaveLength(1);
+      sections.map(section => section.getAttribute('data-marketing-occurrence'))
+    ).toEqual(['connected', 'relationships']);
+
+    const connected = document.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-section-connected"]'
+    )!;
+    expect(connected).toHaveAttribute('data-marketing-variant', 'editorial');
+    expect(connected).toHaveAttribute('data-rhythm', 'product');
+    expect(connected).toHaveTextContent('ONE LIVING PROFILE');
+    expect(connected).toHaveTextContent(
+      HOMEPAGE_LAUNCH_COPY.certified.sections[0].headline
+    );
+    expect(connected).toHaveTextContent(
+      HOMEPAGE_LAUNCH_COPY.certified.sections[0].body
+    );
+    expect(connected.querySelector('.ap-phone-frame')).toBeNull();
+    expect(connected.querySelector('img')).toHaveAttribute(
+      'src',
+      '/assets/generated/homepage-identity-optical-v1.webp'
+    );
+    expect(connected.querySelector('img')).toHaveAttribute(
+      'alt',
+      'A conceptual photographic assembly of a profile identity'
+    );
+
+    const relationships = document.querySelector<HTMLElement>(
+      '[data-homepage-testid="homepage-section-relationships"]'
+    )!;
+    expect(relationships).toHaveAttribute('data-rhythm', 'text');
+    expect(relationships).toHaveTextContent(
+      HOMEPAGE_LAUNCH_COPY.certified.sections[1].headline
+    );
+    expect(relationships).toHaveTextContent(
+      HOMEPAGE_LAUNCH_COPY.certified.sections[1].body
+    );
+    expect(relationships.querySelectorAll('img')).toHaveLength(0);
+    expect(within(relationships).getByRole('list')).toHaveAttribute(
+      'aria-label',
+      'Relationships'
+    );
+
+    const outcomes = within(relationships).getAllByRole('listitem');
+    expect(outcomes).toHaveLength(3);
+    expect(outcomes.map(outcome => outcome.textContent)).toEqual([
+      expect.stringContaining('Be found. Be understood.'),
+      expect.stringContaining('Know who cares.'),
+      expect.stringContaining('Built around who you are.'),
+    ]);
     expect(
-      within(
-        document.querySelector<HTMLElement>(
-          '[data-homepage-testid="homepage-section-relationships"]'
-        )!
-      ).getAllByRole('img')
-    ).toHaveLength(3);
-    for (const id of ['found', 'know', 'smarter', 'built']) {
-      expect(
-        within(
-          document.querySelector<HTMLElement>(
-            `[data-homepage-testid="homepage-section-${id}"]`
-          )!
-        ).queryAllByRole('img')
-      ).toHaveLength(0);
-    }
+      outcomes.map(outcome => outcome.querySelector('span')?.textContent)
+    ).toEqual(['01', '02', '03']);
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
+});
 
+describe('HomepageClose', () => {
   it('closes with the locked lines and the name search as the only control', () => {
     render(<HomepageClose />);
 

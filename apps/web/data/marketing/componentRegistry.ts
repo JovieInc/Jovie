@@ -295,23 +295,6 @@ const SECTION_RESOLUTIONS = {
         },
       ]
     ),
-    occurrenceProofs: [
-      {
-        variantId: 'inline-strip',
-        componentPath:
-          'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        rootBinding: "data-testid='marketing-section-logo-cloud'",
-        delegatedProofs: [
-          {
-            source:
-              'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-            binding: '<HomeTrustSection',
-            occurrences: 1,
-            kind: 'source',
-          },
-        ],
-      },
-    ],
   },
   'feature-grid': {
     ...sourceRoot(

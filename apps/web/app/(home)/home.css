@@ -2285,7 +2285,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
    flex + gap-x-8 + lg nowrap / space-between. The shared trust-strip
    primitive stays a 5-track grid for other mounts. */
 .homepage-certified-proof
-  .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+.system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
   overflow: visible;
 }
 
@@ -2557,6 +2557,117 @@ body:has(.home-viewport)::-webkit-scrollbar {
     transition: none;
   }
 }
+
+/* Locked editorial core foundation. The cleanup pass removes the retired
+   proof and phone rules after the runtime mount switches to these classes. */
+.homepage-certified-section--connected .homepage-certified-section__inner {
+  display: block;
+}
+
+.homepage-connected-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.homepage-certified-section__eyebrow {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-tertiary-token);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.homepage-certified-section--connected .homepage-certified-section__headline,
+.homepage-certified-section--relationships
+  .homepage-certified-section__headline {
+  font-size: clamp(2.5rem, 3.9vw, 3.5rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.homepage-connected-header > .homepage-certified-section__body,
+.homepage-certified-section--relationships .homepage-certified-section__body {
+  color: var(--color-text-secondary-token);
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+.homepage-connected-artwork {
+  width: 100%;
+  margin-top: clamp(var(--space-8), 4vw, var(--space-12));
+  overflow: hidden;
+  aspect-ratio: 1902 / 827;
+  background: #020305;
+}
+
+.homepage-connected-artwork__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.homepage-relationship-outcomes {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: clamp(var(--space-8), 3vw, var(--space-11));
+  list-style: none;
+}
+
+.homepage-relationship-outcome {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.homepage-relationship-outcome__index {
+  padding-top: 0.2rem;
+  color: var(--color-text-tertiary-token);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.homepage-relationship-outcome__copy h3 {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: 1.375rem;
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.homepage-relationship-outcome__copy p {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary-token);
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+@media (min-width: 900px) {
+  .homepage-connected-header {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: clamp(var(--space-4), 2vw, var(--space-6));
+  }
+
+  .homepage-connected-header .homepage-certified-section__copy {
+    grid-column: 1 / span 7;
+  }
+
+  .homepage-connected-header > .homepage-certified-section__body {
+    grid-column: 9 / span 4;
+    margin-top: var(--space-6);
+  }
+}
+
 /* HOMEPAGE CERTIFIED SECTIONS END */
 
 .homepage-hero-command-center {

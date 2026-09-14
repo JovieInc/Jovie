@@ -110,17 +110,10 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     );
 
     expect(HOMEPAGE_LAUNCH_COPY.hero.search.action).toBe('Find me');
-    expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toHaveLength(6);
+    expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toHaveLength(2);
     expect(
       HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.id)
-    ).toEqual([
-      'connected',
-      'found',
-      'know',
-      'relationships',
-      'smarter',
-      'built',
-    ]);
+    ).toEqual(['connected', 'relationships']);
     expect(homepagePage).toContain('HomepageEditorialHero');
     expect(homepagePage).toContain('HomepageCertifiedSections');
     expect(homepagePage).toContain('HomepageClose');

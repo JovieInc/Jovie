@@ -126,8 +126,9 @@ describe('homepage-optical-polish-v1', () => {
     const close = read('components/homepage/HomepageClose.tsx');
     const certifiedCss = readCertifiedCss();
 
-    expect(sections).toContain("data-rhythm='proof'");
-    expect(sections).toContain("data-rhythm={media ? 'product' : 'text'}");
+    expect(sections).not.toContain("data-rhythm='proof'");
+    expect(sections).toContain("rhythm='product'");
+    expect(sections).toContain("rhythm='text'");
     expect(close).toContain("data-rhythm='close'");
     expect(certifiedCss).toContain('--homepage-rhythm-proof:');
     expect(certifiedCss).toContain('--homepage-rhythm-text:');
@@ -139,9 +140,8 @@ describe('homepage-optical-polish-v1', () => {
     expect(certifiedCss).toMatch(
       /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*0;/
     );
-    expect(certifiedCss).not.toMatch(
-      /\.homepage-certified-proof__logos\s*\{[\s\S]*?margin-top:\s*clamp/
-    );
+    expect(certifiedCss).toContain('.homepage-connected-artwork');
+    expect(certifiedCss).toContain('.homepage-relationship-outcomes');
   });
 
   it('kills the elliptical wireframe and the 55% horizon line', () => {
