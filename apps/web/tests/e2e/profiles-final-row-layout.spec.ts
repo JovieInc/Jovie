@@ -31,9 +31,17 @@ type ClippingAncestorMetrics = {
 type FinalRowMetrics = {
   readonly clientHeight: number;
   readonly clippingAncestors: ReadonlyArray<ClippingAncestorMetrics>;
+  readonly contentState: 'rows';
+  readonly display: string;
+  readonly flex: string;
+  readonly minHeight: string;
+  readonly overflowY: string;
+  readonly rowCount: number;
   readonly rowBottom: number;
   readonly rowTop: number;
+  readonly scrollOwner: string;
   readonly scrollHeight: number;
+  readonly scrollTop: number;
   readonly secondaryBottom: number;
   readonly secondaryTop: number;
 };
@@ -78,13 +86,25 @@ async function readFinalRowMetrics(table: Locator): Promise<FinalRowMetrics> {
     return {
       clientHeight: container.clientHeight,
       clippingAncestors,
+      contentState: 'rows',
+      display: getComputedStyle(container).display,
+      flex: getComputedStyle(container).flex,
+      minHeight: getComputedStyle(container).minHeight,
+      overflowY: getComputedStyle(container).overflowY,
+      rowCount: rows.length,
       rowBottom: rowRect.bottom,
       rowTop: rowRect.top,
+      scrollOwner: `${container.tagName.toLowerCase()}.${container.className}`,
       scrollHeight: container.scrollHeight,
+      scrollTop: container.scrollTop,
       secondaryBottom: secondaryRect.bottom,
       secondaryTop: secondaryRect.top,
     };
   });
+}
+
+function logMetrics(label: string, metrics: FinalRowMetrics) {
+  console.log(`[profiles-final-row-layout] ${label}`, JSON.stringify(metrics));
 }
 
 function expectFinalRowWithinClippingAncestors(metrics: FinalRowMetrics) {
@@ -117,12 +137,28 @@ test('keeps the final profile row and destination line visible in a constrained 
   });
 
   await page.setViewportSize(SHORT_VIEWPORT);
+  const baselineMetrics = await readFinalRowMetrics(table);
+  logMetrics('baseline', baselineMetrics);
+
+  await page.goto(
+    `/api/dev/test-auth/enter?persona=creator-ready&fixture=profiles-final-row&redirect=${encodeURIComponent(APP_ROUTES.PROFILES)}`,
+    { waitUntil: 'domcontentloaded', timeout: 120_000 }
+  );
+  await page.waitForURL(/\/app\/profiles(?:$|\?)/, { timeout: 60_000 });
+  await expect(workspace).toBeVisible({ timeout: 30_000 });
+  await expect(table).toBeVisible({ timeout: 30_000 });
+  await expect(table.locator('tbody tr').first()).toBeVisible({
+    timeout: 30_000,
+  });
+
   const shortMetrics = await readFinalRowMetrics(table);
+  logMetrics('short', shortMetrics);
   expect(shortMetrics.scrollHeight).toBeGreaterThan(shortMetrics.clientHeight);
   expectFinalRowWithinClippingAncestors(shortMetrics);
 
   await page.setViewportSize(TALL_VIEWPORT);
   const tallMetrics = await readFinalRowMetrics(table);
+  logMetrics('tall', tallMetrics);
   expectFinalRowWithinClippingAncestors(tallMetrics);
 
   const finalRow = table.locator('tbody tr').last();
