@@ -312,15 +312,37 @@ describe('release-wave admission backpressure', () => {
       expiresAt: null,
     });
 
+    /** @type {Array<[string, object]>} */
     const malformed = [
-      ['id', run => delete run.id],
-      ['status', run => delete run.status],
-      ['timestamp', run => delete run.created_at],
+      [
+        'id',
+        { ...controllerRun({ id: 650, headSha: MAIN_SHA }), id: undefined },
+      ],
+      [
+        'status',
+        { ...controllerRun({ id: 650, headSha: MAIN_SHA }), status: undefined },
+      ],
+      [
+        'timestamp',
+        {
+          ...controllerRun({ id: 650, headSha: MAIN_SHA }),
+          created_at: undefined,
+        },
+      ],
+      [
+        'head_sha',
+        {
+          ...controllerRun({ id: 650, headSha: MAIN_SHA }),
+          head_sha: undefined,
+        },
+      ],
+      [
+        'unknown-status',
+        { ...controllerRun({ id: 650, headSha: MAIN_SHA }), status: 'bogus' },
+      ],
     ];
 
-    for (const [field, mutate] of malformed) {
-      const run = controllerRun({ id: 650, headSha: MAIN_SHA });
-      mutate(run);
+    for (const [field, run] of malformed) {
       const result = classifyReleaseWave([run], {
         currentMainSha: MAIN_SHA,
         now: NOW,

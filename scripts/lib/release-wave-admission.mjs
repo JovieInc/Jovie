@@ -17,6 +17,14 @@ export const DEFAULT_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS = 30 * 60;
 const SHA = /^[0-9a-f]{40}$/;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
 const ACTIVE_STATUSES = new Set(['queued', 'in_progress']);
+const KNOWN_RUN_STATUSES = new Set([
+  'queued',
+  'in_progress',
+  'completed',
+  'requested',
+  'waiting',
+  'pending',
+]);
 
 function exactSha(value) {
   return typeof value === 'string' && SHA.test(value);
@@ -101,14 +109,13 @@ function structurallyValidRun(run) {
   if (!run || typeof run !== 'object' || Array.isArray(run)) return false;
 
   const id = String(run.id ?? run.databaseId ?? '');
-  const status = run.status;
+  const status = typeof run.status === 'string' ? run.status.toLowerCase() : '';
   const path = run.path;
   const branch = run.head_branch ?? run.headBranch;
   const createdAt = run.created_at ?? run.createdAt;
   if (
     !POSITIVE_INTEGER.test(id) ||
-    typeof status !== 'string' ||
-    status.trim() === '' ||
+    !KNOWN_RUN_STATUSES.has(status) ||
     typeof path !== 'string' ||
     path.trim() === '' ||
     typeof branch !== 'string' ||
@@ -118,17 +125,11 @@ function structurallyValidRun(run) {
     return false;
   }
 
-  // GitHub always returns a SHA for a workflow run. Keep an omitted field
-  // compatible with older fixtures, but reject an explicitly malformed one
+  // GitHub workflow runs require head_sha. Reject a missing or malformed SHA
   // instead of silently treating an active run as head-agnostic.
-  for (const value of [run.head_sha, run.headSha]) {
-    if (
-      value !== undefined &&
-      value !== null &&
-      (typeof value !== 'string' || !exactSha(value.toLowerCase()))
-    ) {
-      return false;
-    }
+  const headSha = run.head_sha ?? run.headSha;
+  if (typeof headSha !== 'string' || !exactSha(headSha.toLowerCase())) {
+    return false;
   }
   return true;
 }
