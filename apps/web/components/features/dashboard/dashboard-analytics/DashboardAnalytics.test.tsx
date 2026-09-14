@@ -31,6 +31,14 @@ vi.mock('@/features/dashboard/molecules/DashboardRefreshButton', () => ({
   ),
 }));
 
+function renderAnalytics() {
+  return render(
+    <TooltipProvider>
+      <DashboardAnalytics />
+    </TooltipProvider>
+  );
+}
+
 describe('DashboardAnalytics metric consumer states', () => {
   beforeEach(() => {
     state.loading = false;
@@ -40,11 +48,7 @@ describe('DashboardAnalytics metric consumer states', () => {
 
   it('shows unavailable values instead of fabricated zeroes after a failed observation', () => {
     state.error = 'Analytics unavailable';
-    render(
-      <TooltipProvider>
-        <DashboardAnalytics />
-      </TooltipProvider>
-    );
+    renderAnalytics();
     expect(screen.getByText('Analytics unavailable')).toBeInTheDocument();
     expect(screen.getByTestId('stat-profile-views')).toHaveTextContent('—');
     expect(screen.getByTestId('stat-unique-users')).toHaveTextContent('—');
@@ -59,11 +63,7 @@ describe('DashboardAnalytics metric consumer states', () => {
       top_referrers: [{ referrer: '', count: 8 }],
       top_links: [{ id: 'listen', url: 'listen', clicks: 7 }],
     };
-    render(
-      <TooltipProvider>
-        <DashboardAnalytics />
-      </TooltipProvider>
-    );
+    renderAnalytics();
     expect(screen.getByTestId('stat-profile-views')).toHaveTextContent('100');
     expect(screen.getByTestId('stat-unique-users')).toHaveTextContent(
       '50% of views'
@@ -78,11 +78,7 @@ describe('DashboardAnalytics metric consumer states', () => {
 
   it('hides contradictory values instead of presenting impossible conversion rates', () => {
     state.data = { profile_views: 10, unique_users: 20, subscribers: 2 };
-    render(
-      <TooltipProvider>
-        <DashboardAnalytics />
-      </TooltipProvider>
-    );
+    renderAnalytics();
     expect(screen.getByTestId('stat-unique-users-suspect')).toHaveTextContent(
       '—'
     );
@@ -91,22 +87,14 @@ describe('DashboardAnalytics metric consumer states', () => {
 
   it('renders loading placeholders before any metric is available', () => {
     state.loading = true;
-    render(
-      <TooltipProvider>
-        <DashboardAnalytics />
-      </TooltipProvider>
-    );
+    renderAnalytics();
     expect(screen.queryByTestId('stat-profile-views')).not.toBeInTheDocument();
     expect(screen.queryByText('No city data yet')).not.toBeInTheDocument();
   });
 
   it('distinguishes observed empty metrics and lists from loading', () => {
     state.data = { profile_views: 0, unique_users: 0, subscribers: 0 };
-    render(
-      <TooltipProvider>
-        <DashboardAnalytics />
-      </TooltipProvider>
-    );
+    renderAnalytics();
     expect(screen.getByText('No city data yet')).toBeInTheDocument();
     expect(screen.getByText('No referrer data yet')).toBeInTheDocument();
     expect(screen.getByText('No link data yet')).toBeInTheDocument();

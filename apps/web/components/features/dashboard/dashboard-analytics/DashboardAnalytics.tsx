@@ -64,7 +64,7 @@ function DashboardAnalyticsMetricCard({
       <ContentMetricCardSkeleton
         className='p-4 lg:p-5'
         showIcon={false}
-        subtitleWidth='w-20'
+        showSubtitle={false}
       />
     );
   }
@@ -74,7 +74,7 @@ function DashboardAnalyticsMetricCard({
       <TooltipTrigger asChild>
         <button
           type='button'
-          className='text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+          className='flex text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
           aria-label={`About ${label}`}
         >
           <HelpCircle className='h-3 w-3' />
@@ -89,7 +89,9 @@ function DashboardAnalyticsMetricCard({
   return (
     <ContentMetricCard
       className='p-4 lg:p-5'
-      label={label}
+      label={
+        <span className='block text-app text-secondary-token'>{label}</span>
+      }
       value={
         suspect ? (
           <span
@@ -104,13 +106,13 @@ function DashboardAnalyticsMetricCard({
       }
       subtitle={!suspect && meta ? meta : undefined}
       headerRight={definitionTooltip}
-      headerClassName='gap-1'
-      labelClassName='text-app text-secondary-token'
+      headerClassName='gap-1 [&>div:last-child]:flex'
+      labelClassName='font-normal'
       valueClassName={cn(
         'text-2xl font-semibold tracking-tight',
         suspect ? 'text-tertiary-token' : 'text-primary-token tabular-nums'
       )}
-      subtitleClassName='text-2xs text-tertiary-token tabular-nums'
+      subtitleClassName='text-2xs leading-normal text-tertiary-token tabular-nums'
       data-testid={testId}
     />
   );
