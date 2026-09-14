@@ -265,6 +265,13 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       { sample: { ...audit.sample, failuresOmitted: 1 } },
       { sample: { ...audit.sample, checkRunsObserved: 0 } },
       { sample: { ...audit.sample, reasons: ['head-drift', 'head-drift'] } },
+      {
+        sample: {
+          ...audit.sample,
+          reasons: ['incomplete-observation', 'head-drift'],
+          complete: false,
+        },
+      },
       { sample: { ...audit.sample, complete: false } },
     ]) {
       const response = await POST(

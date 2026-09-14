@@ -72,7 +72,9 @@ export function createSummerCiAuditV2Schema<T extends string>(
     })
     .strict()
     .superRefine((value, context) => {
-      const sortedIds = [...ids].sort();
+      const sortedIds = [...ids].sort((left, right) =>
+        left.localeCompare(right)
+      );
       if (
         value.excludedClasses.some((row, index) => row.id !== sortedIds[index])
       ) {
@@ -94,7 +96,9 @@ export function createSummerCiAuditV2Schema<T extends string>(
           value.measurements.length + sample.failuresOmitted ||
         sample.checkRunsObserved < sample.failuresObserved ||
         sample.reasons.join(',') !==
-          [...new Set(sample.reasons)].sort().join(',') ||
+          [...new Set(sample.reasons)]
+            .sort((left, right) => left.localeCompare(right))
+            .join(',') ||
         sample.complete !==
           (sample.reasons.length === 0 && sample.targetsOmitted === 0)
       ) {
