@@ -508,8 +508,41 @@ exit 0
                     ).read_text(encoding="utf-8")
                 ),
             )
-            for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py"):
+            for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py",
+                         "summer_admissions.py", "summer_existing_repair.py"):
                 self.assertTrue((installed_gate.parent / name).is_file(), name)
+            # Execute the installed publisher and helpers, not just source
+            # imports: accepted aggregate capacity cannot replace attestation.
+            publisher_check = subprocess.run(
+                [sys.executable, "-c", """
+import json
+from datetime import datetime, timezone
+import summer_bottleneck_producer as publisher
+now = datetime.now(timezone.utc)
+at = now.isoformat()
+revision = "a" * 40
+fleet = {"schema": "jovie-fleet-gate/v1", "observedAt": at, "signals": {
+    "closureHealth": {"status": "healthy", "openPrs": 0},
+    "queue": {"status": "known", "source": "live", "greenReadyPrs": 0, "nativeQueueCount": 0},
+    "lease": {"observedAt": at, "status": "ok", "capacity": {"available": 0}},
+    "main": {"sha": revision}, "production": {"deployedSha": revision},
+    "concurrencyEvidence": {"accepted": False}}}
+runtime = {"generated_at": at, "running": [], "retrying": [], "blocked": []}
+attestation = {"schema": "gem-service-attestation/v1", "observedAt": at,
+    "service": "symphony-elixir.service", "sourceRevision": revision,
+    "active": True, "healthy": True, "listener": {"port": 4041, "boundToService": True}}
+snapshot = publisher.compose_snapshot(fleet, runtime, now, attestation)
+assert snapshot["signals"]["runner"]["sourceRevision"] == revision
+assert set(snapshot["signals"]["admissions"]) >= {
+    "newImplementation", "ownedRemediation", "push", "providerEligibility", "downstreamHealth"}
+assert snapshot["signals"]["admissions"]["providerEligibility"]["state"] == "UNKNOWN"
+print("installed-publisher-observation-verified")
+"""], cwd=installed_gate.parent,
+                env={"HOME": str(pathlib.Path(directory) / "home"), "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(publisher_check.returncode, 0, publisher_check.stderr)
+            self.assertIn("installed-publisher-observation-verified", publisher_check.stdout)
             import_check = subprocess.run(
                 [sys.executable, str(installed_gate), "--help"],
                 cwd=installed_gate.parent,
@@ -531,6 +564,9 @@ exit 0
         self.assertEqual(import_check.returncode, 0, import_check.stderr)
         self.assertTrue(receipt["artifacts"]["proofContext"]["matches"])
         self.assertTrue(receipt["artifacts"]["summerSymphonyConsumer"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerBottleneckProducer"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerAdmissions"]["matches"])
+        self.assertTrue(receipt["artifacts"]["summerExistingRepair"]["matches"])
         self.assertTrue(
             receipt["artifacts"]["existingRepairControllerManifest"]["matches"]
         )
