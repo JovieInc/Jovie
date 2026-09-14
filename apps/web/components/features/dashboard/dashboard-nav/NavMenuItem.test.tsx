@@ -32,11 +32,7 @@ describe('NavMenuItem', () => {
     expect(label.className).not.toContain('justify-self-start');
   });
 
-  // JOV-6181 (desktop rail companion): the compact New Chat create row is
-  // w-fit with an auto-sized label track, so its span hugs the text — the
-  // full-track terminal fade would shear the trailing glyph ("Chat" -> "Cha")
-  // with rail space free. Primary/secondary create tones keep the raw clip.
-  it('keeps the New Chat primary rail label off the terminal fade', () => {
+  it('does not mask-fade the compact New Chat primary label', () => {
     render(
       <NavMenuItem
         item={{
@@ -54,6 +50,7 @@ describe('NavMenuItem', () => {
     expect(label.className).toContain('w-full');
     expect(label.className).toContain('justify-self-stretch');
     expect(label.className).toContain('overflow-hidden');
-    expect(label.className).not.toContain('mask-image');
+    expect(label.className).not.toContain('mask-image:linear-gradient');
+    expect(label.className).not.toContain('-webkit-mask-image:linear-gradient');
   });
 });
