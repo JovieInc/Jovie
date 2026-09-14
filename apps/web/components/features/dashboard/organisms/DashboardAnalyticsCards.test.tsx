@@ -28,21 +28,15 @@ describe('DashboardAnalyticsCards consumer states', () => {
 
   it('transitions from initial skeleton to truthful unavailable metrics', () => {
     query.isLoading = true;
-    const { rerender } = render(
-      <TooltipProvider>
-        <DashboardAnalyticsCards refreshSignal={0} />
-      </TooltipProvider>
-    );
+    const { rerender } = render(<DashboardAnalyticsCards refreshSignal={0} />, {
+      wrapper: TooltipProvider,
+    });
     expect(screen.getByRole('status')).toHaveTextContent(
       'Loading Analytics Overview'
     );
     query.isLoading = false;
     query.error = new Error('Unavailable');
-    rerender(
-      <TooltipProvider>
-        <DashboardAnalyticsCards refreshSignal={1} />
-      </TooltipProvider>
-    );
+    rerender(<DashboardAnalyticsCards refreshSignal={1} />);
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Analytics Overview Unavailable'
     );
@@ -63,22 +57,16 @@ describe('DashboardAnalyticsCards consumer states', () => {
 
   it('keeps existing metrics visible while refresh is pending and suppresses duplicate clicks', () => {
     query.data = { profile_views: 100, unique_users: 40 };
-    const { rerender } = render(
-      <TooltipProvider>
-        <DashboardAnalyticsCards refreshSignal={0} />
-      </TooltipProvider>
-    );
+    const { rerender } = render(<DashboardAnalyticsCards refreshSignal={0} />, {
+      wrapper: TooltipProvider,
+    });
     const refresh = screen.getByRole('button', {
       name: 'Refresh Analytics Overview',
     });
     fireEvent.click(refresh);
     expect(query.refetch).toHaveBeenCalledOnce();
     query.isFetching = true;
-    rerender(
-      <TooltipProvider>
-        <DashboardAnalyticsCards refreshSignal={1} />
-      </TooltipProvider>
-    );
+    rerender(<DashboardAnalyticsCards refreshSignal={1} />);
     expect(refresh).toBeDisabled();
     expect(screen.getByText('Unique visitors')).toBeInTheDocument();
     expect(screen.getByText('40')).toBeInTheDocument();

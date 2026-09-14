@@ -48,13 +48,9 @@ describe('MetricsChart consumer states', () => {
     const { rerender } = render(<MetricsChart points={[]} />);
     expect(screen.getByTestId('admin-usage-chart-empty')).toHaveClass('h-64');
     expect(screen.getByRole('status')).toHaveTextContent('No usage data');
-    expect(screen.getByTestId('admin-usage-chart-summary')).toHaveClass(
-      'invisible'
-    );
-    expect(screen.getByTestId('admin-usage-chart-summary')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
+    const summary = screen.getByTestId('admin-usage-chart-summary');
+    expect(summary).toHaveClass('invisible');
+    expect(summary).toHaveAttribute('aria-hidden', 'true');
     rerender(<MetricsChart points={points([0])} />);
     expect(screen.queryByText('No usage data')).not.toBeInTheDocument();
     expect(screen.getByText('Current DAU').parentElement).toHaveTextContent(
