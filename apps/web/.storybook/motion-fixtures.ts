@@ -25,12 +25,16 @@ export function installStorybookMotionFixtures(browser: Window): void {
   document.head.appendChild(style);
 
   // Prefer reduced motion so components that branch on it render consistently.
+  const nativeMatchMedia = browser.matchMedia.bind(browser);
   try {
     Object.defineProperty(browser, 'matchMedia', {
       writable: true,
       configurable: true,
       value: (query: string) => {
-        const reduced = query.includes('prefers-reduced-motion');
+        if (!query.includes('prefers-reduced-motion')) {
+          return nativeMatchMedia(query);
+        }
+        const reduced = true;
         return {
           matches: reduced,
           media: query,

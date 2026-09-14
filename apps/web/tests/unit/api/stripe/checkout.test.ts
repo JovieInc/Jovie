@@ -184,6 +184,31 @@ describe('POST /api/stripe/checkout', () => {
     });
   });
 
+  it('fails closed with the dedicated price remediation when billing has no active price', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetActivePriceIds.mockReturnValue([]);
+    const response = await POST(
+      new NextRequest('http://localhost/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: 'price_old_pro' }),
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Billing is temporarily unavailable',
+    });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Checkout rejected: no active price IDs configured',
+      expect.objectContaining({
+        message:
+          'getActivePriceIds() returned empty — STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY missing',
+      }),
+      expect.objectContaining({ route: '/api/stripe/checkout' })
+    );
+  });
+
   it('creates checkout session for authenticated user', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({

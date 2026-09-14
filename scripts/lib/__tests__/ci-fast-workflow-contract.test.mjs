@@ -210,6 +210,41 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('runs the owned Spotify Storybook proof only for its changed surface', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/SPOTIFY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.stories.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect.ts',
+      'apps/web/app/api/spotify/search/route.ts',
+      'apps/web/tests/e2e/storybook-spotify-connect.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input:
+          'apps/web/components/features/dashboard/organisms/OtherDialog.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+    expect(remaining).toContain('tests/e2e/storybook-spotify-connect.spec.ts');
+    expect(remaining).toContain('playwright.config.storybook.ts');
+    expect(remaining).toContain('upload-safe-playwright-artifact');
+    expect(remaining).toContain('PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES');
+  });
+
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
     const webParts = CI_FAST_SOURCE.slice(
       CI_FAST_SOURCE.indexOf('const webParts = ['),

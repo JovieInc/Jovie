@@ -32,6 +32,18 @@ describe('Storybook motion fixtures', () => {
     }
   );
 
+  it('preserves responsive media queries while default motion stays frozen', () => {
+    const responsive = { matches: true } as MediaQueryList;
+    const nativeMedia = vi.fn().mockReturnValue(responsive);
+    window.matchMedia = nativeMedia;
+    installStorybookMotionFixtures(window);
+    expect(window.matchMedia('(min-width: 768px)')).toBe(responsive);
+    expect(nativeMedia).toHaveBeenCalledWith('(min-width: 768px)');
+    expect(window.matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(
+      true
+    );
+  });
+
   it('preserves the browser media implementation and animation CSS for exact live opt-in', () => {
     window.history.replaceState(null, '', '/?__jovie_motion=live');
     const nativeMedia = vi.fn().mockReturnValue({ matches: false });
