@@ -298,6 +298,127 @@ class RepairTests(unittest.TestCase):
         repair._replace_private(self.root / f"{IDENT}.json", payload)
         return task, payload, executable
 
+    def allowance_fixture(self):
+        task, payload, executable = self.provider_granted_fixture()
+        grant = payload["providerGrant"]
+        auth = Path(grant["authStatePath"])
+        auth.write_text(json.dumps({"existing-provider-account": {
+            "user_id": grant["accountUserId"], "key": "test-only-provider-secret"}}))
+        grant["authStateSha256"] = hashlib.sha256(auth.read_bytes()).hexdigest()
+        task["existingRepair"]["assignmentDigest"] = repair.assignment_digest(payload)
+        repair._replace_private(self.root / f"{IDENT}.json", payload)
+        now = time.time()
+        config = {"creditUsagePercent": 23.1, "monthlyLimit": {"val": 100},
+                  "onDemandCap": {"val": 0}, "currentPeriod": {
+                      "start": repair.datetime.fromtimestamp(now - 3600, repair.timezone.utc).isoformat(),
+                      "end": repair.datetime.fromtimestamp(now + 3600, repair.timezone.utc).isoformat()}}
+        return task, payload, config
+
+    def allowance_response(self, config, *, raw=None, status=200, url=None):
+        response = io.BytesIO(json.dumps({"config": config}).encode() if raw is None else raw)
+        response.status = status
+        response.geturl = lambda: url or "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
+        return response
+
+    def test_allowance_uses_authenticated_account_and_preserves_independent_evidence(self):
+        _task, payload, config = self.allowance_fixture()
+        opener = mock.Mock(return_value=self.allowance_response(config))
+        observed = repair.observe_grok_allowance(payload, opener=opener)
+        row, evidence = observed["providerEligibility"], observed["providerObservation"]
+        self.assertEqual(row["state"], "ALLOWED")
+        self.assertEqual(evidence["includedRemainingPercent"], 76)
+        self.assertEqual(evidence["providerGrantDigest"], repair._digest(payload["providerGrant"]))
+        self.assertEqual(evidence["outputDigest"], payload["providerGrant"]["qualification"]["outputDigest"])
+        self.assertEqual(row["sourceDigest"], repair._digest(evidence))
+        self.assertLessEqual(repair.datetime.fromisoformat(row["expiresAt"]).timestamp(), payload["expiresAt"])
+        request = opener.call_args.args[0]
+        self.assertEqual(request.get_method(), "GET")
+        self.assertEqual(request.get_header("Authorization"), "Bearer test-only-provider-secret")
+        self.assertEqual(opener.call_args.kwargs, {"timeout": 15})
+        self.assertNotIn("test-only-provider-secret", json.dumps(observed))
+        self.assertIsNone(repair._ProviderNoRedirect().redirect_request(None))
+        config["creditUsagePercent"] = 100
+        observed = repair.observe_grok_allowance(payload, opener=lambda *_a, **_k:self.allowance_response(config))
+        self.assertEqual(observed["providerEligibility"]["state"], "HELD")
+        self.assertIsNotNone(observed["providerEligibility"]["observedAt"])
+        self.assertEqual(observed["providerObservation"]["includedRemainingPercent"], 0)
+
+    def test_allowance_missing_unified_fields_or_invalid_numbers_never_implies_capacity(self):
+        _task, payload, config = self.allowance_fixture()
+        variants = [{"onDemandCap": {"val": 0}, "onDemandUsed": {"val": 0},
+                     "prepaidBalance": {"val": 0}, "isUnifiedBillingUser": True},
+                    None, [], {**config, "creditUsagePercent": True},
+                    {**config, "creditUsagePercent": -1}, {**config, "creditUsagePercent": float("nan")},
+                    {**config, "monthlyLimit": 0}, {**config, "monthlyLimit": True},
+                    {**config, "onDemandCap": {"val": 1}}, {**config, "onDemandCap": None},
+                    {**config, "currentPeriod": None},
+                    {**config, "currentPeriod": {"start":"2000-01-01", "end":"2999-01-01"}},
+                    {**config, "currentPeriod": {"start":"2000-01-01T00:00:00Z", "end":"2001-01-01T00:00:00Z"}}]
+        for value in variants:
+            with self.subTest(value=value):
+                observed = repair.observe_grok_allowance(payload, opener=lambda *_a, **_k:self.allowance_response(value))
+                self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
+                self.assertIsNone(observed["providerObservation"])
+
+    def test_allowance_network_auth_redirect_and_malformed_responses_fail_closed(self):
+        _task, payload, config = self.allowance_fixture()
+        for options in ({"raw": b"not-json"}, {"raw": b"x" * 65537}, {"raw": b"[]"},
+                        {"status": 201}, {"url": "https://example.invalid/redirect"}):
+            observed = repair.observe_grok_allowance(payload, opener=lambda *_a, **_k:self.allowance_response(config, **options))
+            self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
+        for code in (401, 403, 429, 500):
+            error = repair.urllib.error.HTTPError("https://cli-chat-proxy.grok.com", code, "test-only-provider-secret", {}, None)
+            observed = repair.observe_grok_allowance(payload, opener=mock.Mock(side_effect=error))
+            self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
+            self.assertNotIn("test-only-provider-secret", json.dumps(observed))
+        with mock.patch.object(repair.urllib.request, "build_opener") as builder:
+            builder.return_value.open.side_effect = TimeoutError("timeout")
+            self.assertEqual(repair.observe_grok_allowance(payload)["providerEligibility"]["state"], "UNKNOWN")
+            self.assertIsInstance(builder.call_args.args[0], type)
+
+    def test_allowance_rejects_changed_auth_and_wrong_account_without_request(self):
+        _task, payload, config = self.allowance_fixture()
+        grant = payload["providerGrant"]
+        auth = Path(grant["authStatePath"])
+        for value in ({"account":{"user_id":"other", "key":"secret"}}, [],
+                      {"account":{"user_id":grant["accountUserId"], "key":False}}):
+            auth.write_text(json.dumps(value))
+            grant["authStateSha256"] = hashlib.sha256(auth.read_bytes()).hexdigest()
+            opener = mock.Mock()
+            self.assertEqual(repair.observe_grok_allowance(payload, opener=opener)["providerEligibility"]["state"], "UNKNOWN")
+            opener.assert_not_called()
+        auth.write_text("changed after grant")
+        opener = mock.Mock()
+        self.assertEqual(repair.observe_grok_allowance(payload, opener=opener)["providerEligibility"]["state"], "UNKNOWN")
+        opener.assert_not_called()
+
+    def test_allowance_rechecks_auth_and_grant_after_request(self):
+        _task, payload, config = self.allowance_fixture()
+        auth = Path(payload["providerGrant"]["authStatePath"])
+        def replaced(*_args, **_kwargs):
+            auth.write_text("replaced during request")
+            return self.allowance_response(config)
+        observed = repair.observe_grok_allowance(payload, opener=replaced)
+        self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
+        self.assertIsNone(observed["providerObservation"])
+
+    def test_task_observer_publishes_quota_evidence_only_for_the_same_fresh_runtime_and_assignment(self):
+        task, payload, config = self.allowance_fixture()
+        self.write_admission_receipts()
+        opener = mock.Mock(return_value=self.allowance_response(config))
+        checks = [{"__typename":"CheckRun", "name":task["selected"]["handle"], "status":"COMPLETED", "conclusion":"FAILURE"}]
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks), \
+             mock.patch.object(repair.urllib.request, "build_opener") as builder:
+            builder.return_value.open = opener
+            observed = repair.observe_task_admissions(IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"], source_revision=payload["generation"])
+        self.assertEqual(observed["providerEligibility"]["state"], "ALLOWED")
+        self.assertEqual(observed["downstreamHealth"]["state"], "ALLOWED")
+        self.assertEqual(observed["assignmentDigest"], repair.assignment_digest(payload))
+        self.assertEqual(observed["providerObservation"]["providerGrantDigest"], repair._digest(payload["providerGrant"]))
+        opener.assert_called_once()
+
     def test_provider_grant_validation_and_grok_runner_are_source_and_assignment_bound(self):
         task, payload, executable = self.provider_granted_fixture()
         self.assertEqual(repair.load_validated_candidate(IDENT, controller.__file__), payload)
@@ -1295,7 +1416,7 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(observed["runtimeInvocationId"], "f" * 32)
         self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
         self.assertEqual(observed["providerEligibility"]["reason"],
-                         "provider-quota-observation-unavailable")
+                         "provider-included-allowance-unavailable")
         self.assertIsNone(observed["providerObservation"])
         self.assertEqual(observed["downstreamHealth"]["state"], "ALLOWED")
         self.assertEqual(observed["downstreamHealth"]["reason"], "observed-target-available")

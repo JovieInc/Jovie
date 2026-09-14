@@ -146,7 +146,7 @@ function request(body: unknown) {
 
 // Exercise the actual publisher composition, using only its synthetic test inputs.
 // No host observation, credential access, or submission runs in this subprocess.
-function publisherSnapshot() {
+function publisherSnapshot(providerState?: 'ALLOWED' | 'HELD' | 'UNKNOWN') {
   const fixturePath = resolve(
     process.cwd(),
     '../../scripts/symphony/tests/summer-publisher-admissions.test.py'
@@ -166,10 +166,31 @@ case.reference.update(mode='isolated-cli', issueId='11111111-1111-4111-8111-1111
     ownerId='22222222-2222-4222-8222-222222222222', issueRevision=fixture['FRESH_AT'],
     repository='JovieInc/Jovie', pr=1, head=fixture['MAIN_SHA'],
     workspace='/fixture/owned-repair', writerUnit='fixture-repair.service')
+if sys.argv[2]:
+    provider_fixture = runpy.run_path(str(__import__('pathlib').Path(sys.argv[1]).with_name('existing-pr-repair.test.py')))
+    provider_case = provider_fixture['RepairTests']()
+    clock = provider_fixture['mock'].patch.object(
+        provider_fixture['repair'].time, 'time', return_value=fixture['NOW'].timestamp())
+    clock.start()
+    try:
+        provider_case.setUp()
+        provider_case.stack.enter_context(provider_fixture['mock'].patch.object(
+            provider_fixture['repair'], '_iso_now', return_value=fixture['NOW'].isoformat()))
+        _task, payload, config = provider_case.allowance_fixture()
+        if sys.argv[2] == 'HELD':
+            config['creditUsagePercent'] = 100
+        elif sys.argv[2] == 'UNKNOWN':
+            config.pop('creditUsagePercent')
+        case.observed.update(provider_fixture['repair'].observe_grok_allowance(payload,
+            opener=lambda *_args, **_kwargs: provider_case.allowance_response(config)))
+    finally:
+        provider_case.doCleanups()
+        clock.stop()
 print(json.dumps(fixture['MODULE'].compose_snapshot(case.fleet, case.runtime,
     fixture['NOW'], case.attestation, existing_repair=case.reference,
     task_admissions=case.observed)))`,
         fixturePath,
+        providerState ?? '',
       ],
       { encoding: 'utf8', timeout: 5000 }
     )
@@ -217,6 +238,39 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
+
+  it.each(['ALLOWED', 'HELD', 'UNKNOWN'] as const)(
+    'preserves the actual provider observer %s result through the signed receiver',
+    async state => {
+      const input = publisherSnapshot(state);
+      vi.setSystemTime(new Date(input.observedAt));
+      vi.stubEnv('VERCEL_GIT_COMMIT_SHA', input.signals.release.productionSha);
+      const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+        Response.json(
+          {
+            ok: true,
+            receipt: { eventId: input.eventId, decision: 'accepted' },
+          },
+          { status: 202 }
+        )
+      );
+      vi.stubGlobal('fetch', fetch);
+      expect(input.signals.taskAdmissions.providerEligibility.state).toBe(
+        state
+      );
+      expect((await POST(request(input))).status).toBe(202);
+      const delivered = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+      expect(delivered.signals.taskAdmissions).toEqual(
+        input.signals.taskAdmissions
+      );
+      expect(JSON.stringify(delivered)).not.toContain(
+        'test-only-provider-secret'
+      );
+      expect(
+        delivered.signals.taskAdmissions.providerObservation === null
+      ).toBe(state === 'UNKNOWN');
+    }
+  );
 
   it('signs the actual publisher runtime and task evidence without refreshing or granting it', async () => {
     const input = publisherSnapshot();
