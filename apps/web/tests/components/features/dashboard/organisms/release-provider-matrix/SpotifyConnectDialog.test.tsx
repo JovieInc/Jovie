@@ -89,7 +89,13 @@ function renderDialog() {
 }
 
 function getResultButton(name: string) {
-  const button = screen.getByText(name).closest('button');
+  const button = screen
+    .getAllByRole('button', { hidden: true })
+    .find(
+      candidate =>
+        candidate.classList.contains('system-b-spotify-connect-result-row') &&
+        candidate.textContent?.includes(name)
+    );
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Missing result button for ${name}`);
   }
@@ -150,7 +156,7 @@ describe('SpotifyConnectDialog', () => {
 
     mockHandleArtistSelect.mockClear();
     input.focus();
-    await user.keyboard('{ArrowDown}{ArrowDown}');
+    await user.keyboard('{ArrowDown}');
     expect(input).toHaveAttribute(
       'aria-activedescendant',
       'spotify-connect-result-2'
