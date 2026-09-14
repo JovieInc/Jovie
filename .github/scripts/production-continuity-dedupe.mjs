@@ -2,8 +2,8 @@
 
 import { execFile } from 'node:child_process';
 import { appendFile } from 'node:fs/promises';
-import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const REMINDER_WINDOW_MS = 30 * 60 * 1000;
