@@ -282,9 +282,16 @@ def _project_closure_evidence(
     Missing identifiers remain explicit instead of becoming an empty target
     set that could be mistaken for a healthy observation.
     """
-    observed_at = closure.get("observedAt")
-    if not isinstance(observed_at, str) or not observed_at:
-        observed_at = gate_observed_at if isinstance(gate_observed_at, str) else None
+    source_observed_at = closure.get("observedAt")
+    if "observedAt" not in closure or source_observed_at is None:
+        observed_at_status = "missing"
+        observed_at = None
+    elif isinstance(source_observed_at, str) and source_observed_at:
+        observed_at_status = "present"
+        observed_at = source_observed_at
+    else:
+        observed_at_status = "malformed"
+        observed_at = None
     reasons = closure.get("reasons")
     if reasons is None:
         reason_status = "missing"
@@ -322,6 +329,9 @@ def _project_closure_evidence(
                 number = row.get("pr")
                 source_state = row.get("sourceState")
                 if type(number) is not int or number <= 0:
+                    lifecycle_status = "malformed"
+                    continue
+                if not isinstance(source_state, str) or not source_state:
                     lifecycle_status = "malformed"
                     continue
                 if (
@@ -371,6 +381,7 @@ def _project_closure_evidence(
         ),
         "repository": repository,
         "observedAt": observed_at,
+        "observedAtStatus": observed_at_status,
         "gateObservedAt": gate_observed_at if isinstance(gate_observed_at, str) else None,
         "reasons": projected_reasons,
         "reasonStatus": reason_status,
