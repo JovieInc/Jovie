@@ -236,6 +236,10 @@ class EvidenceTests(unittest.TestCase):
             result = MODULE.read_downstream(path, "JovieInc/Jovie", now)
             self.assertEqual(result["headroom"], 5)
             self.assertTrue(result["healthy"])
+            self.assertEqual(
+                result["closureEvidence"]["repairPrs"]["status"], "missing"
+            )
+            self.assertEqual(result["closureEvidence"]["ownerEvidence"], "missing")
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/LogYourBody", now))
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now + 601))
             gate["state"] = "AMBER"
@@ -278,6 +282,99 @@ class EvidenceTests(unittest.TestCase):
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now))
             path.write_text('{}')
             self.assertIsNone(MODULE.read_downstream(path, "JovieInc/Jovie", now))
+
+    def test_downstream_closure_evidence_preserves_current_targets_and_owners(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "gate.json"
+            now = 2000
+            observed = datetime.fromtimestamp(now, timezone.utc).isoformat()
+            gate = {
+                "schema": "jovie-fleet-gate/v1",
+                "observedAt": observed,
+                "state": "AMBER",
+                "workAdmission": {
+                    "allowed": False,
+                    "newIssueLeaseAllowed": False,
+                    "newImplementationAllowed": False,
+                },
+                "closureAdmission": {
+                    "newIssueIntakeAllowed": False,
+                    "newImplementationAllowed": False,
+                    "remediationContinues": True,
+                },
+                "remediationAdmission": {
+                    "allowed": True,
+                    "localAllowed": True,
+                    "pushAllowed": False,
+                },
+                "signals": {
+                    "main": {"status": "green"},
+                    "production": {"status": "green"},
+                    "closureHealth": {
+                        "schema": "jovie-closure-health/v1",
+                        "observedAt": observed,
+                        "reasons": [
+                            "expired-held-prs",
+                            "internally-repairable-prs-open",
+                        ],
+                        "repairPrs": [12, 11],
+                        "expiredHolds": [12],
+                        "closePrs": [],
+                        "lifecycleActions": [
+                            {
+                                "repository": "JovieInc/Jovie",
+                                "pr": 11,
+                                "sourceState": "repair",
+                                "headSha": "a" * 40,
+                                "owner": "symphony",
+                                "writer": "symphony",
+                                "action": "exact-head-branch-update",
+                                "reason": "merge-state-dirty",
+                                "observedAt": observed,
+                            },
+                            {
+                                "repository": "JovieInc/Jovie",
+                                "pr": 12,
+                                "sourceState": "held",
+                                "headSha": "b" * 40,
+                                "owner": "symphony",
+                                "writer": "symphony",
+                                "action": "reconcile-expired-machine-hold",
+                                "reason": "draft",
+                                "observedAt": observed,
+                            },
+                        ],
+                    },
+                    "queue": {
+                        "repository": "JovieInc/Jovie",
+                        "status": "known",
+                        "greenReadyPrs": 0,
+                        "target": 15,
+                    },
+                },
+            }
+            path.write_text(json.dumps(gate))
+
+            evidence = MODULE.read_downstream(path, "JovieInc/Jovie", now)[
+                "closureEvidence"
+            ]
+
+            self.assertEqual(
+                evidence["schema"], "jovie-downstream-closure-evidence/v1"
+            )
+            self.assertEqual(evidence["observedAt"], observed)
+            self.assertEqual(evidence["reasons"], [
+                "expired-held-prs",
+                "internally-repairable-prs-open",
+            ])
+            self.assertEqual(evidence["repairPrs"]["ids"], [11, 12])
+            self.assertEqual(evidence["expiredHolds"]["ids"], [12])
+            self.assertEqual(
+                [item["pr"] for item in evidence["targets"]], [11, 12]
+            )
+            self.assertEqual(evidence["targets"][0]["owner"], "symphony")
+            self.assertEqual(evidence["targets"][1]["action"], "reconcile-expired-machine-hold")
+            self.assertEqual(evidence["ownerEvidence"], "present")
 
     def test_runtime_counts_useful_stage_without_counting_notifications(self):
         now = datetime.now(timezone.utc).isoformat()
