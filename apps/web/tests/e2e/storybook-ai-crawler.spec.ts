@@ -110,8 +110,10 @@ async function assertState(
   }
 
   if (name === 'loading') {
+    // The loading branch renders 4 skeleton rows with 2 LoadingSkeleton slots
+    // each (label + value), so the drawer shows 8 loading-skeleton slots.
     await expect(panel.locator('[data-slot="loading-skeleton"]')).toHaveCount(
-      4
+      8
     );
     await expect(panel.getByRole('status').first()).toHaveAttribute(
       'aria-busy',
