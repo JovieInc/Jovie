@@ -53,6 +53,8 @@ SEVERE_IO_FULL_AVG10 = 20.0
 CONCURRENCY_LINE = re.compile(r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$", re.MULTILINE)
 CANONICAL_CONCURRENCY = re.compile(r"[1-9][0-9]*")
 CANONICAL_REVISION = re.compile(r"[0-9a-f]{40}")
+DOWNSTREAM_CLOSURE_EVIDENCE_SCHEMA = "jovie-downstream-closure-evidence/v1"
+MAX_DOWNSTREAM_CLOSURE_TARGETS = 100
 
 
 def utc_now() -> str:
@@ -233,6 +235,172 @@ def read_router_capacity(directory: pathlib.Path, runtime: dict[str, Any] | None
         return None
 
 
+def _project_pr_numbers(value: object) -> dict[str, Any]:
+    """Project current PR identifiers without treating malformed data as empty."""
+    if value is None:
+        return {"status": "missing", "ids": [], "total": None, "truncated": False}
+    if not isinstance(value, list):
+        return {
+            "status": "malformed",
+            "ids": [],
+            "total": None,
+            "truncated": False,
+        }
+    numbers: list[int] = []
+    for item in value:
+        if type(item) is not int or item <= 0:
+            return {
+                "status": "malformed",
+                "ids": [],
+                "total": None,
+                "truncated": False,
+            }
+        numbers.append(item)
+    if len(numbers) != len(set(numbers)):
+        return {
+            "status": "malformed",
+            "ids": [],
+            "total": None,
+            "truncated": False,
+        }
+    ordered = sorted(numbers)
+    return {
+        "status": "present",
+        "ids": ordered[:MAX_DOWNSTREAM_CLOSURE_TARGETS],
+        "total": len(ordered),
+        "truncated": len(ordered) > MAX_DOWNSTREAM_CLOSURE_TARGETS,
+    }
+
+
+def _project_closure_evidence(
+    closure: dict[str, Any], gate_observed_at: object, repository: str
+) -> dict[str, Any]:
+    """Expose bounded, source-bound repair targets for downstream routing.
+
+    This is diagnostic evidence only. It does not change the concurrency
+    decision, grant authority, or the separate fleet admission projection.
+    Missing identifiers remain explicit instead of becoming an empty target
+    set that could be mistaken for a healthy observation.
+    """
+    source_observed_at = closure.get("observedAt")
+    if "observedAt" not in closure or source_observed_at is None:
+        observed_at_status = "missing"
+        observed_at = None
+    elif isinstance(source_observed_at, str) and source_observed_at:
+        observed_at_status = "present"
+        observed_at = source_observed_at
+    else:
+        observed_at_status = "malformed"
+        observed_at = None
+    reasons = closure.get("reasons")
+    if reasons is None:
+        reason_status = "missing"
+    elif isinstance(reasons, list) and all(
+        isinstance(reason, str) and reason for reason in reasons
+    ):
+        reason_status = "present"
+    else:
+        reason_status = "malformed"
+    projected_reasons = (
+        sorted(set(reasons))[:MAX_DOWNSTREAM_CLOSURE_TARGETS]
+        if reason_status == "present"
+        else []
+    )
+    id_projections = {
+        name: _project_pr_numbers(closure.get(name))
+        for name in ("repairPrs", "expiredHolds", "closePrs")
+    }
+    current_ids = {
+        number
+        for projection in id_projections.values()
+        for number in projection["ids"]
+    }
+    lifecycle = closure.get("lifecycleActions")
+    lifecycle_status = "missing" if lifecycle is None else "present"
+    lifecycle_targets: list[dict[str, Any]] = []
+    if lifecycle is not None:
+        if not isinstance(lifecycle, list):
+            lifecycle_status = "malformed"
+        else:
+            for row in lifecycle:
+                if not isinstance(row, dict):
+                    lifecycle_status = "malformed"
+                    continue
+                number = row.get("pr")
+                source_state = row.get("sourceState")
+                if type(number) is not int or number <= 0:
+                    lifecycle_status = "malformed"
+                    continue
+                if not isinstance(source_state, str) or not source_state:
+                    lifecycle_status = "malformed"
+                    continue
+                if (
+                    number not in current_ids
+                    and source_state not in {"repair", "held", "close"}
+                ):
+                    continue
+                if row.get("repository") != repository:
+                    lifecycle_status = "malformed"
+                    continue
+                required = ("owner", "writer", "action", "reason", "observedAt")
+                if any(
+                    not isinstance(row.get(field), str) or not row[field]
+                    for field in required
+                ):
+                    lifecycle_status = "malformed"
+                    continue
+                item: dict[str, Any] = {
+                    "pr": number,
+                    "sourceState": source_state,
+                    "owner": row["owner"],
+                    "writer": row["writer"],
+                    "action": row["action"],
+                    "reason": row["reason"],
+                    "observedAt": row["observedAt"],
+                }
+                issue = row.get("issue")
+                if isinstance(issue, str) and issue:
+                    item["issue"] = issue
+                head_sha = row.get("headSha")
+                item["headSha"] = (
+                    head_sha
+                    if isinstance(head_sha, str)
+                    and CANONICAL_REVISION.fullmatch(head_sha)
+                    else None
+                )
+                lifecycle_targets.append(item)
+    lifecycle_targets.sort(key=lambda item: item["pr"])
+    lifecycle_truncated = len(lifecycle_targets) > MAX_DOWNSTREAM_CLOSURE_TARGETS
+    lifecycle_targets = lifecycle_targets[:MAX_DOWNSTREAM_CLOSURE_TARGETS]
+    return {
+        "schema": DOWNSTREAM_CLOSURE_EVIDENCE_SCHEMA,
+        "sourceSchema": (
+            closure.get("schema")
+            if isinstance(closure.get("schema"), str)
+            else None
+        ),
+        "repository": repository,
+        "observedAt": observed_at,
+        "observedAtStatus": observed_at_status,
+        "gateObservedAt": gate_observed_at if isinstance(gate_observed_at, str) else None,
+        "reasons": projected_reasons,
+        "reasonStatus": reason_status,
+        "repairPrs": id_projections["repairPrs"],
+        "expiredHolds": id_projections["expiredHolds"],
+        "closePrs": id_projections["closePrs"],
+        "lifecycleStatus": lifecycle_status,
+        "targets": lifecycle_targets,
+        "targetsTruncated": lifecycle_truncated,
+        "ownerEvidence": (
+            "present"
+            if lifecycle_targets
+            else "malformed"
+            if lifecycle_status == "malformed"
+            else "missing"
+        ),
+    }
+
+
 def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> dict[str, Any] | None:
     """Read the lane gate without turning repair permission into new-work permission."""
     try:
@@ -276,6 +444,9 @@ def read_downstream(path: pathlib.Path, repository: str, now_epoch: float) -> di
             "healthy": healthy,
             "headroom": max(0, budget - ready),
             "repository": repository,
+            "closureEvidence": _project_closure_evidence(
+                closure, gate.get("observedAt"), repository
+            ),
             "newWorkAllowed": normal_intake,
             "repairOnly": (
                 gate.get("state") != "RED"
