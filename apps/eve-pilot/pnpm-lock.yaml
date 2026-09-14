@@ -16,13 +16,13 @@ importers:
         version: 2.8.0
       ai:
         specifier: 7.0.58
-        version: 7.0.58(zod@4.3.6)
+        version: 7.0.58(zod@4.5.4)
       braintrust:
         specifier: 3.30.0
-        version: 3.30.0(zod@4.3.6)
+        version: 3.30.0(zod@4.5.4)
       eve:
         specifier: 0.47.7
-        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.30.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.5.4))(braintrust@3.30.0(zod@4.5.4))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -30,8 +30,8 @@ importers:
         specifier: 0.6.18
         version: 0.6.18
       zod:
-        specifier: 4.3.6
-        version: 4.3.6
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: 26.2.0
@@ -3194,26 +3194,26 @@ packages:
   zod@4.1.11:
     resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+  zod@4.5.4:
+    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
 
 snapshots:
 
-  '@ai-sdk/gateway@4.0.46(zod@4.3.6)':
+  '@ai-sdk/gateway@4.0.46(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.25(zod@4.3.6)
+      '@ai-sdk/provider-utils': 5.0.25(zod@4.5.4)
       '@vercel/oidc': 3.2.0
-      zod: 4.3.6
+      zod: 4.5.4
 
-  '@ai-sdk/provider-utils@5.0.25(zod@4.3.6)':
+  '@ai-sdk/provider-utils@5.0.25(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider': 4.0.7
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.0
       undici: 7.29.0
-      zod: 4.3.6
+      zod: 4.5.4
 
   '@ai-sdk/provider@4.0.7':
     dependencies:
@@ -4225,7 +4225,7 @@ snapshots:
       tar-stream: 3.1.7
       undici: 7.29.0
       xdg-app-paths: 5.1.0
-      zod: 4.3.6
+      zod: 4.5.4
     transitivePeerDependencies:
       - bare-abort-controller
       - react-native-b4a
@@ -4317,12 +4317,12 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.58(zod@4.3.6):
+  ai@7.0.58(zod@4.5.4):
     dependencies:
-      '@ai-sdk/gateway': 4.0.46(zod@4.3.6)
+      '@ai-sdk/gateway': 4.0.46(zod@4.5.4)
       '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.25(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 5.0.25(zod@4.5.4)
+      zod: 4.5.4
 
   ajv@8.20.0:
     dependencies:
@@ -4419,7 +4419,7 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  braintrust@3.30.0(zod@4.3.6):
+  braintrust@3.30.0(zod@4.5.4):
     dependencies:
       '@next/env': 14.2.35
       '@vercel/functions': 1.6.0
@@ -4448,8 +4448,8 @@ snapshots:
       termi-link: 1.1.0
       unplugin: 2.3.11
       uuid: 11.1.1
-      zod: 4.3.6
-      zod-to-json-schema: 3.25.2(zod@4.3.6)
+      zod: 4.5.4
+      zod-to-json-schema: 3.25.2(zod@4.5.4)
     optionalDependencies:
       '@braintrust/bt-darwin-arm64': 0.12.0
       '@braintrust/bt-darwin-x64': 0.12.0
@@ -4705,14 +4705,14 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.30.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.5.4))(braintrust@3.30.0(zod@4.5.4))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
-      ai: 7.0.58(zod@4.3.6)
+      ai: 7.0.58(zod@4.5.4)
       nitro: 3.0.260610-beta(@vercel/blob@2.8.0)(chokidar@4.0.0)(dotenv@16.6.1)(lru-cache@11.5.2)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       undici: 8.9.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
-      braintrust: 3.30.0(zod@4.3.6)
+      braintrust: 3.30.0(zod@4.5.4)
       just-bash: 3.4.2
       microsandbox: 0.6.18
     transitivePeerDependencies:
@@ -5693,7 +5693,7 @@ snapshots:
       async-retry: 1.3.3
       debug: 4.4.3
       ws: 8.21.3
-      zod: 4.3.6
+      zod: 4.5.4
     transitivePeerDependencies:
       - bare-abort-controller
       - bufferutil
@@ -6201,12 +6201,12 @@ snapshots:
       buffer-crc32: 0.2.13
       fd-slicer: 1.1.0
 
-  zod-to-json-schema@3.25.2(zod@4.3.6):
+  zod-to-json-schema@3.25.2(zod@4.5.4):
     dependencies:
-      zod: 4.3.6
+      zod: 4.5.4
 
   zod@3.22.4: {}
 
   zod@4.1.11: {}
 
-  zod@4.3.6: {}
+  zod@4.5.4: {}
