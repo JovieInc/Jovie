@@ -120,7 +120,7 @@ describe('AiCrawlerIntelligenceCard', () => {
     const row = screen.getByTestId('ai-crawler-intelligence-card');
     expect(row).toHaveClass('min-h-12');
     expect(row.tagName).toBe('BUTTON');
-    expect(screen.getByText('AI Visibility')).toBeInTheDocument();
+    expect(screen.getByText('AI Crawler Reads')).toBeInTheDocument();
     expect(
       screen.getByText('420 reads · 2 services tracked')
     ).toBeInTheDocument();
@@ -169,7 +169,9 @@ describe('AiCrawlerIntelligenceCard', () => {
     expect(row.tagName).not.toBe('BUTTON');
     const teaser = screen.getByTestId('ai-crawler-card-teaser');
     expect(
-      within(teaser).getByText('See which AI services read your pages')
+      within(teaser).getByText(
+        'Observed machine reads only · no referral or revenue attribution'
+      )
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /upgrade to pro/i })

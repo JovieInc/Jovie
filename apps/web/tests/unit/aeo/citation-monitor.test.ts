@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AEO_MEASUREMENT_CONTRACT_VERSION,
   buildCanonicalQuestions,
   type CitationResult,
   classifyCitationTrend,
   computeCitationStats,
   formatShareOfCitation,
+  getAeoMeasurementDisclosure,
   parseCitationResponse,
 } from '@/lib/aeo/citation-monitor';
 
@@ -197,5 +199,25 @@ describe('classifyCitationTrend', () => {
 
   it('returns steady for equal values', () => {
     expect(classifyCitationTrend(0.5, 0.5)).toBe('steady');
+  });
+});
+
+describe('three-layer measurement contract', () => {
+  it('keeps the disclosure contract versioned and citations in observed visibility', () => {
+    expect(AEO_MEASUREMENT_CONTRACT_VERSION).toBe('aeo-measurement-layers:v1');
+    expect(getAeoMeasurementDisclosure('citation')).toMatchObject({
+      layer: 'observed_visibility',
+      layerLabel: 'Observed Visibility',
+      label: 'Citations',
+    });
+  });
+
+  it('labels crawler reads as readiness machine-access evidence', () => {
+    expect(getAeoMeasurementDisclosure('crawler_read')).toMatchObject({
+      layer: 'readiness',
+      layerLabel: 'Readiness Signal',
+      label: 'AI Crawler Reads',
+      description: expect.stringContaining('do not show an AI answer mention'),
+    });
   });
 });
