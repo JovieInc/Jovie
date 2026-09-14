@@ -94,6 +94,7 @@ RUNTIME_NAMES = (
     "model-registry.json",
     "provider_capacity.py",
     "existing_pr_repair.py",
+    "symphony-existing-repair-resolv.conf",
     "writer-owned-pr-promote.sh",
     "writer-owned-pr-promotion.mjs",
     "queue-deferral-receipt.mjs",
@@ -3085,7 +3086,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
         return packaged if packaged.is_file() else source
 
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py", "symphony-fallback-finalize.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py", "provider_capacity.py", "existing_pr_repair.py", "symphony-existing-repair-resolv.conf", "symphony-fallback-finalize.py")},
         "model-registry.json": registry,
         "writer-owned-pr-promote.sh": packaged_or_source(
             "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"
@@ -3159,6 +3160,20 @@ def _valid_runtime_file(path: pathlib.Path) -> bool:
 
 
 def _valid_bundle_file(name: str, path: pathlib.Path) -> bool:
+    if name == "symphony-existing-repair-resolv.conf":
+        try:
+            return (
+                not path.is_symlink()
+                and path.is_file()
+                and path.read_bytes() == (
+                    b"# Controller-owned provider resolver; no host-local fallback.\n"
+                    b"nameserver 1.1.1.1\n"
+                    b"nameserver 1.0.0.1\n"
+                    b"options timeout:2 attempts:1\n"
+                )
+            )
+        except OSError:
+            return False
     if name == "model-registry.json":
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -3274,6 +3289,7 @@ def install(destination_root: str | None) -> int:
                 "existing_pr_repair.py",
                 "model-registry.json",
                 "writer-owned-pr-promotion.mjs",
+                "symphony-existing-repair-resolv.conf",
             ):
                 (release / name).write_bytes(data)
                 os.chmod(release / name, 0o644)
