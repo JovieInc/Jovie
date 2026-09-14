@@ -415,6 +415,7 @@ test.describe('public profile browser admission', () => {
         await expect(eventsButton).toHaveAttribute('aria-label', 'Events');
       }
 
+      await eventsButton.scrollIntoViewIfNeeded();
       const geometry = await eventsButton.evaluate(element => {
         const rect = element.getBoundingClientRect();
         return {
@@ -450,7 +451,9 @@ test.describe('public profile browser admission', () => {
 
       await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
       await expect(eventsButton).toHaveAttribute('aria-current', 'page');
-      const selected = page.getByTestId('profile-primary-tab-tour');
+      const selected = page.locator(
+        'section[data-testid="profile-primary-tab-tour"]'
+      );
       await expect(selected).toBeVisible();
       await expect(
         selected.getByRole('heading', { name: 'Shows', exact: true })
