@@ -76,12 +76,15 @@
 }
 
 .system-b-marketing.dark,
+:root.dark .system-b-marketing,
 .home-viewport.dark,
+:root.dark .home-viewport,
 .system-b-root-not-found-page.dark {
   color-scheme: dark;
 }
 
-.system-b-marketing.dark {
+.system-b-marketing.dark,
+:root.dark .system-b-marketing {
   --color-bg-base: #030407;
   --color-bg-surface-0: #06080d;
   --color-bg-surface-1: #0f1420;

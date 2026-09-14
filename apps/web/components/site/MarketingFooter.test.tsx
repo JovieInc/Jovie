@@ -6,6 +6,11 @@ import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const mockUsePathname = vi.fn<() => string | null>(() => '/about');
+const themeState = vi.hoisted(() => ({
+  theme: 'dark',
+  resolvedTheme: 'dark',
+  setTheme: vi.fn(),
+}));
 
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
@@ -14,6 +19,10 @@ vi.mock('next/navigation', async importOriginal => {
     usePathname: () => mockUsePathname(),
   };
 });
+
+vi.mock('next-themes', () => ({
+  useTheme: () => themeState,
+}));
 
 // Product default: SHOW_MARKETING_FULL_FOOTER is false (clean homepage baseline).
 // Enable it here so footer content assertions exercise expanded chrome in isolation.
@@ -32,6 +41,9 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
 describe('MarketingFooter', () => {
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/about');
+    themeState.theme = 'dark';
+    themeState.resolvedTheme = 'dark';
+    themeState.setTheme.mockReset();
   });
 
   it('renders the full marketing footer when the full-footer flag is enabled', () => {
@@ -154,5 +166,19 @@ describe('MarketingFooter', () => {
 
     expect(source).toContain('max-w-public-content px-5 sm:px-6 lg:px-8');
     expect(source).not.toContain('max-w-linear-content px-[clamp(');
+  });
+
+  it('mounts preferences only on the declared marketing surface', () => {
+    const { rerender } = render(<MarketingFooter variant='minimal' />);
+
+    expect(screen.getByTestId('marketing-footer-controls')).toBeInTheDocument();
+    expect(screen.getByTestId('marketing-locale-static')).toHaveTextContent(
+      'English'
+    );
+
+    mockUsePathname.mockReturnValue('/artistname');
+    rerender(<MarketingFooter variant='minimal' />);
+
+    expect(screen.queryByTestId('marketing-footer-controls')).toBeNull();
   });
 });

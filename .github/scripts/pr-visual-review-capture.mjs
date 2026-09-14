@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -11,6 +13,26 @@ import {
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:3100';
 const routes = JSON.parse(process.env.PR_VISUAL_ROUTES ?? '[]');
 const outDir = process.env.PR_VISUAL_OUT ?? 'pr-visual-artifacts';
+const isExactSha = value =>
+  typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value);
+const exactHead = (() => {
+  if (isExactSha(process.env.PR_VISUAL_HEAD_SHA)) {
+    return process.env.PR_VISUAL_HEAD_SHA;
+  }
+
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (eventPath) {
+    try {
+      const event = JSON.parse(readFileSync(eventPath, 'utf8'));
+      const pullRequestHead = event?.pull_request?.head?.sha;
+      if (isExactSha(pullRequestHead)) return pullRequestHead;
+    } catch {
+      // Fall through to the runner SHA when the event payload is unavailable.
+    }
+  }
+
+  return isExactSha(process.env.GITHUB_SHA) ? process.env.GITHUB_SHA : null;
+})();
 const viewports = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
@@ -243,3 +265,65 @@ if (!validation.ok) {
   }
   process.exitCode = 1;
 }
+
+/**
+ * The protected pull_request_target workflow runs this checked-out script from
+ * the PR head, while its YAML remains sourced from the base branch. Keep the
+ * public footer interaction proof here so it shares this job's exact build and
+ * production server rather than creating a second browser lane.
+ */
+async function runFooterInteractionProof() {
+  if (!routes.includes('/')) return;
+
+  const child = spawn(
+    'pnpm',
+    [
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'playwright',
+      'test',
+      'tests/e2e/marketing-footer-controls.spec.ts',
+      '--config=playwright.config.ts',
+      '--project=chromium',
+      '--reporter=line',
+    ],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        BASE_URL: baseUrl,
+        E2E_SKIP_WEB_SERVER: '1',
+        E2E_SKIP_SEED: '1',
+        E2E_SKIP_WARMUP: '1',
+        PR_VISUAL_OUT: outDir,
+        PR_VISUAL_HEAD_SHA: exactHead ?? '',
+      },
+      stdio: 'inherit',
+    }
+  );
+
+  const result = await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (code, signal) => resolve({ code, signal }));
+  });
+
+  if (result.code === 0) return;
+
+  const failure = {
+    route: '/',
+    exactHead,
+    code: result.code,
+    signal: result.signal,
+    status: 'failed',
+  };
+  await writeFile(
+    join(outDir, 'footer-interaction-failure.json'),
+    JSON.stringify(failure, null, 2)
+  );
+  throw new Error(
+    `Footer interaction proof failed (code=${result.code ?? 'null'}, signal=${result.signal ?? 'null'})`
+  );
+}
+
+await runFooterInteractionProof();

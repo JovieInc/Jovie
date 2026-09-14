@@ -91,6 +91,7 @@ web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/
 web.marketing-investors|web|marketing-investors|apps/web/app/(marketing)/investors/page.tsx|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
+web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile

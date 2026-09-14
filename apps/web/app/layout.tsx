@@ -16,6 +16,7 @@ import { GoogleAnalytics } from '@/components/providers/GoogleAnalytics';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
+import { THEME_ROUTE_POLICY } from '@/lib/theme/route-policy';
 import {
   isValidGaMeasurementId,
   shouldMountGoogleAnalytics,
@@ -250,6 +251,11 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
+        {/* Keep one route policy for the React provider and synchronous theme
+            bootstrap. This inert JSON payload is available before body paint. */}
+        <script id='jovie-theme-route-policy' type='application/json'>
+          {JSON.stringify(THEME_ROUTE_POLICY)}
+        </script>
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
         <script src='/electron-runtime-init.js' />
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}

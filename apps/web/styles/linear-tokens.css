@@ -315,6 +315,7 @@
 
 :root.dark,
 .system-b-marketing.dark,
+:root.dark .system-b-marketing,
 [data-theme="linear"].dark {
   /* Text — Jovie Noir Ion (JOV-4635) */
   --linear-text-primary: #f5f7fb;

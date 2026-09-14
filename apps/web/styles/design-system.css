@@ -1002,6 +1002,19 @@ html[data-profile-initial-mode]
   --noir-ion-selected: rgba(17, 175, 255, 0.1);
   --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+  /* Light aliases keep shared marketing chrome on the same Noir Ion token
+     family as the dark surface while the footer theme control is active. */
+  --noir-ion-text-strong: var(--color-text-primary-token);
+  --noir-ion-text-primary: var(--color-text-primary-token);
+  --noir-ion-text-secondary: var(--color-text-secondary-token);
+  --noir-ion-text-muted: var(--color-text-tertiary-token);
+  --noir-ion-text-tertiary: var(--color-text-quaternary-token);
+  --noir-ion-text-disabled: var(--color-text-disabled-token);
+  --noir-ion-text-inverse: var(--color-text-tooltip);
+  --noir-ion-border-subtle: var(--color-border-subtle);
+  --noir-ion-border-default: var(--color-border-default);
+  --noir-ion-border-strong: var(--color-border-strong);
+  --noir-ion-border-interactive: var(--color-border-focus);
 
   --app-shell-content-surface: var(--noir-ion-card);
 
@@ -2375,7 +2388,8 @@ html[data-profile-initial-mode]
   color-scheme: dark;
 }
 
-.system-b-marketing.dark {
+.system-b-marketing.dark,
+:root.dark .system-b-marketing {
   --color-bg-base: #030407;
   --color-bg-surface-0: #06080d;
   --color-bg-surface-1: #0f1420;
@@ -2447,27 +2461,33 @@ html[data-profile-initial-mode]
   color-scheme: dark;
 }
 
-.system-b-marketing.dark :where(.bg-base) {
+.system-b-marketing.dark :where(.bg-base),
+:root.dark .system-b-marketing :where(.bg-base) {
   background-color: var(--color-bg-base);
 }
 
-.system-b-marketing.dark :where(.bg-surface-page) {
+.system-b-marketing.dark :where(.bg-surface-page),
+:root.dark .system-b-marketing :where(.bg-surface-page) {
   background-color: var(--color-bg-page);
 }
 
-.system-b-marketing.dark :where(.bg-surface-0) {
+.system-b-marketing.dark :where(.bg-surface-0),
+:root.dark .system-b-marketing :where(.bg-surface-0) {
   background-color: var(--color-bg-surface-0);
 }
 
-.system-b-marketing.dark :where(.bg-surface-1) {
+.system-b-marketing.dark :where(.bg-surface-1),
+:root.dark .system-b-marketing :where(.bg-surface-1) {
   background-color: var(--color-bg-surface-1);
 }
 
-.system-b-marketing.dark :where(.bg-surface-2) {
+.system-b-marketing.dark :where(.bg-surface-2),
+:root.dark .system-b-marketing :where(.bg-surface-2) {
   background-color: var(--color-bg-surface-2);
 }
 
-.system-b-marketing.dark :where(.bg-surface-3) {
+.system-b-marketing.dark :where(.bg-surface-3),
+:root.dark .system-b-marketing :where(.bg-surface-3) {
   background-color: var(--color-bg-surface-3);
 }
 

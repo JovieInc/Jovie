@@ -24,6 +24,7 @@ import { useThemeToggle } from './useThemeToggle';
 export function ThemeToggle({
   appearance = 'icon',
   className = '',
+  size = 'default',
   shortcutKey,
   variant = 'default',
 }: ThemeToggleProps) {
@@ -39,7 +40,7 @@ export function ThemeToggle({
     shortcutDescriptionId,
     currentTheme,
     indicatorX,
-  } = useThemeToggle(shortcutKey);
+  } = useThemeToggle(shortcutKey, size === 'footer' ? 44 : 28);
 
   const renderTooltipContent = useMemo(
     () =>
@@ -71,7 +72,11 @@ export function ThemeToggle({
   // Don't render anything until mounted to prevent hydration mismatch
   if (!mounted) {
     return (
-      <ThemeToggleSkeleton appearance={appearance} className={className} />
+      <ThemeToggleSkeleton
+        appearance={appearance}
+        className={className}
+        size={size}
+      />
     );
   }
 
@@ -84,6 +89,7 @@ export function ThemeToggle({
         shortcutDescriptionId={shortcutDescriptionId}
         shortcutDescription={shortcutDescription}
         className={className}
+        size={size}
         variant={variant}
         wrapButton={withShortcutTooltip}
       />
