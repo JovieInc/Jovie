@@ -1545,15 +1545,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "run=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "spotify=false"
+            echo "kbd=false"
+            echo "run=false"
+          } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
             exit 0
           fi
           SPOTIFY_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog(\.stories)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect\.ts|app/api/spotify/search/.*|tests/e2e/storybook-spotify-connect\.spec\.ts)$'
+          KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
           changed_files="$RUNNER_TEMP/spotify-storybook-changed-files.txt"
           git diff --name-only "origin/${{ github.base_ref }}" HEAD > "$changed_files"
           if grep -qE "$SPOTIFY_STORYBOOK_PATTERN" "$changed_files"; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "spotify=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$KBD_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "kbd=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
           fi
       - name: Run ci-fast lanes
         id: lanes
@@ -1593,12 +1607,22 @@ jobs:
         shell: bash
         working-directory: apps/web
         env:
+          RUN_SPOTIFY: ${{ steps.spotify-storybook.outputs.spotify }}
+          RUN_KBD: ${{ steps.spotify-storybook.outputs.kbd }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
         run: |
           set -euo pipefail
+          specs=()
+          if [[ "$RUN_SPOTIFY" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-spotify-connect.spec.ts)
+          fi
+          if [[ "$RUN_KBD" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-kbd-motion.spec.ts)
+          fi
+          test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
           STORYBOOK_PID=$!
           trap 'kill "$STORYBOOK_PID" 2>/dev/null || true' EXIT
@@ -1611,7 +1635,7 @@ jobs:
             if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
               node ../../.github/scripts/guard-playwright-artifacts.mjs --run -- \
                 pnpm exec playwright test \
-                  tests/e2e/storybook-spotify-connect.spec.ts \
+                  "${specs[@]}" \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
               exit 0
             fi
