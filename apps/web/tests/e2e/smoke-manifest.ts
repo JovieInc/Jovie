@@ -31,6 +31,7 @@ export const DESKTOP_SMOKE_SPECS = [
   'signup-funnel.smoke.spec.ts',
   'claim-prebuilt.smoke.spec.ts',
   'smoke-auth.spec.ts',
+  'profiles-final-row-layout.spec.ts',
   'shell-chat-v1.spec.ts',
   'shell-chat-v1-flag-off.spec.ts',
   'chat-performance-ratchet.spec.ts',
