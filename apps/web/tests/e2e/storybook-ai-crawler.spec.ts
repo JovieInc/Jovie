@@ -55,8 +55,12 @@ async function openState(page: Page, storyId: string): Promise<Locator> {
   await expect(page.locator('#storybook-root')).toBeAttached({
     timeout: 60_000,
   });
+  // Storybook dev compiles each story's module graph on demand and the repo's
+  // own Storybook config documents cold-start compiles that can take minutes
+  // (webServer timeout is 600s), so the first state must tolerate the full
+  // cold compile rather than a short render window.
   const panel = page.getByTestId('ai-crawler-detail-panel');
-  await expect(panel).toBeVisible({ timeout: 15_000 });
+  await expect(panel).toBeVisible({ timeout: 120_000 });
   return panel;
 }
 
@@ -187,7 +191,7 @@ async function saveEvidence(
 }
 
 test.describe('AI crawler measurement state proof', () => {
-  test.describe.configure({ retries: 0, timeout: 90_000 });
+  test.describe.configure({ retries: 0, timeout: 240_000 });
 
   for (const state of STATES) {
     test(`renders ${state.name} at narrow width`, async ({
