@@ -54,7 +54,8 @@ export const TooltipComposition: Story = {
         <TooltipContent
           contentVariant='compact'
           side='bottom'
-          className='flex w-screen max-w-56 items-center gap-2'
+          className='flex w-56 max-w-full py-2 items-center gap-2'
+          style={{ maxWidth: 'calc(100vw - var(--space-4))' }}
         >
           <span>Open palette</span>
           <Kbd variant='tooltip'>⌘K</Kbd>
@@ -74,7 +75,8 @@ export const TooltipComposition: Story = {
         <TooltipContent
           contentVariant='rich'
           side='bottom'
-          className='flex w-screen max-w-56 flex-wrap items-center gap-2'
+          className='flex w-56 max-w-full py-2 flex-wrap items-center gap-2'
+          style={{ maxWidth: 'calc(100vw - var(--space-4))' }}
         >
           <span className='min-w-0'>
             Move focus through the command palette
@@ -106,7 +108,8 @@ export const TooltipLongKey: Story = {
       <TooltipContent
         contentVariant='rich'
         side='bottom'
-        className='flex w-screen max-w-56 items-center gap-2'
+        className='flex w-56 max-w-full py-2 items-center gap-2'
+        style={{ maxWidth: 'calc(100vw - var(--space-4))' }}
       >
         <span className='min-w-0'>Move through the command palette</span>
         <Kbd
