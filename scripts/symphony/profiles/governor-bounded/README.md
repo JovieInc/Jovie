@@ -31,7 +31,11 @@ delivery. Back up the current workflow, five drop-ins, publisher inputs and
 runtime-input environment; record their hashes and the service invocation.
 Install this workflow at `~/.config/symphony/WORKFLOW.md`, retire the old
 `five-pr-trial.conf`, and install the five exact profile drop-ins. Preserve the
-separate signing environment and verified Symphony 3f3e3d5 release. Align the
+separate signing environment. Use verified Symphony release
+`dae31f823850c9ef2dea121433e5b60f09af26fa`, published as
+`symphony-build-dae31f823850c9ef2dea121433e5b60f09af26fa` after successful
+make-all run `34870559167` (attempt 1) and release run `34870865399`.
+Verify its package digest and provenance before the safe transition. Align the
 other compared policy/gate/closure/unit files to the same reviewed configuration
 revision through their existing delivery owner. Do not pin around a mismatch.
 Update `SYMPHONY_RUNTIME_WORKFLOW` to the actual new workflow only as part of
