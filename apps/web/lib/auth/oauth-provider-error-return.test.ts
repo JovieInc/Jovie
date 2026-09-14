@@ -41,6 +41,7 @@ function fakeApplePlugin(
   const provider: OAuthProvider = {
     id: 'apple',
     name: 'Fake Apple',
+    accountSubject: () => 'apple-user-1',
     createAuthorizationURL: ({ state }) => {
       const url = new URL('https://apple.test/authorize');
       url.searchParams.set('state', state);
@@ -49,7 +50,6 @@ function fakeApplePlugin(
     validateAuthorizationCode,
     getUserInfo: async () => ({
       user: {
-        id: 'apple-user-1',
         name: 'Test User',
         email: 'oauth-return@example.com',
         emailVerified: true,
@@ -347,34 +347,34 @@ describe('oauthProviderErrorReturn', () => {
     await expectNoSessionOrAuthorizationCode(harness);
   });
 
-  it.each<ClientMutation>([
-    'deleted',
-    'disabled',
-  ])('fails closed when the OAuth client is %s after login starts', async mutation => {
-    const harness = await createHarness();
-    const flow = await beginAuthorization(harness);
-    const where = [{ field: 'clientId', value: CLIENT_ID }];
-    if (mutation === 'deleted') {
-      await harness.context.adapter.deleteMany({
-        model: 'oauthClient',
-        where,
+  it.each<ClientMutation>(['deleted', 'disabled'])(
+    'fails closed when the OAuth client is %s after login starts',
+    async mutation => {
+      const harness = await createHarness();
+      const flow = await beginAuthorization(harness);
+      const where = [{ field: 'clientId', value: CLIENT_ID }];
+      if (mutation === 'deleted') {
+        await harness.context.adapter.deleteMany({
+          model: 'oauthClient',
+          where,
+        });
+      } else {
+        await harness.context.adapter.update({
+          model: 'oauthClient',
+          where,
+          update: { disabled: true },
+        });
+      }
+
+      const failed = await callback(harness, flow, {
+        error: 'access_denied',
       });
-    } else {
-      await harness.context.adapter.update({
-        model: 'oauthClient',
-        where,
-        update: { disabled: true },
-      });
+
+      expect(locationFrom(failed).origin).toBe(ORIGIN);
+      expect(locationFrom(failed).pathname).toBe('/api/auth/error');
+      await expectNoSessionOrAuthorizationCode(harness);
     }
-
-    const failed = await callback(harness, flow, {
-      error: 'access_denied',
-    });
-
-    expect(locationFrom(failed).origin).toBe(ORIGIN);
-    expect(locationFrom(failed).pathname).toBe('/api/auth/error');
-    await expectNoSessionOrAuthorizationCode(harness);
-  });
+  );
 
   it('fails closed when the exact registered redirect changes', async () => {
     const harness = await createHarness();

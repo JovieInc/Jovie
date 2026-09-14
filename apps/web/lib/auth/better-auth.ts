@@ -321,12 +321,24 @@ function buildPlugins() {
   ];
 }
 
+// better-auth 1.7.4 reads `db._?.schema` during drizzleAdapter() construction.
+// The canonical `db` proxy initializes the pool on any property access, which
+// throws when DATABASE_URL is unset (CI structural tests and Next build).
+const drizzleDb = new Proxy(db, {
+  get(target, prop, receiver) {
+    if (prop === '_' && !env.DATABASE_URL) {
+      return undefined;
+    }
+    return Reflect.get(target, prop, receiver);
+  },
+});
+
 export const auth = betterAuth({
   appName: 'Jovie',
   baseURL: resolveBaseUrl(),
   secret: resolveSecret(),
   disabledPaths: ['/token'],
-  database: drizzleAdapter(db, {
+  database: drizzleAdapter(drizzleDb, {
     provider: 'pg',
     // Explicit: the repo bans db.transaction(); do not rely on the adapter
     // default staying false (plan eng row 32).
