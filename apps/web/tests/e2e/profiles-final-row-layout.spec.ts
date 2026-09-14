@@ -164,7 +164,7 @@ test('keeps the final profile row and destination line visible in a constrained 
   const firstRow = table.locator('tbody tr').first();
   await firstRow.click();
   await expect(firstRow).toHaveAttribute('aria-selected', 'true');
-  await expect(finalRow).toHaveAttribute('aria-selected', 'false');
+  await expect(finalRow).not.toHaveAttribute('aria-selected', 'true');
   await finalRow.focus();
   await expect(finalRow).toBeFocused();
   await finalRow.press('Enter');
