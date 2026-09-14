@@ -348,7 +348,7 @@ test.describe('public profile browser admission', () => {
     {
       id: 'populated-mobile-pointer',
       width: 390,
-      height: 844,
+      height: 932,
       layout: 'compact' as const,
       events: 'populated' as const,
       activation: 'pointer' as const,
@@ -364,7 +364,7 @@ test.describe('public profile browser admission', () => {
     {
       id: 'empty-mobile-keyboard',
       width: 390,
-      height: 844,
+      height: 932,
       layout: 'compact' as const,
       events: 'empty' as const,
       activation: 'keyboard' as const,
