@@ -65,7 +65,9 @@ def observe_ci_audit(repo, revision, reader, *, targets=(), clock=None):
     selected = {}
     for row in targets if isinstance(targets, (list, tuple)) else ():
         if (isinstance(row, dict) and row.get("repository") == repo
-                and row.get("action") == "repair" and type(row.get("pr")) is int
+                and row.get("schema") == "jovie-pr-lifecycle-action/v1"
+                and row.get("sourceState") == "repair" and row.get("terminal") is False
+                and type(row.get("pr")) is int
                 and 0 < row["pr"] <= MAX_SAFE_INTEGER and _sha(row.get("headSha"))):
             selected[row["pr"]] = row["headSha"]
     target_count = len(selected)

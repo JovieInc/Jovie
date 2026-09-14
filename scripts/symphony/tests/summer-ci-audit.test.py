@@ -12,10 +12,18 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import summer_ci_audit as audit
 import summer_bottleneck_producer as producer
+import closure_health
 
 NOW = datetime(2026, 9, 14, 22, 0, tzinfo=timezone.utc)
 SHA = "a" * 40
 OTHER = "b" * 40
+
+
+def repair_target(number=1, reason="required-checks-failed"):
+    return closure_health._lifecycle_action(
+        {"number": number, "headRefOid": SHA}, 0,
+        {"state": "repair", "reason": reason, "issue": "JOV-1"}, None,
+        NOW, "JovieInc/Jovie")
 
 
 def check(identifier=1, **changes):
@@ -52,7 +60,7 @@ class AuditTests(unittest.TestCase):
 
     def test_complete_pagination_and_explicit_bounded_sample(self):
         value = fixture([check(i + 1) for i in range(130)], targets=[
-            {"repository":"JovieInc/Jovie", "pr":n, "headSha":SHA, "action":"repair"}
+            repair_target(n)
             for n in range(1, 6)])
         self.assertEqual(len(value["measurements"]), 25)
         self.assertEqual(value["sample"]["failuresObserved"], 520)
@@ -106,9 +114,20 @@ class AuditTests(unittest.TestCase):
             if path.startswith("pulls/"):return {"state":"closed","head":{"sha":SHA}}
             if path=="branches/main":return {"commit":{"sha":SHA}}
             return {"total_count":0,"check_runs":[]}
-        value=audit.observe_ci_audit("JovieInc/Jovie",SHA,reader,targets=[{"repository":"JovieInc/Jovie","pr":1,"action":"repair","headSha":SHA}],clock=lambda:NOW)
+        value=audit.observe_ci_audit("JovieInc/Jovie",SHA,reader,targets=[repair_target()],clock=lambda:NOW)
         self.assertFalse(value["sample"]["complete"])
         self.assertEqual(value["classes"],[])
+
+    def test_actual_fleet_lifecycle_records_select_observations_without_stealing_ownership(self):
+        target = repair_target(42, "merge-state-dirty")
+        self.assertEqual(target['action'], 'exact-head-branch-update')
+        self.assertEqual(target['owner'], 'gem')
+        value = fixture(targets=[target])
+        self.assertEqual([row['pr'] for row in value['measurements']], [None, 42])
+        self.assertEqual(value['classes'], [])
+        self.validate(value)
+        self.assertEqual(fixture(targets=[{**target, 'terminal': True}]), fixture())
+        self.assertEqual(fixture(targets=[{**target, 'sourceState': 'held'}]), fixture())
 
     def test_invalid_check_timestamps_and_names_are_explicitly_incomplete(self):
         for changes in ({"completed_at":None},{"completed_at":"2026-09-14"},
