@@ -32,7 +32,11 @@ const Kbd = React.forwardRef<HTMLElement, KbdProps>(
           variant === 'tooltip'
             ? // Tooltip variant: the existing 8px radius token matches the
               // canonical overlay's 16px radius after its 8px `space-2` inset.
-              'rounded-(--radius-sm) border-strong bg-surface-tooltip text-tooltip-foreground'
+              // Use the tooltip foreground token for the key edge so the
+              // inverted light tooltip does not pair a black border with a
+              // black surface. The 20% alpha keeps the edge restrained in
+              // both themes without introducing a new palette token.
+              'rounded-(--radius-sm) border-(--color-text-tooltip)/20 bg-surface-tooltip text-tooltip-foreground'
             : // Default variant: for use outside tooltips
               'bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
           className
