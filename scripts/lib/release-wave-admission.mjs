@@ -97,6 +97,42 @@ function parseInput(input) {
   return { valid: false, runs: [] };
 }
 
+function structurallyValidRun(run) {
+  if (!run || typeof run !== 'object' || Array.isArray(run)) return false;
+
+  const id = String(run.id ?? run.databaseId ?? '');
+  const status = run.status;
+  const path = run.path;
+  const branch = run.head_branch ?? run.headBranch;
+  const createdAt = run.created_at ?? run.createdAt;
+  if (
+    !POSITIVE_INTEGER.test(id) ||
+    typeof status !== 'string' ||
+    status.trim() === '' ||
+    typeof path !== 'string' ||
+    path.trim() === '' ||
+    typeof branch !== 'string' ||
+    branch.trim() === '' ||
+    parseTimestamp(createdAt) === null
+  ) {
+    return false;
+  }
+
+  // GitHub always returns a SHA for a workflow run. Keep an omitted field
+  // compatible with older fixtures, but reject an explicitly malformed one
+  // instead of silently treating an active run as head-agnostic.
+  for (const value of [run.head_sha, run.headSha]) {
+    if (
+      value !== undefined &&
+      value !== null &&
+      (typeof value !== 'string' || !exactSha(value.toLowerCase()))
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function baseDecision({ nowMs, currentMainSha, maxAgeSeconds }) {
   return {
     schema: RELEASE_WAVE_ADMISSION_SCHEMA,
@@ -146,6 +182,13 @@ export function classifyReleaseWave(input, options = {}) {
 
   const runsById = new Map();
   for (const candidate of parsedInput.runs) {
+    if (!structurallyValidRun(candidate)) {
+      return {
+        ...decision,
+        hold: true,
+        reason: 'controller-state-malformed',
+      };
+    }
     const run = normalizeRun(candidate);
     if (run && !runsById.has(run.id)) runsById.set(run.id, run);
   }
@@ -256,7 +299,7 @@ export async function runCli(argv = process.argv.slice(2), io = {}) {
     maxAgeSeconds: args['max-age-seconds'],
   });
   write(`${JSON.stringify(decision)}\n`);
-  return 0;
+  return decision.reason === 'controller-state-malformed' ? 2 : 0;
 }
 
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {

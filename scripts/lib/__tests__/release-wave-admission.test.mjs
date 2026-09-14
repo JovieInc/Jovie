@@ -303,6 +303,34 @@ describe('release-wave admission backpressure', () => {
     expect(second.observedAt).not.toBe(first.observedAt);
   });
 
+  it('blocks malformed individual records but ignores valid nonmatching records', () => {
+    expect(
+      classifyReleaseWave([{}], { currentMainSha: MAIN_SHA, now: NOW })
+    ).toMatchObject({
+      hold: true,
+      reason: 'controller-state-malformed',
+      expiresAt: null,
+    });
+
+    const malformed = [
+      ['id', run => delete run.id],
+      ['status', run => delete run.status],
+      ['timestamp', run => delete run.created_at],
+    ];
+
+    for (const [field, mutate] of malformed) {
+      const run = controllerRun({ id: 650, headSha: MAIN_SHA });
+      mutate(run);
+      const result = classifyReleaseWave([run], {
+        currentMainSha: MAIN_SHA,
+        now: NOW,
+      });
+      expect(result.hold, field).toBe(true);
+      expect(result.reason, field).toBe('controller-state-malformed');
+      expect(result.expiresAt, field).toBeNull();
+    }
+  });
+
   it('projects the active run through the workflow and keeps an older head held', () => {
     const { result, outputs, summary } = runReleaseWaveStep({
       inProgressRuns: [
@@ -341,6 +369,15 @@ describe('release-wave admission backpressure', () => {
     });
     expect(summary).toContain('controller-state-unavailable');
     expect(result.stderr).toContain('native enrollment is blocked');
+  });
+
+  it('refuses the workflow when an individual controller run is malformed', () => {
+    const { result } = runReleaseWaveStep({
+      queuedRuns: [{}],
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('classifier failed closed');
   });
 
   it('blocks the workflow when the controller API read fails', () => {
@@ -426,6 +463,23 @@ describe('release-wave admission backpressure', () => {
     });
     expect(malformedCode).toBe(2);
     expect(JSON.parse(malformedOutput)).toMatchObject({
+      hold: true,
+      reason: 'controller-state-malformed',
+      expiresAt: null,
+    });
+
+    let malformedRecordOutput = '';
+    const malformedRecordCode = await runCli(
+      ['classify', '--main-sha', MAIN_SHA],
+      {
+        input: JSON.stringify([{}]),
+        write: value => {
+          malformedRecordOutput += value;
+        },
+      }
+    );
+    expect(malformedRecordCode).toBe(2);
+    expect(JSON.parse(malformedRecordOutput)).toMatchObject({
       hold: true,
       reason: 'controller-state-malformed',
       expiresAt: null,
