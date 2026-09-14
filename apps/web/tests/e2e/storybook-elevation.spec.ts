@@ -269,3 +269,119 @@ test.describe('sidebar account and tooltip regressions', () => {
     }
   }
 });
+
+test.describe('two opportunity formats near the composer', () => {
+  for (const theme of THEMES) {
+    for (const width of [1200, 390]) {
+      test(`compact suggestions dock and yield to picker [${theme}, ${width}]`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 760 });
+        await openStory(
+          page,
+          'chat-emptystate-composerregion--above-composer',
+          theme
+        );
+        const suggestion = page.getByRole('button', {
+          name: 'Review your release checklist',
+        });
+        const surface = page.getByTestId('chat-composer-surface');
+        await expect(suggestion).toBeVisible();
+        const row = (await suggestion.boundingBox())!;
+        const composer = (await surface.boundingBox())!;
+        expect(row.height).toBeLessThanOrEqual(32);
+        expect(composer.y - row.y - row.height).toBeGreaterThanOrEqual(0);
+        expect(composer.y - row.y - row.height).toBeLessThanOrEqual(40);
+        await page.getByRole('button', { name: 'Attachment options' }).click();
+        await expect(page.getByRole('menu')).toBeVisible();
+        await expect(suggestion).toBeHidden();
+        await page.keyboard.press('Escape');
+        await expect(suggestion).toBeVisible();
+        await suggestion.click();
+        await expect(page.getByLabel('Chat Message Input')).toHaveValue(
+          'Review your release checklist'
+        );
+      });
+    }
+    test(`editorial retains full context [${theme}]`, async ({ page }) => {
+      await openStory(page, 'organisms-opportunitycard--editorial', theme);
+      await expect(page.getByRole('article')).toHaveAttribute(
+        'data-opportunity-format',
+        'editorial'
+      );
+      await expect(
+        page.getByRole('heading', { name: 'Review your release checklist' })
+      ).toBeVisible();
+      await expect(
+        page.getByText('Check artwork, credits and links before the release.')
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Review Release' })
+      ).toBeVisible();
+    });
+  }
+});
+
+test.describe('desktop header shares the traffic-light row', () => {
+  for (const width of [1200, 390]) {
+    test(`aligned controls and title at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 760 });
+      await page.addInitScript(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.documentElement.dataset.desktopRuntime = 'electron';
+        });
+      });
+      await openStory(
+        page,
+        'organisms-appshellframe--header-alignment',
+        'light'
+      );
+      const toggle = page.getByTestId('electron-sidebar-toggle');
+      const heading = page.getByRole('heading', { name: 'New Chat' });
+      await expect(toggle).toBeVisible();
+      await expect(heading).toBeVisible();
+      const assertGeometry = async () => {
+        const title = (await heading.boundingBox())!;
+        const control = (await toggle.boundingBox())!;
+        expect(
+          Math.abs(title.y + title.height / 2 - control.y - control.height / 2)
+        ).toBeLessThanOrEqual(2);
+        expect(title.x).toBeGreaterThanOrEqual(200);
+        expect(
+          await heading.evaluate(el => el.scrollWidth <= el.clientWidth)
+        ).toBe(true);
+        expect(title.x + title.width).toBeLessThanOrEqual(width);
+        await expect(page.getByTestId('dashboard-header')).toHaveCSS(
+          '-webkit-app-region',
+          'drag'
+        );
+        await expect(toggle).toHaveCSS('-webkit-app-region', 'no-drag');
+        await expect(page.getByRole('button', { name: 'Help' })).toHaveCSS(
+          '-webkit-app-region',
+          'no-drag'
+        );
+      };
+      await assertGeometry();
+      if (width > 1024) {
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-label', 'Expand sidebar');
+        await expect(page.locator('[data-app-shell-sidebar-mount]')).toHaveCSS(
+          'width',
+          '0px'
+        );
+        await assertGeometry();
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-label', 'Collapse sidebar');
+      }
+    });
+  }
+  test('browser retains its normal page header', async ({ page }) => {
+    await openStory(page, 'organisms-appshellframe--header-alignment', 'light');
+    await expect(page.getByTestId('electron-titlebar-row')).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'New Chat' })).toBeVisible();
+    await expect(page.getByTestId('dashboard-header')).toHaveCSS(
+      '-webkit-app-region',
+      'none'
+    );
+  });
+});

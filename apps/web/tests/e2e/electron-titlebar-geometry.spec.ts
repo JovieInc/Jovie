@@ -3,8 +3,8 @@
  *
  * These tests run in the browser (not in an actual Electron shell) and verify:
  * 1. The titlebar DOM structure — sidebar-cell contains back/forward,
- *    sidebar toggle + update pill; main-cell is a plain drag region (no header —
- *    page headers moved into
+ *    sidebar toggle; the page header shares the same top edge.
+ *    Page headers remain inside
  *    the elevated content card below).
  * 2. No duplicate sidebar toggles — Electron gets exactly one titlebar toggle
  *    and zero web sidebar-header controls.
@@ -92,7 +92,7 @@ async function assertElectronShellControls(
   );
 }
 
-test('titlebar DOM has a single sidebar toggle and an empty main-cell drag region', async ({
+test('titlebar DOM has a single sidebar toggle and no second main-cell band', async ({
   page,
 }) => {
   // Skip outside the explicit dev-auth E2E lane; Electron shell setup needs a bypassed Clerk session.
@@ -136,21 +136,13 @@ test('titlebar DOM has a single sidebar toggle and an empty main-cell drag regio
     sidebarCell.locator('[data-testid="electron-traffic-light-safe-area"]')
   ).toBeAttached();
 
-  // Main cell exists as a drag region but contains no chrome — the page header
-  // lives inside the elevated content card below.
-  const mainCell = titlebarRow.locator(
-    '[data-testid="electron-titlebar-main-cell"]'
+  await expect(
+    titlebarRow.locator('[data-testid="electron-titlebar-main-cell"]')
+  ).toHaveCount(0);
+  await expect(page.getByTestId('dashboard-header')).toHaveAttribute(
+    'data-electron-drag-region',
+    'true'
   );
-  await expect(mainCell).toBeAttached();
-  await expect(
-    mainCell.locator('[data-testid="electron-nav-pill"]')
-  ).toHaveCount(0);
-  await expect(
-    mainCell.locator('[data-testid="electron-nav-back"]')
-  ).toHaveCount(0);
-  await expect(
-    mainCell.locator('[data-testid="electron-nav-forward"]')
-  ).toHaveCount(0);
 });
 
 test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
@@ -326,6 +318,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const mainPlaneBox = mainPlane.getBoundingClientRect();
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
+        titlebarTop: titlebarBox.top,
         titlebarBottom: titlebarBox.bottom,
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
@@ -339,8 +332,8 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       `${route} has no second top-gap owner`
     ).toBe(0);
     expect(
-      Math.abs((geometry?.titlebarBottom ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} body begins at the titlebar boundary`
+      Math.abs((geometry?.titlebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
+      `${route} body shares the titlebar top edge`
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs((geometry?.sidebarTop ?? 0) - (geometry?.bodyTop ?? 0)),

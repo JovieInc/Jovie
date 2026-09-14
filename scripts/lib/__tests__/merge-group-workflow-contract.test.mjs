@@ -711,6 +711,12 @@ describe('merge_group workflow contract', () => {
       'pnpm --filter @jovie/web test:coverage -- --changed'
     );
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).not.toContain(
+      String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
+    );
+    expect(coverage).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    );
     expect(coverage).toContain('--bail 1');
     expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
     expect(coverage).toContain(

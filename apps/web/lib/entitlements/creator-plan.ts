@@ -4,9 +4,9 @@ import { aliasedTable, eq, inArray } from 'drizzle-orm';
 import { db, withRetry } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import { isLegacyFanSendPrice } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
 import {
-  checkBoolean,
   getEntitlements,
   type PlanEntitlements,
   type PlanId,
@@ -32,6 +32,37 @@ function resolveEffectivePlan(
 }
 
 /**
+ * Resolve outbound capability without changing existing legacy paid contracts.
+ *
+ * The public Artist Visibility offer does not include fan-send spend. Existing
+ * subscribers retain the capability only when their persisted Stripe price is
+ * an explicitly mapped legacy price; missing, active-offer, and unknown prices
+ * fail closed.
+ */
+export function getCreatorPlanEntitlements(
+  plan: PlanId,
+  stripePriceId?: string | null
+): PlanEntitlements {
+  const entitlements = getEntitlements(plan);
+  if (
+    plan === 'trial' ||
+    !entitlements.booleans.canSendNotifications ||
+    isLegacyFanSendPrice(stripePriceId)
+  ) {
+    return entitlements;
+  }
+
+  logger.warn(
+    '[entitlements] Paid fan sending requires a verified legacy price',
+    { plan, hasStripePriceId: Boolean(stripePriceId) }
+  );
+  return {
+    ...entitlements,
+    booleans: { ...entitlements.booleans, canSendNotifications: false },
+  };
+}
+
+/**
  * Look up a creator's plan and entitlements by their profile ID.
  *
  * Used by server-side code that operates outside an authenticated session
@@ -49,9 +80,11 @@ export async function getCreatorEntitlements(
             claimedUserId: userProfileClaims.userId,
             claimedPlan: claimedUsers.plan,
             claimedTrialEndsAt: claimedUsers.trialEndsAt,
+            claimedStripePriceId: claimedUsers.stripePriceId,
             legacyUserId: creatorProfiles.userId,
             legacyPlan: legacyUsers.plan,
             legacyTrialEndsAt: legacyUsers.trialEndsAt,
+            legacyStripePriceId: legacyUsers.stripePriceId,
           })
           .from(creatorProfiles)
           .leftJoin(
@@ -78,7 +111,13 @@ export async function getCreatorEntitlements(
         : result?.legacyTrialEndsAt
     );
 
-    return { plan, entitlements: getEntitlements(plan) };
+    const stripePriceId = result?.claimedUserId
+      ? result.claimedStripePriceId
+      : result?.legacyStripePriceId;
+    return {
+      plan,
+      entitlements: getCreatorPlanEntitlements(plan, stripePriceId),
+    };
   } catch (error) {
     logger.error(
       'Failed to load creator entitlements',
@@ -159,6 +198,7 @@ export async function getBatchCreatorEntitlements(
             id: users.id,
             plan: users.plan,
             trialEndsAt: users.trialEndsAt,
+            stripePriceId: users.stripePriceId,
           })
           .from(users)
           .where(inArray(users.id, ownerIds));
@@ -168,6 +208,9 @@ export async function getBatchCreatorEntitlements(
       row.id,
       resolveEffectivePlan(row.plan, row.trialEndsAt),
     ])
+  );
+  const priceByUserId = new Map(
+    userPlans.map(row => [row.id, row.stripePriceId])
   );
 
   const map = new Map<
@@ -181,7 +224,10 @@ export async function getBatchCreatorEntitlements(
       : 'free';
     map.set(creatorProfileId, {
       plan,
-      entitlements: getEntitlements(plan),
+      entitlements: getCreatorPlanEntitlements(
+        plan,
+        ownerUserId ? priceByUserId.get(ownerUserId) : null
+      ),
     });
   }
 
@@ -202,6 +248,6 @@ export async function getBatchCreatorEntitlements(
 export async function canCreatorSendNotifications(
   creatorProfileId: string
 ): Promise<boolean> {
-  const { plan } = await getCreatorEntitlements(creatorProfileId);
-  return checkBoolean(plan, 'canSendNotifications');
+  const { entitlements } = await getCreatorEntitlements(creatorProfileId);
+  return entitlements.booleans.canSendNotifications;
 }

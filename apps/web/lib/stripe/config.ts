@@ -13,6 +13,7 @@
 
 import 'server-only';
 
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { PRICING } from '@/lib/config/pricing';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
@@ -49,45 +50,12 @@ const toMappingRecord = (
 const buildActivePriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
     {
-      priceId: PRICING.pro.monthly.priceId || '',
-      plan: PRICING.pro.monthly.entitlementPlan,
-      amount: PRICING.pro.monthly.amount,
-      currency: 'usd',
-      interval: PRICING.pro.monthly.interval,
-      description: PRICING.pro.monthly.label,
-    },
-    {
-      priceId: PRICING.pro.annual.priceId || '',
-      plan: PRICING.pro.annual.entitlementPlan,
-      amount: PRICING.pro.annual.amount,
-      currency: 'usd',
-      interval: PRICING.pro.annual.interval,
-      description: PRICING.pro.annual.label,
-    },
-    {
-      priceId: PRICING.max.monthly.priceId || '',
-      plan: PRICING.max.monthly.entitlementPlan,
-      amount: PRICING.max.monthly.amount,
-      currency: 'usd',
-      interval: PRICING.max.monthly.interval,
-      description: PRICING.max.monthly.label,
-    },
-    {
-      priceId: PRICING.max.annual.priceId || '',
-      plan: PRICING.max.annual.entitlementPlan,
-      amount: PRICING.max.annual.amount,
-      currency: 'usd',
-      interval: PRICING.max.annual.interval,
-      description: PRICING.max.annual.label,
-    },
-    {
-      priceId: env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY || '',
+      priceId: env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY || '',
       plan: 'pro',
-      amount: 2900,
-      currency: 'usd',
-      interval: 'month',
-      description: 'YouTube Thumbnails Founder',
-      listed: false,
+      amount: toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd),
+      currency: ARTIST_VISIBILITY_OFFER.pro.currency,
+      interval: ARTIST_VISIBILITY_OFFER.pro.interval,
+      description: ARTIST_VISIBILITY_OFFER.pro.displayName,
     },
   ];
 
@@ -99,7 +67,55 @@ const buildActivePriceMappings = (): Record<string, PriceMapping> => {
  * founding -> pro per ENTITLEMENT_REGISTRY.getEntitlements('founding').
  */
 const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
-  const mappings: PriceMapping[] = [];
+  const mappings: PriceMapping[] = [
+    {
+      priceId: env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY || '',
+      plan: 'pro',
+      amount: 2900,
+      currency: 'usd',
+      interval: 'month',
+      description: 'YouTube Thumbnails Founder',
+      listed: false,
+      legacy: true,
+    },
+
+    {
+      priceId: env.STRIPE_PRICE_PRO_MONTHLY || '',
+      plan: PRICING.pro.monthly.entitlementPlan,
+      amount: 3900,
+      currency: 'usd',
+      legacy: true,
+      interval: PRICING.pro.monthly.interval,
+      description: PRICING.pro.monthly.label,
+    },
+    {
+      priceId: PRICING.pro.annual.priceId || '',
+      plan: PRICING.pro.annual.entitlementPlan,
+      amount: PRICING.pro.annual.amount,
+      currency: 'usd',
+      legacy: true,
+      interval: PRICING.pro.annual.interval,
+      description: PRICING.pro.annual.label,
+    },
+    {
+      priceId: PRICING.max.monthly.priceId || '',
+      plan: PRICING.max.monthly.entitlementPlan,
+      amount: PRICING.max.monthly.amount,
+      currency: 'usd',
+      legacy: true,
+      interval: PRICING.max.monthly.interval,
+      description: PRICING.max.monthly.label,
+    },
+    {
+      priceId: PRICING.max.annual.priceId || '',
+      plan: PRICING.max.annual.entitlementPlan,
+      amount: PRICING.max.annual.amount,
+      currency: 'usd',
+      legacy: true,
+      interval: PRICING.max.annual.interval,
+      description: PRICING.max.annual.label,
+    },
+  ];
 
   if (env.STRIPE_PRICE_FOUNDING_MONTHLY) {
     mappings.push({
@@ -209,16 +225,21 @@ export function validateStripeConfig(): {
   }
 
   // Pro tier is the primary paid product — must be configured
-  if (!env.STRIPE_PRICE_PRO_MONTHLY) {
-    missingVars.push('STRIPE_PRICE_PRO_MONTHLY');
-  }
-
-  if (!env.STRIPE_PRICE_PRO_ANNUAL && !env.STRIPE_PRICE_PRO_YEARLY) {
-    missingVars.push('STRIPE_PRICE_PRO_ANNUAL');
+  if (!env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY) {
+    missingVars.push('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY');
   }
 
   return {
     isValid: missingVars.length === 0,
     missingVars,
   };
+}
+
+/** Existing paid subscribers retain established sends; new/unknown prices never inherit them. */
+export function isLegacyFanSendPrice(
+  priceId: string | null | undefined
+): boolean {
+  return Boolean(
+    priceId && !ACTIVE_PRICE_MAPPINGS[priceId] && LEGACY_PRICE_MAPPINGS[priceId]
+  );
 }

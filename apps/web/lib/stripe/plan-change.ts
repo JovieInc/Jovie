@@ -27,6 +27,7 @@ import {
   getPriceMappingDetails,
   type PlanType,
 } from './config';
+import { assertCheckoutPriceContract } from './price-contract';
 
 /**
  * Plan hierarchy for determining upgrade vs downgrade
@@ -195,6 +196,10 @@ export async function previewPlanChange(
       return null;
     }
 
+    await assertCheckoutPriceContract(newPriceId, id =>
+      stripe.prices.retrieve(id)
+    );
+
     // Get current subscription
     const subscription = await getActiveSubscription(customerId);
     if (!subscription) {
@@ -315,6 +320,10 @@ export async function executePlanChange(
         effectiveDate: new Date(),
       };
     }
+
+    await assertCheckoutPriceContract(newPriceId, id =>
+      stripe.prices.retrieve(id)
+    );
 
     // Get current subscription with expanded price data
     const subscriptionRaw = await stripe.subscriptions.retrieve(
