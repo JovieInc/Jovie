@@ -79,25 +79,41 @@ const appShellFrameBlock = extractShellWorkspaceBlock(systemBAppCss);
 const workspaceMarker =
   '/* NOIR ION D — workspace state surfaces (shell-scoped) */';
 
+// Noir Ion dark-mode anchors live in the :root.dark block that carries the
+// surface ladder. A file-wide first match can instead hit the light :root
+// alias block (shared marketing chrome), which points
+// --noir-ion-text-secondary back at var(--color-text-secondary-token) —
+// itself projected from the Noir Ion anchors — so scope the read to the
+// dark block, the same marker-owned extraction the web Noir Ion contract
+// uses for --noir-ion-canvas.
+function extractDarkNoirIonBlock(css: string): string {
+  const blocks = css.match(/:root\.dark(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g) ?? [];
+  const hit = blocks.find(block => block.includes('--noir-ion-canvas:'));
+  if (!hit) throw new Error('Noir Ion dark block not found in web canon CSS');
+  return hit;
+}
+
+const darkNoirIonBlock = extractDarkNoirIonBlock(designSystemCss);
+
 describe('shell workspace CSS extraction', () => {
-  test.each([
-    '"',
-    "'",
-  ])('reads the marker-owned dark selector list with %s quotes', quote => {
-    const frame = `[data-app-shell-frame=${quote}true${quote}]`;
-    const block = `.dark ${frame},\n${frame}.dark {
+  test.each(['"', "'"])(
+    'reads the marker-owned dark selector list with %s quotes',
+    quote => {
+      const frame = `[data-app-shell-frame=${quote}true${quote}]`;
+      const block = `.dark ${frame},\n${frame}.dark {
   --color-border-subtle: expected;
   &:hover { --nested: value; }
   --shadow-popover: expected-shadow;
 }`;
-    const css = `${frame} { --color-border-subtle: wrong; }
+      const css = `${frame} { --color-border-subtle: wrong; }
 ${workspaceMarker}
 ${block}
 .unrelated { --shadow-popover: wrong; }`;
-    const extracted = extractShellWorkspaceBlock(css);
-    expect(extracted).toBe(block);
-    expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
-  });
+      const extracted = extractShellWorkspaceBlock(css);
+      expect(extracted).toBe(block);
+      expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
+    }
+  );
 
   test.each([
     ['', 'Noir Ion D marker not found'],
@@ -120,6 +136,28 @@ ${block}
   });
 });
 
+describe('dark Noir Ion block extraction', () => {
+  const darkBlock = `:root.dark {
+  --noir-ion-canvas: #030407;
+  --noir-ion-text-secondary: #d7dce8;
+}`;
+
+  test('reads the anchor-owned dark block, not an earlier light alias', () => {
+    const css = `:root {
+  --noir-ion-text-secondary: var(--color-text-secondary-token);
+}
+${darkBlock}`;
+    const extracted = extractDarkNoirIonBlock(css);
+    expect(readCssVar('--noir-ion-text-secondary', extracted)).toBe('#d7dce8');
+  });
+
+  test('rejects CSS without the anchor-owned dark block', () => {
+    expect(() =>
+      extractDarkNoirIonBlock(':root { --noir-ion-canvas: #030407; }')
+    ).toThrow('Noir Ion dark block not found in web canon CSS');
+  });
+});
+
 describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => {
   test('borderSubtle matches the app-shell frame --color-border-subtle', () => {
     expect(normalize(SYSTEM_B_DESKTOP_TOKENS.borderSubtle)).toBe(
@@ -131,7 +169,7 @@ describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => 
     // The app-shell frame does not override text color; it inherits the dark
     // Noir Ion anchor (DESIGN.md: Text secondary #D7DCE8).
     expect(normalize(SYSTEM_B_DESKTOP_TOKENS.textSecondary)).toBe(
-      normalize(readCssVar('--noir-ion-text-secondary', designSystemCss))
+      normalize(readCssVar('--noir-ion-text-secondary', darkNoirIonBlock))
     );
   });
 
