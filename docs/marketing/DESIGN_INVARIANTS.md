@@ -136,7 +136,11 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
   unpublished or empty release entries. Homepage previews share the same
   entry/artwork family. Deliberate gradient-and-type artwork is valid. Changelog
   page and homepage-preview artwork use the shared 16px radius token with actual
-  clipping; reserve equal desktop title space so media top edges align.
+  clipping; reserve equal desktop title space so media top edges align. Group
+  dates and titles tightly; retain full wording with a tested shared row height
+  that accommodates wrapping, and reserve media aspect ratios before loading.
+  Blog posts, category pages and related cards reuse the editorial family; show
+  only articles belonging to the named category, with other articles separately labeled.
 - **Founder evidence/status:** explicit Cursor timeline request and request for
   editorial images inspired by ElevenLabs/OpenAI. Current implementation is a proposal.
 - **Enforcement:** inspect reference pixels and real scroll behavior, record
@@ -281,3 +285,11 @@ clipboard, locale, CLI, dropdown or connection fix. Current artifact status and
 the Pen transport checkpoint belong in the separate operator handback, not in
 the normative rules. Unrelated speech that the user retracted as belonging to
 another task supplies no design requirement or action authority here.
+
+## MKT-D15 — Marketing control size and arrow semantics
+
+- **Scope:** marketing buttons, footer preferences, editorial links, CLI and visibility studies.
+- **Requirement:** diagonal up-right arrows denote a new browsing context; straight-right arrows denote same-context navigation. Copy uses copy/check; in-page actions use appropriate non-navigation symbols. External destinations do not automatically require a new window. Match footer controls to the canonical button visible size and hit target; smaller marketing labels are a scoped proposal, not an app-wide change.
+- **Founder evidence/status:** explicit arrow and canonical footer-size direction on 2026-09-13; smaller button text was tentative.
+- **Enforcement:** inspect actual target/rel and action behavior, verify keyboard/clipboard states, and compare controls against g3IC1 geometry rather than zoomed screenshots. Current atom reads 28px visible within a 44px target; retain accessible targets. New-context links require the appropriate safe rel contract.
+- **Change/exception:** communicate actual navigation behavior consistently; do not impose a new-context destination merely to justify an icon. Re-evaluate scoped label size after rendered comparison.
