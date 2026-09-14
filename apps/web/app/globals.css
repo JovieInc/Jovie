@@ -122,6 +122,8 @@ html[data-desktop-runtime="electron"]
   [data-app-shell-frame="true"]:has([data-main-header-inset="true"])
   [data-electron-titlebar="true"] {
   width: var(--electron-controls-width);
+  /* With no sidebar beneath the controls, reveal the header/ambient plane. */
+  background: transparent;
 }
 
 html[data-desktop-runtime="electron"]
@@ -158,7 +160,8 @@ html[data-desktop-runtime="electron"]
 }
 
 /* Match the existing sidebar rail's horizontal inset. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
 }

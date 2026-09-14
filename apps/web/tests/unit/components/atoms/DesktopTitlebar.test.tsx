@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act, render, screen, waitFor } from '@testing-library/react';
+import postcss from 'postcss';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DesktopReleaseIdentity,
@@ -141,6 +144,39 @@ describe('DesktopTitlebar', () => {
         'data-main-header-inset',
         'true'
       );
+    }
+  );
+
+  it.each([
+    [{ state: 'closed' as const, open: false }, 'transparent'],
+    [{ isMobile: true }, 'transparent'],
+    [{}, 'rgb(var(--sidebar-background))'],
+  ])(
+    'paints window controls on the surface that owns them',
+    (overrides, expected) => {
+      document.documentElement.dataset.desktopRuntime = 'electron';
+      const { container, unmount } = renderTitlebar(overrides);
+      container.dataset.appShellFrame = 'true';
+      const titlebar = screen.getByTestId('electron-titlebar-row');
+      const css = postcss.parse(
+        readFileSync(resolve(__dirname, '../../../../app/globals.css'), 'utf8')
+      );
+      const backgrounds: string[] = [];
+      css.walkRules(rule => {
+        // Evaluate the actual CSS selectors against the rendered sidebar state.
+        // This must not make the expanded sidebar transparent as a side effect.
+        if (
+          rule.selector.includes('[data-electron-titlebar=') &&
+          titlebar.matches(rule.selector)
+        ) {
+          rule.walkDecls('background', declaration => {
+            backgrounds.push(declaration.value);
+          });
+        }
+      });
+      expect(backgrounds.at(-1)).toBe(expected);
+      unmount();
+      document.documentElement.removeAttribute('data-desktop-runtime');
     }
   );
 
