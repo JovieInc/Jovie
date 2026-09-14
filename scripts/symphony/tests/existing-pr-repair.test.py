@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -88,6 +89,7 @@ class RepairTests(unittest.TestCase):
         self.stack.enter_context(mock.patch.object(controller, "_complete_open_prs", side_effect=lambda repo: [self.pr]))
         self.stack.enter_context(mock.patch.object(controller, "_fetch_single_issue", side_effect=lambda ident: self.issue))
         self.stack.enter_context(mock.patch.object(controller, "_native_dispatch_prerequisite", return_value=None))
+        self.stack.enter_context(mock.patch.object(controller, "_pr_status_check_rollup", return_value=None))
         self.stack.enter_context(mock.patch.object(controller, "gc_fallback_locks"))
         self.stack.enter_context(mock.patch.object(controller, "_fallback_lock_count", return_value=1))
         self.stack.enter_context(mock.patch.object(controller, "_fallback_lease_dir", return_value=self.leases))
@@ -105,8 +107,10 @@ class RepairTests(unittest.TestCase):
                       expiresAt=repair.datetime.fromtimestamp(payload["expiresAt"], repair.timezone.utc).isoformat())
         task = {"schema": "jovie-symphony-repair-task/v3", "taskKey": "a" * 64, "decisionFingerprint": "a" * 64,
                 "action": "execute-existing-owned-repair", "authority": "host-assigned-isolated-repair-only",
-                "selected": {"id": "affected-only-unit-selection"},
-                "source": {"sourceVersion": "b" * 40}, "existingRepair": target}
+                "selected": {"id": "affected-only-unit-selection", "sourceRevision": "b" * 40,
+                             "sourceDigest": "d" * 64, "owner": "ci-reliability", "handle": "audit:repair"},
+                "source": {"sourceVersion": "b" * 40, "snapshotDigest": "e" * 64},
+                "existingRepair": target}
         eligibility = {"qualified": True, "provider": "fixture-local", "model": "fixture-task-model", "funding": "included-local",
                        "taskAppropriate": True, "costAppropriate": True, "delegationPolicyBound": True,
                        "expiresAt": payload["expiresAt"], "authPoolIdentity": "b" * 64}
@@ -119,12 +123,104 @@ class RepairTests(unittest.TestCase):
                 "baseHead": payload["head"],
                 "finalHead": "b" * 40,
                 "outputDigest": "c" * 64,
+                "taskAcceptanceDigest": repair.task_acceptance_digest(task),
+                "taskAccepted": True,
             },
         }
         return task, executor
 
-    def run_isolated(self, task, executor=None):
-        return repair.execute_isolated(task, controller.__file__, lambda _: self.issue, lambda _: [self.pr], executor=executor)
+    def run_isolated(self, task, executor=None, *, resolved=True, expected_final_head=None,
+                     selected_check=True):
+        observed_calls = 0
+        planned_final_head = None
+
+        def fetch_prs(_repo):
+            nonlocal observed_calls, planned_final_head
+            observed_calls += 1
+            if observed_calls == 1 and executor is not None:
+                result = getattr(executor.execute, "return_value", {})
+                observation = result.get("_executionObservation", {}) if isinstance(result, dict) else {}
+                planned_final_head = expected_final_head or observation.get("finalHead")
+            if observed_calls > 1 and executor is not None:
+                head = planned_final_head or self.pr.get("headRefOid")
+                observation = {**self.pr, "headRefOid": head,
+                               "mergeStateStatus": "CLEAN" if resolved else self.pr.get("mergeStateStatus"),
+                               "mergeable": "MERGEABLE" if resolved else self.pr.get("mergeable")}
+                if resolved and selected_check:
+                    observation["statusCheckRollup"] = [{
+                        "__typename": "CheckRun",
+                        "name": task["selected"]["handle"],
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                    }]
+                return [observation]
+            return [self.pr]
+
+        return repair.execute_isolated(task, controller.__file__, lambda _: self.issue,
+                                       fetch_prs, executor=executor)
+
+    def write_admission_receipts(self):
+        now = repair.time.time()
+        def timestamp(epoch):
+            return repair.datetime.fromtimestamp(epoch, repair.timezone.utc).isoformat().replace("+00:00", "Z")
+        runtime_revision = "c" * 40
+        fleet = {
+            "schema": repair.ADMISSION_FLEET_SCHEMA,
+            "sourceRevision": "d" * 40,
+            "observedAt": timestamp(now),
+            "signals": {
+                "main": {"sha": "f" * 40},
+                "queue": {
+                    "repository": "JovieInc/Jovie",
+                    "status": "known",
+                    "source": "live",
+                },
+            },
+            "workAdmission": {
+                "allowed": True, "newImplementationAllowed": True,
+                "newIssueLeaseAllowed": True,
+            },
+            "closureAdmission": {
+                "newImplementationAllowed": True,
+                "newIssueIntakeAllowed": True,
+                "remediationContinues": True,
+            },
+            "remediationAdmission": {
+                "allowed": True, "localAllowed": True, "pushAllowed": True,
+                "authority": "single-pr-writer-exact-head",
+            },
+        }
+        attestation = {
+            "schema": repair.ADMISSION_ATTESTATION_SCHEMA,
+            "sourceRevision": runtime_revision,
+            "observedAt": timestamp(now),
+            "active": True,
+            "healthy": True,
+            "listener": {"port": 4041, "boundToService": True},
+            "runtime": {"workflowPath": "/fixture/symphony-workflow.md",
+                        "generation": "e" * 64, "invocationId": "f" * 32},
+        }
+        concurrency = {
+            "schema": repair.ADMISSION_CONCURRENCY_SCHEMA,
+            "sourceRevision": runtime_revision,
+            "observedAt": timestamp(now),
+            "provenance": {"sourceRevision": runtime_revision, "observedAt": timestamp(now)},
+            "resourceScope": {
+                "repository": "JovieInc/Jovie",
+                "runtimeUrl": repair.ADMISSION_RUNTIME_URL,
+                "workflow": "/fixture/symphony-workflow.md",
+            },
+            "provider": {
+                "eligible": True,
+                "source": "active-issue-authenticated-routes",
+            },
+            "downstream": {"healthy": True, "repository": "JovieInc/Jovie"},
+        }
+        for name, value in (("ADMISSION_FLEET_PATH", fleet),
+                            ("ADMISSION_CONCURRENCY_PATH", concurrency),
+                            ("ADMISSION_ATTESTATION_PATH", attestation)):
+            self.admission_paths[name].write_text(json.dumps(value), encoding="utf-8")
+        return fleet, concurrency, attestation
 
     def provider_granted_fixture(self):
         task, _executor = self.isolated_fixture()
@@ -191,8 +287,7 @@ class RepairTests(unittest.TestCase):
     def test_provider_grant_validation_and_grok_runner_are_source_and_assignment_bound(self):
         task, payload, executable = self.provider_granted_fixture()
         self.assertEqual(repair.load_validated_candidate(IDENT, controller.__file__), payload)
-        for key, value in (("issuedAt", payload["issuedAt"] - 1),
-                           ("expiresAt", payload["expiresAt"] + 1)):
+        for key, value in (("issuedAt", payload["issuedAt"] - 1), ("expiresAt", payload["expiresAt"] + 1)):
             crossed = copy.deepcopy(payload)
             crossed["providerGrant"][key] = value
             with self.assertRaisesRegex(ValueError, "provider-grant-assignment-window-invalid"):
@@ -207,97 +302,56 @@ class RepairTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "provider-grant-qualification-time-invalid"):
             repair.validate_provider_grant(naive)
         now = time.time()
+        def observed(age):
+            return repair.datetime.fromtimestamp(now - age, repair.timezone.utc).isoformat().replace("+00:00", "Z")
         fresh_edge = copy.deepcopy(payload)
-        fresh_edge["providerGrant"]["qualification"]["observedAt"] = repair.datetime.fromtimestamp(
-            now - repair.MAX_QUALIFICATION_AGE_SECONDS + 1,
-            repair.timezone.utc,
-        ).isoformat().replace("+00:00", "Z")
+        fresh_edge["providerGrant"]["qualification"]["observedAt"] = observed(repair.MAX_QUALIFICATION_AGE_SECONDS - 1)
         repair.validate_provider_grant(fresh_edge, now=now)
         stale = copy.deepcopy(fresh_edge)
-        stale["providerGrant"]["qualification"]["observedAt"] = repair.datetime.fromtimestamp(
-            now - repair.MAX_QUALIFICATION_AGE_SECONDS - 1,
-            repair.timezone.utc,
-        ).isoformat().replace("+00:00", "Z")
+        stale["providerGrant"]["qualification"]["observedAt"] = observed(repair.MAX_QUALIFICATION_AGE_SECONDS + 1)
         with self.assertRaisesRegex(ValueError, "provider-grant-qualification-stale"):
             repair.validate_provider_grant(stale, now=now)
-        runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout="changed", stderr=""))
+        acceptance = repair.task_acceptance_digest(task)
+        runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout=f"changed\n{repair.TASK_ACCEPTANCE_MARKER} {acceptance}\n", stderr=""))
         adapter = repair.GrokOwnedRepairExecutor(run=runner)
         eligibility = adapter.qualify(task, payload)
         self.writer()
-        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9", "OPENAI_API_KEY": "secret"}), \
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9", "OPENAI_API_KEY": "secret",
+                                         "SUMMER_GOVERNOR_ENFORCE_ENABLED": "true",
+                                         "SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY": "secret", "DATABASE_URL": "postgresql://product-secret"}), \
              mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
             result = adapter.execute(task, payload, {**eligibility, "runId": "JOV-5552-run"})
         self.assertEqual(result["status"], "succeeded")
-        self.assertEqual(result["_executionObservation"]["baseHead"], payload["head"])
+        observation = result["_executionObservation"]
+        self.assertEqual(observation["baseHead"], payload["head"])
         command = runner.call_args.args[0]
         self.assertEqual(command[0], str(executable))
         self.assertIn("grok-4.6", command)
         self.assertIn("--disable-web-search", command)
         self.assertIn("--no-subagents", command)
-        self.assertNotIn("OPENAI_API_KEY", runner.call_args.kwargs["env"])
+        child_env = runner.call_args.kwargs["env"]
+        self.assertTrue(set(child_env).issubset(repair.CHILD_ENV_ALLOWLIST))
+        for secret in ("OPENAI_API_KEY", "LINEAR_API_KEY", "SUMMER_GOVERNOR_ENFORCE_ENABLED",
+                       "SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY", "DATABASE_URL"):
+            self.assertNotIn(secret, child_env)
+        self.assertEqual(child_env["HOME"], os.environ["HOME"])
+        self.assertTrue(0 < runner.call_args.kwargs["timeout"] <= payload["providerGrant"]["expiresAt"] - time.time())
+        self.assertTrue(observation["taskAccepted"])
 
-    def write_admission_receipts(self):
-        now = repair.time.time()
-        def timestamp(epoch):
-            return repair.datetime.fromtimestamp(epoch, repair.timezone.utc).isoformat().replace("+00:00", "Z")
-        runtime_revision = "c" * 40
-        fleet = {
-            "schema": repair.ADMISSION_FLEET_SCHEMA,
-            "sourceRevision": "d" * 40,
-            "observedAt": timestamp(now),
-            "signals": {
-                "main": {"sha": "f" * 40},
-                "queue": {
-                    "repository": "JovieInc/Jovie",
-                    "status": "known",
-                    "source": "live",
-                },
-            },
-            "workAdmission": {
-                "allowed": True, "newImplementationAllowed": True,
-                "newIssueLeaseAllowed": True,
-            },
-            "closureAdmission": {
-                "newImplementationAllowed": True,
-                "newIssueIntakeAllowed": True,
-                "remediationContinues": True,
-            },
-            "remediationAdmission": {
-                "allowed": True, "localAllowed": True, "pushAllowed": True,
-                "authority": "single-pr-writer-exact-head",
-            },
-        }
-        attestation = {
-            "schema": repair.ADMISSION_ATTESTATION_SCHEMA,
-            "sourceRevision": runtime_revision,
-            "observedAt": timestamp(now),
-            "active": True,
-            "healthy": True,
-            "listener": {"port": 4041, "boundToService": True},
-            "runtime": {"workflowPath": "/fixture/symphony-workflow.md",
-                        "generation": "e" * 64, "invocationId": "f" * 32},
-        }
-        concurrency = {
-            "schema": repair.ADMISSION_CONCURRENCY_SCHEMA,
-            "sourceRevision": runtime_revision,
-            "observedAt": timestamp(now),
-            "provenance": {"sourceRevision": runtime_revision, "observedAt": timestamp(now)},
-            "resourceScope": {
-                "repository": "JovieInc/Jovie",
-                "runtimeUrl": repair.ADMISSION_RUNTIME_URL,
-                "workflow": "/fixture/symphony-workflow.md",
-            },
-            "provider": {
-                "eligible": True,
-                "source": "active-issue-authenticated-routes",
-            },
-            "downstream": {"healthy": True, "repository": "JovieInc/Jovie"},
-        }
-        for name, value in (("ADMISSION_FLEET_PATH", fleet),
-                            ("ADMISSION_CONCURRENCY_PATH", concurrency),
-                            ("ADMISSION_ATTESTATION_PATH", attestation)):
-            self.admission_paths[name].write_text(json.dumps(value), encoding="utf-8")
-        return fleet, concurrency, attestation
+    def test_grok_exit_zero_changed_head_without_exact_task_acceptance_stays_unverified(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout="changed\n", stderr=""))
+        adapter = repair.GrokOwnedRepairExecutor(run=runner)
+        eligibility = adapter.qualify(task, payload)
+        self.writer()
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}), \
+             mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
+            result = adapter.execute(task, payload, {**eligibility, "runId": "JOV-5552-acceptance"})
+        observation = result["_executionObservation"]
+        self.assertEqual((result["status"], result["detail"], observation["taskAccepted"],
+                          observation["taskAcceptanceDigest"]),
+                         ("failed", "grok-execution-task-acceptance-unverified", False,
+                          repair.task_acceptance_digest(task)))
 
     def test_current_execution_admission_requires_each_independent_authority(self):
         mutations = (
@@ -386,6 +440,308 @@ class RepairTests(unittest.TestCase):
             repair._replace_private(cleanup_target, {"ok": True})
         self.assertFalse(any(path.name.startswith(".cleanup.json.") for path in self.root.iterdir()))
 
+    def test_delayed_outbox_rechecks_current_admission_before_claim(self):
+        task, _payload, _executable = self.provider_granted_fixture()
+        fleet, concurrency, attestation = self.write_admission_receipts()
+        fleet["remediationAdmission"]["pushAllowed"] = False
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet), encoding="utf-8")
+        result = self.run_isolated(task)
+        self.assertEqual(result, {"status": "held", "reason": "execution-admission-push-held"})
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+
+    def test_grok_execution_rechecks_admission_before_spawn(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        fleet, concurrency, attestation = self.write_admission_receipts()
+        acceptance = repair.task_acceptance_digest(task)
+        runner = mock.Mock(return_value=mock.Mock(
+            returncode=0,
+            stdout=f"changed\n{repair.TASK_ACCEPTANCE_MARKER} {acceptance}\n",
+            stderr="",
+        ))
+        adapter = repair.GrokOwnedRepairExecutor(
+            run=runner, admission_reader=repair.read_current_execution_admission
+        )
+        eligibility = adapter.qualify(task, payload)
+        self.writer()
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}), \
+             mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40, payload["head"]]):
+            result = adapter.execute(task, payload, {**eligibility, "runId": "JOV-5552-admission"})
+            self.assertEqual(result["status"], "succeeded")
+            fleet["remediationAdmission"]["pushAllowed"] = False
+            self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet), encoding="utf-8")
+            with self.assertRaisesRegex(repair.ExecutionAdmissionHeld, "execution-admission-push-held"):
+                adapter.execute(task, payload, {**eligibility, "runId": "JOV-5552-held"})
+        self.assertEqual(runner.call_count, 1)
+
+    def test_correlated_result_recovery_ignores_later_admission_hold(self):
+        task, executor = self.isolated_fixture()
+        first = self.run_isolated(task, executor)
+        fleet, _concurrency, _attestation = self.write_admission_receipts()
+        fleet["remediationAdmission"]["pushAllowed"] = False
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet), encoding="utf-8")
+        payload = repair.read_private(self.root / f"{IDENT}.json")
+        with mock.patch.object(repair.time, "time", return_value=payload["expiresAt"] + 1):
+            replay = self.run_isolated(task, executor)
+        self.assertEqual(replay, first)
+        self.assertEqual(executor.execute.call_count, 1)
+
+    @unittest.skipUnless(os.name == "posix", "requires process sessions")
+    def test_bounded_runner_stops_descendants_without_touching_unrelated_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            descendant_path = Path(directory) / "descendant.pid"
+            child = ("import os,pathlib,signal,time; c=os.fork(); "
+                     f"p=pathlib.Path({str(descendant_path)!r}); "
+                     "(p.write_text(str(os.getpid())),signal.signal(signal.SIGTERM,signal.SIG_IGN)) if c==0 else None; "
+                     "time.sleep(10)")
+            unrelated = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(10)"], start_new_session=True)
+            try:
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    repair._run_bounded([sys.executable, "-c", child], stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE, text=True, timeout=0.1)
+                self.assertIsNone(unrelated.poll())
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline and not descendant_path.exists():
+                    time.sleep(0.02)
+                self.assertTrue(descendant_path.is_file())
+                while time.monotonic() < deadline:
+                    try:
+                        os.kill(int(descendant_path.read_text()), 0)
+                    except ProcessLookupError:
+                        break
+                    time.sleep(0.02)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(int(descendant_path.read_text()), 0)
+            finally:
+                unrelated.terminate()
+                unrelated.wait(timeout=5)
+
+    @unittest.skipUnless(os.name == "posix", "requires process sessions")
+    def test_bounded_runner_cleans_descendant_after_successful_leader_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            descendant_path = Path(directory) / "descendant.pid"
+            child = ("import os,pathlib,signal,time; c=os.fork(); "
+                     f"p=pathlib.Path({str(descendant_path)!r}); "
+                     "(signal.signal(signal.SIGTERM,signal.SIG_IGN),"
+                     "p.write_text(str(os.getpid())),os.close(1),os.close(2),time.sleep(10)) if c==0 else os._exit(0)")
+            result = repair._run_bounded([sys.executable, "-c", child],
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                         text=True, timeout=2)
+            self.assertEqual(result.returncode, 0)
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline and not descendant_path.exists():
+                time.sleep(0.02)
+            self.assertTrue(descendant_path.is_file())
+            descendant_pid = int(descendant_path.read_text())
+            while time.monotonic() < deadline:
+                try:
+                    os.kill(descendant_pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.02)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(descendant_pid, 0)
+
+    def test_observer_binds_exact_target_and_keeps_provider_unknown_without_quota_source(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "FAILURE"}]
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks) as fetch_checks:
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"],
+                source_revision=payload["generation"],
+            )
+        self.assertIsInstance(observed, dict)
+        self.assertEqual(observed["schema"], repair.TASK_ADMISSIONS_SCHEMA)
+        self.assertEqual(observed["assignmentDigest"], repair.assignment_digest(payload))
+        self.assertEqual(observed["sourceRevision"], payload["generation"])
+        self.assertEqual(observed["runtimeRevision"], "c" * 40)
+        self.assertEqual(observed["runtimeGeneration"], "e" * 64)
+        self.assertEqual(observed["runtimeInvocationId"], "f" * 32)
+        self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
+        self.assertEqual(observed["providerEligibility"]["reason"],
+                         "provider-quota-observation-unavailable")
+        self.assertIsNone(observed["providerObservation"])
+        self.assertEqual(observed["downstreamHealth"]["state"], "ALLOWED")
+        self.assertEqual(observed["downstreamHealth"]["reason"], "observed-target-available")
+        self.assertRegex(observed["downstreamHealth"]["sourceDigest"], r"^[a-f0-9]{64}$")
+        fetch_checks.assert_called_once_with("JovieInc/Jovie", payload["pr"])
+
+    def test_observer_returns_unknown_for_crossed_or_ambiguous_target(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        with mock.patch.object(controller, "_pr_status_check_rollup", return_value=[]):
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"], source_revision="c" * 40,
+            )
+        self.assertEqual(observed["sourceRevision"], "c" * 40)
+        self.assertEqual(observed["providerEligibility"]["reason"],
+                         "task-source-binding-mismatch")
+        self.assertEqual(observed["downstreamHealth"]["reason"],
+                         "task-source-binding-mismatch")
+
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_complete_open_prs", return_value=[self.pr, self.pr.copy()]), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=[{
+                 "__typename": "CheckRun", "name": task["selected"]["handle"],
+                 "status": "COMPLETED", "conclusion": "SUCCESS",
+             }]):
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"], source_revision=payload["generation"],
+            )
+        self.assertEqual(observed["downstreamHealth"]["state"], "UNKNOWN")
+        self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
+
+    def test_observer_rejects_check_when_pr_head_changes_between_reads(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        changed = {**self.pr, "headRefOid": "c" * 40}
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_complete_open_prs",
+                               side_effect=[[self.pr], [changed]]), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=[{
+                 "__typename": "CheckRun", "name": task["selected"]["handle"],
+                 "status": "COMPLETED", "conclusion": "SUCCESS",
+             }]):
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"],
+                source_revision=payload["generation"],
+            )
+        self.assertEqual(observed["downstreamHealth"]["state"], "UNKNOWN")
+        self.assertEqual(observed["downstreamHealth"]["reason"],
+                         "task-target-observation-unavailable")
+
+    def test_observer_rejects_runtime_restart_after_authenticated_reads(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        runtime = ("c" * 40, "e" * 64, "f" * 32)
+        restarted = ("c" * 40, "d" * 64, "f" * 32)
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        with mock.patch.object(repair, "_task_admission_runtime_binding",
+                               side_effect=[runtime, restarted]), \
+             mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks):
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"],
+                source_revision=payload["generation"],
+            )
+        self.assertEqual(observed["downstreamHealth"]["state"], "UNKNOWN")
+        self.assertEqual(observed["downstreamHealth"]["reason"],
+                         "task-runtime-binding-changed")
+        self.assertEqual(observed["runtimeGeneration"], "d" * 64)
+
+    def test_observer_holds_when_assignment_is_consumed_after_target_read(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks), \
+             mock.patch.object(repair, "_assignment_consumed",
+                               side_effect=[False, False, True]):
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"],
+                source_revision=payload["generation"],
+            )
+        self.assertEqual(observed["providerEligibility"]["state"], "UNKNOWN")
+        self.assertEqual(observed["providerEligibility"]["reason"],
+                         "provider-quota-observation-unavailable")
+        self.assertEqual(observed["downstreamHealth"]["state"], "UNKNOWN")
+        self.assertEqual(observed["downstreamHealth"]["reason"],
+                         "task-observation-expired")
+
+    def test_observer_holds_when_runtime_attestation_disappears_after_target_read(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        runtime = ("c" * 40, "e" * 64, "f" * 32)
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        with mock.patch.object(repair, "_task_admission_runtime_binding",
+                               side_effect=[runtime, None]), \
+             mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks):
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"],
+                source_revision=payload["generation"],
+            )
+        self.assertIsNone(observed)
+
+    def test_observer_does_not_probe_after_assignment_is_consumed(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        claim = self.root / f"{IDENT}.claim"
+        claim.write_text("claimed\n", encoding="utf-8")
+        claim.chmod(0o600)
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_fetch_single_issue") as fetch_issue, \
+             mock.patch.object(controller, "_complete_open_prs") as fetch_prs, \
+             mock.patch.object(controller, "_pr_status_check_rollup") as fetch_checks:
+            observed = repair.observe_task_admissions(
+                IDENT, controller.__file__, selected_id=task["selected"]["id"],
+                selected_handle=task["selected"]["handle"], source_revision=payload["generation"],
+            )
+        self.assertIsNone(observed)
+        fetch_issue.assert_not_called()
+        fetch_prs.assert_not_called()
+        fetch_checks.assert_not_called()
+
+    def test_observer_fail_closed_paths_cover_runtime_controller_and_check_shapes(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        kwargs = {
+            "selected_id": task["selected"]["id"],
+            "selected_handle": task["selected"]["handle"],
+            "source_revision": payload["generation"],
+        }
+        with mock.patch.object(repair, "_task_admission_runtime_binding", return_value=None):
+            self.assertIsNone(repair.observe_task_admissions(IDENT, controller.__file__, **kwargs))
+        self.write_admission_receipts()
+        with mock.patch.object(repair, "_task_admission_target_observation", side_effect=ValueError("incomplete")):
+            observed = repair.observe_task_admissions(IDENT, controller.__file__, **kwargs)
+        self.assertEqual(observed["downstreamHealth"]["state"], "UNKNOWN")
+        self.assertIsNone(repair.observe_task_admissions(
+            IDENT, controller.__file__, selected_id="unsupported-class",
+            selected_handle=kwargs["selected_handle"], source_revision=payload["generation"],
+        ))
+
+        loaded = repair._task_admission_controller_module(controller.__file__)
+        self.assertTrue(callable(loaded._fetch_single_issue))
+        self.assertIsNone(repair._task_admission_selected_check(
+            kwargs["selected_id"], kwargs["selected_handle"], None
+        ))
+        self.assertIsNotNone(repair._task_admission_selected_check(
+            kwargs["selected_id"], kwargs["selected_handle"], [
+                None,
+                {"__typename": "Other", "name": kwargs["selected_handle"]},
+                {"__typename": "CheckRun", "name": "other", "status": "COMPLETED",
+                 "conclusion": "SUCCESS"},
+                {"__typename": "StatusContext", "context": kwargs["selected_handle"],
+                 "state": "SUCCESS"},
+            ]
+        ))
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_fetch_single_issue", return_value=None), \
+             mock.patch.object(controller, "_complete_open_prs", return_value=[]):
+            self.assertIsNone(repair._task_admission_target_observation(
+                payload, controller.__file__, kwargs["selected_id"], kwargs["selected_handle"]
+            ))
+        with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
+             mock.patch.object(controller, "_fetch_single_issue", return_value=self.issue), \
+             mock.patch.object(controller, "_complete_open_prs", return_value=[self.pr]), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=[]):
+            self.assertIsNone(repair._task_admission_target_observation(
+                payload, controller.__file__, kwargs["selected_id"], kwargs["selected_handle"]
+            ))
+
     def test_discovery_excludes_claimed_and_terminal_assignments(self):
         _task, payload, _executable = self.provider_granted_fixture()
         self.assertEqual(repair.candidates(controller.__file__), [payload])
@@ -416,6 +772,17 @@ class RepairTests(unittest.TestCase):
             control.assert_not_called()
         self.assertFalse((self.root / f"{IDENT}.claim").exists())
 
+    def test_owned_inventory_adds_status_rows_only_to_exact_target_pr(self):
+        task, _executor = self.isolated_fixture()
+        other = {**self.pr, "number": self.pr["number"] + 1}
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        with mock.patch.object(controller, "_complete_open_prs", return_value=[self.pr, other]), \
+             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks):
+            rows = controller._owned_repair_pr_inventory(task, "JovieInc/Jovie")
+        self.assertEqual(rows[0]["statusCheckRollup"], checks)
+        self.assertNotIn("statusCheckRollup", rows[1])
+
     def test_isolated_mode_never_enters_native_or_generic_fallback(self):
         task, executor = self.isolated_fixture()
         with self.assertRaisesRegex(ValueError, "assignment-schema-invalid"):
@@ -432,7 +799,7 @@ class RepairTests(unittest.TestCase):
             self.assertEqual(os.fstat(9).st_ino, (self.leases / f"{IDENT}.lock").stat().st_ino)
             code = "import fcntl,sys; f=open(sys.argv[1],'a'); fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)"
             self.assertNotEqual(subprocess.run(["python3", "-c", code, str(self.leases / f"{IDENT}.lock")], capture_output=True).returncode, 0)
-            return {"status": "succeeded"}
+            return executor.execute.return_value
         executor.execute.side_effect = execute
         self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
         self.assertEqual(self.run_isolated(task, executor)["status"], "succeeded")
@@ -449,10 +816,66 @@ class RepairTests(unittest.TestCase):
             self.run_isolated(task, executor)
         self.assertTrue((self.root / f"{IDENT}.acceptance.json").is_file())
         self.assertEqual(json.loads((self.root / f"{IDENT}.run.json").read_text())["status"], "started")
-        self.assertEqual(self.run_isolated(task, executor)["reason"], "isolated-repair-claimed-outcome-unknown")
+        payload = repair.read_private(self.root / f"{IDENT}.json")
+        with mock.patch.object(repair.time, "time", return_value=payload["expiresAt"] + 1):
+            self.assertEqual(self.run_isolated(task, executor)["reason"], "isolated-repair-claimed-outcome-unknown")
         self.assertEqual(executor.execute.call_count, 1)
         recovery = json.loads((self.root / f"{IDENT}.recovery.json").read_text())
         self.assertEqual(recovery["state"], "unknown")
+
+    def test_isolated_repair_replays_correlated_result_after_expiry_without_rerun(self):
+        task, executor = self.isolated_fixture()
+        first = self.run_isolated(task, executor)
+        payload = repair.read_private(self.root / f"{IDENT}.json")
+        self.assertEqual(repair.candidates(controller.__file__), [])
+        with mock.patch.object(repair.time, "time", return_value=payload["expiresAt"] + 1):
+            replay = self.run_isolated(task, executor)
+        self.assertEqual(replay, first)
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_changed_head_without_task_acceptance_is_recorded_but_unverified(self):
+        task, executor = self.isolated_fixture()
+        executor.execute.return_value["_executionObservation"]["taskAccepted"] = False
+        result = self.run_isolated(task, executor)
+        self.assertEqual((result["status"], result["execution"]["verification"]["headChanged"],
+                          result["execution"]["verification"]["taskAccepted"]), ("succeeded", True, False))
+
+    def test_changed_head_with_worker_marker_but_unfixed_task_stays_unverified(self):
+        task, payload, executable = self.provider_granted_fixture()
+        acceptance = repair.task_acceptance_digest(task)
+        runner = mock.Mock(return_value=mock.Mock(
+            returncode=0,
+            stdout=f"changed\n{repair.TASK_ACCEPTANCE_MARKER} {acceptance}\n",
+            stderr="",
+        ))
+        adapter = repair.GrokOwnedRepairExecutor(run=runner)
+        eligibility = adapter.qualify(task, payload)
+        with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}), \
+             mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
+            result = self.run_isolated(task, adapter, resolved=False, expected_final_head="b" * 40)
+        evaluation, verification = result["execution"]["sourceEvaluation"], result["execution"]["verification"]
+        self.assertEqual((result["status"], result["detail"], evaluation["workerAttested"],
+                          evaluation["taskResolved"], verification["taskAccepted"], evaluation["reason"]),
+                         ("succeeded", "owned-repair-source-evaluation-unverified", True, False, False,
+                          "task-check-unresolved"))
+
+    def test_clean_mergeable_changed_head_without_selected_check_stays_unverified(self):
+        task, executor = self.isolated_fixture()
+        result = self.run_isolated(task, executor, resolved=True, selected_check=False)
+        evaluation = result["execution"]["sourceEvaluation"]
+        verification = result["execution"]["verification"]
+        self.assertEqual((result["status"], result["detail"], evaluation["taskResolved"],
+                          verification["taskAccepted"], evaluation["reason"]),
+                         ("succeeded", "owned-repair-source-evaluation-unverified", False, False,
+                          "task-check-evidence-unavailable"))
+
+    def test_execution_window_reserves_process_cleanup_time(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        grant = payload["providerGrant"]
+        with self.assertRaisesRegex(ValueError, "execution-window-too-short"):
+            repair._remaining_execution_timeout(
+                payload, grant, now=grant["expiresAt"] - repair.PROCESS_CLEANUP_GRACE_SECONDS
+            )
 
     def test_isolated_repair_rejects_competing_lease_and_does_not_claim(self):
         task, executor = self.isolated_fixture()
