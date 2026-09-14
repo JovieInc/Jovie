@@ -1,5 +1,11 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
-import { render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
@@ -98,7 +104,14 @@ describe('HomepageCertifiedSections', () => {
 });
 
 describe('HomepageClose', () => {
-  it('closes with the locked lines and the name search as the only control', () => {
+  function setClipboard(value: Clipboard | undefined) {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value,
+    });
+  }
+
+  it('closes with the locked lines, name search, and agent onboarding action', () => {
     render(<HomepageClose />);
 
     const section = screen.getByRole('region', {
@@ -120,7 +133,7 @@ describe('HomepageClose', () => {
     expect(within(section).getByRole('combobox')).toBe(
       screen.getByRole('combobox')
     );
-    expect(within(section).getByRole('button')).toBe(
+    expect(within(section).getByTestId('homepage-close-cta')).toBe(
       screen.getByTestId('homepage-close-cta')
     );
 
@@ -141,11 +154,67 @@ describe('HomepageClose', () => {
     expect(cta).toHaveTextContent('Find me');
     expect(cta).toHaveAttribute('data-size', 'marketing');
     expect(cta).toHaveAttribute('data-variant', 'primary');
-    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getAllByRole('button')).toHaveLength(2);
     expect(screen.queryAllByRole('link')).toHaveLength(0);
+
+    const copyButton = screen.getByRole('button', {
+      name: 'Copy agent onboarding link',
+    });
+    expect(copyButton).toHaveTextContent('Onboard your agent');
+    expect(copyButton).toHaveAttribute('data-copy-state', 'idle');
 
     // Quiet wordmark signs the page off without becoming a second control.
     const mark = screen.getByTestId('homepage-close-mark');
     expect(mark.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('announces a successful agent onboarding copy', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    setClipboard({ writeText } as Clipboard);
+    render(<HomepageClose />);
+
+    const copyButton = screen.getByRole('button', {
+      name: 'Copy agent onboarding link',
+    });
+    fireEvent.click(copyButton);
+
+    await waitFor(() => expect(copyButton).toHaveTextContent('Copied'));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/cli'));
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining('/llms.txt')
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      expect.not.stringContaining('npm install')
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Agent onboarding link copied.'
+    );
+  });
+
+  it('exposes a selectable fallback when clipboard access is unavailable', async () => {
+    setClipboard(undefined);
+    const execCommand = vi.fn().mockReturnValue(false);
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand,
+    });
+    render(<HomepageClose />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Copy agent onboarding link' })
+    );
+
+    const fallback = await screen.findByRole('textbox', {
+      name: 'Agent Onboarding Link',
+    });
+    expect(fallback.tagName).toBe('TEXTAREA');
+    expect((fallback as HTMLTextAreaElement).value).toContain(
+      "Use Jovie's read-only public artist context:"
+    );
+    expect((fallback as HTMLTextAreaElement).value).toContain('/llms.txt');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Clipboard unavailable. Select the onboarding link below.'
+    );
+    Reflect.deleteProperty(document, 'execCommand');
   });
 });

@@ -14,13 +14,14 @@ export const HOMEPAGE_SHIPPING_LAYERS = [
 export type HomepageShippingLayer = (typeof HOMEPAGE_SHIPPING_LAYERS)[number];
 
 // Locked editorial homepage: the hero is followed by the connected and
-// relationships body and the close CTA.
+// relationships body, the changelog preview, and the close CTA.
 export const HOMEPAGE_UNLOCKED_SECTION_MOUNTS = [
   'HomepageCertifiedSections',
 ] as const;
 
 export const HOMEPAGE_STORY_STACK_MOUNTS = [
   'HomepageUnlockedSections',
+  'HomepageEditorialChangelog',
   'HomepageClose',
 ] as const;
 

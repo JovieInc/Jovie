@@ -85,6 +85,10 @@ export const HOMEPAGE_LAUNCH_COPY = {
       headline: 'See what the world sees.',
       support: 'Start with your name.',
     },
+    changelog: {
+      headline: "What's new in Jovie",
+      allPostsLabel: 'All posts',
+    },
   },
   workspace: {
     kicker: 'What Jovie finds.',
