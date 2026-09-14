@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -243,3 +244,66 @@ if (!validation.ok) {
   }
   process.exitCode = 1;
 }
+
+/**
+ * The protected pull_request_target workflow runs this checked-out script from
+ * the PR head, while its YAML remains sourced from the base branch. Keep the
+ * public footer interaction proof here so it shares this job's exact build and
+ * production server rather than creating a second browser lane.
+ */
+async function runFooterInteractionProof() {
+  if (!routes.includes('/')) return;
+
+  const child = spawn(
+    'pnpm',
+    [
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'playwright',
+      'test',
+      'tests/e2e/marketing-footer-controls.spec.ts',
+      '--config=playwright.config.ts',
+      '--project=chromium',
+      '--reporter=line',
+    ],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        BASE_URL: baseUrl,
+        E2E_SKIP_WEB_SERVER: '1',
+        E2E_SKIP_SEED: '1',
+        E2E_SKIP_WARMUP: '1',
+        PR_VISUAL_OUT: outDir,
+        PR_VISUAL_HEAD_SHA:
+          process.env.PR_VISUAL_HEAD_SHA ?? process.env.GITHUB_SHA ?? '',
+      },
+      stdio: 'inherit',
+    }
+  );
+
+  const result = await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (code, signal) => resolve({ code, signal }));
+  });
+
+  if (result.code === 0) return;
+
+  const failure = {
+    route: '/',
+    exactHead: process.env.PR_VISUAL_HEAD_SHA ?? process.env.GITHUB_SHA ?? null,
+    code: result.code,
+    signal: result.signal,
+    status: 'failed',
+  };
+  await writeFile(
+    join(outDir, 'footer-interaction-failure.json'),
+    JSON.stringify(failure, null, 2)
+  );
+  throw new Error(
+    `Footer interaction proof failed (code=${result.code ?? 'null'}, signal=${result.signal ?? 'null'})`
+  );
+}
+
+await runFooterInteractionProof();
