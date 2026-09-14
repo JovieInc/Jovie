@@ -81,7 +81,12 @@ function controllerRun({
   };
 }
 
-function runReleaseWaveStep({ queuedRuns = [], inProgressRuns = [] } = {}) {
+function runReleaseWaveStep({
+  queuedRuns = [],
+  inProgressRuns = [],
+  malformedStatus = '',
+  failStatus = '',
+} = {}) {
   const root = mkdtempSync(resolve(tmpdir(), 'release-wave-step-'));
   const bin = resolve(root, 'bin');
   const output = resolve(root, 'output');
@@ -93,12 +98,12 @@ function runReleaseWaveStep({ queuedRuns = [], inProgressRuns = [] } = {}) {
     resolve(bin, 'gh'),
     `#!/usr/bin/env bash
 case "\$*" in
-  *"status=queued"*) printf '%s\\n' '${JSON.stringify([
-    { workflow_runs: queuedRuns },
-  ])}' ;;
-  *"status=in_progress"*) printf '%s\\n' '${JSON.stringify([
-    { workflow_runs: inProgressRuns },
-  ])}' ;;
+  *"status=queued"*)
+    ${failStatus === 'queued' ? 'exit 42' : malformedStatus === 'queued' ? "printf '%s\\n' '{\"unexpected\":true}'" : `printf '%s\\n' '${JSON.stringify([{ workflow_runs: queuedRuns }])}'`}
+    ;;
+  *"status=in_progress"*)
+    ${failStatus === 'in_progress' ? 'exit 43' : malformedStatus === 'in_progress' ? "printf '%s\\n' 'null'" : `printf '%s\\n' '${JSON.stringify([{ workflow_runs: inProgressRuns }])}'`}
+    ;;
   *) printf '%s\\n' '[]' ;;
 esac
 `
@@ -125,7 +130,6 @@ esac
           REPO: 'JovieInc/Jovie',
           MAIN_SHA,
           RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800',
-          RELEASE_WAVE_OBSERVATION_HOLD_SECONDS: '300',
           GITHUB_OUTPUT: output,
           GITHUB_STEP_SUMMARY: summary,
           PATH: `${bin}:${process.env.PATH ?? ''}`,
@@ -269,8 +273,8 @@ describe('release-wave admission backpressure', () => {
     expect(result.expiresAt).toBe('2026-09-14T18:30:00Z');
   });
 
-  it('bounds a future-dated controller clock to one maximum window', () => {
-    const result = classifyReleaseWave(
+  it('blocks on a future-dated controller clock without inventing an expiry', () => {
+    const first = classifyReleaseWave(
       [
         controllerRun({
           id: 601,
@@ -280,11 +284,23 @@ describe('release-wave admission backpressure', () => {
       ],
       { currentMainSha: MAIN_SHA, now: NOW, maxAgeSeconds: 600 }
     );
+    const second = classifyReleaseWave(
+      [
+        controllerRun({
+          id: 601,
+          headSha: MAIN_SHA,
+          createdAt: '2026-09-14T20:00:00Z',
+        }),
+      ],
+      { currentMainSha: MAIN_SHA, now: NOW + 5 * 60_000, maxAgeSeconds: 600 }
+    );
 
-    expect(result.hold).toBe(true);
-    expect(result.expiresAt).toBe('2026-09-14T19:10:00Z');
-    expect(result.remainingSeconds).toBe(600);
-    expect(result.remainingSeconds).toBeLessThanOrEqual(600);
+    for (const result of [first, second]) {
+      expect(result.hold).toBe(true);
+      expect(result.reason).toBe('controller-state-malformed');
+      expect(result.expiresAt).toBeNull();
+    }
+    expect(second.observedAt).not.toBe(first.observedAt);
   });
 
   it('projects the active run through the workflow and keeps an older head held', () => {
@@ -311,15 +327,56 @@ describe('release-wave admission backpressure', () => {
     expect(summary).toContain('jovie-release-wave-admission/v1');
   });
 
-  it('fails closed to a releasable neutral decision for an invalid main SHA', () => {
+  it('blocks the workflow when the controller API response shape is malformed', () => {
+    const { result, outputs, summary } = runReleaseWaveStep({
+      malformedStatus: 'queued',
+    });
+
+    expect(result.status).toBe(2);
+    expect(outputs).toMatchObject({
+      hold: '1',
+      reason: 'controller-state-unavailable',
+      expires_at: '',
+      run_id: 'unknown',
+    });
+    expect(summary).toContain('controller-state-unavailable');
+    expect(result.stderr).toContain('native enrollment is blocked');
+  });
+
+  it('blocks the workflow when the controller API read fails', () => {
+    const { result, outputs, summary } = runReleaseWaveStep({
+      failStatus: 'in_progress',
+    });
+
+    expect(result.status).toBe(2);
+    expect(outputs).toMatchObject({
+      hold: '1',
+      reason: 'controller-state-unavailable',
+      expires_at: '',
+      run_id: 'unknown',
+    });
+    expect(summary).toContain('"expiresAt": null');
+    expect(result.stderr).toContain('native enrollment is blocked');
+  });
+
+  it('rejects an invalid main SHA before classifying controller state', () => {
+    expect(() =>
+      classifyReleaseWave([controllerRun({ id: 701, headSha: OLD_HEAD_A })], {
+        currentMainSha: 'not-a-sha',
+        now: NOW,
+      })
+    ).toThrow(/currentMainSha must be an exact 40-character SHA/);
+  });
+
+  it('classifies a malformed controller response as unknown', () => {
     const result = classifyReleaseWave(
-      [controllerRun({ id: 701, headSha: OLD_HEAD_A })],
-      { currentMainSha: 'not-a-sha', now: NOW }
+      { workflow_runs: 'not-an-array' },
+      { currentMainSha: MAIN_SHA, now: NOW }
     );
 
-    expect(result.hold).toBe(false);
-    expect(result.reason).toBe('invalid-main-sha');
-    expect(result.activeRunIds).toEqual([]);
+    expect(result.hold).toBe(true);
+    expect(result.reason).toBe('controller-state-malformed');
+    expect(result.expiresAt).toBeNull();
   });
 
   it('rejects an unbounded age or non-finite observation clock', () => {
@@ -369,8 +426,9 @@ describe('release-wave admission backpressure', () => {
     });
     expect(malformedCode).toBe(2);
     expect(JSON.parse(malformedOutput)).toMatchObject({
-      hold: false,
+      hold: true,
       reason: 'controller-state-malformed',
+      expiresAt: null,
     });
   });
 
@@ -384,6 +442,15 @@ describe('release-wave admission backpressure', () => {
     expect(AUTOENROLL_WORKFLOW).toContain('for status in queued in_progress');
     expect(AUTOENROLL_WORKFLOW).toContain('status=$status');
     expect(AUTOENROLL_WORKFLOW).toContain(
+      'error("malformed controller run response")'
+    );
+    expect(AUTOENROLL_WORKFLOW).toContain(
+      'Production Controller state is unavailable or malformed'
+    );
+    expect(AUTOENROLL_WORKFLOW).not.toContain(
+      'RELEASE_WAVE_OBSERVATION_HOLD_SECONDS'
+    );
+    expect(AUTOENROLL_WORKFLOW).toContain(
       'DRAIN_RELEASE_WAVE_HOLD: $' + '{{ steps.release-wave.outputs.hold }}'
     );
     expect(AUTOENROLL_WORKFLOW).toContain(
@@ -392,6 +459,9 @@ describe('release-wave admission backpressure', () => {
     expect(DRAIN_SCRIPT).toContain('RELEASE_WAVE_HOLD_ACTIVE=0');
     expect(DRAIN_SCRIPT).toContain('ENROLL_SLOTS=0');
     expect(DRAIN_SCRIPT).toContain('DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS');
+    expect(DRAIN_SCRIPT).not.toContain(
+      'DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS'
+    );
     expect(DRAIN_SCRIPT).toContain('&& "$RELEASE_WAVE_HOLD_ACTIVE" != "1"');
     expect(DRAIN_SCRIPT).toContain(
       '=== DEQUEUE (hard gates → queue removal) ==='

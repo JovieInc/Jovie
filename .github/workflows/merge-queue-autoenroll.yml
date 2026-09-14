@@ -208,7 +208,6 @@ jobs:
           # Bound the admission hold to the documented 30-minute recovery
           # window. Terminal controller runs release the hold earlier.
           RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'
-          RELEASE_WAVE_OBSERVATION_HOLD_SECONDS: '300'
         shell: bash
         run: |
           set -euo pipefail
@@ -225,11 +224,12 @@ jobs:
               break
             fi
             if ! status_runs="$(jq -ce '
-              if type == "array" then
-                [ .[] | if type == "object" then (.workflow_runs // []) else [] end ] | add // []
-              elif type == "object" then
-                (.workflow_runs // [])
-              else []
+              if type == "array" and all(.[]; type == "object" and (.workflow_runs | type == "array") and all(.workflow_runs[]; type == "object")) then
+                [ .[] | .workflow_runs ] | add // []
+              elif type == "object" and (.workflow_runs | type == "array") then
+                .workflow_runs
+              else
+                error("malformed controller run response")
               end
             ' <<<"$status_pages")"; then
               read_failed=1
@@ -239,25 +239,23 @@ jobs:
           done
 
           if [[ "$read_failed" -eq 1 ]]; then
-            # Unknown controller state must not open a new admission path. The
-            # fallback is itself bounded and has no durable state, so the next
-            # pass can release it once the read succeeds.
-            unavailable_expiry="$(node -e '
-              const seconds = Number(process.argv[1]);
-              process.stdout.write(new Date(Date.now() + seconds * 1000).toISOString().replace(".000Z", "Z"));
-            ' "$RELEASE_WAVE_OBSERVATION_HOLD_SECONDS")"
+            # Unknown controller state must not open a new admission path. Do
+            # not manufacture an expiry here: each new workflow run would
+            # otherwise renew a supposedly bounded observation hold forever.
+            # Failing this job is an explicit, fail-closed blocker; the next
+            # normal event retries the read without any durable second ledger.
             {
               echo 'hold=1'
               echo 'reason=controller-state-unavailable'
-              echo "expires_at=$unavailable_expiry"
+              echo 'expires_at='
               echo 'run_id=unknown'
             } >>"$GITHUB_OUTPUT"
             jq -n \
               --arg reason controller-state-unavailable \
-              --arg expires_at "$unavailable_expiry" \
-              '{schema:"jovie-release-wave-admission/v1",hold:true,reason:$reason,expiresAt:$expires_at}' \
+              '{schema:"jovie-release-wave-admission/v1",hold:true,reason:$reason,expiresAt:null,blocker:"controller-state-unavailable"}' \
               >>"$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo '::error::Production Controller state is unavailable or malformed; native enrollment is blocked until an authoritative read succeeds' >&2
+            exit 2
           fi
 
           if ! decision="$(printf '%s' "$controller_runs" \
@@ -275,6 +273,14 @@ jobs:
           ' <<<"$decision" >/dev/null
           hold_value="$(jq -r '.hold | if . then "1" else "0" end' <<<"$decision")"
           reason_value="$(jq -r '.reason' <<<"$decision")"
+          case "$reason_value" in
+            controller-wave-active|controller-wave-draining|no-active-controller|release-wave-expired)
+              ;;
+            *)
+              echo "::error::Production Controller release-wave evidence is unknown ($reason_value); native enrollment is blocked" >&2
+              exit 2
+              ;;
+          esac
           expires_value="$(jq -r '.expiresAt // empty' <<<"$decision")"
           run_value="$(jq -r '.activeRunId // empty' <<<"$decision")"
           {
@@ -607,7 +613,6 @@ jobs:
           DRAIN_RELEASE_WAVE_EXPIRES_AT: ${{ steps.release-wave.outputs.expires_at }}
           DRAIN_RELEASE_WAVE_RUN_ID: ${{ steps.release-wave.outputs.run_id }}
           DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'
-          DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS: '300'
           # A non-draft main PR whose required source checks never registered a
           # check-run on its exact head can never turn green and never enroll
           # (observed 2026-09-03 across multiple open PRs for 24h+). The drain

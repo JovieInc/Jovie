@@ -74,16 +74,27 @@ function normalizeRun(run) {
   return { id, status, path, branch, createdAt, headSha };
 }
 
-function inputRuns(input) {
-  if (Array.isArray(input)) return input;
-  if (
-    input &&
-    typeof input === 'object' &&
-    Array.isArray(input.workflow_runs)
-  ) {
-    return input.workflow_runs;
+function parseInput(input) {
+  if (Array.isArray(input)) {
+    return {
+      valid: input.every(
+        run => run && typeof run === 'object' && !Array.isArray(run)
+      ),
+      runs: input,
+    };
   }
-  return [];
+  if (input && typeof input === 'object') {
+    if (Array.isArray(input.workflow_runs)) {
+      return {
+        valid: input.workflow_runs.every(
+          run => run && typeof run === 'object' && !Array.isArray(run)
+        ),
+        runs: input.workflow_runs,
+      };
+    }
+    return { valid: false, runs: [] };
+  }
+  return { valid: false, runs: [] };
 }
 
 function baseDecision({ nowMs, currentMainSha, maxAgeSeconds }) {
@@ -121,11 +132,20 @@ export function classifyReleaseWave(input, options = {}) {
   const decision = baseDecision({ nowMs, currentMainSha, maxAgeSeconds });
 
   if (!currentMainSha) {
-    return { ...decision, reason: 'invalid-main-sha' };
+    throw new Error('currentMainSha must be an exact 40-character SHA');
+  }
+
+  const parsedInput = parseInput(input);
+  if (!parsedInput.valid) {
+    return {
+      ...decision,
+      hold: true,
+      reason: 'controller-state-malformed',
+    };
   }
 
   const runsById = new Map();
-  for (const candidate of inputRuns(input)) {
+  for (const candidate of parsedInput.runs) {
     const run = normalizeRun(candidate);
     if (run && !runsById.has(run.id)) runsById.set(run.id, run);
   }
@@ -133,6 +153,20 @@ export function classifyReleaseWave(input, options = {}) {
     (left, right) => left.createdAt - right.createdAt
   );
   const maxAgeMs = maxAgeSeconds * 1000;
+  const futureRun = runs.find(run => run.createdAt > nowMs);
+  if (futureRun) {
+    // A future created_at cannot produce a stable expiry without introducing
+    // another durable observation ledger. Keep the decision unknown and let
+    // the workflow block admission until the authoritative run clock is sane.
+    return {
+      ...decision,
+      hold: true,
+      reason: 'controller-state-malformed',
+      activeRunId: futureRun.id,
+      activeRunHeadSha: futureRun.headSha || null,
+      activeRunStatus: futureRun.status,
+    };
+  }
   const liveRuns = runs.filter(run => nowMs - run.createdAt <= maxAgeMs);
 
   if (liveRuns.length === 0) {
@@ -151,10 +185,7 @@ export function classifyReleaseWave(input, options = {}) {
   }
 
   const selected = liveRuns[0];
-  // A future created_at can occur under clock skew. Clamp the deadline to one
-  // max-age window from observation so a malformed clock cannot create an
-  // effectively unbounded hold.
-  const expiresAtMs = Math.min(selected.createdAt + maxAgeMs, nowMs + maxAgeMs);
+  const expiresAtMs = selected.createdAt + maxAgeMs;
   const mainAdvanced =
     selected.headSha !== '' && selected.headSha !== currentMainSha;
   const remainingSeconds = Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000));
@@ -212,8 +243,9 @@ export async function runCli(argv = process.argv.slice(2), io = {}) {
     write(
       JSON.stringify({
         schema: RELEASE_WAVE_ADMISSION_SCHEMA,
-        hold: false,
+        hold: true,
         reason: 'controller-state-malformed',
+        expiresAt: null,
       }) + '\n'
     );
     return 2;

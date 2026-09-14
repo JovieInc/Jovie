@@ -43,8 +43,6 @@
 #     must carry a bounded expiry and controller run identity
 #   DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS  maximum active-wave age (default
 #     1800, the documented 30-minute recovery window)
-#   DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS  bounded API-unknown fallback
-#     (default 300)
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, controller-repair-only,
 #                         draft-only, hold-intake, deferred-release-only,
 #                         or blocked
@@ -242,7 +240,6 @@ DRAIN_RELEASE_WAVE_REASON="${DRAIN_RELEASE_WAVE_REASON:-}"
 DRAIN_RELEASE_WAVE_EXPIRES_AT="${DRAIN_RELEASE_WAVE_EXPIRES_AT:-}"
 DRAIN_RELEASE_WAVE_RUN_ID="${DRAIN_RELEASE_WAVE_RUN_ID:-}"
 DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS="${DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS:-1800}"
-DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS="${DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS:-300}"
 if [[ "$DRAIN_RELEASE_WAVE_HOLD" != "0" && "$DRAIN_RELEASE_WAVE_HOLD" != "1" ]]; then
   echo "::error::DRAIN_RELEASE_WAVE_HOLD must be 0 or 1" >&2
   exit 2
@@ -253,11 +250,6 @@ if [[ ! "$DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS" =~ ^[1-9][0-9]*$ ]] \
   echo "::error::DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS must be 60-3600" >&2
   exit 2
 fi
-if [[ ! "$DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS" =~ ^[1-9][0-9]*$ ]] \
-  || (( DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS > DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS )); then
-  echo "::error::DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS must be positive and no larger than the active-wave maximum" >&2
-  exit 2
-fi
 RELEASE_WAVE_HOLD_ACTIVE=0
 if [[ "$DRAIN_RELEASE_WAVE_HOLD" == "1" ]]; then
   if [[ ! "$DRAIN_RELEASE_WAVE_REASON" =~ ^[a-z0-9-]+$ ]]; then
@@ -265,18 +257,14 @@ if [[ "$DRAIN_RELEASE_WAVE_HOLD" == "1" ]]; then
     exit 2
   fi
   if [[ "$DRAIN_RELEASE_WAVE_REASON" == "controller-state-unavailable" ]]; then
-    if [[ "$DRAIN_RELEASE_WAVE_RUN_ID" != "unknown" ]]; then
-      echo "::error::Unavailable release-wave hold requires run_id=unknown" >&2
-      exit 2
-    fi
-    release_wave_expiry_limit="$DRAIN_RELEASE_WAVE_OBSERVATION_HOLD_SECONDS"
-  else
-    if [[ ! "$DRAIN_RELEASE_WAVE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
-      echo "::error::Active release-wave hold requires a controller run id" >&2
-      exit 2
-    fi
-    release_wave_expiry_limit="$DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS"
+    echo "::error::Unavailable release-wave evidence must block before drain; no expiring fallback is accepted" >&2
+    exit 2
   fi
+  if [[ ! "$DRAIN_RELEASE_WAVE_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+    echo "::error::Active release-wave hold requires a controller run id" >&2
+    exit 2
+  fi
+  release_wave_expiry_limit="$DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS"
   release_wave_state="$(node -e '
     const [expiry, maxSeconds] = process.argv.slice(1);
     const parsed = Date.parse(expiry || "");
@@ -1272,6 +1260,7 @@ restore_deferred_hold() {  # restore_deferred_hold <num>
 # an unproven revision.
 reconcile_deferred_auto_merge_after_main_push() {
   [[ "$DRAIN_RECONCILE_QUEUE_DEFERRED" == "1" ]] || return 0
+  [[ "$RELEASE_WAVE_HOLD_ACTIVE" == "1" ]] && return 0
 
   echo "=== RECONCILE (disabled; preserving queue-deferred holds) ==="
   echo "  ~ no typed pressure-deferral provenance; owner release required"
