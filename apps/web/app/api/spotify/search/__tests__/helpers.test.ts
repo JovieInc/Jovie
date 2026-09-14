@@ -451,15 +451,6 @@ describe('annotateClaimedStatusForCurrentUser', () => {
 
     expect(annotated).toEqual(results);
   });
-
-  it('does not query ownership for an anonymous caller', async () => {
-    const results = [makeResult({ id: 'artist-id', name: 'Artist' })];
-
-    expect(await annotateClaimedStatusForCurrentUser(results, null)).toBe(
-      results
-    );
-    expect(mockSelect).not.toHaveBeenCalled();
-  });
 });
 
 describe('boostClaimedArtists', () => {

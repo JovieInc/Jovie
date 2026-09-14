@@ -1,10 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 
 const STORY_ID = 'features-dashboard-releases-spotifyconnectdialog--default';
-const EVIDENCE_DIR = join('test-results', 'storybook-spotify-connect-evidence');
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800 },
   { name: 'short-viewport', width: 390, height: 520 },
@@ -21,8 +18,6 @@ async function attachEvidence(page: Page, testInfo: TestInfo, name: string) {
     body: screenshot,
     contentType: 'image/png',
   });
-  await mkdir(EVIDENCE_DIR, { recursive: true });
-  await writeFile(join(EVIDENCE_DIR, name), screenshot);
 }
 async function assertAccessible(page: Page) {
   const results = await new AxeBuilder({ page })
@@ -44,6 +39,7 @@ async function assertSearchInteraction(page: Page) {
 
   const dropdown = page.locator('.system-b-spotify-connect-dropdown');
   await expect(dropdown).toBeVisible();
+  await expect(dropdown).toHaveCSS('position', 'static');
   await expect(
     page
       .locator('.system-b-spotify-connect-result-row')
@@ -55,57 +51,68 @@ async function assertSearchInteraction(page: Page) {
       .filter({ hasText: 'Other Owner' })
   ).toBeDisabled();
 
-  const geometry = await dropdown.evaluate(element => {
-    const dropdownRect = element.getBoundingClientRect();
-    const dialog = element.closest('[role="dialog"]');
-    const dialogRect = dialog?.getBoundingClientRect();
-    return {
-      dropdownPosition: getComputedStyle(element).position,
-      dropdownBottom: dropdownRect.bottom,
-      dialogBottom: dialogRect?.bottom ?? null,
-      dialogClientHeight: dialog?.clientHeight ?? 0,
-      dialogScrollHeight: dialog?.scrollHeight ?? 0,
-    };
-  });
-
-  expect(geometry.dropdownPosition).toBe('static');
-  if (page.viewportSize()?.height === 520) {
-    expect(geometry.dialogScrollHeight).toBeGreaterThan(
-      geometry.dialogClientHeight
-    );
-  } else {
-    expect(geometry.dropdownBottom).toBeLessThanOrEqual(
-      geometry.dialogBottom ?? Number.POSITIVE_INFINITY
-    );
-  }
-
   const rows = page.locator('.system-b-spotify-connect-result-row');
   await expect(rows).toHaveCount(5);
   const lastRow = rows.nth(4);
   await lastRow.scrollIntoViewIfNeeded();
   await expect(lastRow).toBeVisible();
 
-  const lastRowInteraction = await lastRow.evaluate(element => {
+  const lastRowVisibility = await lastRow.evaluate(element => {
+    const clips = (value: string) => value !== 'visible';
     const rect = element.getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
-    const hit = document.elementFromPoint(x, y);
+    const clipRect = [0, 0, window.innerWidth, window.innerHeight];
+    let clippingAncestorCount = 0;
+    let ancestor = element.parentElement;
+    while (ancestor) {
+      const style = getComputedStyle(ancestor);
+      const clipsX = clips(style.overflowX),
+        clipsY = clips(style.overflowY);
+      if (!clipsX && !clipsY) {
+        ancestor = ancestor.parentElement;
+        continue;
+      }
+      clippingAncestorCount += 1;
+      const ancestorRect = ancestor.getBoundingClientRect();
+      if (clipsX) {
+        clipRect[0] = Math.max(clipRect[0], ancestorRect.left);
+        clipRect[2] = Math.min(clipRect[2], ancestorRect.right);
+      }
+      if (clipsY) {
+        clipRect[1] = Math.max(clipRect[1], ancestorRect.top);
+        clipRect[3] = Math.min(clipRect[3], ancestorRect.bottom);
+      }
+      ancestor = ancestor.parentElement;
+    }
     return {
-      intersectsViewport:
-        rect.top < window.innerHeight &&
-        rect.bottom > 0 &&
-        rect.left < window.innerWidth,
-      pointerTargetIsRow: hit === element || hit?.closest('button') === element,
+      fitsClippingAncestors:
+        rect.left >= clipRect[0] &&
+        rect.top >= clipRect[1] &&
+        rect.right <= clipRect[2] &&
+        rect.bottom <= clipRect[3],
+      clippingAncestorCount,
+      pointerTargetIsRow:
+        document
+          .elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2
+          )
+          ?.closest('button') === element,
     };
   });
-  expect(lastRowInteraction.intersectsViewport).toBe(true);
-  expect(lastRowInteraction.pointerTargetIsRow).toBe(true);
+  expect(
+    lastRowVisibility.fitsClippingAncestors,
+    JSON.stringify(lastRowVisibility)
+  ).toBe(true);
+  expect(lastRowVisibility.clippingAncestorCount).toBeGreaterThan(0);
+  expect(lastRowVisibility.pointerTargetIsRow).toBe(true);
 
   await input.focus();
-  await input.press('ArrowDown');
+  for (let index = 0; index < 4; index += 1) {
+    await input.press('ArrowDown');
+  }
   await expect(input).toHaveAttribute(
     'aria-activedescendant',
-    'spotify-connect-result-0'
+    'spotify-connect-result-4'
   );
 }
 test.describe('Spotify connect dialog Storybook behavior', () => {
