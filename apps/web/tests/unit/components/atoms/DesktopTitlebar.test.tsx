@@ -1,6 +1,9 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import {
+  DesktopReleaseIdentity,
+  DesktopTitlebar,
+} from '@/components/atoms/DesktopTitlebar';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 
 const electronRuntimeMock = vi.hoisted(() => ({
@@ -29,7 +32,11 @@ vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
   ),
 }));
 
-function renderTitlebar() {
+function renderTitlebar(
+  overrides: Partial<
+    import('@/components/organisms/sidebar/context').SidebarContextValue
+  > = {}
+) {
   return render(
     <SidebarContext.Provider
       value={{
@@ -40,9 +47,11 @@ function renderTitlebar() {
         setOpenMobile: vi.fn(),
         isMobile: false,
         toggleSidebar: vi.fn(),
+        ...overrides,
       }}
     >
       <DesktopTitlebar />
+      <DesktopReleaseIdentity />
     </SidebarContext.Provider>
   );
 }
@@ -120,54 +129,63 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-nav-pill'));
     expect(
-      screen.getByTestId('electron-titlebar-main-cell')
-    ).not.toContainElement(screen.getByTestId('electron-nav-pill'));
+      screen.queryByTestId('electron-titlebar-main-cell')
+    ).not.toBeInTheDocument();
   });
 
-  it('main cell is a plain drag region with no rounded card chrome', () => {
-    renderTitlebar();
+  it.each([{ state: 'closed' as const, open: false }, { isMobile: true }])(
+    'reserves main-header space when the sidebar does not own a visible rail',
+    overrides => {
+      renderTitlebar(overrides);
+      expect(screen.getByTestId('electron-titlebar-row')).toHaveAttribute(
+        'data-main-header-inset',
+        'true'
+      );
+    }
+  );
 
-    const mainCell = screen.getByTestId('electron-titlebar-main-cell');
-    const className = mainCell.className;
-    // No rounded-top, no border, no content-surface background — the main cell
-    // is a plain drag region. The elevated card lives in #main-content below.
-    expect(className).not.toMatch(/rounded-t/);
-    expect(className).not.toMatch(/\bborder\b/);
-    expect(className).not.toMatch(/linear-app-content-surface/);
+  it('keeps release identity outside the window-control row', () => {
+    renderTitlebar();
+    expect(screen.getByTestId('electron-titlebar-row')).not.toContainElement(
+      screen.getByTestId('electron-release-identity')
+    );
   });
 
   it.each([
     ['production', 'Stable'],
     ['staging', 'Canary'],
     ['local', 'Local'],
-  ])('renders the %s build as a persistent %s release identity', async (channel, label) => {
-    const version = channel === 'staging' ? '26.8.2-staging.1.1' : '26.8.1';
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: {
-        getBuildIdentity: vi.fn().mockResolvedValue({
-          channel,
-          version,
-          sourceRevision: '8e42ec8d79cbee578971636b78bb80dc32c78b39',
-          builtAt: channel === 'local' ? null : '2026-08-16T18:20:00.000Z',
-          provenance: channel === 'local' ? 'development' : 'verified',
-        }),
-      },
-    });
+  ])(
+    'renders the %s build as a persistent %s release identity',
+    async (channel, label) => {
+      const version = channel === 'staging' ? '26.8.2-staging.1.1' : '26.8.1';
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: {
+          getBuildIdentity: vi.fn().mockResolvedValue({
+            channel,
+            version,
+            sourceRevision: '8e42ec8d79cbee578971636b78bb80dc32c78b39',
+            builtAt: channel === 'local' ? null : '2026-08-16T18:20:00.000Z',
+            provenance: channel === 'local' ? 'development' : 'verified',
+          }),
+        },
+      });
 
-    renderTitlebar();
+      renderTitlebar();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
-        `${label} · ${version} · 8e42ec8`
-      );
-      expect(
-        screen.getByLabelText(
-          `${label} environment, version ${version}, source revision 8e42ec8d79cbee578971636b78bb80dc32c78b39`
-        )
-      ).toBeInTheDocument();
-    });
-  });
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('electron-release-identity')
+        ).toHaveTextContent(`${label} · ${version} · 8e42ec8`);
+        expect(
+          screen.getByLabelText(
+            `${label} environment, version ${version}, source revision 8e42ec8d79cbee578971636b78bb80dc32c78b39`
+          )
+        ).toBeInTheDocument();
+      });
+    }
+  );
 
   it('reads exact package provenance from the validated main-process bridge', async () => {
     Object.defineProperty(window, 'electronAPI', {
@@ -296,23 +314,23 @@ describe('DesktopTitlebar', () => {
     );
   });
 
-  it.each([
-    null,
-    'invalid',
-  ])('fails closed for a non-object identity payload', async value => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      value: { getBuildIdentity: vi.fn().mockResolvedValue(value) },
-    });
+  it.each([null, 'invalid'])(
+    'fails closed for a non-object identity payload',
+    async value => {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: { getBuildIdentity: vi.fn().mockResolvedValue(value) },
+      });
 
-    renderTitlebar();
+      renderTitlebar();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
-        'Desktop · Version Unknown · Unverified'
-      );
-    });
-  });
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('electron-release-identity')
+        ).toHaveTextContent('Desktop · Version Unknown · Unverified');
+      });
+    }
+  );
 
   it('ignores a stale identity response after the bridge changes', async () => {
     let resolveIdentity: ((value: object) => void) | undefined;
@@ -354,6 +372,7 @@ describe('DesktopTitlebar', () => {
         }}
       >
         <DesktopTitlebar />
+        <DesktopReleaseIdentity />
       </SidebarContext.Provider>
     );
     await waitFor(() => {
@@ -414,6 +433,7 @@ describe('DesktopTitlebar', () => {
         }}
       >
         <DesktopTitlebar />
+        <DesktopReleaseIdentity />
       </SidebarContext.Provider>
     );
 
@@ -462,6 +482,7 @@ describe('DesktopTitlebar', () => {
         }}
       >
         <DesktopTitlebar />
+        <DesktopReleaseIdentity />
       </SidebarContext.Provider>
     );
     await waitFor(() => {
