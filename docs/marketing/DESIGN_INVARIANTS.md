@@ -134,7 +134,9 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
   reading column, sticky date rail, large editorial images, restrained hierarchy.
   Keep Jovie's system and real published release dates/copy; exclude internal,
   unpublished or empty release entries. Homepage previews share the same
-  entry/artwork family. Deliberate gradient-and-type artwork is valid.
+  entry/artwork family. Deliberate gradient-and-type artwork is valid. Changelog
+  page and homepage-preview artwork use the shared 16px radius token with actual
+  clipping; reserve equal desktop title space so media top edges align.
 - **Founder evidence/status:** explicit Cursor timeline request and request for
   editorial images inspired by ElevenLabs/OpenAI. Current implementation is a proposal.
 - **Enforcement:** inspect reference pixels and real scroll behavior, record
