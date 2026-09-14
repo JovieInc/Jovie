@@ -509,7 +509,7 @@ exit 0
                 ),
             )
             for name in ("symphony_capacity_evidence.py", "symphony_accepted_completion.py", "provider_capacity.py",
-                         "summer_admissions.py", "summer_existing_repair.py"):
+                         "summer_admissions.py", "summer_existing_repair.py", "summer_ci_audit.py"):
                 self.assertTrue((installed_gate.parent / name).is_file(), name)
             # Execute the installed publisher and helpers, not just source
             # imports: accepted aggregate capacity cannot replace attestation.

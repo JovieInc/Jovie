@@ -673,6 +673,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
             )
             with (
                 mock.patch.object(MODULE, "observe_main", return_value=main),
+                mock.patch.object(MODULE, "observe_ci_audit", return_value=None) as audit_observer,
                 mock.patch.object(
                     MODULE,
                     "observe_production",
@@ -712,6 +713,9 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 ),
             ):
                 signals = MODULE.observe_signals(args, now)
+
+        audit_observer.assert_called_once_with("JovieInc/Jovie", main["sha"], MODULE.gh_json,
+                                              targets=GREEN_SIGNALS["closureHealth"].get("lifecycleActions", []))
 
         self.assertEqual(
             signals["concurrencyEvidence"],
