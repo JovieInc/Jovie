@@ -1537,6 +1537,24 @@ jobs:
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
+      # Source-PR proof for the Spotify dialog stays path-scoped and reuses the
+      # existing dependency/Chromium setup below. The merge-group matrix still
+      # runs the complete Storybook surface set on the combined head.
+      - name: Select Spotify Storybook browser proof
+        id: spotify-storybook
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "run=false" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            exit 0
+          fi
+          SPOTIFY_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog(\.stories)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect\.ts|app/api/spotify/search/.*|tests/e2e/storybook-spotify-connect\.spec\.ts)$'
+          changed_files="$RUNNER_TEMP/spotify-storybook-changed-files.txt"
+          git diff --name-only "origin/${{ github.base_ref }}" HEAD > "$changed_files"
+          if grep -qE "$SPOTIFY_STORYBOOK_PATTERN" "$changed_files"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Run ci-fast lanes
         id: lanes
         env:
@@ -1558,7 +1576,7 @@ jobs:
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
       - name: Setup Playwright (Chromium)
-        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        if: ${{ success() && (steps.structural.outputs.skip != 'true' || steps.spotify-storybook.outputs.run == 'true') }}
         uses: ./.github/actions/setup-playwright
       - name: Run structural ci-fast lane
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
@@ -1569,6 +1587,50 @@ jobs:
           CI_FAST_ONLY_STRUCTURAL: 'true'
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes-structural.json
         run: node scripts/ci-fast-lanes.mjs
+      - name: Run Spotify Storybook browser proof
+        id: spotify-storybook-test
+        if: ${{ success() && steps.spotify-storybook.outputs.run == 'true' }}
+        shell: bash
+        working-directory: apps/web
+        env:
+          STORYBOOK_BASE_URL: http://localhost:6006
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
+        run: |
+          set -euo pipefail
+          pnpm exec storybook dev -p 6006 --no-open &
+          STORYBOOK_PID=$!
+          trap 'kill "$STORYBOOK_PID" 2>/dev/null || true' EXIT
+
+          for _attempt in $(seq 1 150); do
+            kill -0 "$STORYBOOK_PID" 2>/dev/null || {
+              echo "::error::Spotify Storybook dev server died"
+              exit 1
+            }
+            if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
+              node ../../.github/scripts/guard-playwright-artifacts.mjs --run -- \
+                pnpm exec playwright test \
+                  tests/e2e/storybook-spotify-connect.spec.ts \
+                  --config=playwright.config.storybook.ts --project=chromium --reporter=line
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Spotify Storybook dev server failed to start within 300s"
+          exit 1
+      - name: Upload Spotify Storybook browser evidence
+        if: ${{ steps.spotify-storybook.outputs.run == 'true' && steps.spotify-storybook-test.outcome == 'success' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        env:
+          PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+        with:
+          name: spotify-storybook-${{ github.sha }}-${{ github.run_attempt }}
+          path: apps/web/test-results
+          retention-days: '7'
+          if-no-files-found: error
+          allow-images: 'true'
+          public-images: 'true'
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
         continue-on-error: true
