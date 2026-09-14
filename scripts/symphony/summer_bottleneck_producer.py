@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Compose and optionally submit one source-bound Summer bottleneck snapshot.
 
-The producer reads only Gem's canonical fleet receipt and the official
-Symphony state endpoint. Signing and OIDC delivery remain in the existing
-Jovie production bridge; this process never reads or prints its credentials.
+The producer reads Gem's canonical fleet receipt, the official Symphony
+state endpoint, and the existing gem-service attestation. Runner source
+attestation stays fail-closed unless that file is fresh within 600s
+(EVIDENCE_MAX_AGE_SECONDS). Signing and OIDC delivery remain in the
+existing Jovie production bridge; this process never reads or prints its
+credentials.
 """
 
 from __future__ import annotations
@@ -18,11 +21,24 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
+from summer_admissions import admission_projection
+from summer_existing_repair import (
+    load_existing_repair_reference,
+    load_existing_repair_task_admissions,
+    task_admissions_match,
+)
+
 FLEET_PATH = pathlib.Path.home() / "gem-workspace/state/gem-priority-gate/latest.json"
+ATTESTATION_PATH = (
+    pathlib.Path.home() / "gem-workspace/state/gem-service-attestation.json"
+)
+CONCURRENCY_PATH = pathlib.Path.home() / "gem-workspace/state/symphony-concurrency.json"
 RUNTIME_URL = "http://127.0.0.1:4041/api/v1/state"
 BRIDGE_URL = "https://jov.ie/api/internal/ovie/summer-bottleneck"
 MAX_SOURCE_AGE_SECONDS = 15 * 60
 MAX_CLOCK_SKEW_SECONDS = 60
+# Match symphony-concurrency-controller. Do not coarsen.
+EVIDENCE_MAX_AGE_SECONDS = 600
 MAX_BYTES = 64 * 1024
 SHA = set("0123456789abcdef")
 DIGEST = set("0123456789abcdef")
@@ -177,25 +193,103 @@ def audit_projection(
     }
 
 
-def attested_runtime_revision(signals: dict[str, Any]) -> str | None:
-    evidence = signals.get("concurrencyEvidence")
-    if not isinstance(evidence, dict) or evidence.get("accepted") is not True:
-        return None
-    identity = evidence.get("runtime")
-    if (
-        not isinstance(identity, dict)
-        or identity.get("schema") != "symphony-runtime-identity/v1"
-        or identity.get("service") != "symphony-elixir.service"
-    ):
-        return None
+def optional_sha(value: object) -> str | None:
     try:
-        return exact_sha(identity.get("sourceRevision"), "runtime identity source revision")
+        return exact_sha(value, "runtime source revision")
     except ValueError:
         return None
 
 
+def runtime_identity_revision(value: object) -> str | None:
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != "symphony-runtime-identity/v1"
+        or value.get("service") != "symphony-elixir.service"
+    ):
+        return None
+    return optional_sha(value.get("sourceRevision"))
+
+
+def service_attestation_revision(value: object, now: datetime) -> str | None:
+    if not isinstance(value, dict) or value.get("schema") != "gem-service-attestation/v1":
+        return None
+    listener = value.get("listener")
+    if (
+        value.get("active") is not True
+        or value.get("healthy") is not True
+        or not isinstance(listener, dict)
+        or listener.get("port") != 4041
+        or listener.get("boundToService") is not True
+    ):
+        return None
+    service = value.get("service")
+    if service is not None and service != "symphony-elixir.service":
+        return None
+    try:
+        observed = parse_time(value.get("observedAt"), "service attestation")
+    except (TypeError, ValueError):
+        return None
+    age = (now - observed).total_seconds()
+    if age < -MAX_CLOCK_SKEW_SECONDS or age > EVIDENCE_MAX_AGE_SECONDS:
+        return None
+    return optional_sha(value.get("sourceRevision"))
+
+
+def load_service_attestation() -> dict[str, Any] | None:
+    try:
+        value = json.loads(ATTESTATION_PATH.read_text())
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def attested_runtime_revision(
+    signals: dict[str, Any],
+    runtime: dict[str, Any],
+    now: datetime,
+    attestation: dict[str, Any] | None = None,
+) -> str | None:
+    """Emit a runner SHA only from a fresh gem-service attestation.
+
+    A valid but stale file (observedAt older than 600s) stays null. That is
+    the live JOV-6163 hold: Symphony concurrency then reports
+    source-attestation-unavailable. Do not copy the stale SHA, do not use
+    fleet/state identity to bypass freshness, and do not coarsen 600s.
+    """
+    if attestation is None:
+        attestation = load_service_attestation()
+    revision = service_attestation_revision(attestation, now)
+    if revision is None:
+        return None
+    evidence = signals.get("concurrencyEvidence")
+    fleet_revision = (
+        runtime_identity_revision(evidence.get("runtime"))
+        if isinstance(evidence, dict)
+        else None
+    )
+    state_revision = optional_sha(runtime.get("sourceRevision"))
+    if fleet_revision is not None and fleet_revision != revision:
+        return None
+    if state_revision is not None and state_revision != revision:
+        return None
+    return revision
+
+
+def load_concurrency_observation():
+    try:
+        return json.loads(CONCURRENCY_PATH.read_text())
+    except (OSError, ValueError):
+        return None
+
+
 def compose_snapshot(
-    fleet: dict[str, Any], runtime: dict[str, Any], now: datetime
+    fleet: dict[str, Any],
+    runtime: dict[str, Any],
+    now: datetime,
+    attestation: dict[str, Any] | None = None,
+    concurrency: dict[str, Any] | None = None,
+    existing_repair: dict[str, Any] | None = None,
+    task_admissions: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if now.tzinfo is None:
         raise ValueError("current time must be timezone-aware")
@@ -218,7 +312,10 @@ def compose_snapshot(
     runtime_at = require_fresh(
         runtime.get("generated_at"), "Symphony runtime", now
     )
-    runtime_revision = attested_runtime_revision(signals)
+    attestation = attestation if attestation is not None else load_service_attestation()
+    runtime_revision = attested_runtime_revision(
+        signals, runtime, now, attestation
+    )
     main_sha = exact_sha(main.get("sha"), "main SHA")
     production_sha_raw = production.get("deployedSha")
     production_sha = (
@@ -291,8 +388,34 @@ def compose_snapshot(
         "capacitySource": capacity_source,
         "workSource": work_source,
     }
+    attested_runtime = attestation.get("runtime", {}) if isinstance(attestation, dict) else {}
+    if runtime_revision is not None and isinstance(attested_runtime, dict):
+        generation = attested_runtime.get("generation")
+        invocation = attested_runtime.get("invocationId")
+        if (isinstance(generation, str) and len(generation) == 64 and set(generation) <= DIGEST
+                and isinstance(invocation, str) and len(invocation) == 32 and set(invocation) <= DIGEST):
+            runner_value.update(runtimeGeneration=generation, runtimeInvocationId=invocation)
     observed_at = now.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    admissions = admission_projection(fleet, concurrency, now, main_sha, runtime_revision, attestation)
+    repair_signal = {"existingRepair": existing_repair} if existing_repair is not None else {}
+    runtime_binding = {"runtimeRevision": runtime_revision,
+                       "runtimeGeneration": runner_value.get("runtimeGeneration"),
+                       "runtimeInvocationId": runner_value.get("runtimeInvocationId")}
+    if task_admissions_match(task_admissions, existing_repair, ci_audit, main_sha, runtime_binding):
+        repair_signal["taskAdmissions"] = task_admissions
     semantic_sources = {
+        **repair_signal,
+        "admissions": admissions,
+        # A new measured authority observation needs a new event after a missed
+        # delivery or expired grant. Existing task fingerprints still dedupe work.
+        "admissionSourceObservations": {
+            key: admissions[key]["observedAt"] for key in
+            ("newImplementation", "ownedRemediation", "push", "providerEligibility", "downstreamHealth")
+        },
+        **({"taskAdmissionSourceObservations": {
+            key: task_admissions.get(key, {}).get("observedAt")
+            for key in ("providerEligibility", "downstreamHealth")
+        }} if "taskAdmissions" in repair_signal else {}),
         "closure": closure_value,
         "queue": queue_value,
         "release": release_value,
@@ -308,7 +431,8 @@ def compose_snapshot(
         "observedAt": observed_at,
         "sourceVersion": main_sha,
         "signals": {
-            "closure": {
+            **repair_signal,
+            "admissions": admissions,            "closure": {
                 "schema": "jovie.eve.summer-closure-projection/v1",
                 "sourceSchema": "jovie-closure-health/v1",
                 **source_fields(
@@ -428,7 +552,25 @@ def main() -> int:
     parser.add_argument("--submit", action="store_true")
     args = parser.parse_args()
     fleet, runtime = read_sources(args.source_bundle)
-    snapshot = compose_snapshot(fleet, runtime, datetime.now(timezone.utc))
+    concurrency = None if args.source_bundle else load_concurrency_observation()
+    existing_repair = None if args.source_bundle else load_existing_repair_reference()
+    attestation = load_service_attestation()
+    now = datetime.now(timezone.utc)
+    snapshot = compose_snapshot(fleet, runtime, now, attestation=attestation,
+                                concurrency=concurrency, existing_repair=existing_repair)
+    if not args.source_bundle and existing_repair is not None:
+        runner = snapshot["signals"]["runner"]
+        task_admissions = load_existing_repair_task_admissions(
+            existing_repair, snapshot["signals"]["ciAudit"], snapshot["sourceVersion"],
+            {"runtimeRevision": runner["sourceRevision"],
+             "runtimeGeneration": runner.get("runtimeGeneration"),
+             "runtimeInvocationId": runner.get("runtimeInvocationId")},
+        )
+        # Recompose with the same measured sources. The observation supplies its
+        # own timestamps; composing a snapshot never refreshes old evidence.
+        snapshot = compose_snapshot(fleet, runtime, datetime.now(timezone.utc), attestation=attestation,
+                                    concurrency=concurrency, existing_repair=existing_repair,
+                                    task_admissions=task_admissions)
     result = submit(snapshot, os.environ.get("CRON_SECRET", "")) if args.submit else snapshot
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0

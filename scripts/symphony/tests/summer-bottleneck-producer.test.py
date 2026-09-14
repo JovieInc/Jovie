@@ -6,6 +6,7 @@ import io
 import json
 import pathlib
 import tempfile
+import sys
 import unittest
 from datetime import datetime, timezone
 from unittest import mock
@@ -15,6 +16,7 @@ PATH = ROOT / "scripts/symphony/summer_bottleneck_producer.py"
 SPEC = importlib.util.spec_from_file_location("summer_bottleneck_producer", PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
+sys.path.insert(0, str(PATH.parent))
 SPEC.loader.exec_module(MODULE)
 
 GATE_PATH = ROOT / "scripts/symphony/gem-priority-gate.py"
@@ -103,7 +105,10 @@ def sources():
 
 class ProducerTests(unittest.TestCase):
     def test_composes_current_authorities_without_invented_timestamps(self):
-        snapshot = MODULE.compose_snapshot(*sources(), NOW)
+        observed_service = {"schema": "gem-service-attestation/v1", "observedAt": "2026-09-05T19:29:00Z",
+                            "service": "symphony-elixir.service", "active": True, "healthy": True,
+                            "sourceRevision": RUNTIME_SHA, "listener": {"port": 4041, "boundToService": True}}
+        snapshot = MODULE.compose_snapshot(*sources(), NOW, observed_service)
         signals = snapshot["signals"]
         self.assertEqual(snapshot["sourceVersion"], MAIN_SHA)
         self.assertEqual(signals["closure"]["openPullRequests"], 49)
