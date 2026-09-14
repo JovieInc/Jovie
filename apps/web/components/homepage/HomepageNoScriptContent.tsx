@@ -5,7 +5,7 @@ import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
  * Keep the homepage useful when JavaScript is unavailable.
  *
  * This is deliberately real, user-readable SSR content rather than
- * crawler-only copy: the same nine certified sections the scripted page
+ * crawler-only copy: the same locked editorial sections the scripted page
  * renders, in the same order. The home stylesheet hides it for
  * scripting-enabled browsers, while agents and people without JavaScript get
  * the same canonical proposition and public routes. Keeping the section in
@@ -29,6 +29,14 @@ export function HomepageNoScriptContent() {
         <div key={section.id}>
           <h3>{section.headline}</h3>
           <p>{section.body}</p>
+          {'outcomes' in section
+            ? section.outcomes.map(outcome => (
+                <div key={outcome.id}>
+                  <h4>{outcome.headline}</h4>
+                  <p>{outcome.body}</p>
+                </div>
+              ))
+            : null}
         </div>
       ))}
 

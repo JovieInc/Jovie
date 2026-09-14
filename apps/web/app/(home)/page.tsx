@@ -4,6 +4,7 @@ import {
   HomepageCertifiedSections,
 } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
+import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditorialChangelog';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
 import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HERO_COPY } from '@/components/homepage/intent';
@@ -168,6 +169,7 @@ function HomepageStoryStack() {
       data-testid='homepage-story-stack'
     >
       <HomepageUnlockedSections />
+      <HomepageEditorialChangelog />
       <HomepageClose />
     </div>
   );
