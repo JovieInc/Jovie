@@ -31,10 +31,16 @@ def load_repair_validator():
         "releaseValidatorRelativePath": ".local/bin/.symphony-codex-auth-fallback/current/existing_pr_repair.py",
         "installer": "scripts/symphony/symphony-codex-exhausted.py install",
     }
-    if json.loads(manifest_path.read_text()) != expected:
+    observed_manifest = json.loads(manifest_path.read_text())
+    resolver_key = "releaseResolverRelativePath"
+    if isinstance(observed_manifest, dict) and resolver_key in observed_manifest:
+        expected[resolver_key] = ".local/bin/.symphony-codex-auth-fallback/current/symphony-existing-repair-resolv.conf"
+    if observed_manifest != expected:
         raise ValueError("existing-repair-package-manifest-invalid")
     paths = [manifest_path, *(home / expected[key] for key in
              ("launcherRelativePath", "releaseControllerRelativePath", "releaseValidatorRelativePath"))]
+    if resolver_key in expected:
+        paths.append(home / expected[resolver_key])
     for path in paths:
         info = path.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
@@ -53,8 +59,11 @@ def load_repair_validator():
         return subprocess.check_output(["git", "-C", source_root, *arguments], stderr=subprocess.DEVNULL, timeout=10)
     if git_value("rev-parse", f"{revision}^{{commit}}").decode().strip() != revision:
         raise ValueError("existing-repair-package-source-invalid")
+    resolver = paths[4].resolve() if len(paths) == 5 else None
+    if resolver is not None and resolver.parent != controller.parent:
+        raise ValueError("existing-repair-package-release-mismatch")
     verified = {}
-    for installed in (controller, validator):
+    for installed in (controller, validator, *((resolver,) if resolver is not None else ())):
         info = installed.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
             raise ValueError("existing-repair-package-file-untrusted")

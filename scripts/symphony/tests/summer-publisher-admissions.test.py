@@ -183,7 +183,7 @@ class ExistingRepairLoaderTests(unittest.TestCase):
             def git(*args, data=b""):
                 return subprocess.check_output(["git", "-C", str(source), *args], input=data).decode().strip()
             blob = git("hash-object", "-w", "--stdin", data=b"IDENTITY = 'fixture'\n")
-            tree = git("mktree", data=f"100644 blob {blob}\texisting_pr_repair.py\n100644 blob {blob}\tsymphony-codex-exhausted.py\n".encode())
+            tree = git("mktree", data=f"100644 blob {blob}\texisting_pr_repair.py\n100644 blob {blob}\tsymphony-codex-exhausted.py\n100644 blob {blob}\tsymphony-existing-repair-resolv.conf\n".encode())
             tree = git("mktree", data=f"040000 tree {tree}\tsymphony\n".encode())
             tree = git("mktree", data=f"040000 tree {tree}\tscripts\n".encode())
             revision = git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit-tree", tree, data=b"fixture\n")
@@ -193,6 +193,24 @@ class ExistingRepairLoaderTests(unittest.TestCase):
                 module, controller = REPAIR.load_repair_validator()
                 self.assertEqual(module.IDENTITY, "fixture")
                 self.assertEqual(controller, (home / expected["releaseControllerRelativePath"]).resolve())
+                resolver_path = ".local/bin/.symphony-codex-auth-fallback/current/symphony-existing-repair-resolv.conf"
+                resolver = home / resolver_path
+                resolver.write_text("IDENTITY = 'fixture'\n")
+                resolver.chmod(0o644)
+                manifest.write_text(json.dumps({**expected, "releaseResolverRelativePath": resolver_path}))
+                self.assertEqual(REPAIR.load_repair_validator()[0].IDENTITY, "fixture")
+                manifest.write_text(json.dumps({**expected, "releaseResolverRelativePath": "other.conf"}))
+                with self.assertRaisesRegex(ValueError, "manifest-invalid"):
+                    REPAIR.load_repair_validator()
+                manifest.write_text(json.dumps({**expected, "releaseResolverRelativePath": resolver_path}))
+                resolver.chmod(0o666)
+                with self.assertRaisesRegex(ValueError, "file-untrusted"):
+                    REPAIR.load_repair_validator()
+                resolver.chmod(0o644)
+                resolver.write_text("unreviewed resolver\n")
+                with self.assertRaisesRegex(ValueError, "source-mismatch"):
+                    REPAIR.load_repair_validator()
+                manifest.write_text(json.dumps(expected))
                 manifest.write_text(json.dumps({**expected, "releaseValidatorRelativePath": "other.py"}))
                 with self.assertRaisesRegex(ValueError, "manifest-invalid"):
                     REPAIR.load_repair_validator()
