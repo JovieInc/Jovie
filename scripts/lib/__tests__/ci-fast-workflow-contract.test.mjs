@@ -329,6 +329,11 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+
+    expect(remaining).toContain('tests/e2e/storybook-spotify-connect.spec.ts');
+    expect(remaining).toContain('playwright.config.storybook.ts');
+    expect(remaining).toContain('upload-safe-playwright-artifact');
+    expect(remaining).toContain('PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES');
   });
 
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
