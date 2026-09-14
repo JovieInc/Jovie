@@ -72,6 +72,7 @@ RECEIPT_STALE_AFTER = timedelta(minutes=10)
 # deadlocks controller repair against the outage it exists to fix.
 REPAIR_FEED_REASONS = frozenset(
     {
+        "expired-held-prs",
         "internally-repairable-prs-open",
         "no-merge-progress-over-1h",
         "queue-controller-red-over-10m",

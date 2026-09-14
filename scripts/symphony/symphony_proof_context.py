@@ -146,6 +146,35 @@ def account_state(row: dict, now: datetime) -> str:
     return hashlib.sha256(json.dumps([cooldown, error], sort_keys=True).encode()).hexdigest()
 
 
+def validate_account_row(row: dict, now: datetime) -> dict:
+    """Revalidate one enrolled identity independently of runtime freshness."""
+    if not isinstance(row, dict):
+        raise ValueError("malformed enrollment")
+    provider, profile, model = (row.get(k) for k in ("provider", "profile", "model"))
+    identity_type = row.get("identityType", "codex-account")
+    if (not isinstance(provider, str) or not contract.V2_PROVIDER_ID.fullmatch(provider)
+        or not isinstance(model, str) or not contract.V2_MODEL_ID.fullmatch(model)
+        or row.get("agentProfile") != "coder"):
+        raise ValueError("enrollment identity mismatch")
+    if identity_type == "codex-account":
+        account_path = Path(row["accountPath"])
+        if profile != profile_identity(account_path):
+            raise ValueError("enrollment identity mismatch")
+        account_binding = account_state(row, now)
+    elif identity_type == "provider-executor":
+        executor = Path(row["executorPath"])
+        auth_state = Path(row["authStatePath"])
+        if (profile != provider_pool_identity(provider, model, executor, auth_state)
+            or row.get("executorSha256") != digest(executor)
+            or row.get("authStateSha256") != digest(auth_state)
+            or row.get("authPoolIdentity") != profile):
+            raise ValueError("enrollment identity mismatch")
+        account_binding = executor_state(row)
+    else:
+        raise ValueError("enrollment identity mismatch")
+    return {**row, "accountStateSha256": account_binding}
+
+
 def load_context(now: datetime, path: Path | None = None) -> dict:
     path = path or Path(os.environ.get("SYMPHONY_PROOF_CONTEXT", "/home/timwhite/gem-workspace/state/proof-context.json"))
     value = private_json(path)
@@ -175,34 +204,13 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
     seats = set()
     enrolled = []
     for row in accounts:
-        if not isinstance(row, dict):
-            raise ValueError("malformed enrollment")
-        provider, profile, model = (row.get(k) for k in ("provider", "profile", "model"))
-        identity_type = row.get("identityType", "codex-account")
-        if (not isinstance(provider, str) or not contract.V2_PROVIDER_ID.fullmatch(provider)
-            or not isinstance(model, str) or not contract.V2_MODEL_ID.fullmatch(model)
-            or row.get("agentProfile") != "coder"):
-            raise ValueError("enrollment identity mismatch")
-        if identity_type == "codex-account":
-            if profile != profile_identity(Path(row["accountPath"])):
-                raise ValueError("enrollment identity mismatch")
-            account_binding = account_state(row, now)
-        elif identity_type == "provider-executor":
-            executor = Path(row["executorPath"])
-            auth_state = Path(row["authStatePath"])
-            if (profile != provider_pool_identity(provider, model, executor, auth_state)
-                or row.get("executorSha256") != digest(executor)
-                or row.get("authStateSha256") != digest(auth_state)
-                or row.get("authPoolIdentity") != profile):
-                raise ValueError("enrollment identity mismatch")
-            account_binding = executor_state(row)
-        else:
-            raise ValueError("enrollment identity mismatch")
+        normalized = validate_account_row(row, now)
+        provider, profile = (normalized[k] for k in ("provider", "profile"))
         seat = (provider, profile)
         if seat in seats:
             raise ValueError("duplicate enrollment")
         seats.add(seat)
-        enrolled.append({**row, "accountStateSha256": account_binding})
+        enrolled.append(normalized)
     artifacts = Path(value["attestationDir"])
     info = artifacts.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:

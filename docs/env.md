@@ -227,13 +227,27 @@ Webhook secret for the dedicated Stripe merch webhook at
 `/api/webhooks/stripe-merch`. Used for one-time merch Checkout completion and
 refund events; separate from subscription and tip webhook secrets.
 
-### `STRIPE_PRICE_STANDARD_MONTHLY`
+### `STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY`
 
-The price ID for the Standard monthly subscription (branding removed).
+Required for new Artist Visibility Pro checkout. Set this to a distinct, active
+Stripe recurring price ID (`price_...`) for **USD 19900 cents every month** in the
+same Stripe account and mode as `STRIPE_SECRET_KEY`. Do not reuse an older Pro
+price ID or change existing subscribers' prices. Free profile and audience
+capture remain free; Enterprise contact sales goes to `support@jov.ie`.
 
-### `STRIPE_PRICE_STANDARD_YEARLY`
+Provision the value through the supported Doppler/deployment environment path
+and redeploy so the server rebuilds its checkout price mappings. Startup checks
+verify presence, not the price's actual Stripe amount, currency, or active status.
+Verify those in Stripe and exercise checkout on the deployed build separately;
+a passing unit test or startup check is not live billing proof.
 
-The price ID for the Standard yearly subscription (branding removed).
+### Legacy Pro price IDs
+
+`STRIPE_PRICE_PRO_MONTHLY` retains the old $39 monthly subscription mapping.
+`STRIPE_PRICE_PRO_ANNUAL` (or `STRIPE_PRICE_PRO_YEARLY`) retains the existing
+$375 annual mapping. They resolve existing subscriptions/webhooks and are not
+eligible for new checkout. Setting them does not replace the required Artist
+Visibility price configuration.
 
 ## Cloudinary Configuration
 

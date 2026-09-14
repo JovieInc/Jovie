@@ -1,0 +1,186 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: GitHub-hosted probes observe Jovie and Summer outside the pausable Vercel team, while only the fixed Gem runner persists the existing provider-recovery receipt; neither path receives Vercel mutation credentials.
+# removal-trigger: Remove the hosted alert hop after an independently hosted signed Vercel spend receiver proves threshold delivery, founder acknowledgement, and durable Summer ingress for 30 consecutive days; retain an external availability deadman.
+name: Production Continuity Guard
+# clock-class: production-liveness
+
+on:
+  # Vercel's native notifications are the event-driven spend-risk signal.
+  # This external five-minute probe catches a missed notification and projects
+  # that remained individually paused after another project was resumed.
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: production-continuity-guard
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: Probe production continuity
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      status: ${{ steps.probe.outputs.status }}
+      affected_targets: ${{ steps.probe.outputs.affected_targets }}
+      incident_classes: ${{ steps.probe.outputs.incident_classes }}
+      incident_key: ${{ steps.probe.outputs.incident_key }}
+    steps:
+      - name: Checkout policy source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Probe Jovie and Summer production
+        id: probe
+        run: >-
+          node .github/scripts/production-continuity.mjs
+          --output "$RUNNER_TEMP/production-continuity.json"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Publish exact observation receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-continuity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-continuity.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Summarize production state
+        env:
+          STATUS: ${{ steps.probe.outputs.status }}
+          AFFECTED_TARGETS: ${{ steps.probe.outputs.affected_targets }}
+          INCIDENT_CLASSES: ${{ steps.probe.outputs.incident_classes }}
+        run: |
+          {
+            echo "### Production Continuity Guard"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Status | $STATUS |"
+            echo "| Affected targets | ${AFFECTED_TARGETS:-none} |"
+            echo "| Incident classes | ${INCIDENT_CLASSES:-none} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  founder-alert:
+    name: Notify production on-call (${{ needs.observe.outputs.incident_key }})
+    needs: observe
+    if: ${{ needs.observe.outputs.status == 'unhealthy' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment:
+      name: Production – jovie
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      AFFECTED_TARGETS: ${{ needs.observe.outputs.affected_targets }}
+      INCIDENT_CLASSES: ${{ needs.observe.outputs.incident_classes }}
+      INCIDENT_KEY: ${{ needs.observe.outputs.incident_key }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout policy source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Deduplicate acknowledged alert transport
+        id: dedupe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: node .github/scripts/production-continuity-dedupe.mjs
+
+      - name: Deliver immediate founder alert
+        if: ${{ steps.dedupe.outputs.should_notify == 'true' }}
+        run: |
+          set -euo pipefail
+          test -n "$SLACK_WEBHOOK_URL" || {
+            echo "::error::Production Slack webhook is unavailable; alert delivery is unproven."
+            exit 1
+          }
+          response_file="$RUNNER_TEMP/slack-response.txt"
+          http_code="$(curl --silent --show-error --connect-timeout 10 --max-time 20 \
+            --output "$response_file" --write-out '%{http_code}' \
+            -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' \
+            -d "$(jq -n \
+              --arg targets "$AFFECTED_TARGETS" \
+              --arg classes "$INCIDENT_CLASSES" \
+              --arg key "$INCIDENT_KEY" \
+              --arg run "$RUN_URL" \
+              '{text: "Production continuity incident", attachments: [{color: "danger", fields: [
+                {title: "Affected", value: $targets, short: false},
+                {title: "Class", value: $classes, short: false},
+                {title: "Incident key", value: $key, short: false},
+                {title: "Receipt", value: ("<" + $run + "|Open production guard run>"), short: false},
+                {title: "Policy", value: "Founder handles first. Agents investigate immediately and may change spend only inside an explicit numeric emergency envelope.", short: false}
+              ]}]}')")"
+          test "$http_code" = "200" && test "$(tr -d '\r\n' < "$response_file")" = "ok" || {
+            echo "::error::Slack did not acknowledge the production alert."
+            exit 1
+          }
+          echo "Slack acknowledged the production incident alert."
+
+  agent-ingress:
+    name: Admit one Summer provider-recovery task
+    needs: observe
+    if: ${{ needs.observe.outputs.status == 'unhealthy' }}
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact main policy source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Persist provider-unavailable receipt
+        env:
+          INCIDENT_KEY: ${{ needs.observe.outputs.incident_key }}
+          AFFECTED_TARGETS: ${{ needs.observe.outputs.affected_targets }}
+          INCIDENT_CLASSES: ${{ needs.observe.outputs.incident_classes }}
+        run: |
+          set -euo pipefail
+          event_file="$RUNNER_TEMP/production-continuity-event.json"
+          jq -n \
+            --arg key "$INCIDENT_KEY" \
+            --arg targets "$AFFECTED_TARGETS" \
+            --arg classes "$INCIDENT_CLASSES" \
+            '{client_payload: {
+              delivery_key: $key,
+              repository: "JovieInc/Jovie",
+              source: "production-continuity-guard",
+              event: "production-continuity-unavailable",
+              failure: "provider-unavailable",
+              evidence: {
+                affectedTargets: ($targets | split(",")),
+                incidentClasses: ($classes | split(",")),
+                productionMutation: "none"
+              }
+            }}' > "$event_file"
+          node scripts/backlog-orchestrator/delivery-state-machine.mjs \
+            --event-file="$event_file"
+
+  preserve-incident:
+    name: Preserve production incident
+    needs: [observe, founder-alert, agent-ingress]
+    if: ${{ always() && needs.observe.outputs.status == 'unhealthy' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Fail after alert and agent ingress
+        env:
+          ALERT_RESULT: ${{ needs.founder-alert.result }}
+          INGRESS_RESULT: ${{ needs.agent-ingress.result }}
+        run: |
+          echo "::error::Production is unavailable; founder alert=$ALERT_RESULT, agent ingress=$INGRESS_RESULT."
+          exit 1

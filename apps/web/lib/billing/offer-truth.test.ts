@@ -26,7 +26,10 @@ describe('Artist Visibility offer contract', () => {
     expect(getPlanSignupHref('pro', 'month')).toBe(
       '/signup?plan=pro&interval=month'
     );
-    expect(ARTIST_VISIBILITY_OFFER.enterprise.checkout).toBe(false);
+    expect(ARTIST_VISIBILITY_OFFER.enterprise).toMatchObject({
+      checkout: false,
+      href: 'mailto:support@jov.ie',
+    });
   });
   it('rejects stale annual and Max signup offers', () => {
     expect(() => getPlanSignupHref('pro', 'year')).toThrow();
