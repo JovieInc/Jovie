@@ -21,4 +21,14 @@ describe('ThemeToggleSkeleton', () => {
     expect(toolbar.children).toHaveLength(3);
     expect(toolbar).toHaveClass('border-subtle', 'bg-surface-2');
   });
+
+  it('reserves the footer root target and visible segment geometry', () => {
+    const { getByRole } = render(
+      <ThemeToggleSkeleton appearance='segmented' size='footer' />
+    );
+    const toolbar = getByRole('toolbar', { name: 'Theme' });
+
+    expect(toolbar).toHaveClass('h-11', 'px-0', 'py-2');
+    expect(toolbar.children[0]).toHaveClass('h-7', 'w-11', 'px-3');
+  });
 });
