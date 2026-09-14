@@ -1,21 +1,43 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
-import { Logo } from '@/components/atoms/Logo';
-import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
+'use client';
+
+import { Button } from '@jovie/ui';
+import { Check, Copy } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
-import {
-  HOMEPAGE_CERTIFIED_CONTEXT,
-  HOMEPAGE_CERTIFIED_EVENTS,
-} from '@/data/homepageCertifiedOptimization';
+import { BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
-/**
- * Section 9: the close. Repeats the hero's only conversion control — the
- * existing name search — under the locked closing lines, then signs off with
- * a quiet, non-interactive wordmark.
- */
+const AGENT_ONBOARDING_PAYLOAD = [
+  `Use Jovie's read-only public artist context: ${BASE_URL}${APP_ROUTES.CLI}`,
+  `Docs: ${BASE_URL}/llms.txt`,
+  'No account, API key, writes, or telemetry required.',
+].join('\n');
+
+/** Founder-locked homepage close CTA. */
 export function HomepageClose() {
   const { close } = HOMEPAGE_LAUNCH_COPY.certified;
-  const { search } = HOMEPAGE_LAUNCH_COPY.hero;
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'fallback'>(
+    'idle'
+  );
+
+  async function copyAgentOnboardingUrl() {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('clipboard-unavailable');
+      }
+      await navigator.clipboard.writeText(AGENT_ONBOARDING_PAYLOAD);
+      setCopyState('copied');
+    } catch {
+      setCopyState('fallback');
+    }
+  }
+
+  function returnToNameSearch() {
+    document.getElementById('homepage-name-search')?.focus();
+  }
 
   return (
     <MarketingCtaSection
@@ -35,29 +57,60 @@ export function HomepageClose() {
         >
           {close.headline}
         </h2>
-        <p className='homepage-close__support'>{close.support}</p>
+        {close.support ? (
+          <p className='homepage-close__support'>{close.support}</p>
+        ) : null}
         <div
-          className='homepage-close__search'
-          data-testid='homepage-close-search'
+          className='homepage-close__actions'
+          data-testid='homepage-close-actions'
         >
-          <HeroSpotifySearch
-            appearance='editorial'
-            inputId='homepage-close-name-search'
-            placeholder={search.placeholder}
-            submitLabel={search.action}
-            submitTestId='homepage-close-cta'
-            submitAnalytics={{
-              eventName: HOMEPAGE_CERTIFIED_EVENTS.SEARCH_SUBMITTED,
-              properties: {
-                ...HOMEPAGE_CERTIFIED_CONTEXT,
-                placement: 'close',
-              },
-            }}
+          <Button asChild size='marketing' variant='primary'>
+            <Link
+              href='#homepage-name-search'
+              onClick={returnToNameSearch}
+              data-testid='homepage-close-profile-cta'
+            >
+              Find your profile
+            </Link>
+          </Button>
+          <button
+            type='button'
+            className='homepage-close__copy'
+            onClick={() => void copyAgentOnboardingUrl()}
+            data-copy-state={copyState}
+            aria-label={
+              copyState === 'copied'
+                ? 'Agent onboarding link copied'
+                : 'Copy agent onboarding link'
+            }
+          >
+            <span>
+              {copyState === 'copied' ? 'Copied' : 'Onboard your agent'}
+            </span>
+            {copyState === 'copied' ? (
+              <Check aria-hidden='true' size={14} />
+            ) : (
+              <Copy aria-hidden='true' size={14} />
+            )}
+          </button>
+        </div>
+        {copyState === 'fallback' ? (
+          <textarea
+            aria-label='Agent Onboarding Link'
+            className='homepage-close__copy-fallback'
+            onFocus={event => event.currentTarget.select()}
+            readOnly
+            value={AGENT_ONBOARDING_PAYLOAD}
+            rows={3}
           />
-        </div>
-        <div className='homepage-close__mark' data-testid='homepage-close-mark'>
-          <Logo variant='word' size='xs' aria-hidden />
-        </div>
+        ) : null}
+        <span className='sr-only' role='status' aria-live='polite'>
+          {copyState === 'copied'
+            ? 'Agent onboarding link copied.'
+            : copyState === 'fallback'
+              ? 'Clipboard unavailable. Select the onboarding link below.'
+              : ''}
+        </span>
       </div>
     </MarketingCtaSection>
   );

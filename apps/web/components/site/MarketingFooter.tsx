@@ -133,10 +133,9 @@ export function MarketingFooter({
   const pageOwnsFinalCta =
     typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
-  const footerColumns =
-    pathname === APP_ROUTES.HOME
-      ? MARKETING_FOOTER_COLUMNS.filter(column => column.title !== 'Connect')
-      : MARKETING_FOOTER_COLUMNS;
+  // The homepage is explicitly bound to the full CCDnQ footer composition.
+  // Keep every canonical column, including Connect, in the expanded variant.
+  const footerColumns = MARKETING_FOOTER_COLUMNS;
 
   return (
     <footer

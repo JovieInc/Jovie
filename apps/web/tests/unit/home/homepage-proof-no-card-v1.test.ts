@@ -17,80 +17,37 @@ function readCertifiedCss(): string {
   return css.slice(start, end);
 }
 
-function extractDesktopProofGrid(css: string): string {
-  const start = css.indexOf('@media (min-width: 1024px)');
-  const end = css.indexOf('.homepage-certified-section__inner,', start);
-  expect(start, 'desktop proof spacing query exists').toBeGreaterThanOrEqual(0);
-  expect(end, 'desktop proof spacing query is bounded').toBeGreaterThan(start);
-  return css.slice(start, end);
-}
-
-interface LogoBox {
-  readonly id: string;
-  readonly left: number;
-  readonly right: number;
-}
-
-function logosOverlap(boxes: readonly LogoBox[]): boolean {
-  return boxes.some((box, index) =>
-    boxes
-      .slice(index + 1)
-      .some(other => box.left < other.right && box.right > other.left)
-  );
-}
-
 describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
-  it('keeps the certified proof strip on the page background, never a frosted card', () => {
+  it('omits unsupported adoption proof until it has an attributable receipt', () => {
     const sections = read('components/homepage/HomepageCertifiedSections.tsx');
-    const certifiedCss = readCertifiedCss();
+    const routeManifest = read('data/marketing/routeManifest.ts');
 
-    expect(sections).toContain("presentation='inline-strip'");
-    expect(sections).toContain('homepage-certified-proof__logos');
-    expect(sections).not.toContain("presentation='card'");
-    expect(certifiedCss).not.toMatch(
-      /\.homepage-certified-proof[\s\S]{0,240}backdrop-filter/
+    expect(sections).not.toContain('HomeTrustSection');
+    expect(sections).not.toContain('marketing-section-logo-cloud');
+    expect(sections).not.toContain('homepage-certified-proof');
+
+    const homepageEntry = routeManifest.slice(
+      routeManifest.indexOf("glob: '(home)/page.tsx'"),
+      routeManifest.indexOf("glob: '(marketing)/new/page.tsx'")
     );
-    expect(certifiedCss).not.toMatch(
-      /\.homepage-certified-proof[\s\S]{0,240}border-radius:\s*var\(--radius/
-    );
+    expect(homepageEntry).not.toContain("'logo-cloud'");
+    expect(homepageEntry).toContain('unsupported adoption strip');
   });
 
-  it('matches /pricing compact desktop spacing for the four homepage logos', () => {
+  it('keeps the editorial body on the shared page background with stable spacing', () => {
     const certifiedCss = readCertifiedCss();
-    const desktop = extractDesktopProofGrid(certifiedCss);
-    const tablet = certifiedCss.slice(
-      certifiedCss.indexOf('@media (min-width: 768px)'),
-      certifiedCss.indexOf('@media (min-width: 1024px)')
-    );
 
-    expect(tablet).toContain('display: flex');
-    expect(tablet).toContain('gap: var(--space-5) var(--space-8)');
-    expect(tablet).toContain('min-width: max-content');
-    expect(tablet).toContain('max-width: none');
-    expect(desktop).toContain('flex-wrap: nowrap');
-    expect(desktop).toContain('justify-content: space-between');
-    expect(desktop).toContain('gap: var(--space-8)');
-    expect(certifiedCss).not.toMatch(
-      /\.homepage-certified-proof[\s\S]{0,400}grid-template-columns:\s*minmax\(var\(--space-24\)/
+    expect(certifiedCss).not.toContain('.homepage-certified-proof');
+    expect(certifiedCss).toContain('aspect-ratio: 1902 / 827');
+    expect(certifiedCss).toContain('homepage-relationship-outcomes');
+    expect(certifiedCss).toContain(
+      'gap: clamp(var(--space-8), 3vw, var(--space-11))'
     );
-
-    const collidingFiveTrack = [
-      { id: 'awal', left: 0, right: 90 },
-      { id: 'orchard', left: 80, right: 170 },
-      { id: 'umg', left: 150, right: 600 },
-      { id: 'armada', left: 540, right: 640 },
-    ];
-    const pricedSpacing = [
-      { id: 'awal', left: 0, right: 61 },
-      { id: 'orchard', left: 93, right: 136 },
-      { id: 'umg', left: 168, right: 619 },
-      { id: 'armada', left: 651, right: 747 },
-    ];
-    expect(logosOverlap(collidingFiveTrack)).toBe(true);
-    expect(logosOverlap(pricedSpacing)).toBe(false);
+    expect(certifiedCss).not.toMatch(/backdrop-filter/);
+    expect(certifiedCss).not.toMatch(/box-shadow:/);
   });
 
-  it('clears the sticky marketing-glass nav for every certified heading', () => {
+  it('clears the sticky marketing-glass nav for every editorial heading', () => {
     const css = read('app/(home)/home.css');
     const certifiedCss = readCertifiedCss();
 
@@ -107,7 +64,5 @@ describe('homepage-proof-no-card-v1 (JOV-6201 wave 2)', () => {
     expect(certifiedCss).toContain(
       '.home-viewport .homepage-certified-section__headline'
     );
-    expect(css).toContain('--homepage-sticky-nav-height: 2.72rem');
-    expect(css).toContain('--homepage-sticky-nav-height: 3.15rem');
   });
 });

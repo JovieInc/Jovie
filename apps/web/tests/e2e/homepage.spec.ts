@@ -2,7 +2,6 @@ import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import {
   evaluateAcceptanceEvidence,
   evaluateRelationalGrid,
-  evaluateSharedSearchGeometry,
 } from '../../../../scripts/component-rendered-invariant-policy.mjs';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
@@ -424,7 +423,7 @@ test.describe('Homepage', () => {
     expect(hydrationErrors).toEqual([]);
   });
 
-  test('locks the nine certified sections, their order, heading lines, and CLS', async ({
+  test('locks the editorial sections, their order, heading lines, and CLS', async ({
     page,
     browserName,
   }) => {
@@ -447,13 +446,9 @@ test.describe('Homepage', () => {
 
     const sectionIds = [
       'marketing-section-hero',
-      'marketing-section-logo-cloud',
       'homepage-section-connected',
-      'homepage-section-found',
-      'homepage-section-know',
       'homepage-section-relationships',
-      'homepage-section-smarter',
-      'homepage-section-built',
+      'homepage-editorial-changelog',
       'homepage-close',
     ];
     const sectionTops = await page.evaluate(
@@ -471,80 +466,49 @@ test.describe('Homepage', () => {
     expect(sectionTops.some(top => Number.isNaN(top))).toBe(false);
     expect(sectionTops).toEqual([...sectionTops].sort((a, b) => a - b));
 
-    const heroToProofBoundary = await page.evaluate(() => {
+    const heroToStoryBoundary = await page.evaluate(() => {
       const hero = document.querySelector<HTMLElement>(
         '[data-testid="marketing-section-hero"]'
       );
       const stack = document.querySelector<HTMLElement>(
         '[data-testid="homepage-story-stack"]'
       );
-      const proofSection = document.querySelector<HTMLElement>(
-        '[data-testid="marketing-section-logo-cloud"]'
+      const storySection = document.querySelector<HTMLElement>(
+        '[data-homepage-testid="homepage-section-connected"]'
       );
-      if (!(hero && stack && proofSection)) return null;
+      if (!(hero && stack && storySection)) return null;
       return {
         gap:
           stack.getBoundingClientRect().top -
           hero.getBoundingClientRect().bottom,
-        proofOffset:
-          proofSection.getBoundingClientRect().top -
+        storyOffset:
+          storySection.getBoundingClientRect().top -
           stack.getBoundingClientRect().top,
       };
     });
-    expect(heroToProofBoundary).not.toBeNull();
-    expect(heroToProofBoundary?.gap).toBeGreaterThanOrEqual(0);
-    expect(heroToProofBoundary?.gap).toBeLessThanOrEqual(1);
+    expect(heroToStoryBoundary).not.toBeNull();
+    expect(heroToStoryBoundary?.gap).toBeGreaterThanOrEqual(0);
+    expect(heroToStoryBoundary?.gap).toBeLessThanOrEqual(1);
     expect(
-      Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
+      Math.abs(heroToStoryBoundary?.storyOffset ?? Number.NaN)
     ).toBeLessThanOrEqual(1);
 
-    // Section 2 retains verified logos on the page
-    // background, never a frosted card.
-    const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(
-      page.getByText("Proof is earned. We don't borrow it.", { exact: true })
-    ).toHaveCount(0);
-    await expect(
-      proof.getByText("BUILT BY PEOPLE WHO'VE CREATED FOR")
-    ).toBeVisible();
-    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
+    // Unsupported adoption proof stays omitted until an attributable receipt exists.
+    await expect(page.getByTestId('marketing-section-logo-cloud')).toHaveCount(
+      0
     );
-    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
-    await expect(proof.locator('svg')).toHaveCount(4);
 
     // Locked section copy, verbatim.
     for (const [id, headline, body] of [
       [
         'connected',
         'Everything about you, connected.',
-        'Your work, links, story, and presence—organized into one living profile.',
-      ],
-      [
-        'found',
-        'Be found. Be understood.',
-        'Share the right version of you, legible wherever people want to know how you can help.',
-      ],
-      [
-        'know',
-        'Know who cares.',
-        'See who is paying attention, what brought them to you, and what they may want next.',
+        'Your work, links, and story. One living profile.',
       ],
       [
         'relationships',
         'Turn attention into relationships.',
         'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
-      ],
-      [
-        'smarter',
-        'A presence that gets smarter.',
-        'Every interaction improves what you know, what you show, and what you do next.',
-      ],
-      [
-        'built',
-        'Built around who you are.',
-        'Jovie adapts to your work without reducing you to a category.',
       ],
     ] as const) {
       const section = page.locator(
@@ -556,7 +520,8 @@ test.describe('Homepage', () => {
       await expect(section.getByText(body)).toBeVisible();
     }
 
-    // Real product exports load at device quality where they appear.
+    // The connected story uses the canonical conceptual artwork; the
+    // relationships story is text-only and keeps the outcomes as semantic rows.
     const connected = page.locator(
       '[data-homepage-testid="homepage-section-connected"]'
     );
@@ -566,9 +531,10 @@ test.describe('Homepage', () => {
       '[data-homepage-testid="homepage-section-relationships"]'
     );
     await relationships.scrollIntoViewIfNeeded();
-    await expect(relationships.locator('img')).toHaveCount(3);
+    await expect(relationships.locator('img')).toHaveCount(0);
+    await expect(relationships.getByRole('listitem')).toHaveCount(3);
     const exportSelector =
-      '[data-homepage-testid="homepage-section-connected"] img, [data-homepage-testid="homepage-section-relationships"] img';
+      '[data-homepage-testid="homepage-section-connected"] img';
     await page.waitForFunction(
       selector =>
         Array.from(document.querySelectorAll<HTMLImageElement>(selector)).every(
@@ -589,7 +555,7 @@ test.describe('Homepage', () => {
           };
         })
       );
-    expect(exportQuality).toHaveLength(4);
+    expect(exportQuality).toHaveLength(1);
     for (const image of exportQuality) {
       expect(
         image.naturalWidth,
@@ -597,20 +563,25 @@ test.describe('Homepage', () => {
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
 
-    // Section 9 repeats the name search; CTA is Find me, never Search.
+    // The close CTA returns to the hero search and offers the agent onboarding
+    // payload as a separate, selectable action.
     const close = page.getByTestId('marketing-section-cta');
     await close.scrollIntoViewIfNeeded();
     await expect(
-      close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
+      close.getByRole('heading', {
+        level: 2,
+        name: 'Take control of your presence.',
+      })
     ).toBeVisible();
-    await expect(close.getByText('Start with your name.')).toBeVisible();
-    await expect(close.getByPlaceholder('Search your name')).toBeVisible();
     await expect(
-      close.getByRole('button', { name: 'Find me', exact: true })
+      close.getByRole('link', { name: 'Find your profile', exact: true })
+    ).toHaveAttribute('href', '#homepage-name-search');
+    await expect(
+      close.getByRole('button', { name: 'Copy agent onboarding link' })
     ).toBeEnabled();
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Search$/ })).toHaveCount(0);
     await expect(page.getByText('Get started')).toHaveCount(0);
     await expect(page.getByText('Drop more music')).toHaveCount(0);
@@ -649,7 +620,7 @@ test.describe('Homepage', () => {
           );
         })
       );
-      expect(headingLines).toHaveLength(8);
+      expect(headingLines).toHaveLength(4);
       await expect
         .poll(async () =>
           Math.max(
@@ -680,47 +651,22 @@ test.describe('Homepage', () => {
     await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
-  test('proof logos do not collide and headings clear the sticky nav at 1280', async ({
+  test('editorial artwork stays inside the viewport and headings clear the sticky nav at 1280', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoHomepage(page);
     await page.evaluate(() => document.fonts.ready);
 
-    const proof = page.getByTestId('marketing-section-logo-cloud');
-    await expect(proof.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
+    const artwork = page.locator(
+      '[data-homepage-testid="homepage-section-connected"] img'
     );
-    await expect(proof.locator('[data-presentation="card"]')).toHaveCount(0);
-
-    const logoBoxes = await proof.locator('svg').evaluateAll(svgs =>
-      svgs.map(svg => {
-        const box = svg.getBoundingClientRect();
-        return {
-          label: svg.getAttribute('aria-label') ?? svg.textContent ?? '',
-          left: box.left,
-          right: box.right,
-          top: box.top,
-          bottom: box.bottom,
-        };
-      })
+    await expect(artwork).toBeVisible();
+    const artworkBox = await artwork.boundingBox();
+    expect(artworkBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((artworkBox?.x ?? 0) + (artworkBox?.width ?? 0)).toBeLessThanOrEqual(
+      1280
     );
-    expect(logoBoxes).toHaveLength(4);
-    for (let index = 0; index < logoBoxes.length; index += 1) {
-      for (let other = index + 1; other < logoBoxes.length; other += 1) {
-        const a = logoBoxes[index];
-        const b = logoBoxes[other];
-        const overlaps =
-          a.left < b.right &&
-          a.right > b.left &&
-          a.top < b.bottom &&
-          a.bottom > b.top;
-        expect(overlaps, `${a.label} overlaps ${b.label} at 1280px`).toBe(
-          false
-        );
-      }
-    }
 
     const headerBottom = await page
       .getByTestId('header-nav')
@@ -731,8 +677,7 @@ test.describe('Homepage', () => {
 
     const headings = page.locator('[data-homepage-section-heading]');
     const headingCount = await headings.count();
-    expect(headingCount).toBeGreaterThanOrEqual(7);
-
+    expect(headingCount).toBe(3);
     for (let index = 0; index < headingCount; index += 1) {
       const heading = headings.nth(index);
       const name = (await heading.innerText()).trim();
@@ -1091,40 +1036,19 @@ test.describe('Homepage', () => {
     const heroSearch = await measureSearch(
       '[data-testid="homepage-editorial-hero-search"]'
     );
-    const closeSearch = await measureSearch(
-      '[data-testid="homepage-close-search"]'
-    );
     expect(heroSearch).not.toBeNull();
-    expect(closeSearch).not.toBeNull();
     expect(heroSearch?.treatment).toBe('editorial');
-    expect(closeSearch?.treatment).toBe('editorial');
     expect(heroSearch?.actionHeight).toBeCloseTo(28, 0);
-    expect(closeSearch?.actionHeight).toBeCloseTo(28, 0);
     expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetBottom ?? 0, 0);
     expect(heroSearch?.insetTop).toBeCloseTo(heroSearch?.insetRight ?? 0, 0);
-    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetBottom ?? 0, 0);
-    expect(closeSearch?.insetTop).toBeCloseTo(closeSearch?.insetRight ?? 0, 0);
-    expect(heroSearch?.fieldHeight).toBeCloseTo(
-      closeSearch?.fieldHeight ?? 0,
-      0
-    );
-    expect(heroSearch?.fieldBackground).toBe(closeSearch?.fieldBackground);
-    expect(
-      evaluateSharedSearchGeometry({
-        hero: {
-          treatment: heroSearch?.treatment,
-          fieldHeight: heroSearch?.fieldHeight,
-          fieldBackground: heroSearch?.fieldBackground,
-          consumerAuraPierce: false,
-        },
-        close: {
-          treatment: closeSearch?.treatment,
-          fieldHeight: closeSearch?.fieldHeight,
-          fieldBackground: closeSearch?.fieldBackground,
-          consumerAuraPierce: false,
-        },
-      }).ok
-    ).toBe(true);
+
+    const close = page.getByTestId('marketing-section-cta');
+    await expect(
+      close.getByRole('link', { name: 'Find your profile', exact: true })
+    ).toBeVisible();
+    await expect(
+      close.getByRole('button', { name: 'Copy agent onboarding link' })
+    ).toBeVisible();
 
     const input = page
       .getByTestId('homepage-editorial-hero-search')
@@ -1193,12 +1117,12 @@ test.describe('Homepage', () => {
     const ctaLinks = page.locator('[data-cta-sign-up="true"]');
     const count = await ctaLinks.count();
 
-    // The certified homepage converts through the name search (two Find me
-    // buttons); anchor sign-up CTAs are optional, but any that exist must
+    // The certified homepage converts through the hero name search; anchor
+    // sign-up CTAs are optional, but any that exist must
     // still route through /start.
     await expect(
       page.getByRole('button', { name: 'Find me', exact: true })
-    ).toHaveCount(2);
+    ).toHaveCount(1);
 
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);

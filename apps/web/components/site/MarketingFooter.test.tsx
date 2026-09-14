@@ -84,8 +84,8 @@ describe('MarketingFooter', () => {
       screen.queryByText('Built for artists. By artists.')
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('heading', { name: 'Connect' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('heading', { name: 'Connect' })
+    ).toBeInTheDocument();
   });
 
   it('keeps developer resources discoverable in the minimal homepage footer', () => {

@@ -168,12 +168,8 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'hero',
         'centered-none'
       ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'logo-cloud',
-        'inline-strip'
-      ),
-      // All six source-owned editorial occurrences remain ordered and legal.
+      // The unsupported adoption strip is intentionally omitted until it has
+      // an attributable permission or adoption receipt.
       approvedVariantBinding(
         'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         'feature-split',
@@ -184,31 +180,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'apps/web/components/homepage/HomepageCertifiedSections.tsx',
         'feature-split',
         'editorial',
-        'found'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'know'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
         'relationships'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'smarter'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-        'feature-split',
-        'editorial',
-        'built'
       ),
       approvedBinding(
         'apps/web/components/homepage/HomepageClose.tsx',
@@ -220,7 +192,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'source history #17063, #17185, #17353; pinned 12b203f9',
       notes:
-        'Nine scripted beats and source owners are inventoried. Editorial rows have an explicit optional-media source contract; Search-close CTA has a source-only canonical root and editorial-search body binding; exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
+        'Locked connected and relationships beats plus the close actions are inventoried. The unsupported adoption strip is omitted. The changelog preview is a route-local editorial feed backed by CHANGELOG.md and remains outside the recipe section registry. Exact mounted validation remains pending and Pen identity is explicitly unknown. No-script fallback is a separate runtime state. No render or visual admission.',
     },
     status: 'active',
     specVersion: '1.3.0',
