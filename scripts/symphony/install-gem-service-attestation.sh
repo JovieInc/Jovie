@@ -97,6 +97,7 @@ install_complete=false
 finish_or_rollback() {
   local status="$?" index target_path temporary
   if [[ "${install_complete}" != true && "${install_started}" == true ]]; then
+    systemctl --user stop "${TIMER}" || true
     for index in "${!TARGETS[@]}"; do
       target_path="${TARGETS[$index]}"
       if [[ -e "${BACKUP_DIR}/${index}.existed" ]]; then
@@ -158,12 +159,6 @@ if [[ "${check_status}" -ne 0 ]]; then
 fi
 
 systemctl --user daemon-reload
-# Resume the same existing timer; this repo does not ship a replacement timer.
-if systemctl --user list-unit-files "${TIMER}" | grep -q "${TIMER}"; then
-  systemctl --user start "${TIMER}"
-else
-  printf 'warning: %s is not installed as a user unit; publisher files installed but timer not started\n' "${TIMER}" >&2
-fi
 
 # Publish one fresh observation for activation verify.
 set +e
@@ -178,6 +173,14 @@ set -e
 if [[ "${publish_status}" -ne 0 ]]; then
   printf 'publisher install succeeded but observation publish exited %s\n' "${publish_status}" >&2
   exit "${publish_status}"
+fi
+
+# Publish successfully before resuming the same timer. A failed publisher must
+# not leave a newly active timer reading files during source rollback.
+if systemctl --user list-unit-files "${TIMER}" | grep -q "${TIMER}"; then
+  systemctl --user start "${TIMER}"
+else
+  printf 'warning: %s is not installed as a user unit; publisher files installed but timer not started\n' "${TIMER}" >&2
 fi
 
 printf 'gem-service-attestation publisher installed (backup=%s)\n' "${BACKUP_DIR}"
