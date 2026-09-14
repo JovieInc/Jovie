@@ -18,11 +18,11 @@ importers:
         specifier: 7.0.58
         version: 7.0.58(zod@4.3.6)
       braintrust:
-        specifier: 3.30.0
-        version: 3.30.0(zod@4.3.6)
+        specifier: 3.32.0
+        version: 3.32.0(zod@4.3.6)
       eve:
         specifier: 0.47.7
-        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.30.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.32.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -1421,8 +1421,8 @@ packages:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
 
-  braintrust@3.30.0:
-    resolution: {integrity: sha512-F0TWmhAyvC6b8QgrKRZsVz3xcQN4I2fVHpkeUVEic57bvWg7szfW9RvA5BX5M4qSmp9XCH7QytX0m0vsCzgjIg==}
+  braintrust@3.32.0:
+    resolution: {integrity: sha512-dAY6Q3XYMyqDW5A9+8RNUKBqDhBbDVB55xrKpMaCXvnTz1psXYSlkzFta6sox+WHs6PHZR539+lufOexoUfRNg==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.34 || ^4.0
@@ -4419,7 +4419,7 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  braintrust@3.30.0(zod@4.3.6):
+  braintrust@3.32.0(zod@4.3.6):
     dependencies:
       '@next/env': 14.2.35
       '@vercel/functions': 1.6.0
@@ -4705,14 +4705,14 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.30.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.32.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.18)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.58(zod@4.3.6)
       nitro: 3.0.260610-beta(@vercel/blob@2.8.0)(chokidar@4.0.0)(dotenv@16.6.1)(lru-cache@11.5.2)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       undici: 8.9.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
-      braintrust: 3.30.0(zod@4.3.6)
+      braintrust: 3.32.0(zod@4.3.6)
       just-bash: 3.4.2
       microsandbox: 0.6.18
     transitivePeerDependencies:
