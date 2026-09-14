@@ -33,6 +33,15 @@ QUALIFICATION_SCHEMA = "symphony-provider-qualification/v1"
 GROK_PROVIDER = "grok"
 GROK_MODEL = "grok-4.6"
 PROVIDER_GRANT_ID = r"[A-Za-z0-9][A-Za-z0-9._:-]{7,127}"
+ADMISSION_FLEET_PATH = Path.home() / "gem-workspace/state/gem-priority-gate/latest.json"
+ADMISSION_CONCURRENCY_PATH = Path.home() / "gem-workspace/state/symphony-concurrency.json"
+ADMISSION_ATTESTATION_PATH = Path.home() / "gem-workspace/state/gem-service-attestation.json"
+ADMISSION_RUNTIME_URL = "http://127.0.0.1:4041/api/v1/state"
+ADMISSION_FLEET_SCHEMA = "jovie-fleet-gate/v1"
+ADMISSION_CONCURRENCY_SCHEMA = "symphony-concurrency/v1"
+ADMISSION_ATTESTATION_SCHEMA = "gem-service-attestation/v1"
+ADMISSION_MAX_AGE_SECONDS = 10 * 60
+ADMISSION_MAX_CLOCK_SKEW_SECONDS = 60
 MAX_PROVIDER_OUTPUT_BYTES = 128 * 1024
 MAX_QUALIFICATION_AGE_SECONDS = 10 * 60
 EXECUTION_EVIDENCE_SCHEMA = "symphony-existing-repair-evidence/v1"
@@ -283,6 +292,223 @@ def validate_provider_grant(payload, now=None):
     )
     return grant, executable
 
+
+class ExecutionAdmissionHeld(ValueError):
+    """Current Summer admission is held or cannot be independently observed."""
+
+
+def _admission_object(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _admission_semantic_identity(value):
+    """Match Summer's source digest rule while excluding volatile timestamps."""
+    if isinstance(value, list):
+        return [_admission_semantic_identity(child) for child in value]
+    if isinstance(value, dict):
+        return {key: _admission_semantic_identity(child)
+                for key, child in value.items() if key != "observedAt"}
+    return value
+
+
+def _admission_digest(value):
+    return hashlib.sha256(json.dumps(
+        _admission_semantic_identity(value), sort_keys=True, separators=(",", ":")
+    ).encode()).hexdigest()
+
+
+def _read_admission_json(path):
+    """Read one bounded host projection; callers convert failures to UNKNOWN."""
+    path = Path(path)
+    with path.open("r", encoding="utf-8") as handle:
+        raw = handle.read(256 * 1024 + 1)
+    require(len(raw.encode("utf-8")) <= 256 * 1024, "admission-evidence-too-large")
+    value = json.loads(raw)
+    require(isinstance(value, dict), "admission-evidence-object-required")
+    return value
+
+
+def _admission_recent(value, now_epoch):
+    if not isinstance(value, str):
+        return False
+    try:
+        observed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if observed.tzinfo is None or observed.utcoffset() is None:
+            return False
+        age = now_epoch - observed.timestamp()
+        return -ADMISSION_MAX_CLOCK_SKEW_SECONDS <= age <= ADMISSION_MAX_AGE_SECONDS
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return False
+
+
+def _admission_conjunction(*values):
+    if any(value is False for value in values):
+        return False
+    return True if all(value is True for value in values) else None
+
+
+def _admission_state(value):
+    if value is True:
+        return "ALLOWED"
+    if value is False:
+        return "HELD"
+    return "UNKNOWN"
+
+
+def _admission_row(value, source, revision, valid, schema, reason):
+    state = _admission_state(value) if valid else "UNKNOWN"
+    return {
+        "state": state,
+        "sourceSchema": schema,
+        "observedAt": source.get("observedAt") if valid else None,
+        "sourceRevision": revision if valid else None,
+        "sourceDigest": _admission_digest(source) if valid else None,
+        "reason": reason if state != "UNKNOWN" else "source-evidence-unavailable",
+    }
+
+
+def read_current_execution_admission(now=None):
+    """Read the existing Summer admission projection without side effects.
+
+    This function intentionally consumes only the three host receipts already
+    used by Summer. It does not mint a grant, claim an assignment, inspect
+    capacity, or infer permission from a missing/partial receipt.
+    """
+    try:
+        current = time.time() if now is None else float(now)
+        require(math.isfinite(current), "admission-clock-invalid")
+    except (TypeError, ValueError):
+        current = float("nan")
+
+    try:
+        fleet = _read_admission_json(ADMISSION_FLEET_PATH)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        fleet = {}
+    try:
+        concurrency = _read_admission_json(ADMISSION_CONCURRENCY_PATH)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        concurrency = {}
+    try:
+        attestation = _read_admission_json(ADMISSION_ATTESTATION_PATH)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        attestation = {}
+
+    signals = _admission_object(fleet.get("signals"))
+    queue = _admission_object(signals.get("queue"))
+    main = _admission_object(signals.get("main"))
+    work = _admission_object(fleet.get("workAdmission"))
+    closure = _admission_object(fleet.get("closureAdmission"))
+    remediation = _admission_object(fleet.get("remediationAdmission"))
+    main_revision = main.get("sha") if isinstance(main.get("sha"), str) else None
+    fleet_valid = (
+        fleet.get("schema") == ADMISSION_FLEET_SCHEMA
+        and _admission_recent(fleet.get("observedAt"), current)
+        and queue.get("repository") == REPOS["JOV"]
+        and queue.get("status") == "known"
+        and queue.get("source") == "live"
+        and re.fullmatch(r"[0-9a-f]{40}", main_revision or "") is not None
+    )
+    new_work = _admission_conjunction(
+        work.get("allowed"), work.get("newImplementationAllowed"),
+        work.get("newIssueLeaseAllowed"), closure.get("newImplementationAllowed"),
+        closure.get("newIssueIntakeAllowed"),
+    )
+    owned_remediation = _admission_conjunction(
+        remediation.get("allowed"), remediation.get("localAllowed"),
+        closure.get("remediationContinues"),
+        True if remediation.get("authority") == "single-pr-writer-exact-head" else None,
+    )
+    # Gem's canonical fleet receipt binds the snapshot to signals.main.sha;
+    # there is no top-level fleet sourceRevision field. Keep malformed or
+    # missing main authority UNKNOWN instead of accepting a legacy shape.
+    fleet_revision = main_revision if fleet_valid else None
+
+    runtime = _admission_object(attestation.get("runtime"))
+    listener = _admission_object(attestation.get("listener"))
+    runtime_revision = attestation.get("sourceRevision")
+    attestation_valid = (
+        attestation.get("schema") == ADMISSION_ATTESTATION_SCHEMA
+        and _admission_recent(attestation.get("observedAt"), current)
+        and isinstance(runtime_revision, str)
+        and re.fullmatch(r"[0-9a-f]{40}", runtime_revision) is not None
+        and attestation.get("active") is True
+        and attestation.get("healthy") is True
+        and listener.get("port") == 4041
+        and listener.get("boundToService") is True
+        and isinstance(runtime.get("workflowPath"), str)
+        and bool(runtime["workflowPath"])
+    )
+    report = _admission_object(concurrency)
+    provenance = _admission_object(report.get("provenance"))
+    scope = _admission_object(report.get("resourceScope"))
+    report_valid = (
+        report.get("schema") == ADMISSION_CONCURRENCY_SCHEMA
+        and _admission_recent(report.get("observedAt"), current)
+        and _admission_recent(provenance.get("observedAt"), current)
+        and attestation_valid
+        and report.get("sourceRevision") == runtime_revision
+        and provenance.get("sourceRevision") == runtime_revision
+        and scope.get("repository") == REPOS["JOV"]
+        and scope.get("runtimeUrl") == ADMISSION_RUNTIME_URL
+        and scope.get("workflow") == runtime["workflowPath"]
+    )
+    provider = _admission_object(report.get("provider"))
+    downstream = _admission_object(report.get("downstream"))
+    admissions = {
+        "newImplementation": _admission_row(
+            new_work, fleet, fleet_revision, fleet_valid,
+            ADMISSION_FLEET_SCHEMA, "new-implementation-gate",
+        ),
+        "ownedRemediation": _admission_row(
+            owned_remediation, fleet, fleet_revision, fleet_valid,
+            ADMISSION_FLEET_SCHEMA, "single-pr-writer-exact-head-required",
+        ),
+        "push": _admission_row(
+            remediation.get("pushAllowed"), fleet, fleet_revision, fleet_valid,
+            ADMISSION_FLEET_SCHEMA, "independent-push-gate",
+        ),
+        "providerEligibility": _admission_row(
+            provider.get("eligible"), report, runtime_revision,
+            report_valid and provider.get("source") == "active-issue-authenticated-routes",
+            ADMISSION_CONCURRENCY_SCHEMA, "authenticated-provider-route-gate",
+        ),
+        "downstreamHealth": _admission_row(
+            downstream.get("healthy"), report, runtime_revision,
+            report_valid and downstream.get("repository") == REPOS["JOV"],
+            ADMISSION_CONCURRENCY_SCHEMA, "downstream-health-observation",
+        ),
+    }
+    required = ("ownedRemediation", "push", "providerEligibility", "downstreamHealth")
+    failed = next((name for name in required if admissions[name]["state"] != "ALLOWED"), None)
+    if failed is None:
+        allowed, reason = True, "execution-admission-allowed"
+    else:
+        allowed = False
+        reason_name = {
+            "ownedRemediation": "owned-remediation",
+            "providerEligibility": "provider-eligibility",
+            "downstreamHealth": "downstream-health",
+        }.get(failed, failed)
+        reason = f"execution-admission-{reason_name}-{admissions[failed]['state'].lower()}"
+    return {
+        "schema": "jovie.eve.summer-admissions-projection/v1",
+        "repository": REPOS["JOV"],
+        "authorityScope": "observed-class-admission-task-acceptance-required",
+        "allowed": allowed,
+        "reason": reason,
+        **admissions,
+    }
+
+
+def _require_execution_admission(reader=None):
+    observation = (read_current_execution_admission() if reader is None else reader())
+    if not isinstance(observation, dict) or observation.get("allowed") is not True:
+        reason = observation.get("reason") if isinstance(observation, dict) else None
+        raise ExecutionAdmissionHeld(reason or "execution-admission-authority-unavailable")
+    required = ("ownedRemediation", "push", "providerEligibility", "downstreamHealth")
+    if any(_admission_object(observation.get(name)).get("state") != "ALLOWED" for name in required):
+        raise ExecutionAdmissionHeld("execution-admission-authority-unavailable")
+    return observation
 
 def load_validated_candidate(identifier, controller):
     """Read one complete, provider-qualified assignment without side effects."""

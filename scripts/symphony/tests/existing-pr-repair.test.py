@@ -46,7 +46,16 @@ class RepairTests(unittest.TestCase):
         self.root.mkdir(mode=0o700)
         self.leases = self.tmp / "leases"
         self.leases.mkdir()
+        self.admission = self.tmp / "admission"
+        self.admission.mkdir()
+        self.admission_paths = {
+            "ADMISSION_FLEET_PATH": self.admission / "fleet.json",
+            "ADMISSION_CONCURRENCY_PATH": self.admission / "concurrency.json",
+            "ADMISSION_ATTESTATION_PATH": self.admission / "attestation.json",
+        }
         for name, value in (("ROOT", self.root), ("LEASE_ROOT", self.leases), ("GUARD", SOURCE / "symphony-lease-guard")):
+            self.stack.enter_context(mock.patch.object(repair, name, value))
+        for name, value in self.admission_paths.items():
             self.stack.enter_context(mock.patch.object(repair, name, value))
         self.stack.enter_context(mock.patch.object(controller, "_repair_module", return_value=repair))
         self.stack.enter_context(mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "", "SYMPHONY_ISSUE_LEASE_FD": ""}))
@@ -226,6 +235,156 @@ class RepairTests(unittest.TestCase):
         self.assertIn("--disable-web-search", command)
         self.assertIn("--no-subagents", command)
         self.assertNotIn("OPENAI_API_KEY", runner.call_args.kwargs["env"])
+
+    def write_admission_receipts(self):
+        now = repair.time.time()
+        def timestamp(epoch):
+            return repair.datetime.fromtimestamp(epoch, repair.timezone.utc).isoformat().replace("+00:00", "Z")
+        runtime_revision = "c" * 40
+        fleet = {
+            "schema": repair.ADMISSION_FLEET_SCHEMA,
+            "sourceRevision": "d" * 40,
+            "observedAt": timestamp(now),
+            "signals": {
+                "main": {"sha": "f" * 40},
+                "queue": {
+                    "repository": "JovieInc/Jovie",
+                    "status": "known",
+                    "source": "live",
+                },
+            },
+            "workAdmission": {
+                "allowed": True, "newImplementationAllowed": True,
+                "newIssueLeaseAllowed": True,
+            },
+            "closureAdmission": {
+                "newImplementationAllowed": True,
+                "newIssueIntakeAllowed": True,
+                "remediationContinues": True,
+            },
+            "remediationAdmission": {
+                "allowed": True, "localAllowed": True, "pushAllowed": True,
+                "authority": "single-pr-writer-exact-head",
+            },
+        }
+        attestation = {
+            "schema": repair.ADMISSION_ATTESTATION_SCHEMA,
+            "sourceRevision": runtime_revision,
+            "observedAt": timestamp(now),
+            "active": True,
+            "healthy": True,
+            "listener": {"port": 4041, "boundToService": True},
+            "runtime": {"workflowPath": "/fixture/symphony-workflow.md",
+                        "generation": "e" * 64, "invocationId": "f" * 32},
+        }
+        concurrency = {
+            "schema": repair.ADMISSION_CONCURRENCY_SCHEMA,
+            "sourceRevision": runtime_revision,
+            "observedAt": timestamp(now),
+            "provenance": {"sourceRevision": runtime_revision, "observedAt": timestamp(now)},
+            "resourceScope": {
+                "repository": "JovieInc/Jovie",
+                "runtimeUrl": repair.ADMISSION_RUNTIME_URL,
+                "workflow": "/fixture/symphony-workflow.md",
+            },
+            "provider": {
+                "eligible": True,
+                "source": "active-issue-authenticated-routes",
+            },
+            "downstream": {"healthy": True, "repository": "JovieInc/Jovie"},
+        }
+        for name, value in (("ADMISSION_FLEET_PATH", fleet),
+                            ("ADMISSION_CONCURRENCY_PATH", concurrency),
+                            ("ADMISSION_ATTESTATION_PATH", attestation)):
+            self.admission_paths[name].write_text(json.dumps(value), encoding="utf-8")
+        return fleet, concurrency, attestation
+
+    def test_current_execution_admission_requires_each_independent_authority(self):
+        mutations = (
+            ("ownedRemediation", lambda fleet, _concurrency, _attestation: fleet["remediationAdmission"].update(allowed=False)),
+            ("push", lambda fleet, _concurrency, _attestation: fleet["remediationAdmission"].update(pushAllowed=False)),
+            ("providerEligibility", lambda _fleet, concurrency, _attestation: concurrency["provider"].update(eligible=False)),
+            ("downstreamHealth", lambda _fleet, concurrency, _attestation: concurrency["downstream"].update(healthy=False)),
+        )
+        for name, mutate in mutations:
+            with self.subTest(name=name):
+                fleet, concurrency, attestation = self.write_admission_receipts()
+                mutate(fleet, concurrency, attestation)
+                for path, value in ((self.admission_paths["ADMISSION_FLEET_PATH"], fleet),
+                                    (self.admission_paths["ADMISSION_CONCURRENCY_PATH"], concurrency),
+                                    (self.admission_paths["ADMISSION_ATTESTATION_PATH"], attestation)):
+                    path.write_text(json.dumps(value), encoding="utf-8")
+                observation = repair.read_current_execution_admission()
+                self.assertFalse(observation["allowed"])
+                self.assertEqual(observation[name]["state"], "HELD")
+
+    def test_current_execution_admission_rejects_stale_naive_and_cross_revision_evidence(self):
+        fleet, concurrency, attestation = self.write_admission_receipts()
+        now = repair.time.time()
+        stale = repair.datetime.fromtimestamp(
+            now - repair.ADMISSION_MAX_AGE_SECONDS - 1, repair.timezone.utc
+        ).isoformat().replace("+00:00", "Z")
+        fleet["observedAt"] = stale
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet), encoding="utf-8")
+        observation = repair.read_current_execution_admission(now=now)
+        self.assertEqual(observation["push"]["state"], "UNKNOWN")
+        self.assertFalse(observation["allowed"])
+
+        fleet, concurrency, attestation = self.write_admission_receipts()
+        concurrency["provenance"]["sourceRevision"] = "e" * 40
+        self.admission_paths["ADMISSION_CONCURRENCY_PATH"].write_text(json.dumps(concurrency), encoding="utf-8")
+        observation = repair.read_current_execution_admission(now=now)
+        self.assertEqual(observation["providerEligibility"]["state"], "UNKNOWN")
+        self.assertEqual(observation["downstreamHealth"]["state"], "UNKNOWN")
+
+        fleet, concurrency, attestation = self.write_admission_receipts()
+        attestation["observedAt"] = repair.datetime.fromtimestamp(
+            now, repair.timezone.utc
+        ).replace(tzinfo=None).isoformat()
+        self.admission_paths["ADMISSION_ATTESTATION_PATH"].write_text(json.dumps(attestation), encoding="utf-8")
+        observation = repair.read_current_execution_admission(now=now)
+        self.assertEqual(observation["providerEligibility"]["state"], "UNKNOWN")
+        self.assertFalse(observation["allowed"])
+
+    def test_current_execution_admission_uses_gem_main_sha_and_live_queue_shape(self):
+        fleet, _concurrency, _attestation = self.write_admission_receipts()
+        observation = repair.read_current_execution_admission()
+        self.assertEqual(observation["ownedRemediation"]["state"], "ALLOWED")
+        self.assertEqual(observation["ownedRemediation"]["sourceRevision"], "f" * 40)
+        fleet["sourceRevision"] = "a" * 40
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet), encoding="utf-8")
+        observation = repair.read_current_execution_admission()
+        self.assertEqual(observation["ownedRemediation"]["state"], "ALLOWED")
+        self.assertEqual(observation["ownedRemediation"]["sourceRevision"], "f" * 40)
+
+        for key, value in (("status", "unknown"), ("source", "cache")):
+            fleet, _concurrency, _attestation = self.write_admission_receipts()
+            fleet["signals"]["queue"][key] = value
+            self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet), encoding="utf-8")
+            observation = repair.read_current_execution_admission()
+            self.assertEqual(observation["ownedRemediation"]["state"], "UNKNOWN")
+            self.assertFalse(observation["allowed"])
+
+    def test_current_execution_admission_fail_closed_on_malformed_sources(self):
+        self.assertEqual(repair._admission_semantic_identity([{"observedAt": "volatile"}, 1]), [{}, 1])
+        self.assertFalse(repair._admission_recent(None, 0))
+        self.assertFalse(repair._admission_recent("not-a-time", 0))
+        self.assertEqual(repair._admission_state(None), "UNKNOWN")
+        for path in self.admission_paths.values():
+            if path.exists():
+                path.unlink()
+        observation = repair.read_current_execution_admission(now="invalid-clock")
+        self.assertFalse(observation["allowed"])
+        self.assertEqual(observation["push"]["state"], "UNKNOWN")
+        with self.assertRaisesRegex(repair.ExecutionAdmissionHeld, "held"):
+            repair._require_execution_admission(lambda: {"allowed": False, "reason": "held"})
+        with self.assertRaisesRegex(repair.ExecutionAdmissionHeld, "authority-unavailable"):
+            repair._require_execution_admission(lambda: {"allowed": True})
+        cleanup_target = self.root / "cleanup.json"
+        with mock.patch.object(os, "replace", side_effect=OSError("replace failed")), \
+             self.assertRaises(OSError):
+            repair._replace_private(cleanup_target, {"ok": True})
+        self.assertFalse(any(path.name.startswith(".cleanup.json.") for path in self.root.iterdir()))
 
     def test_discovery_excludes_claimed_and_terminal_assignments(self):
         _task, payload, _executable = self.provider_granted_fixture()
