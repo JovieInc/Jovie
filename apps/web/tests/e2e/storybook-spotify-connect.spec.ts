@@ -13,9 +13,10 @@ async function openStory(page: Page) {
   await expect(page.getByRole('dialog')).toBeVisible({ timeout: 60_000 });
 }
 async function attachEvidence(page: Page, testInfo: TestInfo, name: string) {
-  const screenshot = await page.screenshot({ animations: 'disabled' });
+  const path = testInfo.outputPath(name);
+  await page.screenshot({ animations: 'disabled', path });
   await testInfo.attach(name, {
-    body: screenshot,
+    path,
     contentType: 'image/png',
   });
 }
