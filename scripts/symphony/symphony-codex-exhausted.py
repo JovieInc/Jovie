@@ -1742,11 +1742,14 @@ _REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
 PRODUCT_FAILURE_TOMBSTONE_CONTEXT = "jovie-queue-product-failure/v1"
 
 
-def _pr_status_check_rollup(repo: str, number: int) -> list | None:
+def _pr_status_check_rollup(repo: str, number: int, *, expected_head: str | None = None) -> list | None:
     payload = _gh_json(
-        ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
+        ["gh", "pr", "view", str(number), "--repo", repo, "--json",
+         "headRefOid,statusCheckRollup" if expected_head is not None else "statusCheckRollup"]
     )
     if not isinstance(payload, dict):
+        return None
+    if expected_head is not None and payload.get("headRefOid") != expected_head:
         return None
     checks = payload.get("statusCheckRollup")
     return checks if isinstance(checks, list) else None
@@ -2217,7 +2220,10 @@ def _owned_repair_pr_inventory(task, repo):
     target_pr = target.get("pr") if isinstance(target, dict) else None
     if type(target_pr) is not int:
         return prs
-    checks = _pr_status_check_rollup(repo, target_pr)
+    matching = [pr for pr in prs if isinstance(pr, dict) and pr.get("number") == target_pr]
+    if len(matching) != 1 or not re.fullmatch(r"[a-f0-9]{40}", str(matching[0].get("headRefOid"))):
+        return prs
+    checks = _pr_status_check_rollup(repo, target_pr, expected_head=matching[0]["headRefOid"])
     if not isinstance(checks, list):
         return prs
     return [{**pr, "statusCheckRollup": checks}

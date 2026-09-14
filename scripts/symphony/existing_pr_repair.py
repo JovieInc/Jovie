@@ -1949,6 +1949,159 @@ def _git_head(workspace):
     return head
 
 
+def _record_isolated_result(task, payload, eligibility, acceptance, run_started, result,
+                            fetch_issue, fetch_prs):
+    """Resume host outcome observation without spending another provider turn."""
+    target = task["existingRepair"]
+    identifier = target["identifier"]
+    result_path = ROOT / f"{identifier}.execution.json"
+    run_path = _receipt_path(identifier, "run")
+    pending_path = _receipt_path(identifier, "pending-result")
+    run_id = acceptance["runId"]
+    provider_grant_digest = acceptance["providerGrantDigest"]
+    lease_digest = acceptance["leaseIdentity"]
+    result = json.loads(json.dumps(result))
+    require(isinstance(result, dict) and result.get("status") in ("succeeded", "failed"),
+            "isolated-repair-result-invalid")
+    if not os.path.lexists(pending_path):
+        exclusive_write(pending_path, {
+            "schema": "symphony-existing-repair-pending-result/v1",
+            "taskKey": task["taskKey"], "assignmentDigest": target["assignmentDigest"],
+            "runId": run_id, "result": result,
+            "acceptanceDigest": _digest(acceptance), "runDigest": _digest(run_started),
+        })
+    observation = result.pop("_executionObservation", {}) if isinstance(result, dict) else {}
+    base_head = observation.get("baseHead", payload["head"])
+    final_head = observation.get("finalHead", base_head)
+    require(re.fullmatch(r"[0-9a-f]{40}", base_head)
+            and re.fullmatch(r"[0-9a-f]{40}", final_head),
+            "isolated-repair-result-head-invalid")
+    output_digest = observation.get("outputDigest") or _digest({"runId": run_id})
+    require(re.fullmatch(r"[a-f0-9]{64}", output_digest), "isolated-repair-result-evidence-invalid")
+    expected_task_acceptance = task_acceptance_digest(task, target)
+    task_acceptance = observation.get("taskAcceptanceDigest") or expected_task_acceptance
+    require(re.fullmatch(r"[a-f0-9]{64}", task_acceptance),
+            "isolated-repair-task-acceptance-evidence-invalid")
+    task_accepted = (
+        observation.get("taskAccepted") is True
+        and task_acceptance == expected_task_acceptance
+    )
+    source_evaluation = _evaluate_source_bound_target(
+        task, payload, base_head, final_head, fetch_issue, fetch_prs,
+        task_accepted,
+    )
+    if result["status"] == "succeeded" and (not task_accepted or not source_evaluation["taskResolved"]):
+        if not task_accepted or final_head == base_head:
+            result.update(status="failed", detail="owned-repair-worker-outcome-unverified")
+        elif time.time() >= payload["expiresAt"]:
+            result.update(status="failed", detail="owned-repair-finalization-deadline-expired")
+        else:
+            return {"status": "held", "reason": (
+                "owned-repair-host-push-required" if source_evaluation["observedPrHead"] == base_head
+                else "owned-repair-exact-head-checks-pending"
+            )}
+    task_accepted = task_accepted and source_evaluation["taskResolved"]
+    run_terminal = {
+        **run_started,
+        "status": result["status"],
+        "completedAt": result.get("completedAt") or _iso_now(),
+        "baseHead": base_head,
+        "finalHead": final_head,
+        "outputDigest": output_digest,
+        "exitCode": observation.get("exitCode"),
+    }
+    run_digest = _digest(run_terminal)
+    verification = {
+        "schema": EXECUTION_EVIDENCE_SCHEMA,
+        "claimRecorded": True,
+        "acceptanceRecorded": True,
+        "runStarted": True,
+        "runTerminal": True,
+        "resultPersisted": True,
+        "leaseHeld": True,
+        "workspaceBound": True,
+        "headObserved": True,
+        "headChanged": final_head != base_head,
+        "taskAccepted": task_accepted,
+    }
+    execution = {
+        "runId": run_id,
+        "provider": eligibility["provider"],
+        "model": eligibility["model"],
+        "authPoolIdentity": eligibility["authPoolIdentity"],
+        "leaseIdentity": lease_digest,
+        "evidenceDigest": "0" * 64,
+        "assignmentDigest": target["assignmentDigest"],
+        "providerGrantDigest": provider_grant_digest,
+        "acceptanceDigest": _digest(acceptance),
+        "runDigest": run_digest,
+        "taskAcceptanceDigest": task_acceptance,
+        "baseHead": base_head,
+        "finalHead": final_head,
+        "outputDigest": output_digest,
+        "sourceEvaluation": source_evaluation,
+        "verification": verification,
+    }
+    execution["evidenceDigest"] = _execution_evidence_digest(execution)
+    result["completedAt"] = run_terminal["completedAt"]
+    result["detail"] = str(result.get("detail") or "isolated-repair-completed")[:240]
+    if result["status"] == "succeeded" and not task_accepted:
+        result["detail"] = "owned-repair-source-evaluation-unverified"
+    result["execution"] = execution
+    pending = read_private(pending_path)
+    pending["terminal"] = {"run": run_terminal, "result": result}
+    _replace_private(pending_path, pending)
+    _publish_isolated_terminal(task, pending, run_path, result_path)
+    return result
+
+
+def _publish_isolated_terminal(task, pending, run_path, result_path):
+    """Recover a crash between the two existing terminal receipt writes."""
+    terminal = pending["terminal"]
+    result, run = terminal["result"], terminal["run"]
+    execution = result["execution"]
+    require(execution["runDigest"] == _digest(run) and
+            execution["evidenceDigest"] == _execution_evidence_digest(execution) and
+            run["taskKey"] == task["taskKey"] and
+            run["assignmentDigest"] == task["existingRepair"]["assignmentDigest"] and
+            run["runId"] == pending["runId"], "isolated-repair-pending-terminal-cross-bound")
+    _replace_private(run_path, run)
+    exclusive_write(result_path, {"taskKey": task["taskKey"],
+                                  "assignmentDigest": task["existingRepair"]["assignmentDigest"],
+                                  "result": result})
+
+
+def _resume_isolated_result(task, payload, acceptance, run, fetch_issue, fetch_prs):
+    """Read-only reconciliation still uses the original issue lease."""
+    identifier = task["existingRepair"]["identifier"]
+    pending = read_private(_receipt_path(identifier, "pending-result"))
+    claim = read_private(ROOT / f"{identifier}.claim")
+    require(isinstance(pending, dict) and
+            pending.get("schema") == "symphony-existing-repair-pending-result/v1" and
+            pending.get("taskKey") == claim.get("taskKey") == task["taskKey"] and
+            pending.get("assignmentDigest") == task["existingRepair"]["assignmentDigest"] and
+            claim.get("task") == task and
+            pending.get("runId") == acceptance.get("runId") and
+            pending.get("acceptanceDigest") == _digest(acceptance) and
+            (pending.get("runDigest") == _digest(run) or
+             pending.get("terminal", {}).get("run") == run), "isolated-repair-pending-result-cross-bound")
+    fd = os.open(LEASE_ROOT / f"{identifier}.lock", os.O_RDWR | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(fd)
+        require(info.st_dev == payload["leaseIdentity"]["device"] and
+                info.st_ino == payload["leaseIdentity"]["inode"], "isolated-repair-resume-lease-changed")
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if "terminal" in pending:
+            _publish_isolated_terminal(task, pending, _receipt_path(identifier, "run"),
+                                       ROOT / f"{identifier}.execution.json")
+            return _read_correlated_terminal_result(
+                ROOT / f"{identifier}.execution.json", task, task["existingRepair"], payload)
+        return _record_isolated_result(task, payload, claim["eligibility"], acceptance, run,
+                                       pending["result"], fetch_issue, fetch_prs)
+    finally:
+        os.close(fd)
+
+
 def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None):
     """Run one signed, assigned repair under the shared issue lease.
 
@@ -1986,6 +2139,10 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
         acceptance = read_private(acceptance_path) if os.path.lexists(acceptance_path) else None
         run = read_private(run_path) if os.path.lexists(run_path) else None
         _claim_receipts_correlated(task, target, acceptance, run)
+        if os.path.lexists(_receipt_path(identifier, "pending-result")):
+            require(isinstance(acceptance, dict) and isinstance(run, dict),
+                    "isolated-repair-pending-receipts-missing")
+            return _resume_isolated_result(task, payload, acceptance, run, fetch_issue, fetch_prs)
         recovery = {
             "schema": "symphony-existing-repair-recovery/v1",
             "taskKey": task["taskKey"],
@@ -2125,79 +2282,10 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
                 # a later invocation records unknown recovery instead of
                 # rerunning after admission changes.
                 return {"status": "held", "reason": str(exc)}
-            require(isinstance(result, dict) and result.get("status") in ("succeeded", "failed"),
-                    "isolated-repair-result-invalid")
-            observation = result.pop("_executionObservation", {}) if isinstance(result, dict) else {}
-            base_head = observation.get("baseHead", payload["head"])
-            final_head = observation.get("finalHead", base_head)
-            require(re.fullmatch(r"[0-9a-f]{40}", base_head)
-                    and re.fullmatch(r"[0-9a-f]{40}", final_head),
-                    "isolated-repair-result-head-invalid")
-            output_digest = observation.get("outputDigest") or _digest({"runId": run_id})
-            require(re.fullmatch(r"[a-f0-9]{64}", output_digest), "isolated-repair-result-evidence-invalid")
-            expected_task_acceptance = task_acceptance_digest(task, target)
-            task_acceptance = observation.get("taskAcceptanceDigest") or expected_task_acceptance
-            require(re.fullmatch(r"[a-f0-9]{64}", task_acceptance),
-                    "isolated-repair-task-acceptance-evidence-invalid")
-            task_accepted = (
-                observation.get("taskAccepted") is True
-                and task_acceptance == expected_task_acceptance
+            return _record_isolated_result(
+                task, payload, eligibility, acceptance, run_started, result,
+                fetch_issue, fetch_prs,
             )
-            source_evaluation = _evaluate_source_bound_target(
-                task, payload, base_head, final_head, fetch_issue, fetch_prs,
-                task_accepted,
-            )
-            task_accepted = task_accepted and source_evaluation["taskResolved"]
-            run_terminal = {
-                **run_started,
-                "status": result["status"],
-                "completedAt": result.get("completedAt") or _iso_now(),
-                "baseHead": base_head,
-                "finalHead": final_head,
-                "outputDigest": output_digest,
-                "exitCode": observation.get("exitCode"),
-            }
-            run_digest = _digest(run_terminal)
-            verification = {
-                "schema": EXECUTION_EVIDENCE_SCHEMA,
-                "claimRecorded": True,
-                "acceptanceRecorded": True,
-                "runStarted": True,
-                "runTerminal": True,
-                "resultPersisted": True,
-                "leaseHeld": True,
-                "workspaceBound": True,
-                "headObserved": True,
-                "headChanged": final_head != base_head,
-                "taskAccepted": task_accepted,
-            }
-            execution = {
-                "runId": run_id,
-                "provider": eligibility["provider"],
-                "model": eligibility["model"],
-                "authPoolIdentity": eligibility["authPoolIdentity"],
-                "leaseIdentity": lease_digest,
-                "evidenceDigest": "0" * 64,
-                "assignmentDigest": target["assignmentDigest"],
-                "providerGrantDigest": provider_grant_digest,
-                "acceptanceDigest": _digest(acceptance),
-                "runDigest": run_digest,
-                "taskAcceptanceDigest": task_acceptance,
-                "baseHead": base_head,
-                "finalHead": final_head,
-                "outputDigest": output_digest,
-                "sourceEvaluation": source_evaluation,
-                "verification": verification,
-            }
-            execution["evidenceDigest"] = _execution_evidence_digest(execution)
-            result["completedAt"] = run_terminal["completedAt"]
-            result["detail"] = str(result.get("detail") or "isolated-repair-completed")[:240]
-            if result["status"] == "succeeded" and not task_accepted:
-                result["detail"] = "owned-repair-source-evaluation-unverified"
-            result["execution"] = execution
-            exclusive_write(result_path, {"taskKey": task["taskKey"], "assignmentDigest": target["assignmentDigest"], "result": result})
-            _replace_private(run_path, run_terminal)
-            return result
         finally:
             if original is None:
                 os.environ.pop("SYMPHONY_ISSUE_LEASE_FD", None)

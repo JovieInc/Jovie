@@ -34,6 +34,7 @@ def load(name, filename):
 
 repair = load("repair_under_test", "existing_pr_repair.py")
 controller = load("repair_controller", "symphony-codex-exhausted.py")
+REAL_STATUS_CHECK_READER = controller._pr_status_check_rollup
 guard = load("repair_guard", "symphony-lease-guard")
 IDENT = "JOV-5552"
 HEAD = "a" * 40
@@ -1524,6 +1525,31 @@ class RepairTests(unittest.TestCase):
         self.assertFalse((self.root / f"{IDENT}.claim").exists())
         executor.execute.assert_not_called()
 
+    def test_owned_status_read_rejects_head_change_between_inventory_and_checks(self):
+        self.stack.enter_context(mock.patch.object(controller, "_pr_status_check_rollup", REAL_STATUS_CHECK_READER))
+        task, _executor = self.isolated_fixture()
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        with mock.patch.object(controller, "_complete_open_prs", return_value=[self.pr]), \
+             mock.patch.object(controller, "_gh_json", return_value={
+                 "headRefOid": "b" * 40, "statusCheckRollup": checks,
+             }) as reader:
+            self.assertEqual(controller._owned_repair_pr_inventory(task, "JovieInc/Jovie"), [self.pr])
+            self.assertIn("headRefOid,statusCheckRollup", reader.call_args.args[0])
+            reader.return_value["headRefOid"] = self.pr["headRefOid"]
+            self.assertEqual(controller._owned_repair_pr_inventory(task, "JovieInc/Jovie")[0]["statusCheckRollup"], checks)
+        for rows in ([self.pr, self.pr], [{**self.pr, "headRefOid": None}]):
+            with mock.patch.object(controller, "_complete_open_prs", return_value=rows):
+                self.assertEqual(controller._owned_repair_pr_inventory(task, "JovieInc/Jovie"), rows)
+        with mock.patch.object(controller, "_complete_open_prs", return_value=None):
+            self.assertIsNone(controller._owned_repair_pr_inventory(task, "JovieInc/Jovie"))
+        with mock.patch.object(controller, "_complete_open_prs", return_value=[self.pr]):
+            self.assertEqual(controller._owned_repair_pr_inventory({}, "JovieInc/Jovie"), [self.pr])
+        for response in (None, {}, {"statusCheckRollup": []}):
+            with mock.patch.object(controller, "_gh_json", return_value=response):
+                expected = response.get("statusCheckRollup") if isinstance(response, dict) else None
+                self.assertEqual(controller._pr_status_check_rollup("JovieInc/Jovie", 1), expected)
+
     def test_isolated_repair_claims_once_under_real_shared_lease(self):
         task, executor = self.isolated_fixture()
         def execute(*args, lease_fd):
@@ -1570,7 +1596,7 @@ class RepairTests(unittest.TestCase):
         executor.execute.return_value["_executionObservation"]["taskAccepted"] = False
         result = self.run_isolated(task, executor)
         self.assertEqual((result["status"], result["execution"]["verification"]["headChanged"],
-                          result["execution"]["verification"]["taskAccepted"]), ("succeeded", True, False))
+                          result["execution"]["verification"]["taskAccepted"]), ("failed", True, False))
 
     def test_changed_head_with_worker_marker_but_unfixed_task_stays_unverified(self):
         task, payload, executable = self.provider_granted_fixture()
@@ -1585,21 +1611,107 @@ class RepairTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"SYMPHONY_ISSUE_LEASE_FD": "9"}), \
              mock.patch.object(repair, "_git_head", side_effect=[payload["head"], "b" * 40]):
             result = self.run_isolated(task, adapter, resolved=False, expected_final_head="b" * 40)
-        evaluation, verification = result["execution"]["sourceEvaluation"], result["execution"]["verification"]
-        self.assertEqual((result["status"], result["detail"], evaluation["workerAttested"],
-                          evaluation["taskResolved"], verification["taskAccepted"], evaluation["reason"]),
-                         ("succeeded", "owned-repair-source-evaluation-unverified", True, False, False,
-                          "task-check-unresolved"))
+        self.assertEqual(result, {"status": "held", "reason": "owned-repair-exact-head-checks-pending"})
+        self.assertFalse((self.root / f"{IDENT}.execution.json").exists())
 
     def test_clean_mergeable_changed_head_without_selected_check_stays_unverified(self):
         task, executor = self.isolated_fixture()
         result = self.run_isolated(task, executor, resolved=True, selected_check=False)
-        evaluation = result["execution"]["sourceEvaluation"]
-        verification = result["execution"]["verification"]
-        self.assertEqual((result["status"], result["detail"], evaluation["taskResolved"],
-                          verification["taskAccepted"], evaluation["reason"]),
-                         ("succeeded", "owned-repair-source-evaluation-unverified", False, False,
-                          "task-check-evidence-unavailable"))
+        self.assertEqual(result, {"status": "held", "reason": "owned-repair-exact-head-checks-pending"})
+        self.assertTrue((self.root / f"{IDENT}.pending-result.json").exists())
+        self.assertFalse((self.root / f"{IDENT}.execution.json").exists())
+
+    def resolved_pr(self, task, *, head="b" * 40):
+        return {**self.pr, "headRefOid": head, "mergeStateStatus": "CLEAN", "mergeable": "MERGEABLE",
+                "statusCheckRollup": [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                                       "status": "COMPLETED", "conclusion": "SUCCESS"}]}
+
+    def resume_pending(self, task, prs):
+        return repair.execute_isolated(task, controller.__file__, lambda _: self.issue, lambda _: prs)
+
+    def test_pending_result_resumes_exact_checks_without_a_second_provider_turn(self):
+        task, executor = self.isolated_fixture()
+        self.assertEqual(self.run_isolated(task, executor, selected_check=False)["status"], "held")
+        # An intervening new-work/push hold does not prevent read-only reconciliation.
+        fleet, _concurrency, _attestation = self.write_admission_receipts()
+        fleet["remediationAdmission"]["pushAllowed"] = False
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet))
+        result = self.resume_pending(task, [self.resolved_pr(task)])
+        self.assertEqual(result["status"], "succeeded")
+        self.assertTrue(result["execution"]["verification"]["taskAccepted"])
+        self.assertEqual(self.resume_pending(task, [self.resolved_pr(task)]), result)
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_pending_result_names_missing_push_and_never_accepts_stale_head_checks(self):
+        task, executor = self.isolated_fixture()
+        self.run_isolated(task, executor, selected_check=False)
+        result = self.resume_pending(task, [self.resolved_pr(task, head=task["existingRepair"]["head"])])
+        self.assertEqual(result, {"status": "held", "reason": "owned-repair-host-push-required"})
+        self.assertEqual(executor.execute.call_count, 1)
+        self.assertFalse((self.root / f"{IDENT}.execution.json").exists())
+
+    def test_pending_result_deadline_records_failure_without_rerunning(self):
+        task, executor = self.isolated_fixture()
+        self.run_isolated(task, executor, selected_check=False)
+        payload = repair.read_private(self.root / f"{IDENT}.json")
+        with mock.patch.object(repair.time, "time", return_value=payload["expiresAt"] + 1):
+            result = self.resume_pending(task, [self.pr])
+            self.assertEqual((result["status"], result["detail"]),
+                             ("failed", "owned-repair-finalization-deadline-expired"))
+            self.assertEqual(self.resume_pending(task, [self.pr]), result)
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_crash_after_worker_result_before_source_observation_recovers(self):
+        task, executor = self.isolated_fixture()
+        with mock.patch.object(repair, "_evaluate_source_bound_target", side_effect=OSError("missed event")):
+            with self.assertRaises(OSError):
+                self.run_isolated(task, executor)
+        self.assertTrue((self.root / f"{IDENT}.pending-result.json").exists())
+        self.assertEqual(self.resume_pending(task, [self.resolved_pr(task)])["status"], "succeeded")
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_crash_between_terminal_receipt_writes_recovers_without_new_observation(self):
+        task, executor = self.isolated_fixture()
+        original = repair.exclusive_write
+        def interrupted(path, payload):
+            if path.name == f"{IDENT}.execution.json":
+                raise OSError("simulated restart")
+            return original(path, payload)
+        with mock.patch.object(repair, "exclusive_write", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.run_isolated(task, executor)
+        # The exact successful observation is already durable; API outage does not erase it.
+        result = self.resume_pending(task, [])
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_pending_result_rejects_cross_bound_receipts(self):
+        task, executor = self.isolated_fixture()
+        self.run_isolated(task, executor, selected_check=False)
+        path = self.root / f"{IDENT}.pending-result.json"
+        original = repair.read_private(path)
+        for key in ("schema", "taskKey", "assignmentDigest", "runId", "acceptanceDigest", "runDigest"):
+            repair._replace_private(path, {**original, key: "crossed"})
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "pending-result-cross-bound"):
+                self.resume_pending(task, [self.resolved_pr(task)])
+        repair._replace_private(path, original)
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_pending_result_keeps_real_shared_lease_and_rejects_replaced_inode(self):
+        task, executor = self.isolated_fixture()
+        self.run_isolated(task, executor, selected_check=False)
+        path = self.leases / f"{IDENT}.lock"
+        with path.open("r") as held:
+            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaises(BlockingIOError):
+                self.resume_pending(task, [self.resolved_pr(task)])
+        replacement = path.with_suffix(".replacement")
+        replacement.write_text("")
+        replacement.replace(path)
+        with self.assertRaisesRegex(ValueError, "resume-lease-changed"):
+            self.resume_pending(task, [self.resolved_pr(task)])
+        self.assertEqual(executor.execute.call_count, 1)
+
 
     def test_execution_window_reserves_process_cleanup_time(self):
         task, payload, _executable = self.provider_granted_fixture()
