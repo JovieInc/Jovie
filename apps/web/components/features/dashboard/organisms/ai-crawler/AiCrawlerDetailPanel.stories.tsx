@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as React from 'react';
-import { queryKeys } from '@/lib/queries/keys';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 import { AiCrawlerDetailPanel } from './AiCrawlerDetailPanel';
 
@@ -55,21 +54,13 @@ const teaserAnalytics: AiCrawlerAnalyticsResponse = {
   isTeaser: true,
 };
 
-function createStoryQueryClient(
-  data: AiCrawlerAnalyticsResponse | null,
-  loading: boolean
-) {
+function createStoryQueryClient() {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
       mutations: { retry: false },
     },
   });
-
-  if (!loading) {
-    client.setQueryData(queryKeys.dashboard.aiCrawlers(), data);
-  }
-
   return client;
 }
 
@@ -102,10 +93,7 @@ function AiCrawlerDetailStory({
   readonly data: AiCrawlerAnalyticsResponse | null;
   readonly loading?: boolean;
 }) {
-  const queryClient = React.useMemo(
-    () => createStoryQueryClient(data, loading),
-    [data, loading]
-  );
+  const queryClient = React.useMemo(() => createStoryQueryClient(), []);
   const [ready, setReady] = React.useState(false);
 
   React.useLayoutEffect(() => {
