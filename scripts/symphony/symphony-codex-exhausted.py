@@ -2207,6 +2207,23 @@ def repair_preflight_command(identifier, issue_revision):
     return 0
 
 
+def _owned_repair_pr_inventory(task, repo):
+    """Add the exact target's fresh status rows to the existing PR inventory."""
+    prs = _complete_open_prs(repo)
+    if not isinstance(prs, list):
+        return prs
+    target = task.get("existingRepair") if isinstance(task, dict) else None
+    target_pr = target.get("pr") if isinstance(target, dict) else None
+    if type(target_pr) is not int:
+        return prs
+    checks = _pr_status_check_rollup(repo, target_pr)
+    if not isinstance(checks, list):
+        return prs
+    return [{**pr, "statusCheckRollup": checks}
+            if isinstance(pr, dict) and pr.get("number") == target_pr else pr
+            for pr in prs]
+
+
 def owned_repair_command():
     """Signed consumer entry. No qualified live repair adapter is installed yet."""
     try:
@@ -2216,7 +2233,7 @@ def owned_repair_command():
         task = json.loads(raw)
         result = _repair_module().execute_isolated(task, __file__,
             lambda identifier: _fetch_single_issue(identifier),
-            lambda repo: _complete_open_prs(repo))
+            lambda repo: _owned_repair_pr_inventory(task, repo))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         result = {"status": "held", "reason": str(exc)}
     print(json.dumps(result, sort_keys=True))
