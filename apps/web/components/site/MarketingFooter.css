@@ -116,11 +116,11 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border: 1px solid var(--linear-border-subtle);
+  border: 1px solid var(--mf-hairline);
   border-radius: var(--radius-pill);
-  background: var(--linear-bg-button);
+  background: var(--color-bg-button);
   padding-inline: var(--space-3);
-  color: var(--linear-text-secondary);
+  color: var(--mf-text-secondary);
   font-size: 0.8125rem;
   font-weight: var(--font-weight-medium);
   line-height: 1;

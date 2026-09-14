@@ -1004,17 +1004,17 @@ html[data-profile-initial-mode]
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
   /* Light aliases keep shared marketing chrome on the same Noir Ion token
      family as the dark surface while the footer theme control is active. */
-  --noir-ion-text-strong: var(--linear-text-primary);
-  --noir-ion-text-primary: var(--linear-text-primary);
-  --noir-ion-text-secondary: var(--linear-text-secondary);
-  --noir-ion-text-muted: var(--linear-text-tertiary);
-  --noir-ion-text-tertiary: var(--linear-text-quaternary);
+  --noir-ion-text-strong: var(--color-text-primary-token);
+  --noir-ion-text-primary: var(--color-text-primary-token);
+  --noir-ion-text-secondary: var(--color-text-secondary-token);
+  --noir-ion-text-muted: var(--color-text-tertiary-token);
+  --noir-ion-text-tertiary: var(--color-text-quaternary-token);
   --noir-ion-text-disabled: var(--color-text-disabled-token);
-  --noir-ion-text-inverse: var(--linear-text-inverse);
-  --noir-ion-border-subtle: var(--linear-border-subtle);
-  --noir-ion-border-default: var(--linear-border-default);
-  --noir-ion-border-strong: var(--linear-border-strong);
-  --noir-ion-border-interactive: var(--linear-border-focus);
+  --noir-ion-text-inverse: var(--color-text-tooltip);
+  --noir-ion-border-subtle: var(--color-border-subtle);
+  --noir-ion-border-default: var(--color-border-default);
+  --noir-ion-border-strong: var(--color-border-strong);
+  --noir-ion-border-interactive: var(--color-border-focus);
 
   --app-shell-content-surface: var(--noir-ion-card);
 
