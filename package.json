@@ -29,7 +29,7 @@
       "vite": "6.4.3",
       "@lhci/cli>lighthouse": "13.4.1",
       "drizzle-orm": "0.45.2",
-      "jsdom": "26.1.0",
+      "jsdom": "30.0.1",
       "react": "19.2.8",
       "react-dom": "19.2.8",
       "@modelcontextprotocol/sdk": ">=1.26.0",
