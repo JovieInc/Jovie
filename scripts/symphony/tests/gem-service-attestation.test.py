@@ -349,6 +349,80 @@ class PublisherTests(unittest.TestCase):
         self.assertIn('not a git repository', rejected.stderr)
         self.assertEqual(rejected.stdout, '')
 
+    def test_failed_installer_restores_sources_and_previous_timer_activity(self):
+        for active, failure in ((a, f) for a in (True, False) for f in ("check", "publish", "timer-start")):
+            with self.subTest(timer_active=active, failure=failure), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                repo = root / 'repo'
+                base = repo / 'scripts/symphony'
+                (base / 'systemd').mkdir(parents=True)
+                names = ['emit_gem_service_attestation.py', 'symphony_proof_context.py',
+                         'gem_gate_contract.py', 'systemd/gem-service-attestation.service']
+                for name in names:
+                    (base / name).write_text('new fixture source\n')
+                env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+                env.update(HOME=str(root), GEM_SERVICE_ATTESTATION_VERIFY_ONLY='false', FAILURE=failure,
+                           GIT_CONFIG_COUNT='3', GIT_CONFIG_KEY_0='maintenance.auto', GIT_CONFIG_VALUE_0='false',
+                           GIT_CONFIG_KEY_1='gc.auto', GIT_CONFIG_VALUE_1='0',
+                           GIT_CONFIG_KEY_2='maintenance.autoDetach', GIT_CONFIG_VALUE_2='false')
+                subprocess.run(['git', 'init', '-q', str(repo)], env=env, check=True)
+                subprocess.run(['git', '-C', str(repo), 'add', '.'], env=env, check=True)
+                subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture', '-c',
+                                'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], env=env, check=True)
+                config = root / '.config/symphony'
+                config.mkdir(parents=True)
+                (config / 'runner-source.env').write_text(
+                    f'SYMPHONY_RELEASE_PROVENANCE={self.sidecar}\n'
+                    f'JOVIE_CONFIGURATION_SOURCE_ROOT={repo}\n'
+                    f'JOVIE_CONFIGURATION_SOURCE_REVISION={CONFIG}\n'
+                    'JOVIE_CONFIGURATION_PROFILE=governor-bounded\n')
+                targets = [root / 'gem-workspace/scripts' / name for name in
+                           ['emit-gem-service-attestation.py', 'symphony_proof_context.py', 'gem_gate_contract.py']]
+                targets.append(root / '.config/systemd/user/gem-service-attestation.service')
+                for target in targets:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text('original source\n')
+                    target.chmod(0o644)
+                targets[0].chmod(0o755)
+                timer = root / 'timer-active'
+                if active: timer.touch()
+                bins = root / 'bin'
+                bins.mkdir()
+                (bins / 'systemctl').write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$HOME/systemctl.log"
+case "$*" in
+  "--user is-active --quiet gem-service-attestation.timer") test -f "$HOME/timer-active" ;;
+  "--user is-active --quiet gem-service-attestation.service") exit 1 ;;
+  "--user stop gem-service-attestation.timer") rm -f "$HOME/timer-active" ;;
+  "--user start gem-service-attestation.timer")
+    touch "$HOME/timer-active"
+    if [ "$FAILURE" = timer-start ] && [ ! -f "$HOME/start-failed" ]; then
+      touch "$HOME/start-failed"; exit 2
+    fi ;;
+  "--user list-unit-files gem-service-attestation.timer") printf 'gem-service-attestation.timer enabled\\n' ;;
+  *) exit 0 ;;
+esac
+''')
+                (bins / 'python3').write_text('''#!/bin/sh
+case "$*" in
+  *--check*) [ "$FAILURE" != check ] || exit 2 ;;
+  *) [ "$FAILURE" != publish ] || exit 2 ;;
+esac
+exit 0
+''')
+                for path in bins.iterdir(): path.chmod(0o755)
+                env['PATH'] = str(bins) + os.pathsep + env['PATH']
+                result = subprocess.run(['bash', str(Path(E.__file__).with_name('install-gem-service-attestation.sh')),
+                                         str(repo)], env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(timer.exists(), active)
+                self.assertTrue(all(target.read_text() == 'original source\n' for target in targets))
+                self.assertEqual(targets[0].stat().st_mode & 0o777, 0o755)
+                calls = (root / 'systemctl.log').read_text()
+                self.assertIn('daemon-reload', calls)
+                self.assertNotIn('restart symphony', calls)
+                self.assertFalse((root / 'gem-workspace/state/gem-service-attestation.json').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

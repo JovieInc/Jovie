@@ -622,6 +622,81 @@ print("installed-publisher-observation-verified")
 
 
 class FleetControllerInstallerContractTests(unittest.TestCase):
+    def test_install_repairs_canonical_overwrite_under_existing_bounded_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            settings.write_text("JOVIE_CONFIGURATION_PROFILE=governor-bounded\n")
+            settings.chmod(0o600)
+            canonical = (fixture / "scripts/symphony/WORKFLOW.md").read_text()
+            paths["workflow"].write_text(canonical.replace("max_concurrent_agents: 8", "max_concurrent_agents: 1"))
+            process = self._install(fixture, env)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            expected = (fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md").read_text()
+            self.assertEqual(paths["workflow"].read_text(), expected.replace("max_concurrent_agents: 5", "max_concurrent_agents: 1"))
+
+    def test_upgrade_preserves_persisted_governor_profile_and_smaller_ceiling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            settings.write_text("JOVIE_CONFIGURATION_PROFILE=governor-bounded\n")
+            settings.chmod(0o600)
+            bounded = (fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md").read_text()
+            expected = bounded.replace("max_concurrent_agents: 5", "max_concurrent_agents: 1")
+            paths["workflow"].write_text(expected)
+            for _ in range(2):
+                process = self._install(fixture, env)
+                self.assertEqual(process.returncode, 0, process.stderr)
+                self.assertEqual(paths["workflow"].read_text(), expected)
+                receipt = next(json.loads(line) for line in process.stdout.splitlines() if line.startswith('{"'))
+                self.assertEqual(receipt["configurationProfile"], "governor-bounded")
+                self.assertEqual(receipt["workflow"]["installedMaxConcurrentAgents"], 1)
+                self.assertTrue(receipt["workflow"]["matches"])
+            # A later reviewed source upgrade retains the same operator scope.
+            source = fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md"
+            source.write_text(bounded + "\nReviewed fixture upgrade.\n")
+            subprocess.run(["git", "-C", str(fixture), "add", "."], check=True, env=_git_env())
+            subprocess.run(["git", "-C", str(fixture), "-c", "user.name=Fixture", "-c",
+                            "user.email=fixture@example.invalid", "commit", "-qm", "upgrade"], check=True, env=_git_env())
+            process = self._install(fixture, env)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual(paths["workflow"].read_text(), expected + "\nReviewed fixture upgrade.\n")
+            self.assertIn("command: /usr/bin/false", paths["workflow"].read_text())
+            self.assertIn("required_labels:", paths["workflow"].read_text())
+            self.assertIn("project_slug:", paths["workflow"].read_text())
+
+    def test_profile_conflict_unknown_duplicate_and_untrusted_file_fail_before_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            cases = [("governor-bounded", {"JOVIE_CONFIGURATION_PROFILE": "canonical"}, 0o600),
+                     ("unknown", {}, 0o600), ("governor-bounded", {}, 0o644),
+                     ("governor-bounded\nJOVIE_CONFIGURATION_PROFILE=canonical", {}, 0o600)]
+            for value, extra, mode in cases:
+                settings.write_text("JOVIE_CONFIGURATION_PROFILE=" + value + "\n")
+                settings.chmod(mode)
+                before = paths["workflow"].read_bytes()
+                process = self._install(fixture, {**env, **extra})
+                self.assertNotEqual(process.returncode, 0)
+                self.assertEqual(paths["workflow"].read_bytes(), before)
+                self.assertEqual(paths["gate"].read_text(), "old gate\n")
+
+    def test_bounded_profile_rejects_controller_ceiling_above_reviewed_maximum(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            settings = paths["workflow"].parent / "runner-source.env"
+            settings.write_text("JOVIE_CONFIGURATION_PROFILE=governor-bounded\n")
+            settings.chmod(0o600)
+            before = (fixture / "scripts/symphony/profiles/governor-bounded/WORKFLOW.md").read_text()
+            paths["workflow"].write_text(before)
+            process = self._install(fixture, env, workflow_overlay="128")
+            self.assertNotEqual(process.returncode, 0)
+            self.assertEqual(paths["workflow"].read_text(), before)
+
     def test_fixture_git_runs_without_detached_maintenance(self):
         env = _git_env()
 
