@@ -786,7 +786,7 @@ export function ProfileCompactSurface({
                           className='h-3.5 w-3.5 shrink-0 text-white/58'
                           aria-hidden='true'
                         />
-                        <span className='min-w-0 max-w-full whitespace-normal [overflow-wrap:anywhere] md:truncate md:whitespace-nowrap md:[overflow-wrap:normal]'>
+                        <span className='min-w-0 max-w-full whitespace-normal [overflow-wrap:anywhere] md:truncate md:whitespace-nowrap md:wrap-normal'>
                           {locationLabel}
                         </span>
                       </>
