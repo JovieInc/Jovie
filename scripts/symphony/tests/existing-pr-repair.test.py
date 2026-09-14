@@ -10,11 +10,15 @@ import io
 import json
 import os
 from pathlib import Path
+import socket
+import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
+import signal
 from unittest import mock
 
 SOURCE = Path(__file__).resolve().parents[1]
@@ -36,6 +40,14 @@ HEAD = "a" * 40
 ISSUE_ID = "d1d9b064-5264-4907-a3ca-f599eb75b9de"
 OWNER = "01a0818b-6e1b-7573-a2b1-a7ad52ea8328"
 REVISION = "2026-09-08T12:00:00Z"
+
+
+def _accept_once(listener):
+    try:
+        connection, _address = listener.accept()
+        connection.close()
+    except OSError:
+        pass
 
 
 class RepairTests(unittest.TestCase):
@@ -158,6 +170,7 @@ class RepairTests(unittest.TestCase):
 
         return repair.execute_isolated(task, controller.__file__, lambda _: self.issue,
                                        fetch_prs, executor=executor)
+
 
     def write_admission_receipts(self):
         now = repair.time.time()
@@ -485,7 +498,506 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(replay, first)
         self.assertEqual(executor.execute.call_count, 1)
 
-    @unittest.skipUnless(os.name == "posix", "requires process sessions")
+
+
+    def test_grok_sandbox_mounts_only_the_workspace_cli_and_auth_state(self):
+        _task, payload, executable = self.provider_granted_fixture()
+        mcp_config = Path(payload["workspace"]) / ".mcp.json"
+        mcp_config.write_text('{"mcpServers":{"leak":{"command":"cat"}}}', encoding="utf-8")
+        workspace_secret = Path(payload["workspace"]) / ".env.local"
+        workspace_secret.write_text("company-secret", encoding="utf-8")
+        workspace_socket_path = Path(payload["workspace"]) / "company.sock"
+        workspace_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        workspace_socket.bind(str(workspace_socket_path))
+        workspace_socket.listen(1)
+        with mock.patch.object(repair, "_bwrap_executable", return_value=Path("/usr/bin/bwrap")), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_local_host_addresses",
+                               return_value=[(socket.AF_INET, "10.0.0.5")]), \
+             mock.patch.dict(os.environ, {
+                 "OPENAI_API_KEY": "secret",
+                 "SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY": "secret",
+                 "SYMPHONY_ASSIGNMENT_PATH": "/host/assignment.json",
+                 "GEM_SERVICE_ATTESTATION_PATH": "/host/attestation.json",
+             }):
+            command, child_env = repair._sandboxed_grok_command(
+                [str(executable), "--probe"], payload, payload["providerGrant"], executable
+            )
+        mounts = []
+        for index, value in enumerate(command[:-2]):
+            if value in ("--bind", "--ro-bind"):
+                mounts.append((value, command[index + 1], command[index + 2]))
+        workspace = str(Path(payload["workspace"]).resolve())
+        auth = str(Path(payload["providerGrant"]["authStatePath"]).resolve())
+        executable_path = str(executable.resolve())
+        resolver_path = str((SOURCE / repair.SANDBOX_RESOLV_CONF_NAME).resolve())
+        self.assertIn(("--bind", workspace, workspace), mounts)
+        self.assertIn(("--ro-bind", auth, auth), mounts)
+        self.assertIn(("--ro-bind", executable_path, executable_path), mounts)
+        self.assertIn(("--ro-bind", resolver_path, "/etc/resolv.conf"), mounts)
+        self.assertIn(("--ro-bind", "/dev/null", str(mcp_config)), mounts)
+        self.assertIn(("--ro-bind", "/dev/null", str(workspace_secret)), mounts)
+        self.assertIn(("--ro-bind", "/dev/null", str(workspace_socket_path)), mounts)
+        self.assertNotIn(("--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf"), mounts)
+        self.assertNotIn(("--bind", str(Path.home()), str(Path.home())), mounts)
+        self.assertNotIn(("--ro-bind", str(Path.home()), str(Path.home())), mounts)
+        self.assertEqual(child_env["HOME"], str(Path.home().resolve()))
+        self.assertEqual(child_env["GIT_CONFIG_GLOBAL"], "/dev/null")
+        for secret in ("OPENAI_API_KEY", "SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY",
+                       "SYMPHONY_ASSIGNMENT_PATH", "GEM_SERVICE_ATTESTATION_PATH"):
+            self.assertNotIn(secret, child_env)
+        for flag in ("--tmpfs", "--clearenv", "--unshare-all", "--share-net", "--chdir",
+                     "--property=IPAddressDeny=127.0.0.0/8", "--property=IPAddressDeny=::1/128"):
+            self.assertIn(flag, command)
+        workspace_socket.close()
+        workspace_socket_path.unlink()
+
+    def test_host_containment_helpers_require_root_owned_tools_and_effective_network_deny(self):
+        original_platform = sys.platform
+        with mock.patch.object(repair.sys, "platform", "darwin"):
+            self.assertIsNone(repair._bwrap_executable())
+            self.assertIsNone(repair._systemd_executable((Path("/missing"),)))
+            self.assertIsNone(repair._systemctl_executable())
+        self.assertEqual(sys.platform, original_platform)
+
+        first = Path("/bwrap-insecure")
+        second = Path("/bwrap-missing")
+        third = Path("/bwrap-root-owned")
+        stats = {
+            first: mock.Mock(st_mode=stat.S_IFREG | 0o770, st_uid=0),
+            third: mock.Mock(st_mode=stat.S_IFREG | 0o700, st_uid=0),
+        }
+
+        def lstat(path):
+            if path == second:
+                raise OSError("missing")
+            return stats[path]
+
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "BWRAP_PATHS", (first, second, third)), \
+             mock.patch.object(Path, "lstat", autospec=True, side_effect=lambda path: lstat(path)), \
+             mock.patch.object(repair.os, "access", return_value=True):
+            self.assertEqual(repair._bwrap_executable(), third)
+            self.assertEqual(repair._systemd_executable((first, second, third)), third)
+            with mock.patch.object(repair, "BWRAP_PATHS", (first, second)):
+                self.assertIsNone(repair._bwrap_executable())
+
+        # On Linux the fixed boundary's first failure mode is the
+        # system-manager tool check, not the darwin platform guard.
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_local_host_addresses",
+                               return_value=[(socket.AF_INET, "10.0.0.5")]), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=None):
+            with self.assertRaisesRegex(ValueError,
+                                        "linux-systemd-system-boundary-unavailable"):
+                repair._systemd_network_sandbox_command(["/bin/true"])
+
+        with mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_local_host_addresses",
+                               return_value=[(socket.AF_INET, "10.0.0.5")]):
+            wrapped = repair._systemd_network_sandbox_command(["/bin/true"])
+        self.assertEqual(wrapped[-2:], ["--", "/bin/true"])
+        self.assertIn("--property=IPAddressDeny=127.0.0.0/8", wrapped)
+        self.assertIn("--system", wrapped)
+        self.assertNotIn("--user", wrapped)
+        self.assertNotIn("--scope", wrapped)
+        self.assertNotIn("--property=ProtectSystem=strict", wrapped)
+
+    def test_linux_host_address_inventory_uses_all_interface_addresses(self):
+        ip = Path("/usr/sbin/ip")
+        inventory = json.dumps([
+            {"ifname": "lo", "addr_info": [{"local": "127.0.0.1"}, {"local": "::1"}]},
+            {"ifname": "eth0", "addr_info": [
+                {"local": "192.168.12.116"}, {"local": "fe80::1%eth0"},
+                {"local": "ff02::1"}, {"local": "::"},
+            ]},
+            {"ifname": "tailscale0", "addr_info": [
+                {"local": "100.105.87.117"}, {"local": "fd7a:115c:a1e0::cc32:5778"},
+            ]},
+        ])
+        result = subprocess.CompletedProcess([], 0, stdout=inventory)
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_ip_executable", return_value=ip), \
+             mock.patch.object(repair.subprocess, "run", return_value=result) as run:
+            self.assertEqual(repair._local_host_addresses(), (
+                (socket.AF_INET, "100.105.87.117"),
+                (socket.AF_INET, "192.168.12.116"),
+                (socket.AF_INET6, "fd7a:115c:a1e0::cc32:5778"),
+                (socket.AF_INET6, "fe80::1"),
+            ))
+        self.assertEqual(run.call_args.args[0], [str(ip), "-j", "addr", "show"])
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_ip_executable", return_value=ip), \
+             mock.patch.object(repair.subprocess, "run",
+                               return_value=subprocess.CompletedProcess([], 1, stdout="[]")):
+            self.assertEqual(repair._linux_local_host_addresses(), ())
+
+    def test_systemd_service_command_and_cleanup_are_fixed_and_exact(self):
+        unit = "symphony-existing-repair-1234-deadbeef"
+        with mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")):
+            command = repair._systemd_service_command(
+                ["/usr/bin/bwrap", "--version"], ["127.0.0.0/8", "192.168.12.116/32"],
+                unit=unit, runtime_seconds=2.5,
+            )
+            self.assertEqual(command[:4], ["/usr/bin/sudo", "-n", "/usr/bin/systemd-run", "--system"])
+            self.assertIn("--wait", command)
+            self.assertIn("--pipe", command)
+            self.assertIn("--uid=" + str(os.getuid()), command)
+            self.assertIn("--gid=" + str(os.getgid()), command)
+            self.assertIn("--property=RuntimeMaxSec=2.500s", command)
+            self.assertIn("--property=IPAddressDeny=127.0.0.0/8", command)
+            self.assertIn("--property=CapabilityBoundingSet=", command)
+            self.assertNotIn("--user", command)
+            self.assertIsNone(repair._systemd_unit_from_command(["--unit=arbitrary.service"]))
+            self.assertIsNone(repair._systemd_cleanup_callback(
+                ["/usr/bin/sudo", "-n", "/usr/bin/other", "--system", f"--unit={unit}"]
+            ))
+            callback = repair._systemd_cleanup_callback(command)
+        self.assertEqual(repair._systemd_unit_from_command(command), unit)
+        with mock.patch.object(repair, "_stop_systemd_unit") as stop:
+            callback()
+        stop.assert_called_once_with(unit)
+        with self.assertRaisesRegex(ValueError, "linux-network-deny-entry-invalid"):
+            with mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+                 mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")):
+                repair._systemd_service_command(["/bin/true"], ["not-an-ip"], unit=unit)
+        with self.assertRaisesRegex(ValueError, "systemd-service-runtime-invalid"):
+            with mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+                 mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")):
+                repair._systemd_service_command(["/bin/true"], [], unit=unit, runtime_seconds=0)
+        with mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair, "_systemctl_executable", return_value=Path("/usr/bin/systemctl")), \
+             mock.patch.object(repair.subprocess, "run", side_effect=[
+                 subprocess.CompletedProcess([], 5), subprocess.CompletedProcess([], 4),
+                 subprocess.CompletedProcess([], 0, stdout="")
+             ]) as run:
+            repair._stop_systemd_unit(unit)
+        self.assertEqual(run.call_args_list[1].args[0], ["/usr/bin/sudo", "-n", "/usr/bin/systemctl",
+                                                         "--system", "--quiet", "is-active", unit])
+        self.assertEqual(run.call_args_list[0].args[0], ["/usr/bin/sudo", "-n", "/usr/bin/systemctl",
+                                                         "--system", "stop", unit])
+        self.assertEqual(run.call_args_list[2].args[0], ["/usr/bin/sudo", "-n", "/usr/bin/systemctl",
+                                                         "--system", "--quiet", "show", "--property=ControlGroup",
+                                                         "--value", unit])
+        with mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair, "_systemctl_executable", return_value=Path("/usr/bin/systemctl")), \
+             mock.patch.object(repair.subprocess, "run",
+                               return_value=subprocess.CompletedProcess([], 1)):
+            with self.assertRaisesRegex(ValueError, "linux-systemd-cleanup-failed"):
+                repair._stop_systemd_unit(unit)
+
+        # A failed stop command remains a cleanup failure; the exact command
+        # above contains no unsupported --wait flag to hide the launcher error.
+
+    def test_systemd_cleanup_requires_inactive_unit_and_empty_cgroup(self):
+        unit = "symphony-existing-repair-1234-deadbeef"
+
+        def cleanup(*results):
+            with mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+                 mock.patch.object(repair, "_systemctl_executable", return_value=Path("/usr/bin/systemctl")), \
+                 mock.patch.object(repair.subprocess, "run", side_effect=results) as run:
+                repair._stop_systemd_unit(unit)
+                return run
+
+        with self.assertRaisesRegex(ValueError, "linux-systemd-cleanup-still-active"):
+            cleanup(subprocess.CompletedProcess([], 0), subprocess.CompletedProcess([], 0))
+        with self.assertRaisesRegex(ValueError, "linux-systemd-cleanup-state-unavailable"):
+            cleanup(subprocess.CompletedProcess([], 0), subprocess.CompletedProcess([], 2))
+        with self.assertRaisesRegex(ValueError, "linux-systemd-cleanup-cgroup-not-empty"):
+            cleanup(subprocess.CompletedProcess([], 0), subprocess.CompletedProcess([], 3),
+                    subprocess.CompletedProcess([], 0, stdout="/repair.scope\n"))
+
+        cleanup(subprocess.CompletedProcess([], 0), subprocess.CompletedProcess([], 3),
+                subprocess.CompletedProcess([], 0, stdout=""),
+                subprocess.CompletedProcess([], 0, stdout="failed\n"))
+        with self.assertRaisesRegex(ValueError, "linux-systemd-cleanup-still-active"):
+            cleanup(subprocess.CompletedProcess([], 0), subprocess.CompletedProcess([], 3),
+                    subprocess.CompletedProcess([], 0, stdout=""),
+                    subprocess.CompletedProcess([], 0, stdout="activating\n"))
+
+    def test_systemd_network_sandbox_fails_on_address_inventory_churn_and_probe_errors(self):
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_local_host_addresses", side_effect=[
+                 [(socket.AF_INET, "192.168.12.116")], [(socket.AF_INET, "192.168.12.117")]
+             ]), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")):
+            with self.assertRaisesRegex(ValueError, "linux-local-network-addresses-changed"):
+                repair._systemd_network_sandbox_command(["/bin/true"])
+
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_local_host_addresses", return_value=[]), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")):
+            with self.assertRaisesRegex(ValueError, "linux-local-network-addresses-unavailable"):
+                repair._systemd_network_sandbox_command(["/bin/true"])
+
+        addresses = [(socket.AF_INET, "192.168.12.116")]
+        completed = subprocess.CompletedProcess([], 1)
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_local_host_addresses", side_effect=[addresses, addresses]), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair, "_stop_systemd_unit") as stop, \
+             mock.patch.object(repair.subprocess, "run", side_effect=OSError("systemd unavailable")):
+            self.assertFalse(repair._systemd_network_boundary_available())
+        self.assertTrue(stop.called)
+
+    def test_network_boundary_probe_rejects_unavailable_and_ineffective_filters(self):
+        executable = Path("/usr/bin/systemd-run")
+        systemctl = Path("/usr/bin/systemctl")
+        completed = lambda code: subprocess.CompletedProcess([], code)
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=executable), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair.subprocess, "run", return_value=completed(1)):
+            self.assertFalse(repair._systemd_network_boundary_available())
+
+        def simulated_systemd(denied_code, connect_denied):
+            def run(command, **_kwargs):
+                if command[0] == str(systemctl):
+                    if "is-active" in command:
+                        return completed(4)
+                    if "show" in command:
+                        return subprocess.CompletedProcess(command, 0, stdout="")
+                    return completed(0)
+                denied = any("IPAddressDeny=" in value for value in command)
+                if not denied or connect_denied:
+                    with socket.create_connection((command[-2], int(command[-1])), timeout=1):
+                        pass
+                return completed(denied_code if denied else 0)
+            return run
+
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=executable), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair, "_local_host_addresses",
+                               return_value=[(socket.AF_INET, "127.0.0.1")]), \
+             mock.patch.object(repair.subprocess, "run", side_effect=simulated_systemd(1, False)):
+            self.assertTrue(repair._systemd_network_boundary_available())
+
+        # A manager can accept IPAddressDeny while still allowing the connection;
+        # that result is an unsupported boundary and must hold execution.
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=executable), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair, "_local_host_addresses",
+                               return_value=[(socket.AF_INET, "127.0.0.1")]), \
+             mock.patch.object(repair.subprocess, "run", side_effect=simulated_systemd(0, True)):
+            self.assertFalse(repair._systemd_network_boundary_available())
+
+    def test_network_and_workspace_safety_helpers_fail_closed_on_unproven_shapes(self):
+        addresses = [
+            (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("127.0.0.1", 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("10.0.0.5", 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("10.0.0.5", 0)),
+            (socket.AF_INET6, socket.SOCK_STREAM, 0, "", ("::1", 0, 0, 0)),
+            (socket.AF_INET6, socket.SOCK_STREAM, 0, "", ("fe80::1%en0", 0, 0, 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("not-an-address", 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("224.0.0.1", 0)),
+        ]
+        with mock.patch.object(repair.sys, "platform", "darwin"), \
+             mock.patch.object(repair.socket, "getaddrinfo", return_value=addresses), \
+             mock.patch.object(repair.socket, "gethostname", return_value="gem-host"):
+            self.assertEqual(repair._local_host_addresses(), ((socket.AF_INET, "10.0.0.5"),))
+        with mock.patch.object(repair.sys, "platform", "darwin"), \
+             mock.patch.object(repair.socket, "getaddrinfo", side_effect=OSError("unavailable")):
+            self.assertEqual(repair._local_host_addresses(), ())
+        self.assertIn("10.0.0.5/32", repair._network_deny_entries("10.0.0.5"))
+        self.assertIn("2001:db8::1/128", repair._network_deny_entries("2001:db8::1"))
+        with mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair, "_local_host_addresses",
+                               return_value=[(socket.AF_INET, "10.0.0.5")]):
+            command = repair._systemd_network_sandbox_command(["/bin/true"])
+        self.assertIn("--property=IPAddressDeny=10.0.0.5/32", command)
+
+        with mock.patch.object(repair.os, "scandir", side_effect=OSError("unavailable")):
+            with self.assertRaisesRegex(ValueError, "sandbox-workspace-scan-unavailable"):
+                repair._sandbox_workspace_private_paths(self.workspace)
+        with mock.patch.object(repair, "SANDBOX_WORKSPACE_SCAN_LIMIT", 0):
+            with self.assertRaisesRegex(ValueError, "sandbox-workspace-scan-limit"):
+                repair._sandbox_workspace_private_paths(self.workspace)
+        with mock.patch.object(repair, "_read_admission_json", side_effect=OSError("unavailable")):
+            self.assertIsNone(repair._task_admission_runtime_binding(time.time()))
+
+    def test_workspace_scan_rejects_entry_failures_and_walks_unskipped_directories(self):
+        nested = self.workspace / "source" / "nested"
+        nested.mkdir(parents=True)
+        (nested / ".env.local").write_text("secret", encoding="utf-8")
+        (self.workspace / "node_modules").mkdir()
+        (self.workspace / "node_modules" / ".env.local").write_text("ignored", encoding="utf-8")
+        private = repair._sandbox_workspace_private_paths(self.workspace)
+        self.assertIn(nested / ".env.local", private)
+        self.assertNotIn(self.workspace / "node_modules" / ".env.local", private)
+
+        entry = mock.Mock(path=str(self.workspace / "broken"), name="broken")
+        entry.stat.side_effect = OSError("entry disappeared")
+        with mock.patch.object(repair.os, "scandir", return_value=(entry,)):
+            with self.assertRaisesRegex(ValueError, "sandbox-workspace-entry-unavailable"):
+                repair._sandbox_workspace_private_paths(self.workspace)
+
+    def test_selected_task_evidence_requires_one_successful_exact_check(self):
+        task, _payload, _executable = self.provider_granted_fixture()
+        handle = task["selected"]["handle"]
+        check = {"__typename": "CheckRun", "name": handle,
+                 "status": "COMPLETED", "conclusion": "SUCCESS"}
+        evidence = repair._selected_check_evidence(
+            task, {"statusCheckRollup": [check]}
+        )
+        self.assertEqual(evidence["check"], handle)
+        context = {"__typename": "StatusContext", "context": handle, "state": "SUCCESS"}
+        self.assertEqual(repair._selected_check_evidence(
+            task, {"statusCheckRollup": [context]}
+        )["result"], "SUCCESS")
+        for rows in (
+            [{"__typename": "CheckRun", "name": handle,
+              "status": "COMPLETED", "conclusion": "FAILURE"}],
+            [{"__typename": "Other", "name": handle}],
+            [check, check],
+        ):
+            with self.subTest(rows=rows):
+                self.assertIsNone(repair._selected_check_evidence(
+                    task, {"statusCheckRollup": rows}
+                ))
+
+    def test_source_evaluation_preserves_unavailable_observation_and_unknown_check(self):
+        task, payload, _executable = self.provider_granted_fixture()
+        failing = lambda _identifier: (_ for _ in ()).throw(OSError("tracker unavailable"))
+        evaluation = repair._evaluate_source_bound_target(
+            task, payload, HEAD, "b" * 40, failing, lambda _repo: [], True
+        )
+        self.assertEqual(evaluation["reason"], "target-observation-unavailable")
+        self.assertEqual(evaluation["taskResolved"], False)
+        self.assertEqual(evaluation["digest"], repair._source_evaluation_digest(evaluation))
+
+    def test_sandbox_fails_closed_when_required_system_path_is_unavailable(self):
+        _task, payload, executable = self.provider_granted_fixture()
+        with mock.patch.object(repair, "_bwrap_executable", return_value=Path("/usr/bin/bwrap")), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_root_owned_system_path", return_value=None):
+            with self.assertRaisesRegex(ValueError, "sandbox-system-path-unavailable:/usr"):
+                repair._sandboxed_grok_command([str(executable)], payload,
+                                               payload["providerGrant"], executable)
+
+    def test_sandbox_requires_controller_owned_resolver_config(self):
+        _task, payload, executable = self.provider_granted_fixture()
+        with mock.patch.object(repair, "_bwrap_executable", return_value=Path("/usr/bin/bwrap")), \
+             mock.patch.object(repair, "_systemd_run_executable", return_value=Path("/usr/bin/systemd-run")), \
+             mock.patch.object(repair, "_sudo_executable", return_value=Path("/usr/bin/sudo")), \
+             mock.patch.object(repair.sys, "platform", "linux"), \
+             mock.patch.object(repair, "_local_host_addresses",
+                               return_value=[(socket.AF_INET, "10.0.0.5")]), \
+             mock.patch.object(repair, "_sandbox_resolver_path",
+                               side_effect=repair.ExecutionSandboxUnavailable("resolver missing")):
+            with self.assertRaisesRegex(ValueError, "resolver missing"):
+                repair._sandboxed_grok_command(
+                    [str(executable)], payload, payload["providerGrant"], executable
+                )
+
+    def test_live_execution_holds_without_maintained_sandbox_before_claim(self):
+        task, _payload, _executable = self.provider_granted_fixture()
+        self.write_admission_receipts()
+        with mock.patch.object(repair, "_bwrap_executable", return_value=None), \
+             mock.patch.object(repair, "_systemd_network_boundary_available", return_value=True):
+            result = self.run_isolated(task)
+        self.assertEqual(result["status"], "held")
+        self.assertIn("linux-bwrap-unavailable", result["reason"])
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux mount namespace")
+    def test_linux_sandbox_hides_host_files_but_keeps_exact_auth_and_workspace(self):
+        if repair._bwrap_executable() is None:
+            self.skipTest("root-owned bwrap is unavailable")
+        if not repair._systemd_network_boundary_available():
+            self.skipTest("systemd loopback boundary is unavailable")
+        self.stack.enter_context(mock.patch.dict(os.environ, {
+            "SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY": "private-fixture",
+        }))
+        _task, payload, executable = self.provider_granted_fixture()
+        outside_secret = self.tmp / "outside-secret"
+        outside_marker = self.tmp / "outside-marker"
+        workspace_probe = self.workspace / "sandbox-probe.txt"
+        mcp_config = self.workspace / ".mcp.json"
+        mcp_config.write_text('{"mcpServers":{"leak":"company-secret"}}', encoding="utf-8")
+        workspace_secret = self.workspace / ".env.local"
+        workspace_secret.write_text("company-secret", encoding="utf-8")
+        workspace_socket_path = self.workspace / "company.sock"
+        workspace_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        workspace_socket.bind(str(workspace_socket_path))
+        workspace_socket.listen(1)
+        protected = [self.tmp / name for name in ("signing.key", "assignment.json", "attestation.json")]
+        for path in protected:
+            path.write_text("company-secret", encoding="utf-8")
+        unix_socket_path = self.tmp / "company.sock"
+        unix_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        unix_socket.bind(str(unix_socket_path))
+        unix_socket.listen(1)
+        local_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        local_listener.bind(("127.0.0.1", 0))
+        local_listener.listen(1)
+        local_listener.settimeout(2)
+        local_port = local_listener.getsockname()[1]
+        accept_thread = threading.Thread(target=lambda: _accept_once(local_listener), daemon=True)
+        accept_thread.start()
+        outside_secret.write_text("company-secret", encoding="utf-8")
+        probe = self.tmp / "probe-cli"
+        probe.write_text(
+            "#!/bin/sh\n"
+            "secret=$1; marker=$2; result=$3; auth=$4; signing=$5; assignment=$6; attestation=$7; socket_path=$8; workspace_secret=$9; workspace_socket=${10}; port=${11}\n"
+            "if test -f \"$secret\"; then printf visible > \"$result\"; else printf hidden > \"$result\"; fi\n"
+            "if cat \"$auth\" >/dev/null 2>&1; then printf auth >> \"$result\"; fi\n"
+            "if grep -q company-secret .mcp.json 2>/dev/null; then printf mcpvisible >> \"$result\"; else printf mcpblocked >> \"$result\"; fi\n"
+            "for path in \"$signing\" \"$assignment\" \"$attestation\" \"$socket_path\"; do if test -e \"$path\"; then printf visible >> \"$result\"; else printf hidden >> \"$result\"; fi; done\n"
+            "if grep -q company-secret \"$workspace_secret\" 2>/dev/null; then printf visible >> \"$result\"; else printf hidden >> \"$result\"; fi\n"
+            "if test -S \"$workspace_socket\"; then printf visible >> \"$result\"; else printf hidden >> \"$result\"; fi\n"
+            "if python3 - \"$port\" <<'PY' >/dev/null 2>&1\n"
+            "import socket, sys\n"
+            "with socket.create_connection(('127.0.0.1', int(sys.argv[1])), timeout=1): pass\n"
+            "PY\n"
+            "then printf localvisible >> \"$result\"; else printf localblocked >> \"$result\"; fi\n"
+            "python3 - <<'PY' || exit 1\n"
+            "import os, stat\n"
+            "assert os.statvfs('/proc').f_flag & os.ST_RDONLY\n"
+            "assert 'SUMMER_BOTTLENECK_SIGNING_PRIVATE_KEY' not in os.environ\n"
+            "for path in ('/proc/kcore', '/proc/kallsyms', '/proc/kmsg'):\n"
+            "    assert stat.S_ISCHR(os.stat(path).st_mode)\n"
+            "    assert os.stat(path).st_rdev == os.stat('/dev/null').st_rdev\n"
+            "PY\n"
+            "printf procrestricted >> \"$result\"\n"
+            "touch \"$marker\"\n",
+            encoding="utf-8",
+        )
+        probe.chmod(0o700)
+        command, child_env = repair._sandboxed_grok_command(
+            [str(probe), str(outside_secret), str(outside_marker), str(workspace_probe),
+             payload["providerGrant"]["authStatePath"], *map(str, protected), str(unix_socket_path),
+             str(workspace_secret), str(workspace_socket_path), str(local_port)],
+            payload, payload["providerGrant"], probe,
+        )
+        try:
+            result = repair._run_bounded(
+                command, cwd=str(self.workspace), env=child_env, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5, pass_fds=(),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                workspace_probe.read_text(encoding="utf-8"),
+                "hiddenauthmcpblockedhiddenhiddenhiddenhiddenhiddenhiddenlocalblockedprocrestricted",
+            )
+            self.assertFalse(outside_marker.exists())
+        finally:
+            local_listener.close()
+            unix_socket.close()
+            workspace_socket.close()
+            accept_thread.join(timeout=3)
+
     def test_bounded_runner_stops_descendants_without_touching_unrelated_session(self):
         with tempfile.TemporaryDirectory() as directory:
             descendant_path = Path(directory) / "descendant.pid"
@@ -497,7 +1009,7 @@ class RepairTests(unittest.TestCase):
             try:
                 with self.assertRaises(subprocess.TimeoutExpired):
                     repair._run_bounded([sys.executable, "-c", child], stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE, text=True, timeout=0.1)
+                                        stderr=subprocess.PIPE, text=True, timeout=0.5)
                 self.assertIsNone(unrelated.poll())
                 deadline = time.monotonic() + 2
                 while time.monotonic() < deadline and not descendant_path.exists():
@@ -540,6 +1052,226 @@ class RepairTests(unittest.TestCase):
                 time.sleep(0.02)
             with self.assertRaises(ProcessLookupError):
                 os.kill(descendant_pid, 0)
+
+    @unittest.skipUnless(os.name == "posix", "requires process sessions")
+    def test_bounded_runner_stops_exact_service_when_launcher_exits_early(self):
+        with tempfile.TemporaryDirectory() as directory:
+            descendant_path = Path(directory) / "service-descendant.pid"
+            stopped_path = Path(directory) / "service-stopped"
+            child = ("import os,pathlib,time; c=os.fork(); "
+                     f"p=pathlib.Path({str(descendant_path)!r}); "
+                     "(p.write_text(str(os.getpid())),time.sleep(10)) if c==0 else os._exit(7)")
+
+            def stop_service():
+                stopped_path.write_text("stopped", encoding="utf-8")
+
+            with mock.patch.object(repair, "_systemd_cleanup_callback", return_value=stop_service):
+                result = repair._run_bounded(
+                    [sys.executable, "-c", child], stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, text=True, timeout=2,
+                )
+            self.assertEqual(result.returncode, 7)
+            self.assertEqual(stopped_path.read_text(encoding="utf-8"), "stopped")
+            deadline = time.monotonic() + 2
+            while time.monotonic() < deadline and not descendant_path.exists():
+                time.sleep(0.02)
+            self.assertTrue(descendant_path.is_file())
+            # SIGKILL delivery to an orphaned descendant is immediate, but
+            # reaping is asynchronous: the killed process lingers as a zombie
+            # until its reaper (init on the runner) collects it, and
+            # os.kill(pid, 0) keeps succeeding until then. Mirror the
+            # descendants_without_touching test and poll for the reaped state
+            # instead of asserting it instantaneously.
+            while time.monotonic() < deadline:
+                try:
+                    os.kill(int(descendant_path.read_text()), 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.02)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(descendant_path.read_text()), 0)
+
+    def test_bounded_runner_drains_large_stdout_and_stderr_with_bounded_capture(self):
+        child = ("import sys; data='x'*262144; sys.stdout.write(data); sys.stdout.flush(); "
+                 "sys.stderr.write(data); sys.stderr.flush()")
+        result = repair._run_bounded([sys.executable, "-c", child],
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     text=True, timeout=5)
+        self.assertEqual(result.returncode, 0)
+        self.assertGreater(len(result.stdout.encode()), repair.MAX_PROVIDER_OUTPUT_BYTES)
+        self.assertGreater(len(result.stderr.encode()), repair.MAX_PROVIDER_OUTPUT_BYTES)
+        self.assertLessEqual(len(result.stdout.encode()), repair.MAX_PROVIDER_OUTPUT_BYTES + 4)
+        self.assertLessEqual(len(result.stderr.encode()), repair.MAX_PROVIDER_OUTPUT_BYTES + 4)
+
+    def test_bounded_runner_supports_binary_and_uncaptured_streams(self):
+        binary = repair._run_bounded(
+            [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'ok')"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5
+        )
+        self.assertEqual(binary.returncode, 0)
+        self.assertEqual(binary.stdout, b"ok")
+        uncaptured = repair._run_bounded(
+            [sys.executable, "-c", "pass"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+        )
+        self.assertEqual(uncaptured.returncode, 0)
+        self.assertIsNone(uncaptured.stdout)
+        self.assertIsNone(uncaptured.stderr)
+
+    def test_bounded_runner_times_out_without_captured_streams(self):
+        with self.assertRaises(subprocess.TimeoutExpired):
+            repair._run_bounded(
+                [sys.executable, "-c", "import time; time.sleep(10)"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=0.2
+            )
+
+    def test_process_group_signal_falls_back_when_group_lookup_is_unavailable(self):
+        process = mock.Mock(pid=1234)
+        process.send_signal.side_effect = OSError("gone")
+        with mock.patch.object(repair.os, "getpgid", side_effect=OSError("gone")):
+            repair._signal_owned_process_group(process, signal.SIGTERM)
+        process.send_signal.assert_called_once_with(signal.SIGTERM)
+
+    def test_terminate_process_retains_leader_pid_when_group_lookup_fails(self):
+        process = mock.Mock(pid=1234)
+        process.poll.return_value = 0
+        with mock.patch.object(repair.os, "getpgid", side_effect=OSError("gone")), \
+             mock.patch.object(repair, "_signal_owned_process_group") as signal_group:
+            repair._terminate_owned_process(process)
+        self.assertEqual(signal_group.call_args_list, [
+            mock.call(process, signal.SIGTERM, 1234),
+            mock.call(process, signal.SIGKILL, 1234),
+        ])
+
+    def test_terminate_process_escalates_after_term_grace_expires(self):
+        process = mock.Mock(pid=1234)
+        process.wait.side_effect = [subprocess.TimeoutExpired("repair", 5)]
+        process.poll.return_value = 0
+        with mock.patch.object(repair, "_signal_owned_process_group") as signal_group:
+            repair._terminate_owned_process(process, 1234)
+        self.assertEqual(signal_group.call_args_list, [
+            mock.call(process, signal.SIGTERM, 1234),
+            mock.call(process, signal.SIGKILL, 1234),
+        ])
+        process.wait.assert_called_once_with(timeout=5)
+
+    def test_bounded_runner_terminates_when_selector_setup_fails(self):
+        with mock.patch.object(repair.selectors, "DefaultSelector",
+                               side_effect=RuntimeError("selector unavailable")), \
+             mock.patch.object(repair, "_terminate_owned_process",
+                               wraps=repair._terminate_owned_process) as terminate:
+            with self.assertRaisesRegex(RuntimeError, "selector unavailable"):
+                repair._run_bounded(
+                    [sys.executable, "-c", "import time; time.sleep(10)"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5
+                )
+        self.assertTrue(terminate.called)
+
+    def test_bounded_runner_terminates_when_selector_drain_fails(self):
+        class BrokenSelector:
+            def __init__(self):
+                self.fds = []
+
+            def register(self, fd, _events, _name):
+                self.fds.append(fd)
+                if len(self.fds) == 1:
+                    raise RuntimeError("selector register unavailable")
+
+            def unregister(self, _fd):
+                pass
+
+            def close(self):
+                pass
+
+        with mock.patch.object(repair.selectors, "DefaultSelector", return_value=BrokenSelector()), \
+             mock.patch.object(repair, "_terminate_owned_process",
+                               wraps=repair._terminate_owned_process) as terminate:
+            with self.assertRaisesRegex(RuntimeError, "selector register unavailable"):
+                repair._run_bounded(
+                    [sys.executable, "-c", "import time; time.sleep(10)"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5
+                )
+        self.assertTrue(terminate.called)
+
+    def test_bounded_runner_terminates_when_selector_select_fails(self):
+        class BrokenSelector:
+            def register(self, _fd, _events, _name):
+                pass
+
+            def select(self, _timeout):
+                raise RuntimeError("selector select unavailable")
+
+            def unregister(self, _fd):
+                pass
+
+            def close(self):
+                pass
+
+        with mock.patch.object(repair.selectors, "DefaultSelector", return_value=BrokenSelector()), \
+             mock.patch.object(repair, "_terminate_owned_process",
+                               wraps=repair._terminate_owned_process) as terminate:
+            with self.assertRaisesRegex(RuntimeError, "selector select unavailable"):
+                repair._run_bounded(
+                    [sys.executable, "-c", "import time; time.sleep(10)"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5
+                )
+        self.assertTrue(terminate.called)
+
+    def test_bounded_runner_preserves_drain_failure_when_cleanup_fails(self):
+        original_cleanup = repair._terminate_owned_process
+
+        def cleanup_then_fail(process, pgid):
+            original_cleanup(process, pgid)
+            raise OSError("cleanup unavailable")
+
+        with mock.patch.object(repair.selectors, "DefaultSelector",
+                               side_effect=RuntimeError("selector unavailable")), \
+             mock.patch.object(repair, "_terminate_owned_process",
+                               side_effect=cleanup_then_fail):
+            with self.assertRaisesRegex(RuntimeError, "selector unavailable") as raised:
+                repair._run_bounded(
+                    [sys.executable, "-c", "pass"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5
+                )
+        self.assertIsInstance(raised.exception.__cause__, OSError)
+        self.assertEqual(str(raised.exception.__cause__), "cleanup unavailable")
+
+    def test_bounded_runner_terminates_when_selector_read_fails(self):
+        class BrokenSelector:
+            def __init__(self):
+                self.fd = None
+                self.name = None
+
+            def register(self, fd, _events, name):
+                self.fd, self.name = fd, name
+
+            def select(self, _timeout):
+                return [(mock.Mock(fd=self.fd, data=self.name), 1)]
+
+            def unregister(self, _fd):
+                pass
+
+            def close(self):
+                pass
+
+        selector = BrokenSelector()
+        original_read = repair.os.read
+
+        def fail_selected_pipe(fd, length):
+            if fd == selector.fd:
+                raise OSError("pipe unavailable")
+            return original_read(fd, length)
+
+        with mock.patch.object(repair.selectors, "DefaultSelector", return_value=selector), \
+             mock.patch.object(repair.os, "read", side_effect=fail_selected_pipe), \
+             mock.patch.object(repair, "_terminate_owned_process",
+                               wraps=repair._terminate_owned_process) as terminate:
+            with self.assertRaisesRegex(OSError, "pipe unavailable"):
+                repair._run_bounded(
+                    [sys.executable, "-c", "import time; time.sleep(10)"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5
+                )
+        self.assertTrue(terminate.called)
 
     def test_observer_binds_exact_target_and_keeps_provider_unknown_without_quota_source(self):
         task, payload, _executable = self.provider_granted_fixture()

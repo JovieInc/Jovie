@@ -9,11 +9,14 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import importlib.util
+import ipaddress
 import json
 import math
 import os
 from pathlib import Path
 import re
+import selectors
+import socket
 import stat
 import signal
 import subprocess
@@ -70,6 +73,58 @@ CHILD_ENV_ALLOWLIST = frozenset((
     "HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TMP", "TEMP",
     "TERM", "NO_COLOR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME",
 ))
+BWRAP_PATHS = (Path("/usr/bin/bwrap"), Path("/bin/bwrap"))
+SYSTEMD_RUN_PATHS = (Path("/usr/bin/systemd-run"), Path("/bin/systemd-run"))
+SYSTEMCTL_PATHS = (Path("/usr/bin/systemctl"), Path("/bin/systemctl"))
+SUDO_PATHS = (Path("/usr/bin/sudo"), Path("/bin/sudo"))
+IP_PATHS = (Path("/usr/sbin/ip"), Path("/sbin/ip"), Path("/usr/bin/ip"), Path("/bin/ip"))
+SANDBOX_SYSTEM_DIRECTORIES = ("/usr", "/bin", "/sbin", "/lib", "/lib64", "/usr/local")
+SANDBOX_SYSTEM_FILES = (
+    "/etc/ssl", "/etc/hosts", "/etc/nsswitch.conf",
+    "/etc/passwd", "/etc/group",
+)
+SANDBOX_RESOLV_CONF_NAME = "symphony-existing-repair-resolv.conf"
+SANDBOX_RESOLV_CONF_CONTENT = (
+    "# Controller-owned provider resolver; no host-local fallback.\n"
+    "nameserver 1.1.1.1\n"
+    "nameserver 1.0.0.1\n"
+    "options timeout:2 attempts:1\n"
+).encode("ascii")
+SANDBOX_MCP_PATHS = (".mcp.json", ".cursor/mcp.json")
+SANDBOX_SENSITIVE_FILENAMES = frozenset((
+    ".npmrc", ".netrc", ".git-credentials", "credentials.json",
+    "service-account.json", "service-account-key.json", "secrets.json",
+))
+SANDBOX_SENSITIVE_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
+SANDBOX_WORKSPACE_SCAN_LIMIT = 20000
+SANDBOX_NETWORK_DENY_ENTRIES = (
+    "127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12",
+    "192.168.0.0/16", "169.254.0.0/16", "100.64.0.0/10", "fc00::/7",
+    "fe80::/10",
+)
+SANDBOX_REQUIRED_SYSTEM_PATHS = frozenset(("/usr", "/etc/ssl"))
+SYSTEMD_UNIT_PATTERN = re.compile(
+    r"^symphony-existing-repair(?:-net)?-[0-9]+-[a-f0-9]{8}$"
+)
+# Host proc submounts from ProtectKernelTunables/ProtectKernelLogs prevent
+# unprivileged bwrap from mounting its private PID namespace's proc filesystem.
+# The child instead gets read-only proc with sensitive kernel files masked;
+# the syscall filter still denies kernel-log access. The private tmpfs root
+# and exact system/workspace mounts remain the filesystem boundary.
+SYSTEMD_BOUNDARY_PROPERTIES = (
+    "--property=Type=exec",
+    "--property=KillMode=control-group",
+    "--property=TimeoutStopSec=1s",
+    "--property=NoNewPrivileges=yes",
+    "--property=CapabilityBoundingSet=",
+    "--property=AmbientCapabilities=",
+    "--property=PrivateTmp=yes",
+    "--property=PrivateDevices=yes",
+    "--property=ProtectControlGroups=yes",
+    "--property=ProtectKernelModules=yes",
+    "--property=SystemCallFilter=~syslog",
+    "--property=RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6",
+)
 # This is an authorization-policy binding, not a provider model identifier.
 # The owner must explicitly attest the Fable 5.1 last-resort exception while
 # leaving the router-selected model opaque to this repair contract.
@@ -83,6 +138,10 @@ def require(condition, reason):
 
 class ExecutionAdmissionHeld(ValueError):
     """Current Summer admission is held or cannot be independently observed."""
+
+
+class ExecutionSandboxUnavailable(ValueError):
+    """The maintained host sandbox cannot provide the required boundary."""
 
 
 def private_directory():
@@ -831,6 +890,7 @@ def observe_task_admissions(identifier, controller, *, selected_id,
         # serialize exception text from authenticated helpers into a receipt.
         return None
 
+
 def load_validated_candidate(identifier, controller):
     """Read one complete, provider-qualified assignment without side effects."""
     payload = load_isolated(identifier, controller)
@@ -863,6 +923,490 @@ def _task_acceptance_attested(output, expected_digest):
 
 def _bounded_child_environment():
     return {key: value for key, value in os.environ.items() if key in CHILD_ENV_ALLOWLIST}
+
+
+def _bwrap_executable():
+    """Find the root-owned Linux bwrap supplied by the host."""
+    if not sys.platform.startswith("linux"):
+        return None
+    for candidate in BWRAP_PATHS:
+        try:
+            info = candidate.lstat()
+            if (stat.S_ISREG(info.st_mode) and info.st_uid == 0
+                    and not (stat.S_IMODE(info.st_mode) & 0o022)
+                    and os.access(candidate, os.X_OK)):
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
+def _systemd_executable(paths):
+    if not sys.platform.startswith("linux"):
+        return None
+    for candidate in paths:
+        try:
+            info = candidate.lstat()
+            if (stat.S_ISREG(info.st_mode) and info.st_uid == 0
+                    and not (stat.S_IMODE(info.st_mode) & 0o022)
+                    and os.access(candidate, os.X_OK)):
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
+def _systemd_run_executable():
+    return _systemd_executable(SYSTEMD_RUN_PATHS)
+
+
+def _systemctl_executable():
+    return _systemd_executable(SYSTEMCTL_PATHS)
+
+
+def _sudo_executable():
+    return _systemd_executable(SUDO_PATHS)
+
+
+def _ip_executable():
+    return _systemd_executable(IP_PATHS)
+
+
+def _linux_local_host_addresses():
+    """Read every current interface address through the root-owned ip tool."""
+    ip = _ip_executable()
+    if ip is None:
+        return ()
+    try:
+        result = subprocess.run(
+            [str(ip), "-j", "addr", "show"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            check=False, timeout=2, text=True,
+        )
+        if result.returncode != 0 or not isinstance(result.stdout, str):
+            return ()
+        interfaces = json.loads(result.stdout)
+    except (OSError, ValueError, TypeError, UnicodeError, subprocess.SubprocessError):
+        return ()
+    if not isinstance(interfaces, list):
+        return ()
+    addresses = set()
+    for interface in interfaces:
+        if not isinstance(interface, dict) or not isinstance(interface.get("addr_info"), list):
+            continue
+        for info in interface["addr_info"]:
+            if not isinstance(info, dict) or not isinstance(info.get("local"), str):
+                continue
+            value = info["local"].split("%", 1)[0]
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError:
+                continue
+            if address.is_loopback or address.is_unspecified or address.is_multicast:
+                continue
+            family = socket.AF_INET if address.version == 4 else socket.AF_INET6
+            addresses.add((family, str(address)))
+    return tuple(sorted(addresses, key=lambda item: (item[0], item[1])))
+
+
+def _local_host_addresses():
+    """Return current non-loopback interface addresses, without DNS names."""
+    if sys.platform.startswith("linux"):
+        return _linux_local_host_addresses()
+    addresses = []
+    seen = set()
+    try:
+        candidates = socket.getaddrinfo(socket.gethostname(), None, 0, socket.SOCK_STREAM)
+    except OSError:
+        return ()
+    for family, _socktype, _protocol, _canonname, sockaddr in candidates:
+        if family not in (socket.AF_INET, socket.AF_INET6) or not sockaddr:
+            continue
+        host = sockaddr[0]
+        if not isinstance(host, str) or "%" in host:
+            continue
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            continue
+        if address.is_loopback or address.is_unspecified or address.is_multicast:
+            continue
+        key = (family, host)
+        if key not in seen:
+            seen.add(key)
+            addresses.append(key)
+    return tuple(addresses)
+
+
+def _network_deny_entries(host=None):
+    entries = list(SANDBOX_NETWORK_DENY_ENTRIES)
+    if host is not None:
+        address = ipaddress.ip_address(host)
+        entries.append(f"{address}/{32 if address.version == 4 else 128}")
+    return tuple(entries)
+
+
+def _systemd_unit_name(prefix):
+    unit = f"{prefix}{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    require(SYSTEMD_UNIT_PATTERN.fullmatch(unit) is not None,
+            "systemd-unit-name-invalid")
+    return unit
+
+
+def _systemd_unit_from_command(command):
+    units = [value.removeprefix("--unit=") for value in command
+             if isinstance(value, str) and value.startswith("--unit=")]
+    if len(units) != 1 or SYSTEMD_UNIT_PATTERN.fullmatch(units[0]) is None:
+        return None
+    return units[0]
+
+
+def _systemd_service_command(command, deny_entries, *, unit, runtime_seconds=None):
+    """Build the fixed unprivileged system-manager boundary.
+
+    The only privileged operation here is starting/stopping this exact,
+    controller-generated service. Service properties are fixed in source and
+    the child identity is always the invoking non-root operator.
+    """
+    sudo = _sudo_executable()
+    systemd_run = _systemd_run_executable()
+    if sudo is None or systemd_run is None:
+        raise ExecutionSandboxUnavailable("linux-systemd-system-boundary-unavailable")
+    require(isinstance(command, (list, tuple)) and command
+            and all(isinstance(value, str) and value for value in command),
+            "systemd-service-command-invalid")
+    require(SYSTEMD_UNIT_PATTERN.fullmatch(unit) is not None,
+            "systemd-unit-name-invalid")
+    require(os.getuid() != 0 and os.getgid() != 0,
+            "systemd-service-unprivileged-user-required")
+    for entry in deny_entries:
+        try:
+            ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            raise ExecutionSandboxUnavailable("linux-network-deny-entry-invalid")
+    wrapped = [
+        str(sudo), "-n", str(systemd_run), "--system", "--quiet", "--collect",
+        "--wait", "--pipe", f"--unit={unit}",
+        f"--uid={os.getuid()}", f"--gid={os.getgid()}",
+        *SYSTEMD_BOUNDARY_PROPERTIES,
+    ]
+    if runtime_seconds is not None:
+        require(type(runtime_seconds) in (int, float)
+                and math.isfinite(runtime_seconds) and runtime_seconds > 0,
+                "systemd-service-runtime-invalid")
+        wrapped.append(f"--property=RuntimeMaxSec={runtime_seconds:.3f}s")
+    wrapped.extend(f"--property=IPAddressDeny={entry}" for entry in dict.fromkeys(deny_entries))
+    wrapped.extend(("--", *command))
+    return wrapped
+
+
+def _stop_systemd_unit(unit):
+    """Stop only the exact worker unit recorded in a generated command."""
+    if SYSTEMD_UNIT_PATTERN.fullmatch(unit or "") is None:
+        raise ExecutionSandboxUnavailable("systemd-unit-name-invalid")
+    sudo = _sudo_executable()
+    systemctl = _systemctl_executable()
+    if sudo is None or systemctl is None:
+        raise ExecutionSandboxUnavailable("linux-systemd-cleanup-unavailable")
+    result = subprocess.run(
+        [str(sudo), "-n", str(systemctl), "--system", "stop", unit],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        check=False, timeout=2,
+    )
+    # systemctl stop is synchronous by default; --wait is valid for start and
+    # restart only and turns an otherwise terminal cleanup into a false error.
+    if result.returncode not in (0, 5):
+        raise ExecutionSandboxUnavailable("linux-systemd-cleanup-failed")
+    status = subprocess.run(
+        [str(sudo), "-n", str(systemctl), "--system", "--quiet", "is-active", unit],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        check=False, timeout=2,
+    )
+    if status.returncode == 0:
+        raise ExecutionSandboxUnavailable("linux-systemd-cleanup-still-active")
+    if status.returncode not in (1, 3, 4):
+        raise ExecutionSandboxUnavailable("linux-systemd-cleanup-state-unavailable")
+
+    cgroup = subprocess.run(
+        [str(sudo), "-n", str(systemctl), "--system", "--quiet", "show",
+         "--property=ControlGroup", "--value", unit],
+        capture_output=True, text=True, check=False, timeout=2,
+    )
+    if cgroup.returncode != 0 or cgroup.stdout.strip():
+        raise ExecutionSandboxUnavailable("linux-systemd-cleanup-cgroup-not-empty")
+    if status.returncode == 4:
+        # is-active=unknown plus an empty ControlGroup is the collected/absent
+        # unit proof. Do not accept an arbitrary stop failure without it.
+        return
+
+    state = subprocess.run(
+        [str(sudo), "-n", str(systemctl), "--system", "--quiet", "show",
+         "--property=ActiveState", "--value", unit],
+        capture_output=True, text=True, check=False, timeout=2,
+    )
+    if state.returncode != 0 or state.stdout.strip() not in ("inactive", "failed"):
+        raise ExecutionSandboxUnavailable("linux-systemd-cleanup-still-active")
+
+
+def _systemd_cleanup_callback(command):
+    """Return cleanup for a generated system service, never arbitrary units."""
+    unit = _systemd_unit_from_command(command)
+    sudo = _sudo_executable()
+    systemd_run = _systemd_run_executable()
+    if (unit is None or sudo is None or systemd_run is None
+            or command[:4] != [str(sudo), "-n", str(systemd_run), "--system"]):
+        return None
+    return lambda: _stop_systemd_unit(unit)
+
+
+def _systemd_network_boundary_available():
+    """Require the system manager to enforce host-network denial."""
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        host_addresses = _local_host_addresses()
+        if not host_addresses:
+            return False
+        probe_code = "import socket,sys; socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=1).close()"
+
+        def probe_network(family, host, deny_entries):
+            listener = socket.socket(family, socket.SOCK_STREAM)
+            unit = _systemd_unit_name("symphony-existing-repair-net-")
+            try:
+                bind_address = (host, 0, 0, 0) if family == socket.AF_INET6 else (host, 0)
+                listener.bind(bind_address)
+                listener.listen(1)
+                listener.settimeout(0.2)
+                port = listener.getsockname()[1]
+                command = _systemd_service_command(
+                    [sys.executable, "-c", probe_code, host, str(port)],
+                    deny_entries, unit=unit, runtime_seconds=5,
+                )
+                try:
+                    result = subprocess.run(
+                        command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        check=False, timeout=8,
+                    )
+                except (OSError, subprocess.SubprocessError):
+                    try:
+                        _stop_systemd_unit(unit)
+                    except (OSError, ValueError, subprocess.SubprocessError):
+                        pass
+                    raise
+                try:
+                    connection, _address = listener.accept()
+                except (socket.timeout, OSError):
+                    reachable = False
+                else:
+                    connection.close()
+                    reachable = True
+                return result.returncode, reachable
+            finally:
+                listener.close()
+
+        baseline_code, baseline_reachable = probe_network(
+            socket.AF_INET, "127.0.0.1", ())
+        if baseline_code != 0 or not baseline_reachable:
+            return False
+        denied_code, denied_reachable = probe_network(
+            socket.AF_INET, "127.0.0.1", _network_deny_entries("127.0.0.1"))
+        if denied_code == 0 or denied_reachable:
+            return False
+        for family, host in host_addresses:
+            address = ipaddress.ip_address(host)
+            if address.is_link_local:
+                continue
+            baseline_code, baseline_reachable = probe_network(family, host, ())
+            if baseline_code != 0 or not baseline_reachable:
+                return False
+            denied_code, denied_reachable = probe_network(
+                family, host, _network_deny_entries(host))
+            if denied_code == 0 or denied_reachable:
+                return False
+        return _local_host_addresses() == host_addresses
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        return False
+
+
+def _systemd_network_sandbox_command(command, *, runtime_seconds=None):
+    if not sys.platform.startswith("linux"):
+        raise ExecutionSandboxUnavailable("linux-systemd-network-boundary-unavailable")
+    host_addresses = _local_host_addresses()
+    if not host_addresses:
+        raise ExecutionSandboxUnavailable("linux-local-network-addresses-unavailable")
+    deny_entries = list(SANDBOX_NETWORK_DENY_ENTRIES)
+    deny_entries.extend(_network_deny_entries(host)[-1] for _family, host in host_addresses)
+    # Re-read immediately before constructing the privileged command. Any
+    # interface churn makes the fixed service property set stale, so hold.
+    if _local_host_addresses() != host_addresses:
+        raise ExecutionSandboxUnavailable("linux-local-network-addresses-changed")
+    unit = _systemd_unit_name("symphony-existing-repair-")
+    return _systemd_service_command(
+        command, deny_entries, unit=unit, runtime_seconds=runtime_seconds,
+    )
+
+
+def _sandbox_child_environment():
+    """Pin config and temporary paths inside the bwrap filesystem."""
+    environment = _bounded_child_environment()
+    home = str(Path.home().resolve())
+    environment.update({
+        "HOME": home,
+        "PATH": "/usr/bin:/bin",
+        "TMPDIR": "/tmp",
+        "TMP": "/tmp",
+        "TEMP": "/tmp",
+        "XDG_CONFIG_HOME": f"{home}/.config",
+        "XDG_CACHE_HOME": f"{home}/.cache",
+        "XDG_DATA_HOME": f"{home}/.local/share",
+        "GROK_HOME": f"{home}/.grok",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_SYSTEM": "/dev/null",
+        "GIT_TERMINAL_PROMPT": "0",
+    })
+    return environment
+
+
+def _sandbox_dirs(command, path, seen):
+    """Create only destination directories in bwrap's private root."""
+    path = Path(path)
+    pending = []
+    while path != Path("/"):
+        pending.append(path)
+        path = path.parent
+    for directory in reversed(pending):
+        value = str(directory)
+        if value not in seen:
+            command.extend(("--dir", value))
+            seen.add(value)
+
+
+def _sandbox_sensitive_workspace_name(name):
+    lowered = name.lower()
+    return (
+        lowered == ".env"
+        or lowered.startswith(".env.")
+        or lowered in SANDBOX_SENSITIVE_FILENAMES
+        or lowered.endswith(SANDBOX_SENSITIVE_SUFFIXES)
+    )
+
+
+def _sandbox_workspace_private_paths(workspace):
+    """Find workspace files and sockets that must not cross the bind mount."""
+    private = []
+    pending = [Path(workspace)]
+    inspected = 0
+    skipped_directories = {".git", ".next", ".turbo", "build", "coverage", "dist", "node_modules"}
+    while pending:
+        directory = pending.pop()
+        try:
+            entries = tuple(os.scandir(directory))
+        except OSError as exc:
+            raise ExecutionSandboxUnavailable("sandbox-workspace-scan-unavailable") from exc
+        for entry in entries:
+            inspected += 1
+            if inspected > SANDBOX_WORKSPACE_SCAN_LIMIT:
+                raise ExecutionSandboxUnavailable("sandbox-workspace-scan-limit")
+            path = Path(entry.path)
+            try:
+                info = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise ExecutionSandboxUnavailable("sandbox-workspace-entry-unavailable") from exc
+            if stat.S_ISSOCK(info.st_mode) or (
+                    stat.S_ISREG(info.st_mode) and _sandbox_sensitive_workspace_name(entry.name)):
+                private.append(path)
+            elif stat.S_ISDIR(info.st_mode) and entry.name not in skipped_directories:
+                pending.append(path)
+    return tuple(private)
+
+
+def _root_owned_system_path(value):
+    try:
+        source = Path(value)
+        resolved = source.resolve(strict=True)
+        info = resolved.stat()
+        if ((stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)) and info.st_uid == 0
+                and not (stat.S_IMODE(info.st_mode) & 0o022)):
+            return resolved
+    except OSError:
+        pass
+    return None
+
+
+def _sandbox_resolver_path():
+    """Return the installed controller-owned resolver configuration."""
+    path = Path(__file__).resolve().with_name(SANDBOX_RESOLV_CONF_NAME)
+    try:
+        info = path.lstat()
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                and not (stat.S_IMODE(info.st_mode) & 0o022)
+                and not path.is_symlink(), "sandbox-resolver-file-untrusted")
+        require(path.read_bytes() == SANDBOX_RESOLV_CONF_CONTENT,
+                "sandbox-resolver-content-invalid")
+    except OSError as exc:
+        raise ExecutionSandboxUnavailable("sandbox-resolver-file-unavailable") from exc
+    return path
+
+
+def _sandboxed_grok_command(command, payload, grant, executable):
+    """Build a bwrap command with the exact workspace/auth files mounted."""
+    bwrap = _bwrap_executable()
+    if bwrap is None:
+        raise ExecutionSandboxUnavailable("linux-bwrap-unavailable")
+    workspace = Path(payload["workspace"]).resolve()
+    auth = Path(grant["authStatePath"]).resolve()
+    executable = Path(executable).resolve()
+    require(workspace.is_dir(), "provider-grant-workspace-unavailable")
+    require(auth != workspace and workspace not in auth.parents,
+            "provider-grant-auth-workspace-overlap")
+    require(executable != workspace and workspace not in executable.parents,
+            "provider-grant-executable-workspace-overlap")
+    sandbox_environment = _sandbox_child_environment()
+    wrapped = [
+        str(bwrap), "--die-with-parent", "--new-session", "--unshare-all", "--share-net",
+        "--clearenv", "--tmpfs", "/", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+    ]
+    for path in ("/proc/kcore", "/proc/kallsyms", "/proc/kmsg"):
+        wrapped.extend(("--ro-bind", "/dev/null", path))
+    wrapped.extend(("--remount-ro", "/proc"))
+    seen = set()
+    for value in SANDBOX_SYSTEM_DIRECTORIES + SANDBOX_SYSTEM_FILES:
+        source = _root_owned_system_path(value)
+        if source is None:
+            if value in SANDBOX_REQUIRED_SYSTEM_PATHS:
+                raise ExecutionSandboxUnavailable(f"sandbox-system-path-unavailable:{value}")
+            continue
+        destination = Path(value)
+        _sandbox_dirs(wrapped, destination if destination.is_dir() else destination.parent, seen)
+        wrapped.extend(("--ro-bind", str(source), str(destination)))
+    resolver = _sandbox_resolver_path()
+    _sandbox_dirs(wrapped, Path("/etc/resolv.conf").parent, seen)
+    wrapped.extend(("--ro-bind", str(resolver), "/etc/resolv.conf"))
+    home = Path.home().resolve()
+    _sandbox_dirs(wrapped, home, seen)
+    _sandbox_dirs(wrapped, home / ".grok", seen)
+    _sandbox_dirs(wrapped, workspace, seen)
+    wrapped.extend(("--bind", str(workspace), str(workspace)))
+    masked_paths = set()
+    for path in _sandbox_workspace_private_paths(workspace):
+        _sandbox_dirs(wrapped, path.parent, seen)
+        wrapped.extend(("--ro-bind", "/dev/null", str(path)))
+        masked_paths.add(str(path))
+    _sandbox_dirs(wrapped, executable.parent, seen)
+    wrapped.extend(("--ro-bind", str(executable), str(executable)))
+    _sandbox_dirs(wrapped, auth.parent, seen)
+    wrapped.extend(("--ro-bind", str(auth), str(auth)))
+    for relative in SANDBOX_MCP_PATHS:
+        config = workspace / relative
+        if os.path.lexists(config) and str(config) not in masked_paths:
+            _sandbox_dirs(wrapped, config.parent, seen)
+            wrapped.extend(("--ro-bind", "/dev/null", str(config)))
+    for key, value in sorted(sandbox_environment.items()):
+        wrapped.extend(("--setenv", key, str(value)))
+    wrapped.extend(("--chdir", str(workspace), "--", *command))
+    return _systemd_network_sandbox_command(
+        wrapped, runtime_seconds=_remaining_execution_timeout(payload, grant)
+    ), sandbox_environment
 
 
 def _remaining_execution_timeout(payload, grant, now=None):
@@ -908,9 +1452,151 @@ def _terminate_owned_process(process, pgid=None):
         process.wait(timeout=5)
 
 
+def _drain_bounded_process_pipes(process, pgid, timeout, *, text_mode,
+                                 terminate_service=None):
+    """Drain both pipes concurrently while retaining only bounded output."""
+    streams = {}
+    process_streams = {
+        name: getattr(process, name, None) for name in ("stdout", "stderr")
+    }
+    buffers = {"stdout": bytearray(), "stderr": bytearray()}
+    encodings = {}
+    selector = None
+    terminated = False
+    timed_out = False
+    cleanup_deadline = None
+
+    def terminate_group(*, stop_service=False):
+        nonlocal cleanup_deadline, terminated
+        if terminated:
+            return
+        cleanup_deadline = time.monotonic() + PROCESS_CLEANUP_GRACE_SECONDS
+        terminated = True
+        service_error = None
+        if stop_service and terminate_service is not None:
+            try:
+                terminate_service()
+            except BaseException as exc:
+                service_error = exc
+        try:
+            _terminate_owned_process(process, pgid)
+        except BaseException as cleanup_error:
+            if service_error is not None:
+                raise cleanup_error from service_error
+            raise
+        if service_error is not None:
+            raise service_error
+
+    def close_stream(fd):
+        stream = streams.pop(fd, None)
+        if selector is not None:
+            try:
+                selector.unregister(fd)
+            except (KeyError, OSError, ValueError):
+                pass
+        if stream is not None:
+            try:
+                stream.close()
+            except (OSError, ValueError):
+                pass
+
+    try:
+        selector = selectors.DefaultSelector()
+        for name, stream in process_streams.items():
+            if stream is None:
+                continue
+            fd = stream.fileno()
+            os.set_blocking(fd, False)
+            selector.register(fd, selectors.EVENT_READ, name)
+            streams[fd] = stream
+            encodings[name] = (getattr(stream, "encoding", None), getattr(stream, "errors", None))
+
+        capture_limit = MAX_PROVIDER_OUTPUT_BYTES + 1
+        deadline = time.monotonic() + float(timeout)
+        while streams or (not terminated and process.poll() is None):
+            if not terminated:
+                if process.poll() is not None:
+                    terminate_group(stop_service=terminate_service is not None)
+                elif time.monotonic() >= deadline:
+                    timed_out = True
+                    terminate_group(stop_service=True)
+
+            if terminated:
+                remaining = cleanup_deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                wait_for = min(0.1, remaining)
+            else:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
+                    terminate_group(stop_service=True)
+                    continue
+                wait_for = min(0.1, remaining)
+
+            if not streams:
+                try:
+                    process.wait(timeout=wait_for)
+                except subprocess.TimeoutExpired:
+                    pass
+                continue
+
+            for key, _ in selector.select(wait_for):
+                fd = key.fd
+                try:
+                    chunk = os.read(fd, 65536)
+                except BlockingIOError:
+                    continue
+                if not chunk:
+                    close_stream(fd)
+                    continue
+                name = key.data
+                room = capture_limit - len(buffers[name])
+                if room > 0:
+                    buffers[name].extend(chunk[:room])
+        if not terminated:
+            if process.poll() is None:
+                timed_out = True
+                terminate_group(stop_service=True)
+            else:
+                terminate_group(stop_service=terminate_service is not None)
+    except BaseException as exc:
+        if not terminated:
+            try:
+                terminate_group(stop_service=True)
+            except BaseException as cleanup_error:
+                raise exc from cleanup_error
+        raise
+    finally:
+        for fd in tuple(streams):
+            close_stream(fd)
+        for stream in process_streams.values():
+            if stream is not None:
+                try:
+                    stream.close()
+                except (OSError, ValueError):
+                    pass
+        if selector is not None:
+            try:
+                selector.close()
+            except (OSError, ValueError):
+                pass
+
+    def output(name):
+        raw = bytes(buffers[name])
+        if not text_mode:
+            return raw
+        encoding, errors = encodings.get(name, (None, None))
+        return raw.decode(encoding or "utf-8", errors or "replace")
+
+    return output("stdout") if process_streams["stdout"] is not None else None, \
+        output("stderr") if process_streams["stderr"] is not None else None, timed_out
+
+
 def _run_bounded(command, **kwargs):
-    """Run in an owned session and clean descendants on timeout."""
+    """Run with concurrent bounded pipe drains and owned process cleanup."""
     timeout = kwargs.pop("timeout")
+    text_mode = bool(kwargs.get("text") or kwargs.get("universal_newlines"))
     process = subprocess.Popen(command, start_new_session=True, **kwargs)
     try:
         # Capture ownership while the group leader is alive.  Looking it up
@@ -918,17 +1604,13 @@ def _run_bounded(command, **kwargs):
         owned_pgid = os.getpgid(process.pid)
     except OSError:
         owned_pgid = process.pid
-    try:
-        stdout, stderr = process.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired as exc:
-        _terminate_owned_process(process, owned_pgid)
-        stdout, stderr = process.communicate()
-        raise subprocess.TimeoutExpired(command, timeout, output=stdout or exc.output,
-                                        stderr=stderr or exc.stderr) from exc
-    # A successful leader can still leave a detached child in the owned
-    # session.  Close the group on the normal path as well so no provider
-    # descendant outlives the assignment.
-    _terminate_owned_process(process, owned_pgid)
+    terminate_service = _systemd_cleanup_callback(command)
+    stdout, stderr, timed_out = _drain_bounded_process_pipes(
+        process, owned_pgid, timeout, text_mode=text_mode,
+        terminate_service=terminate_service,
+    )
+    if timed_out:
+        raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr)
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
@@ -1059,8 +1741,9 @@ def _repair_prompt(task, payload):
         f"Before reporting completion, print exactly one line: {TASK_ACCEPTANCE_MARKER} {acceptance}",
         "That line is an exact task-acceptance attestation; do not print it unless every target binding above is the task you accepted.",
         "Work only in this exact checkout and existing PR branch.",
-        "Make the smallest correct repair, run the relevant tests, commit, and push the existing branch.",
-        "Do not create an issue or PR, change issue ownership, merge, deploy, alter queue policy, or use another workspace.",
+        "Make the smallest correct repair, run the relevant tests, and commit the repair.",
+        "The host controller performs any exact assigned-branch push only after independently rechecking current push admission.",
+        "Do not push, create an issue or PR, change issue ownership, merge, deploy, alter queue policy, or use another workspace.",
         "Do not weaken tests or gates. If the repair cannot be completed, exit nonzero after preserving the exact reason.",
     ))
 
@@ -1099,6 +1782,13 @@ class GrokOwnedRepairExecutor:
             "executablePath": str(executable),
         }
 
+    def require_sandbox(self, payload):
+        """Fail closed before claiming when the maintained host boundary is absent."""
+        grant, executable = validate_provider_grant(payload)
+        if not _systemd_network_boundary_available():
+            raise ExecutionSandboxUnavailable("linux-systemd-loopback-boundary-unavailable")
+        _sandboxed_grok_command([], payload, grant, executable)
+
     def execute(self, task, payload, eligibility, *, lease_fd=9):
         require(lease_fd == 9 and os.environ.get("SYMPHONY_ISSUE_LEASE_FD") == "9",
                 "provider-grant-lease-missing")
@@ -1126,6 +1816,10 @@ class GrokOwnedRepairExecutor:
         detail = "grok-execution-failed"
         status = "failed"
         try:
+            if self.run is None:
+                command, environment = _sandboxed_grok_command(
+                    command, payload, grant, executable
+                )
             # Recheck immediately before spawning. A signed outbox may have
             # waited past a push/provider/downstream hold; a grant alone never
             # overrides the current independent admission projection.
@@ -1344,6 +2038,10 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
             _require_execution_admission(executor.admission_reader)
         except ExecutionAdmissionHeld as exc:
             return {"status": "held", "reason": str(exc)}
+        try:
+            executor.require_sandbox(payload)
+        except (ExecutionSandboxUnavailable, OSError, ValueError, KeyError, TypeError) as exc:
+            return {"status": "held", "reason": f"qualified-isolated-repair-sandbox-unavailable:{exc}"}
     try:
         os.fstat(9)
     except OSError:
