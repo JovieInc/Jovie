@@ -43,12 +43,24 @@ export async function sendCheckIn({
   if (!CHECK_IN_ID_PATTERN.test(checkInId))
     throw new Error('Check-in id is invalid');
 
+  const payload = {
+    check_in_id: checkInId,
+    environment,
+    status,
+  };
+  if (status === 'in_progress') {
+    payload.monitor_config = {
+      checkin_margin: 5,
+      failure_issue_threshold: 1,
+      max_runtime: 3,
+      recovery_threshold: 1,
+      schedule: { type: 'crontab', value: '*/5 * * * *' },
+      timezone: 'UTC',
+    };
+  }
+
   const response = await fetchImpl(buildCronCheckInUrl(dsn, monitorSlug), {
-    body: JSON.stringify({
-      check_in_id: checkInId,
-      environment,
-      status,
-    }),
+    body: JSON.stringify(payload),
     headers: { 'content-type': 'application/json' },
     method: 'POST',
     signal: AbortSignal.timeout(10_000),
