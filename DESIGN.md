@@ -303,3 +303,5 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 ## Decisions Log
 
 Read [the decisions log reference](docs/design-system/DETAILS.md#decisions-log) when changing this area.
+
+Editorial card titles (founder correction, 2026-09-14) remain complete at every width. `BlogCard` uses explicit `data-wrap="editorial-title"` with shared media/title/metadata subgrid tracks per visual row; later rows size independently. Do not clamp, truncate, or reserve one global fixed title height. Other shell heading bounds remain enforced. The six-card Storybook regression covers short, two-line, and longer titles at desktop, tablet, and mobile widths.

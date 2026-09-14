@@ -83,7 +83,10 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
             </div>
           )}
         </div>
-        <h2 className='text-xl font-semibold tracking-tight text-primary-token leading-snug'>
+        <h2
+          data-wrap='editorial-title'
+          className='text-xl font-semibold tracking-tight text-primary-token leading-snug'
+        >
           {post.title}
         </h2>
       </Link>

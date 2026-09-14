@@ -13,7 +13,7 @@ export function BlogRelatedPosts({ posts, authors }: BlogRelatedPostsProps) {
   return (
     <section aria-label='Related Posts'>
       {/* ui-casing-allow: founder-locked k8VOLy editorial heading */}
-      <h2 className='text-xl font-semibold tracking-tight text-primary-token mb-6'>
+      <h2 className='line-clamp-2 text-xl font-semibold tracking-tight text-primary-token mb-6'>
         Keep reading
       </h2>
       <div className='grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3'>
