@@ -7,9 +7,15 @@ Neither source slice authorizes installation, runtime activation or deployment.
 
 The private operator context names the source revision, runtime binary/workflow
 and imported contract hashes, exact account/provider/model enrollment, and the
-Codex executable path/digest. Context freshness is at most 600 seconds. A proof
-row cannot attest itself: its private artifact must exactly match, including
-process generation, executable digest and current account-state fingerprint.
+Codex executable path/digest. `proof-context.json` is the sole enrollment
+authority for this v2 slice; there is no secondary grant store. Context
+freshness is at most 600 seconds. A proof row cannot attest itself: its private
+artifact must exactly match, including process generation, executable digest and
+current account-state fingerprint. When the runtime rotates, refresh may carry
+only rows from that private context after remeasuring their current account or
+executor binding; a source revision, receipt, or caller-supplied identity alone
+never authorizes reuse. Malformed old runtime metadata, scope, runner, or
+enrollment data fails closed.
 
 The runtime observer uses `systemctl --user show` and verifies the service
 MainPID, cgroup and start time. It finds the actual 4041 listener, requires its

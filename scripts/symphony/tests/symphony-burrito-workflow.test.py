@@ -1253,6 +1253,20 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(admission["reason"], "closure-health-not-green")
             self.assertEqual(admission["closurePurpose"], "admission")
 
+            # Expired held PR debt is also owned by the existing controller's
+            # promote-or-supersede repair action. It feeds controller startup,
+            # while ordinary new-issue admission remains held.
+            write_closure("red", ["expired-held-prs", "internally-repairable-prs-open"])
+            activation = helper.read_closure_stop_line(
+                gate, now=now, purpose="controller-activation"
+            )
+            self.assertFalse(activation["hold"])
+            self.assertEqual(
+                activation["repairFeedReasons"],
+                ["expired-held-prs", "internally-repairable-prs-open"],
+            )
+            self.assertTrue(helper.read_closure_stop_line(gate, now=now)["hold"])
+
             # Grace carrying only the controller-outage feed reason behaves the
             # same in both purposes.
             write_closure("grace", ["queue-controller-red-over-10m"])
@@ -1387,6 +1401,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             helper.REPAIR_FEED_REASONS,
             frozenset(
                 {
+                    "expired-held-prs",
                     "internally-repairable-prs-open",
                     "no-merge-progress-over-1h",
                     "queue-controller-red-over-10m",

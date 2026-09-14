@@ -87,6 +87,7 @@ CLOSURE_PURPOSES = frozenset(
 # Mirrors gem-priority-gate.REPAIR_FEED_REASONS (closure_allows_controller_repair).
 REPAIR_FEED_REASONS = frozenset(
     {
+        "expired-held-prs",
         "internally-repairable-prs-open",
         "no-merge-progress-over-1h",
         "queue-controller-red-over-10m",
