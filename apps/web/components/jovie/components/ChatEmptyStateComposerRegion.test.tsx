@@ -47,6 +47,30 @@ describe('ChatEmptyStateComposerRegion', () => {
     );
   });
 
+  it.each(
+    CHAT_EMPTY_ROTATE_SAMPLES.map(
+      (sample, index) => [sample.id, index] as const
+    )
+  )(
+    'preserves the live bubble shape for sample %s with and without activation',
+    (_id, index) => {
+      for (const interactive of [false, true]) {
+        sessionStorage.setItem(CHAT_EMPTY_SAMPLE_STORAGE_KEY, String(index));
+        const { unmount } = render(
+          <ChatEmptyStateComposerRegion
+            onSelectSample={interactive ? vi.fn() : undefined}
+          >
+            <div />
+          </ChatEmptyStateComposerRegion>
+        );
+        expect(
+          screen.getByTestId('chat-empty-state-sample-user')
+        ).toHaveAttribute('data-bubble-shape', 'pill');
+        unmount();
+      }
+    }
+  );
+
   it('rotates the sample conversation across empty-chat mounts', () => {
     const { unmount } = render(
       <ChatEmptyStateComposerRegion onSelectSample={vi.fn()}>

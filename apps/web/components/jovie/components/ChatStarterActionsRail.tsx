@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useEffect, useState } from 'react';
+import { CHAT_STARTER_ACTIONS } from '../starter-actions';
 import type { ChatActionCard as ChatActionCardModel } from '../types';
 import { ChatActionCard } from './ChatActionCard';
 
@@ -75,6 +76,7 @@ export function ChatStarterActionsRail({
       >
         <ChatActionCard
           title={activeCard.title}
+          icon={CHAT_STARTER_ACTIONS[activeCard.id].icon}
           body={activeCard.body}
           actionLabel={activeCard.actionLabel}
           ariaLabel={activeCard.title}

@@ -30,6 +30,7 @@ export function ChatEmptyStateSamplePreview({
       <div className='system-b-chat-message-row justify-end'>
         <div
           className='system-b-chat-user-bubble'
+          data-bubble-shape='pill'
           data-testid='chat-empty-state-sample-user'
         >
           <div className='system-b-chat-user-text'>{sample.prompt}</div>
