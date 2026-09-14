@@ -103,6 +103,36 @@ class AcceptedCompletionTests(unittest.TestCase):
     def github(self, repository, pr_number):
         self.assertEqual((repository, pr_number), ("JovieInc/Jovie", 99))
         return self.pr, self.rules
+
+    def write_rotated_context(self, row, *, contract_sha=None):
+        old_source = self.root / "old-runtime-source"
+        old_source.mkdir()
+        (old_source / "marker").write_text("old runtime source")
+        subprocess.run(["git", "-C", str(old_source), "init", "-q"], check=True)
+        subprocess.run(["git", "-C", str(old_source), "add", "marker"], check=True)
+        subprocess.run([
+            "git", "-C", str(old_source), "-c", "user.email=test@example.com",
+            "-c", "user.name=Test", "commit", "-qm", "old runtime",
+        ], check=True)
+        old_revision = subprocess.check_output(
+            ["git", "-C", str(old_source), "rev-parse", "HEAD"], text=True,
+        ).strip()
+        old_binary = self.root / "old-runtime-binary"
+        old_binary.write_bytes(b"old runtime binary")
+        runtime = {
+            **F.RUNTIME, "sourceRevision": old_revision,
+            "binarySha256": T.digest(old_binary),
+        }
+        if contract_sha is not None:
+            runtime["contractSha256"] = contract_sha
+        A._write_private(self.context, {
+            "runtime": runtime, "sourceRoot": str(old_source),
+            "binaryPath": str(old_binary),
+            "workflowPath": str(F.SOURCE / "scripts/symphony/WORKFLOW.md"),
+            "codexPath": str(self.executor), "codexSha256": T.digest(self.executor),
+            "observedAt": (self.now - timedelta(days=2)).isoformat(),
+            "accounts": [row], "attestationDir": str(self.attestations),
+        })
     def assert_github_rejected(self, pr, rules=None, *, head="d" * 40, number=99):
         with self.assertRaises(ValueError):
             A.validate_github_outcome(pr, rules or self.rules, expected_issue=self.issue,
@@ -145,6 +175,70 @@ class AcceptedCompletionTests(unittest.TestCase):
         before = self.context.read_bytes()
         with self.assertRaisesRegex(ValueError, "service attestation"):
             A.reconcile(self.args(), github=self.github, now=self.now + timedelta(seconds=1))
+        self.assertEqual(self.context.read_bytes(), before)
+
+    def test_refresh_rebinds_current_enrollment_after_runtime_rotation(self):
+        account = self.root / "enrolled-seat"
+        account.mkdir()
+        (account / "auth.json").write_text("{}")
+        (account / "config.toml").write_text('model = "grok-4.6"')
+        A._write_private(account.parent / "state.json", {"cooldowns": {}, "last_error": {}})
+        row = {
+            "provider": "grok", "model": "grok-4.6", "agentProfile": "coder",
+            "accountPath": str(account), "profile": T.profile_identity(account),
+        }
+        self.write_rotated_context(row)
+        self.result_path.unlink()
+        self.lease_path.unlink()
+
+        result = A.reconcile(self.args(), github=self.github, now=self.now)
+
+        self.assertEqual((result["target"], result["approved"]), (0, False))
+        refreshed = json.loads(self.context.read_text())
+        self.assertEqual(refreshed["runtime"]["sourceRevision"], F.RUNTIME["sourceRevision"])
+        self.assertEqual(refreshed["accounts"][0]["profile"], row["profile"])
+        self.assertEqual(refreshed["codexPath"], str(self.executor))
+
+    def test_refresh_rejects_revoked_enrollment_after_runtime_rotation(self):
+        account = self.root / "revoked-seat"
+        account.mkdir()
+        (account / "auth.json").write_text("{}")
+        (account / "config.toml").write_text('model = "grok-4.6"')
+        state = {"cooldowns": {}, "last_error": {}}
+        A._write_private(account.parent / "state.json", state)
+        row = {
+            "provider": "grok", "model": "grok-4.6", "agentProfile": "coder",
+            "accountPath": str(account), "profile": T.profile_identity(account),
+        }
+        self.write_rotated_context(row)
+        self.result_path.unlink()
+        self.lease_path.unlink()
+        # The existing enrollment binding is revoked/replaced after the old
+        # context was written; its profile no longer matches auth.json.
+        (account / "auth.json").write_text('{"revoked": true}')
+        before = self.context.read_bytes()
+
+        with self.assertRaisesRegex(ValueError, "no trusted completion identities"):
+            A.reconcile(self.args(), github=self.github, now=self.now)
+        self.assertEqual(self.context.read_bytes(), before)
+
+    def test_refresh_rejects_non_runtime_context_corruption_during_rotation(self):
+        account = self.root / "corrupt-seat"
+        account.mkdir()
+        (account / "auth.json").write_text("{}")
+        (account / "config.toml").write_text('model = "grok-4.6"')
+        A._write_private(account.parent / "state.json", {"cooldowns": {}, "last_error": {}})
+        row = {
+            "provider": "grok", "model": "grok-4.6", "agentProfile": "coder",
+            "accountPath": str(account), "profile": T.profile_identity(account),
+        }
+        self.write_rotated_context(row, contract_sha="d" * 64)
+        self.result_path.unlink()
+        self.lease_path.unlink()
+        before = self.context.read_bytes()
+
+        with self.assertRaisesRegex(ValueError, "no trusted completion identities"):
+            A.reconcile(self.args(), github=self.github, now=self.now)
         self.assertEqual(self.context.read_bytes(), before)
 
     def test_refresh_rejects_service_identity_or_runtime_changed_since_observation(self):
