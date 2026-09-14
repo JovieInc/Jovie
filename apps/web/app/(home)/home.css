@@ -2285,7 +2285,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
    flex + gap-x-8 + lg nowrap / space-between. The shared trust-strip
    primitive stays a 5-track grid for other mounts. */
 .homepage-certified-proof
-  .system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
+.system-b-mounted-home-trust-strip[data-presentation="inline-strip"] {
   overflow: visible;
 }
 
@@ -3957,6 +3957,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .system-b-marketing.dark
+  .system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-label,
+:root.dark
+  .system-b-marketing
   .system-b-mounted-home-trust-strip
   .system-b-mounted-home-trust-strip-label {
   color: var(--color-text-secondary-token);

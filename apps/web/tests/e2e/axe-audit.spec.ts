@@ -335,8 +335,9 @@ test.describe('Axe color-contrast — authenticated surfaces (light + dark)', ()
         const page = await surfaceContext.newPage();
 
         // Set theme in localStorage BEFORE first navigation so theme-init.js
-        // picks it up on page load. Authenticated routes (/app/*, /onboarding)
-        // respect 'jovie-theme' in localStorage; marketing routes always stay dark.
+        // picks it up on page load. Authenticated routes and the declared
+        // marketing theme routes respect 'jovie-theme' in localStorage;
+        // profile, playlist, and other excluded public surfaces stay dark.
         await page.addInitScript((t: string) => {
           try {
             localStorage.setItem('jovie-theme', t);
