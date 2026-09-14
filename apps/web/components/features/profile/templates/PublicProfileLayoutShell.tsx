@@ -84,7 +84,12 @@ export function PublicProfileLayoutShell({
         )}
         data-layout={isDesktopLayout ? 'desktop' : 'compact'}
       >
-        <main className='relative flex min-h-0 min-w-0 w-full flex-col items-center justify-center'>
+        <main
+          className={cn(
+            'relative flex min-h-0 min-w-0 w-full flex-col items-center justify-center',
+            !isDesktopLayout && 'h-full'
+          )}
+        >
           {shouldRenderHeading ? (
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
