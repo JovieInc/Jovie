@@ -156,6 +156,11 @@ export function filterAdditionalSections(
             lower
           );
         }
+        if (item.kind === 'action')
+          return fuzzyMatch(
+            `${item.action.label} ${item.action.description}`,
+            lower
+          );
         if (item.kind === 'nav') {
           return fuzzyMatch(`${item.nav.label} ${item.nav.description}`, lower);
         }
