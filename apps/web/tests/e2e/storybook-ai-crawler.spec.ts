@@ -125,8 +125,13 @@ async function assertState(
       'aria-busy',
       'true'
     );
-    await expect(panel).not.toContainText('Unknown');
-    await expect(panel).not.toContainText('No AI crawler visits recorded yet.');
+    // The fixture intentionally leaves the request pending. Read the current
+    // loading snapshot once instead of waiting past fetchWithTimeout's
+    // ten-second deadline, where the component correctly transitions to the
+    // missing-telemetry state.
+    const loadingText = await panel.textContent();
+    expect(loadingText).not.toContain('Unknown');
+    expect(loadingText).not.toContain('No AI crawler visits recorded yet.');
     return;
   }
 
