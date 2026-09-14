@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -12,6 +13,26 @@ import {
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:3100';
 const routes = JSON.parse(process.env.PR_VISUAL_ROUTES ?? '[]');
 const outDir = process.env.PR_VISUAL_OUT ?? 'pr-visual-artifacts';
+const isExactSha = value =>
+  typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value);
+const exactHead = (() => {
+  if (isExactSha(process.env.PR_VISUAL_HEAD_SHA)) {
+    return process.env.PR_VISUAL_HEAD_SHA;
+  }
+
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (eventPath) {
+    try {
+      const event = JSON.parse(readFileSync(eventPath, 'utf8'));
+      const pullRequestHead = event?.pull_request?.head?.sha;
+      if (isExactSha(pullRequestHead)) return pullRequestHead;
+    } catch {
+      // Fall through to the runner SHA when the event payload is unavailable.
+    }
+  }
+
+  return isExactSha(process.env.GITHUB_SHA) ? process.env.GITHUB_SHA : null;
+})();
 const viewports = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
@@ -276,8 +297,7 @@ async function runFooterInteractionProof() {
         E2E_SKIP_SEED: '1',
         E2E_SKIP_WARMUP: '1',
         PR_VISUAL_OUT: outDir,
-        PR_VISUAL_HEAD_SHA:
-          process.env.PR_VISUAL_HEAD_SHA ?? process.env.GITHUB_SHA ?? '',
+        PR_VISUAL_HEAD_SHA: exactHead ?? '',
       },
       stdio: 'inherit',
     }
@@ -292,7 +312,7 @@ async function runFooterInteractionProof() {
 
   const failure = {
     route: '/',
-    exactHead: process.env.PR_VISUAL_HEAD_SHA ?? process.env.GITHUB_SHA ?? null,
+    exactHead,
     code: result.code,
     signal: result.signal,
     status: 'failed',

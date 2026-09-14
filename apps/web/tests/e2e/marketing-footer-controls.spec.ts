@@ -65,6 +65,18 @@ async function openHome(
   await expect(page.getByTestId('marketing-footer')).toBeVisible();
   await expect(page.getByTestId('marketing-footer-controls')).toBeVisible();
   await expect(page.getByRole('toolbar', { name: 'Theme' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Light Theme' })).toBeVisible();
+}
+
+async function waitForThemeControls(
+  page: import('@playwright/test').Page
+): Promise<void> {
+  await expect(page.getByRole('toolbar', { name: 'Theme' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'System Theme' })
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Light Theme' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dark Theme' })).toBeVisible();
 }
 
 async function clearThemePreference(
@@ -200,7 +212,7 @@ test.describe('marketing footer theme controls', () => {
       await openHome(page, VIEWPORTS[0]);
       await clearThemePreference(page);
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await expect(page.getByRole('toolbar', { name: 'Theme' })).toBeVisible();
+      await waitForThemeControls(page);
 
       await chooseTheme(page, 'system');
       const systemState = await readThemeState(page);
@@ -212,7 +224,7 @@ test.describe('marketing footer theme controls', () => {
       expect(lightState.colorScheme).toBe('light');
 
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await expect(page.getByRole('toolbar', { name: 'Theme' })).toBeVisible();
+      await waitForThemeControls(page);
       const persistedLightState = await readThemeState(page);
       expect(persistedLightState.stored).toBe('light');
       expect(persistedLightState.pressed.light).toBe(true);
@@ -224,7 +236,7 @@ test.describe('marketing footer theme controls', () => {
       expect(darkState.colorScheme).toBe('dark');
 
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await expect(page.getByRole('toolbar', { name: 'Theme' })).toBeVisible();
+      await waitForThemeControls(page);
       const persistedDarkState = await readThemeState(page);
       expect(persistedDarkState.stored).toBe('dark');
       expect(persistedDarkState.pressed.dark).toBe(true);
@@ -295,9 +307,7 @@ test.describe('marketing footer theme controls', () => {
         await openHome(page, viewport);
         await clearThemePreference(page);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(
-          page.getByRole('toolbar', { name: 'Theme' })
-        ).toBeVisible();
+        await waitForThemeControls(page);
 
         await page
           .getByTestId('marketing-footer-controls')
