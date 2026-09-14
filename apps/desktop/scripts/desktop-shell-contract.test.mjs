@@ -1051,10 +1051,14 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
   );
   assert.match(globalsCss, /--electron-sidebar-collapsed-width: 52px;/);
-  assert.match(
+  // The electron titlebar is an absolute flex overlay sharing one top row
+  // with the page header; the retired two-column grid must stay gone.
+  assert.doesNotMatch(
     globalsCss,
-    /grid-template-columns: var\(--electron-sidebar-width\) minmax\(0, 1fr\);/
+    /grid-template-columns: var\(--electron-sidebar-width\)/
   );
+  // The overlay reserves a fixed control-row width for native window controls.
+  assert.match(globalsCss, /--electron-controls-width: 200px;/);
   assert.doesNotMatch(
     globalsCss,
     /grid-template-columns: var\(--linear-app-sidebar-width\)/
@@ -1106,11 +1110,9 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     `titlebar height (${titlebarHeight}px) must contain y=${y}px + traffic-light height`
   );
 
-  // The second grid cell must absorb every window resize instead of letting
-  // sidebar/titlebar chrome overflow back into the native control reserve.
-  assert.match(
-    globalsCss,
-    /grid-template-columns: var\(--electron-sidebar-width\) minmax\(0, 1fr\);/
-  );
+  // Main-content clearance comes from the header-inset path: the shared top
+  // row reserves the fixed control-row width so chrome never overlaps the
+  // native control reserve after resize.
+  assert.match(globalsCss, /padding-left: var\(--electron-controls-width\);/);
   assert.match(mainSource, /minWidth: 800,/);
 });
