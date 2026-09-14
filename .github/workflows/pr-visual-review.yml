@@ -135,6 +135,23 @@ jobs:
           PR_VISUAL_ROUTES="$(node -p "JSON.stringify(require('./pr-visual-artifacts/routing.json').routes)")" node .github/scripts/pr-visual-review-capture.mjs
           test -f pr-visual-artifacts/manifest.json
 
+      - name: Run footer interaction proof
+        id: footer_interactions
+        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success' && contains(steps.route.outputs.routes, '"/"')
+        env:
+          BASE_URL: http://127.0.0.1:3100
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          PR_VISUAL_OUT: pr-visual-artifacts
+          PR_VISUAL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: >-
+          pnpm --filter @jovie/web exec playwright test
+          tests/e2e/marketing-footer-controls.spec.ts
+          --config=playwright.config.ts
+          --project=chromium
+          --reporter=line
+
       - name: Stop server
         if: always()
         run: kill "$(cat "$RUNNER_TEMP/pr-visual-server.pid" 2>/dev/null)" 2>/dev/null || true
