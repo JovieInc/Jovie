@@ -81,11 +81,7 @@ function MarketingPricingPlanCard({
             {getMarketingPlanCtaLabel(plan)}
           </Link>
         </Button>
-      ) : (
-        <p className='marketing-pricing-plan-card__body'>
-          Sales contact details coming soon.
-        </p>
-      )}
+      ) : null}
 
       <ul className='marketing-pricing-plan-card__features'>
         {plan.features.map(feature => (

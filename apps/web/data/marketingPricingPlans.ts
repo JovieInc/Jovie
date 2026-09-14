@@ -1,42 +1,16 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
-import { toCents } from '@/lib/config/plan-prices';
-import { formatAmount, formatAmountNoCents } from '@/lib/utils/format-number';
+import {
+  ARTIST_VISIBILITY_OFFER,
+  FREE_PROFILE_TRUTH,
+  formatUsdAmount,
+  PRO_TRIAL_DURATION_DAYS,
+  PRO_TRIAL_TRUTH,
+} from '@/lib/billing/offer-truth';
 
 /**
  * Public marketing offer copy (JOV-6231).
  * Billing/checkout contract remains PR #17743 (JOV-6218).
  */
-const ARTIST_VISIBILITY_OFFER = {
-  free: {
-    displayName: 'Free',
-  },
-  pro: {
-    displayName: 'Pro',
-    monthlyUsd: 199,
-    outcomes: [
-      'Continuous visibility monitoring',
-      'Prioritized opportunities',
-      'Agentic fixes',
-    ],
-  },
-  enterprise: {
-    displayName: 'Enterprise',
-    cta: 'Contact sales',
-  },
-  fanSends: {
-    freeTrialEmailAllowance: 50,
-  },
-} as const;
-
-const FREE_PROFILE_TRUTH =
-  'Your artist profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
-
-function formatUsdAmount(amount: number): string {
-  return Number.isInteger(amount)
-    ? formatAmountNoCents(toCents(amount))
-    : formatAmount(toCents(amount));
-}
-
 /** Public acquisition offers are distinct from legacy subscriber entitlement IDs. */
 export const MARKETING_PRICING_PLAN_IDS = [
   'free',
@@ -50,11 +24,10 @@ export type MarketingPricingPlanId =
 export const ARTIST_VISIBILITY_AVAILABILITY = {
   status: 'limited_access',
   label: 'Limited access',
-  note: 'Visibility monitoring, prioritized opportunities, and approved fixes are not yet generally available.',
+  note: `${PRO_TRIAL_TRUTH} Visibility monitoring, prioritized opportunities, and approved fixes are not yet generally available.`,
 } as const;
 
-// No sales destination is assumed. Populate only with an approved contact route.
-export const ENTERPRISE_CONTACT_HREF: string | null = null;
+export const ENTERPRISE_CONTACT_HREF = ARTIST_VISIBILITY_OFFER.enterprise.href;
 
 export interface MarketingPricingPlan {
   readonly id: MarketingPricingPlanId;
@@ -199,6 +172,5 @@ export const ARTIST_VISIBILITY_COMPARISON = [
 
 export const FAN_SEND_OFFER_NOTE = `Fan sends are separately metered. The trial allowance is ${ARTIST_VISIBILITY_OFFER.fanSends.freeTrialEmailAllowance} emails, not a recurring allowance. Paid sending is currently unavailable.`;
 
-export const PUBLIC_PRICING_DESCRIPTION = `Free artist profiles, a planned ${formatUsdAmount(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd)} monthly Pro offer, and Enterprise by agreement.`;
-export const PRICING_REQUEST_ACCESS_COPY =
-  'Request access to Artist Visibility. Monitoring and approved fixes are not yet generally available.';
+export const PUBLIC_PRICING_DESCRIPTION = `Free artist profiles, a ${formatUsdAmount(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd)} monthly Pro offer with a ${PRO_TRIAL_DURATION_DAYS}-day no-card trial, and Enterprise contact sales.`;
+export const PRICING_REQUEST_ACCESS_COPY = `Request access to Artist Visibility. ${PRO_TRIAL_TRUTH} Monitoring and approved fixes are not yet generally available.`;
