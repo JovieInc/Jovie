@@ -80,6 +80,7 @@ const OWNED_REPAIR_CONTROLLER_MANIFEST_KEYS = [
   'launcherRelativePath',
   'releaseControllerRelativePath',
   'releaseValidatorRelativePath',
+  'releaseResolverRelativePath',
   'installer',
 ];
 
