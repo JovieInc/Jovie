@@ -7,7 +7,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { getFeaturedCreatorsForSearch } from '@/lib/featured-creators';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
@@ -173,6 +173,103 @@ export async function annotateClaimedStatusWithMeta(
   } catch (error) {
     logger.warn('[Spotify Search] Claimed status lookup failed:', error);
     return { degraded: true, results };
+  }
+}
+
+/**
+ * Add caller ownership to claimed results without putting user-specific data
+ * in the shared search response cache. The legacy profile owner is used only
+ * for profiles with no canonical claim rows, matching the write-side access
+ * rules in `getExactProfileAccess`.
+ */
+export async function annotateClaimedStatusForCurrentUser(
+  results: SpotifyArtistResult[],
+  appUserId: string | null
+): Promise<SpotifyArtistResult[]> {
+  if (results.length === 0 || !appUserId) {
+    return results;
+  }
+
+  try {
+    const spotifyIds = results.map(result => result.id);
+    const rows = await db
+      .select({
+        spotifyId: creatorProfiles.spotifyId,
+        legacyUserId: creatorProfiles.userId,
+        claimId: userProfileClaims.id,
+        claimUserId: userProfileClaims.userId,
+        claimRole: userProfileClaims.role,
+      })
+      .from(creatorProfiles)
+      .leftJoin(
+        userProfileClaims,
+        eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
+      )
+      .where(inArray(creatorProfiles.spotifyId, spotifyIds));
+
+    const profileOwnership = new Map<
+      string,
+      {
+        hasCanonicalClaims: boolean;
+        writableClaimCount: number;
+        ownerClaimCount: number;
+        legacyUserId: string | null;
+      }
+    >();
+
+    for (const row of rows) {
+      if (!row.spotifyId) continue;
+
+      const ownership = profileOwnership.get(row.spotifyId) ?? {
+        hasCanonicalClaims: false,
+        writableClaimCount: 0,
+        ownerClaimCount: 0,
+        legacyUserId: row.legacyUserId,
+      };
+
+      if (row.claimId) {
+        ownership.hasCanonicalClaims = true;
+        if (row.claimRole === 'owner') {
+          ownership.ownerClaimCount += 1;
+        }
+        if (
+          row.claimUserId === appUserId &&
+          (row.claimRole === 'owner' || row.claimRole === 'manager')
+        ) {
+          ownership.writableClaimCount += 1;
+        }
+      }
+
+      profileOwnership.set(row.spotifyId, ownership);
+    }
+
+    const ownedIds = new Set(
+      [...profileOwnership].flatMap(([spotifyId, ownership]) =>
+        (ownership.writableClaimCount === 1 &&
+          ownership.ownerClaimCount <= 1) ||
+        (!ownership.hasCanonicalClaims && ownership.legacyUserId === appUserId)
+          ? [spotifyId]
+          : []
+      )
+    );
+
+    if (ownedIds.size === 0) {
+      return results;
+    }
+
+    return results.map(result =>
+      ownedIds.has(result.id)
+        ? { ...result, isClaimedByCurrentUser: true }
+        : result
+    );
+  } catch (error) {
+    // Search remains available, but the UI must fail closed for claimed rows
+    // when ownership cannot be established.
+    logger.warn(
+      '[Spotify Search] Current-user claimed status lookup failed:',
+      error
+    );
+    return results;
   }
 }
 
