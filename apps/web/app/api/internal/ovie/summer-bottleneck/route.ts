@@ -8,6 +8,7 @@ import { summerAdmissionsSchema } from '@/lib/ovie/summer-admissions';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
+import { summerTaskAdmissionsSchema } from '@/lib/ovie/summer-task-admissions';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -158,6 +159,12 @@ const unsignedSnapshotSchema = z
             schema: z.literal('jovie.eve.summer-runner-projection/v1'),
             sourceSchema: z.literal('symphony-runner-projection/v1'),
             ...runtimeSourceFields,
+            runtimeGeneration: z.string().regex(DIGEST).nullable().optional(),
+            runtimeInvocationId: z
+              .string()
+              .regex(/^[a-f0-9]{32}$/u)
+              .nullable()
+              .optional(),
             blockedSince: timestamp.nullable(),
             capacitySource: runnerAuthority,
             workSource: runnerAuthority,
@@ -169,6 +176,7 @@ const unsignedSnapshotSchema = z
         productPaths: summerProductPathsSchema.optional(),
         admissions: summerAdmissionsSchema.optional(),
         existingRepair: existingRepairSchema.optional(),
+        taskAdmissions: summerTaskAdmissionsSchema.optional(),
       })
       .strict(),
   })
