@@ -609,6 +609,27 @@ describe('ProfileCompactTemplate', () => {
     expect(metadata.querySelector('svg')).toBeNull();
   });
 
+  it('scopes the mobile overflow contract to the active home surface slot', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const surface = screen.getByTestId('profile-compact-surface');
+
+    expect(surface.parentElement).toHaveAttribute(
+      'data-profile-home-mode',
+      'true'
+    );
+    expect(surface.parentElement?.parentElement).toHaveClass(
+      'profile-compact-surface-slot'
+    );
+  });
+
   it('keeps the artist photo in color with profile text over the image', async () => {
     render(
       <ProfileCompactTemplate
