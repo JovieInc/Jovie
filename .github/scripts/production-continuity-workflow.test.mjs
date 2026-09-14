@@ -22,11 +22,8 @@ it('keeps the external guard bounded, ordered, deduplicated, and credential-free
     /delivery-state-machine\.mjs/,
     /productionMutation: "none"/,
     /Deduplicate acknowledged alert transport/,
-    /30 minutes ago/,
-    /\.steps\[\]/,
-    /\.name == \$step and \.conclusion == "success"/,
+    /production-continuity-dedupe\.mjs/,
     /steps\.dedupe\.outputs\.should_notify == 'true'/,
-    /\.conclusion == "success"/,
     /contents: read/,
   ])
     assert.match(workflow, required);

@@ -12,7 +12,7 @@ export const DEFAULT_TARGETS = Object.freeze([
   },
   {
     id: 'summer-production',
-    url: 'https://summer.jov.ie/api/health',
+    url: 'https://summer.jov.ie/runtime/v1/health',
   },
 ]);
 
@@ -337,7 +337,7 @@ export function planBudgetContinuityAction({
     };
   }
 
-  const requiredBudget = Math.ceil(spend + minimumHeadroom);
+  const requiredBudget = Math.max(budget, Math.ceil(spend + minimumHeadroom));
   const stageCeiling = Math.min(ceiling, budget + maximumStage);
   if (requiredBudget > stageCeiling) {
     return {

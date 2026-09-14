@@ -98,7 +98,16 @@ describe('production continuity classification', () => {
   });
 
   it('accepts only explicit HTTPS CLI targets and writes a deterministic receipt', async () => {
-    assert.equal(parseTargets([]).length, 2);
+    assert.deepEqual(parseTargets([]), [
+      {
+        id: 'jovie-production',
+        url: 'https://jov.ie/api/health/build-info',
+      },
+      {
+        id: 'summer-production',
+        url: 'https://summer.jov.ie/runtime/v1/health',
+      },
+    ]);
     assert.deepEqual(parseTargets(['summer=https://summer.jov.ie/health']), [
       { id: 'summer', url: 'https://summer.jov.ie/health' },
     ]);
@@ -257,6 +266,19 @@ describe('founder-first staged budget policy', () => {
       'approved-stage-cannot-create-required-headroom'
     );
     assert.equal(insufficient.budgetMutationAuthorized, false);
+
+    const alreadyHasHeadroom = planBudgetContinuityAction({
+      ...base,
+      budgetAmountUsd: 20,
+      currentSpendUsd: 10,
+      ackWindowExpired: true,
+      approvedEmergencyCeilingUsd: 25,
+      maximumStageIncreaseUsd: 2,
+      minimumHeadroomUsd: 0.5,
+      spendRateContained: true,
+    });
+    assert.equal(alreadyHasHeadroom.proposedBudgetUsd, 20);
+    assert.ok(alreadyHasHeadroom.proposedBudgetUsd >= 20);
   });
 
   it('keeps 50 and 75 percent thresholds alert-only and rejects stale evidence', () => {

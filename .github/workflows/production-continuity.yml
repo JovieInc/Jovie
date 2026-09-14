@@ -83,37 +83,17 @@ jobs:
       INCIDENT_KEY: ${{ needs.observe.outputs.incident_key }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
+      - name: Checkout policy source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Deduplicate acknowledged alert transport
         id: dedupe
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          expected_name="Notify production on-call ($INCIDENT_KEY)"
-          delivered_step="Deliver immediate founder alert"
-          reminder_cutoff="$(date -u -d '30 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')"
-          recent_runs="$(gh api \
-            "repos/$REPOSITORY/actions/workflows/production-continuity.yml/runs?status=completed&per_page=20")"
-          acknowledged=0
-          while read -r prior_run_id; do
-            [[ "$prior_run_id" =~ ^[1-9][0-9]*$ ]] || continue
-            prior_jobs="$(gh api \
-              "repos/$REPOSITORY/actions/runs/$prior_run_id/jobs?per_page=100")"
-            acknowledged="$(jq --arg name "$expected_name" --arg step "$delivered_step" \
-              '[.jobs[] | select(.name == $name) | .steps[] |
-                select(.name == $step and .conclusion == "success")] | length' \
-              <<<"$prior_jobs")"
-            [ "$acknowledged" -eq 0 ] || break
-          done < <(jq -r --arg cutoff "$reminder_cutoff" \
-            '.workflow_runs[] | select(.created_at >= $cutoff) | .id' \
-            <<<"$recent_runs")
-          if [ "$acknowledged" -gt 0 ]; then
-            echo "should_notify=false" >> "$GITHUB_OUTPUT"
-            echo "A transport receipt exists for $INCIDENT_KEY inside the 30-minute reminder window."
-          else
-            echo "should_notify=true" >> "$GITHUB_OUTPUT"
-          fi
+        run: node .github/scripts/production-continuity-dedupe.mjs
 
       - name: Deliver immediate founder alert
         if: ${{ steps.dedupe.outputs.should_notify == 'true' }}
