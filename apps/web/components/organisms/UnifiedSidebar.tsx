@@ -483,7 +483,7 @@ export function UnifiedSidebar({
       <SidebarHeader
         data-electron-drag-region='true'
         className={cn(
-          'relative justify-center gap-0 px-2.5',
+          'relative justify-center gap-0 px-(--space-2-5)',
           isRouteSidebar || isOperatorSection
             ? 'h-(--app-shell-header-height-compact) py-0.5'
             : 'h-16 pl-4 pr-3 pt-5 pb-4'
@@ -501,7 +501,7 @@ export function UnifiedSidebar({
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 px-2 pb-2.5 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <SidebarContent className='min-h-0 flex-1 px-2 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
             {section === 'ov' ? (
@@ -540,7 +540,7 @@ export function UnifiedSidebar({
         // SidebarFooter is shrink-0; with the restored full-height flex chain
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so media and the protected account panel pin bottom.
-        <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-2.5 pb-3.5'>
+        <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5)'>
           <SidebarBottomNowPlayingBridge />
           <SidebarIdentityGroup
             calm={!isRouteSidebar}

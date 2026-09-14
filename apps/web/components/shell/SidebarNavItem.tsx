@@ -103,7 +103,7 @@ export function getSidebarNavRowClassName({
     getToneClassName({ active, nested, tone }),
     calm &&
       !collapsed &&
-      'h-9 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-2.5 text-(length:--text-app) border border-transparent after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
+      'h-9 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) border border-transparent after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
     calm && active && 'border-subtle font-semibold',
     className
   );

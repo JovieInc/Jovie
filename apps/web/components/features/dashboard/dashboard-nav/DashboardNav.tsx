@@ -415,7 +415,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           <SidebarGroup className='p-0'>
             <div
               data-sidebar-search-slot='true'
-              className='mx-1 flex h-9 shrink-0 items-center gap-2.5 rounded-full border border-subtle bg-surface-1 pr-1.5 group-data-[collapsible=icon]:hidden'
+              className='mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) rounded-full border border-subtle bg-surface-1 pr-1.5 group-data-[collapsible=icon]:hidden'
             >
               {searchSurface}
               <span aria-hidden='true' className='h-4 w-px bg-subtle' />

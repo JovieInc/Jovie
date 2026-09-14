@@ -482,7 +482,9 @@ export function SidebarThreadsSection({
           </Button>
         ) : null}
         {unreadOnly && visible.length === 0 ? (
-          <p className='px-2.5 text-xs text-tertiary-token'>No unread chats</p>
+          <p className='px-(--space-2-5) text-xs text-tertiary-token'>
+            No unread chats
+          </p>
         ) : null}
         {visible.map((t, index) => {
           const active = activeThreadId === t.id;
@@ -494,7 +496,7 @@ export function SidebarThreadsSection({
               new Date(t.updatedAt).toDateString() !== today &&
               new Date(visible[index - 1].updatedAt).toDateString() ===
                 today ? (
-                <div className='px-2.5 pb-2 pt-6 text-(length:--text-3xs) font-bold tracking-widest text-sidebar-muted'>
+                <div className='px-(--space-2-5) pb-2 pt-6 text-(length:--text-3xs) font-bold tracking-widest text-sidebar-muted'>
                   EARLIER
                 </div>
               ) : null}
