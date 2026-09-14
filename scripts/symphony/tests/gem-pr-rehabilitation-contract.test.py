@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import pathlib
@@ -236,7 +238,7 @@ class DeploymentContractTests(unittest.TestCase):
         ) as consumer, mock.patch.object(
             CYCLE.symphony_accepted_completion, "reconcile", return_value={"target": 1}
         ):
-            self.assertEqual(CYCLE.main(), 0)
+            self.assertEqual(CYCLE.main(), 1)
 
         producer.assert_called_once_with()
         consumer.assert_called_once_with()
@@ -300,6 +302,60 @@ class DeploymentContractTests(unittest.TestCase):
             CYCLE.subprocess, "run", side_effect=OSError("exec format error")
         ):
             self.assertEqual(CYCLE.run_capacity_projection(), 1)
+
+    def test_delivery_diagnostics_are_bounded_and_exclude_raw_credentials(self):
+        samples = [
+            (SimpleNamespace(returncode=1, stderr="Traceback\nHTTPError: HTTP Error 422: secret-token", stdout="secret-token"),
+             {"errorType": "HTTPError", "httpStatus": 422}),
+            (SimpleNamespace(returncode=78, stderr="secret-tokenError: hidden", stdout=""),
+             {"errorType": "child-process-failed"}),
+            (SimpleNamespace(returncode=0, stderr="secret-token", stdout=json.dumps({
+                "eve": {"receipt": {"eventId": "summer_abc", "status": "accepted"}},
+                "secret": "secret-token"})), {"eventId": "summer_abc", "status": "accepted"}),
+            (SimpleNamespace(returncode=0, stdout=json.dumps({"taskKey": "a" * 64,
+                "state": "held", "reason": "push-held", "eventId": "unsafe\nsecret-token"})),
+             {"taskKey": "a" * 64, "state": "held", "reason": "push-held"}),
+            (SimpleNamespace(returncode=0, stdout="not-json secret-token"), {}),
+            (SimpleNamespace(returncode=0, stdout="[]"), {}),
+            (SimpleNamespace(returncode=0, stdout='{"eve":null}'), {}),
+            (SimpleNamespace(returncode=0, stdout='{"eve":{"receipt":null}}'), {}),
+        ]
+        for process, expected in samples:
+            with self.subTest(process=process), contextlib.redirect_stdout(io.StringIO()) as output:
+                CYCLE.report_delivery("publication", process)
+                raw = output.getvalue()
+                self.assertNotIn("secret-token", raw)
+                self.assertLess(len(raw), 600)
+                value = json.loads(raw)
+                self.assertEqual(value["stage"], "publication")
+                for key, item in expected.items():
+                    self.assertEqual(value[key], item)
+
+    def test_gate_failure_stops_publication_and_consumer_reports_its_own_result(self):
+        with mock.patch.object(CYCLE.subprocess, "run", return_value=SimpleNamespace(
+                returncode=1, stderr="ValueError: invalid receipt")) as run, contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_summer_bottleneck_producer(), 1)
+            run.assert_called_once()
+            self.assertEqual(json.loads(output.getvalue())["stage"], "fleet-observation")
+        with mock.patch.object(CYCLE.subprocess, "run", return_value=SimpleNamespace(
+                returncode=0, stdout='{"state":"healthy-noop"}')), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(CYCLE.run_summer_symphony_consumer(), 0)
+            self.assertEqual(json.loads(output.getvalue())["state"], "healthy-noop")
+
+    def test_each_delivery_failure_marks_cycle_failed_without_suppressing_other_paths(self):
+        for producer, consumer in ((1, 0), (0, 78), (OSError("missing"), 0),
+                                   (0, subprocess.TimeoutExpired("consumer", 1)), (0, 0)):
+            with self.subTest(producer=producer, consumer=consumer), mock.patch.object(
+                    CYCLE, "pr_drain_repos", return_value=[]), mock.patch.object(
+                    CYCLE, "run_capacity_projection", return_value=0), mock.patch.object(
+                    CYCLE.symphony_accepted_completion, "reconcile"), mock.patch.object(
+                    CYCLE, "run_summer_bottleneck_producer", side_effect=producer if isinstance(producer, Exception) else None,
+                    return_value=producer) as publish, mock.patch.object(
+                    CYCLE, "run_summer_symphony_consumer", side_effect=consumer if isinstance(consumer, Exception) else None,
+                    return_value=consumer) as consume:
+                self.assertEqual(CYCLE.main(), int(bool(producer or consumer)))
+                publish.assert_called_once()
+                consume.assert_called_once()
 
     def test_activation_requires_exact_rehabilitation_attestation(self):
         workflow = ACTIVATION.read_text(encoding="utf-8")
