@@ -156,17 +156,22 @@ test('keeps the final profile row and destination line visible in a constrained 
   expect(shortMetrics.scrollHeight).toBeGreaterThan(shortMetrics.clientHeight);
   expectFinalRowWithinClippingAncestors(shortMetrics);
 
-  await page.setViewportSize(TALL_VIEWPORT);
-  const tallMetrics = await readFinalRowMetrics(table);
-  logMetrics('tall', tallMetrics);
-  expectFinalRowWithinClippingAncestors(tallMetrics);
-
   const finalRow = table.locator('tbody tr').last();
   await expect(finalRow).toBeVisible();
   await finalRow.click();
   await expect(finalRow).toHaveAttribute('aria-selected', 'true');
+
+  const firstRow = table.locator('tbody tr').first();
+  await firstRow.click();
+  await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+  await expect(finalRow).toHaveAttribute('aria-selected', 'false');
   await finalRow.focus();
   await expect(finalRow).toBeFocused();
   await finalRow.press('Enter');
   await expect(finalRow).toHaveAttribute('aria-selected', 'true');
+
+  await page.setViewportSize(TALL_VIEWPORT);
+  const tallMetrics = await readFinalRowMetrics(table);
+  logMetrics('tall', tallMetrics);
+  expectFinalRowWithinClippingAncestors(tallMetrics);
 });
