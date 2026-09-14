@@ -165,7 +165,12 @@ describe('ChangelogEmailSignup', () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(screen.getByTestId('changelog-success-message')).toBeVisible();
+      expect(
+        screen.getByRole('heading', { name: 'Check your email' })
+      ).toBeVisible();
+      expect(screen.getByTestId('changelog-success-message')).toHaveTextContent(
+        'Confirm your subscription to receive Jovie changelog emails.'
+      );
     });
     await waitFor(() => expect(turnstileMock.unmountCount).toBe(1));
     expect(turnstileMock.onStateChange).toBeNull();
@@ -264,7 +269,12 @@ describe('ChangelogEmailSignup', () => {
       target: { value: 'reader@example.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
-    expect(await screen.findByText("You're already subscribed.")).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: 'Jovie changelog' })
+    ).toBeVisible();
+    expect(
+      screen.getByText('This email already receives the Jovie changelog.')
+    ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Subscribe' })
     ).not.toBeInTheDocument();

@@ -46,10 +46,17 @@ export function ChangelogEmailSignup({
   const [turnstileFailed, setTurnstileFailed] = useState(false);
 
   const settled = status === 'success' || status === 'subscribed';
-  const successMessage =
-    status === 'subscribed'
-      ? "You're already subscribed."
-      : 'Check your email to confirm your subscription.';
+  const heading = settled
+    ? status === 'subscribed'
+      ? 'Jovie changelog'
+      : 'Check your email'
+    : 'Get product updates';
+  const description = settled
+    ? status === 'subscribed'
+      ? 'This email already receives the Jovie changelog.'
+      : 'Confirm your subscription to receive Jovie changelog emails.'
+    : 'New features and improvements from Jovie.';
+  const successMessage = `${heading}. ${description}`;
 
   useEffect(() => {
     if (settled) statusRef.current?.focus({ preventScroll: true });
@@ -152,16 +159,17 @@ export function ChangelogEmailSignup({
       data-visual-state={status}
       className='rounded-2xl bg-surface-1 p-6'
     >
-      {/* eslint-disable @jovie/canonical-ui-label-casing -- approved qKrDn sentence-case heading */}
       <h2
         id={`${formId}-heading`}
         className='line-clamp-2 text-2xl font-semibold tracking-tight text-primary-token'
       >
-        Get product updates
+        {heading}
       </h2>
-      {/* eslint-enable @jovie/canonical-ui-label-casing */}
-      <p className='mt-4 text-base text-secondary-token'>
-        New features and improvements from Jovie.
+      <p className='mt-4 grid text-base text-secondary-token'>
+        <span className='invisible col-start-1 row-start-1' aria-hidden='true'>
+          Confirm your subscription to receive Jovie changelog emails.
+        </span>
+        <span className='col-start-1 row-start-1'>{description}</span>
       </p>
       <div className='mt-4 grid'>
         <form
@@ -235,11 +243,7 @@ export function ChangelogEmailSignup({
           role='status'
           aria-live='polite'
           data-testid='changelog-success-message'
-          className={
-            settled
-              ? 'col-start-1 row-start-1 self-center text-sm text-primary-token'
-              : 'sr-only'
-          }
+          className='sr-only'
         >
           {settled
             ? successMessage
