@@ -1011,4 +1011,23 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toHaveClass('sr-only');
     expect(screen.queryByTestId('connections-toolbar-actions')).toBeNull();
   });
+
+  it('keeps the final profile row reachable with its secondary line', () => {
+    renderWorkspace(data);
+
+    const table = screen.getByRole('table');
+    expect(table.parentElement).toHaveClass(
+      'overflow-auto',
+      'min-h-0',
+      'flex-1'
+    );
+
+    const finalRow = screen.getByText('Instagram').closest('tr');
+    expect(finalRow).not.toBeNull();
+    expect(
+      within(finalRow as HTMLElement).getByTitle(
+        'https://jov.ie/tim/s/instagram'
+      )
+    ).toHaveTextContent('jov.ie · tim/s/instagram');
+  });
 });

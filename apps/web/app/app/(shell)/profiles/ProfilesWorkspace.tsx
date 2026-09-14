@@ -1640,6 +1640,7 @@ export function ProfilesWorkspace({
           }}
           getContextMenuItems={getContextMenuItems}
           rowHeight={56}
+          containerClassName='min-h-0 flex-1'
           minWidth='390px'
           isRowSelected={row =>
             !row.id.startsWith('preview:') && selected?.id === row.id
