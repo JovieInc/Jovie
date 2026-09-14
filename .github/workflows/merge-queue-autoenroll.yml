@@ -199,8 +199,40 @@ jobs:
           else
             echo "::notice::Production release checkpoint is $checkpoint_state ($checkpoint_reason) for current main $MAIN_SHA; release verification remains separate from source and native merge-group admission"
           fi
+      - name: Verify trusted release-wave policy availability
+        id: release-wave-policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # pull_request workflows execute this definition from the PR while
+          # the checkout above is deliberately pinned to trusted main. During
+          # the pre-land window, the trusted checkout may not contain the new
+          # helper yet. Probe only that trusted tree: never fetch or execute
+          # the PR head as a bootstrap shortcut.
+          {
+            echo 'available=false'
+            echo 'hold=0'
+            echo 'reason=trusted-main-release-wave-not-landed'
+            echo 'expires_at='
+            echo 'run_id='
+          } >>"$GITHUB_OUTPUT"
+          helper='scripts/lib/release-wave-admission.mjs'
+          workflow='.github/workflows/merge-queue-autoenroll.yml'
+          if [[ -f "$helper" ]]; then
+            echo 'available=true' >>"$GITHUB_OUTPUT"
+            echo 'Trusted main contains the release-wave classifier'
+            exit 0
+          fi
+          if ! grep -Fq -- '- name: Resolve active production release wave' "$workflow"; then
+            echo '::notice::Trusted main predates release-wave admission; preserving the pre-land maintenance path'
+            exit 0
+          fi
+          echo '::error::Trusted main declares release-wave admission but its classifier is missing' >&2
+          exit 2
       - name: Resolve active production release wave
         id: release-wave
+        if: steps.release-wave-policy.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -608,10 +640,10 @@ jobs:
           # enrollment/re-entry. Existing queue members and every safety
           # dequeue path remain authoritative. The classifier gives this hold
           # a terminal/expiry deadline so it can never become indefinite.
-          DRAIN_RELEASE_WAVE_HOLD: ${{ steps.release-wave.outputs.hold }}
-          DRAIN_RELEASE_WAVE_REASON: ${{ steps.release-wave.outputs.reason }}
-          DRAIN_RELEASE_WAVE_EXPIRES_AT: ${{ steps.release-wave.outputs.expires_at }}
-          DRAIN_RELEASE_WAVE_RUN_ID: ${{ steps.release-wave.outputs.run_id }}
+          DRAIN_RELEASE_WAVE_HOLD: ${{ steps.release-wave.outputs.hold || steps.release-wave-policy.outputs.hold }}
+          DRAIN_RELEASE_WAVE_REASON: ${{ steps.release-wave.outputs.reason || steps.release-wave-policy.outputs.reason }}
+          DRAIN_RELEASE_WAVE_EXPIRES_AT: ${{ steps.release-wave.outputs.expires_at || steps.release-wave-policy.outputs.expires_at }}
+          DRAIN_RELEASE_WAVE_RUN_ID: ${{ steps.release-wave.outputs.run_id || steps.release-wave-policy.outputs.run_id }}
           DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'
           # A non-draft main PR whose required source checks never registered a
           # check-run on its exact head can never turn green and never enroll

@@ -46,6 +46,26 @@ const RELEASE_WAVE_STEP = (() => {
     .map(line => (line.startsWith('          ') ? line.slice(10) : line))
     .join('\n');
 })();
+const TRUSTED_POLICY_STEP = (() => {
+  const marker =
+    '      - name: Verify trusted release-wave policy availability\n';
+  const start = AUTOENROLL_WORKFLOW.indexOf(marker);
+  if (start < 0) throw new Error('trusted release-wave policy step is missing');
+  const end = AUTOENROLL_WORKFLOW.indexOf(
+    '      - name: Resolve active production release wave\n',
+    start
+  );
+  if (end < 0) throw new Error('trusted policy step boundary is missing');
+  const block = AUTOENROLL_WORKFLOW.slice(start, end);
+  const runMarker = '        run: |\n';
+  const runStart = block.indexOf(runMarker);
+  if (runStart < 0) throw new Error('trusted policy workflow run is missing');
+  return block
+    .slice(runStart + runMarker.length)
+    .split('\n')
+    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
+    .join('\n');
+})();
 
 const NOW = Date.parse('2026-09-14T19:00:00Z');
 const MAIN_SHA = 'c'.repeat(40);
@@ -146,6 +166,62 @@ esac
           .map(line => line.split('=', 2))
       ),
       summary: readFileSync(summary, 'utf8'),
+    };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function runTrustedPolicyStep({
+  workflow = 'old-trusted-main',
+  helper = false,
+} = {}) {
+  const root = mkdtempSync(resolve(tmpdir(), 'release-wave-policy-'));
+  const output = resolve(root, 'output');
+  const summary = resolve(root, 'summary');
+  mkdirSync(resolve(root, '.github/workflows'), { recursive: true });
+  mkdirSync(resolve(root, 'scripts/lib'), { recursive: true });
+  writeFileSync(
+    resolve(root, '.github/workflows/merge-queue-autoenroll.yml'),
+    workflow === 'release-wave'
+      ? '- name: Resolve active production release wave\n'
+      : ''
+  );
+  if (helper)
+    writeFileSync(resolve(root, 'scripts/lib/release-wave-admission.mjs'), '');
+  writeFileSync(output, '');
+  writeFileSync(summary, '');
+  try {
+    const result = spawnSync(
+      'bash',
+      [
+        '--noprofile',
+        '--norc',
+        '-e',
+        '-o',
+        'pipefail',
+        '-c',
+        TRUSTED_POLICY_STEP,
+      ],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          PATH: process.env.PATH ?? '',
+        },
+      }
+    );
+    return {
+      result,
+      outputs: Object.fromEntries(
+        readFileSync(output, 'utf8')
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map(line => line.split('=', 2))
+      ),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -510,6 +586,18 @@ describe('release-wave admission backpressure', () => {
 
   it('wires the bounded receipt to new enrollment only', () => {
     expect(AUTOENROLL_WORKFLOW).toContain(
+      '- name: Verify trusted release-wave policy availability'
+    );
+    expect(AUTOENROLL_WORKFLOW).toContain(
+      "if: steps.release-wave-policy.outputs.available == 'true'"
+    );
+    expect(AUTOENROLL_WORKFLOW).toContain(
+      "grep -Fq -- '- name: Resolve active production release wave'"
+    );
+    expect(AUTOENROLL_WORKFLOW).not.toContain(
+      'github.event.pull_request.head.sha'
+    );
+    expect(AUTOENROLL_WORKFLOW).toContain(
       '- name: Resolve active production release wave'
     );
     expect(AUTOENROLL_WORKFLOW).toContain(
@@ -527,7 +615,8 @@ describe('release-wave admission backpressure', () => {
       'RELEASE_WAVE_OBSERVATION_HOLD_SECONDS'
     );
     expect(AUTOENROLL_WORKFLOW).toContain(
-      'DRAIN_RELEASE_WAVE_HOLD: $' + '{{ steps.release-wave.outputs.hold }}'
+      'DRAIN_RELEASE_WAVE_HOLD: $' +
+        '{{ steps.release-wave.outputs.hold || steps.release-wave-policy.outputs.hold }}'
     );
     expect(AUTOENROLL_WORKFLOW).toContain(
       "DRAIN_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800'"
@@ -543,5 +632,30 @@ describe('release-wave admission backpressure', () => {
       '=== DEQUEUE (hard gates → queue removal) ==='
     );
     expect(DEFAULT_RELEASE_WAVE_HOLD_MAX_AGE_SECONDS).toBe(1800);
+  });
+
+  it('skips the classifier for an old trusted main checkout without executing PR code', () => {
+    const { result, outputs } = runTrustedPolicyStep();
+    expect(result.status).toBe(0);
+    expect(outputs).toMatchObject({
+      available: 'false',
+      hold: '0',
+      reason: 'trusted-main-release-wave-not-landed',
+    });
+    expect(result.stdout).toContain('pre-land maintenance path');
+    expect(result.stdout).not.toContain('release-wave-admission.mjs');
+  });
+
+  it('fails when trusted main declares the policy but the deployed helper is missing', () => {
+    const { result, outputs } = runTrustedPolicyStep({
+      workflow: 'release-wave',
+    });
+    expect(result.status).toBe(2);
+    expect(outputs).toMatchObject({
+      available: 'false',
+      hold: '0',
+      reason: 'trusted-main-release-wave-not-landed',
+    });
+    expect(result.stderr).toContain('classifier is missing');
   });
 });
