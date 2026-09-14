@@ -61,7 +61,14 @@ function createStoryQueryClient(
 ) {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, staleTime: Infinity },
+      queries: {
+        retry: false,
+        staleTime: Infinity,
+        // The non-loading stories are complete snapshots. Disable every
+        // query on this private client so a cache miss cannot fall through to
+        // Storybook's generic /api fallback and replace the fixture shape.
+        ...(loading ? {} : { enabled: false }),
+      },
       mutations: { retry: false },
     },
   });
