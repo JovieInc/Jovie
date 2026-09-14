@@ -47,12 +47,16 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
   const artwork = EDITORIAL_ARTWORK[post.slug];
 
   return (
-    <article className='min-w-0' data-pen-source='O64tu' data-variant={variant}>
+    <article
+      className='row-span-3 grid min-w-0 grid-rows-subgrid gap-y-2'
+      data-pen-source='O64tu'
+      data-variant={variant}
+    >
       <Link
         href={`/blog/${post.slug}`}
-        className='group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
+        className='group row-span-2 grid grid-rows-subgrid gap-y-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
       >
-        <div className='relative mb-4 aspect-video overflow-hidden rounded-lg bg-surface-3'>
+        <div className='relative aspect-video overflow-hidden rounded-lg bg-surface-3'>
           {artwork ? (
             <div
               aria-hidden='true'
@@ -83,19 +87,21 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
           {post.title}
         </h2>
       </Link>
-      <div className='mt-2 flex flex-wrap items-center gap-x-2 text-xs text-tertiary-token'>
+      <div className='flex items-baseline gap-x-2 text-xs text-tertiary-token'>
         {post.category && (
           <>
             <Link
               href={`/blog/category/${slugifyCategory(post.category)}`}
-              className='rounded-sm hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+              className='min-w-0 break-words rounded-sm hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
             >
               {post.category}
             </Link>
             <span aria-hidden='true'>·</span>
           </>
         )}
-        <time dateTime={post.date}>{formatDate(post.date)}</time>
+        <time className='shrink-0 whitespace-nowrap' dateTime={post.date}>
+          {formatDate(post.date)}
+        </time>
       </div>
       <span className='sr-only'>By {author.name}</span>
     </article>
