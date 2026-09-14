@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { AppShellFrame } from './AppShellFrame';
 import { SidebarProvider } from './sidebar/context';
-import { Sidebar } from './sidebar/Sidebar';
+import { Sidebar } from './sidebar/sidebar';
 
 const meta: Meta<typeof AppShellFrame> = {
   title: 'Organisms/AppShellFrame',
