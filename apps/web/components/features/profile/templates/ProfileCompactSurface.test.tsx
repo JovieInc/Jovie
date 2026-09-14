@@ -269,4 +269,23 @@ describe('ProfileCompactSurface', () => {
     );
     expect(listenSurface).not.toHaveAttribute('data-profile-overflow-mode');
   });
+
+  it('keeps the home hero and content regions in the responsive layout contract', () => {
+    renderSurface();
+
+    expect(screen.getByTestId('profile-cover')).toHaveClass(
+      'profile-home-fluid-hero',
+      'profile-home-fluid-hero--no-media',
+      'shrink-0'
+    );
+    expect(screen.getByTestId('profile-content-scroll')).toHaveClass(
+      'profile-home-content-scroll',
+      'min-h-0',
+      'flex-1',
+      'flex',
+      'flex-col',
+      'overflow-y-auto',
+      'overscroll-contain'
+    );
+  });
 });
