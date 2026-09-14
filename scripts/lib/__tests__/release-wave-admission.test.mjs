@@ -26,46 +26,50 @@ const DRAIN_SCRIPT = readFileSync(
   resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
   'utf8'
 );
-const RELEASE_WAVE_STEP = (() => {
-  const marker = '      - name: Resolve active production release wave\n';
-  const start = AUTOENROLL_WORKFLOW.indexOf(marker);
-  if (start < 0) throw new Error('release-wave workflow step is missing');
-  const end = AUTOENROLL_WORKFLOW.indexOf(
-    '      - name: Resolve exact admission scope\n',
-    start
-  );
-  if (end < 0)
-    throw new Error('release-wave workflow step boundary is missing');
+function workflowStep(name, nextName) {
+  const start = AUTOENROLL_WORKFLOW.indexOf(`      - name: ${name}\n`);
+  if (start < 0) throw new Error(`Missing workflow step: ${name}`);
+  const end = AUTOENROLL_WORKFLOW.indexOf(`      - name: ${nextName}\n`, start);
+  if (end < 0) throw new Error(`Missing workflow boundary: ${nextName}`);
   const block = AUTOENROLL_WORKFLOW.slice(start, end);
   const runMarker = '        run: |\n';
   const runStart = block.indexOf(runMarker);
-  if (runStart < 0) throw new Error('release-wave workflow run is missing');
+  if (runStart < 0) throw new Error(`Missing workflow run: ${name}`);
   return block
     .slice(runStart + runMarker.length)
     .split('\n')
     .map(line => (line.startsWith('          ') ? line.slice(10) : line))
     .join('\n');
-})();
-const TRUSTED_POLICY_STEP = (() => {
-  const marker =
-    '      - name: Verify trusted release-wave policy availability\n';
-  const start = AUTOENROLL_WORKFLOW.indexOf(marker);
-  if (start < 0) throw new Error('trusted release-wave policy step is missing');
-  const end = AUTOENROLL_WORKFLOW.indexOf(
-    '      - name: Resolve active production release wave\n',
-    start
+}
+const RELEASE_WAVE_STEP = workflowStep(
+  'Resolve active production release wave',
+  'Resolve exact admission scope'
+);
+const TRUSTED_POLICY_STEP = workflowStep(
+  'Verify trusted release-wave policy availability',
+  'Resolve active production release wave'
+);
+
+function runWorkflowStep(script, cwd, env) {
+  return spawnSync(
+    'bash',
+    ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
+    {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, ...env },
+    }
   );
-  if (end < 0) throw new Error('trusted policy step boundary is missing');
-  const block = AUTOENROLL_WORKFLOW.slice(start, end);
-  const runMarker = '        run: |\n';
-  const runStart = block.indexOf(runMarker);
-  if (runStart < 0) throw new Error('trusted policy workflow run is missing');
-  return block
-    .slice(runStart + runMarker.length)
-    .split('\n')
-    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
-    .join('\n');
-})();
+}
+function readOutputs(path) {
+  return Object.fromEntries(
+    readFileSync(path, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => line.split('=', 2))
+  );
+}
 
 const NOW = Date.parse('2026-09-14T19:00:00Z');
 const MAIN_SHA = 'c'.repeat(40);
@@ -130,41 +134,18 @@ esac
   );
   chmodSync(resolve(bin, 'gh'), 0o755);
   try {
-    const result = spawnSync(
-      'bash',
-      [
-        '--noprofile',
-        '--norc',
-        '-e',
-        '-o',
-        'pipefail',
-        '-c',
-        RELEASE_WAVE_STEP,
-      ],
-      {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GH_TOKEN: 'test-read-token',
-          REPO: 'JovieInc/Jovie',
-          MAIN_SHA,
-          RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800',
-          GITHUB_OUTPUT: output,
-          GITHUB_STEP_SUMMARY: summary,
-          PATH: `${bin}:${process.env.PATH ?? ''}`,
-        },
-      }
-    );
+    const result = runWorkflowStep(RELEASE_WAVE_STEP, REPO_ROOT, {
+      GH_TOKEN: 'test-read-token',
+      REPO: 'JovieInc/Jovie',
+      MAIN_SHA,
+      RELEASE_WAVE_HOLD_MAX_AGE_SECONDS: '1800',
+      GITHUB_OUTPUT: output,
+      GITHUB_STEP_SUMMARY: summary,
+      PATH: `${bin}:${process.env.PATH ?? ''}`,
+    });
     return {
       result,
-      outputs: Object.fromEntries(
-        readFileSync(output, 'utf8')
-          .trim()
-          .split('\n')
-          .filter(Boolean)
-          .map(line => line.split('=', 2))
-      ),
+      outputs: readOutputs(output),
       summary: readFileSync(summary, 'utf8'),
     };
   } finally {
@@ -172,13 +153,9 @@ esac
   }
 }
 
-function runTrustedPolicyStep({
-  workflow = 'old-trusted-main',
-  helper = false,
-} = {}) {
+function runTrustedPolicyStep({ workflow = 'old-trusted-main' } = {}) {
   const root = mkdtempSync(resolve(tmpdir(), 'release-wave-policy-'));
   const output = resolve(root, 'output');
-  const summary = resolve(root, 'summary');
   mkdirSync(resolve(root, '.github/workflows'), { recursive: true });
   mkdirSync(resolve(root, 'scripts/lib'), { recursive: true });
   writeFileSync(
@@ -187,41 +164,14 @@ function runTrustedPolicyStep({
       ? '- name: Resolve active production release wave\n'
       : ''
   );
-  if (helper)
-    writeFileSync(resolve(root, 'scripts/lib/release-wave-admission.mjs'), '');
   writeFileSync(output, '');
-  writeFileSync(summary, '');
   try {
-    const result = spawnSync(
-      'bash',
-      [
-        '--noprofile',
-        '--norc',
-        '-e',
-        '-o',
-        'pipefail',
-        '-c',
-        TRUSTED_POLICY_STEP,
-      ],
-      {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_OUTPUT: output,
-          PATH: process.env.PATH ?? '',
-        },
-      }
-    );
+    const result = runWorkflowStep(TRUSTED_POLICY_STEP, root, {
+      GITHUB_OUTPUT: output,
+    });
     return {
       result,
-      outputs: Object.fromEntries(
-        readFileSync(output, 'utf8')
-          .trim()
-          .split('\n')
-          .filter(Boolean)
-          .map(line => line.split('=', 2))
-      ),
+      outputs: readOutputs(output),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
