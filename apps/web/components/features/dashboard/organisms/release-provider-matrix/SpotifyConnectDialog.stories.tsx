@@ -70,7 +70,7 @@ function SpotifyConnectDialogStory(
   }, []);
 
   return (
-    <div className='min-h-[36rem]'>
+    <div className='min-h-144'>
       <SpotifyConnectDialog {...args} />
     </div>
   );
@@ -81,7 +81,7 @@ const meta = {
   parameters: {
     layout: 'centered',
     jovie: {
-      uncoveredProps: ['onConnected', 'onImportStart'],
+      uncoveredProps: ['releases', 'artistName', 'isLoading'],
     },
   },
   args: {
