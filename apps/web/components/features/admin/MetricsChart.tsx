@@ -105,51 +105,52 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
     return { latest, deltaPct, avgUsers, maxUsers };
   }, [chartData]);
 
-  if (!stats) {
-    return (
-      <div className='space-y-3'>
-        <MetricsChartHeader />
-        <ContentChartState
-          state='empty'
-          title='No usage data'
-          message='No usage data available yet.'
-          testId='admin-usage-chart-empty'
-        />
-      </div>
-    );
-  }
-
   return (
     <div className='space-y-4'>
       <div className='flex items-start justify-between'>
         <MetricsChartHeader />
-        <ContentMetricDelta
-          direction={
-            stats.deltaPct > 0 ? 'up' : stats.deltaPct < 0 ? 'down' : 'flat'
-          }
-          value={`${stats.deltaPct >= 0 ? '+' : ''}${stats.deltaPct.toFixed(1)}%`}
-          aria-label={`Daily active users changed by ${stats.deltaPct.toFixed(1)}%`}
-        />
+        {stats ? (
+          <ContentMetricDelta
+            direction={
+              stats.deltaPct > 0 ? 'up' : stats.deltaPct < 0 ? 'down' : 'flat'
+            }
+            value={`${stats.deltaPct >= 0 ? '+' : ''}${stats.deltaPct.toFixed(1)}%`}
+            aria-label={`Daily active users changed by ${stats.deltaPct.toFixed(1)}%`}
+          />
+        ) : null}
       </div>
 
       <div className='h-64'>
-        <LazyLineChart data={chartData} />
+        {stats ? (
+          <LazyLineChart data={chartData} />
+        ) : (
+          <ContentChartState
+            state='empty'
+            title='No usage data'
+            message='No usage data available yet.'
+            testId='admin-usage-chart-empty'
+          />
+        )}
       </div>
 
-      <div className='grid gap-4 sm:grid-cols-3'>
+      <div
+        className={`grid gap-4 sm:grid-cols-3${stats ? '' : ' invisible'}`}
+        aria-hidden={!stats || undefined}
+        data-testid='admin-usage-chart-summary'
+      >
         <ContentMetricStat
           label='Current DAU'
-          value={stats.latest.users.toLocaleString()}
+          value={stats?.latest.users.toLocaleString() ?? '—'}
           valueClassName='text-2xl'
         />
         <ContentMetricStat
-          label='14d Average'
-          value={stats.avgUsers.toLocaleString()}
+          label='Average DAU'
+          value={stats?.avgUsers.toLocaleString() ?? '—'}
           valueClassName='text-2xl'
         />
         <ContentMetricStat
-          label='Peak day'
-          value={stats.maxUsers.toLocaleString()}
+          label='Peak Day'
+          value={stats?.maxUsers.toLocaleString() ?? '—'}
           valueClassName='text-2xl'
         />
       </div>
@@ -161,7 +162,7 @@ function MetricsChartHeader() {
   return (
     <div>
       <h3 className='text-sm font-medium text-primary-token'>
-        Daily active users
+        Daily Active Users
       </h3>
       <p className='text-2xs text-tertiary-token'>Last 14 days</p>
     </div>

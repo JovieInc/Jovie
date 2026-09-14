@@ -35,10 +35,10 @@ describe('MetricsChart consumer states', () => {
       expect(
         screen.getByText(/Daily active users changed/).parentElement
       ).toHaveTextContent(delta as string);
-      expect(screen.getByText('14d Average').parentElement).toHaveTextContent(
+      expect(screen.getByText('Average DAU').parentElement).toHaveTextContent(
         average as string
       );
-      expect(screen.getByText('Peak day').parentElement).toHaveTextContent(
+      expect(screen.getByText('Peak Day').parentElement).toHaveTextContent(
         peak as string
       );
     }
@@ -48,7 +48,13 @@ describe('MetricsChart consumer states', () => {
     const { rerender } = render(<MetricsChart points={[]} />);
     expect(screen.getByTestId('admin-usage-chart-empty')).toHaveClass('h-64');
     expect(screen.getByRole('status')).toHaveTextContent('No usage data');
-    expect(screen.queryByText('Current DAU')).not.toBeInTheDocument();
+    expect(screen.getByTestId('admin-usage-chart-summary')).toHaveClass(
+      'invisible'
+    );
+    expect(screen.getByTestId('admin-usage-chart-summary')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
     rerender(<MetricsChart points={points([0])} />);
     expect(screen.queryByText('No usage data')).not.toBeInTheDocument();
     expect(screen.getByText('Current DAU').parentElement).toHaveTextContent(
