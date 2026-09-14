@@ -2357,6 +2357,7 @@ jobs:
                   tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
+                  tests/e2e/storybook-spotify-connect.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
               exit 0
             fi

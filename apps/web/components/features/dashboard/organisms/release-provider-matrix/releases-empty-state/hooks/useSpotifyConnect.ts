@@ -18,6 +18,7 @@ export interface SpotifyArtist {
   name: string;
   url: string;
   isClaimed?: boolean;
+  isClaimedByCurrentUser?: boolean;
 }
 
 export interface UseSpotifyConnectParams {
