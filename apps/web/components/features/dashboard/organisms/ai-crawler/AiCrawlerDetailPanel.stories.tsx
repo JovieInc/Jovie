@@ -115,11 +115,17 @@ function AiCrawlerDetailStory({
 
   React.useLayoutEffect(() => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = createAnalyticsFetchMock(data, originalFetch, loading);
+    const storyFetch = createAnalyticsFetchMock(data, originalFetch, loading);
+    globalThis.fetch = storyFetch;
     setReady(true);
 
     return () => {
-      globalThis.fetch = originalFetch;
+      // Storybook may mount and clean up a story more than once while the
+      // preview is initializing. Only restore the function this instance
+      // installed; an older cleanup must not replace a newer story fixture.
+      if (globalThis.fetch === storyFetch) {
+        globalThis.fetch = originalFetch;
+      }
     };
   }, [data, loading]);
 

@@ -130,7 +130,9 @@ async function assertState(
     // ten-second deadline, where the component correctly transitions to the
     // missing-telemetry state.
     const loadingText = await panel.textContent();
-    expect(loadingText).not.toContain('Unknown');
+    expect(loadingText).not.toContain(
+      'AI crawler reads are Unknown until telemetry is available.'
+    );
     expect(loadingText).not.toContain('No AI crawler visits recorded yet.');
     return;
   }
