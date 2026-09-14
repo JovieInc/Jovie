@@ -133,10 +133,7 @@ export function MarketingFooter({
   const pageOwnsFinalCta =
     typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
-  const footerColumns =
-    pathname === APP_ROUTES.HOME
-      ? MARKETING_FOOTER_COLUMNS.filter(column => column.title !== 'Connect')
-      : MARKETING_FOOTER_COLUMNS;
+  const footerColumns = MARKETING_FOOTER_COLUMNS;
 
   return (
     <footer
