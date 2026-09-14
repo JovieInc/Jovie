@@ -355,7 +355,7 @@
     "plop": "^4.0.5",
     "postcss": "^8.5.23",
     "promptfoo": "0.121.12",
-    "storybook": "10.5.10",
+    "storybook": "10.6.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
