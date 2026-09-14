@@ -7,7 +7,7 @@ import {
 import { StoryBlogCard } from './StoryBlogCard';
 
 /**
- * Storybook-only blog card fixture (no node:fs BlogCard path).
+ * Production blog card with browser-safe deterministic data.
  * Used by Marketing/Recipes/blog-landing and Marketing/Sections compositions.
  */
 const meta = {
@@ -17,7 +17,7 @@ const meta = {
     ...marketingCenteredParameters,
     docs: {
       description: {
-        component: `${MARKETING_STORY_DESCRIPTION} Fixture card mirrors product blog card grammar without filesystem imports.`,
+        component: `${MARKETING_STORY_DESCRIPTION} Production BlogCard rendered with browser-safe deterministic data.`,
       },
     },
   },
@@ -49,6 +49,39 @@ export const Featured: Story = {
   render: args => (
     <div className='mx-auto max-w-3xl p-8'>
       <StoryBlogCard {...args} />
+    </div>
+  ),
+};
+
+/** Published frontmatter plus the canonical O64tu media variants. */
+export const CanonicalEditorial: Story = {
+  render: () => (
+    <div className='grid grid-cols-1 gap-12 p-6 md:grid-cols-3'>
+      {[
+        {
+          slug: 'the-suno-playbook-teardown',
+          title: 'The $100K Suno Playbook Is Missing the Hard Part',
+          date: '2026-07-04',
+          category: 'Music Business',
+        },
+        {
+          slug: 'the-contact-problem',
+          title: 'The Contact Problem',
+          date: '2026-03-18',
+          category: 'Artist Management',
+        },
+        {
+          slug: 'the-myspace-problem',
+          title: 'The MySpace Problem',
+          date: '2025-02-03',
+          category: 'Inbound Marketing',
+        },
+      ].map(post => (
+        <StoryBlogCard
+          key={post.slug}
+          post={{ ...post, author: 'Tim White', excerpt: '', readingTime: 0 }}
+        />
+      ))}
     </div>
   ),
 };

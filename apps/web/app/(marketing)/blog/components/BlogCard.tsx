@@ -1,10 +1,10 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import { Avatar } from '@/components/molecules/Avatar';
+import { slugifyCategory } from '@/lib/blog/categories';
 import type {
   BlogPostSummary,
   ResolvedAuthor,
 } from '@/lib/blog/presentation-contracts';
-import { CategoryPill } from './CategoryPill';
 
 export interface BlogCardProps {
   readonly post: BlogPostSummary;
@@ -12,128 +12,92 @@ export interface BlogCardProps {
   readonly variant?: 'featured' | 'default';
 }
 
+// O64tu / QQ1R4 artwork: M3HZDy paint and each instance’s live text.
+const EDITORIAL_ARTWORK: Readonly<
+  Record<string, { src: string; headline: string }>
+> = {
+  'the-suno-playbook-teardown': {
+    src: '/images/blog/suno-playbook.svg',
+    headline: 'The hard part.',
+  }, // GDHzI/gunjT
+  'the-contact-problem': {
+    src: '/images/blog/contact-problem.svg',
+    headline: 'The handoff.',
+  }, // MJskE/gunjT
+  'the-myspace-problem': {
+    src: '/images/blog/myspace-problem.svg',
+    headline: 'Build your home.',
+  }, // zNtKo/gunjT
+  'the-friday-problem': {
+    src: '/images/blog/friday-problem.svg',
+    headline: 'Before Friday.',
+  }, // zI2L5/gunjT
+};
+
 function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'long',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
 export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
-  if (variant === 'featured') {
-    return (
-      <article className='group rounded-2xl border border-border-subtle p-8 sm:p-10 transition-colors duration-subtle hover:border-border-default'>
-        {/* Meta — category pill outside the link to avoid nested <a> */}
-        <div className='flex flex-wrap items-center gap-3 mb-4'>
-          <time
-            dateTime={post.date}
-            className='text-sm font-medium text-tertiary-token tabular-nums'
-          >
-            {formatDate(post.date)}
-          </time>
-          <span className='text-quaternary-token'>·</span>
-          <span className='text-sm text-tertiary-token'>
-            {post.readingTime} min read
-          </span>
-          {post.category && (
-            <>
-              <span className='text-quaternary-token'>·</span>
-              <CategoryPill category={post.category} />
-            </>
-          )}
-        </div>
-
-        <Link
-          href={`/blog/${post.slug}`}
-          className='block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded-lg'
-        >
-          {/* Title */}
-          <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token mb-4 group-hover:text-primary-token transition-colors line-clamp-2'>
-            {post.title}
-          </h2>
-
-          {/* Excerpt */}
-          <p className='text-lg leading-relaxed text-secondary-token mb-6 line-clamp-3'>
-            {post.excerpt}
-          </p>
-
-          {/* Author */}
-          <div className='flex items-center gap-3'>
-            <Avatar
-              src={author.avatarUrl}
-              name={author.name}
-              alt={`${author.name} avatar`}
-              size='sm'
-              verified={author.isVerified}
-            />
-            <div className='flex items-center gap-2 text-sm'>
-              <span className='font-medium text-primary-token'>
-                {author.name}
-              </span>
-              {author.title && (
-                <>
-                  <span className='text-quaternary-token'>·</span>
-                  <span className='text-tertiary-token'>{author.title}</span>
-                </>
-              )}
-            </div>
-          </div>
-        </Link>
-      </article>
-    );
-  }
+  const artwork = EDITORIAL_ARTWORK[post.slug];
 
   return (
-    <article className='group rounded-xl border border-border-subtle p-6 h-full transition-colors duration-subtle hover:border-border-default'>
-      {/* Meta */}
-      <div className='flex flex-wrap items-center gap-2 mb-3'>
-        <time
-          dateTime={post.date}
-          className='text-sm font-medium text-tertiary-token tabular-nums'
-        >
-          {formatDate(post.date)}
-        </time>
-        <span className='text-quaternary-token'>·</span>
-        <span className='text-sm text-tertiary-token'>
-          {post.readingTime} min read
-        </span>
-      </div>
-
-      {/* Category — outside the link to avoid nested <a> */}
-      {post.category && (
-        <div className='mb-3'>
-          <CategoryPill category={post.category} />
-        </div>
-      )}
-
+    <article className='min-w-0' data-pen-source='O64tu' data-variant={variant}>
       <Link
         href={`/blog/${post.slug}`}
-        className='block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded-lg'
+        className='group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
       >
-        {/* Title */}
-        <h2 className='text-lg sm:text-xl font-semibold tracking-tight text-primary-token mb-3 group-hover:text-primary-token transition-colors line-clamp-2'>
+        <div className='relative mb-4 aspect-video overflow-hidden rounded-lg bg-surface-3'>
+          {artwork ? (
+            <div
+              aria-hidden='true'
+              className='relative flex h-full items-center justify-center'
+            >
+              {/* Canonical gradient artwork contains no text, faces, or album art. */}
+              <Image
+                src={artwork.src}
+                alt=''
+                width={384}
+                height={216}
+                className='absolute inset-0 h-full w-full'
+              />
+              <span className='relative px-6 text-center text-2xl font-semibold text-white dark:text-white'>
+                {artwork.headline}
+              </span>
+            </div>
+          ) : (
+            <div
+              aria-hidden='true'
+              className='flex h-full items-center justify-center p-6 text-center text-xl font-semibold text-primary-token'
+            >
+              {post.title}
+            </div>
+          )}
+        </div>
+        <h2 className='text-xl font-semibold tracking-tight text-primary-token leading-snug'>
           {post.title}
         </h2>
-
-        {/* Excerpt */}
-        <p className='text-base leading-relaxed text-secondary-token line-clamp-2 mb-4'>
-          {post.excerpt}
-        </p>
-
-        {/* Author */}
-        <div className='flex items-center gap-2 text-sm'>
-          <Avatar
-            src={author.avatarUrl}
-            name={author.name}
-            alt={`${author.name} avatar`}
-            size='xs'
-            verified={author.isVerified}
-          />
-          <span className='font-medium text-primary-token'>{author.name}</span>
-        </div>
       </Link>
+      <div className='mt-2 flex flex-wrap items-center gap-x-2 text-xs text-tertiary-token'>
+        {post.category && (
+          <>
+            <Link
+              href={`/blog/category/${slugifyCategory(post.category)}`}
+              className='rounded-sm hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+            >
+              {post.category}
+            </Link>
+            <span aria-hidden='true'>·</span>
+          </>
+        )}
+        <time dateTime={post.date}>{formatDate(post.date)}</time>
+      </div>
+      <span className='sr-only'>By {author.name}</span>
     </article>
   );
 }
