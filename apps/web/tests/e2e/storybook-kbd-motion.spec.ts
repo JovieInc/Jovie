@@ -46,6 +46,19 @@ async function sampleFrames(page: Page) {
   });
 }
 
+/**
+ * Leave the trigger and then leave Radix's hoverable-content grace polygon.
+ * The first move arms the polygon; a single move to its endpoint can remain
+ * inside it indefinitely, so the second move is deliberately across the
+ * viewport.
+ */
+async function movePointerOutside(page: Page) {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('Storybook motion test requires a viewport');
+  await page.mouse.move(1, 1);
+  await page.mouse.move(viewport.width - 1, viewport.height - 1);
+}
+
 test.describe('Kbd real Tooltip motion', () => {
   test.describe.configure({ retries: 0, timeout: 90_000 });
   for (const reducedMotion of ['no-preference', 'reduce'] as const) {
@@ -105,7 +118,7 @@ test.describe('Kbd real Tooltip motion', () => {
           await long.hover();
           await expect(tip).toBeVisible();
           traces.hoverOpen = await sampleFrames(page);
-          await page.mouse.move(1, 1);
+          await movePointerOutside(page);
           await expect(tip).toBeHidden();
 
           // Reverse pointer intent without sleeping through the transition.
@@ -114,7 +127,7 @@ test.describe('Kbd real Tooltip motion', () => {
           await long.hover();
           await expect(tip).toBeVisible();
           traces.reversal = await sampleFrames(page);
-          await page.mouse.move(1, 1);
+          await movePointerOutside(page);
           await expect(tip).toBeHidden();
           await short.focus();
           await page.keyboard.press('Tab');
