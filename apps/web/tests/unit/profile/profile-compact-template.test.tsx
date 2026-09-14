@@ -714,6 +714,12 @@ describe('ProfileCompactTemplate', () => {
     expect(scrollRegion.className).toContain('-mx-(--page-pad)');
     expect(scrollRegion.className).toContain('px-(--page-pad)');
     expect(scrollRegion.className).toContain('overflow-y-auto');
+
+    const surfaceSlot = screen
+      .getByTestId('profile-compact-shell')
+      .querySelector('.profile-compact-surface-slot');
+    expect(surfaceSlot).toHaveClass('profile-compact-surface-slot');
+    expect(surfaceSlot).toHaveClass('relative', 'min-h-0', 'flex-1');
   });
 
   it('does not bleed the content scroll region outside home mode', async () => {
