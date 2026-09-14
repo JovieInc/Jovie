@@ -946,7 +946,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'coverage report --include="*/scripts/symphony/fleet_admission_receipt.py" --show-missing --precision=2 --fail-under=74',
       'python3 scripts/symphony/tests/symphony-nvme-package-cache.test.py',
       'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
-      'python3 scripts/symphony/tests/test-model-router.py',
+      'python3 scripts/symphony/tests/run-model-state-gate.py',
       'python3 scripts/symphony/tests/cursor-cli-worker.test.py',
       'python3 -m coverage run --branch scripts/symphony/tests/hyperagent-lifecycle.test.py',
       'python3 scripts/symphony/tests/symphony-github-poke.test.py',
