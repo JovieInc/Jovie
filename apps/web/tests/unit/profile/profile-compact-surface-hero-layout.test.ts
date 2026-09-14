@@ -11,6 +11,14 @@ const PROFILE_COMPACT_SURFACE = join(
   'ProfileCompactSurface.tsx'
 );
 const DESIGN_SYSTEM = join(process.cwd(), 'styles', 'design-system.css');
+const PROFILE_MOBILE_OVERFLOW = join(
+  process.cwd(),
+  'components',
+  'features',
+  'profile',
+  'templates',
+  'useProfileMobileOverflow.ts'
+);
 
 /**
  * Public profile home hero with real artwork has ONE definite token-driven
@@ -76,6 +84,81 @@ describe('ProfileCompactSurface home hero layout', () => {
     // windows share shell height instead of crushing the carousel).
     expect(contents).toMatch(
       /\.public-profile-compact-shell\s*\{[\s\S]{0,400}--cover-height:\s*clamp\(200px,\s*45%,\s*340px\)/
+    );
+  });
+
+  it('keeps the mobile media token additive to identity and reserves the dock', () => {
+    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
+
+    // The media slot owns the token; the in-flow identity band is additive.
+    // The browser layout suite proves the resulting geometry and composition.
+    expect(contents).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.profile-home-fluid-hero[\s\S]*?flex:\s*0 0 auto;[\s\S]*?height:\s*auto;[\s\S]*?min-height:\s*calc\([\s\S]*?var\(--cover-height\)\s*\+\s*var\(--profile-hero-identity-min-height\)[\s\S]*?\);/
+    );
+    expect(contents).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.profile-cover-home-media[\s\S]*?flex:\s*0 0 var\(--cover-height\);[\s\S]*?height:\s*var\(--cover-height\);/
+    );
+    expect(contents).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.profile-home-content-column[\s\S]*?flex:\s*1 1 0%;[\s\S]*?min-height:\s*0;[\s\S]*?margin-bottom:\s*var\(--profile-bottom-nav-height\);/
+    );
+    expect(contents).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?profile-home-rail[\s\S]*?justify-content:\s*flex-start;[\s\S]*?\[data-testid="profile-compact-surface"\][\s\S]*?\.profile-home-content-scroll\s*\{\s*padding-bottom:\s*0;/
+    );
+  });
+
+  it('lets oversized mobile identity content scroll the primary action above the dock', () => {
+    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
+    const sourceContents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
+    const overflowSourceContents = readFileSync(
+      PROFILE_MOBILE_OVERFLOW,
+      'utf8'
+    );
+    const template = readFileSync(
+      join(
+        process.cwd(),
+        'components',
+        'features',
+        'profile',
+        'templates',
+        'ProfileCompactTemplate.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(template).toContain(
+      "className='profile-compact-surface-slot relative min-h-0 flex-1'"
+    );
+    expect(contents).toMatch(
+      /\.profile-viewport:not\(\.profile-viewport--embedded\):has\([\s\S]*?data-profile-overflow-mode="scroll"[\s\S]*?\)\s*\{[\s\S]*?overflow-y:\s*auto;/
+    );
+    expect(overflowSourceContents).toContain(
+      'window.matchMedia(PROFILE_MOBILE_MEDIA_QUERY)'
+    );
+    expect(overflowSourceContents).toContain(
+      "const PROFILE_MOBILE_MEDIA_QUERY = '(max-width: 767px)'"
+    );
+    expect(sourceContents).toContain(
+      "data-profile-home-mode={isHomeMode ? 'true' : undefined}"
+    );
+    expect(overflowSourceContents).toContain(
+      'setOverflowMode(surface.scrollHeight > surface.clientHeight + 1)'
+    );
+    expect(overflowSourceContents).toContain('overflowProbeFrameRef');
+    expect(contents).toMatch(
+      /data-profile-overflow-mode="scroll"\]\[data-profile-home-mode="true"\]/
+    );
+    expect(contents).toMatch(
+      /\.profile-compact-surface-slot\s*\{[\s\S]*?height:\s*auto;[\s\S]*?flex:\s*1 0 auto;/
+    );
+    expect(contents).toMatch(
+      /\.profile-home-content-scroll\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?padding-bottom:\s*var\(--profile-bottom-nav-height\);/
+    );
+    expect(contents).toMatch(
+      /\.profile-viewport:not\(\.profile-viewport--embedded\):has\([\s\S]*?data-profile-overflow-mode="scroll"[\s\S]*?\)\s+\.profile-floating-tab-bar\s*\{\s*position:\s*fixed;/
+    );
+
+    expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
+      'data-profile-overflow-mode'
     );
   });
 

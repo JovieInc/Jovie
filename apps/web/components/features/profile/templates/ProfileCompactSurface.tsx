@@ -474,11 +474,10 @@ export function ProfileCompactSurface({
   // in the identity grid normally so adjacent social actions never overlap.
   const socialIconClassName =
     'inline-flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
-  // Composition rule: the home hero has one definite token-driven height
-  // (h-(--cover-height) = clamp(220px, 34svh, 400px)) on every viewport. It
-  // never shrink-wraps — the old short-viewport min-h-0/flex-none band
-  // collapse is gone. Media crops via object-cover, never squashes; the
-  // carousel below owns the remaining viewport height.
+  // Composition rule: the home media slot has one definite token-driven
+  // height (clamp(220px, 34svh, 400px)) on every viewport. The in-flow identity
+  // band follows that slot, media crops via object-cover, and the carousel owns
+  // the remaining viewport height.
   const heroHeightClassName = isHomeMode
     ? resolvedHeroImageUrl
       ? 'h-(--cover-height) shrink-0'
@@ -787,7 +786,7 @@ export function ProfileCompactSurface({
                           className='h-3.5 w-3.5 shrink-0 text-white/58'
                           aria-hidden='true'
                         />
-                        <span className='shrink-0 whitespace-nowrap'>
+                        <span className='min-w-0 max-w-full whitespace-normal [overflow-wrap:anywhere] md:truncate md:whitespace-nowrap md:[overflow-wrap:normal]'>
                           {locationLabel}
                         </span>
                       </>

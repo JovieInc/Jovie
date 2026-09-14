@@ -880,6 +880,190 @@
   flex: 0 0 auto;
 }
 
+/* The public mobile contract gives the media slot the tokenized 34svh height;
+   the in-flow identity band is additive and remains directly attached to the
+   media. Keep the rail at the top of its remaining region so the primary card
+   follows the identity without introducing an ownerless spacer. */
+@media (max-width: 767px) {
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-fluid-hero:not(.profile-home-fluid-hero--no-media)
+  ) {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: calc(
+      var(--cover-height) +
+      var(--profile-hero-identity-min-height)
+    );
+  }
+
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      .profile-cover-home-media
+  ) {
+    flex: 0 0 var(--cover-height);
+    height: var(--cover-height);
+  }
+
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-content-column,
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      .profile-home-content-scroll
+  ) {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      [data-testid="profile-home-rail"]
+  ) {
+    flex: 1 1 0%;
+    justify-content: flex-start;
+    min-height: 0;
+  }
+
+  /* Reserve the floating dock outside the scroll box. The existing padding
+     utility reserves the same space inside the box, which would make the
+     layout metrics report content underneath the dock after the hero is
+     pinned to its token. */
+  :where(
+    [data-testid="profile-compact-surface"][data-mode="profile"]
+      > .profile-home-content-column
+  ) {
+    margin-bottom: var(--profile-bottom-nav-height);
+  }
+
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    .profile-home-content-scroll {
+    padding-bottom: 0;
+  }
+
+  /* Large text can make the in-flow identity taller than the phone viewport.
+     Let the outer public profile become the scroll surface in that case so a
+     focused card action can be brought above the fixed dock. Normal content
+     still fits the existing 100dvh frame, while intrinsic hero content is no
+     longer clipped by the fixed shell. Embedded previews retain their fixed
+     frame and their own host scroll contract. */
+  .profile-viewport:not(.profile-viewport--embedded):has(
+    .profile-compact-surface-slot
+      > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+  ) {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-padding-bottom: calc(
+      var(--profile-bottom-nav-height) +
+      var(--space-2)
+    );
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .public-profile-layout-frame--compact {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .public-profile-layout-frame--compact
+    .public-profile-layout-compact-slot {
+    height: auto;
+    min-height: 100dvh;
+    flex: 1 0 auto;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .public-profile-compact-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .profile-compact-surface-slot {
+    height: auto;
+    min-height: 0;
+    flex: 1 0 auto;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .profile-compact-surface-slot
+    > div,
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .profile-compact-surface-slot
+    > div
+    > [data-testid="profile-compact-surface"] {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .profile-home-content-column {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .profile-home-content-scroll {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+    padding-bottom: var(--profile-bottom-nav-height);
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    [data-testid="profile-home-rail"] {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    [data-testid="profile-home-rail"]
+    > div {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: auto;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):has(
+      .profile-compact-surface-slot
+        > [data-profile-overflow-mode="scroll"][data-profile-home-mode="true"]
+    )
+    .profile-floating-tab-bar {
+    position: fixed;
+  }
+}
+
 /* Query-mode profile URLs are served from the ISR home shell, then hydrate into
    the requested mode from window.location. Match the mode header on first paint
    so hydration does not move the compact profile frame. */
