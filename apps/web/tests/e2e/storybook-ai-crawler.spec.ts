@@ -49,10 +49,12 @@ async function openState(page: Page, storyId: string): Promise<Locator> {
     timeout: 60_000,
   });
 
-  const root = page.locator('#storybook-root');
-  await expect(root).toBeVisible({ timeout: 60_000 });
-  await expect(root).not.toBeEmpty({ timeout: 60_000 });
-
+  // The detail panel uses the mobile RightDrawer branch at this viewport. Its
+  // fixed overlay is visible while the Storybook root itself has no in-flow
+  // box, so root visibility is not a valid render readiness signal here.
+  await expect(page.locator('#storybook-root')).toBeAttached({
+    timeout: 60_000,
+  });
   const panel = page.getByTestId('ai-crawler-detail-panel');
   await expect(panel).toBeVisible({ timeout: 15_000 });
   return panel;
@@ -181,7 +183,7 @@ async function saveEvidence(
     body: evidence,
     contentType: 'application/json',
   });
-  await expect(page.locator('#storybook-root')).toBeVisible();
+  await expect(panel).toBeVisible();
 }
 
 test.describe('AI crawler measurement state proof', () => {
