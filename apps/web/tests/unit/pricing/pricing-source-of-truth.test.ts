@@ -17,6 +17,11 @@ import {
   MARKETING_PRICING_PLAN_IDS,
   MARKETING_PRICING_PLANS,
 } from '@/data/marketingPricingPlans';
+import {
+  ARTIST_VISIBILITY_OFFER,
+  formatUsdAmount,
+  PRO_TRIAL_TRUTH,
+} from '@/lib/billing/offer-truth';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
@@ -135,14 +140,30 @@ describe('Public Artist Visibility acquisition contract', () => {
       'enterprise',
     ]);
     expect(MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro')?.price).toBe(
-      '$199'
+      formatUsdAmount(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd)
     );
     expect(
       MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro')?.cadence
     ).toBe('/mo');
     expect(getMarketingPlanHref('pro')).toBe('https://jov.ie/waitlist');
     expect(getMarketingPlanHref('free')).toBe('https://jov.ie/waitlist');
-    expect(getMarketingPlanHref('enterprise')).toBeNull();
+    expect(getMarketingPlanHref('enterprise')).toBe(
+      ARTIST_VISIBILITY_OFFER.enterprise.href
+    );
+  });
+  it('derives public price, trial terms, and Enterprise destination from offer truth', () => {
+    const pro = MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro');
+    const enterprise = MARKETING_PRICING_PLANS.find(
+      plan => plan.id === 'enterprise'
+    );
+
+    expect(pro?.price).toBe(
+      formatUsdAmount(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd)
+    );
+    expect(pro?.offerNote).toContain(PRO_TRIAL_TRUTH);
+    expect(enterprise?.ctaLabel).toBe(ARTIST_VISIBILITY_OFFER.enterprise.cta);
+    expect(enterprise?.ctaHref).toBe(ARTIST_VISIBILITY_OFFER.enterprise.href);
+    expect(enterprise?.ctaHref).toBe('mailto:support@jov.ie');
   });
   it('does not grant legacy Max entitlements through new public copy', () => {
     const pro = MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro');

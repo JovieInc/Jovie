@@ -19,7 +19,7 @@ describe('MarketingPricingPlans', () => {
     expect(screen.queryByTestId('marketing-pricing-plan-team')).toBeNull();
   });
 
-  it('offers access requests without trial or Enterprise checkout links', () => {
+  it('offers access requests with canonical trial terms and Enterprise contact', () => {
     render(
       <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
     );
@@ -31,14 +31,16 @@ describe('MarketingPricingPlans', () => {
     const pro = within(screen.getByTestId('marketing-pricing-plan-pro'));
     expect(pro.getByText('$199')).toBeInTheDocument();
     expect(pro.getByText('Limited access')).toBeInTheDocument();
+    expect(
+      pro.getByText(/14-day Pro trial\. No credit card/)
+    ).toBeInTheDocument();
     expect(pro.getByText(/not yet generally available/)).toBeInTheDocument();
     const enterprise = within(
       screen.getByTestId('marketing-pricing-plan-enterprise')
     );
-    expect(enterprise.queryByRole('link')).toBeNull();
     expect(
-      enterprise.getByText('Sales contact details coming soon.')
-    ).toBeInTheDocument();
+      enterprise.getByRole('link', { name: 'Contact sales' })
+    ).toHaveAttribute('href', 'mailto:support@jov.ie');
     expect(screen.queryByText('Max', { exact: true })).toBeNull();
     expect(screen.queryByRole('link', { name: /trial/i })).toBeNull();
   });
