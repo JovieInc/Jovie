@@ -227,33 +227,24 @@ describe('UnifiedSidebar library route', () => {
     expect(panel).toHaveTextContent('jov.ie/timwhite');
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
-
-    const update = screen.getByTestId('update-available-pill');
-    expect(screen.getByTestId('sidebar-notifications')).toContainElement(
-      update
-    );
-    expect(update.closest('[data-sidebar="content"]')).not.toBeNull();
-    expect(update.closest('[data-sidebar="footer"]')).toBeNull();
   });
 
-  it('mounts the desktop update listener before the runtime effect resolves', () => {
+  it('keeps pending Inbox work reachable without a sidebar notifications region', () => {
+    // Runtime updates moved from the sidebar to the central Inbox
+    // (RuntimeUpdateProvider + SidebarInboxButton); the notification region
+    // and its pill are gone from the sidebar content.
     electronRuntimeMock.isElectronRuntime = false;
-    document.documentElement.dataset.desktopRuntime = 'electron';
-
     renderUnifiedSidebar({
       pathname: APP_ROUTES.DASHBOARD,
       section: 'dashboard',
     });
 
-    // The runtime hook is intentionally still false on this first render,
-    // but the synchronous bridge check must mount the pill now so a one-shot
-    // Electron update event emitted during boot cannot be missed.
-    expect(screen.getByTestId('update-available-pill')).toBeInTheDocument();
-    expect(screen.getByTestId('sidebar-notifications')).toContainElement(
-      screen.getByTestId('update-available-pill')
-    );
-
-    document.documentElement.removeAttribute('data-desktop-runtime');
+    expect(
+      screen.queryByTestId('sidebar-notifications')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('update-available-pill')
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the unified user panel available on settings routes', () => {
