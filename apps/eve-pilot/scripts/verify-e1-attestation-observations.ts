@@ -1,15 +1,17 @@
 /**
  * CLI entry for E1 observation gate. Invoked by
  * scripts/summer-commissioning/verify-e1-attestation-observations.mjs
+ *
+ * Receipt path must be writable on Gem self-hosted runners (timwhite cannot
+ * mkdir /opt/cursor). See resolveE1ReceiptPath.
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import {
   e1PublisherShapedReceipt,
   evaluateE1AttestationObservations,
 } from '../agent/lib/e1-attestation-observation-gate.ts';
-
-const receiptPath =
-  '/opt/cursor/artifacts/e1-attestation-observations-receipt.json';
+import { resolveE1ReceiptPath } from '../agent/lib/e1-receipt-path.ts';
 
 async function main() {
   const mode = process.env.E1_GATE_MODE ?? 'live';
@@ -47,13 +49,15 @@ async function main() {
     nowMs,
   });
 
-  await mkdir('/opt/cursor/artifacts', { recursive: true });
+  const receiptPath = await resolveE1ReceiptPath();
+  await mkdir(dirname(receiptPath), { recursive: true });
   await writeFile(
     receiptPath,
     `${JSON.stringify({ ...result, mode, generatedAt: new Date().toISOString() }, null, 2)}\n`,
     'utf8'
   );
   console.log(JSON.stringify(result, null, 2));
+  console.log(`E1_RECEIPT_PATH=${receiptPath}`);
   if (result.status !== 'pass') process.exit(2);
 }
 

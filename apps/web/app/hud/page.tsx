@@ -6,7 +6,6 @@ import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisc
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
-import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { authorizeHud } from '@/lib/auth/hud';
@@ -32,7 +31,8 @@ function firstString(value: string | string[] | undefined): string | null {
 
 /**
  * Canonical Ops screen: /hud.
- * ?fs=1 fullscreen. ?kiosk=TOKEN TV. ?ovie=mac packaged Mac (three YC metrics).
+ * Default /hud is rewritten into the OV app shell. Isolated chrome is only
+ * ?fs=1 fullscreen, ?kiosk=TOKEN TV, or ?ovie=mac packaged Mac.
  */
 export default async function HudPage({
   searchParams,
@@ -81,24 +81,27 @@ export default async function HudPage({
   if (tokenOk || fullscreen) {
     return (
       <main className='hud-kiosk-viewport min-h-screen bg-page text-primary-token'>
+        {fullscreen && !tokenOk ? (
+          <div className='flex justify-end px-4 pt-4'>
+            <HudFullscreenControl action='exit' />
+          </div>
+        ) : null}
         <div className='flex flex-col gap-3 p-4'>{dashboard}</div>
       </main>
     );
   }
 
   return (
-    <StandaloneProductPage width='xl' className='hud-admin-viewport'>
-      <AdminPage
-        title={OVIE_OPS_PRODUCT_NAME}
-        description='Decisions, survival, bottleneck, delivery, operating chain.'
-        testId='hud-admin-page'
-        actions={<HudFullscreenControl />}
-      >
-        {dashboard}
-        <HudNoiseDisclosure id='developer-controls' label='Developer Controls'>
-          <OperationalControlPanel />
-        </HudNoiseDisclosure>
-      </AdminPage>
-    </StandaloneProductPage>
+    <AdminPage
+      title={OVIE_OPS_PRODUCT_NAME}
+      description='Decisions, survival, bottleneck, delivery, operating chain.'
+      testId='hud-admin-page'
+      actions={<HudFullscreenControl />}
+    >
+      {dashboard}
+      <HudNoiseDisclosure id='developer-controls' label='Developer Controls'>
+        <OperationalControlPanel />
+      </HudNoiseDisclosure>
+    </AdminPage>
   );
 }

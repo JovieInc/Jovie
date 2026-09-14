@@ -127,6 +127,26 @@ describe('workflow capture server state machine', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it('keeps creator-initiated recording requests in Ovie', async () => {
+    await createWorkflowCaptureRequest({
+      userId: USER_ID,
+      request: {
+        requestingTaskId: 'creator-task',
+        title: 'Record my workflow',
+        instructions: 'Supervised capture',
+        requestedBy: 'creator',
+      },
+    });
+    expect(database.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          audience: 'ovie',
+          requestedBy: 'creator',
+        }),
+      })
+    );
+  });
+
   it('creates one deterministic pending Inbox request', async () => {
     const first = await createRequest();
     const second = await createRequest();
@@ -148,6 +168,7 @@ describe('workflow capture server state machine', () => {
       expect.objectContaining({
         id: first.captureId,
         kind: 'workflow_capture.request',
+        payload: expect.objectContaining({ audience: 'ovie' }),
         userId: USER_ID,
         status: 'pending',
       })

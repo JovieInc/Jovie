@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoisted mocks - must be defined before vi.mock calls
 const {
+  mockStripePrices,
   mockStripeSubscriptions,
   mockStripeInvoices,
   mockStripeSubscriptionSchedules,
@@ -18,6 +19,7 @@ const {
   mockGetPriceMappingDetails,
   mockPriceMappings,
 } = vi.hoisted(() => ({
+  mockStripePrices: { retrieve: vi.fn() },
   mockStripeSubscriptions: {
     list: vi.fn(),
     retrieve: vi.fn(),
@@ -44,6 +46,7 @@ vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
+    prices: mockStripePrices,
     subscriptions: mockStripeSubscriptions,
     invoices: mockStripeInvoices,
     subscriptionSchedules: mockStripeSubscriptionSchedules,
@@ -156,8 +159,45 @@ function makeSubscription(overrides: Record<string, unknown> = {}) {
 // --- Tests ---
 
 describe('@critical plan-change.ts', () => {
+  it('rejects Stripe drift before preview or subscription mutation', async () => {
+    mockStripePrices.retrieve.mockResolvedValue({
+      id: PRICE_PRO_MONTHLY,
+      active: true,
+      unit_amount: 3900,
+    });
+    const result = await executePlanChange({
+      subscriptionId: 'sub_123',
+      newPriceId: PRICE_PRO_MONTHLY,
+    });
+    expect(result.success).toBe(false);
+    expect(mockStripeSubscriptions.retrieve).not.toHaveBeenCalled();
+    expect(mockStripeSubscriptions.update).not.toHaveBeenCalled();
+    expect(mockStripeSubscriptionSchedules.create).not.toHaveBeenCalled();
+    expect(
+      await previewPlanChange({
+        customerId: 'cus_123',
+        newPriceId: PRICE_PRO_MONTHLY,
+      })
+    ).toBeNull();
+    expect(mockStripeInvoices.createPreview).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStripePrices.retrieve.mockImplementation(async (id: string) => ({
+      id,
+      active: true,
+      currency: priceMappingsData[id].currency,
+      unit_amount: priceMappingsData[id].amount,
+      type: 'recurring',
+      billing_scheme: 'per_unit',
+      transform_quantity: null,
+      recurring: {
+        interval: priceMappingsData[id].interval,
+        interval_count: 1,
+        usage_type: 'licensed',
+      },
+    }));
 
     // Default config mocks
     mockGetActivePriceIds.mockReturnValue([

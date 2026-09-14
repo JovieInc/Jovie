@@ -249,6 +249,9 @@ describe('ChatInput', () => {
     // Dropdown menu receives focus when opened (standard Radix behavior)
     expect(getByRole('menu')).toBeInTheDocument();
     expect(
+      document.querySelector('[data-chat-composer-overlay="true"]')
+    ).toBeTruthy();
+    expect(
       getByRole('menuitem', { name: /Attach Files/i })
     ).toBeInTheDocument();
     expect(screen.queryByText('Attachments')).not.toBeInTheDocument();

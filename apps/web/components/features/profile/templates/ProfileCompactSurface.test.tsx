@@ -249,4 +249,24 @@ describe('ProfileCompactSurface', () => {
 
     expect(screen.getByTestId('profile-home-alerts-row')).toBeInTheDocument();
   });
+
+  it('marks only the active public home surface for mobile overflow scoping', () => {
+    const { unmount } = renderSurface();
+    const homeSurface = screen.getByTestId('profile-compact-surface');
+
+    expect(homeSurface.parentElement).toHaveAttribute(
+      'data-profile-home-mode',
+      'true'
+    );
+    expect(homeSurface).not.toHaveAttribute('data-profile-overflow-mode');
+
+    unmount();
+    renderSurface({ activeMode: 'listen' });
+    const listenSurface = screen.getByTestId('profile-compact-surface');
+
+    expect(listenSurface.parentElement).not.toHaveAttribute(
+      'data-profile-home-mode'
+    );
+    expect(listenSurface).not.toHaveAttribute('data-profile-overflow-mode');
+  });
 });

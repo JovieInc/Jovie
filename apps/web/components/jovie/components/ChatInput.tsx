@@ -259,7 +259,7 @@ function DictationStatusBanner({
         size='sm'
         onClick={onCancel}
         className={DICTATION_BANNER_BUTTON_CLASS}
-        aria-label='Cancel dictation'
+        aria-label='Cancel Dictation'
       >
         Cancel
       </Button>
@@ -816,6 +816,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       : surfaceMode === 'entity' && !isStacked
         ? 'relative flex justify-end'
         : 'relative flex justify-center';
+    const showDictationBanner =
+      isListening ||
+      Boolean(dictationError) ||
+      (showDictationHint && Boolean(dictationUnavailableHint));
+    const showComposerOverlay =
+      showInlinePicker || plusMenuOpen || showDictationBanner;
     // Container the slash key listener cares about when the picker is closed.
     // (The active-listener inside SlashCommandMenu only mounts while open.)
 
@@ -833,10 +839,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onCancel={handleMicCancel}
       />
     );
-    const showDictationBanner =
-      isListening ||
-      Boolean(dictationError) ||
-      (showDictationHint && Boolean(dictationUnavailableHint));
     // The mic slot stays mounted when the desktop can point at system
     // dictation, so the hint has somewhere to land.
     const hasDictationAffordance =
@@ -896,7 +898,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         aria-label={CHAT_COMPOSER_FORM_ARIA_LABEL}
         className='relative z-10 w-full focus-within:outline-none'
       >
-        <div className={dockClass}>
+        <div
+          className={dockClass}
+          data-chat-composer-overlay={showComposerOverlay ? 'true' : undefined}
+        >
           {/* ROOT inline picker is absolutely positioned so it does not alter
               the composer surface height and cause layout shift when it opens. */}
           {showInlinePicker ? (

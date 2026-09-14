@@ -7,13 +7,14 @@ const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 export const MIN_CHANGED_LINE_COVERAGE = 60;
 /** Must fail before GitHub merge-queue check_response_timeout_minutes=20. */
 export const EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES = 18;
-export const EXACT_HEAD_COVERAGE_STEP_TIMEOUT = '15m';
+/** Must stay in lockstep with ci.yml Exact-head Coverage `timeout --kill-after=20s`. */
+export const EXACT_HEAD_COVERAGE_STEP_TIMEOUT = '17m';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const WEB_SOURCE_PREFIX = 'apps/web/';
 
 const SOURCE_PATH = /^apps\/web\/.*\.(?:[cm]?[jt]sx?)$/;
 const EXCLUDED_SOURCE_PATH =
-  /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)|\.(?:test|spec)\.[cm]?[jt]sx?$|\.d\.ts$|\.config(?:\.[^./]+)*\.[cm]?[jt]s$|(?:^|\/)types?(?:\/|\.[cm]?ts$)|(?:^|\/)(?:layout|loading|not-found)\.tsx$/;
+  /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)|\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\.d\.ts$|\.config(?:\.[^./]+)*\.[cm]?[jt]s$|(?:^|\/)types?(?:\/|\.[cm]?ts$)|(?:^|\/)(?:layout|loading|not-found)\.tsx$/;
 
 export function isCoverageSourcePath(path) {
   return SOURCE_PATH.test(path) && !EXCLUDED_SOURCE_PATH.test(path);
@@ -35,7 +36,12 @@ export function toWebCoverageIncludePaths(files) {
     ) {
       throw new Error(`Invalid coverage include path: ${filePath}`);
     }
-    return relativePath;
+    // Vitest consumes coverage.include entries as glob patterns, but these are
+    // literal repo paths. Route-group segments like "app/app/(shell)/..."
+    // would otherwise be read as glob groups and match nothing, silently
+    // dropping the file from the V8 report. Backslash-escape every glob
+    // metacharacter so each entry matches exactly its own path.
+    return relativePath.replace(/[^A-Za-z0-9/._-]/g, ch => `\\${ch}`);
   });
 }
 

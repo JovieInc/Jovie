@@ -176,6 +176,8 @@ describe('remaining route-shaped shell skeleton matchers', () => {
   it('matches the full admin subtree without matching settings admin', () => {
     expect(isAdminShellRoute(APP_ROUTES.ADMIN)).toBe(true);
     expect(isAdminShellRoute(APP_ROUTES.ADMIN_ACTIVITY)).toBe(true);
+    expect(isAdminShellRoute(APP_ROUTES.ADMIN_OPS)).toBe(true);
+    expect(isAdminShellRoute(APP_ROUTES.HUD_WIKI)).toBe(false);
     expect(isAdminShellRoute(APP_ROUTES.SETTINGS_ADMIN)).toBe(false);
   });
 
@@ -263,7 +265,8 @@ describe('isOvShellRoute', () => {
     expect(isOvShellRoute(APP_ROUTES.OV)).toBe(true);
     expect(isOvShellRoute(APP_ROUTES.ADMIN_CHAT)).toBe(true);
     expect(isOvShellRoute('/app/ov/ops')).toBe(true);
-    expect(isOvShellRoute(APP_ROUTES.ADMIN_OPS)).toBe(false);
+    expect(isOvShellRoute(APP_ROUTES.ADMIN_OPS)).toBe(true);
+    expect(isOvShellRoute(APP_ROUTES.HUD_WIKI)).toBe(false);
     expect(isOvShellRoute(APP_ROUTES.DASHBOARD)).toBe(false);
   });
 });
@@ -323,7 +326,7 @@ describe('shouldUseEssentialShellData', () => {
   it('uses essential shell data for OV routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.OV)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.ADMIN_CHAT)).toBe(true);
-    expect(shouldUseEssentialShellData(APP_ROUTES.ADMIN_OPS)).toBe(false);
+    expect(shouldUseEssentialShellData(APP_ROUTES.ADMIN_OPS)).toBe(true);
   });
 
   it('does not treat the legacy dashboard root as a nested dashboard subroute', () => {

@@ -69,25 +69,18 @@ const buttonVariants = cva(
     compoundVariants: [
       {
         variant: 'link',
-        size: [
-          'sm',
-          'marketing',
-          'md',
-          'lg',
-          'icon',
-          'icon-xs',
-          'icon-sm',
-          'icon-md',
-          'icon-lg',
-          'icon-xl',
-        ],
-        className:
-          'h-auto min-h-0 w-auto min-w-0 px-0 py-0 before:hidden aria-disabled:opacity-60',
+        size: ['sm', 'marketing', 'md', 'lg'],
+        className: 'w-auto min-w-0 px-0 py-0 aria-disabled:opacity-60',
       },
       {
         variant: 'link',
         size: ['icon', 'icon-xs', 'icon-sm', 'icon-md', 'icon-lg', 'icon-xl'],
-        className: `before:block ${ICON_HIT_TARGET_44}`,
+        className: 'min-h-0 w-auto min-w-0 px-0 py-0 aria-disabled:opacity-60',
+      },
+      {
+        variant: 'link',
+        size: ['icon', 'icon-xs', 'icon-sm', 'icon-md', 'icon-lg', 'icon-xl'],
+        className: `h-auto before:block ${ICON_HIT_TARGET_44}`,
       },
     ],
     defaultVariants: {

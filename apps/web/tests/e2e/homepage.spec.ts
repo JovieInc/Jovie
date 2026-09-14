@@ -123,10 +123,22 @@ test.describe('Homepage', () => {
     await expect(
       header.getByRole('link', { name: 'Customers' })
     ).toHaveAttribute('href', '/artists');
-    await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
     await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
     await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
-    await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
+      0
+    );
+    await expect(header.getByRole('button', { name: 'Resources' })).toHaveCount(
+      0
+    );
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',

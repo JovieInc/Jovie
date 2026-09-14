@@ -102,12 +102,26 @@ describe('changed test coverage', () => {
     expect(isCoverageSourcePath('apps/web/workflows/example.ts')).toBe(true);
     expect(isCoverageSourcePath('apps/web/vitest.config.fast.mts')).toBe(false);
     expect(isCoverageSourcePath('apps/web/lib/example.test.ts')).toBe(false);
+    expect(
+      isCoverageSourcePath('apps/web/components/atoms/example.stories.tsx')
+    ).toBe(false);
     expect(isCoverageSourcePath('scripts/lib/example.mjs')).toBe(false);
     expect(
       evaluateChangedLineCoverage({
         changedLines: new Map([
           ['apps/web/vitest.config.fast.mts', new Set([1])],
           ['scripts/lib/example.mjs', new Set([1])],
+        ]),
+        coverage: {},
+      })
+    ).toMatchObject({ ok: true, applicable: false });
+  });
+
+  it('treats a stories-only diff as a non-applicable coverage receipt', () => {
+    expect(
+      evaluateChangedLineCoverage({
+        changedLines: new Map([
+          ['apps/web/components/atoms/example.stories.tsx', new Set([1, 2, 3])],
         ]),
         coverage: {},
       })
@@ -132,16 +146,34 @@ describe('changed test coverage', () => {
     );
     expect(coverage).toContain('has_web_coverage_changes');
     expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
+    expect(coverage).toContain(
+      'pnpm --filter @jovie/web test:coverage --changed'
+    );
+    expect(coverage).not.toContain(
+      'pnpm --filter @jovie/web test:coverage -- --changed'
+    );
     expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
     expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
     expect(coverage).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);
     expect(coverage).toContain(String.raw`--changed \"\$COVERAGE_BASE\"`);
+    expect(coverage).not.toContain(
+      String.raw`test:coverage -- --changed \"\$COVERAGE_BASE\"`
+    );
+    expect(coverage).toContain(
+      String.raw`test:coverage --changed \"\$COVERAGE_BASE\"`
+    );
+    const coverageRun = coverage.slice(
+      coverage.indexOf('Run exact-head coverage and changed-behavior ratchet')
+    );
+    const runBody = coverageRun.slice(coverageRun.indexOf('        run: |'));
+    expect(runBody).not.toMatch(/^\s+#.*`/m);
     expect(coverage).toContain('--bail 1');
     expect(coverage).toContain('JOVIE_COVERAGE_INCLUDE');
     expect(coverage).toContain('.coverageInclude // [] | .[]');
     expect(coverage).toContain(
       'Applicable exact-head coverage plan produced no include paths.'
     );
+    expect(EXACT_HEAD_COVERAGE_STEP_TIMEOUT).toBe('17m');
     expect(coverage).toContain(
       `timeout --kill-after=20s ${EXACT_HEAD_COVERAGE_STEP_TIMEOUT}`
     );

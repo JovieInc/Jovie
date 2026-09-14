@@ -4059,6 +4059,11 @@ jobs:
           CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
           EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        # Do not put a double-dash separator before --changed. pnpm 9
+        # forwards that token and Vitest then treats --changed as a
+        # positional, which runs the full suite until the 18m job cap.
+        # Keep this note in YAML, not inside the shell script, so
+        # actionlint/shellcheck do not see quoted command substitution.
         run: |
           set -euo pipefail
           coverage_group=''
@@ -4092,8 +4097,8 @@ jobs:
               exit 1
             fi
             export JOVIE_COVERAGE_INCLUDE=\"\$include\"
-            timeout --kill-after=20s 15m \
-              pnpm --filter @jovie/web test:coverage -- --changed \"\$COVERAGE_BASE\" --bail 1
+            timeout --kill-after=20s 17m \
+              pnpm --filter @jovie/web test:coverage --changed \"\$COVERAGE_BASE\" --bail 1
             node scripts/check-changed-test-coverage.mjs \
               --base \"\$COVERAGE_BASE\" \
               --head \"\$EXPECTED_HEAD\"

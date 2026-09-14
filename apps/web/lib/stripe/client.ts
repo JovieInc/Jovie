@@ -9,6 +9,7 @@ import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { assertCheckoutPriceContract } from './price-contract';
 
 let stripeSingleton: Stripe | undefined;
 
@@ -163,6 +164,9 @@ export async function createCheckoutSession({
 }): Promise<Stripe.Checkout.Session> {
   try {
     const stripeClient = getStripe();
+    await assertCheckoutPriceContract(priceId, id =>
+      stripeClient.prices.retrieve(id)
+    );
     const requestOptions: Stripe.RequestOptions | undefined = idempotencyKey
       ? { idempotencyKey }
       : undefined;
