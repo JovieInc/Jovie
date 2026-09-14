@@ -309,7 +309,7 @@ class RepairTests(unittest.TestCase):
         repair._replace_private(self.root / f"{IDENT}.json", payload)
         now = time.time()
         config = {"creditUsagePercent": 23.1, "monthlyLimit": {"val": 100},
-                  "onDemandCap": {"val": 0}, "currentPeriod": {
+                  "onDemandCap": {"val": 0}, "prepaidBalance": {"val": 0}, "currentPeriod": {
                       "start": repair.datetime.fromtimestamp(now - 3600, repair.timezone.utc).isoformat(),
                       "end": repair.datetime.fromtimestamp(now + 3600, repair.timezone.utc).isoformat()}}
         return task, payload, config
@@ -351,6 +351,8 @@ class RepairTests(unittest.TestCase):
                     {**config, "creditUsagePercent": -1}, {**config, "creditUsagePercent": float("nan")},
                     {**config, "monthlyLimit": 0}, {**config, "monthlyLimit": True},
                     {**config, "onDemandCap": {"val": 1}}, {**config, "onDemandCap": None},
+                    {**config, "prepaidBalance": {"val": 1}}, {**config, "prepaidBalance": None},
+                    {**config, "prepaidBalance": {"val": False}},
                     {**config, "currentPeriod": None},
                     {**config, "currentPeriod": {"start":"2000-01-01", "end":"2999-01-01"}},
                     {**config, "currentPeriod": {"start":"2000-01-01T00:00:00Z", "end":"2001-01-01T00:00:00Z"}}]
