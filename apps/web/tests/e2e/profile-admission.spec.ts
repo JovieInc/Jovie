@@ -344,6 +344,141 @@ test.describe('public profile browser admission', () => {
     });
   }
 
+  const eventsNavigationCases = [
+    {
+      id: 'populated-mobile-pointer',
+      width: 390,
+      height: 844,
+      layout: 'compact' as const,
+      events: 'populated' as const,
+      activation: 'pointer' as const,
+    },
+    {
+      id: 'populated-desktop-keyboard',
+      width: 1512,
+      height: 982,
+      layout: 'desktop' as const,
+      events: 'populated' as const,
+      activation: 'keyboard' as const,
+    },
+    {
+      id: 'empty-mobile-keyboard',
+      width: 390,
+      height: 844,
+      layout: 'compact' as const,
+      events: 'empty' as const,
+      activation: 'keyboard' as const,
+    },
+    {
+      id: 'empty-desktop-pointer',
+      width: 1512,
+      height: 982,
+      layout: 'desktop' as const,
+      events: 'empty' as const,
+      activation: 'pointer' as const,
+    },
+  ] as const;
+
+  for (const fixture of eventsNavigationCases) {
+    test(`${fixture.id} exposes and activates the Events destination`, async ({
+      page,
+    }, testInfo) => {
+      await installPublicRouteMocks(page);
+      await page.setViewportSize({
+        width: fixture.width,
+        height: fixture.height,
+      });
+      const response = await page.goto(
+        `/renders/profile-admission?layout=public&state=claimed&events=${fixture.events}`,
+        { waitUntil: 'domcontentloaded' }
+      );
+      expect(response?.status()).toBe(200);
+      await waitForSettledProfileLayout(page, fixture.layout);
+
+      const surface = page.getByTestId(
+        fixture.layout === 'desktop'
+          ? 'profile-desktop-surface'
+          : 'profile-compact-surface'
+      );
+      const navigation = surface.getByRole('navigation', {
+        name: 'Profile Navigation',
+      });
+      const eventsButton = navigation.getByRole('button', {
+        name: 'Events',
+        exact: true,
+      });
+      await expect(eventsButton).toBeVisible();
+      await expect(
+        navigation.getByRole('button', { name: 'Shows', exact: true })
+      ).toHaveCount(0);
+      if (fixture.layout === 'compact') {
+        await expect(eventsButton).toHaveAttribute('aria-label', 'Events');
+      }
+
+      const geometry = await eventsButton.evaluate(element => {
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        };
+      });
+      expect(geometry.width).toBeGreaterThanOrEqual(44);
+      expect(geometry.height).toBeGreaterThanOrEqual(44);
+      expect(geometry.left).toBeGreaterThanOrEqual(0);
+      expect(geometry.top).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+      expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+      await captureStill(
+        page,
+        testInfo,
+        `events-navigation-${fixture.id}-home.png`
+      );
+
+      if (fixture.activation === 'keyboard') {
+        await eventsButton.focus();
+        await expect(eventsButton).toBeFocused();
+        await page.keyboard.press('Enter');
+      } else {
+        await eventsButton.click();
+      }
+
+      await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
+      await expect(eventsButton).toHaveAttribute('aria-current', 'page');
+      const selected = page.getByTestId('profile-primary-tab-tour');
+      await expect(selected).toBeVisible();
+      await expect(
+        selected.getByRole('heading', { name: 'Shows', exact: true })
+      ).toBeVisible();
+
+      if (fixture.events === 'populated') {
+        if (fixture.layout === 'compact') {
+          await expect(selected.getByTestId('tour-drawer-list')).toBeVisible();
+        }
+        await expect(
+          selected.getByText('The Novo', { exact: true })
+        ).toBeVisible();
+      } else if (fixture.layout === 'compact') {
+        const empty = selected.getByTestId('profile-primary-tab-events-empty');
+        await expect(empty).toBeVisible();
+        await expect(empty).toContainText('No upcoming shows');
+      } else {
+        await expect(selected).toContainText('No upcoming shows.');
+      }
+
+      await captureStill(
+        page,
+        testInfo,
+        `events-navigation-${fixture.id}-selected.png`
+      );
+    });
+  }
+
   for (const state of ['unclaimed', 'claimed', 'owner'] as const) {
     for (const width of [1179, 1180, 1512]) {
       test(`${state} ${width}px renders only actual banner space`, async ({
