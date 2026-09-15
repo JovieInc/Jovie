@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { ensureSignedInUser } from '../helpers/auth';
 
 /**
@@ -171,11 +172,15 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
         priceId?: string;
         description?: string;
         amount?: number;
+        currency?: string;
+        interval?: string;
       }>;
       options?: Array<{
         priceId?: string;
         description?: string;
         amount?: number;
+        currency?: string;
+        interval?: string;
       }>;
     } | null = null;
 
@@ -208,7 +213,12 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
 
     // Find the primary paid Pro monthly plan specifically.
     const proMonthlyOption = allOptions.find(
-      o => o.description === 'Pro' && o.amount === 3900 && o.priceId
+      o =>
+        o.description === ARTIST_VISIBILITY_OFFER.pro.displayName &&
+        o.amount === toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd) &&
+        o.currency === ARTIST_VISIBILITY_OFFER.pro.currency &&
+        o.interval === ARTIST_VISIBILITY_OFFER.pro.interval &&
+        o.priceId
     );
     expect(
       proMonthlyOption,
@@ -218,8 +228,8 @@ test.describe('Billing Checkout: Stripe checkout session creation', () => {
     const proMonthlyPriceId = proMonthlyOption!.priceId!;
     expect(
       proMonthlyOption!.amount,
-      'Pro monthly price should be $39/mo (3900 cents)'
-    ).toBe(3900);
+      'Artist Visibility Pro monthly price should be $199/mo (19900 cents)'
+    ).toBe(toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd));
 
     // Create checkout session with Pro monthly price
     let checkoutUrl: string | null = null;
