@@ -395,7 +395,7 @@ function executeAdmissionScope({
   }
 }
 
-function executeClockAdmissionProbe({ pages = [], activeStatus = '', apiFailure = '' } = {}) {
+function executeClockAdmissionProbe({ pages = [], activeStatus = '', activeCiStatus = '', apiFailure = '' } = {}) {
   const workflow = readRepoFile('.github/workflows/runner-heartbeat.yml');
   const script = workflowRunScript(workflow, 'Reconcile pending native admission');
   const directory = mkdtempSync(join(tmpdir(), 'merge-queue-clock-'));
@@ -412,7 +412,8 @@ if [[ "$1 $2" == 'api graphql' ]]; then
   printf '%s\\n' "$MOCK_PAGES"
 elif [[ "$1" == 'api' ]]; then
   [[ "$MOCK_API_FAILURE" != 'runs' ]] || exit 43
-  if [[ -n "$MOCK_ACTIVE_STATUS" && "$2" == *"status=$MOCK_ACTIVE_STATUS&"* ]]; then
+  if [[ -n "$MOCK_ACTIVE_STATUS" && "$2" == *"merge-queue-autoenroll.yml/runs?status=$MOCK_ACTIVE_STATUS&"* ]] ||
+    [[ -n "$MOCK_ACTIVE_CI_STATUS" && "$2" == *"ci.yml/runs?event=merge_group&status=$MOCK_ACTIVE_CI_STATUS&"* ]]; then
     printf '%s\\n' '{"total_count":1}'
   else
     printf '%s\\n' '{"total_count":0}'
@@ -433,6 +434,7 @@ fi
         GH_REPO: REPOSITORY,
         MOCK_PAGES: JSON.stringify(pages),
         MOCK_ACTIVE_STATUS: activeStatus,
+        MOCK_ACTIVE_CI_STATUS: activeCiStatus,
         MOCK_API_FAILURE: apiFailure,
         MOCK_CALLS: calls,
         MOCK_DISPATCHES: dispatches,
@@ -446,13 +448,16 @@ fi
 
 describe('existing remediation clock admission wake', () => {
   const page = (nodes, hasNextPage = false) => ({ data: { repository: { pullRequests: { nodes, pageInfo: { hasNextPage, endCursor: hasNextPage ? 'next' : null } } } } });
-  const pending = { isDraft: false, isInMergeQueue: false, mergeable: 'MERGEABLE' };
+  const pending = { isDraft: false, mergeable: 'MERGEABLE' };
 
   it('reuses the scheduled clock and wakes the canonical writer without a PR payload', () => {
     const workflow = readRepoFile('.github/workflows/runner-heartbeat.yml');
     const job = extractWorkflowJobBlock(workflow, 'remediation-clock');
     expect(job).toContain("if: github.event_name == 'schedule'");
     expect(job).toContain('pull-requests: read');
+    expect(job).not.toContain('isInMergeQueue');
+    expect(job).not.toContain('mergeQueueEntry');
+    expect(job).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     const result = executeClockAdmissionProbe({ pages: [page([{ ...pending, isDraft: true }], true), page([pending])] });
     expect(result.status, result.stderr).toBe(0);
     expect(job).toContain('gh api graphql --paginate --slurp');
@@ -465,7 +470,6 @@ describe('existing remediation clock admission wake', () => {
   it.each([
     { nodes: [] },
     { nodes: [{ ...pending, isDraft: true }] },
-    { nodes: [{ ...pending, isInMergeQueue: true }] },
     { nodes: [{ ...pending, mergeable: 'CONFLICTING' }] },
   ])('does not wake or read active passes when there is no pending demand: %j', ({ nodes }) => {
     const result = executeClockAdmissionProbe({ pages: [page(nodes)] });
@@ -480,6 +484,15 @@ describe('existing remediation clock admission wake', () => {
       expect(result.status, result.stderr).toBe(0);
       expect(result.dispatches).toBe('');
       expect(result.stdout).toContain('no duplicate wake');
+    }
+  );
+
+  it.each(['queued', 'in_progress', 'waiting', 'pending', 'requested'])(
+    'leaves the next wake to combined-head CI while it is %s', activeCiStatus => {
+      const result = executeClockAdmissionProbe({ pages: [page([pending])], activeCiStatus });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.dispatches).toBe('');
+      expect(result.stdout).toContain('its completion owns the next wake');
     }
   );
 
