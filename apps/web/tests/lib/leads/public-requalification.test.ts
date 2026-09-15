@@ -132,6 +132,54 @@ describe('requalifyPublicLead', () => {
     mockSpotifyEnrichLead.mockResolvedValue(spotify());
   });
 
+  it('rejects non-Linktree input before looking up a candidate', async () => {
+    const getLeadByHandle = vi.fn(async () => lead());
+    const { deps } = dependencies({ getLeadByHandle });
+
+    await expect(
+      requalifyPublicLead(
+        { linktreeUrl: 'https://example.com/rhirhimusic' },
+        deps
+      )
+    ).rejects.toThrow('valid Linktree URL');
+    expect(getLeadByHandle).not.toHaveBeenCalled();
+  });
+
+  it('creates a candidate seed when the public handle is not known', async () => {
+    const createdLead = lead();
+    const getLeadByHandle = vi.fn(async () => null);
+    const createLead = vi.fn(
+      async (_input: { handle: string; url: string }) => createdLead
+    );
+    const { deps } = dependencies({ getLeadByHandle, createLead });
+
+    const result = await requalifyPublicLead(
+      { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+      deps
+    );
+
+    expect(getLeadByHandle).toHaveBeenCalledWith('rhirhimusic');
+    expect(createLead).toHaveBeenCalledWith({
+      handle: 'rhirhimusic',
+      url: 'https://linktr.ee/rhirhimusic',
+    });
+    expect(result.candidateId).toBe(createdLead.id);
+  });
+
+  it('uses runtime environment and clock defaults when overrides are absent', async () => {
+    const { deps } = dependencies();
+    delete deps.environment;
+    delete deps.now;
+
+    const result = await requalifyPublicLead(
+      { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+      deps
+    );
+
+    expect(result.environment).toBe('dev');
+    expect(result.observedAt).not.toBe(FIXED_NOW.toISOString());
+  });
+
   it('persists an immutable public run without private contact data', async () => {
     const { deps, updateLead, persistRunReceipt } = dependencies();
 
@@ -268,6 +316,35 @@ describe('requalifyPublicLead', () => {
     expect(updateLead).not.toHaveBeenCalled();
   });
 
+  it('rejects an unreadable latest receipt before writing lead updates', async () => {
+    const { deps, updateLead } = dependencies({
+      getLatestRunReceipt: vi.fn(async () => ({ runId: 'unreadable' })),
+    });
+
+    await expect(
+      requalifyPublicLead(
+        { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+        deps
+      )
+    ).rejects.toBeInstanceOf(PublicRequalificationConflictError);
+    expect(updateLead).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unreadable receipt for the current attempt', async () => {
+    const { deps, updateLead } = dependencies({
+      getLatestRunReceipt: vi.fn(async () => null),
+      getRunReceipt: vi.fn(async () => ({ runId: 'unreadable' })),
+    });
+
+    await expect(
+      requalifyPublicLead(
+        { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+        deps
+      )
+    ).rejects.toBeInstanceOf(PublicRequalificationConflictError);
+    expect(updateLead).not.toHaveBeenCalled();
+  });
+
   it('appends a new attempt for a genuinely new public observation', async () => {
     const first = dependencies();
     const initial = await requalifyPublicLead(
@@ -336,6 +413,45 @@ describe('requalifyPublicLead', () => {
     });
   });
 
+  it('records disqualification timestamps when public evidence fails qualification', async () => {
+    const disqualified = {
+      ...qualification(),
+      status: 'disqualified' as const,
+      disqualificationReason: 'missing_public_identity',
+    };
+    const { deps, updateLead } = dependencies({
+      qualify: vi.fn(async () => disqualified),
+    });
+
+    await requalifyPublicLead(
+      { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+      deps
+    );
+
+    expect(updateLead.mock.calls[0]?.[1]).toMatchObject({
+      status: 'disqualified',
+      disqualificationReason: 'missing_public_identity',
+      qualifiedAt: null,
+      disqualifiedAt: FIXED_NOW,
+    });
+  });
+
+  it('preserves lead status after it leaves the requalification lifecycle', async () => {
+    const approvedLead = { ...lead(), status: 'approved' as const };
+    const getLeadByHandle = vi.fn(async () => approvedLead);
+    const { deps, updateLead } = dependencies({ getLeadByHandle });
+
+    await requalifyPublicLead(
+      { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+      deps
+    );
+
+    expect(updateLead.mock.calls[0]?.[1]).not.toHaveProperty('status');
+    expect(updateLead.mock.calls[0]?.[1]).not.toHaveProperty(
+      'disqualificationReason'
+    );
+  });
+
   it('deduplicates concurrent refreshes for the same source revision', async () => {
     const shared = dependencies();
     let preflightReads = 0;
@@ -383,5 +499,21 @@ describe('requalifyPublicLead', () => {
         deps
       )
     ).rejects.toThrow('dev-only');
+  });
+
+  it('fails closed when the saved receipt does not prove durable persistence', async () => {
+    const { deps, updateLead } = dependencies({
+      getLatestRunReceipt: vi.fn(async () => null),
+      getRunReceipt: vi.fn(async () => null),
+      persistRunReceipt: vi.fn(async () => true),
+    });
+
+    await expect(
+      requalifyPublicLead(
+        { linktreeUrl: 'https://linktr.ee/rhirhimusic' },
+        deps
+      )
+    ).rejects.toThrow('not durably persisted');
+    expect(updateLead).toHaveBeenCalledTimes(1);
   });
 });
