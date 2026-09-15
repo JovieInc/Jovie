@@ -98,19 +98,29 @@ Rules:
   out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **Admission is independent of prior production deployment.** A pending, missing,
-  or failed release checkpoint does not block an otherwise qualified source PR.
-  Exact-head source checks, explicit scoped incident holds, and required native
-  merge-group correctness, provenance, and ancestry checks remain enforced.
-  Admission receipts say `source-qualified`; they never certify production.
+- **Source qualification is separate from production certification.** A pending,
+  missing, or failed release checkpoint by itself does not make an otherwise
+  qualified source PR ineligible. Exact-head source checks, explicit scoped
+  incident holds, and required native merge-group correctness, provenance, and
+  ancestry checks remain enforced. Admission receipts say `source-qualified`;
+  they never certify production.
   The production controller owns deployment serialization and exact runtime
   certification. When main and production are healthy, exact-main review is
   current, and integrity is clear, controller containment and production SHA
-  lag select `hold-intake`: qualified PRs continue through the native queue,
-  while controller containment still holds new implementation and deployment.
+  lag select `hold-intake`: clean exact-head PRs may enter the native queue
+  while new implementation and deployment stay held, subject to the separate
+  release-wave pause below.
+  A separate active release-wave lease pauses only new native queue enrollment
+  and re-entry while a Production Controller run is queued or in progress. The
+  workflow fixes each run's deadline at 30 minutes from `created_at`. Terminal
+  completion releases that run's hold sooner; another queued or in-progress run
+  can keep the pause active against its own deadline. Repeated observations do
+  not restart a run's deadline. Already-admitted native entries remain in the
+  queue, subject to ordinary safety-dequeue checks, throughout the pause.
+  Unavailable or malformed controller state fails closed before enrollment.
   Capacity-dependent mutation requires its own accepted evidence. Unknown
-  source/review/integrity evidence still blocks admission. An
-  existing incident hold is cleared only by its own evidence.
+  source/review/integrity evidence still blocks admission. An existing incident
+  hold is cleared only by its own evidence.
 - **GitHub's native merge queue owns combined-head integration.** The
   `merge_group` event validates the synthetic SHA and emits the same required
   contexts as the source PR. Main reuses an exact successful merge-group SHA;
