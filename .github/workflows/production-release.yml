@@ -1272,6 +1272,14 @@ jobs:
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
             if [ "$PROMOTION_RESULT" = "success" ] &&
+              [[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+              [ "$PROMOTION_SHA" != "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced before production promotion to $PROMOTION_SHA; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_before_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$PROMOTION_RESULT" = "success" ] &&
               [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
               [ "$ROLLBACK_RESULT" = "skipped" ]; then
               echo "::notice::Main advanced to $current_main after exact production promotion; refusing stale staging alias mutation and omitting a current staging receipt for $EXPECTED_COMMIT_SHA."
@@ -1466,6 +1474,14 @@ jobs:
           set -euo pipefail
           current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
           if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            if [ "$PROMOTION_RESULT" = "success" ] &&
+              [[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+              [ "$PROMOTION_SHA" != "$EXPECTED_COMMIT_SHA" ] &&
+              [ "$ROLLBACK_RESULT" = "skipped" ]; then
+              echo "::notice::Main advanced before production promotion to $PROMOTION_SHA; omitting a falsely current staging receipt for $EXPECTED_COMMIT_SHA."
+              echo "staging_refresh_outcome=superseded_before_promotion" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             if [ "$PROMOTION_RESULT" = "success" ] &&
               [ "$PROMOTION_SHA" = "$EXPECTED_COMMIT_SHA" ] &&
               [ "$ROLLBACK_RESULT" = "skipped" ]; then
