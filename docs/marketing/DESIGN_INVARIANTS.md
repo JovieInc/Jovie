@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.3.0
+spec-version: 1.4.0
 doc-freshness: docs/marketing/DESIGN_INVARIANTS.md
 -->
 # Marketing design invariants
@@ -33,7 +33,8 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
 
 - **Scope:** marketing design execution, shared Pen components, review handback.
 - **Requirement:** use the existing canonical marketing canvas and reusable
-  library/atoms; establish a single writer. Show a real render quickly and vary
+  library/atoms; establish one writer per overlapping source scope. Coordinated
+  writers may work on disjoint nodes. Show a real render quickly and vary
   one coherent set of decisions. Keep other copy, style, and layout fixed until
   the task authorizes that scope. Do not repeatedly ask permission to begin.
 - **Founder evidence/status:** requirement; repeated requests to work directly
@@ -104,8 +105,10 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
   strong still and optionally add restrained motion. Do not revive artist-name,
   album-promo, screenshot-collage or label/connector diagrams as cosmetic polish.
 - **Founder evidence/status:** editorial conceptual direction accepted; the
-  specific monochrome photographic assembly remains a proposal, not a blanket
-  visual lock. The desktop Library screenshot was explicitly for the right rail.
+  monochrome photographic assembly was included in the subsequently approved
+  homepage first pass. That acceptance is scoped to the composition, not a
+  blanket lock on other imagery or a completed gradient refinement. The desktop Library screenshot was explicitly for the
+  right rail.
 - **Enforcement:** render review checks concept, hierarchy and actual readability;
   provenance distinguishes conceptual art from product proof. Deliberate owned
   art follows the existing scene-first palette policy; protected source colors
@@ -136,13 +139,17 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
   unpublished or empty release entries. Homepage previews share the same
   entry/artwork family. Deliberate gradient-and-type artwork is valid. Changelog
   page and homepage-preview artwork use the shared 16px radius token with actual
-  clipping; reserve equal desktop title space so media top edges align. Group
-  dates and titles tightly; retain full wording with a tested shared row height
-  that accommodates wrapping, and reserve media aspect ratios before loading.
-  Blog posts, category pages and related cards reuse the editorial family; show
-  only articles belonging to the named category, with other articles separately labeled.
+  clipping. Homepage changelog and shared blog preview cards put equal-ratio
+  artwork FIRST, full titles BELOW, then compact category/date metadata. Reserve
+  media dimensions before loading; below-image titles wrap naturally. This
+  supersedes title/date-above-image and fixed title-height alignment workarounds.
+  The full changelog retains its separate sticky-date timeline. Blog posts,
+  category pages and related cards reuse the editorial family; show only matching
+  articles in a named category and label cross-category recommendations separately.
 - **Founder evidence/status:** explicit Cursor timeline request and request for
-  editorial images inspired by ElevenLabs/OpenAI. Current implementation is a proposal.
+  editorial images inspired by ElevenLabs/OpenAI; later accepted image-first
+  preview direction supersedes earlier title-above-image studies. Design
+  acceptance does not itself certify the implemented or deployed result.
 - **Enforcement:** inspect reference pixels and real scroll behavior, record
   initial/scrolled date-state contract in Pen, then test Jovie runtime separately.
   Verify publication sources, legibility, consistent media ratios and narrow flow.
@@ -160,6 +167,12 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
 - **Founder evidence/status:** “the copy/paste button is the key though”; later
   “that footer cta is great” approves the displayed K4ar1 composition with
   “Take control of your presence.” / “Find your profile” / “Onboard your agent”.
+  This is historical acceptance. The September 14 scoped correction relayed
+  through the marketing coordinator calls for “See what world sees”,
+  “Start with your name”, “Find me”, and a thin “Onboard your agent” treatment.
+  It supersedes the older closing-copy reference only. Resolve exact current
+  wording, desktop/mobile nodes and geometry from the saved canonical source;
+  the historical K4ar1 export is not current saved-source proof.
 - **Enforcement:** visible copy affordance, accessible name/focus/target; show
   success only after clipboard resolution and announce it. On rejection provide
   selectable instructions. Test default, pending, success and failure behavior;
@@ -176,9 +189,10 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
   principles; then compare strongest options in identical geometry with one
   primary action held constant. Evaluate clarity, specificity, credibility,
   rhythm, audience and fit. Isolate primary-label experiments from headlines.
-- **Founder evidence/status:** heavy copy exploration requested. Current
-  “Take control of your presence.” remains in place; “Shape how the world sees
-  you.” and “Your next chapter starts here.” remain viable study choices.
+- **Founder evidence/status:** heavy copy exploration requested. The
+  September 13 baseline was “Take control of your presence.”; “Shape how the
+  world sees you.” and “Your next chapter starts here.” were viable study
+  choices. MKT-D08 records the later scoped closing-CTA correction.
   “Put your presence to work.” is explicitly rejected as weird shuffled copy
   without a natural lead idea. Other three were not rejected.
 - **Enforcement:** semantic/editorial review plus controlled rendered comparisons.
@@ -291,5 +305,12 @@ another task supplies no design requirement or action authority here.
 - **Scope:** marketing buttons, footer preferences, editorial links, CLI and visibility studies.
 - **Requirement:** diagonal up-right arrows denote a new browsing context; straight-right arrows denote same-context navigation. Copy uses copy/check; in-page actions use appropriate non-navigation symbols. External destinations do not automatically require a new window. Match footer controls to the canonical button visible size and hit target; smaller marketing labels are a scoped proposal, not an app-wide change.
 - **Founder evidence/status:** explicit arrow and canonical footer-size direction on 2026-09-13; smaller button text was tentative.
-- **Enforcement:** inspect actual target/rel and action behavior, verify keyboard/clipboard states, and compare controls against g3IC1 geometry rather than zoomed screenshots. Current atom reads 28px visible within a 44px target; retain accessible targets. New-context links require the appropriate safe rel contract.
-- **Change/exception:** communicate actual navigation behavior consistently; do not impose a new-context destination merely to justify an icon. Re-evaluate scoped label size after rendered comparison.
+- **Enforcement:** inspect actual target/rel and action behavior, verify keyboard/clipboard states, and compare controls against g3IC1 geometry rather than zoomed screenshots. The recorded g3IC1 master contract is 28px visible within a 44px target; verify the current saved source and retain accessible targets. New-context links require the appropriate safe rel contract.
+- **Change/exception:** the September 14 native Pen PM handoff permits ONLY
+  `FoiAh.height = 32` instance overrides for `C5ui5`, `D8v2A`, `UB1Gg`,
+  `KiTH6` under public-profile shell `kh2z3`, and `uM8hY` under release shell
+  `VrRlg`, retaining 44px hit areas and the 28px `g3IC1` master. This is a
+  scoped exception, not a global button-size change, broader master/padding/
+  header authorization, or proof the edit was saved. Communicate actual
+  navigation behavior consistently; do not impose a new-context destination
+  merely to justify an icon. Re-evaluate scoped label size after rendered comparison.
