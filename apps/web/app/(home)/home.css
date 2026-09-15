@@ -2462,7 +2462,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (max-width: 767px) {
-  .homepage-close__headline {
+  .home-viewport .homepage-close .homepage-close__headline {
     max-width: 342px;
     font-size: 2rem;
     text-wrap: wrap;
