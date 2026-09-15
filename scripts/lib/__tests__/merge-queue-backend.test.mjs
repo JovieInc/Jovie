@@ -318,6 +318,7 @@ function executeAdmissionScope({
   workflowEvent = 'pull_request',
   pullRequests = [],
   pullRequestEvent = null,
+  eventName = null,
   productionAdmissionAllowed = true,
   fleetPromotionMode = 'normal',
 }) {
@@ -357,7 +358,7 @@ function executeAdmissionScope({
         encoding: 'utf8',
         env: {
           ...process.env,
-          EVENT_NAME: pullRequestEvent ? 'pull_request' : 'workflow_run',
+          EVENT_NAME: eventName ?? (pullRequestEvent ? 'pull_request' : 'workflow_run'),
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
@@ -393,6 +394,109 @@ function executeAdmissionScope({
     rmSync(directory, { recursive: true, force: true });
   }
 }
+
+function executeClockAdmissionProbe({ pages = [], activeStatus = '', apiFailure = '' } = {}) {
+  const workflow = readRepoFile('.github/workflows/runner-heartbeat.yml');
+  const script = workflowRunScript(workflow, 'Reconcile pending native admission');
+  const directory = mkdtempSync(join(tmpdir(), 'merge-queue-clock-'));
+  const dispatches = join(directory, 'dispatches');
+  const calls = join(directory, 'calls');
+  const ghPath = join(directory, 'gh');
+  writeFileSync(dispatches, '');
+  writeFileSync(calls, '');
+  writeFileSync(ghPath, `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s %s\\n' "$1" "$2" >>"$MOCK_CALLS"
+if [[ "$1 $2" == 'api graphql' ]]; then
+  [[ "$MOCK_API_FAILURE" != 'inventory' ]] || exit 42
+  printf '%s\\n' "$MOCK_PAGES"
+elif [[ "$1" == 'api' ]]; then
+  [[ "$MOCK_API_FAILURE" != 'runs' ]] || exit 43
+  if [[ -n "$MOCK_ACTIVE_STATUS" && "$2" == *"status=$MOCK_ACTIVE_STATUS&"* ]]; then
+    printf '%s\\n' '{"total_count":1}'
+  else
+    printf '%s\\n' '{"total_count":0}'
+  fi
+elif [[ "$1 $2" == 'workflow run' ]]; then
+  printf '%s\\n' "$*" >>"$MOCK_DISPATCHES"
+else
+  exit 99
+fi
+`);
+  chmodSync(ghPath, 0o755);
+  try {
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${directory}:${process.env.PATH}`,
+        GH_REPO: REPOSITORY,
+        MOCK_PAGES: JSON.stringify(pages),
+        MOCK_ACTIVE_STATUS: activeStatus,
+        MOCK_API_FAILURE: apiFailure,
+        MOCK_CALLS: calls,
+        MOCK_DISPATCHES: dispatches,
+      },
+    });
+    return { ...result, calls: readFileSync(calls, 'utf8'), dispatches: readFileSync(dispatches, 'utf8') };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+describe('existing remediation clock admission wake', () => {
+  const page = (nodes, hasNextPage = false) => ({ data: { repository: { pullRequests: { nodes, pageInfo: { hasNextPage, endCursor: hasNextPage ? 'next' : null } } } } });
+  const pending = { isDraft: false, isInMergeQueue: false, mergeable: 'MERGEABLE' };
+
+  it('reuses the scheduled clock and wakes the canonical writer without a PR payload', () => {
+    const workflow = readRepoFile('.github/workflows/runner-heartbeat.yml');
+    const job = extractWorkflowJobBlock(workflow, 'remediation-clock');
+    expect(job).toContain("if: github.event_name == 'schedule'");
+    expect(job).toContain('pull-requests: read');
+    const result = executeClockAdmissionProbe({ pages: [page([{ ...pending, isDraft: true }], true), page([pending])] });
+    expect(result.status, result.stderr).toBe(0);
+    expect(job).toContain('gh api graphql --paginate --slurp');
+    expect(result.dispatches).toBe('workflow run merge-queue-autoenroll.yml --ref main\n');
+    expect(executeAdmissionScope({ eventName: 'workflow_dispatch' })).toEqual(expect.objectContaining({
+      disposition: 'neutral', reason: 'manual-maintenance', pr_number: '', head_sha: '', reconcile_queue_reentry: '0',
+    }));
+  });
+
+  it.each([
+    { nodes: [] },
+    { nodes: [{ ...pending, isDraft: true }] },
+    { nodes: [{ ...pending, isInMergeQueue: true }] },
+    { nodes: [{ ...pending, mergeable: 'CONFLICTING' }] },
+  ])('does not wake or read active passes when there is no pending demand: %j', ({ nodes }) => {
+    const result = executeClockAdmissionProbe({ pages: [page(nodes)] });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.dispatches).toBe('');
+    expect(result.calls.trim().split('\n')).toHaveLength(1);
+  });
+
+  it.each(['queued', 'in_progress', 'waiting', 'pending', 'requested'])(
+    'suppresses a duplicate while the canonical pass is %s', activeStatus => {
+      const result = executeClockAdmissionProbe({ pages: [page([pending])], activeStatus });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.dispatches).toBe('');
+      expect(result.stdout).toContain('no duplicate wake');
+    }
+  );
+
+  it.each(['inventory', 'runs'])('fails visibly when the %s API fails', apiFailure => {
+    const result = executeClockAdmissionProbe({ pages: [page([pending])], apiFailure });
+    expect(result.status).not.toBe(0);
+    expect(result.dispatches).toBe('');
+  });
+
+  it.each([[], [{}], [{ errors: [{ message: 'unavailable' }] }], [page([{ ...pending, isDraft: null }])], [page([pending], true)]].map(pages => ({ pages })))(
+    'rejects malformed inventory instead of treating it as empty demand: %j', ({ pages }) => {
+      const result = executeClockAdmissionProbe({ pages });
+      expect(result.status).not.toBe(0);
+      expect(result.dispatches).toBe('');
+    }
+  );
+});
 
 /**
  * @param {{
@@ -798,9 +902,8 @@ describe('queue workflow mutation safety', () => {
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
     expect(workflow).toContain(
-      'types: [reopened, labeled, unlabeled, enqueued, dequeued]'
+      'types: [ready_for_review, reopened, labeled, unlabeled, enqueued, dequeued]'
     );
-    expect(workflow).not.toContain('ready_for_review, reopened');
 
     expect(fleetPolicy).toContain('github-token: ${{ github.token }}');
     expect(scope).toContain('case "$EVENT_NAME" in');
@@ -966,10 +1069,11 @@ describe('queue workflow mutation safety', () => {
     );
   });
 
-  it('treats a native enqueued event as an exact-head continuation candidate', () => {
+  it.each(['ready_for_review', 'enqueued'])(
+    'treats %s as an exact-head admission candidate without restarting CI', action => {
     const outputs = executeAdmissionScope({
       pullRequestEvent: {
-        action: 'enqueued',
+        action,
         pull_request: {
           number: 16762,
           base: { ref: 'main' },
