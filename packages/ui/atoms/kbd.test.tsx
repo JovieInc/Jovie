@@ -49,8 +49,11 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('bg-surface-tooltip');
       // Deliberate-red guard: the tooltip keycap must not inherit the card surface.
       expect(kbd.className).not.toContain('bg-(--linear-bg-surface-1)');
-      expect(kbd.className).toContain('border-(--linear-border-default)');
-      expect(kbd.className).toContain('text-(--linear-text-primary)');
+      expect(kbd.className).toContain('border-strong');
+      expect(kbd.className).toContain('text-tooltip-foreground');
+      expect(kbd.className).toContain('rounded-(--radius-sm)');
+      // Tooltip surfaces stay dark in light mode; primary text is dark there.
+      expect(kbd.className).not.toContain('text-(--linear-text-primary)');
     });
 
     it('tooltip variant has dark mode styles', () => {
@@ -61,7 +64,7 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByTestId('kbd');
       expect(kbd.className).toContain('bg-surface-tooltip');
-      expect(kbd.className).toContain('border-(--linear-border-default)');
+      expect(kbd.className).toContain('border-strong');
     });
   });
 
@@ -73,13 +76,14 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('items-center');
       expect(kbd.className).toContain('justify-center');
       expect(kbd.className).toContain('rounded-(--app-shell-radius-item)');
-      expect(kbd.className).toContain('min-h-5');
-      expect(kbd.className).toContain('min-w-5');
-      expect(kbd.className).toContain('px-1.5');
-      expect(kbd.className).toContain('py-px');
-      expect(kbd.className).toContain('leading-none');
-      expect(kbd.className).toContain('font-mono');
-      expect(kbd.className).toContain('text-2xs');
+      expect(kbd.className).toContain('min-h-6');
+      expect(kbd.className).toContain('min-w-6');
+      expect(kbd.className).toContain('px-2');
+      expect(kbd.className).toContain('py-0.5');
+      expect(kbd.className).toContain('leading-4');
+      expect(kbd.className).toContain('font-sans');
+      expect(kbd.className).toContain('text-xs');
+      expect(kbd.className).toContain('tracking-tight');
       expect(kbd.className).toContain('font-medium');
       expect(kbd.className).toContain('shadow-sm');
     });
@@ -110,6 +114,17 @@ describe('Kbd', () => {
   });
 
   describe('Content', () => {
+    it('uses the canonical icon for the Shift glyph with an accessible label', () => {
+      render(<Kbd data-testid='kbd'>⇧</Kbd>);
+      const kbd = screen.getByTestId('kbd');
+      expect(kbd).toHaveAttribute('data-key', 'shift');
+      expect(screen.getByText('Shift')).toHaveClass('sr-only');
+      expect(kbd.querySelector('[data-kbd-shift-icon="true"]')).toHaveAttribute(
+        'aria-hidden',
+        'true'
+      );
+    });
+
     it('renders single key', () => {
       render(<Kbd>K</Kbd>);
       expect(screen.getByText('K')).toBeInTheDocument();
@@ -150,7 +165,7 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByText('⌘K');
       expect(kbd.className).toContain('bg-surface-tooltip');
-      expect(kbd.className).toContain('text-(--linear-text-primary)');
+      expect(kbd.className).toContain('text-tooltip-foreground');
     });
   });
 });
