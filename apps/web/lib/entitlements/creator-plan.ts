@@ -251,3 +251,23 @@ export async function canCreatorSendNotifications(
   const { entitlements } = await getCreatorEntitlements(creatorProfileId);
   return entitlements.booleans.canSendNotifications;
 }
+
+/** Resolve the same deterministic claimed owner used by creator entitlements. */
+export async function getCreatorOwnerUserId(
+  creatorProfileId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({
+      claimedUserId: userProfileClaims.userId,
+      legacyUserId: creatorProfiles.userId,
+    })
+    .from(creatorProfiles)
+    .leftJoin(
+      userProfileClaims,
+      eq(userProfileClaims.creatorProfileId, creatorProfiles.id)
+    )
+    .where(eq(creatorProfiles.id, creatorProfileId))
+    .orderBy(userProfileClaims.userId)
+    .limit(1);
+  return row?.claimedUserId ?? row?.legacyUserId ?? null;
+}

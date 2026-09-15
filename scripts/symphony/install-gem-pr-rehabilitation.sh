@@ -5,12 +5,18 @@ readonly SOURCE_ROOT="${1:-$(git rev-parse --show-toplevel)}"
 readonly GEM_ROOT="${GEM_WORKSPACE:-/home/timwhite/gem-workspace}"
 readonly EXPECTED_SOURCE_REVISION="${GEM_CONTROLLER_EXPECTED_REVISION:-}"
 readonly VERIFY_ONLY="${GEM_REHABILITATION_VERIFY_ONLY:-false}"
+readonly DEFER_FIRST_CYCLE="${GEM_REHABILITATION_DEFER_FIRST_CYCLE:-false}"
 readonly UNIT_ROOT="${HOME}/.config/systemd/user"
 readonly TIMER="gem-pr-drain.timer"
 readonly SERVICE="gem-pr-drain.service"
 readonly PREFLIGHT_ONLY="${GEM_REHABILITATION_PREFLIGHT_ONLY:-false}"
 # shellcheck source=lib/user-systemd-context.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/user-systemd-context.sh"
+
+case "${DEFER_FIRST_CYCLE}" in
+  true|false) ;;
+  *) printf 'GEM_REHABILITATION_DEFER_FIRST_CYCLE must be true or false\n' >&2; exit 2 ;;
+esac
 
 if [[ "${PREFLIGHT_ONLY}" == true ]]; then
   prepare_user_systemd_context
@@ -225,13 +231,20 @@ node --check "${GEM_ROOT}/scripts/summer-symphony-outbox-consumer.mjs"
 python3 -m json.tool "${GEM_ROOT}/config/existing-repair-controller-manifest.json" >/dev/null
 systemctl --user daemon-reload
 systemctl --user enable --now "${TIMER}"
-systemctl --user start "${SERVICE}"
-[[ "$(systemctl --user show "${SERVICE}" --property=Result --value)" == success ]]
+# A repair can install diagnostics while delivery is held or failing. Leave
+# execution to the existing timer when explicitly requested; source/hash proof
+# must never turn an unobserved cycle into successful runtime activation.
+LAST_CYCLE_RESULT=pending
+if [[ "${DEFER_FIRST_CYCLE}" == false ]]; then
+  systemctl --user start "${SERVICE}"
+  [[ "$(systemctl --user show "${SERVICE}" --property=Result --value)" == success ]]
+  LAST_CYCLE_RESULT=success
+fi
 systemctl --user is-enabled --quiet "${TIMER}"
 systemctl --user is-active --quiet "${TIMER}"
 
 RECEIPT="${GEM_ROOT}/state/gem-pr-rehabilitation-attestation.json"
-export RECEIPT SOURCE_REVISION SOURCE_ROOT GEM_ROOT UNIT_ROOT
+export RECEIPT SOURCE_REVISION SOURCE_ROOT GEM_ROOT UNIT_ROOT LAST_CYCLE_RESULT
 python3 - <<'PY'
 import hashlib
 import json
@@ -287,7 +300,7 @@ receipt = {
     "sourceRevision": os.environ["SOURCE_REVISION"],
     "timerEnabled": True,
     "timerActive": True,
-    "lastCycleResult": "success",
+    "lastCycleResult": os.environ["LAST_CYCLE_RESULT"],
     "artifacts": artifacts,
 }
 destination = Path(os.environ["RECEIPT"])
@@ -298,5 +311,5 @@ PY
 
 install_complete=true
 trap - EXIT
-printf 'installed and attested Gem PR rehabilitation from %s backup=%s\n' \
-  "${SOURCE_REVISION}" "${BACKUP_DIR}"
+printf 'installed and source-attested Gem PR rehabilitation from %s first-cycle=%s backup=%s\n' \
+  "${SOURCE_REVISION}" "${LAST_CYCLE_RESULT}" "${BACKUP_DIR}"
