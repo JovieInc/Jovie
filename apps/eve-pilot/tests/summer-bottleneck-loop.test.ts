@@ -306,6 +306,20 @@ describe('Summer bottleneck loop', () => {
         .filter(item => summerCiImprovementClassIds.some(id => id === item.id))
         .every(item => item.inEnvelope)
     ).toBe(true);
+    expect(
+      ranking.find(item => item.id === 'native-queue-starvation')
+    ).toMatchObject({
+      inEnvelope: true,
+      owner: 'Summer',
+      handle: 'symphony',
+    });
+    expect(
+      ranking
+        .filter(item => !summerCiImprovementClassIds.some(id => id === item.id))
+        .filter(item => item.id !== 'native-queue-starvation')
+        .filter(item => item.id !== 'release-certification-starvation')
+        .every(item => !item.inEnvelope)
+    ).toBe(true);
   });
 
   it.each([
@@ -580,6 +594,11 @@ describe('Summer bottleneck loop', () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
       snapshot({
+        closure: {
+          status: 'red',
+          blockedSince: '2026-09-02T03:00:00.000Z',
+          openPullRequests: 100,
+        },
         queue: {
           blockedSince: '2026-09-02T05:00:00.000Z',
           eligibleCleanPrs: 8,
@@ -591,10 +610,34 @@ describe('Summer bottleneck loop', () => {
 
     expect(receipt).toMatchObject({
       decision: 'symphony-succeeded',
-      selected: { id: 'release-certification-starvation', inEnvelope: true },
+      selected: { id: 'native-queue-starvation', inEnvelope: true },
       terminal: true,
     });
     expect(proof.dispatchToSymphony).toHaveBeenCalledTimes(1);
+    expect(proof.dispatchToSymphony.mock.calls[0][0]).toMatchObject({
+      action: 'reconcile-native-queue-starvation',
+      selected: { id: 'native-queue-starvation' },
+    });
+  });
+
+  it('still dispatches release certification when the queue is healthy', async () => {
+    const proof = harness();
+    const receipt = await ingestSummerBottleneckSnapshot(
+      snapshot({
+        queue: {
+          blockedSince: null,
+          eligibleCleanPrs: 0,
+          queuedPrs: 0,
+        },
+      }),
+      proof.dependencies
+    );
+
+    expect(receipt).toMatchObject({
+      decision: 'symphony-succeeded',
+      selected: { id: 'release-certification-starvation', inEnvelope: true },
+      terminal: true,
+    });
     expect(proof.dispatchToSymphony.mock.calls[0][0]).toMatchObject({
       action: 'reconcile-release-certification-starvation',
       selected: { id: 'release-certification-starvation' },
@@ -605,9 +648,14 @@ describe('Summer bottleneck loop', () => {
     const proof = harness();
     const receipt = await ingestSummerBottleneckSnapshot(
       snapshot({
-        queue: {
+        closure: {
+          status: 'red',
           blockedSince: '2026-09-02T05:00:00.000Z',
-          eligibleCleanPrs: 8,
+          openPullRequests: 8,
+        },
+        queue: {
+          blockedSince: null,
+          eligibleCleanPrs: 0,
           queuedPrs: 0,
         },
         release: {
@@ -622,7 +670,7 @@ describe('Summer bottleneck loop', () => {
 
     expect(receipt).toMatchObject({
       decision: 'held-out-of-envelope',
-      selected: { id: 'native-queue-starvation', inEnvelope: false },
+      selected: { id: 'closure-health-red', inEnvelope: false },
       escalation: {
         owner: 'Summer',
         handle: 'ovie-founder-review',
