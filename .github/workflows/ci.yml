@@ -1589,6 +1589,8 @@ jobs:
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     if: >-
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
@@ -1677,9 +1679,7 @@ jobs:
           PROFILE_ADMISSION_DIAGNOSTICS: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
-          PLAYWRIGHT_ARTIFACT_PATHS: |
-            apps/web/test-results/**/events-navigation-*.png
-            apps/web/test-results/**/events-navigation-*.json
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/*/attachments/events-navigation-*.png
         run: >-
           node .github/scripts/guard-playwright-artifacts.mjs --run --
           pnpm --filter @jovie/web exec playwright test
@@ -1687,15 +1687,13 @@ jobs:
           --config=playwright.config.noauth.ts
           --project=chromium
           --reporter=line
-      - name: Upload profile admission failure evidence
+      - name: Upload public Events navigation evidence
         if: ${{ always() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**/events-navigation-*.png') != '' }}
         continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            apps/web/test-results/**/events-navigation-*.png
-            apps/web/test-results/**/events-navigation-*.json
+          path: apps/web/test-results/
           retention-days: 3
           allow-images: 'true'
           public-images: 'true'
