@@ -96,6 +96,7 @@ web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desk
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
+web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx|desktop,mobile
