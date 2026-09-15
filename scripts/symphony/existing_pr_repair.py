@@ -46,6 +46,10 @@ ADMISSION_RUNTIME_URL = "http://127.0.0.1:4041/api/v1/state"
 ADMISSION_FLEET_SCHEMA = "jovie-fleet-gate/v1"
 ADMISSION_CONCURRENCY_SCHEMA = "symphony-concurrency/v1"
 ADMISSION_ATTESTATION_SCHEMA = "gem-service-attestation/v1"
+# The canonical fleet contains the complete open-PR/check inventory. An
+# observed 80-PR receipt is ~535 KiB; keep a bounded fleet-specific budget.
+ADMISSION_MAX_JSON_BYTES = 256 * 1024
+ADMISSION_FLEET_MAX_JSON_BYTES = 1024 * 1024
 ADMISSION_MAX_AGE_SECONDS = 10 * 60
 ADMISSION_MAX_CLOCK_SKEW_SECONDS = 60
 TASK_ADMISSIONS_SCHEMA = "jovie.eve.summer-task-admissions/v1"
@@ -418,13 +422,13 @@ def _admission_digest(value):
     ).encode()).hexdigest()
 
 
-def _read_admission_json(path):
-    """Read one bounded host projection; callers convert failures to UNKNOWN."""
+def _read_admission_json(path, *, max_bytes=ADMISSION_MAX_JSON_BYTES):
+    """Read one byte-bounded host projection; failures remain UNKNOWN."""
     path = Path(path)
-    with path.open("r", encoding="utf-8") as handle:
-        raw = handle.read(256 * 1024 + 1)
-    require(len(raw.encode("utf-8")) <= 256 * 1024, "admission-evidence-too-large")
-    value = json.loads(raw)
+    with path.open("rb") as handle:
+        raw = handle.read(max_bytes + 1)
+    require(len(raw) <= max_bytes, "admission-evidence-too-large")
+    value = json.loads(raw.decode("utf-8"))
     require(isinstance(value, dict), "admission-evidence-object-required")
     return value
 
@@ -482,7 +486,7 @@ def read_current_execution_admission(now=None):
         current = float("nan")
 
     try:
-        fleet = _read_admission_json(ADMISSION_FLEET_PATH)
+        fleet = _read_admission_json(ADMISSION_FLEET_PATH, max_bytes=ADMISSION_FLEET_MAX_JSON_BYTES)
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
         fleet = {}
     try:
