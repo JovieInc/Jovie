@@ -276,6 +276,23 @@ describe('Linktree Strategy', () => {
       expect(result).toBeDefined();
     });
 
+    it('does not inspect contact email data in public-only mode', () => {
+      const html = `
+        <html>
+          <head>
+            <meta property="og:description" content="Book me at artist@example.com">
+          </head>
+          <body>
+            <a href="https://instagram.com/johndoe">artist@example.com</a>
+          </body>
+        </html>
+      `;
+
+      const result = extractLinktree(html, { includeContactEmail: false });
+
+      expect(result.contactEmail).toBeNull();
+    });
+
     it('prefers structured Next.js data when available', () => {
       const html = FIXTURES.structured;
       const result = extractLinktree(html);
