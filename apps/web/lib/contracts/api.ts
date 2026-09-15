@@ -7,6 +7,8 @@ export interface SpotifyArtistResult {
   popularity: number;
   verified?: boolean;
   isClaimed?: boolean;
+  /** True only when the authenticated user can write this claimed profile. */
+  isClaimedByCurrentUser?: boolean;
 }
 
 export interface AppleMusicArtistResult {

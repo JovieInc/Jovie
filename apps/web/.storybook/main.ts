@@ -59,6 +59,9 @@ const config: StorybookConfig = {
           check: true,
           reactDocgen: 'react-docgen-typescript',
           reactDocgenTypescriptOptions: {
+            // Preserve the plugin's story exclusion and skip this non-component
+            // bootstrap before docgen initializes the TypeScript project.
+            exclude: ['**/*.stories.tsx', '**/.storybook/preview.tsx'],
             shouldExtractLiteralValuesFromEnum: true,
             propFilter: prop =>
               prop.parent ? !/node_modules/.test(prop.parent.fileName) : true,

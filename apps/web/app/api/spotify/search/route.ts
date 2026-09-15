@@ -24,6 +24,7 @@ import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 import {
   annotateClaimedStatus,
+  annotateClaimedStatusForCurrentUser,
   annotateClaimedStatusWithMeta,
   applyVipBoost,
   applyVipBoostWithMeta,
@@ -53,17 +54,15 @@ class SearchEnrichmentFallbackError extends Error {
   }
 }
 
-async function getSearchRateLimitIdentifier(
-  request: NextRequest
-): Promise<string> {
+async function getSearchAuthUserId(): Promise<string | null> {
   try {
     const { userId } = await getCachedAuth();
-    return userId ? `user:${userId}` : `ip:${getClientIP(request)}`;
+    return userId;
   } catch (error) {
-    logger.warn('[Spotify Search] Auth lookup failed; using IP fallback', {
+    logger.warn('[Spotify Search] Auth lookup failed; using anonymous search', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return `ip:${getClientIP(request)}`;
+    return null;
   }
 }
 
@@ -175,7 +174,10 @@ export async function GET(request: NextRequest) {
   const normalizedQuery = q.toLowerCase();
 
   // Rate limiting with headers for client visibility
-  const identifier = await getSearchRateLimitIdentifier(request);
+  const currentUserId = await getSearchAuthUserId();
+  const identifier = currentUserId
+    ? `user:${currentUserId}`
+    : `ip:${getClientIP(request)}`;
   const rateLimitResult = await spotifySearchApiLimiter.limit(identifier);
   const rateLimitHeaders = {
     ...NO_STORE_HEADERS,
@@ -200,7 +202,11 @@ export async function GET(request: NextRequest) {
       const annotated = await annotateClaimedStatus(filtered);
       const claimedBoosted = boostClaimedArtists(annotated);
       const vipBoosted = await applyVipBoost(claimedBoosted, q, limit);
-      return NextResponse.json(vipBoosted, { headers: rateLimitHeaders });
+      const userAwareResults = await annotateClaimedStatusForCurrentUser(
+        vipBoosted,
+        currentUserId
+      );
+      return NextResponse.json(userAwareResults, { headers: rateLimitHeaders });
     }
     // No cached results — return empty rather than hitting Spotify with a 1-char query
     return NextResponse.json([], { headers: rateLimitHeaders });
@@ -260,7 +266,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(results, { headers: rateLimitHeaders });
+    const userAwareResults = await annotateClaimedStatusForCurrentUser(
+      results,
+      currentUserId
+    );
+    return NextResponse.json(userAwareResults, { headers: rateLimitHeaders });
   } catch (error) {
     return handleSearchError(error, q, limit, rateLimitHeaders);
   }
