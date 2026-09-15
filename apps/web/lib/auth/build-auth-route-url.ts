@@ -1,7 +1,13 @@
 import { APP_ROUTES } from '@/constants/routes';
 
 import { normalizeAuthClaimHandle } from './auth-shell-intent';
+import { sanitizeAuthStateParam } from './central-auth-routing';
 import { sanitizeRedirectUrl } from './constants';
+import {
+  parseAuthBillingInterval,
+  parseAuthOfferArtist,
+  validatePlan,
+} from './plan-intent';
 
 /**
  * Default post-auth destination for sign-up flows when no redirect_url is set.
@@ -16,8 +22,9 @@ interface SearchParamReader {
 
 /**
  * Builds a cross-link between auth routes while forwarding the sanitized
- * `redirect_url` and claim `handle`. Other search params are dropped so
- * oauth errors and emails do not leak across modes.
+ * `redirect_url`, claim handle, native state and normalized offer values.
+ * Other search params are dropped so oauth errors and emails do not leak
+ * across modes.
  */
 export function buildAuthRouteUrl(
   pathname: string,
@@ -35,6 +42,18 @@ export function buildAuthRouteUrl(
     routeUrl.searchParams.set('redirect_url', redirectUrl);
   }
 
+  const plan = validatePlan(searchParams.get('plan'));
+  if (plan) routeUrl.searchParams.set('plan', plan);
+  const interval =
+    parseAuthBillingInterval(searchParams.get('interval')) ??
+    parseAuthBillingInterval(searchParams.get('billing'));
+  if (plan && interval) routeUrl.searchParams.set('interval', interval);
+  const artist =
+    parseAuthOfferArtist(searchParams.get('artist')) ??
+    parseAuthOfferArtist(searchParams.get('artist_name'));
+  if (artist) routeUrl.searchParams.set('artist_name', artist);
+  const authState = sanitizeAuthStateParam(searchParams.get('auth_state'));
+  if (authState) routeUrl.searchParams.set('auth_state', authState);
   return routeUrl.pathname + routeUrl.search;
 }
 

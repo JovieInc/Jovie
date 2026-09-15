@@ -71,14 +71,14 @@ describe('onboarding checkout page plan resolution', () => {
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('organic user with 15K followers gets Max', () => {
+  it('organic user with 15K followers keeps the public Pro offer', () => {
     const result = resolveCheckoutPlan({
       cookieHeader: '',
       planParam: 'pro',
       sourceParam: 'organic',
       spotifyFollowers: 15_000,
     });
-    expect(result.plan).toBe('max');
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);
   });
 
@@ -127,14 +127,14 @@ describe('onboarding checkout page plan resolution', () => {
     expect(result.isDefaultUpsell).toBe(true);
   });
 
-  it('organic user with exactly 10K followers gets Max', () => {
+  it('organic user with exactly 10K followers keeps the public Pro offer', () => {
     const result = resolveCheckoutPlan({
       cookieHeader: '',
       planParam: 'pro',
       sourceParam: 'organic',
       spotifyFollowers: 10_000,
     });
-    expect(result.plan).toBe('max');
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);
   });
 
