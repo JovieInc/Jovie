@@ -43,6 +43,26 @@ export interface ProfileAeoFact {
   readonly value: string;
 }
 
+/**
+ * Provenance class for a public profile description paragraph.
+ *
+ * The class lets the semantic guard apply stricter checks to free-form artist
+ * claims without treating canonical titles, dates, or relationships as copy
+ * to rewrite heuristically.
+ */
+export type ProfileAeoDescriptionKind =
+  | 'identity'
+  | 'bio'
+  | 'catalog'
+  | 'highlight'
+  | 'playlist'
+  | 'collaboration';
+
+export interface ProfileAeoDescriptionBlock {
+  readonly kind: ProfileAeoDescriptionKind;
+  readonly text: string;
+}
+
 export interface ProfileAeoLink {
   readonly id: string;
   readonly platform: string;
@@ -58,12 +78,36 @@ export interface ProfileAeoContent {
   readonly followLinks: readonly ProfileAeoLink[];
   /** Plain-text paragraphs — used by meta descriptions, JSON-LD, and tests. */
   readonly description: readonly string[];
+  /** Description paragraphs with their canonical source class. */
+  readonly descriptionBlocks: readonly ProfileAeoDescriptionBlock[];
   /**
    * `description` split into entity-linked segments (parallel array). Render
    * this in the UI; keep `description` for plain-text consumers.
    */
   readonly descriptionSegments: readonly (readonly EntityMentionSegment[])[];
   readonly faqs: readonly ProfileAeoFaqItem[];
+}
+
+export interface ProfileAeoValidationIssue {
+  readonly code:
+    | 'missing-artist-identity'
+    | 'invalid-profile-url'
+    | 'description-blocks-mismatch'
+    | 'empty-description-block'
+    | 'description-identity-missing'
+    | 'description-segments-mismatch'
+    | 'empty-description-segment'
+    | 'unsupported-superlative'
+    | 'orphaned-quantitative-claim'
+    | 'empty-fact-label'
+    | 'empty-fact-value'
+    | 'empty-faq-question'
+    | 'empty-faq-answer'
+    | 'faq-identity-missing'
+    | 'empty-faq-source-label'
+    | 'invalid-faq-source';
+  readonly path: string;
+  readonly message: string;
 }
 
 export interface BuildProfileAeoContentInput {
@@ -95,6 +139,88 @@ function trimSentence(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return trimmed;
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/**
+ * These claims are intentionally excluded from public AEO copy when the
+ * profile has no supporting evidence field. A creator's source text remains
+ * intact in their profile data; this gate only keeps an unsupported ranking
+ * claim out of answer-engine evidence.
+ */
+const UNSUPPORTED_SUPERLATIVE_PATTERN =
+  /\b(?:the\s+world['’]s\s+)?(?:best|greatest|biggest|most\s+(?:important|influential|popular|successful))\s+(?:artist|producer|musician|performer|singer|songwriter|rapper|dj|remixer|band|act)\b/i;
+const COPULAR_SUPERLATIVE_PATTERN =
+  /\b(?:am|are|is|was|were)\s+(?:the\s+)?(?:best|greatest|biggest)\b/i;
+const RELATIONAL_SUPERLATIVE_PATTERN =
+  /\b(?:best|greatest|biggest)\s+friend\b/i;
+const BARE_RANKING_PATTERN = /\b(?:number\s+one|no\.\s*1|#1)\b/i;
+
+/** A lone number/date has no entity, relationship, or qualifier to preserve. */
+const STANDALONE_NUMBER_PATTERN =
+  /^(?:[$€£]\s*)?\d+(?:[.,]\d+)?(?:\s*%|\s*(?:usd|eur|gbp))?\.?$/i;
+const STANDALONE_YEAR_PATTERN = /^\d{4}(?:[-/]\d{1,2}(?:[-/]\d{1,2})?)?\.?$/;
+const MONTH_DATE_PATTERN = /^[a-z]{3,9}\s+\d{1,2}(?:,\s*\d{4})?\.?$/i;
+
+function segmentSentences(value: string): string[] {
+  const Segmenter = Intl.Segmenter;
+  if (!Segmenter) return [value];
+
+  return [
+    ...new Segmenter('en', { granularity: 'sentence' }).segment(value),
+  ].map(({ segment }) => segment);
+}
+
+function removeQuotedText(value: string): string {
+  return value
+    .replace(/"[^"\n]*"|“[^”\n]*”|‘[^’\n]*’/g, ' ')
+    .replace(/(?<![\p{L}\p{N}])'[^'\n]+'(?=$|[^\p{L}\p{N}])/gu, ' ');
+}
+
+function isUnsupportedSuperlativeClaim(value: string): boolean {
+  return segmentSentences(value).some(sentence => {
+    const searchableValue = removeQuotedText(sentence);
+    return (
+      UNSUPPORTED_SUPERLATIVE_PATTERN.test(searchableValue) ||
+      (COPULAR_SUPERLATIVE_PATTERN.test(searchableValue) &&
+        !RELATIONAL_SUPERLATIVE_PATTERN.test(searchableValue)) ||
+      BARE_RANKING_PATTERN.test(searchableValue)
+    );
+  });
+}
+
+function isStandaloneQuantitativeClaim(value: string): boolean {
+  const normalized = value.trim();
+  if (
+    STANDALONE_NUMBER_PATTERN.test(normalized) ||
+    STANDALONE_YEAR_PATTERN.test(normalized)
+  ) {
+    return true;
+  }
+
+  return (
+    MONTH_DATE_PATTERN.test(normalized) &&
+    !Number.isNaN(Date.parse(normalized.replace(/\.$/, '')))
+  );
+}
+
+function sanitizeFreeformClaim(value: string): string | null {
+  const retainedSentences = segmentSentences(value).filter(sentence => {
+    return (
+      !isUnsupportedSuperlativeClaim(sentence) &&
+      !isStandaloneQuantitativeClaim(sentence)
+    );
+  });
+
+  // Keep the native segment text unchanged. In particular, do not rebuild
+  // sentences from punctuation-delimited tokens: decimals, URLs, initials,
+  // abbreviations, and titles are all valid source text.
+  return cleanText(retainedSentences.join(''));
+}
+
+function ensureSubjectContext(artistName: string, value: string): string {
+  return containsArtistIdentity(value, artistName)
+    ? value
+    : `${artistName}: ${value}`;
 }
 
 function dedupeStrings(values: readonly string[]): string[] {
@@ -162,6 +288,125 @@ function profilePath(handle: string, path = ''): string {
   return `/${encodeURIComponent(handle)}${path}`;
 }
 
+/**
+ * Returns `null` for an intentionally absent date and `undefined` for a
+ * non-empty value that cannot be trusted as a date.
+ */
+function parseReleaseTimestamp(
+  value: string | Date | null | undefined
+): number | null | undefined {
+  if (value == null || (typeof value === 'string' && value.trim() === '')) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? undefined : timestamp;
+}
+
+function normalizeReleaseFact(
+  release: AeoReleaseFact | null | undefined
+): AeoReleaseFact | null {
+  const title = cleanText(release?.title);
+  if (!title) return null;
+
+  return {
+    title,
+    slug: cleanText(release?.slug),
+    releaseType: cleanText(release?.releaseType),
+    releaseDate: release?.releaseDate ?? null,
+    artistNames: release?.artistNames
+      ? dedupeStrings(release.artistNames)
+      : null,
+  };
+}
+
+function toAeoReleaseFact(release: PublicRelease): AeoReleaseFact | null {
+  return normalizeReleaseFact({
+    title: release.title,
+    slug: release.slug,
+    releaseType: release.releaseType,
+    releaseDate: release.releaseDate,
+    artistNames: release.artistNames,
+  });
+}
+
+function isCurrentRelease(
+  release: AeoReleaseFact | PublicRelease,
+  now: Date
+): boolean {
+  const timestamp = parseReleaseTimestamp(release.releaseDate);
+  if (timestamp === undefined) return false;
+  if (timestamp === null) return Boolean(cleanText(release.title));
+
+  return timestamp <= now.getTime();
+}
+
+function filterCurrentReleases(
+  releases: readonly PublicRelease[],
+  now: Date
+): PublicRelease[] {
+  return releases.filter(release => isCurrentRelease(release, now));
+}
+
+function selectLatestRelease(
+  suppliedRelease: AeoReleaseFact | null | undefined,
+  releases: readonly PublicRelease[],
+  now: Date
+): AeoReleaseFact | null {
+  const supplied = normalizeReleaseFact(suppliedRelease);
+  const currentSupplied =
+    supplied && isCurrentRelease(supplied, now) ? supplied : null;
+  const currentReleaseFacts = releases
+    .map(toAeoReleaseFact)
+    .filter((release): release is AeoReleaseFact =>
+      Boolean(release && isCurrentRelease(release, now))
+    );
+  const candidates = currentSupplied
+    ? [currentSupplied, ...currentReleaseFacts]
+    : currentReleaseFacts;
+
+  const datedCandidates = candidates
+    .map((release, index) => ({
+      index,
+      release,
+      timestamp: parseReleaseTimestamp(release.releaseDate),
+    }))
+    .filter(
+      (
+        candidate
+      ): candidate is {
+        readonly index: number;
+        readonly release: AeoReleaseFact;
+        readonly timestamp: number;
+      } => typeof candidate.timestamp === 'number'
+    );
+
+  if (datedCandidates.length > 0) {
+    const firstCandidate = datedCandidates[0];
+    if (!firstCandidate) return candidates[0] ?? null;
+
+    let latestCandidate = firstCandidate;
+    for (const candidate of datedCandidates.slice(1)) {
+      if (candidate.timestamp > latestCandidate.timestamp) {
+        latestCandidate = candidate;
+        continue;
+      }
+      // The supplied release appears first, so a tie keeps its richer source
+      // metadata instead of allowing a catalog row to replace it.
+      if (
+        candidate.timestamp === latestCandidate.timestamp &&
+        candidate.index < latestCandidate.index
+      ) {
+        latestCandidate = candidate;
+      }
+    }
+
+    return latestCandidate.release;
+  }
+
+  return candidates[0] ?? null;
+}
+
 function getProfileSource(artist: Artist): ProfileAeoSource {
   return {
     label: 'Jovie profile',
@@ -206,6 +451,8 @@ function getReleaseSource(
 }
 
 function isUpcomingTourDate(tourDate: TourDateViewModel, now: Date): boolean {
+  if (tourDate.ticketStatus === 'cancelled') return false;
+
   const startDate = new Date(tourDate.startDate);
   if (Number.isNaN(startDate.getTime())) return false;
   return startDate.getTime() >= now.getTime();
@@ -349,6 +596,84 @@ function buildLinkSections(
   return { listenLinks, followLinks };
 }
 
+function buildBioDescriptionBlock(
+  artist: Artist
+): ProfileAeoDescriptionBlock | null {
+  const bio = cleanText(artist.tagline);
+  const safeBio = bio ? sanitizeFreeformClaim(bio) : null;
+  if (!safeBio) return null;
+
+  return {
+    kind: 'bio',
+    text: ensureSubjectContext(artist.name, trimSentence(safeBio)),
+  };
+}
+
+function buildCatalogDescriptionBlock(params: {
+  readonly artist: Artist;
+  readonly latestRelease: AeoReleaseFact | null;
+  readonly releases: readonly PublicRelease[];
+  readonly tourDates: readonly TourDateViewModel[];
+  readonly merchCards: readonly PublicMerchCard[];
+  readonly now: Date;
+}): ProfileAeoDescriptionBlock | null {
+  const { artist, latestRelease, releases, tourDates, merchCards, now } =
+    params;
+  const upcomingTourDateCount = tourDates.filter(tourDate =>
+    isUpcomingTourDate(tourDate, now)
+  ).length;
+  const catalogFacts = [
+    releases.length > 0 ? pluralize(releases.length, 'listed release') : null,
+    upcomingTourDateCount > 0
+      ? pluralize(upcomingTourDateCount, 'upcoming show')
+      : null,
+    merchCards.length > 0 ? pluralize(merchCards.length, 'merch item') : null,
+  ].filter((value): value is string => Boolean(value));
+
+  if (!latestRelease?.title && catalogFacts.length === 0) return null;
+
+  const releasePhrase = latestRelease?.title
+    ? `${artist.name}'s latest listed release is "${latestRelease.title}"`
+    : `${artist.name}'s public catalog is listed on Jovie`;
+  const catalogPhrase =
+    catalogFacts.length > 0
+      ? `, with ${formatList(catalogFacts)} on the profile`
+      : '';
+
+  return {
+    kind: 'catalog',
+    text: `${releasePhrase}${catalogPhrase}.`,
+  };
+}
+
+function buildHighlightDescriptionBlock(
+  artist: Artist
+): ProfileAeoDescriptionBlock | null {
+  const highlights = cleanText(artist.career_highlights);
+  const safeHighlights = highlights ? sanitizeFreeformClaim(highlights) : null;
+  if (!safeHighlights) return null;
+
+  return {
+    kind: 'highlight',
+    text: `${artist.name}'s profile highlights: ${trimSentence(safeHighlights)}`,
+  };
+}
+
+function buildPlaylistDescriptionBlock(
+  artist: Artist
+): ProfileAeoDescriptionBlock | null {
+  const targetPlaylists = dedupeStrings(artist.target_playlists ?? []).slice(
+    0,
+    3
+  );
+  if (targetPlaylists.length === 0) return null;
+
+  return {
+    kind: 'playlist',
+    text: `Playlist targets listed for ${artist.name} include ${formatList(targetPlaylists)}.`,
+  };
+}
+
 function buildDescription(params: {
   readonly artist: Artist;
   readonly genres: readonly string[];
@@ -357,7 +682,7 @@ function buildDescription(params: {
   readonly tourDates: readonly TourDateViewModel[];
   readonly merchCards: readonly PublicMerchCard[];
   readonly now: Date;
-}): string[] {
+}): ProfileAeoDescriptionBlock[] {
   const {
     artist,
     genres,
@@ -379,47 +704,24 @@ function buildDescription(params: {
 
   // Avoid pronoun mismatch ("Their") and awkward generated boilerplate.
   const lead = `${artist.name} is an artist${genrePhrase}${originPhrase}${activePhrase}. Find ${artist.name} on Jovie at @${artist.handle}.`;
-  const description = [lead];
-  const bio = cleanText(artist.tagline);
-  if (bio) {
-    description.push(trimSentence(bio));
-  }
-
-  const upcomingTourDateCount = tourDates.filter(tourDate =>
-    isUpcomingTourDate(tourDate, now)
-  ).length;
-  const catalogFacts = [
-    releases.length > 0 ? pluralize(releases.length, 'listed release') : null,
-    upcomingTourDateCount > 0
-      ? pluralize(upcomingTourDateCount, 'upcoming show')
-      : null,
-    merchCards.length > 0 ? pluralize(merchCards.length, 'merch item') : null,
-  ].filter((value): value is string => Boolean(value));
-
-  if (latestRelease?.title || catalogFacts.length > 0) {
-    const releasePhrase = latestRelease?.title
-      ? `The latest listed release is "${latestRelease.title}"`
-      : 'The public catalog is listed on Jovie';
-    const catalogPhrase =
-      catalogFacts.length > 0
-        ? `, with ${formatList(catalogFacts)} on the profile`
-        : '';
-    description.push(`${releasePhrase}${catalogPhrase}.`);
-  }
-
-  const highlights = cleanText(artist.career_highlights);
-  if (highlights) {
-    description.push(`Profile highlights: ${trimSentence(highlights)}`);
-  }
-
-  const targetPlaylists = dedupeStrings(artist.target_playlists ?? []).slice(
-    0,
-    3
-  );
-  if (targetPlaylists.length > 0) {
-    description.push(
-      `Playlist targets listed for ${artist.name} include ${formatList(targetPlaylists)}.`
-    );
+  const description: ProfileAeoDescriptionBlock[] = [
+    { kind: 'identity', text: lead },
+  ];
+  const optionalBlocks = [
+    buildBioDescriptionBlock(artist),
+    buildCatalogDescriptionBlock({
+      artist,
+      latestRelease: latestRelease ?? null,
+      releases,
+      tourDates,
+      merchCards,
+      now,
+    }),
+    buildHighlightDescriptionBlock(artist),
+    buildPlaylistDescriptionBlock(artist),
+  ];
+  for (const block of optionalBlocks) {
+    if (block) description.push(block);
   }
 
   return description;
@@ -431,6 +733,7 @@ interface StructuredCollaboratorParagraph {
 }
 
 function buildStructuredCollaboratorParagraph(
+  artistName: string,
   artistHandle: string,
   collaborators: readonly StructuredReleaseCollaborator[]
 ): StructuredCollaboratorParagraph | null {
@@ -471,7 +774,10 @@ function buildStructuredCollaboratorParagraph(
   if (entries.length === 0) return null;
 
   const segments: EntityMentionSegment[] = [
-    { type: 'text', text: 'Collaborators credited include ' },
+    {
+      type: 'text',
+      text: `${cleanText(artistName) ?? 'This artist'}'s credited collaborators include `,
+    },
   ];
 
   entries.forEach((entry, entryIndex) => {
@@ -633,23 +939,34 @@ export function buildProfileAeoContent({
 }: BuildProfileAeoContentInput): ProfileAeoContent {
   const uniqueGenres = getUniqueGenres(artist, genres);
   const { listenLinks, followLinks } = buildLinkSections(artist, socialLinks);
+  const currentReleases = filterCurrentReleases(releases, now);
+  const selectedLatestRelease = selectLatestRelease(
+    latestRelease,
+    currentReleases,
+    now
+  );
 
-  const description = buildDescription({
+  const descriptionBlocks = buildDescription({
     artist,
     genres: uniqueGenres,
-    latestRelease,
-    releases,
+    latestRelease: selectedLatestRelease,
+    releases: currentReleases,
     tourDates,
     merchCards,
     now,
   });
   const collaboratorParagraph = buildStructuredCollaboratorParagraph(
+    artist.name,
     artist.handle,
     releaseCollaborators
   );
   if (collaboratorParagraph) {
-    description.push(collaboratorParagraph.text);
+    descriptionBlocks.push({
+      kind: 'collaboration',
+      text: collaboratorParagraph.text,
+    });
   }
+  const description = descriptionBlocks.map(block => block.text);
   const mentionContext: EntityMentionContext = entityMentions ?? {
     ownHandle: artist.handle,
   };
@@ -661,16 +978,281 @@ export function buildProfileAeoContent({
     listenLinks,
     followLinks,
     description,
-    descriptionSegments: description.map((paragraph, index) =>
-      collaboratorParagraph && index === description.length - 1
+    descriptionBlocks,
+    descriptionSegments: descriptionBlocks.map(block =>
+      block.kind === 'collaboration' && collaboratorParagraph
         ? collaboratorParagraph.segments
-        : linkEntityMentions(paragraph, mentionContext)
+        : linkEntityMentions(block.text, mentionContext)
     ),
     faqs: [
       buildOriginFaq(artist),
-      buildLatestReleaseFaq({ artist, latestRelease, releases, socialLinks }),
+      buildLatestReleaseFaq({
+        artist,
+        latestRelease: selectedLatestRelease,
+        releases: currentReleases,
+        socialLinks,
+      }),
       buildTouringFaq({ artist, tourDates, now }),
       buildMerchFaq({ artist, merchCards }),
     ].filter((faq): faq is ProfileAeoFaqItem => faq !== null),
   };
+}
+
+export interface ProfileAeoFaqStructuredData {
+  readonly '@context': 'https://schema.org';
+  readonly '@type': 'FAQPage';
+  readonly mainEntity: readonly {
+    readonly '@type': 'Question';
+    readonly name: string;
+    readonly acceptedAnswer: {
+      readonly '@type': 'Answer';
+      readonly text: string;
+    };
+  }[];
+}
+
+/** Build FAQ JSON-LD from the exact FAQ objects rendered in visible HTML. */
+export function buildProfileAeoFaqStructuredData(
+  content: Pick<ProfileAeoContent, 'faqs'>
+): ProfileAeoFaqStructuredData {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: content.faqs.map(item => ({
+      '@type': 'Question' as const,
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer' as const,
+        text: item.answer,
+      },
+    })),
+  };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsArtistIdentity(value: string, artistName: string): boolean {
+  const normalizedValue = cleanText(value)?.normalize('NFKC');
+  const normalizedName = cleanText(artistName)?.normalize('NFKC');
+  if (!normalizedValue || !normalizedName) return false;
+
+  const identityPattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escapeRegExp(normalizedName)}(?=$|[^\\p{L}\\p{N}])`,
+    'iu'
+  );
+  return identityPattern.test(normalizedValue);
+}
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isValidSourceHref(value: string): boolean {
+  if (value.startsWith('/') && !value.startsWith('//')) return true;
+  return isValidHttpUrl(value);
+}
+
+function isOrphanedQuantitativeClaim(value: string): boolean {
+  const normalized = value.trim();
+  if (isStandaloneQuantitativeClaim(normalized)) return true;
+
+  // Generated copy may prefix a lone value with the artist name for
+  // attribution. Keep that still-unqualified value out of the validator's
+  // accepted set without treating ordinary prose containing a colon as bad.
+  const contextualizedValue = normalized.replace(/^[^:]{1,120}:\s*/, '');
+  return (
+    contextualizedValue !== normalized &&
+    isStandaloneQuantitativeClaim(contextualizedValue)
+  );
+}
+
+/**
+ * Validate the semantic contract shared by visible profile copy and its
+ * structured-data consumers. This is deterministic and side-effect free so
+ * tests and the SEO ratchet can run it without provider or database access.
+ */
+export function validateProfileAeoContent(
+  content: ProfileAeoContent
+): ProfileAeoValidationIssue[] {
+  const issues: ProfileAeoValidationIssue[] = [];
+  const artistName = cleanText(content.artistName);
+  const issue = (
+    code: ProfileAeoValidationIssue['code'],
+    path: string,
+    message: string
+  ) => {
+    issues.push({ code, path, message });
+  };
+
+  if (!artistName) {
+    issue(
+      'missing-artist-identity',
+      'artistName',
+      'AEO content must identify the artist by name.'
+    );
+  }
+  if (!isValidHttpUrl(content.profileUrl)) {
+    issue(
+      'invalid-profile-url',
+      'profileUrl',
+      'AEO content must use an absolute HTTP(S) profile URL.'
+    );
+  }
+
+  if (content.descriptionBlocks.length !== content.description.length) {
+    issue(
+      'description-blocks-mismatch',
+      'descriptionBlocks',
+      'Description blocks and plain-text paragraphs must stay parallel.'
+    );
+  }
+
+  content.descriptionBlocks.forEach((block, index) => {
+    const path = `descriptionBlocks[${index}]`;
+    if (!cleanText(block.text)) {
+      issue(
+        'empty-description-block',
+        `${path}.text`,
+        'Description blocks must contain visible text.'
+      );
+    }
+    if (artistName && !containsArtistIdentity(block.text, artistName)) {
+      issue(
+        'description-identity-missing',
+        `${path}.text`,
+        'Every independently extracted description block must name the artist.'
+      );
+    }
+    if (block.kind === 'bio' || block.kind === 'highlight') {
+      if (isUnsupportedSuperlativeClaim(block.text)) {
+        issue(
+          'unsupported-superlative',
+          `${path}.text`,
+          'Free-form profile claims must not assert an unsupported ranking.'
+        );
+      }
+      if (isOrphanedQuantitativeClaim(block.text)) {
+        issue(
+          'orphaned-quantitative-claim',
+          `${path}.text`,
+          'A standalone number or date needs an attributable relationship or qualifier.'
+        );
+      }
+    }
+
+    if (content.description[index] !== block.text) {
+      issue(
+        'description-blocks-mismatch',
+        `description[${index}]`,
+        'Plain-text description must be derived from the same block text.'
+      );
+    }
+  });
+
+  content.description.forEach((paragraph, index) => {
+    if (!cleanText(paragraph)) {
+      issue(
+        'empty-description-block',
+        `description[${index}]`,
+        'Description paragraphs must contain visible text.'
+      );
+    }
+  });
+
+  if (content.descriptionSegments.length !== content.description.length) {
+    issue(
+      'description-segments-mismatch',
+      'descriptionSegments',
+      'Linked description segments must stay parallel with plain-text paragraphs.'
+    );
+  }
+
+  content.descriptionSegments.forEach((segments, index) => {
+    const joined = segments.map(segment => segment.text).join('');
+    segments.forEach((segment, segmentIndex) => {
+      if (!cleanText(segment.text)) {
+        issue(
+          'empty-description-segment',
+          `descriptionSegments[${index}][${segmentIndex}]`,
+          'Description segments must contain visible text.'
+        );
+      }
+    });
+    if (joined !== content.description[index]) {
+      issue(
+        'description-segments-mismatch',
+        `descriptionSegments[${index}]`,
+        'Linked segments must reconstruct the exact visible paragraph.'
+      );
+    }
+  });
+
+  content.facts.forEach((fact, index) => {
+    if (!cleanText(fact.label)) {
+      issue(
+        'empty-fact-label',
+        `facts[${index}].label`,
+        'Canonical facts need a non-empty label.'
+      );
+    }
+    if (!cleanText(fact.value)) {
+      issue(
+        'empty-fact-value',
+        `facts[${index}].value`,
+        'Canonical facts need a non-empty value.'
+      );
+    }
+  });
+
+  content.faqs.forEach((faq, index) => {
+    const path = `faqs[${index}]`;
+    if (!cleanText(faq.question)) {
+      issue(
+        'empty-faq-question',
+        `${path}.question`,
+        'FAQ questions must contain visible text.'
+      );
+    }
+    if (!cleanText(faq.answer)) {
+      issue(
+        'empty-faq-answer',
+        `${path}.answer`,
+        'FAQ answers must contain visible text.'
+      );
+    }
+    if (
+      artistName &&
+      (!containsArtistIdentity(faq.question, artistName) ||
+        !containsArtistIdentity(faq.answer, artistName))
+    ) {
+      issue(
+        'faq-identity-missing',
+        path,
+        'FAQ question and answer must preserve the artist identity.'
+      );
+    }
+    if (!cleanText(faq.source.label)) {
+      issue(
+        'empty-faq-source-label',
+        `${path}.source.label`,
+        'FAQ sources need a visible label.'
+      );
+    }
+    if (!isValidSourceHref(faq.source.href)) {
+      issue(
+        'invalid-faq-source',
+        `${path}.source.href`,
+        'FAQ sources must use a same-origin path or an absolute HTTP(S) URL.'
+      );
+    }
+  });
+
+  return issues;
 }
