@@ -148,11 +148,11 @@ export interface RouteManifestEntry {
 
 /**
  * The route manifest. Per JOV-5650 — every recursive page.tsx under
- * (marketing), (home), and waitlist is represented exactly once. Dynamic
- * engineering article routes are explicit exemptions rather than being hidden
- * behind their index-route entries. This array is the current source authority;
- * generated ledgers and capture catalogs derive their counts instead of copying
- * a prose inventory that can drift.
+ * (marketing), (home), waitlist, and the guarded profile-admission route is
+ * represented exactly once. Dynamic engineering article routes are explicit
+ * exemptions rather than being hidden behind their index-route entries. This
+ * array is the current source authority; generated ledgers and capture catalogs
+ * derive their counts instead of copying a prose inventory that can drift.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -988,7 +988,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
-    glob: '(marketing)/renders/profile-admission/page.tsx',
+    glob: '(profile-admission)/renders/profile-admission/page.tsx',
     renderedSections: [],
     bindingEvidence: {
       status: 'exempt',

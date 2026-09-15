@@ -3,7 +3,7 @@ import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 const ROUTE = '/renders/profile-admission';
-const PAGE = '/(marketing)/renders/profile-admission/page';
+const PAGE = '/(profile-admission)/renders/profile-admission/page';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 
 // Never persist raw URLs/query strings, bodies, headers, env values or errors.
@@ -56,7 +56,9 @@ export function readBuildIdentity(root = process.cwd()) {
       return null;
     }
   };
-  const source = read('app/(marketing)/renders/profile-admission/guard.ts');
+  const source = read(
+    'app/(profile-admission)/renders/profile-admission/guard.ts'
+  );
   const build = read('.next/BUILD_ID');
   const manifests = [
     '.next/dev/server/app-paths-manifest.json',

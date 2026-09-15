@@ -84,16 +84,11 @@ export function PublicProfileLayoutShell({
         )}
         data-layout={isDesktopLayout ? 'desktop' : 'compact'}
       >
-        <main
-          className={cn(
-            'relative flex min-h-0 min-w-0 w-full flex-col items-center justify-center',
-            !isDesktopLayout && 'h-full'
-          )}
-        >
+        <main className='relative flex min-h-0 min-w-0 w-full flex-col items-center justify-center'>
           {shouldRenderHeading ? (
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
-          <div className='public-profile-layout-compact-slot min-h-0'>
+          <div className='public-profile-layout-compact-slot'>
             {!isDesktopLayout && embedded ? (
               <div className='profile-preview-frame flex h-full min-h-0 w-full flex-col overflow-hidden rounded-(--profile-shell-card-radius) border border-(--profile-panel-border) bg-(--profile-content-bg) shadow-(--profile-panel-shadow)'>
                 <div className='flex min-h-11 shrink-0 items-center justify-between border-(--profile-panel-border) border-b px-4'>

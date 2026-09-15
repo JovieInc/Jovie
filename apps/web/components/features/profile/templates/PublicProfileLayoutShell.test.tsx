@@ -35,12 +35,7 @@ describe('PublicProfileLayoutShell', () => {
       'data-layout',
       'compact'
     );
-    expect(screen.getByRole('main')).toHaveClass('h-full');
     expect(screen.getByTestId('compact-content')).toBeInTheDocument();
-    expect(screen.getByTestId('compact-content').parentElement).toHaveClass(
-      'public-profile-layout-compact-slot',
-      'min-h-0'
-    );
     expect(screen.queryByTestId('desktop-content')).not.toBeInTheDocument();
   });
 
