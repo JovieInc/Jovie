@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
-import { isProfileAdmissionFixtureEnabled } from './guard';
-import { ProfileAdmissionFixtureClient } from './ProfileAdmissionFixtureClient';
+import { isProfileAdmissionFixtureEnabled } from '../../../(marketing)/renders/profile-admission/guard';
+import { ProfileAdmissionFixtureClient } from '../../../(marketing)/renders/profile-admission/ProfileAdmissionFixtureClient';
 
 export const revalidate = false;
-export { PROFILE_ADMISSION_FIXTURE_METADATA as metadata } from './guard';
+export { PROFILE_ADMISSION_FIXTURE_METADATA as metadata } from '../../../(marketing)/renders/profile-admission/guard';
 
 /** Secret-free, E2E-only public-profile admission fixture. */
 export default async function ProfileAdmissionFixturePage({

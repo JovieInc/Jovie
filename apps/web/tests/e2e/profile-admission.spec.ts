@@ -417,6 +417,14 @@ test.describe('public profile browser admission', () => {
 
       const geometry = await eventsButton.evaluate(element => {
         const rect = element.getBoundingClientRect();
+        const visibleViewportHeight =
+          window.visualViewport?.height ?? window.innerHeight;
+        const profileShell = element.closest<HTMLElement>(
+          '[data-testid="public-profile-layout-shell"]'
+        );
+        const compactFrame = element.closest<HTMLElement>(
+          '.public-profile-layout-frame--compact'
+        );
         return {
           left: rect.left,
           top: rect.top,
@@ -425,15 +433,28 @@ test.describe('public profile browser admission', () => {
           width: rect.width,
           height: rect.height,
           viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
+          viewportHeight: visibleViewportHeight,
+          layoutViewportHeight: window.innerHeight,
+          pageScrollY: window.scrollY,
+          profileShellBottom:
+            profileShell?.getBoundingClientRect().bottom ?? null,
+          compactFrameBottom:
+            compactFrame?.getBoundingClientRect().bottom ?? null,
         };
+      });
+      await testInfo.attach(`events-navigation-${fixture.id}-geometry.json`, {
+        body: JSON.stringify(geometry, null, 2),
+        contentType: 'application/json',
       });
       expect(geometry.width).toBeGreaterThanOrEqual(44);
       expect(geometry.height).toBeGreaterThanOrEqual(44);
       expect(geometry.left).toBeGreaterThanOrEqual(0);
       expect(geometry.top).toBeGreaterThanOrEqual(0);
       expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth + 1);
-      expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+      expect(
+        geometry.bottom,
+        `Events hit target geometry: ${JSON.stringify(geometry)}`
+      ).toBeLessThanOrEqual(geometry.viewportHeight + 1);
       await captureStill(
         page,
         testInfo,
@@ -450,9 +471,7 @@ test.describe('public profile browser admission', () => {
 
       await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
       await expect(eventsButton).toHaveAttribute('aria-current', 'page');
-      const selected = page.locator(
-        'section[data-testid="profile-primary-tab-tour"]'
-      );
+      const selected = page.getByTestId('profile-primary-tab-tour');
       await expect(selected).toBeVisible();
       await expect(
         selected.getByRole('heading', { name: 'Shows', exact: true })

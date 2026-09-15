@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { PublicProfileFixture } from '@/features/profile/PublicProfileFixture';
-import { MarketingStateRenderClient } from '../../../(marketing)/renders/[state]/MarketingStateRenderClient';
+import { MarketingStateRenderClient } from '../[state]/MarketingStateRenderClient';
 
 function DeliberateRedDesktopHybrid() {
   return (
