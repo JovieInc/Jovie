@@ -40,6 +40,7 @@ from closure_health import (  # noqa: E402 - sibling executable module
     project_product_admission,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
+from summer_ci_audit import observe_ci_audit  # noqa: E402
 from gem_gate_contract import (  # noqa: E402
     V2_PROOF_SCHEMA,
     validate_capacity_receipt as validate_legacy_capacity_receipt,
@@ -2033,6 +2034,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         args.independent_review_receipt
         or args.state_dir.parent / "independent-review.json"
     )
+    closure = observe_closure_health(args.repo, previous_closure_health(args.state_dir), now)
     return {
         "main": main,
         "production": observe_production(args.production_url),
@@ -2049,11 +2051,9 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             snapshot_path=args.state_dir.parent / "queue-snapshot.json",
             now=now,
         ),
-        "closureHealth": observe_closure_health(
-            args.repo,
-            previous_closure_health(args.state_dir),
-            now,
-        ),
+        "closureHealth": closure,
+        "ciAudit": observe_ci_audit(args.repo, main.get("sha"), gh_json,
+                                    targets=closure.get("lifecycleActions", []) if isinstance(closure, dict) else []),
         "concurrencyEvidence": concurrency,
         "independentReview": refresh_independent_review_receipt(
             review_path, main, now

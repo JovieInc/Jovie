@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from summer_admissions import admission_projection
+from summer_ci_audit import SCHEMA as CI_AUDIT_V2, validate_projection as validate_ci_audit_v2
 from summer_existing_repair import (
     load_existing_repair_reference,
     load_existing_repair_task_admissions,
@@ -154,6 +155,8 @@ def audit_projection(
     if value is None:
         return None
     audit = record(value, "CI audit")
+    if audit.get("schema") == CI_AUDIT_V2:
+        return validate_ci_audit_v2(audit, source_version, now, MAX_SOURCE_AGE_SECONDS)
     if audit.get("schema") != "jovie-ci-bottleneck-audit/v1":
         raise ValueError("CI audit schema is invalid")
     observed_at = require_fresh(audit.get("observedAt"), "CI audit", now)

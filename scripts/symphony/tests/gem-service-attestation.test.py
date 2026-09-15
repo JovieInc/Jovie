@@ -292,6 +292,60 @@ class PublisherTests(unittest.TestCase):
             self.assertEqual(E.main(), 78)
             self.assertNotIn('secret text', str(output.call_args))
 
+    def test_restart_retry_reobserves_actual_service_and_keeps_writer_lock(self):
+        destination = self.root / 'receipt.json'
+        destination.write_text('previous observation')
+        attempts = []
+        self.fields['ActiveState'] = 'activating'
+        def measure():
+            attempts.append(self.fields['ActiveState'])
+            return self.observe()
+        def recover(seconds):
+            self.assertEqual(seconds, 5)
+            self.assertEqual(destination.read_text(), 'previous observation')
+            competing = mock.Mock()
+            with self.assertRaises(BlockingIOError):
+                E.publish(destination, competing)
+            competing.assert_not_called()
+            self.fields['ActiveState'] = 'active'
+            self.fields['InvocationID'] = 'new-running-invocation'
+        with mock.patch.object(E.time, 'sleep', side_effect=recover), mock.patch('sys.stderr', new_callable=io.StringIO):
+            receipt = E.publish(destination, lambda: E.observe_with_retry(measure))
+        self.assertEqual(attempts, ['activating', 'active'])
+        self.assertEqual(receipt['runtime']['invocationId'], 'new-running-invocation')
+        self.assertEqual(receipt['observedAt'], NOW.isoformat())
+        self.assertEqual(json.loads(destination.read_text()), receipt)
+
+    def test_retry_exhaustion_preserves_receipt_and_never_logs_secret_exception_text(self):
+        destination = self.root / 'receipt.json'
+        destination.write_text('previous observation')
+        errors = [subprocess.TimeoutExpired(['secret-command'], 10),
+                  OSError('secret-path'), ValueError('secret-response')]
+        observer = mock.Mock(side_effect=errors)
+        with mock.patch.object(E.time, 'sleep') as sleep, mock.patch('sys.stderr', new_callable=io.StringIO) as stderr:
+            with self.assertRaises(ValueError):
+                E.publish(destination, lambda: E.observe_with_retry(observer))
+        self.assertEqual(observer.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [mock.call(5), mock.call(15)])
+        self.assertEqual(destination.read_text(), 'previous observation')
+        self.assertNotIn('secret', stderr.getvalue())
+        attempts = [json.loads(line) for line in stderr.getvalue().splitlines()]
+        self.assertEqual([row['retryInSeconds'] for row in attempts], [5, 15, None])
+        self.assertEqual(attempts[0]['reason'], 'observation-command-timeout')
+        self.assertEqual(E.failure_reason(subprocess.CalledProcessError(1, ['secret'])), 'observation-command-failed')
+
+    def test_publisher_entrypoint_retries_observation_but_not_a_definitively_unhealthy_receipt(self):
+        args = ['publisher', '--provenance', str(self.sidecar), '--source-root', str(self.root),
+                '--source-revision', CONFIG, '--gem-root', str(self.gem)]
+        for receipt, code in [({'healthy': True}, 0), ({'healthy': False}, 2)]:
+            with mock.patch.object(sys, 'argv', args), \
+                 mock.patch.object(E, 'observe', side_effect=[ValueError('official listener ambiguous or unavailable'), receipt]) as observer, \
+                 mock.patch.object(E.time, 'sleep') as sleep, mock.patch('builtins.print'):
+                self.assertEqual(E.main(), code)
+                self.assertEqual(observer.call_count, 2)
+                sleep.assert_called_once_with(5)
+                self.assertEqual(json.loads((self.gem / 'state/gem-service-attestation.json').read_text()), receipt)
+
     def test_operator_profile_environment_and_explicit_override_reach_observer(self):
         args = ['publisher', '--provenance', str(self.sidecar), '--source-root', str(self.root),
                 '--source-revision', CONFIG, '--check']

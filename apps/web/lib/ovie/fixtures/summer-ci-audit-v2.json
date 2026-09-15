@@ -1,0 +1,47 @@
+{
+  "schema": "jovie-ci-bottleneck-audit/v2",
+  "observedAt": "2026-09-14T22:00:00Z",
+  "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sourceDigest": "aa52df09d7227751b0adb49ae8b7a4c659da9bbbf5f5d561018269085faba880",
+  "classes": [],
+  "excludedClasses": [
+    { "id": "affected-only-unit-selection", "reason": "mapping-unaccepted" },
+    { "id": "auto-enroll-self-cancel-churn", "reason": "mapping-unaccepted" },
+    { "id": "controller-cascade-coalescing", "reason": "mapping-unaccepted" },
+    {
+      "id": "controller-check-run-pagination-cap",
+      "reason": "mapping-unaccepted"
+    },
+    {
+      "id": "merge-group-flake-baseline-ratchet",
+      "reason": "mapping-unaccepted"
+    },
+    { "id": "obsolete-unaffected-native-lanes", "reason": "mapping-unaccepted" }
+  ],
+  "measurements": [
+    {
+      "repository": "JovieInc/Jovie",
+      "pr": null,
+      "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkId": 1,
+      "checkName": "ci-fast (profile browser)",
+      "conclusion": "failure",
+      "completedAt": "2026-09-14T21:00:00Z",
+      "dispatchable": false,
+      "nonDispatchableReasons": [
+        "class-unmapped",
+        "owner-unaccepted",
+        "impact-rule-unaccepted",
+        "action-unaccepted"
+      ]
+    }
+  ],
+  "sample": {
+    "checkRunsObserved": 1,
+    "failuresObserved": 1,
+    "failuresOmitted": 0,
+    "targetsOmitted": 0,
+    "complete": true,
+    "reasons": []
+  }
+}

@@ -632,6 +632,252 @@ def _write_null_creator_receipt_drain(
     return logs
 
 
+def _write_release_wave_drain_fixture(
+    tmp_path: Path, *, native: bool = False
+) -> dict[str, Path]:
+    """Write a small fake-GitHub queue with healthy, held, and clean PRs."""
+    logs = {
+        "enroll": tmp_path / "release-wave-enroll",
+        "dequeue": tmp_path / "release-wave-dequeue",
+    }
+    for path in logs.values():
+        path.write_text("", encoding="utf-8")
+    held_removed = tmp_path / "held-removed"
+    clean_enrolled = tmp_path / "clean-enrolled"
+    heads = {101: "a" * 40, 102: "b" * 40, 103: "c" * 40, 104: "d" * 40}
+    prs = [
+        {
+            "n": 101,
+            "t": "Already admitted healthy PR",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/healthy",
+            "headOid": heads[101],
+            "base": "main",
+            "body": "",
+            "L": ["merge-queue"],
+            "fail": [],
+        },
+        {
+            "n": 102,
+            "t": "Held queued PR",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/held",
+            "headOid": heads[102],
+            "base": "main",
+            "body": "",
+            "L": ["merge-queue", "hold"],
+            "fail": [],
+        },
+        {
+            "n": 103,
+            "t": "Clean admission candidate",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/clean",
+            "headOid": heads[103],
+            "base": "main",
+            "body": "",
+            "L": [],
+            "fail": [],
+        },
+        {
+            "n": 104,
+            "t": "Clean recovery candidate",
+            "draft": False,
+            "m": "MERGEABLE",
+            "ms": "CLEAN",
+            "head": "codex/recovery",
+            "headOid": heads[104],
+            "base": "main",
+            "body": "",
+            "L": [],
+            "fail": [],
+        },
+    ]
+    prs_json = json.dumps(prs, separators=(",", ":"))
+    labels_by_pr = {
+        101: '[{"name":"merge-queue"}]',
+        102: '[{"name":"hold"}]',
+        103: '[{"name":"merge-queue"}]',
+        104: "[]",
+    }
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr list" ]]; then
+              printf '%s\\n' '{prs_json}'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr checks" ]]; then
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr edit" ]]; then
+              n="$3"
+              if [[ " $* " == *" --remove-label merge-queue "* ]]; then
+                printf 'dequeue %s\\n' "$n" >>'{logs["dequeue"]}'
+                if [[ "$n" == "102" ]]; then touch '{held_removed}'; fi
+                exit 0
+              fi
+              if [[ " $* " == *" --add-label merge-queue "* ]]; then
+                printf 'enroll %s\\n' "$n" >>'{logs["enroll"]}'
+                if [[ "$n" == "103" ]]; then touch '{clean_enrolled}'; fi
+                exit 0
+              fi
+              echo "unexpected pr edit: $*" >&2
+              exit 2
+            fi
+            if [[ "{str(native).lower()}" == "true" && "$1 $2" == "pr view" && " $* " == *" --json files "* ]]; then
+              printf '%s\\n' '[]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr view" ]]; then
+              n="$3"
+              case "$n" in
+                101) head='{heads[101]}'; base='main'; labels='{labels_by_pr[101]}' ;;
+                102) head='{heads[102]}'; base='main'; labels='{labels_by_pr[102]}' ;;
+                103) head='{heads[103]}'; base='main'; labels='[]'; [[ -f '{clean_enrolled}' ]] && labels='{labels_by_pr[103]}' ;;
+                104) head='{heads[104]}'; base='main'; labels='{labels_by_pr[104]}' ;;
+                *) echo "unexpected pr view: $*" >&2; exit 2 ;;
+              esac
+              printf '%s\\n' '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":'"$labels"',"headRefOid":"'"$head"'","baseRefName":"'"$base"'","baseRefOid":"'"$base"'","body":""}}'
+              exit 0
+            fi
+            if [[ "{str(native).lower()}" == "true" && "$1" == "api" ]]; then
+              if [[ "$2" == *"/git/ref/heads/main"* ]]; then
+                printf '%s\\n' '{"a" * 40}'
+                exit 0
+              fi
+              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                printf '%s\\n' '[]'
+                exit 0
+              fi
+              if [[ "$2" == *"/commits/"*"/status"* ]]; then
+                printf '%s\\n' '{{"statuses":[]}}'
+                exit 0
+              fi
+              if [[ "$2" == *"/commits/"* ]]; then
+                printf '%s\\n' '{{"commit":{{"committer":{{"date":"2026-08-01T00:00:00Z"}}}}}}'
+                exit 0
+              fi
+              echo "unexpected native api args: $*" >&2
+              exit 2
+            fi
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+    if native:
+        native_state = {
+            str(pr["n"]): {
+                "number": pr["n"],
+                "title": pr["t"],
+                "isDraft": pr["draft"],
+                "mergeable": pr["m"],
+                "mergeStateStatus": pr["ms"],
+                "headRefName": pr["head"],
+                "headRefOid": pr["headOid"],
+                "baseRefName": pr["base"],
+                "baseRefOid": "a" * 40,
+                "body": pr["body"],
+                "labels": {"nodes": [{"name": label} for label in pr["L"]]},
+                "queued": pr["n"] in (101, 102),
+                "isInMergeQueue": pr["n"] in (101, 102),
+                "mergeQueueEntry": (
+                    {
+                        "id": f"MQE_{pr['n']}",
+                        "state": "QUEUED",
+                        "position": 1 if pr["n"] == 101 else 2,
+                        "enqueuedAt": "2026-09-14T19:00:00Z",
+                    }
+                    if pr["n"] in (101, 102)
+                    else None
+                ),
+            }
+            for pr in prs
+        }
+        native_state_json = json.dumps(native_state, separators=(",", ":"))
+        native_receipt = json.dumps(
+            {
+                "state": {
+                    "state": "OPEN",
+                    "isDraft": False,
+                    "headRefOid": heads[103],
+                    "isInMergeQueue": True,
+                    "mergeQueueEntry": {
+                        "id": "MQE_103",
+                        "state": "QUEUED",
+                        "position": 3,
+                        "enqueuedAt": "2026-09-14T19:00:00Z",
+                    },
+                }
+            },
+            separators=(",", ":"),
+        )
+        native_ok = json.dumps({"ok": True}, separators=(",", ":"))
+        native_dequeue = json.dumps(
+            {
+                "backend": "native",
+                "changed": True,
+                "state": {"isInMergeQueue": False, "mergeQueueEntry": None},
+            },
+            separators=(",", ":"),
+        )
+        real_node = shutil.which("node")
+        assert real_node, "native release-wave fixture requires the real node executable"
+        native_node = tmp_path / "node"
+        native_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "${{1:-}}" == "-e" ]]; then
+                  exec '{real_node}' "$@"
+                fi
+                case "${{2:-}}" in
+                  preflight) printf '%s\\n' '{native_ok}' ;;
+                  list-state) printf '%s\\n' '{native_state_json}' ;;
+                  max-queue-depth) printf '%s\\n' '16' ;;
+                  --classify-queue) printf '%s\\n' '[]' ;;
+                  unmergeable-eject) printf '%s\\n' '{{"action":"keep","reason":"not-queued"}}' ;;
+                  changelog-drain) printf '%s\\n' '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  changelog-inventory) printf '%s\\n' '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  front-churn) printf '%s\\n' '{{"action":"allow","reason":"no classified failure"}}' ;;
+                  explain-selector) printf '%s\\n' '{{"observed":true,"queued":false,"eligible":false,"reason":"release-wave-hold"}}' ;;
+                  unmergeable-reenqueue) printf '%s\\n' '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  enroll)
+                    printf 'enroll %s\\n' "${{3:-}}" >>'{logs["enroll"]}'
+                    printf '%s\\n' '{native_receipt}'
+                    ;;
+                  dequeue|dequeue-ineligible)
+                    printf 'dequeue %s\\n' "${{3:-}}" >>'{logs["dequeue"]}'
+                    if [[ "${{3:-}}" == "102" ]]; then touch '{held_removed}'; fi
+                    printf '%s\\n' '{native_dequeue}'
+                    ;;
+                  prove-admission|prove-receipt) printf '%s\\n' '{{"ok":false}}' ;;
+                  *) echo "unexpected native node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        native_node.chmod(native_node.stat().st_mode | stat.S_IXUSR)
+    logs["held_removed"] = held_removed
+    logs["clean_enrolled"] = clean_enrolled
+    return logs
+
+
 class TestNullCreatorQueueReceiptProvenance:
     def test_product_failure_tombstone_never_dequeues_queue_follower(
         self, tmp_path: Path
@@ -1992,6 +2238,97 @@ class TestGhRetryHelper:
         result = _run_bash(script)
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert counter.read_text(encoding="utf-8").strip() == "1"
+
+
+class TestReleaseWaveAdmissionHold:
+    def test_active_release_wave_native_backend_keeps_healthy_entry_and_dequeues_hold(
+        self, tmp_path: Path
+    ) -> None:
+        logs = _write_release_wave_drain_fixture(tmp_path, native=True)
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll "
+                    "DRAIN_RELEASE_WAVE_HOLD=1 "
+                    "DRAIN_RELEASE_WAVE_REASON=controller-wave-draining "
+                    f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
+                    "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_MAX_SECONDS=30 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "new native enrollment/re-entry is deferred" in result.stdout
+        assert "queue depth: 2/16 (0 slots)" in result.stdout
+        assert logs["enroll"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue 102\n"
+        assert "dequeue 101" not in logs["dequeue"].read_text(encoding="utf-8")
+        assert logs["held_removed"].exists()
+        assert not logs["clean_enrolled"].exists()
+
+    def test_active_release_wave_holds_new_work_but_keeps_safety_dequeue(
+        self, tmp_path: Path
+    ) -> None:
+        logs = _write_release_wave_drain_fixture(tmp_path)
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRAIN_RELEASE_WAVE_HOLD=1 "
+                    "DRAIN_RELEASE_WAVE_REASON=controller-wave-draining "
+                    f"DRAIN_RELEASE_WAVE_EXPIRES_AT={expires_at} "
+                    "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_MAX_SECONDS=30 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "new native enrollment/re-entry is deferred" in result.stdout
+        assert "queue depth: 2/16 (0 slots)" in result.stdout
+        assert logs["enroll"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue 102\n"
+        assert "dequeue 101" not in logs["dequeue"].read_text(encoding="utf-8")
+        assert logs["held_removed"].exists()
+        assert not logs["clean_enrolled"].exists()
+        assert "#101" in result.stdout
+
+    def test_expired_release_wave_resumes_exact_target_enrollment(
+        self, tmp_path: Path
+    ) -> None:
+        logs = _write_release_wave_drain_fixture(tmp_path)
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRAIN_RELEASE_WAVE_HOLD=1 "
+                    "DRAIN_RELEASE_WAVE_REASON=controller-wave-active "
+                    "DRAIN_RELEASE_WAVE_EXPIRES_AT=2000-01-01T00:00:00Z "
+                    "DRAIN_RELEASE_WAVE_RUN_ID=123 "
+                    "DRAIN_ADMISSION_PR=103 "
+                    f"DRAIN_ADMISSION_HEAD={'c' * 40} "
+                    "DRAIN_MAX_SECONDS=30 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "Release-wave admission hold expired" in result.stdout
+        assert logs["enroll"].read_text(encoding="utf-8") == "enroll 103\n"
+        assert logs["clean_enrolled"].exists()
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue 102\n"
+        assert "dequeue 101" not in logs["dequeue"].read_text(encoding="utf-8")
 
 
 class TestDrainPrQueueWiring:
