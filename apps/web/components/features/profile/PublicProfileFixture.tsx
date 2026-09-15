@@ -10,11 +10,13 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/components/features/home/homepage-profile-preview-fixture';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 export interface PublicProfileFixtureProps {
   readonly longName?: boolean;
   readonly preview?: boolean;
   readonly state?: string;
+  readonly tourDates?: readonly TourDateViewModel[];
 }
 
 /**
@@ -29,6 +31,7 @@ export function PublicProfileFixture({
   longName = false,
   preview = false,
   state = 'unclaimed',
+  tourDates = HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 }: Readonly<PublicProfileFixtureProps>) {
   const artist = {
     ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
@@ -50,7 +53,7 @@ export function PublicProfileFixture({
       photoDownloadSizes={[]}
       pressPhotos={[]}
       allowPhotoDownloads={false}
-      tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
+      tourDates={[...tourDates]}
       releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
       profileBanner={
         <PublicClaimBanner

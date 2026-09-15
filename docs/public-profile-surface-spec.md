@@ -23,7 +23,7 @@ Routes rendered inside the compact profile surface, showing the bottom tab bar.
 | `/{username}` | Home | Profile root; canonical primary surface |
 | `/{username}?mode=profile` | Home | Alias — same as root |
 | `/{username}?mode=listen` | Music | DSP list in tab panel / drawer |
-| `/{username}?mode=tour` | Shows | Always a destination. Empty vs no-surface copy is Wave 1 (JOV-6197). |
+| `/{username}?mode=tour` | Events | Always a destination. Empty vs no-surface copy is Wave 1 (JOV-6197). |
 | `/{username}?mode=subscribe` | Home | Get updates is an action, not an equal-weight destination. Home stays active. |
 | `/{username}?mode=releases` | Music | Releases overlay; Music destination stays active |
 | `/{username}?mode=about` | About | First-class destination on compact and wide |
@@ -94,7 +94,7 @@ Devices may arrange; they must not independently decide what exists.
 |---|---|---|---|---|
 | 1 | `profile` | Home | bottom bar | top nav |
 | 2 | `listen` | Music | bottom bar | top nav |
-| 3 | `tour` | Shows | bottom bar | top nav |
+| 3 | `tour` | Events | bottom bar | top nav |
 | 4 | `about` | About | bottom bar | top nav |
 
 Get updates (`subscribe`) is an action, not a destination. Claimed-only
@@ -112,18 +112,18 @@ fan-capture still gates the action. More remains a menu trigger, not a tab.
 
 Implementation note: `showBottomNav` is currently hardcoded to `true` in `ProfileCompactSurface`. This is correct for Category 1 routes. It is not exposed as a prop. JOV-2024 may add conditional logic — do not change this before that issue is in progress.
 
-### 2.3 Shows availability
+### 2.3 Events availability
 
-Shows is always a destination. Compact and wide must not hide it when there
+Events is always a destination. Compact and wide must not hide it when there
 are no upcoming dates. Wave 1 (JOV-6197) owns empty-surface vs no-upcoming
-copy and notify. Do not invent a second empty-Events or Alerts story here.
+copy and notify. Do not invent a second empty-state or Alerts story here.
 
 ### 2.4 Active State Determination
 
 Active destination is `resolvePublicProfileActiveDestination()` in
 `apps/web/lib/profile/route-config.ts`. Both shells must consume it.
 
-- `tour` stays Shows even when no dates exist.
+- `tour` stays Events even when no dates exist.
 - `about` selects About.
 - `subscribe` / notifications overlay keeps Home active and marks Get updates
   as the active action.
@@ -138,7 +138,7 @@ Active destination is `resolvePublicProfileActiveDestination()` in
 | Direct load of `/{username}` | Destinations render; Home active; profile data fetched server-side (ISR after JOV-2023 fix) |
 | Direct load of `/{username}?mode=listen` | Destinations render; Music active; drawer or tab panel opens to DSP list |
 | Direct load of `/{username}?mode=subscribe` | Destinations render; Home active; Get updates action/flow visible when fan-capture is allowed |
-| Direct load of `/{username}?mode=tour` | Destinations render; Shows active |
+| Direct load of `/{username}?mode=tour` | Destinations render; Events active |
 | Direct load of `/{username}?mode=about` | Destinations render; About active |
 | Direct load of `/{username}?mode=releases` | Destinations render; Music active; releases overlay opens |
 | Browser refresh on any `?mode=` | Page reloads; the same mode is restored from the URL (no state is lost) |
@@ -160,7 +160,7 @@ Content that does not apply this padding will be obscured by the tab bar on devi
 |---|---|
 | < 768px (mobile) | Tab bar renders at the bottom of the viewport-locked surface |
 | 768–1179px (tablet / embedded mode) | Tab bar renders; profile card is inset inside the page; safe area padding still applies |
-| >= 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop arranges the same four destinations in top chrome. It must not invent Alerts/Events-only destinations or hide Shows when empty. |
+| >= 1180px (desktop) | `ProfileDesktopSurface` is loaded via `dynamic()`. Desktop arranges the same four destinations in top chrome. It must not invent Alerts-only destinations or hide Events when empty. |
 
 Desktop and compact share one destination/action contract (JOV-6198).
 
@@ -176,7 +176,7 @@ must not be added as a fifth equal-weight slot.
 
 ### 3.1 Top-Level Navigation Uses Route Changes
 
-Mode changes at the top level (Home ↔ Music ↔ Events ↔ Alerts) MUST update the URL via `history.pushState` to `/{username}?mode=<mode>`. This ensures:
+Mode changes at the top level (Home ↔ Music ↔ Events ↔ About) MUST update the URL via `history.pushState` to `/{username}?mode=<mode>`. This ensures:
 - Browser back and forward work correctly.
 - Deep links share the correct state.
 - Server-side rendering on direct load produces the correct active tab.
@@ -315,7 +315,7 @@ The inline form (`ProfileInlineNotificationsCTA` via `ArtistNotificationsCTA`) a
 |---|---|
 | Profile / Home | Home |
 | Listen / Music | Music |
-| Tour / Shows | Shows |
+| Tour / Events | Events |
 | About | About |
 | Get updates action | Get updates |
 | More menu trigger | More |

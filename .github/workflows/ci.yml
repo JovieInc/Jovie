@@ -1589,6 +1589,8 @@ jobs:
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     if: >-
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
@@ -1623,7 +1625,7 @@ jobs:
 
           CHANGED_FILES="$(git diff --diff-filter=ACDMRT --name-only "$BASE" HEAD -- \
             ':(glob)apps/web/app/\[username\]/**' \
-            'apps/web/app/(marketing)/renders/profile-admission/**' \
+            'apps/web/app/(profile-admission)/renders/profile-admission/**' \
             'apps/web/app/(marketing)/renders/**' \
             'apps/web/app/api/profile/**' \
             'apps/web/components/features/home/homepage-profile-preview-fixture.ts' \
@@ -1675,6 +1677,9 @@ jobs:
           NEXT_PUBLIC_E2E_MODE: '1'
           PUBLIC_NOAUTH_SMOKE: '1'
           PROFILE_ADMISSION_DIAGNOSTICS: '1'
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/*/attachments/events-navigation-*.png
         run: >-
           node .github/scripts/guard-playwright-artifacts.mjs --run --
           pnpm --filter @jovie/web exec playwright test
@@ -1682,14 +1687,16 @@ jobs:
           --config=playwright.config.noauth.ts
           --project=chromium
           --reporter=line
-      - name: Upload profile admission failure evidence
-        if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+      - name: Upload public Events navigation evidence
+        if: ${{ always() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**/events-navigation-*.png') != '' }}
         continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 3
+          allow-images: 'true'
+          public-images: 'true'
 
   ci-fast:
     name: ci-fast
