@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { isProfileAdmissionFixtureEnabled } from '../../../app/(marketing)/renders/profile-admission/guard.ts';
+import { isProfileAdmissionFixtureEnabled } from '../../../app/(profile-admission)/renders/profile-admission/guard.ts';
 import {
   classifyResponse,
   observeProfileAdmissionFailure,
@@ -309,19 +309,19 @@ test('build identity hashes exact bounded source/manifest/compiled bytes, never 
     writeFileSync(join(root, p), s);
   };
   try {
-    write('app/(marketing)/renders/profile-admission/guard.ts', SECRET);
+    write('app/(profile-admission)/renders/profile-admission/guard.ts', SECRET);
     write('.next/BUILD_ID', SECRET);
     write(
       '.next/dev/server/app-paths-manifest.json',
       JSON.stringify({
-        '/(marketing)/renders/profile-admission/page': 'app/profile.js',
+        '/(profile-admission)/renders/profile-admission/page': 'app/profile.js',
       })
     );
     write('.next/dev/server/app/profile.js', SECRET);
     write(
       '.next/server/app-paths-manifest.json',
       JSON.stringify({
-        '/(marketing)/renders/profile-admission/page': '../escape.js',
+        '/(profile-admission)/renders/profile-admission/page': '../escape.js',
       })
     );
     const row = readBuildIdentity(root);
@@ -337,12 +337,12 @@ test('build identity hashes exact bounded source/manifest/compiled bytes, never 
     write(
       '.next/dev/server/app-paths-manifest.json',
       JSON.stringify({
-        '/(marketing)/renders/profile-admission/page': '/tmp/secret',
+        '/(profile-admission)/renders/profile-admission/page': '/tmp/secret',
       })
     );
     assert.equal(readBuildIdentity(root).manifests[0].compiledPageSha256, null);
     write(
-      'app/(marketing)/renders/profile-admission/guard.ts',
+      'app/(profile-admission)/renders/profile-admission/guard.ts',
       Buffer.alloc(2 * 1024 * 1024 + 1)
     );
     assert.equal(readBuildIdentity(root).guardSourceSha256, null);
