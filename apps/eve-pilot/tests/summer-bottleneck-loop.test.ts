@@ -325,21 +325,24 @@ describe('Summer bottleneck loop', () => {
   it.each([
     { capacityAvailable: 0, queuedWork: null },
     { capacityAvailable: null, queuedWork: 1 },
-  ])('does not infer runner starvation from an unknown runner signal: %o', runner => {
-    const ranking = rankSummerBottlenecks(
-      snapshot({
-        runner: {
-          ...runner,
-          blockedSince: '2026-09-02T04:00:00.000Z',
-        },
-      }),
-      NOW
-    );
+  ])(
+    'does not infer runner starvation from an unknown runner signal: %o',
+    runner => {
+      const ranking = rankSummerBottlenecks(
+        snapshot({
+          runner: {
+            ...runner,
+            blockedSince: '2026-09-02T04:00:00.000Z',
+          },
+        }),
+        NOW
+      );
 
-    expect(ranking.map(item => item.id)).not.toContain(
-      'runner-capacity-starvation'
-    );
-  });
+      expect(ranking.map(item => item.id)).not.toContain(
+        'runner-capacity-starvation'
+      );
+    }
+  );
 
   it('suppresses CI and runner repair when their source authorities are unknown', () => {
     const ranking = rankSummerBottlenecks(
@@ -370,42 +373,45 @@ describe('Summer bottleneck loop', () => {
     ).toEqual([]);
   });
 
-  it.each(
-    summerCiImprovementClassIds
-  )('admits only the bounded source-repair task for CI class %s', async selectedId => {
-    const proof = harness();
-    const expected = snapshot().signals.ciAudit.classes.find(
-      item => item.id === selectedId
-    );
-    if (!expected) throw new Error(`missing CI audit fixture ${selectedId}`);
-    await expect(
-      ingestSummerBottleneckSnapshot(
-        ciAuditBottleneckSnapshot({
-          selectedId,
-          selectedState:
-            selectedId === 'auto-enroll-self-cancel-churn' ? 'partial' : 'open',
+  it.each(summerCiImprovementClassIds)(
+    'admits only the bounded source-repair task for CI class %s',
+    async selectedId => {
+      const proof = harness();
+      const expected = snapshot().signals.ciAudit.classes.find(
+        item => item.id === selectedId
+      );
+      if (!expected) throw new Error(`missing CI audit fixture ${selectedId}`);
+      await expect(
+        ingestSummerBottleneckSnapshot(
+          ciAuditBottleneckSnapshot({
+            selectedId,
+            selectedState:
+              selectedId === 'auto-enroll-self-cancel-churn'
+                ? 'partial'
+                : 'open',
+          }),
+          proof.dependencies
+        )
+      ).resolves.toMatchObject({
+        decision: 'symphony-succeeded',
+        selected: { id: selectedId, inEnvelope: true },
+      });
+      expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'remediate-selected-ci-audit-class',
+          authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
+          selected: {
+            id: selectedId,
+            sourceRevision: SOURCE,
+            sourceDigest: '5'.repeat(64),
+            owner: expected.owner,
+            handle: expected.handle,
+          },
         }),
-        proof.dependencies
-      )
-    ).resolves.toMatchObject({
-      decision: 'symphony-succeeded',
-      selected: { id: selectedId, inEnvelope: true },
-    });
-    expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'remediate-selected-ci-audit-class',
-        authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
-        selected: {
-          id: selectedId,
-          sourceRevision: SOURCE,
-          sourceDigest: '5'.repeat(64),
-          owner: expected.owner,
-          handle: expected.handle,
-        },
-      }),
-      { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
-    );
-  });
+        { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
+      );
+    }
+  );
 
   it('dispatches the in-envelope release bottleneck and signs a source-bound terminal receipt', async () => {
     const proof = harness();
@@ -1239,26 +1245,29 @@ describe('Summer bottleneck loop', () => {
       },
       'runner-capacity-starvation',
     ],
-  ])('source-binds and holds the selected %s bottleneck', async (_name, change, expectedId) => {
-    const proof = harness();
-    const receipt = await ingestSummerBottleneckSnapshot(
-      snapshot({
-        ...change,
-        release: {
-          blockedSince: null,
-          unverifiedMerges: 0,
-          productionSha: SOURCE,
-        },
-        ciAudit: null,
-      }),
-      proof.dependencies
-    );
-    expect(receipt).toMatchObject({
-      decision: 'held-out-of-envelope',
-      selected: { id: expectedId },
-    });
-    expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
-  });
+  ])(
+    'source-binds and holds the selected %s bottleneck',
+    async (_name, change, expectedId) => {
+      const proof = harness();
+      const receipt = await ingestSummerBottleneckSnapshot(
+        snapshot({
+          ...change,
+          release: {
+            blockedSince: null,
+            unverifiedMerges: 0,
+            productionSha: SOURCE,
+          },
+          ciAudit: null,
+        }),
+        proof.dependencies
+      );
+      expect(receipt).toMatchObject({
+        decision: 'held-out-of-envelope',
+        selected: { id: expectedId },
+      });
+      expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
+    }
+  );
 
   it('skips malformed and already-terminal events during heartbeat reconciliation', async () => {
     const shared = memoryStore();
