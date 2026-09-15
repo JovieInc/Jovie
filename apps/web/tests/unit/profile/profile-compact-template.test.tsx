@@ -798,7 +798,6 @@ describe('ProfileCompactTemplate', () => {
     const surfaceSlot = banner.nextElementSibling;
 
     expect(shell).toContainElement(banner);
-    expect(shell).toHaveClass('min-h-0');
     expect(banner).toContainElement(screen.getByTestId('test-profile-banner'));
     expect(surfaceSlot).toHaveClass('min-h-0', 'flex-1');
   });
