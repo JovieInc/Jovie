@@ -32,6 +32,23 @@ describe('SidebarNavItem active chrome', () => {
     expect(icon).not.toContain('text-sidebar-muted/70');
   });
 
+  it('applies the calm expanded rail geometry without changing collapsed rows', () => {
+    const row = getSidebarNavRowClassName({ calm: true, active: true });
+    const icon = getSidebarNavIconClassName({ calm: true });
+    const collapsedRow = getSidebarNavRowClassName({
+      calm: true,
+      collapsed: true,
+    });
+
+    expect(row).toContain('h-9');
+    expect(row).toContain('rounded-lg');
+    expect(row).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+    expect(row).toContain('border-subtle');
+    expect(icon).toContain('size-(--app-shell-sidebar-icon-size)');
+    expect(collapsedRow).toContain('h-7');
+    expect(collapsedRow).not.toContain('h-9');
+  });
+
   it('keeps long labels inside the grid and preserves keyboard focus chrome', () => {
     const longLabel =
       'A deliberately long navigation destination that must fade instead of overflowing';
