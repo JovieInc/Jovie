@@ -74,30 +74,60 @@ function extractShellWorkspaceBlock(css: string): string {
   throw new Error('Unclosed shell workspace block');
 }
 
+// Light-scope Noir Ion aliases (added for the marketing footer theme
+// controls) re-point --noir-ion-text-* at the --color-text-*-token
+// references earlier in the file, so a file-wide first-match lookup can
+// return a var() reference instead of the dark hex anchor. Scope lookups
+// to the :root.dark block that owns the Noir Ion surface ladder
+// (noir-ion-ziawi-oklch-v1) — identified by the --noir-ion-canvas anchor
+// rather than a comment that may be reworded.
+function extractNoirIonDarkBlock(css: string): string {
+  const anchors = [...css.matchAll(/:root\.dark\s*\{/g)];
+  for (const anchor of anchors) {
+    const openBrace = css.indexOf('{', anchor.index);
+    let depth = 0;
+    for (let i = openBrace; i < css.length; i++) {
+      if (css[i] === '{') depth += 1;
+      if (css[i] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          const block = css.slice(openBrace + 1, i);
+          if (block.includes('--noir-ion-canvas:')) return block;
+          break;
+        }
+      }
+    }
+  }
+  throw new Error(
+    'Noir Ion dark block (--noir-ion-canvas) not found in web canon CSS'
+  );
+}
+
 const appShellFrameBlock = extractShellWorkspaceBlock(systemBAppCss);
+const noirIonDarkBlock = extractNoirIonDarkBlock(designSystemCss);
 
 const workspaceMarker =
   '/* NOIR ION D — workspace state surfaces (shell-scoped) */';
 
 describe('shell workspace CSS extraction', () => {
-  test.each([
-    '"',
-    "'",
-  ])('reads the marker-owned dark selector list with %s quotes', quote => {
-    const frame = `[data-app-shell-frame=${quote}true${quote}]`;
-    const block = `.dark ${frame},\n${frame}.dark {
+  test.each(['"', "'"])(
+    'reads the marker-owned dark selector list with %s quotes',
+    quote => {
+      const frame = `[data-app-shell-frame=${quote}true${quote}]`;
+      const block = `.dark ${frame},\n${frame}.dark {
   --color-border-subtle: expected;
   &:hover { --nested: value; }
   --shadow-popover: expected-shadow;
 }`;
-    const css = `${frame} { --color-border-subtle: wrong; }
+      const css = `${frame} { --color-border-subtle: wrong; }
 ${workspaceMarker}
 ${block}
 .unrelated { --shadow-popover: wrong; }`;
-    const extracted = extractShellWorkspaceBlock(css);
-    expect(extracted).toBe(block);
-    expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
-  });
+      const extracted = extractShellWorkspaceBlock(css);
+      expect(extracted).toBe(block);
+      expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
+    }
+  );
 
   test.each([
     ['', 'Noir Ion D marker not found'],
@@ -120,6 +150,25 @@ ${block}
   });
 });
 
+describe('noir-ion dark block extraction', () => {
+  test('rejects when no dark block owns the Noir Ion canvas anchor', () => {
+    expect(() =>
+      extractNoirIonDarkBlock(':root.light { --noir-ion-canvas: #030407; }')
+    ).toThrow(
+      'Noir Ion dark block (--noir-ion-canvas) not found in web canon CSS'
+    );
+  });
+
+  test('skips unrelated dark blocks and reads the canvas-owning ladder', () => {
+    const css = [
+      ':root.dark { --color-bg-page: #111; }',
+      ':root.dark { --noir-ion-canvas: #030407; --noir-ion-text-secondary: #d7dce8; }',
+    ].join('\n');
+    const block = extractNoirIonDarkBlock(css);
+    expect(readCssVar('--noir-ion-text-secondary', block)).toBe('#d7dce8');
+  });
+});
+
 describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => {
   test('borderSubtle matches the app-shell frame --color-border-subtle', () => {
     expect(normalize(SYSTEM_B_DESKTOP_TOKENS.borderSubtle)).toBe(
@@ -129,9 +178,11 @@ describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => 
 
   test('textSecondary matches the Noir Ion --noir-ion-text-secondary', () => {
     // The app-shell frame does not override text color; it inherits the dark
-    // Noir Ion anchor (DESIGN.md: Text secondary #D7DCE8).
+    // Noir Ion anchor (DESIGN.md: Text secondary #D7DCE8). Read from the
+    // :root.dark Noir Ion ladder — light-scope aliases earlier in the file
+    // re-point the same name at --color-text-secondary-token.
     expect(normalize(SYSTEM_B_DESKTOP_TOKENS.textSecondary)).toBe(
-      normalize(readCssVar('--noir-ion-text-secondary', designSystemCss))
+      normalize(readCssVar('--noir-ion-text-secondary', noirIonDarkBlock))
     );
   });
 
