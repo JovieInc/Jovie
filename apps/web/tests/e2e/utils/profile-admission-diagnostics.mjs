@@ -56,9 +56,7 @@ export function readBuildIdentity(root = process.cwd()) {
       return null;
     }
   };
-  const source = read(
-    'app/(profile-admission)/renders/profile-admission/guard.ts'
-  );
+  const source = read('app/(marketing)/renders/profile-admission/guard.ts');
   const build = read('.next/BUILD_ID');
   const manifests = [
     '.next/dev/server/app-paths-manifest.json',

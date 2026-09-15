@@ -1659,7 +1659,7 @@ jobs:
         run: >-
           node --experimental-strip-types --test --experimental-test-coverage
           --test-coverage-include='apps/web/tests/e2e/utils/profile-admission-diagnostics.mjs'
-          --test-coverage-include='apps/web/app/(profile-admission)/renders/profile-admission/guard.ts'
+          --test-coverage-include='apps/web/app/(marketing)/renders/profile-admission/guard.ts'
           apps/web/tests/e2e/utils/profile-admission-diagnostics.test.mjs
       - name: Run public-profile browser admission
         if: steps.profile-browser.outputs.run == 'true'
