@@ -433,6 +433,52 @@ class RepairTests(unittest.TestCase):
             self.assertEqual(observation["ownedRemediation"]["state"], "UNKNOWN")
             self.assertFalse(observation["allowed"])
 
+    def test_complete_fleet_inventory_does_not_erase_independent_admissions(self):
+        fleet, _concurrency, _attestation = self.write_admission_receipts()
+        fleet["remediationAdmission"]["pushAllowed"] = False
+        fleet["signals"]["queue"]["pullRequests"] = [{
+            "number": number, "headRefOid": "a" * 40,
+            "statusCheckRollup": [{"name": f"required-check-{check}",
+                "detailsUrl": f"https://github.com/JovieInc/Jovie/actions/runs/{number}/job/{check}",
+                "headSha": "a" * 40, "conclusion": "SUCCESS"} for check in range(30)],
+        } for number in range(80)]
+        raw = json.dumps(fleet).encode("utf-8")
+        self.assertGreater(len(raw), repair.ADMISSION_MAX_JSON_BYTES)
+        self.assertLess(len(raw), repair.ADMISSION_FLEET_MAX_JSON_BYTES)
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_bytes(raw)
+        observed = repair.read_current_execution_admission()
+        self.assertEqual(observed["ownedRemediation"]["state"], "ALLOWED")
+        self.assertEqual(observed["ownedRemediation"]["sourceDigest"], repair._admission_digest(fleet))
+        self.assertEqual(observed["push"]["state"], "HELD")
+        self.assertFalse(observed["allowed"])
+        fleet["signals"]["queue"]["repository"] = "JovieInc/LogYourBody"
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet))
+        self.assertEqual(repair.read_current_execution_admission()["ownedRemediation"]["state"], "UNKNOWN")
+
+    def test_each_admission_source_retains_its_byte_limit(self):
+        fleet, concurrency, attestation = self.write_admission_receipts()
+        rows = (("ADMISSION_FLEET_PATH", fleet, repair.ADMISSION_FLEET_MAX_JSON_BYTES, "ownedRemediation"),
+                ("ADMISSION_CONCURRENCY_PATH", concurrency, repair.ADMISSION_MAX_JSON_BYTES, "providerEligibility"),
+                ("ADMISSION_ATTESTATION_PATH", attestation, repair.ADMISSION_MAX_JSON_BYTES, "downstreamHealth"))
+        for name, value, limit, admission in rows:
+            with self.subTest(source=name):
+                self.write_admission_receipts()
+                value["padding"] = "x" * limit
+                self.admission_paths[name].write_text(json.dumps(value))
+                self.assertEqual(repair.read_current_execution_admission()[admission]["state"], "UNKNOWN")
+
+    def test_admission_reader_counts_utf8_bytes_and_rejects_malformed_content(self):
+        path = self.admission_paths["ADMISSION_FLEET_PATH"]
+        raw = json.dumps({"text": "é" * 100}, ensure_ascii=False).encode("utf-8")
+        path.write_bytes(raw)
+        with self.assertRaisesRegex(ValueError, "admission-evidence-too-large"):
+            repair._read_admission_json(path, max_bytes=len(raw) - 1)
+        self.assertEqual(repair._read_admission_json(path, max_bytes=len(raw))["text"], "é" * 100)
+        for malformed in (b"\xff", b"not-json", b"[]"):
+            path.write_bytes(malformed)
+            with self.assertRaises(ValueError):
+                repair._read_admission_json(path)
+
     def test_current_execution_admission_fail_closed_on_malformed_sources(self):
         self.assertEqual(repair._admission_semantic_identity([{"observedAt": "volatile"}, 1]), [{}, 1])
         self.assertFalse(repair._admission_recent(None, 0))
