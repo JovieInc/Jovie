@@ -25,8 +25,11 @@ constraint; spawn noise is the cheapest capacity to buy back.
    Merge-queue drain and PR conflict handling can reconcile from CI events.
    Auto-Ready is the exception: the owning agent's final source event must pair
    ready + native auto-merge while checks are pending, so it listens to source
-   changes. No workflow listens to `ready_for_review`; an unchanged head never
-   earns a second CI flight.
+   changes. The canonical merge-queue admission controller is the sole
+   exception: it subscribes to `ready_for_review` to re-evaluate exact-head
+   admission (with the Runner Heartbeat clock as ownerless recovery), and no
+   CI flight is restarted — an unchanged head never earns a second CI flight.
+   No other workflow may listen to `ready_for_review`.
 
 4. **Deduplicate event types that add no coverage.** Example: `issues:
    assigned` on Claude Code — the job only runs when the body/title contains
