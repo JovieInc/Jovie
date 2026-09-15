@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +16,34 @@ from gem_repo_registry import pr_drain_repos
 import symphony_accepted_completion
 
 JOVIE_REPOSITORY = "JovieInc/Jovie"
+
+
+def report_delivery(stage: str, result) -> None:
+    """Expose bounded correlation/error metadata, never raw child output or keys."""
+    report = {"schema": "jovie.summer-delivery-observation/v1",
+              "stage": stage, "returncode": result.returncode}
+    stdout = getattr(result, "stdout", "") or ""
+    stderr = getattr(result, "stderr", "") or ""
+    if result.returncode:
+        report["stderrSha256"] = hashlib.sha256(stderr.encode()).hexdigest()
+        error = re.search(r"(?:^|\n)(HTTPError|URLError|ValueError|TypeError|KeyError|OSError|TimeoutError|JSONDecodeError|FileNotFoundError|PermissionError):", stderr)
+        report["errorType"] = error.group(1) if error else "child-process-failed"
+        http = re.search(r"HTTP Error ([1-5][0-9]{2}):", stderr)
+        if http:
+            report["httpStatus"] = int(http.group(1))
+    else:
+        try:
+            value = json.loads(stdout)
+        except (ValueError, TypeError):
+            value = {}
+        if isinstance(value, dict):
+            receipt = value.get("eve", {})
+            receipt = receipt.get("receipt", {}) if isinstance(receipt, dict) else {}
+            for key in ("eventId", "taskKey", "status", "state", "reason"):
+                item = value.get(key) or (receipt.get(key) if isinstance(receipt, dict) else None)
+                if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", item):
+                    report[key] = item
+    print(json.dumps(report, sort_keys=True), flush=True)
 
 
 def run_capacity_projection() -> int:
@@ -62,6 +93,7 @@ def run_summer_bottleneck_producer() -> int:
     # A policy hold is a valid, persisted observation for the producer. Other
     # exit codes identify an observation or contract failure.
     if gate.returncode not in {0, 2}:
+        report_delivery("fleet-observation", gate)
         return gate.returncode or 1
     producer = subprocess.run(
         [
@@ -73,6 +105,7 @@ def run_summer_bottleneck_producer() -> int:
         text=True,
         check=False,
     )
+    report_delivery("publication", producer)
     return producer.returncode
 
 
@@ -87,6 +120,7 @@ def run_summer_symphony_consumer() -> int:
         text=True,
         check=False,
     )
+    report_delivery("outbox-consumption", consumer)
     return consumer.returncode
 
 
@@ -135,7 +169,10 @@ def main() -> int:
         print(f"  {repo}: rc={returncode}")
     print(f"Summer Jovie bottleneck snapshot: rc={summer_returncode}")
     print(f"Summer Symphony outbox consumer: rc={consumer_returncode}")
-    return 0 if all(returncode == 0 for _, returncode in results) else 1
+    # Finish all independent paths first, then make delivery failure visible to
+    # the existing service monitor. Its timer owns the next bounded retry.
+    return 0 if (all(returncode == 0 for _, returncode in results)
+                 and summer_returncode == 0 and consumer_returncode == 0) else 1
 
 
 if __name__ == "__main__":
