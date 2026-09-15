@@ -30,6 +30,24 @@ function readCssVar(name: string, fromCss: string): string {
   return match[1].trim();
 }
 
+// Scoped to :root.dark blocks, mirroring scripts/generate-design-tokens-export.mjs.
+// The file now carries :root light-mode aliases (footer theme controls, #17813)
+// BEFORE :root.dark, so a first-match scan of the whole file reads an alias
+// indirection like `var(--color-text-secondary-token)` instead of the dark
+// anchor. The desktop shell is always dark — contract against the dark block,
+// not the alias.
+function readDarkAnchorVar(name: string): string {
+  const blocks = designSystemCss.match(
+    /:root\.dark(?:\s*,[^{]+)?\s*\{[\s\S]*?\n\}/g
+  );
+  if (!blocks) throw new Error('No :root.dark block in web canon CSS');
+  for (const block of blocks) {
+    const match = block.match(new RegExp(`${name}:\\s*([^;]+);`));
+    if (match) return match[1].trim();
+  }
+  throw new Error(`${name} not found in any :root.dark block`);
+}
+
 // System-B dark-mode source of truth (per DESIGN.md "App Colors — Dark
 // Mode"): the Noir Ion anchors in design-system.css plus the authenticated
 // app-shell frame overrides in system-b-app.css (`[data-app-shell-frame]`,
@@ -80,24 +98,24 @@ const workspaceMarker =
   '/* NOIR ION D — workspace state surfaces (shell-scoped) */';
 
 describe('shell workspace CSS extraction', () => {
-  test.each([
-    '"',
-    "'",
-  ])('reads the marker-owned dark selector list with %s quotes', quote => {
-    const frame = `[data-app-shell-frame=${quote}true${quote}]`;
-    const block = `.dark ${frame},\n${frame}.dark {
+  test.each(['"', "'"])(
+    'reads the marker-owned dark selector list with %s quotes',
+    quote => {
+      const frame = `[data-app-shell-frame=${quote}true${quote}]`;
+      const block = `.dark ${frame},\n${frame}.dark {
   --color-border-subtle: expected;
   &:hover { --nested: value; }
   --shadow-popover: expected-shadow;
 }`;
-    const css = `${frame} { --color-border-subtle: wrong; }
+      const css = `${frame} { --color-border-subtle: wrong; }
 ${workspaceMarker}
 ${block}
 .unrelated { --shadow-popover: wrong; }`;
-    const extracted = extractShellWorkspaceBlock(css);
-    expect(extracted).toBe(block);
-    expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
-  });
+      const extracted = extractShellWorkspaceBlock(css);
+      expect(extracted).toBe(block);
+      expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
+    }
+  );
 
   test.each([
     ['', 'Noir Ion D marker not found'],
@@ -129,9 +147,11 @@ describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => 
 
   test('textSecondary matches the Noir Ion --noir-ion-text-secondary', () => {
     // The app-shell frame does not override text color; it inherits the dark
-    // Noir Ion anchor (DESIGN.md: Text secondary #D7DCE8).
+    // Noir Ion anchor (DESIGN.md: Text secondary #D7DCE8). Read the anchor
+    // from the :root.dark block — a whole-file scan now picks up the :root
+    // light-mode alias (var(--color-text-secondary-token), #17813) instead.
     expect(normalize(SYSTEM_B_DESKTOP_TOKENS.textSecondary)).toBe(
-      normalize(readCssVar('--noir-ion-text-secondary', designSystemCss))
+      normalize(readDarkAnchorVar('--noir-ion-text-secondary'))
     );
   });
 
