@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ListFilter } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, { useMemo, useState } from 'react';
@@ -398,7 +397,7 @@ export function SidebarThreadsSection({
             onClick={() => setUnreadOnly(value => !value)}
             className='relative flex size-4 items-center justify-center text-sidebar-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-3.5 after:lg:hidden'
           >
-            <ListFilter className='size-3.5' aria-hidden='true' />
+            <Icon name='Filter' className='size-3.5' aria-hidden='true' />
           </button>
         ) : null}
         {!calm && unreadCount > 0 && (
