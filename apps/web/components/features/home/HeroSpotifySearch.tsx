@@ -17,8 +17,10 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
+import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 import { InputAuraFrame } from './InputAuraFrame';
 
 const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
@@ -35,10 +37,14 @@ function formatFollowers(count: number | undefined): string {
  */
 function isSpotifyUrl(value: string): boolean {
   const trimmed = value.trim();
+  const normalized = trimmed.startsWith('open.spotify.com/')
+    ? `https://${trimmed}`
+    : trimmed.startsWith('spotify.com/')
+      ? `https://open.${trimmed}`
+      : trimmed;
   return (
-    trimmed.startsWith('https://open.spotify.com/') ||
-    trimmed.startsWith('open.spotify.com/') ||
-    trimmed.startsWith('spotify.com/')
+    normalized.startsWith('https://open.spotify.com/') &&
+    extractSpotifyArtistId(normalized) !== null
   );
 }
 
@@ -94,12 +100,26 @@ export function HeroSpotifySearch({
   const resultsListRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { results, state, search, searchImmediate, clear } =
-    useArtistSearchQuery({
-      debounceMs: 300,
-      limit: 5,
-    });
+  const {
+    results: searchResults,
+    state,
+    search,
+    searchImmediate,
+    clear,
+  } = useArtistSearchQuery({
+    debounceMs: 300,
+    limit: 5,
+  });
   const isLoading = state === 'loading';
+  const trimmedInput = searchQuery.trim();
+  const isInvalidQuery =
+    Boolean(trimmedInput) &&
+    !isSpotifyUrl(trimmedInput) &&
+    !artistSearchQuerySchema.safeParse(trimmedInput).success;
+  const results = useMemo(
+    () => (isInvalidQuery ? [] : searchResults),
+    [isInvalidQuery, searchResults]
+  );
 
   // Total items: results + "paste URL" option
   const totalItems = results.length + 1;
@@ -158,14 +178,22 @@ export function HeroSpotifySearch({
       // If user pastes a Spotify URL, show it in the input but don't
       // auto-navigate — let them click "Claim Artist" to proceed.
       if (isSpotifyUrl(value)) {
+        clear();
         setShowResults(false);
         return;
       }
 
-      search(value);
-      setShowResults(true);
+      if (
+        value.trim() &&
+        !artistSearchQuerySchema.safeParse(value.trim()).success
+      ) {
+        clear();
+      } else {
+        search(value);
+      }
+      setShowResults(Boolean(value.trim()));
     },
-    [search]
+    [search, clear]
   );
 
   const handleArtistSelect = useCallback(
@@ -186,6 +214,12 @@ export function HeroSpotifySearch({
 
     if (isSpotifyUrl(query)) {
       handleNavigateToStart(query);
+      return;
+    }
+
+    if (isInvalidQuery) {
+      setShowResults(true);
+      inputRef.current?.focus();
       return;
     }
 
@@ -214,6 +248,7 @@ export function HeroSpotifySearch({
     results,
     isNavigating,
     isLoading,
+    isInvalidQuery,
     handleNavigateToStart,
     handleArtistSelect,
   ]);
@@ -417,6 +452,12 @@ export function HeroSpotifySearch({
               isEditorial ? 'homepage-name-search__input' : 'text-sm'
             )}
             role='combobox'
+            aria-invalid={isInvalidQuery || undefined}
+            aria-describedby={
+              isInvalidQuery && shouldShowDropdown
+                ? `${resultsId}-validation`
+                : undefined
+            }
             aria-expanded={shouldShowDropdown}
             aria-controls={resultsId}
             aria-activedescendant={
@@ -436,7 +477,7 @@ export function HeroSpotifySearch({
         {shouldShowDropdown && (
           <div
             className={cn(
-              'absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg',
+              'absolute top-full left-0 z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg',
               isEditorial && 'homepage-name-search__results text-left'
             )}
           >
@@ -487,6 +528,16 @@ export function HeroSpotifySearch({
               </option>
             </select>
 
+            {isInvalidQuery && (
+              <p
+                id={`${resultsId}-validation`}
+                role='status'
+                className='p-4 text-sm text-secondary-token'
+              >
+                Enter an artist name or paste a Spotify artist link.
+              </p>
+            )}
+
             {/* Loading skeleton */}
             {state === 'loading' && results.length === 0 && (
               <div className='p-3 space-y-2'>
@@ -506,14 +557,14 @@ export function HeroSpotifySearch({
             )}
 
             {/* Empty state */}
-            {state === 'empty' && (
+            {!isInvalidQuery && state === 'empty' && (
               <div className='p-4 text-center'>
                 <p className='text-sm text-secondary-token'>No artists found</p>
               </div>
             )}
 
             {/* Error state */}
-            {state === 'error' && (
+            {!isInvalidQuery && state === 'error' && (
               <div className='p-4 text-center'>
                 <p role='alert' className='text-sm text-error'>
                   Search failed.
@@ -525,7 +576,7 @@ export function HeroSpotifySearch({
                   className='mt-2'
                   onClick={handleRetry}
                 >
-                  Try again
+                  Try Again
                 </Button>
               </div>
             )}
