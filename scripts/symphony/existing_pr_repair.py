@@ -970,6 +970,17 @@ def _observe_task_admissions(identifier, controller, *, selected_id,
         # grant window, and attested runtime identity at read completion before
         # emitting an ALLOWED row.
         provider_observation = observe_grok_allowance(payload)
+        # The allowance request can take seconds. Do not bind that response to
+        # a target that changed while it was in flight (including the check).
+        confirmed_target = _task_admission_target_observation(
+            payload, controller, selected_id, selected_handle
+        )
+        if confirmed_target != target:
+            return _task_admission_base(
+                payload, selected_id, runtime, expires_at,
+                provider_reason="task-target-binding-changed",
+                downstream_reason="task-target-binding-changed",
+            )
         completed_at = time.time()
         try:
             refreshed = candidate_reader()
@@ -1581,6 +1592,19 @@ def _sandboxed_grok_command(command, payload, grant, executable):
     ), sandbox_environment
 
 
+def _bind_systemd_runtime_timeout(command, timeout_seconds):
+    prefix = "--property=RuntimeMaxSec="
+    indices = [index for index, value in enumerate(command) if value.startswith(prefix)]
+    require(len(indices) == 1 and "--" in command and indices[0] < command.index("--"),
+            "provider-systemd-runtime-binding-invalid")
+    bound = list(command)
+    # Round down so the systemd limit cannot exceed the runner's exact limit.
+    milliseconds = math.floor(timeout_seconds * 1000)
+    require(milliseconds > 0, "provider-grant-execution-window-too-short")
+    bound[indices[0]] = f"{prefix}{milliseconds / 1000:.3f}s"
+    return bound
+
+
 def _remaining_execution_timeout(payload, grant, now=None):
     current = time.time() if now is None else float(now)
     assignment_expires = _grant_time(payload.get("expiresAt"), "assignment-expires-at")
@@ -1988,18 +2012,22 @@ class GrokOwnedRepairExecutor:
         exit_code = None
         acceptance_digest = task_acceptance_digest(task, task["existingRepair"])
         task_accepted = False
-        timeout_seconds = _remaining_execution_timeout(payload, grant)
         detail = "grok-execution-failed"
         status = "failed"
         try:
-            if self.run is None:
-                command, environment = _sandboxed_grok_command(
-                    command, payload, grant, executable
-                )
             # Recheck immediately before spawning. A signed outbox may have
             # waited past a push/provider/downstream hold; a grant alone never
             # overrides the current independent admission projection.
             self.require_admission(task, run_id=run_id)
+            if self.run is None:
+                command, environment = _sandboxed_grok_command(
+                    command, payload, grant, executable
+                )
+            # Both deadlines begin at process launch. Derive one remaining
+            # window after authenticated reads AND sandbox preparation.
+            timeout_seconds = _remaining_execution_timeout(payload, grant)
+            if self.run is None:
+                command = _bind_systemd_runtime_timeout(command, timeout_seconds)
             runner = _run_bounded if self.run is None else self.run
             run_kwargs = {
                 "cwd": str(workspace), "env": environment, "stdin": subprocess.DEVNULL,

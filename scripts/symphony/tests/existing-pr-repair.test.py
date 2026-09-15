@@ -510,7 +510,7 @@ class RepairTests(unittest.TestCase):
             return self.allowance_response(current)
         request.side_effect = quota
         with mock.patch.object(repair.GrokOwnedRepairExecutor, "require_sandbox"), \
-             mock.patch.object(repair, "_sandboxed_grok_command", side_effect=lambda command, *_a: (command, {})), \
+             mock.patch.object(repair, "_sandboxed_grok_command", side_effect=lambda command, *_a: (["fixture-systemd", "--property=RuntimeMaxSec=999s", "--", *command], {})), \
              mock.patch.object(repair, "_run_bounded") as spawn:
             result = self.run_isolated(task)
             self.assertEqual(result["reason"], "execution-admission-provider-eligibility-held")
@@ -519,6 +519,103 @@ class RepairTests(unittest.TestCase):
             duplicate = self.run_isolated(task)
             self.assertEqual(duplicate["reason"], "isolated-repair-claimed-outcome-unknown")
             spawn.assert_not_called()
+
+    def assert_target_change_during_final_allowance_is_held(self, kind):
+        task, _payload, config, _fleet, request = self.task_execution_observer_fixture()
+        checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
+                   "status": "COMPLETED", "conclusion": "FAILURE"}]
+        reads = 0
+        def allowance(*_args, **_kwargs):
+            nonlocal reads
+            reads += 1
+            if reads == 2:
+                if kind == "pr":
+                    self.pr["headRefOid"] = "c" * 40
+                elif kind == "issue":
+                    self.issue["updatedAt"] = "2026-09-08T12:01:00Z"
+                else:
+                    checks[0]["conclusion"] = "SUCCESS"
+            return self.allowance_response(config)
+        request.side_effect = allowance
+        with mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks), \
+             mock.patch.object(repair.GrokOwnedRepairExecutor, "require_sandbox"), \
+             mock.patch.object(repair, "_sandboxed_grok_command") as sandbox, \
+             mock.patch.object(repair, "_run_bounded") as spawn:
+            result = self.run_isolated(task)
+        self.assertEqual(result["status"], "held")
+        self.assertEqual(reads, 2)
+        self.assertTrue((self.root / f"{IDENT}.claim").exists())
+        sandbox.assert_not_called()
+        spawn.assert_not_called()
+
+    def test_live_adapter_rejects_pr_change_during_final_allowance(self):
+        self.assert_target_change_during_final_allowance_is_held("pr")
+
+    def test_live_adapter_rejects_issue_change_during_final_allowance(self):
+        self.assert_target_change_during_final_allowance_is_held("issue")
+
+    def test_live_adapter_rejects_check_change_during_final_allowance(self):
+        self.assert_target_change_during_final_allowance_is_held("check")
+
+    def test_live_adapter_binds_both_deadlines_after_authenticated_reads_and_sandbox_preparation(self):
+        task, payload, config, _fleet, request = self.task_execution_observer_fixture()
+        now = [time.time()]
+        reads = 0
+        def allowance(*_a, **_k):
+            nonlocal reads
+            reads += 1
+            if reads == 2:
+                now[0] += 12
+            return self.allowance_response(config)
+        def sandbox(command, *_args):
+            now[0] += 2  # Preparing the boundary must not extend either limit.
+            return ["fixture-systemd", "--property=RuntimeMaxSec=999s", "--", *command], {}
+        def spawn(command, **kwargs):
+            remaining = repair._remaining_execution_timeout(payload, payload["providerGrant"])
+            self.assertEqual(kwargs["timeout"], remaining)
+            runtime = next(item for item in command if item.startswith("--property=RuntimeMaxSec="))
+            seconds = float(runtime.removeprefix("--property=RuntimeMaxSec=").removesuffix("s"))
+            self.assertLessEqual(seconds, remaining)
+            self.assertLess(remaining - seconds, 0.0011)
+            raise RuntimeError("fixture-stop-at-spawn")
+        request.side_effect = allowance
+        with mock.patch.object(repair.time, "time", side_effect=lambda: now[0]), \
+             mock.patch.object(repair.GrokOwnedRepairExecutor, "require_sandbox"), \
+             mock.patch.object(repair, "_sandboxed_grok_command", side_effect=sandbox), \
+             mock.patch.object(repair, "_run_bounded", side_effect=spawn) as runner:
+            with self.assertRaisesRegex(RuntimeError, "fixture-stop-at-spawn"):
+                self.run_isolated(task)
+        runner.assert_called_once()
+        self.assertEqual(reads, 2)
+
+    def assert_preparation_consumed_execution_window(self, remaining):
+        task, payload, _config, _fleet, _request = self.task_execution_observer_fixture()
+        now = [time.time()]
+        def sandbox(command, *_args):
+            now[0] = payload["providerGrant"]["expiresAt"] - remaining
+            return ["fixture-systemd", "--property=RuntimeMaxSec=999s", "--", *command], {}
+        with mock.patch.object(repair.time, "time", side_effect=lambda: now[0]), \
+             mock.patch.object(repair.GrokOwnedRepairExecutor, "require_sandbox"), \
+             mock.patch.object(repair, "_sandboxed_grok_command", side_effect=sandbox), \
+             mock.patch.object(repair, "_run_bounded") as spawn:
+            with self.assertRaisesRegex(ValueError, "execution-window-too-short"):
+                self.run_isolated(task)
+        spawn.assert_not_called()
+
+    def test_live_adapter_refuses_window_consumed_by_sandbox_preparation(self):
+        self.assert_preparation_consumed_execution_window(repair.PROCESS_CLEANUP_GRACE_SECONDS)
+
+    def test_live_adapter_refuses_expiration_during_sandbox_preparation(self):
+        self.assert_preparation_consumed_execution_window(-1)
+
+    def test_systemd_runtime_binding_rejects_missing_duplicate_and_child_properties(self):
+        for command in (["systemd", "--", "worker"],
+                        ["systemd", "--", "--property=RuntimeMaxSec=1s"],
+                        ["systemd", "--property=RuntimeMaxSec=1s", "--property=RuntimeMaxSec=2s", "--", "worker"]):
+            with self.assertRaisesRegex(ValueError, "runtime-binding-invalid"):
+                repair._bind_systemd_runtime_timeout(command, 5)
+        with self.assertRaisesRegex(ValueError, "execution-window-too-short"):
+            repair._bind_systemd_runtime_timeout(["systemd", "--property=RuntimeMaxSec=1s", "--", "worker"], 0)
 
     def test_provider_grant_validation_and_grok_runner_are_source_and_assignment_bound(self):
         task, payload, executable = self.provider_granted_fixture()
@@ -1523,7 +1620,7 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(observed["downstreamHealth"]["state"], "ALLOWED")
         self.assertEqual(observed["downstreamHealth"]["reason"], "observed-target-available")
         self.assertRegex(observed["downstreamHealth"]["sourceDigest"], r"^[a-f0-9]{64}$")
-        fetch_checks.assert_called_once_with("JovieInc/Jovie", payload["pr"])
+        self.assertEqual(fetch_checks.call_args_list, [mock.call("JovieInc/Jovie", payload["pr"])] * 2)
 
     def test_observer_returns_unknown_for_crossed_or_ambiguous_target(self):
         task, payload, _executable = self.provider_granted_fixture()
@@ -1599,7 +1696,9 @@ class RepairTests(unittest.TestCase):
         checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
                    "status": "COMPLETED", "conclusion": "SUCCESS"}]
         def claimed_during_read(*_args):
-            repair.exclusive_write(self.root / f"{IDENT}.claim", {"taskKey": task["taskKey"]})
+            claim = self.root / f"{IDENT}.claim"
+            if not claim.exists():
+                repair.exclusive_write(claim, {"taskKey": task["taskKey"]})
             return checks
         with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
              mock.patch.object(controller, "_pr_status_check_rollup", side_effect=claimed_during_read):
