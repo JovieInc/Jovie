@@ -23,6 +23,33 @@ export interface BrowserErrorCollection {
   readonly pageErrors: string[];
 }
 
+export interface FocusVisualStyle {
+  readonly backgroundColor: string;
+  readonly borderColor: string;
+  readonly boxShadow: string;
+  readonly outlineColor: string;
+  readonly outlineStyle: string;
+  readonly outlineWidth: string;
+}
+
+export function hasVisibleFocusStyleChange(
+  focused: FocusVisualStyle,
+  blurred: FocusVisualStyle
+): boolean {
+  const outlineChanged =
+    focused.outlineStyle !== 'none' &&
+    focused.outlineWidth !== '0px' &&
+    (focused.outlineStyle !== blurred.outlineStyle ||
+      focused.outlineWidth !== blurred.outlineWidth ||
+      focused.outlineColor !== blurred.outlineColor);
+  const shadowChanged =
+    focused.boxShadow !== 'none' && focused.boxShadow !== blurred.boxShadow;
+  const borderChanged = focused.borderColor !== blurred.borderColor;
+  const backgroundChanged = focused.backgroundColor !== blurred.backgroundColor;
+
+  return outlineChanged || shadowChanged || borderChanged || backgroundChanged;
+}
+
 export async function assertRegisteredQualityChecks(
   page: Page,
   entry: RouteCoverageEntry
@@ -73,6 +100,8 @@ export async function assertRegisteredQualityChecks(
       const focused = await focusedElement.evaluate(element => {
         const style = globalThis.getComputedStyle(element);
         return {
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
           boxShadow: style.boxShadow,
           href: element instanceof HTMLAnchorElement ? element.href : null,
           outlineColor: style.outlineColor,
@@ -92,22 +121,16 @@ export async function assertRegisteredQualityChecks(
       const blurred = await focusedElement.evaluate(element => {
         const style = globalThis.getComputedStyle(element);
         return {
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
           boxShadow: style.boxShadow,
           outlineColor: style.outlineColor,
           outlineStyle: style.outlineStyle,
           outlineWidth: style.outlineWidth,
         };
       });
-      const outlineChanged =
-        focused.outlineStyle !== 'none' &&
-        focused.outlineWidth !== '0px' &&
-        (focused.outlineStyle !== blurred.outlineStyle ||
-          focused.outlineWidth !== blurred.outlineWidth ||
-          focused.outlineColor !== blurred.outlineColor);
-      const shadowChanged =
-        focused.boxShadow !== 'none' && focused.boxShadow !== blurred.boxShadow;
       expect(
-        outlineChanged || shadowChanged,
+        hasVisibleFocusStyleChange(focused, blurred),
         `${entry.id} visible focus indicator ${JSON.stringify({ focused, blurred })}`
       ).toBe(true);
     }
