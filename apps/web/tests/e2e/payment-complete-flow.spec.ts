@@ -24,9 +24,7 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
   // signInUser needs 180s+ for Clerk + Turbopack, plus Stripe checkout page loads
   test.setTimeout(300_000);
 
-  test('completes Standard upgrade and reflects on dashboard', async ({
-    page,
-  }) => {
+  test('completes Pro upgrade and reflects on dashboard', async ({ page }) => {
     test.setTimeout(120_000);
 
     const { stripeClient, priceId } = await getStripeContextOrSkip();
@@ -37,7 +35,7 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
     await interceptTrackingRoutes(page);
     await page.goto('/billing', { waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('button', { name: /upgrade to standard/i })
+      page.getByRole('button', { name: /upgrade to pro/i })
     ).toBeVisible({ timeout: 15_000 });
 
     const { sessionId, url } = await createCheckoutSession(page, priceId);
@@ -67,7 +65,7 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
 
     await interceptTrackingRoutes(page);
     await page.goto('/billing', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/Standard Subscription Active/i)).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Pro Plan' })).toBeVisible({
       timeout: 10_000,
     });
 
