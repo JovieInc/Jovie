@@ -1675,6 +1675,11 @@ jobs:
           NEXT_PUBLIC_E2E_MODE: '1'
           PUBLIC_NOAUTH_SMOKE: '1'
           PROFILE_ADMISSION_DIAGNOSTICS: '1'
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_PATHS: |
+            apps/web/test-results/**/events-navigation-*.png
+            apps/web/test-results/**/events-navigation-*.json
         run: >-
           node .github/scripts/guard-playwright-artifacts.mjs --run --
           pnpm --filter @jovie/web exec playwright test
@@ -1683,13 +1688,17 @@ jobs:
           --project=chromium
           --reporter=line
       - name: Upload profile admission failure evidence
-        if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        if: ${{ always() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**/events-navigation-*.png') != '' }}
         continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/test-results/
+          path: |
+            apps/web/test-results/**/events-navigation-*.png
+            apps/web/test-results/**/events-navigation-*.json
           retention-days: 3
+          allow-images: 'true'
+          public-images: 'true'
 
   ci-fast:
     name: ci-fast

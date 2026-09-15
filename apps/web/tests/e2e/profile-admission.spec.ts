@@ -420,10 +420,16 @@ test.describe('public profile browser admission', () => {
         const visibleViewportHeight =
           window.visualViewport?.height ?? window.innerHeight;
         const profileShell = element.closest<HTMLElement>(
-          '[data-testid="public-profile-layout-shell"]'
+          '[data-testid="profile-compact-shell"]'
         );
         const compactFrame = element.closest<HTMLElement>(
           '.public-profile-layout-frame--compact'
+        );
+        const tabBar = element.closest<HTMLElement>(
+          '[data-testid="profile-tab-bar"]'
+        );
+        const profileViewport = element.closest<HTMLElement>(
+          '[data-testid="public-profile-layout-shell"]'
         );
         return {
           left: rect.left,
@@ -440,6 +446,9 @@ test.describe('public profile browser admission', () => {
             profileShell?.getBoundingClientRect().bottom ?? null,
           compactFrameBottom:
             compactFrame?.getBoundingClientRect().bottom ?? null,
+          tabBarBottom: tabBar?.getBoundingClientRect().bottom ?? null,
+          profileViewportBottom:
+            profileViewport?.getBoundingClientRect().bottom ?? null,
         };
       });
       await testInfo.attach(`events-navigation-${fixture.id}-geometry.json`, {
@@ -455,6 +464,21 @@ test.describe('public profile browser admission', () => {
         geometry.bottom,
         `Events hit target geometry: ${JSON.stringify(geometry)}`
       ).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+      if (fixture.layout === 'compact') {
+        const compactBoundaries = [
+          ['profile viewport', geometry.profileViewportBottom],
+          ['compact frame', geometry.compactFrameBottom],
+          ['compact shell', geometry.profileShellBottom],
+          ['bottom tab bar', geometry.tabBarBottom],
+        ] as const;
+        for (const [label, bottom] of compactBoundaries) {
+          expect(bottom, `${label} bottom is measured`).not.toBeNull();
+          expect(
+            bottom ?? Number.POSITIVE_INFINITY,
+            `${label} must stay inside the visible viewport: ${JSON.stringify(geometry)}`
+          ).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+        }
+      }
       await captureStill(
         page,
         testInfo,
@@ -471,7 +495,9 @@ test.describe('public profile browser admission', () => {
 
       await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
       await expect(eventsButton).toHaveAttribute('aria-current', 'page');
-      const selected = page.getByTestId('profile-primary-tab-tour');
+      const selected = page.locator(
+        'section[data-testid="profile-primary-tab-tour"]'
+      );
       await expect(selected).toBeVisible();
       await expect(
         selected.getByRole('heading', { name: 'Shows', exact: true })
