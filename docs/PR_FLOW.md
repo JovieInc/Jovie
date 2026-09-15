@@ -112,11 +112,12 @@ Rules:
   release-wave pause below.
   A separate active release-wave lease pauses only new native queue enrollment
   and re-entry while a Production Controller run is queued or in progress. The
-  workflow fixes the deadline at 30 minutes after that run's `created_at`; a
-  terminal run releases the hold sooner, and repeated observations do not
-  restart its deadline. Already-admitted native entries remain in the queue,
-  subject to ordinary safety-dequeue checks, throughout the pause. Unavailable
-  or malformed controller state fails closed before enrollment.
+  workflow fixes each run's deadline at 30 minutes from `created_at`. Terminal
+  completion releases that run's hold sooner; another queued or in-progress run
+  can keep the pause active against its own deadline. Repeated observations do
+  not restart a run's deadline. Already-admitted native entries remain in the
+  queue, subject to ordinary safety-dequeue checks, throughout the pause.
+  Unavailable or malformed controller state fails closed before enrollment.
   Capacity-dependent mutation requires its own accepted evidence. Unknown
   source/review/integrity evidence still blocks admission. An existing incident
   hold is cleared only by its own evidence.
