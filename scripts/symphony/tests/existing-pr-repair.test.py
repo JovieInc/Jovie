@@ -421,6 +421,105 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(observed["providerObservation"]["providerGrantDigest"], repair._digest(payload["providerGrant"]))
         opener.assert_called_once()
 
+    def task_execution_observer_fixture(self):
+        task, payload, config = self.allowance_fixture()
+        fleet, concurrency, _attestation = self.write_admission_receipts()
+        fleet["workAdmission"]["allowed"] = False
+        concurrency["provider"]["eligible"] = False
+        concurrency["downstream"]["healthy"] = False
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet))
+        self.admission_paths["ADMISSION_CONCURRENCY_PATH"].write_text(json.dumps(concurrency))
+        self.stack.enter_context(mock.patch.object(repair, "_task_admission_controller_module", return_value=controller))
+        self.stack.enter_context(mock.patch.object(controller, "_pr_status_check_rollup", return_value=[{
+            "__typename": "CheckRun", "name": task["selected"]["handle"],
+            "status": "COMPLETED", "conclusion": "FAILURE",
+        }]))
+        builder = self.stack.enter_context(mock.patch.object(repair.urllib.request, "build_opener"))
+        builder.return_value.open.side_effect = lambda *_a, **_k: self.allowance_response(config)
+        return task, payload, config, fleet, builder.return_value.open
+
+    def test_execution_uses_exact_task_observations_during_aggregate_and_new_work_holds(self):
+        task, _payload, config, fleet, request = self.task_execution_observer_fixture()
+        self.assertFalse(repair.read_current_execution_admission()["allowed"])
+        admission = repair.read_task_execution_admission(task, controller.__file__)
+        self.assertTrue(admission["allowed"])
+        self.assertEqual(admission["newImplementation"]["state"], "HELD")
+        self.assertEqual(admission["providerEligibility"]["reason"], "provider-included-allowance-observed")
+        self.assertEqual(admission["downstreamHealth"]["reason"], "observed-target-available")
+        self.assertFalse((self.root / f"{IDENT}.claim").exists())
+        config["creditUsagePercent"] = 100
+        self.assertEqual(repair.read_task_execution_admission(task, controller.__file__)["reason"],
+                         "execution-admission-provider-eligibility-held")
+        fleet["remediationAdmission"]["pushAllowed"] = False
+        self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet))
+        self.assertEqual(repair.read_task_execution_admission(task, controller.__file__)["reason"],
+                         "execution-admission-push-held")
+        self.assertEqual(request.call_count, 2)
+
+    def test_execution_observation_rejects_changed_assignment_and_hold_during_authenticated_read(self):
+        task, payload, config, fleet, request = self.task_execution_observer_fixture()
+        def held(*_a, **_k):
+            fleet["remediationAdmission"]["allowed"] = False
+            self.admission_paths["ADMISSION_FLEET_PATH"].write_text(json.dumps(fleet))
+            return self.allowance_response(config)
+        request.side_effect = held
+        admission = repair.read_task_execution_admission(task, controller.__file__)
+        self.assertEqual(admission["reason"], "execution-admission-owned-remediation-held")
+        self.write_admission_receipts()
+        task["existingRepair"]["assignmentDigest"] = "0" * 64
+        admission = repair.read_task_execution_admission(task, controller.__file__)
+        self.assertEqual(admission["reason"], "execution-admission-provider-eligibility-unknown")
+        self.assertEqual(request.call_count, 1)
+
+    def test_execution_rechecks_its_own_claim_but_rejects_duplicate_or_crossed_run(self):
+        task, payload, _config, _fleet, request = self.task_execution_observer_fixture()
+        live = repair.GrokOwnedRepairExecutor(controller=controller.__file__)
+        live.require_admission(task)
+        executor = mock.Mock()
+        executor.qualify.return_value = live.qualify(task, payload)
+        def execute(selected, assignment, eligibility, **_kwargs):
+            run_id = eligibility["runId"]
+            live.require_admission(selected, run_id=run_id)
+            self.assertIsNone(repair.observe_task_admissions(IDENT, controller.__file__,
+                selected_id=task["selected"]["id"], selected_handle=task["selected"]["handle"],
+                source_revision=payload["generation"]))
+            for invalid_run in (None, run_id + "-other"):
+                self.assertFalse(repair.read_task_execution_admission(selected, controller.__file__,
+                    run_id=invalid_run)["allowed"])
+            pending = repair._receipt_path(IDENT, "pending-result")
+            repair.exclusive_write(pending, {"pending": True})
+            self.assertFalse(repair.read_task_execution_admission(selected, controller.__file__,
+                run_id=run_id)["allowed"])
+            pending.unlink()
+            raise repair.ExecutionAdmissionHeld("fixture-stop-before-provider")
+        executor.execute.side_effect = execute
+        result = self.run_isolated(task, executor)
+        self.assertEqual(result["reason"], "fixture-stop-before-provider")
+        self.assertEqual(request.call_count, 2)
+        duplicate = self.run_isolated(task, executor)
+        self.assertEqual(duplicate["reason"], "isolated-repair-claimed-outcome-unknown")
+        self.assertEqual(executor.execute.call_count, 1)
+
+    def test_live_adapter_rechecks_exact_allowance_after_claim_before_spawning(self):
+        task, _payload, config, _fleet, request = self.task_execution_observer_fixture()
+        observations = 0
+        def quota(*_a, **_k):
+            nonlocal observations
+            observations += 1
+            current = dict(config, creditUsagePercent=100 if observations > 1 else 0)
+            return self.allowance_response(current)
+        request.side_effect = quota
+        with mock.patch.object(repair.GrokOwnedRepairExecutor, "require_sandbox"), \
+             mock.patch.object(repair, "_sandboxed_grok_command", side_effect=lambda command, *_a: (command, {})), \
+             mock.patch.object(repair, "_run_bounded") as spawn:
+            result = self.run_isolated(task)
+            self.assertEqual(result["reason"], "execution-admission-provider-eligibility-held")
+            self.assertTrue((self.root / f"{IDENT}.claim").exists())
+            self.assertEqual(observations, 2)
+            duplicate = self.run_isolated(task)
+            self.assertEqual(duplicate["reason"], "isolated-repair-claimed-outcome-unknown")
+            spawn.assert_not_called()
+
     def test_provider_grant_validation_and_grok_runner_are_source_and_assignment_bound(self):
         task, payload, executable = self.provider_granted_fixture()
         self.assertEqual(repair.load_validated_candidate(IDENT, controller.__file__), payload)
@@ -1029,7 +1128,8 @@ class RepairTests(unittest.TestCase):
         task, _payload, _executable = self.provider_granted_fixture()
         self.write_admission_receipts()
         with mock.patch.object(repair, "_bwrap_executable", return_value=None), \
-             mock.patch.object(repair, "_systemd_network_boundary_available", return_value=True):
+             mock.patch.object(repair, "_systemd_network_boundary_available", return_value=True), \
+             mock.patch.object(repair, "read_task_execution_admission", return_value=repair.read_current_execution_admission()):
             result = self.run_isolated(task)
         self.assertEqual(result["status"], "held")
         self.assertIn("linux-bwrap-unavailable", result["reason"])
@@ -1498,10 +1598,11 @@ class RepairTests(unittest.TestCase):
         self.write_admission_receipts()
         checks = [{"__typename": "CheckRun", "name": task["selected"]["handle"],
                    "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        def claimed_during_read(*_args):
+            repair.exclusive_write(self.root / f"{IDENT}.claim", {"taskKey": task["taskKey"]})
+            return checks
         with mock.patch.object(repair, "_task_admission_controller_module", return_value=controller), \
-             mock.patch.object(controller, "_pr_status_check_rollup", return_value=checks), \
-             mock.patch.object(repair, "_assignment_consumed",
-                               side_effect=[False, False, True]):
+             mock.patch.object(controller, "_pr_status_check_rollup", side_effect=claimed_during_read):
             observed = repair.observe_task_admissions(
                 IDENT, controller.__file__, selected_id=task["selected"]["id"],
                 selected_handle=task["selected"]["handle"],

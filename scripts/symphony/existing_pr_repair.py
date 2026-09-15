@@ -581,6 +581,10 @@ def read_current_execution_admission(now=None):
             ADMISSION_CONCURRENCY_SCHEMA, "downstream-health-observation",
         ),
     }
+    return _execution_admission_result(admissions)
+
+
+def _execution_admission_result(admissions):
     required = ("ownedRemediation", "push", "providerEligibility", "downstreamHealth")
     failed = next((name for name in required if admissions[name]["state"] != "ALLOWED"), None)
     if failed is None:
@@ -908,6 +912,15 @@ def observe_task_admissions(identifier, controller, *, selected_id,
     only establish the exact issue/PR/head/check target; they never claim,
     grant, select, or write work.
     """
+    return _observe_task_admissions(
+        identifier, controller, selected_id=selected_id,
+        selected_handle=selected_handle, source_revision=source_revision,
+        candidate_reader=lambda: load_validated_candidate(identifier, controller),
+    )
+
+
+def _observe_task_admissions(identifier, controller, *, selected_id,
+                             selected_handle, source_revision, candidate_reader):
     if (not isinstance(identifier, str)
             or not re.fullmatch(r"(?:JOV|LYB)-[1-9][0-9]*", identifier)
             or not isinstance(controller, str) or not Path(controller).is_absolute()
@@ -920,7 +933,7 @@ def observe_task_admissions(identifier, controller, *, selected_id,
     try:
         # This call is intentionally first: consumed/invalid assignments do not
         # cause any authenticated target or provider observation.
-        payload = load_validated_candidate(identifier, controller)
+        payload = candidate_reader()
     except (OSError, ValueError, KeyError, TypeError, ImportError, SyntaxError,
             subprocess.SubprocessError):
         return None
@@ -959,12 +972,10 @@ def observe_task_admissions(identifier, controller, *, selected_id,
         provider_observation = observe_grok_allowance(payload)
         completed_at = time.time()
         try:
-            refreshed = load_validated_candidate(identifier, controller)
+            refreshed = candidate_reader()
             validate_provider_grant(refreshed, now=completed_at)
             require(assignment_digest(refreshed) == assignment_digest(payload),
                     "task-assignment-binding-changed")
-            require(not _assignment_consumed(identifier),
-                    "assignment-consumed-during-observation")
         except (OSError, ValueError, KeyError, TypeError, ImportError, SyntaxError,
                 subprocess.SubprocessError):
             return _task_admission_base(
@@ -994,6 +1005,62 @@ def observe_task_admissions(identifier, controller, *, selected_id,
         # An incomplete or crossed host observation remains UNKNOWN. Do not
         # serialize exception text from authenticated helpers into a receipt.
         return None
+
+
+def _execution_candidate(task, controller, run_id):
+    """Revalidate one assignment, allowing only this invocation's own claim."""
+    target = task["existingRepair"]
+    identifier = target["identifier"]
+    payload = load_isolated(identifier, controller)
+    validate_provider_grant(payload)
+    require(target.get("assignmentDigest") == assignment_digest(payload),
+            "task-assignment-binding-changed")
+    if run_id is None:
+        require(not _assignment_consumed(identifier), "assignment-consumed")
+        return payload
+    claim = read_private(ROOT / f"{identifier}.claim")
+    acceptance = read_private(_receipt_path(identifier, "acceptance"))
+    run = read_private(_receipt_path(identifier, "run"))
+    _claim_receipts_correlated(task, target, acceptance, run)
+    require(claim.get("task") == task and acceptance.get("runId") == run_id
+            and run.get("status") == "started"
+            and run.get("providerGrantDigest") == _digest(payload["providerGrant"])
+            and run.get("leaseIdentity") == _lease_digest(payload)
+            and not os.path.lexists(ROOT / f"{identifier}.execution.json")
+            and not os.path.lexists(_receipt_path(identifier, "pending-result")),
+            "task-execution-claim-mismatch")
+    # This recheck is only legal while the caller still owns the original lease.
+    _check_writer_lease(payload, inherited=True)
+    return payload
+
+
+def read_task_execution_admission(task, controller, *, run_id=None):
+    """Use fresh task evidence without converting aggregate capacity to a grant.
+
+    The current owned-remediation and push decisions remain independent. Provider
+    allowance and downstream health come from the same exact assignment/target
+    observer used for Summer publication, repeated before claim and before spawn.
+    Recovery uses the existing receipts and does not enter this execution path.
+    """
+    admissions = read_current_execution_admission()
+    if any(admissions[name]["state"] != "ALLOWED" for name in ("ownedRemediation", "push")):
+        return admissions
+    observation = _observe_task_admissions(
+        task["existingRepair"]["identifier"], controller,
+        selected_id=task["selected"]["id"],
+        selected_handle=task["selected"]["handle"],
+        source_revision=task["source"]["sourceVersion"],
+        candidate_reader=lambda: _execution_candidate(task, controller, run_id),
+    )
+    # Authenticated observations may take time. Re-read independent host gates
+    # after those observations so a hold during the request cannot be missed.
+    admissions = read_current_execution_admission()
+    for name in ("providerEligibility", "downstreamHealth"):
+        admissions[name] = (observation[name] if observation is not None
+                            else _task_admission_row(reason="task-execution-observation-unavailable"))
+    return _execution_admission_result({name: admissions[name] for name in (
+        "newImplementation", "ownedRemediation", "push", "providerEligibility", "downstreamHealth"
+    )})
 
 
 def load_validated_candidate(identifier, controller):
@@ -1856,15 +1923,19 @@ def _repair_prompt(task, payload):
 class GrokOwnedRepairExecutor:
     """The installed, grant-bound Grok CLI worker for existing PR repairs."""
 
-    def __init__(self, run=None, admission_reader=None):
+    def __init__(self, run=None, admission_reader=None, controller=None):
         self.run = run
-        # Injected runners are test doubles and do not become production
-        # admission sources. The installed live adapter always uses the
-        # canonical host projection unless a focused test supplies a reader.
-        self.admission_reader = (
-            admission_reader if admission_reader is not None
-            else read_current_execution_admission if run is None else None
-        )
+        self.controller = controller
+        # Injected readers/runners are test doubles, never production grants.
+        self.admission_reader = admission_reader
+
+    def require_admission(self, task, *, run_id=None):
+        if self.admission_reader is not None:
+            _require_execution_admission(self.admission_reader)
+        elif self.run is None:
+            require(self.controller is not None, "task-execution-controller-unavailable")
+            _require_execution_admission(lambda: read_task_execution_admission(
+                task, self.controller, run_id=run_id))
 
     def qualify(self, task, payload):
         grant, executable = validate_provider_grant(payload)
@@ -1928,8 +1999,7 @@ class GrokOwnedRepairExecutor:
             # Recheck immediately before spawning. A signed outbox may have
             # waited past a push/provider/downstream hold; a grant alone never
             # overrides the current independent admission projection.
-            if self.admission_reader is not None:
-                _require_execution_admission(self.admission_reader)
+            self.require_admission(task, run_id=run_id)
             runner = _run_bounded if self.run is None else self.run
             run_kwargs = {
                 "cwd": str(workspace), "env": environment, "stdin": subprocess.DEVNULL,
@@ -2272,7 +2342,7 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
             validate_provider_grant(payload)
         except (OSError, ValueError, KeyError, TypeError):
             return {"status": "held", "reason": "qualified-isolated-repair-executor-unavailable"}
-        executor = GrokOwnedRepairExecutor()
+        executor = GrokOwnedRepairExecutor(controller=controller)
     eligibility = executor.qualify(task, payload)
     require(isinstance(eligibility, dict) and eligibility.get("qualified") is True
             and isinstance(eligibility.get("provider"), str)
@@ -2297,7 +2367,7 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
         # before the shared lease/claim is consumed. Recovery receipts above
         # remain readable even when a later admission is held.
         try:
-            _require_execution_admission(executor.admission_reader)
+            executor.require_admission(task)
         except ExecutionAdmissionHeld as exc:
             return {"status": "held", "reason": str(exc)}
         try:
@@ -2451,6 +2521,11 @@ def check_workspace(payload, pr):
 
 
 def check_writer(payload, *, inherited):
+    _check_writer_lease(payload, inherited=inherited)
+    require(not os.path.lexists(ROOT / f"{payload['identifier']}.claim"), "assignment-already-claimed")
+
+
+def _check_writer_lease(payload, *, inherited):
     groups = Path("/proc/self/cgroup").read_text().splitlines()
     require(any(payload["writerUnit"] in line.split(":", 2)[-1].split("/") for line in groups),
             "assignment-writer-unit-mismatch")
@@ -2473,7 +2548,6 @@ def check_writer(payload, *, inherited):
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         finally:
             os.close(fd)
-    require(not os.path.lexists(ROOT / f"{payload['identifier']}.claim"), "assignment-already-claimed")
 
 
 def exclusive_write(path, payload):
