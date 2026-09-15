@@ -82,8 +82,8 @@ export const HOMEPAGE_LAUNCH_COPY = {
       },
     ],
     close: {
-      headline: 'See what the world sees.',
-      support: 'Start with your name.',
+      headline: 'Take control of your presence.',
+      action: 'Find your profile',
     },
     changelog: {
       headline: "What's new in Jovie",

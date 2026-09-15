@@ -41,10 +41,9 @@ export function HomepageNoScriptContent() {
       ))}
 
       <h3>{certified.close.headline}</h3>
-      <p>{certified.close.support}</p>
 
       <p>
-        <a href={APP_ROUTES.START}>{hero.search.action}</a>{' '}
+        <a href={APP_ROUTES.START}>{certified.close.action}</a>{' '}
         <a href={APP_ROUTES.SUPPORT}>Contact support</a>
       </p>
     </section>

@@ -27,12 +27,7 @@
   z-index: 0;
   border-radius: inherit;
   padding: var(--space-px);
-  background: linear-gradient(
-    180deg,
-    var(--input-aura-rim-bright),
-    var(--input-aura-rim) 46%,
-    var(--input-aura-rim-bright)
-  );
+  background: var(--input-aura-rim);
   opacity: 0.72;
   transition: opacity var(--ds-motion-subtle-duration)
     var(--ds-motion-subtle-easing);
@@ -50,8 +45,7 @@
   opacity: 1;
 }
 
-.input-aura-frame--editorial > :not(.input-aura-frame__illumination) {
-  position: relative;
+.input-aura-frame--editorial > .homepage-name-search__field {
   z-index: 1;
 }
 

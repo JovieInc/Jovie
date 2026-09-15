@@ -1,11 +1,5 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
@@ -104,117 +98,36 @@ describe('HomepageCertifiedSections', () => {
 });
 
 describe('HomepageClose', () => {
-  function setClipboard(value: Clipboard | undefined) {
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value,
-    });
-  }
-
-  it('closes with the locked lines, name search, and agent onboarding action', () => {
+  it('renders the saved closing headline and a single focus-only action', () => {
     render(<HomepageClose />);
-
     const section = screen.getByRole('region', {
-      name: HOMEPAGE_LAUNCH_COPY.certified.close.headline,
+      name: 'Take control of your presence.',
     });
-    expect(section.tagName).toBe('SECTION');
     expect(section).toBe(screen.getByTestId('marketing-section-cta'));
-    expect(section).toHaveAttribute(
-      'data-marketing-variant',
-      'editorial-search'
-    );
-    expect(section).toHaveAttribute(
-      'data-marketing-owner',
-      'apps/web/components/homepage/HomepageClose.tsx'
-    );
-    expect(section).toHaveAttribute('data-homepage-testid', 'homepage-close');
-    expect(section).toHaveAttribute('data-rhythm', 'close');
-    expect(section.querySelector('section')).toBeNull();
-    expect(within(section).getByRole('combobox')).toBe(
-      screen.getByRole('combobox')
-    );
-    expect(within(section).getByTestId('homepage-close-cta')).toBe(
-      screen.getByTestId('homepage-close-cta')
-    );
-
+    expect(within(section).getAllByRole('button')).toHaveLength(1);
     expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: HOMEPAGE_LAUNCH_COPY.certified.close.headline,
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(HOMEPAGE_LAUNCH_COPY.certified.close.support)
-    ).toBeInTheDocument();
-    expect(screen.getByRole('combobox')).toHaveAttribute(
-      'placeholder',
-      HOMEPAGE_LAUNCH_COPY.hero.search.placeholder
-    );
-    const cta = screen.getByTestId('homepage-close-cta');
-    expect(cta).toHaveTextContent('Find me');
-    expect(cta).toHaveAttribute('data-size', 'marketing');
-    expect(cta).toHaveAttribute('data-variant', 'primary');
-    expect(screen.getAllByRole('button')).toHaveLength(2);
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
-
-    const copyButton = screen.getByRole('button', {
-      name: 'Copy agent onboarding link',
-    });
-    expect(copyButton).toHaveTextContent('Onboard your agent');
-    expect(copyButton).toHaveAttribute('data-copy-state', 'idle');
-
-    // Quiet wordmark signs the page off without becoming a second control.
-    const mark = screen.getByTestId('homepage-close-mark');
-    expect(mark.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      within(section).getByRole('button', { name: 'Find your profile' })
+    ).toHaveAttribute('type', 'button');
+    expect(within(section).queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('announces a successful agent onboarding copy', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    setClipboard({ writeText } as Clipboard);
-    render(<HomepageClose />);
-
-    const copyButton = screen.getByRole('button', {
-      name: 'Copy agent onboarding link',
-    });
-    fireEvent.click(copyButton);
-
-    await waitFor(() => expect(copyButton).toHaveTextContent('Copied'));
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/cli'));
-    expect(writeText).toHaveBeenCalledWith(
-      expect.stringContaining('/llms.txt')
+  it('returns focus to the existing name without submitting or clearing it', () => {
+    const submit = vi.fn();
+    render(
+      <>
+        <form onSubmit={submit}>
+          <input
+            id='homepage-name-search'
+            aria-label='Name'
+            defaultValue='Beyoncé'
+          />
+        </form>
+        <HomepageClose />
+      </>
     );
-    expect(writeText).toHaveBeenCalledWith(
-      expect.not.stringContaining('npm install')
-    );
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Agent onboarding link copied.'
-    );
-  });
-
-  it('exposes a selectable fallback when clipboard access is unavailable', async () => {
-    setClipboard(undefined);
-    const execCommand = vi.fn().mockReturnValue(false);
-    Object.defineProperty(document, 'execCommand', {
-      configurable: true,
-      value: execCommand,
-    });
-    render(<HomepageClose />);
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Copy agent onboarding link' })
-    );
-
-    const fallback = await screen.findByRole('textbox', {
-      name: 'Agent Onboarding Link',
-    });
-    expect(fallback.tagName).toBe('TEXTAREA');
-    expect((fallback as HTMLTextAreaElement).value).toContain(
-      "Use Jovie's read-only public artist context:"
-    );
-    expect((fallback as HTMLTextAreaElement).value).toContain('/llms.txt');
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Clipboard unavailable. Select the onboarding link below.'
-    );
-    Reflect.deleteProperty(document, 'execCommand');
+    fireEvent.click(screen.getByRole('button', { name: 'Find your profile' }));
+    expect(screen.getByLabelText('Name')).toHaveFocus();
+    expect(screen.getByLabelText('Name')).toHaveValue('Beyoncé');
+    expect(submit).not.toHaveBeenCalled();
   });
 });

@@ -2414,146 +2414,59 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-close {
-  /* Locked close pass: 28/32 Satoshi at 620, quiet wordmark, one low
-     night wash. Tokens only; the 620 sits between semibold and bold on
-     purpose — it is the approved still, not a new scale step. */
-  --homepage-close-headline-weight: 620;
-  --homepage-close-wash: color-mix(
-    in oklab,
-    var(--color-accent-blue) 16%,
-    transparent
-  );
-  --homepage-close-wash-soft: color-mix(
-    in oklab,
-    var(--color-accent-purple) 7%,
-    transparent
-  );
-
-  position: relative;
-  isolation: isolate;
-  overflow: clip;
+  display: flex;
+  min-height: 440px;
+  align-items: center;
+  background: var(--system-b-bg-page);
   border-top: 1px solid var(--homepage-chapter-rule);
-  padding-block: var(--homepage-rhythm-close-start)
-    var(--homepage-rhythm-close-end);
-}
-
-.homepage-close::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(
-      44% 56% at 50% 78%,
-      var(--homepage-close-wash) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      62% 72% at 50% 110%,
-      var(--homepage-close-wash-soft) 0%,
-      transparent 70%
-    );
 }
 
 .homepage-close__inner {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: var(--space-8);
+  padding-block: var(--space-12);
   text-align: center;
 }
 
 .homepage-close__headline {
-  font-size: 1.75rem;
-  font-weight: var(--homepage-close-headline-weight);
-  letter-spacing: -0.01em;
-  line-height: 2rem;
-}
-
-.homepage-close__support {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text-secondary-token);
-  font-size: 0.9375rem;
-  line-height: 1.5rem;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 3.5rem;
+  /* Pen records 650 but its approved raster renders regular; use rendered evidence. */
+  font-weight: 400;
+  color: var(--system-b-text-primary);
   letter-spacing: 0;
-}
-
-.homepage-close__search {
-  width: min(30rem, 100%);
-  margin-top: var(--space-8);
+  line-height: 1.1;
 }
 
 .homepage-close__actions {
   display: flex;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  margin-top: var(--space-4);
 }
 
-.homepage-close__copy {
-  position: relative;
-  display: inline-flex;
-  min-height: var(--space-7);
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 18%, transparent);
-  border-radius: var(--radius-pill);
-  padding-inline: var(--space-3);
-  color: var(--color-text-primary-token);
-  font-size: var(--text-sm);
-  line-height: 1;
-  transition:
-    border-color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+.homepage-close__actions button {
+  width: 125px;
+  border: 0;
+  white-space: nowrap;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 13px;
+  font-weight: 510;
+  line-height: 1.5;
+  letter-spacing: 0;
+  padding-inline: 12px;
+  color: var(--system-b-bg-page);
+  background: var(--system-b-text-primary);
 }
 
-.homepage-close__copy::before {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 44px;
-  height: 44px;
-  content: "";
-  transform: translate(-50%, -50%);
-}
-
-.homepage-close__copy:hover,
-.homepage-close__copy:focus-visible {
-  border-color: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 45%,
-    transparent
-  );
-  color: var(--color-text-primary-token);
-}
-
-.homepage-close__copy:focus-visible {
-  outline: 2px solid var(--noir-ion-ion);
-  outline-offset: 2px;
-}
-
-.homepage-close__copy-fallback {
-  width: min(100%, 30rem);
-  margin-top: var(--space-4);
-  border: 1px solid var(--noir-ion-border-default);
-  border-radius: var(--radius-sm);
-  background: var(--noir-ion-shell);
-  padding: var(--space-2) var(--space-3);
-  resize: vertical;
-  color: var(--color-text-secondary-token);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  text-align: center;
-}
-
-/* Quiet wordmark: the section signs off, it does not link anywhere. */
-.homepage-close__mark {
-  --linear-text-primary: var(--color-text-tertiary-token);
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-20);
-  color: var(--color-text-tertiary-token);
+@media (max-width: 767px) {
+  .homepage-close__headline {
+    max-width: 342px;
+    font-size: 2rem;
+    text-wrap: wrap;
+  }
 }
 
 @media (min-width: 900px) {
