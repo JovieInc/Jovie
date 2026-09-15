@@ -884,7 +884,7 @@ export function ProfileCompactTemplate({
                 {profileBanner}
               </div>
             ) : null}
-            <div className='relative min-h-0 flex-1'>
+            <div className='profile-compact-surface-slot relative min-h-0 flex-1'>
               <ProfileCompactSurface
                 renderMode='interactive'
                 presentation={drawerPresentation}
