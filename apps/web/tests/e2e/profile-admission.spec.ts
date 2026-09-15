@@ -415,7 +415,6 @@ test.describe('public profile browser admission', () => {
         await expect(eventsButton).toHaveAttribute('aria-label', 'Events');
       }
 
-      await eventsButton.scrollIntoViewIfNeeded();
       const geometry = await eventsButton.evaluate(element => {
         const rect = element.getBoundingClientRect();
         return {
