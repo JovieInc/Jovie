@@ -15,6 +15,10 @@ Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
 exception. Do not revive System A or DM Sans from historical examples.
 
+The [founder register](docs/marketing/DESIGN_INVARIANTS.md) owns 2026-09-13
+homepage audience/media direction (superseding the DJ-only homepage brief) and
+marketing theme opt-in (superseding dark-only only on declared marketing routes).
+
 ## Authority and precedence
 
 After `canon/OPERATING_SYSTEM.md` and `canon/DESIGN.md`, this file is the
