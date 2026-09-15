@@ -1008,6 +1008,35 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the guarded profile-admission fixture screen for changed-surface certification', () => {
+    const source =
+      'apps/web/app/(profile-admission)/renders/profile-admission/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.profile-admission'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.profile-admission',
+      platform: 'web',
+      owner: 'profile-admission',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.profile-admission',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
   it('registers the marketing shell layout for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/layout.tsx';
     const screen = SCREEN_REGISTRY.find(
