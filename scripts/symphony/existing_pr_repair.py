@@ -24,6 +24,8 @@ import sys
 import tempfile
 import time
 import uuid
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 
 SCHEMA = "symphony-existing-pr-repair/v1"
@@ -583,6 +585,10 @@ def read_current_execution_admission(now=None):
             ADMISSION_CONCURRENCY_SCHEMA, "downstream-health-observation",
         ),
     }
+    return _execution_admission_result(admissions)
+
+
+def _execution_admission_result(admissions):
     required = ("ownedRemediation", "push", "providerEligibility", "downstreamHealth")
     failed = next((name for name in required if admissions[name]["state"] != "ALLOWED"), None)
     if failed is None:
@@ -620,7 +626,7 @@ def _task_admission_row(state="UNKNOWN", *, observed_at=None, expires_at=None,
                         source_digest=None, reason="task-observation-unavailable"):
     """Build one strict Summer task-admission observation row."""
     require(state in {"ALLOWED", "HELD", "UNKNOWN"}, "task-admission-state-invalid")
-    if state == "ALLOWED":
+    if state == "ALLOWED" or (state == "HELD" and observed_at is not None):
         require(isinstance(observed_at, str) and isinstance(expires_at, str)
                 and isinstance(source_digest, str)
                 and TASK_ADMISSION_DIGEST.fullmatch(source_digest),
@@ -786,9 +792,8 @@ def _task_admission_base(payload, selected_id, runtime, expires_at,
         "runtimeRevision": runtime_revision,
         "runtimeGeneration": runtime_generation,
         "runtimeInvocationId": runtime_invocation,
-        # The current signed qualification carries remaining percent but no
-        # independent quota-source digest. Preserve UNKNOWN until that source
-        # is observed; a provider grant alone never authorizes a probe.
+        # Preserve UNKNOWN until a separately authenticated provider allowance
+        # observation is bound to this exact grant and runtime.
         "providerEligibility": _task_admission_row(
             reason=provider_reason,
         ),
@@ -797,6 +802,108 @@ def _task_admission_base(payload, selected_id, runtime, expires_at,
         ),
         "providerObservation": None,
     }
+
+
+class _ProviderNoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *_args, **_kwargs):
+        return None
+
+
+def observe_grok_allowance(payload, *, opener=None):
+    """Observe this grant's included allowance through the installed CLI API.
+
+    Billing is read-only. Missing included fields (including the current unified
+    billing response) remain UNKNOWN; prepaid/on-demand balances never substitute.
+    The worker receives neither this request nor its authentication token.
+    """
+    unknown = "provider-included-allowance-unavailable"
+    try:
+        grant, _executable = validate_provider_grant(payload)
+        auth_path = _trusted_file(grant["authStatePath"], grant["authStateSha256"],
+                                  "provider-grant-auth")
+        auth_bytes = auth_path.read_bytes()
+        require(len(auth_bytes) <= 65536 and hashlib.sha256(auth_bytes).hexdigest()
+                == grant["authStateSha256"], "provider-auth-changed")
+        auth = json.loads(auth_bytes)
+        require(isinstance(auth, dict), "provider-auth-invalid")
+        accounts = [row for row in auth.values() if isinstance(row, dict)
+                    and row.get("user_id") == grant["accountUserId"]]
+        require(len(accounts) == 1 and isinstance(accounts[0].get("key"), str)
+                and bool(accounts[0]["key"]), "provider-auth-account-mismatch")
+        origin = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
+        request = urllib.request.Request(origin, headers={
+            "Authorization": "Bearer " + accounts[0]["key"],
+            "Accept": "application/json",
+        })
+        open_request = opener or urllib.request.build_opener(_ProviderNoRedirect).open
+        with open_request(request, timeout=15) as response:
+            require(response.status == 200 and response.geturl() == origin,
+                    "provider-allowance-response-untrusted")
+            raw = response.read(65537)
+        require(len(raw) <= 65536, "provider-allowance-response-too-large")
+        body = json.loads(raw)
+        config = body.get("config") if isinstance(body, dict) else None
+        require(isinstance(config, dict), "provider-allowance-response-invalid")
+        used = config.get("creditUsagePercent")
+        limit = config.get("monthlyLimit")
+        limit = limit.get("val") if isinstance(limit, dict) else limit
+        require(type(used) in (int, float) and math.isfinite(used) and used >= 0
+                and type(limit) in (int, float) and math.isfinite(limit) and limit > 0,
+                "provider-included-allowance-unavailable")
+        # A grant permits included execution only. Confirm that this account's
+        # current provider-side on-demand cap cannot silently fund the task.
+        cap = config.get("onDemandCap")
+        require(isinstance(cap, dict) and type(cap.get("val")) in (int, float)
+                and cap["val"] == 0, "provider-on-demand-boundary-unverified")
+        prepaid = config.get("prepaidBalance")
+        require(isinstance(prepaid, dict) and type(prepaid.get("val")) in (int, float)
+                and prepaid["val"] == 0, "provider-prepaid-boundary-unverified")
+        period = config.get("currentPeriod")
+        require(isinstance(period, dict), "provider-allowance-period-unavailable")
+        start, end = (datetime.fromisoformat(period[key].replace("Z", "+00:00"))
+                      for key in ("start", "end"))
+        require(start.tzinfo is not None and end.tzinfo is not None,
+                "provider-allowance-period-invalid")
+        completed = time.time()
+        require(start.timestamp() <= completed < end.timestamp(),
+                "provider-allowance-period-stale")
+        refreshed, _executable = validate_provider_grant(payload, now=completed)
+        require(refreshed == grant and auth_path.read_bytes() == auth_bytes,
+                "provider-auth-changed-during-observation")
+        remaining = max(0, math.floor(100 - used))
+        expires = min(payload["expiresAt"], grant["expiresAt"],
+                      completed + MAX_QUALIFICATION_AGE_SECONDS, end.timestamp())
+        observed_at = datetime.fromtimestamp(completed, timezone.utc).isoformat()
+        evidence = {
+            "providerGrantDigest": _digest(grant), "provider": grant["provider"],
+            "model": grant["model"], "accountUserId": grant["accountUserId"],
+            "authPoolIdentity": grant["authPoolIdentity"],
+            "executableDigest": grant["executableSha256"],
+            "routerDigest": grant["routerDigest"],
+            "outputDigest": grant["qualification"]["outputDigest"],
+            "quotaObservedAt": observed_at,
+            "quotaSourceDigest": _digest({"origin": origin,
+                "accountUserId": grant["accountUserId"],
+                "authPoolIdentity": grant["authPoolIdentity"],
+                "responseDigest": hashlib.sha256(raw).hexdigest()}),
+            "includedRemainingPercent": remaining,
+        }
+        return {"providerObservation": evidence,
+                "providerEligibility": _task_admission_row(
+                    "ALLOWED" if remaining else "HELD",
+                    observed_at=observed_at,
+                    expires_at=datetime.fromtimestamp(expires, timezone.utc).isoformat(),
+                    source_digest=_digest(evidence),
+                    reason="provider-included-allowance-observed" if remaining
+                           else "provider-included-allowance-exhausted")}
+    except urllib.error.HTTPError as error:
+        unknown = ("provider-authentication-rejected" if error.code in (401, 403)
+                   else "provider-allowance-service-unavailable")
+    except (OSError, ValueError, TypeError, KeyError, AttributeError,
+            OverflowError, subprocess.SubprocessError):
+        pass
+    return {"providerEligibility": _task_admission_row(reason=unknown),
+            "providerObservation": None}
 
 
 def observe_task_admissions(identifier, controller, *, selected_id,
@@ -809,6 +916,15 @@ def observe_task_admissions(identifier, controller, *, selected_id,
     only establish the exact issue/PR/head/check target; they never claim,
     grant, select, or write work.
     """
+    return _observe_task_admissions(
+        identifier, controller, selected_id=selected_id,
+        selected_handle=selected_handle, source_revision=source_revision,
+        candidate_reader=lambda: load_validated_candidate(identifier, controller),
+    )
+
+
+def _observe_task_admissions(identifier, controller, *, selected_id,
+                             selected_handle, source_revision, candidate_reader):
     if (not isinstance(identifier, str)
             or not re.fullmatch(r"(?:JOV|LYB)-[1-9][0-9]*", identifier)
             or not isinstance(controller, str) or not Path(controller).is_absolute()
@@ -821,7 +937,7 @@ def observe_task_admissions(identifier, controller, *, selected_id,
     try:
         # This call is intentionally first: consumed/invalid assignments do not
         # cause any authenticated target or provider observation.
-        payload = load_validated_candidate(identifier, controller)
+        payload = candidate_reader()
     except (OSError, ValueError, KeyError, TypeError, ImportError, SyntaxError,
             subprocess.SubprocessError):
         return None
@@ -857,14 +973,24 @@ def observe_task_admissions(identifier, controller, *, selected_id,
         # Authenticated reads can be slow. Revalidate the one-use assignment,
         # grant window, and attested runtime identity at read completion before
         # emitting an ALLOWED row.
+        provider_observation = observe_grok_allowance(payload)
+        # The allowance request can take seconds. Do not bind that response to
+        # a target that changed while it was in flight (including the check).
+        confirmed_target = _task_admission_target_observation(
+            payload, controller, selected_id, selected_handle
+        )
+        if confirmed_target != target:
+            return _task_admission_base(
+                payload, selected_id, runtime, expires_at,
+                provider_reason="task-target-binding-changed",
+                downstream_reason="task-target-binding-changed",
+            )
         completed_at = time.time()
         try:
-            refreshed = load_validated_candidate(identifier, controller)
+            refreshed = candidate_reader()
             validate_provider_grant(refreshed, now=completed_at)
             require(assignment_digest(refreshed) == assignment_digest(payload),
                     "task-assignment-binding-changed")
-            require(not _assignment_consumed(identifier),
-                    "assignment-consumed-during-observation")
         except (OSError, ValueError, KeyError, TypeError, ImportError, SyntaxError,
                 subprocess.SubprocessError):
             return _task_admission_base(
@@ -881,6 +1007,7 @@ def observe_task_admissions(identifier, controller, *, selected_id,
                 provider_reason="provider-quota-observation-unavailable",
                 downstream_reason="task-runtime-binding-changed",
             )
+        result.update(provider_observation)
         observed_at = datetime.fromtimestamp(completed_at, timezone.utc).isoformat()
         target_digest = _admission_digest(target)
         result["downstreamHealth"] = _task_admission_row(
@@ -893,6 +1020,62 @@ def observe_task_admissions(identifier, controller, *, selected_id,
         # An incomplete or crossed host observation remains UNKNOWN. Do not
         # serialize exception text from authenticated helpers into a receipt.
         return None
+
+
+def _execution_candidate(task, controller, run_id):
+    """Revalidate one assignment, allowing only this invocation's own claim."""
+    target = task["existingRepair"]
+    identifier = target["identifier"]
+    payload = load_isolated(identifier, controller)
+    validate_provider_grant(payload)
+    require(target.get("assignmentDigest") == assignment_digest(payload),
+            "task-assignment-binding-changed")
+    if run_id is None:
+        require(not _assignment_consumed(identifier), "assignment-consumed")
+        return payload
+    claim = read_private(ROOT / f"{identifier}.claim")
+    acceptance = read_private(_receipt_path(identifier, "acceptance"))
+    run = read_private(_receipt_path(identifier, "run"))
+    _claim_receipts_correlated(task, target, acceptance, run)
+    require(claim.get("task") == task and acceptance.get("runId") == run_id
+            and run.get("status") == "started"
+            and run.get("providerGrantDigest") == _digest(payload["providerGrant"])
+            and run.get("leaseIdentity") == _lease_digest(payload)
+            and not os.path.lexists(ROOT / f"{identifier}.execution.json")
+            and not os.path.lexists(_receipt_path(identifier, "pending-result")),
+            "task-execution-claim-mismatch")
+    # This recheck is only legal while the caller still owns the original lease.
+    _check_writer_lease(payload, inherited=True)
+    return payload
+
+
+def read_task_execution_admission(task, controller, *, run_id=None):
+    """Use fresh task evidence without converting aggregate capacity to a grant.
+
+    The current owned-remediation and push decisions remain independent. Provider
+    allowance and downstream health come from the same exact assignment/target
+    observer used for Summer publication, repeated before claim and before spawn.
+    Recovery uses the existing receipts and does not enter this execution path.
+    """
+    admissions = read_current_execution_admission()
+    if any(admissions[name]["state"] != "ALLOWED" for name in ("ownedRemediation", "push")):
+        return admissions
+    observation = _observe_task_admissions(
+        task["existingRepair"]["identifier"], controller,
+        selected_id=task["selected"]["id"],
+        selected_handle=task["selected"]["handle"],
+        source_revision=task["source"]["sourceVersion"],
+        candidate_reader=lambda: _execution_candidate(task, controller, run_id),
+    )
+    # Authenticated observations may take time. Re-read independent host gates
+    # after those observations so a hold during the request cannot be missed.
+    admissions = read_current_execution_admission()
+    for name in ("providerEligibility", "downstreamHealth"):
+        admissions[name] = (observation[name] if observation is not None
+                            else _task_admission_row(reason="task-execution-observation-unavailable"))
+    return _execution_admission_result({name: admissions[name] for name in (
+        "newImplementation", "ownedRemediation", "push", "providerEligibility", "downstreamHealth"
+    )})
 
 
 def load_validated_candidate(identifier, controller):
@@ -1413,6 +1596,19 @@ def _sandboxed_grok_command(command, payload, grant, executable):
     ), sandbox_environment
 
 
+def _bind_systemd_runtime_timeout(command, timeout_seconds):
+    prefix = "--property=RuntimeMaxSec="
+    indices = [index for index, value in enumerate(command) if value.startswith(prefix)]
+    require(len(indices) == 1 and "--" in command and indices[0] < command.index("--"),
+            "provider-systemd-runtime-binding-invalid")
+    bound = list(command)
+    # Round down so the systemd limit cannot exceed the runner's exact limit.
+    milliseconds = math.floor(timeout_seconds * 1000)
+    require(milliseconds > 0, "provider-grant-execution-window-too-short")
+    bound[indices[0]] = f"{prefix}{milliseconds / 1000:.3f}s"
+    return bound
+
+
 def _remaining_execution_timeout(payload, grant, now=None):
     current = time.time() if now is None else float(now)
     assignment_expires = _grant_time(payload.get("expiresAt"), "assignment-expires-at")
@@ -1755,15 +1951,19 @@ def _repair_prompt(task, payload):
 class GrokOwnedRepairExecutor:
     """The installed, grant-bound Grok CLI worker for existing PR repairs."""
 
-    def __init__(self, run=None, admission_reader=None):
+    def __init__(self, run=None, admission_reader=None, controller=None):
         self.run = run
-        # Injected runners are test doubles and do not become production
-        # admission sources. The installed live adapter always uses the
-        # canonical host projection unless a focused test supplies a reader.
-        self.admission_reader = (
-            admission_reader if admission_reader is not None
-            else read_current_execution_admission if run is None else None
-        )
+        self.controller = controller
+        # Injected readers/runners are test doubles, never production grants.
+        self.admission_reader = admission_reader
+
+    def require_admission(self, task, *, run_id=None):
+        if self.admission_reader is not None:
+            _require_execution_admission(self.admission_reader)
+        elif self.run is None:
+            require(self.controller is not None, "task-execution-controller-unavailable")
+            _require_execution_admission(lambda: read_task_execution_admission(
+                task, self.controller, run_id=run_id))
 
     def qualify(self, task, payload):
         grant, executable = validate_provider_grant(payload)
@@ -1816,19 +2016,22 @@ class GrokOwnedRepairExecutor:
         exit_code = None
         acceptance_digest = task_acceptance_digest(task, task["existingRepair"])
         task_accepted = False
-        timeout_seconds = _remaining_execution_timeout(payload, grant)
         detail = "grok-execution-failed"
         status = "failed"
         try:
+            # Recheck immediately before spawning. A signed outbox may have
+            # waited past a push/provider/downstream hold; a grant alone never
+            # overrides the current independent admission projection.
+            self.require_admission(task, run_id=run_id)
             if self.run is None:
                 command, environment = _sandboxed_grok_command(
                     command, payload, grant, executable
                 )
-            # Recheck immediately before spawning. A signed outbox may have
-            # waited past a push/provider/downstream hold; a grant alone never
-            # overrides the current independent admission projection.
-            if self.admission_reader is not None:
-                _require_execution_admission(self.admission_reader)
+            # Both deadlines begin at process launch. Derive one remaining
+            # window after authenticated reads AND sandbox preparation.
+            timeout_seconds = _remaining_execution_timeout(payload, grant)
+            if self.run is None:
+                command = _bind_systemd_runtime_timeout(command, timeout_seconds)
             runner = _run_bounded if self.run is None else self.run
             run_kwargs = {
                 "cwd": str(workspace), "env": environment, "stdin": subprocess.DEVNULL,
@@ -2171,7 +2374,7 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
             validate_provider_grant(payload)
         except (OSError, ValueError, KeyError, TypeError):
             return {"status": "held", "reason": "qualified-isolated-repair-executor-unavailable"}
-        executor = GrokOwnedRepairExecutor()
+        executor = GrokOwnedRepairExecutor(controller=controller)
     eligibility = executor.qualify(task, payload)
     require(isinstance(eligibility, dict) and eligibility.get("qualified") is True
             and isinstance(eligibility.get("provider"), str)
@@ -2196,7 +2399,7 @@ def execute_isolated(task, controller, fetch_issue, fetch_prs, *, executor=None)
         # before the shared lease/claim is consumed. Recovery receipts above
         # remain readable even when a later admission is held.
         try:
-            _require_execution_admission(executor.admission_reader)
+            executor.require_admission(task)
         except ExecutionAdmissionHeld as exc:
             return {"status": "held", "reason": str(exc)}
         try:
@@ -2350,6 +2553,11 @@ def check_workspace(payload, pr):
 
 
 def check_writer(payload, *, inherited):
+    _check_writer_lease(payload, inherited=inherited)
+    require(not os.path.lexists(ROOT / f"{payload['identifier']}.claim"), "assignment-already-claimed")
+
+
+def _check_writer_lease(payload, *, inherited):
     groups = Path("/proc/self/cgroup").read_text().splitlines()
     require(any(payload["writerUnit"] in line.split(":", 2)[-1].split("/") for line in groups),
             "assignment-writer-unit-mismatch")
@@ -2372,7 +2580,6 @@ def check_writer(payload, *, inherited):
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         finally:
             os.close(fd)
-    require(not os.path.lexists(ROOT / f"{payload['identifier']}.claim"), "assignment-already-claimed")
 
 
 def exclusive_write(path, payload):

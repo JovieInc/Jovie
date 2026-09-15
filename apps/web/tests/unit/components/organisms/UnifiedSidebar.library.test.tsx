@@ -222,9 +222,11 @@ describe('UnifiedSidebar library route', () => {
     ).toHaveLength(1);
     expect(panel).toContainElement(screen.getByTestId('user-button'));
     expect(
-      within(panel).getByRole('link', { name: /Public Profile/i })
-    ).toHaveAttribute('href', '/timwhite');
-    expect(panel).toHaveTextContent('jov.ie/timwhite');
+      within(panel).queryByRole('link', { name: /Public Profile/i })
+    ).toBeNull();
+    expect(userButtonPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ calm: true, profileHref: '/timwhite' })
+    );
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
 
@@ -345,7 +347,7 @@ describe('UnifiedSidebar library route', () => {
       section: 'dashboard',
     });
 
-    expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -392,7 +394,7 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('button', { name: 'Switch Workspace' })
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Jovie' })).toBeInTheDocument();
   });
 
   it('shows OV as the active admin workspace without changing header height', () => {

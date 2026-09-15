@@ -1,4 +1,5 @@
 import {
+  Activity,
   Banknote,
   CalendarDays,
   CheckSquare,
@@ -6,6 +7,7 @@ import {
   HandCoins,
   IdCard,
   Inbox,
+  Library,
   Lock,
   MailCheck,
   Music,
@@ -15,6 +17,7 @@ import {
   ShieldCheck,
   SquarePen,
   UserCircle,
+  Users,
   Waypoints,
 } from 'lucide-react';
 
@@ -78,6 +81,13 @@ export const profilesNavItem: NavItem = {
   tier: 'core',
   description: 'Monitor DSP profiles, social networks, and artist presence',
 };
+
+/** Founder-locked desktop composition, Pen OqZTF. Mobile retains its own rail. */
+export const canonicalSidebarNavigation = [
+  { ...libraryNavItem, icon: Library, iconName: undefined },
+  { ...contactsNavItem, icon: Users, iconName: undefined },
+  { ...profilesNavItem, icon: Activity, iconName: undefined },
+] as const satisfies readonly NavItem[];
 
 export const calendarNavItem: NavItem = {
   name: 'Calendar',

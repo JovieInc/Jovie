@@ -97,7 +97,13 @@
   /* Shell V1 canonical app-shell tokens — app chrome should prefer these
      names when touching shared shell geometry. Values are centralized here
      (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below. */
-  --app-shell-sidebar-width: 224px;
+  --app-shell-sidebar-width: 280px;
+  --app-shell-sidebar-icon-size: 0.9375rem;
+  --app-shell-sidebar-badge-font-size: 0.5rem;
+  --app-shell-sidebar-history-font-size: 0.78125rem;
+  --app-shell-sidebar-nav-grid: var(--app-shell-sidebar-icon-size)
+    minmax(0, 1fr);
+  --app-shell-sidebar-history-grid: minmax(0, 1fr) auto;
   --app-shell-header-height: 40px;
   --app-shell-header-height-compact: 36px;
   --app-shell-header-padding-x: 12px;

@@ -24,22 +24,29 @@ owns activation. Keep JOV-5853 uncommissioned until the actual signed loop works
 
 ## Required activation action
 
-Identify or provision a company GitHub App installation credential scoped to
-`JovieInc/Jovie`, with repository contents write and pull-request/check/status
-read access. Supply it through the approved host credential mechanism. Gem's
+Use the existing company JovieBot installation (App 2934433, installation
+112037986), restricted to `JovieInc/Jovie` with repository contents write and
+pull-request/check/status read access. The existing FleetGateRefresh job can
+issue a short-lived token through its existing GitHub App action, subject to
+the scoped task grant and independent push admission. Revoke it at job end;
+do not create another issuer or persistent credential. This is the prepared
+implementation boundary, not evidence that such a token has been issued. Gem's
 personal broadly scoped GitHub login is not an acceptable autonomous credential.
 Neither the credential nor Summer signing keys may enter worker mounts,
 environment, prompts or logs. Do not change company/product credential ownership.
 
-The operator must approve one existing, allowlisted repair assignment with all
-of these concrete fields before activation:
+Before execution, the operator approves one existing, allowlisted repair and
+its bounded destination, paths and change limits. The signed decision and
+assignment are bound when Summer selects that authorized task; the result SHA
+is bound from the actual execution afterward. Approval must not depend on an
+unknowable future commit SHA.
 
 | Binding | Required value |
 | --- | --- |
-| Decision and assignment | Exact signed task key and assignment digest |
+| Decision and assignment | Bind the exact signed task key and assignment digest when the authorized task is selected |
 | Target | Existing repository, PR, issue, owner and issue revision |
 | Destination | Exact preallocated repair branch and expected remote SHA |
-| Result | Locally observed commit SHA from the admitted checkout |
+| Result | Bind the locally observed commit SHA after execution; validate it against the approved scope before push |
 | Scope | Exact permitted paths and a bounded change limit |
 | Credential | Approved company installation identity and current permission receipt |
 | Lifetime | Issue time, expiration and explicit revocation source |

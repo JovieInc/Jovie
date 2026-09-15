@@ -26,13 +26,18 @@ describe('DashboardNav route warming', () => {
       'New Chat',
       'Library',
       'Contacts',
-      'Calendar',
-      'Tasks',
+      'Presence',
     ]) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
         'true'
       );
     }
+    expect(
+      screen.queryByRole('link', { name: 'Calendar' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Tasks' })
+    ).not.toBeInTheDocument();
   });
 });
