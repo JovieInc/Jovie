@@ -455,6 +455,9 @@ test.describe('public profile browser admission', () => {
         body: JSON.stringify(geometry, null, 2),
         contentType: 'application/json',
       });
+      console.log(
+        `[Events geometry ${fixture.id}] ${JSON.stringify(geometry)}`
+      );
       expect(geometry.width).toBeGreaterThanOrEqual(44);
       expect(geometry.height).toBeGreaterThanOrEqual(44);
       expect(geometry.left).toBeGreaterThanOrEqual(0);
@@ -495,9 +498,9 @@ test.describe('public profile browser admission', () => {
 
       await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
       await expect(eventsButton).toHaveAttribute('aria-current', 'page');
-      const selected = page.locator(
-        'section[data-testid="profile-primary-tab-tour"]'
-      );
+      const selected = page.getByTestId('profile-primary-tab-tour').filter({
+        has: page.getByRole('heading', { name: 'Shows', exact: true }),
+      });
       await expect(selected).toBeVisible();
       await expect(
         selected.getByRole('heading', { name: 'Shows', exact: true })
