@@ -445,7 +445,14 @@ def compose_snapshot(
                 ),
                 "status": closure_status,
                 "blockedSince": optional_blocked_since(
-                    closure.get("blockedSince"), "closure authority", now
+                    closure.get("blockedSince")
+                    or (
+                        closure.get("latestMergeAt")
+                        if "no-merge-progress-over-1h" in (closure.get("reasons") or [])
+                        else None
+                    ),
+                    "closure authority",
+                    now,
                 ),
                 "openPullRequests": open_prs,
             },
@@ -458,7 +465,14 @@ def compose_snapshot(
                     source_value=queue_value,
                 ),
                 "blockedSince": optional_blocked_since(
-                    queue.get("blockedSince"), "queue authority", now
+                    queue.get("blockedSince")
+                    or (
+                        queue.get("observedAt")
+                        if int(queue.get("greenReadyPrs") or 0) > 0
+                        else None
+                    ),
+                    "queue authority",
+                    now,
                 ),
                 "eligibleCleanPrs": eligible,
                 "queuedPrs": queued,

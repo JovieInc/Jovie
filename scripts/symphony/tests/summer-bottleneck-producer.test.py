@@ -124,6 +124,16 @@ class ProducerTests(unittest.TestCase):
         )
         self.assertEqual(len(signals["ciAudit"]["classes"]), 6)
 
+    def test_copies_latest_merge_as_closure_blocked_since_when_merge_progress_stalled(self):
+        fleet, runtime = sources()
+        fleet["signals"]["closureHealth"]["reasons"] = ["no-merge-progress-over-1h"]
+        fleet["signals"]["closureHealth"]["latestMergeAt"] = "2026-09-05T16:31:49Z"
+        snapshot = MODULE.compose_snapshot(fleet, runtime, NOW)
+        self.assertEqual(
+            snapshot["signals"]["closure"]["blockedSince"],
+            "2026-09-05T16:31:49Z",
+        )
+
     def test_semantically_unchanged_source_keeps_event_id(self):
         left = MODULE.compose_snapshot(*sources(), NOW)
         later = datetime(2026, 9, 5, 19, 31, tzinfo=timezone.utc)

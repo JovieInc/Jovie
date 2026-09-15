@@ -725,7 +725,7 @@ async function processStoredSnapshot(
 ): Promise<SummerBottleneckRecord> {
   const now = dependencies.now();
   const ranking = rankSummerBottlenecks(snapshot, now);
-  const selected = ranking[0] ?? null;
+  const selected = ranking.find(item => item.inEnvelope) ?? ranking[0] ?? null;
   if (!selected) {
     return persistTerminal(dependencies, snapshot, {
       ...baseReceipt(snapshot, dependencies, null, null, ranking),
