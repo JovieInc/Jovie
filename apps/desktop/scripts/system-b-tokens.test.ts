@@ -79,25 +79,54 @@ const appShellFrameBlock = extractShellWorkspaceBlock(systemBAppCss);
 const workspaceMarker =
   '/* NOIR ION D — workspace state surfaces (shell-scoped) */';
 
+// The Noir Ion text tokens now exist twice in design-system.css: a light
+// `:root` alias block (marketing footer theme controls, #17813) and the
+// `:root.dark` ziawi-lock anchors. Desktop is always dark, so the contract
+// must read the dark anchor, not whichever decl appears first in the file.
+function extractNoirIonDarkBlock(css: string): string {
+  const marker = 'Dark mode — Jovie Noir Ion ziawi lock';
+  const markerIndex = css.indexOf(marker);
+  if (markerIndex === -1)
+    throw new Error('Noir Ion ziawi dark marker not found');
+  const selectorStart = css.indexOf(':root.dark', markerIndex);
+  if (selectorStart === -1)
+    throw new Error('Noir Ion ziawi dark selector not found');
+  const blockStart = css.lastIndexOf('\n', selectorStart) + 1;
+  const openBrace = css.indexOf('{', selectorStart);
+  if (openBrace === -1) throw new Error('Noir Ion ziawi dark block not found');
+  let depth = 0;
+  for (let i = openBrace; i < css.length; i++) {
+    const ch = css[i];
+    if (ch === '{') depth += 1;
+    if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return css.slice(blockStart, i + 1);
+    }
+  }
+  throw new Error('Unclosed Noir Ion ziawi dark block');
+}
+
+const noirIonDarkBlock = extractNoirIonDarkBlock(designSystemCss);
+
 describe('shell workspace CSS extraction', () => {
-  test.each([
-    '"',
-    "'",
-  ])('reads the marker-owned dark selector list with %s quotes', quote => {
-    const frame = `[data-app-shell-frame=${quote}true${quote}]`;
-    const block = `.dark ${frame},\n${frame}.dark {
+  test.each(['"', "'"])(
+    'reads the marker-owned dark selector list with %s quotes',
+    quote => {
+      const frame = `[data-app-shell-frame=${quote}true${quote}]`;
+      const block = `.dark ${frame},\n${frame}.dark {
   --color-border-subtle: expected;
   &:hover { --nested: value; }
   --shadow-popover: expected-shadow;
 }`;
-    const css = `${frame} { --color-border-subtle: wrong; }
+      const css = `${frame} { --color-border-subtle: wrong; }
 ${workspaceMarker}
 ${block}
 .unrelated { --shadow-popover: wrong; }`;
-    const extracted = extractShellWorkspaceBlock(css);
-    expect(extracted).toBe(block);
-    expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
-  });
+      const extracted = extractShellWorkspaceBlock(css);
+      expect(extracted).toBe(block);
+      expect(readCssVar('--shadow-popover', extracted)).toBe('expected-shadow');
+    }
+  );
 
   test.each([
     ['', 'Noir Ion D marker not found'],
@@ -131,7 +160,7 @@ describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => 
     // The app-shell frame does not override text color; it inherits the dark
     // Noir Ion anchor (DESIGN.md: Text secondary #D7DCE8).
     expect(normalize(SYSTEM_B_DESKTOP_TOKENS.textSecondary)).toBe(
-      normalize(readCssVar('--noir-ion-text-secondary', designSystemCss))
+      normalize(readCssVar('--noir-ion-text-secondary', noirIonDarkBlock))
     );
   });
 
