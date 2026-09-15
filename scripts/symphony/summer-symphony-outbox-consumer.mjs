@@ -102,6 +102,7 @@ class OutboxPageLimitError extends Error {
 
 const ACTIONS = new Set([
   'reconcile-release-certification-starvation',
+  'reconcile-native-queue-starvation',
   'remediate-selected-ci-audit-class',
 ]);
 const CI_IDS = new Set([
@@ -315,11 +316,15 @@ export function validateTask(task) {
     throw new Error('outbox-task-invalid-or-cross-bound');
   }
   const release = task.selected.id === 'release-certification-starvation';
+  const queueStarvation = task.selected.id === 'native-queue-starvation';
   if (
     !isV3 &&
     ((release &&
       task.action !== 'reconcile-release-certification-starvation') ||
+      (queueStarvation &&
+        task.action !== 'reconcile-native-queue-starvation') ||
       (!release &&
+        !queueStarvation &&
         (!CI_IDS.has(task.selected.id) ||
           task.action !== 'remediate-selected-ci-audit-class')))
   ) {
@@ -333,7 +338,7 @@ export function validateTask(task) {
       task.decisionFingerprint !== task.taskKey ||
       lifetime <= 0 ||
       lifetime > 5400000 ||
-      (!release && !CI_IDS.has(task.selected.id))
+      (!release && !queueStarvation && !CI_IDS.has(task.selected.id))
     )
       throw new Error('existing-repair-task-cross-bound');
   }
