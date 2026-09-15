@@ -14,7 +14,7 @@ const VIEWPORT = { width: 390, height: 844 } as const;
 
 const STATES = [
   {
-    id: 'features-dashboard-ai-crawler-aicrawlerdetailpanel--missingtelemetry',
+    id: 'features-dashboard-ai-crawler-aicrawlerdetailpanel--missing-telemetry',
     name: 'missing-telemetry',
   },
   {
@@ -22,7 +22,7 @@ const STATES = [
     name: 'loading',
   },
   {
-    id: 'features-dashboard-ai-crawler-aicrawlerdetailpanel--realzero',
+    id: 'features-dashboard-ai-crawler-aicrawlerdetailpanel--real-zero',
     name: 'real-zero',
   },
   {
@@ -30,7 +30,7 @@ const STATES = [
     name: 'populated',
   },
   {
-    id: 'features-dashboard-ai-crawler-aicrawlerdetailpanel--freeteaser',
+    id: 'features-dashboard-ai-crawler-aicrawlerdetailpanel--free-teaser',
     name: 'free-teaser',
   },
 ] as const;
