@@ -1,5 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import {
+  ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+  ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+} from '@jovie/ui/atoms/button-contract';
 import { APP_SCREEN_COMPONENT_REGISTRY } from '@/data/appScreens';
 import { MARKETING_SHELL_REGISTRY } from '@/data/marketing';
 import { DESIGN_SYSTEM_COMPONENT_REGISTRY } from './componentRegistry';
@@ -680,7 +684,11 @@ export function validateUIOwnershipRegistry({
     )
       badEntry(issues, entry, 'unregistered-serif');
     const geometry = entry.visibleControlGeometry;
-    if (geometry && (geometry.visiblePx !== 32 || geometry.hitTargetPx !== 44))
+    if (
+      geometry &&
+      (geometry.visiblePx !== ACTION_BUTTON_VISIBLE_HEIGHT_PX ||
+        geometry.hitTargetPx !== ACTION_BUTTON_MOBILE_HIT_TARGET_PX)
+    )
       badEntry(issues, entry, 'invalid-visible-control-geometry');
     const elevation = entry.surfaceElevation;
     if (
