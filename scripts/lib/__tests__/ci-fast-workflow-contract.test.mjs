@@ -231,6 +231,104 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('selects the crawler state proof through the maintained Storybook browser path', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/CRAWLER_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx',
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.tsx',
+      'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.stories.tsx',
+      'apps/web/tests/e2e/storybook-ai-crawler.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input:
+          'apps/web/components/features/dashboard/organisms/OtherDialog.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Run ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'crawler-storybook-selection-'));
+    try {
+      const output = join(root, 'output');
+      const result = spawnSync(
+        'bash',
+        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CHANGED_PATHS:
+              'apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx',
+            RUNNER_TEMP: root,
+            GITHUB_OUTPUT: output,
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        )
+      ).toEqual({
+        run: 'true',
+        spotify: 'false',
+        kbd: 'false',
+        crawler: 'true',
+      });
+
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'true',
+          },
+        }
+      );
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim().split('\n')).toEqual([
+        'tests/e2e/storybook-ai-crawler.spec.ts',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs certification rejection regressions with measured coverage in the web structural lane', () => {
     const webParts = CI_FAST_SOURCE.slice(
       CI_FAST_SOURCE.indexOf('const webParts = ['),
