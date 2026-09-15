@@ -308,3 +308,5 @@ Read [the canonical surface split reference](docs/design-system/DETAILS.md#canon
 ## Decisions Log
 
 Read [the decisions log reference](docs/design-system/DETAILS.md#decisions-log) when changing this area.
+
+Editorial titles (founder, 2026-09-14): `BlogCard` uses `data-wrap="editorial-title"` and per-row subgrid tracks. Show full titles; no truncation or global fixed height. Other heading bounds still apply. Storybook covers short, two-line and long titles across responsive widths.
