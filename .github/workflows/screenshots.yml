@@ -18,9 +18,12 @@ on:
       - 'apps/web/components/**'
       - 'apps/web/data/artistProfilePageOrder.ts'
       - 'apps/web/data/homepageLaunchCopy.ts'
+      - 'apps/web/data/marketing/**'
       - 'apps/web/features/**'
+      - 'apps/web/lib/agent-os/visual-qa/**'
       - 'apps/web/lib/screenshots/**'
       - 'apps/web/tests/product-screenshots/**'
+      - 'apps/web/tests/visual-qa/**'
       - 'apps/web/tailwind.config.*'
       - 'apps/web/app/**/layout.tsx'
       - 'apps/web/app/globals.css'
@@ -121,6 +124,7 @@ jobs:
             --workers=4
         env:
           BASE_URL: http://localhost:3000
+          SCREENSHOT_BUILD_MODE: production
 
       - name: Upload exact marketing route captures
         if: >-

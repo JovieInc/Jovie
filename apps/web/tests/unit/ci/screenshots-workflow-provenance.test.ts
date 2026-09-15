@@ -53,4 +53,14 @@ describe('Product Screenshots provenance cleanliness', () => {
     expect(restore).not.toMatch(/kill .*SCREENSHOT_SERVER/);
     expect(restore).toContain('exit 1');
   });
+
+  it('binds exact marketing evidence to the production build and canonical sources', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const capture = getStepBlock(workflow, 'Capture exact marketing routes');
+
+    expect(capture).toContain('SCREENSHOT_BUILD_MODE: production');
+    expect(workflow).toContain("- 'apps/web/data/marketing/**'");
+    expect(workflow).toContain("- 'apps/web/lib/agent-os/visual-qa/**'");
+    expect(workflow).toContain("- 'apps/web/tests/visual-qa/**'");
+  });
 });
