@@ -35,6 +35,7 @@ readonly -a RELATIVE_SOURCES=(
   scripts/symphony/summer_bottleneck_producer.py
   scripts/symphony/summer_admissions.py
   scripts/symphony/summer_existing_repair.py
+  scripts/symphony/summer_ci_audit.py
   scripts/symphony/summer-symphony-outbox-consumer.mjs
   scripts/symphony/config/existing-repair-controller-manifest.json
   scripts/symphony/gem_repo_registry.py
@@ -59,6 +60,7 @@ readonly -a TARGETS=(
   "${GEM_ROOT}/scripts/summer_bottleneck_producer.py"
   "${GEM_ROOT}/scripts/summer_admissions.py"
   "${GEM_ROOT}/scripts/summer_existing_repair.py"
+  "${GEM_ROOT}/scripts/summer_ci_audit.py"
   "${GEM_ROOT}/scripts/summer-symphony-outbox-consumer.mjs"
   "${GEM_ROOT}/config/existing-repair-controller-manifest.json"
   "${GEM_ROOT}/scripts/gem_repo_registry.py"
@@ -106,6 +108,7 @@ python3 -m py_compile \
   "${SOURCE_ROOT}/scripts/symphony/summer_bottleneck_producer.py" \
   "${SOURCE_ROOT}/scripts/symphony/summer_admissions.py" \
   "${SOURCE_ROOT}/scripts/symphony/summer_existing_repair.py" \
+  "${SOURCE_ROOT}/scripts/symphony/summer_ci_audit.py" \
   "${SOURCE_ROOT}/scripts/symphony/gem_repo_registry.py" \
   "${SOURCE_ROOT}/scripts/symphony/gem_rehabilitation_policy.py" \
   "${SOURCE_ROOT}/scripts/symphony/model-router.py"
@@ -214,6 +217,7 @@ python3 -m py_compile \
   "${GEM_ROOT}/scripts/summer_bottleneck_producer.py" \
   "${GEM_ROOT}/scripts/summer_admissions.py" \
   "${GEM_ROOT}/scripts/summer_existing_repair.py" \
+  "${GEM_ROOT}/scripts/summer_ci_audit.py" \
   "${GEM_ROOT}/scripts/gem_repo_registry.py" \
   "${GEM_ROOT}/scripts/gem_rehabilitation_policy.py" \
   "${GEM_ROOT}/scripts/model-router.py"
@@ -252,6 +256,7 @@ pairs = {
     "summerBottleneckProducer": (source_root / "scripts/symphony/summer_bottleneck_producer.py", gem_root / "scripts/summer_bottleneck_producer.py"),
     "summerAdmissions": (source_root / "scripts/symphony/summer_admissions.py", gem_root / "scripts/summer_admissions.py"),
     "summerExistingRepair": (source_root / "scripts/symphony/summer_existing_repair.py", gem_root / "scripts/summer_existing_repair.py"),
+    "summerCiAudit": (source_root / "scripts/symphony/summer_ci_audit.py", gem_root / "scripts/summer_ci_audit.py"),
     "summerSymphonyConsumer": (source_root / "scripts/symphony/summer-symphony-outbox-consumer.mjs", gem_root / "scripts/summer-symphony-outbox-consumer.mjs"),
     "existingRepairControllerManifest": (source_root / "scripts/symphony/config/existing-repair-controller-manifest.json", gem_root / "config/existing-repair-controller-manifest.json"),
     "registryModule": (source_root / "scripts/symphony/gem_repo_registry.py", gem_root / "scripts/gem_repo_registry.py"),
