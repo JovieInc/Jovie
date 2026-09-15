@@ -8,6 +8,7 @@ import io
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -413,6 +414,8 @@ class DeploymentContractTests(unittest.TestCase):
         stuck_service: bool = False,
         prior_enabled: bool = False,
         prior_active: bool = False,
+        defer_first_cycle: str = "false",
+        fail_first_cycle: bool = False,
     ) -> tuple[subprocess.CompletedProcess[str], pathlib.Path, pathlib.Path, pathlib.Path]:
         root = pathlib.Path(directory)
         fixture = root / "repo"
@@ -480,6 +483,9 @@ case "$*" in
   *"disable gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ENABLED"; exit 0 ;;
   *"stop gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ACTIVE"; exit 0 ;;
   *"start gem-pr-drain.timer"*) : > "$FAKE_TIMER_ACTIVE"; exit 0 ;;
+  *"start gem-pr-drain.service"*)
+    if [ "$FAKE_FIRST_CYCLE_FAILURE" = true ]; then exit 9; else exit 0; fi
+    ;;
   *"show gem-pr-drain.service --property=Result --value"*)
     printf '%s\n' success
     exit 0
@@ -508,6 +514,8 @@ exit 0
                 "FAKE_TIMER_ACTIVE": str(active),
                 "FAKE_ENABLE_FAILURE": "true" if fail_enable else "false",
                 "FAKE_STUCK_SERVICE": "true" if stuck_service else "false",
+                "GEM_REHABILITATION_DEFER_FIRST_CYCLE": defer_first_cycle,
+                "FAKE_FIRST_CYCLE_FAILURE": "true" if fail_first_cycle else "false",
             },
             text=True,
             capture_output=True,
@@ -535,6 +543,68 @@ exit 0
         self.assertIn("--user is-enabled --quiet gem-pr-drain.timer", commands)
         self.assertTrue(receipt["timerEnabled"])
         self.assertTrue(receipt["timerActive"])
+        self.assertEqual(receipt["lastCycleResult"], "success")
+
+    def test_deferred_install_keeps_diagnostics_without_forcing_a_failed_cycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(
+                directory, defer_first_cycle="true", fail_first_cycle=True
+            )
+            self.assertEqual(process.returncode, 0, process.stderr)
+            commands = log.read_text().splitlines()
+            self.assertNotIn("--user start gem-pr-drain.service", commands)
+            self.assertNotIn("--user show gem-pr-drain.service --property=Result --value", commands)
+            self.assertTrue(enabled.exists())
+            self.assertTrue(active.exists())
+            receipt = json.loads((pathlib.Path(directory) /
+                "gem/state/gem-pr-rehabilitation-attestation.json").read_text())
+            self.assertEqual(receipt["lastCycleResult"], "pending")
+            self.assertTrue(all(row["matches"] for row in receipt["artifacts"].values()))
+            # Execute the actual activation predicate: verified installation
+            # with an unobserved first cycle must not pass runtime activation.
+            match = re.search(
+                r'jq -e --arg sha "\$PRODUCTION_SHA" \'(\s*\.schema == '
+                r'"gem-pr-rehabilitation-attestation/v1".*?)\' '
+                r'"\$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json"',
+                ACTIVATION.read_text(), re.DOTALL,
+            )
+            self.assertIsNotNone(match)
+            for result, expected in (("pending", 1), ("success", 0)):
+                candidate = {**receipt, "lastCycleResult": result}
+                check = subprocess.run(
+                    ["jq", "-e", "--arg", "sha", receipt["sourceRevision"], match.group(1)],
+                    input=json.dumps(candidate), capture_output=True, text=True, check=False,
+                )
+                self.assertEqual(check.returncode, expected, check.stderr)
+
+    def test_default_first_cycle_failure_still_rolls_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(
+                directory, fail_first_cycle=True, prior_enabled=True, prior_active=True
+            )
+            self.assertNotEqual(process.returncode, 0)
+            self.assertIn("--user start gem-pr-drain.service", log.read_text())
+            self.assertTrue(enabled.exists())
+            self.assertTrue(active.exists())
+            self.assertFalse((pathlib.Path(directory) /
+                "gem/state/gem-pr-rehabilitation-attestation.json").exists())
+
+    def test_deferred_install_still_rolls_back_a_timer_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, _, enabled, active = self._install_runtime(
+                directory, defer_first_cycle="true", fail_enable=True
+            )
+            self.assertNotEqual(process.returncode, 0)
+            self.assertFalse(enabled.exists())
+            self.assertFalse(active.exists())
+
+    def test_invalid_defer_setting_fails_before_systemd_or_installation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, _, _ = self._install_runtime(directory, defer_first_cycle="yes")
+            self.assertEqual(process.returncode, 2)
+            self.assertIn("must be true or false", process.stderr)
+            self.assertFalse(log.exists())
+            self.assertFalse((pathlib.Path(directory) / "gem/scripts").exists())
 
     def test_installer_ships_priority_gate_runtime_dependencies(self):
         with tempfile.TemporaryDirectory() as directory:
