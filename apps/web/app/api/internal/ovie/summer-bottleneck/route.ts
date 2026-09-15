@@ -6,6 +6,7 @@ import { env } from '@/lib/env';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
 import { summerAdmissionsSchema } from '@/lib/ovie/summer-admissions';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
+import { createSummerCiAuditV2Schema } from '@/lib/ovie/summer-ci-audit';
 import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
 import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
 import { summerTaskAdmissionsSchema } from '@/lib/ovie/summer-task-admissions';
@@ -59,7 +60,7 @@ const runnerAuthority = z
   })
   .strict();
 
-const ciAuditSchema = z
+const ciAuditV1Schema = z
   .object({
     schema: z.literal('jovie-ci-bottleneck-audit/v1'),
     ...sourceFields,
@@ -92,6 +93,11 @@ const ciAuditSchema = z
       });
     }
   });
+
+const ciAuditSchema = z.union([
+  ciAuditV1Schema,
+  createSummerCiAuditV2Schema(summerCiImprovementClassIds),
+]);
 
 // References an existing host grant; signing this snapshot does not grant execution.
 const existingRepairSchema = z

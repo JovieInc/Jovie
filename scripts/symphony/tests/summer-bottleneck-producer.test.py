@@ -275,6 +275,7 @@ class ProducerTests(unittest.TestCase):
             independent_review_receipt=None,
         )
         observations = {
+            "observe_ci_audit": None,
             "observe_main": {"status": "green", "sha": MAIN_SHA},
             "observe_production": {
                 "status": "green",
@@ -321,7 +322,7 @@ class ProducerTests(unittest.TestCase):
             self.addCleanup(patch.stop)
 
         observed = GATE.observe_signals(args, NOW)
-        self.assertNotIn("ciAudit", observed)
+        self.assertIsNone(observed["ciAudit"])
         receipt = GATE.evaluate(observed, GATE.isoformat(NOW))
         runtime = {
             "generated_at": at,

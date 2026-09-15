@@ -21,6 +21,7 @@ import {
   LANE_COMMANDS,
   LANE_GROUPS,
   MARKETING_CERTIFICATION_COMMAND,
+  RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,
   selectLanes,
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
@@ -188,6 +189,26 @@ describe('ci-fast bounded parallel workflow', () => {
     }
     expect(CI_FAST_SOURCE).toContain(
       "'python3 scripts/symphony/tests/run-runtime-proof-gate.py'"
+    );
+  });
+
+  it('selects and runs alignment regressions for source-only changes', () => {
+    const pattern = WORKFLOW.match(/STRUCTURAL_CONTROL_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'scripts/symphony/align-runner-source-revision.sh',
+      'scripts/symphony/tests/align-runner-source-revision.test.sh',
+    ]) {
+      expect(
+        spawnSync('grep', ['-Eq', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(CI_FAST_SOURCE).toContain(
+      "'bash scripts/symphony/tests/align-runner-source-revision.test.sh'"
     );
   });
 
@@ -1323,9 +1344,20 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/symphony/tests/test-model-router.py',
       'scripts/symphony/tests/test_evaluate_fleet_gate.py',
       'scripts/symphony/tests/test_fleet_admission_receipt.py',
+      'scripts/lib/release-wave-admission.mjs',
+      'scripts/lib/__tests__/release-wave-admission.test.mjs',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
     }
+    expect(CI_FAST_SOURCE).toContain(
+      'RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND,'
+    );
+    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
+      'lib/__tests__/release-wave-admission.test.mjs'
+    );
+    expect(RELEASE_WAVE_ADMISSION_COVERAGE_COMMAND).toContain(
+      '--coverage.include=release-wave-admission.mjs'
+    );
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
     expect(CI_FAST_SOURCE).toContain(
