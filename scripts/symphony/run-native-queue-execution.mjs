@@ -57,7 +57,8 @@ async function claimIssue({ identifier, state }) {
 async function writeExecution(record) {
   const origin = required('SUMMER_BOTTLENECK_ORIGIN').replace(/\/$/u, '');
   const headers = { 'content-type': 'application/json' };
-  const bypass = process.env.SUMMER_BOTTLENECK_VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+  const bypass =
+    process.env.SUMMER_BOTTLENECK_VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
   if (bypass) headers['x-vercel-protection-bypass'] = bypass;
   const response = await fetch(`${origin}/summer/v1/symphony/executions`, {
     method: 'POST',
@@ -72,7 +73,9 @@ async function writeExecution(record) {
     throw new Error(`execution-write-invalid:${response.status}`);
   }
   if (!response.ok) {
-    throw new Error(`execution-write-rejected:${parsed.code ?? response.status}`);
+    throw new Error(
+      `execution-write-rejected:${parsed.code ?? response.status}`
+    );
   }
   return parsed;
 }
@@ -99,7 +102,13 @@ const issueIdentifier = process.argv[3];
 const sourceVersion = process.argv[4];
 const snapshotDigest = process.argv[5];
 const fleetPath = process.argv[6];
-if (!taskKey || !issueIdentifier || !sourceVersion || !snapshotDigest || !fleetPath) {
+if (
+  !taskKey ||
+  !issueIdentifier ||
+  !sourceVersion ||
+  !snapshotDigest ||
+  !fleetPath
+) {
   throw new Error(
     'usage: run-native-queue-execution.mjs <taskKey> <issue> <sourceVersion> <snapshotDigest> <fleet.json>'
   );
@@ -111,7 +120,9 @@ const result = await executeNativeQueueStarvation({
   source: { sourceVersion, snapshotDigest },
   admission: fleetAdmission(fleetPath),
   signatureKeyId: required('SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_KEY_ID'),
-  privateKeyPem: required('SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'),
+  privateKeyPem: required(
+    'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_SIGNING_PRIVATE_KEY'
+  ),
   claimIssue,
   enrollPr: async () => ({
     ok: false,

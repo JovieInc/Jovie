@@ -3,11 +3,11 @@ import { generateKeyPairSync } from 'node:crypto';
 import { describe, it } from 'node:test';
 
 import {
+  decideNativeQueueExecution,
   ENROLL_EXACT_HEAD,
+  executeNativeQueueStarvation,
   MUTATION_AUTHORITY_UNAVAILABLE,
   NO_GREEN_READY_PR,
-  decideNativeQueueExecution,
-  executeNativeQueueStarvation,
   signNativeQueueExecution,
   unsignedNativeQueueExecution,
 } from './native-queue-starvation-execute.mjs';

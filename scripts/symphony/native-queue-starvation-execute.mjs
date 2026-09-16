@@ -41,7 +41,8 @@ export function decideNativeQueueExecution(input) {
       status: 'failed',
       detail: NO_GREEN_READY_PR,
       mutationAttempted: false,
-      authority: 'exact-source-ci-native-queue-production-gates-remain-required',
+      authority:
+        'exact-source-ci-native-queue-production-gates-remain-required',
       pr: null,
       head: null,
     };
@@ -61,7 +62,8 @@ export function decideNativeQueueExecution(input) {
       status: 'failed',
       detail: NO_GREEN_READY_PR,
       mutationAttempted: false,
-      authority: 'exact-source-ci-native-queue-production-gates-remain-required',
+      authority:
+        'exact-source-ci-native-queue-production-gates-remain-required',
       pr: null,
       head: null,
     };
@@ -162,10 +164,9 @@ export async function executeNativeQueueStarvation({
         }
       : {
           status: 'failed',
-          detail: String(enrolled?.reason ?? 'native-queue-enroll-failed').slice(
-            0,
-            240
-          ),
+          detail: String(
+            enrolled?.reason ?? 'native-queue-enroll-failed'
+          ).slice(0, 240),
           mutationAttempted: true,
           authority:
             'exact-source-ci-native-queue-production-gates-remain-required',
