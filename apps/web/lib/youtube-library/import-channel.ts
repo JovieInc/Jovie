@@ -195,7 +195,9 @@ export async function loadYouTubeImportSnapshot(input: {
     input.userId,
     input.creatorProfileId
   );
-  const connected = accounts.filter(account => account.status === 'connected');
+  const connected = accounts.filter(
+    account => account.status === 'connected' || account.status === 'error'
+  );
   if (connected.length !== 1) {
     return snapshotFromAccounts({ accounts });
   }
@@ -268,7 +270,9 @@ export async function importYouTubeChannelPage(input: {
     input.userId,
     input.creatorProfileId
   );
-  const connected = accounts.filter(account => account.status === 'connected');
+  const connected = accounts.filter(
+    account => account.status === 'connected' || account.status === 'error'
+  );
   if (connected.length !== 1) {
     return snapshotFromAccounts({ accounts });
   }
@@ -358,6 +362,7 @@ export async function importYouTubeChannelPage(input: {
       lastSyncAt: now,
       lastErrorCode: null,
       lastErrorUserMessage: null,
+      status: 'connected',
     });
     const localVideoCount = store.countVideos
       ? await store.countVideos(input.creatorProfileId, account.channelId)
@@ -366,6 +371,7 @@ export async function importYouTubeChannelPage(input: {
       accounts: [
         {
           ...account,
+          status: 'connected',
           lastSyncAt: now,
           lastErrorCode: null,
           lastErrorUserMessage: null,
@@ -383,6 +389,7 @@ export async function importYouTubeChannelPage(input: {
     const lastErrorUserMessage = quota
       ? 'YouTube quota is exhausted. Resume import after the quota resets.'
       : 'YouTube could not be imported. Try again or reconnect the channel.';
+    const status = quota ? account.status : ('error' as const);
     const cursor: YouTubeImportCursor | null = existing
       ? {
           ...existing,
@@ -393,11 +400,13 @@ export async function importYouTubeChannelPage(input: {
     await store.markAccount(account.id, {
       lastErrorCode,
       lastErrorUserMessage,
+      ...(quota ? {} : { status: 'error' }),
     });
     return snapshotFromAccounts({
       accounts: [
         {
           ...account,
+          status,
           lastErrorCode,
           lastErrorUserMessage,
         },

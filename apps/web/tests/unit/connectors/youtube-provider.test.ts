@@ -161,6 +161,68 @@ describe('YouTube Library provider', () => {
     expect(page?.videos).toHaveLength(1);
   });
 
+  it('counts a mismatched-channel video as skipped once', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/channels')) {
+        return jsonResponse({
+          items: [
+            {
+              id: 'channel-1',
+              snippet: { title: 'Artist channel' },
+              contentDetails: { relatedPlaylists: { uploads: 'uploads-1' } },
+            },
+          ],
+        });
+      }
+      if (url.pathname.endsWith('/playlistItems')) {
+        return jsonResponse({
+          items: [
+            { contentDetails: { videoId: 'owned-1' } },
+            { contentDetails: { videoId: 'foreign-1' } },
+            { contentDetails: { videoId: 'gone-1' } },
+          ],
+        });
+      }
+      return jsonResponse({
+        items: [
+          {
+            id: 'owned-1',
+            snippet: {
+              channelId: 'channel-1',
+              title: 'Owned',
+              publishedAt: '2026-08-01T00:00:00.000Z',
+              thumbnails: {},
+            },
+            contentDetails: { duration: 'PT1M' },
+            status: { privacyStatus: 'public' },
+          },
+          {
+            id: 'foreign-1',
+            snippet: {
+              channelId: 'channel-other',
+              title: 'Foreign',
+              publishedAt: '2026-08-01T00:00:00.000Z',
+              thumbnails: {},
+            },
+            contentDetails: { duration: 'PT1M' },
+            status: { privacyStatus: 'public' },
+          },
+        ],
+      });
+    });
+    const provider = createYouTubeLibraryProvider({
+      accessToken: 'access-token',
+      fetcher,
+    });
+    const page = await provider.listChannelVideosPage?.('channel-1');
+    expect(page?.videos.map(video => video.videoId)).toEqual(['owned-1']);
+    expect(page?.skipped).toEqual([
+      { videoId: 'foreign-1', reason: 'wrong_channel' },
+      { videoId: 'gone-1', reason: 'missing_id' },
+    ]);
+  });
+
   it('fails closed when the authorized account does not own the channel', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({

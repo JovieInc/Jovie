@@ -178,6 +178,19 @@ describe('YouTube channel import', () => {
         localVideoCount: 2,
       }).state
     ).toBe('populated');
+    expect(
+      resolveYouTubeImportSurface({
+        accounts: [
+          {
+            ...base,
+            status: 'connected',
+            lastErrorCode: 'youtube_sync_failed',
+            lastErrorUserMessage: 'YouTube could not be imported.',
+          },
+        ],
+        cursor: cursor({ pageToken: 'page-3' }),
+      })
+    ).toMatchObject({ state: 'error', resumable: true });
   });
 
   it('returns disconnected when no authorized account exists', async () => {
@@ -277,6 +290,40 @@ describe('YouTube channel import', () => {
     expect(saved.at(-1)).toMatchObject({
       pageToken: 'page-4',
       lastErrorCode: 'youtube_quota_limited',
+    });
+    expect(store.markAccount).toHaveBeenCalledWith(
+      'account-1',
+      expect.not.objectContaining({ status: 'error' })
+    );
+
+    const { store: failedStore, saved: failedSaved } = createStore({
+      accounts: [account()],
+      cursor: cursor({
+        pageToken: 'page-5',
+        counts: { ...emptyYouTubeImportCounts(), imported: 12 },
+      }),
+    });
+    const failed = await importPage(
+      failedStore,
+      provider(
+        vi.fn(async () => {
+          throw new YouTubeProviderError('backend', 500, 'backendError');
+        })
+      )
+    );
+    expect(failed).toMatchObject({
+      state: 'error',
+      resumable: true,
+      counts: { imported: 12 },
+    });
+    expect(failedSaved.at(-1)).toMatchObject({
+      lastErrorCode: 'youtube_sync_failed',
+    });
+    expect(failedStore.markAccount).toHaveBeenCalledWith('account-1', {
+      lastErrorCode: 'youtube_sync_failed',
+      lastErrorUserMessage:
+        'YouTube could not be imported. Try again or reconnect the channel.',
+      status: 'error',
     });
   });
 });

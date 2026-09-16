@@ -5,7 +5,7 @@ import { serverFetch } from '@/lib/http/server-fetch';
 import { parseYouTubeDuration } from '@/lib/youtube/metadata';
 import type {
   YouTubeChannelVideo,
-  YouTubeChannelVideosPage,
+  YouTubeImportSkip,
   YouTubeLibraryProvider,
   YouTubeMetricWindow,
   YouTubeVideoMetrics,
@@ -306,7 +306,7 @@ export function createYouTubeLibraryProvider(input: {
         fetcher,
         'YouTube uploads page'
       );
-      const skipped: YouTubeChannelVideosPage['skipped'] = [];
+      const skipped: YouTubeImportSkip[] = [];
       const ids: string[] = [];
       for (const item of playlist.items ?? []) {
         const videoId = item.contentDetails?.videoId?.trim();
@@ -327,11 +327,13 @@ export function createYouTubeLibraryProvider(input: {
         );
         for (const item of data.items ?? []) {
           const video = toChannelVideo(item, channelId);
+          const videoId = item.id?.trim() || null;
           if (!video) {
             skipped.push({
-              videoId: item.id?.trim() || null,
+              videoId,
               reason: 'wrong_channel',
             });
+            if (videoId) found.add(videoId);
             continue;
           }
           found.add(video.videoId);

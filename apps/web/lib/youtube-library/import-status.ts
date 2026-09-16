@@ -115,7 +115,13 @@ export function parseYouTubeImportCursor(
     'failed',
     'updated',
   ] as const;
-  const parsed = emptyYouTubeImportCounts();
+  const parsed: {
+    discovered: number;
+    imported: number;
+    skipped: number;
+    failed: number;
+    updated: number;
+  } = emptyYouTubeImportCounts();
   for (const key of keys) {
     const raw = counts[key];
     if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0)
@@ -188,7 +194,9 @@ export function resolveYouTubeImportSurface(input: {
     counts: emptyYouTubeImportCounts(),
     reasons: [],
   };
-  const connected = input.accounts.filter(row => row.status === 'connected');
+  const connected = input.accounts.filter(
+    row => row.status === 'connected' || row.status === 'error'
+  );
   if (connected.length > 1) {
     return {
       ...empty,
@@ -236,7 +244,7 @@ export function resolveYouTubeImportSurface(input: {
   if (account.lastErrorCode === 'youtube_quota_limited') {
     return { ...base, state: 'quota-limited', resumable };
   }
-  if (account.status === 'error') {
+  if (account.status === 'error' || account.lastErrorCode) {
     return { ...base, state: 'error', resumable };
   }
   if (resumable) return { ...base, state: 'partial', resumable: true };
